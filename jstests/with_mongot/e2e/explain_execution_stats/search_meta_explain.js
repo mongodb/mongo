@@ -5,7 +5,7 @@
  * ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {verifyE2ESearchMetaExplainOutput} from "jstests/with_mongot/e2e/lib/explain_utils.js";
+import {verifyE2ESearchMetaExplainOutput} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();

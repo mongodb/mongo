@@ -8,7 +8,7 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     generateRandomVectorEmbedding,
     verifyE2EVectorSearchExplainOutput,
-} from "jstests/with_mongot/e2e/lib/explain_utils.js";
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();

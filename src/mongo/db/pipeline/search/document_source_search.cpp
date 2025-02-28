@@ -39,7 +39,9 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
+#include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
+#include "mongo/db/views/resolved_view.h"
 
 namespace mongo {
 
@@ -69,9 +71,18 @@ Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
         // When serializing $search, we only need to serialize the full mongot remote spec when
         // in a sharded scenario (i.e., when we have a metadata merge protocol verison), regardless
         // of whether we're on a router or a data-bearing node. Otherwise, we only need the mongot
-        // query.
         if (_spec.getMetadataMergeProtocolVersion().has_value()) {
             MutableDocument spec{Document(_spec.toBSON())};
+            // TODO SERVER-100566 inspect vectorSearch directly to see if it contains a view name
+            // data member store, skip inspecting the expCtx.
+            if (auto viewName = pExpCtx->getViewNSForMongotIndexedView()) {
+                MongotQueryOnShardedView view;
+                view.setViewNss(*pExpCtx->getViewNSForMongotIndexedView());
+                auto resolvedNamespace =
+                    pExpCtx->getResolvedNamespace(*pExpCtx->getViewNSForMongotIndexedView());
+                view.setEffectivePipeline(resolvedNamespace.pipeline);
+                spec["view"] = Value(view.toBSON());
+            }
             return Value(Document{{getSourceName(), spec.freezeToValue()}});
         }
     }
@@ -86,7 +97,6 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
             str::stream() << "$search value must be an object. Found: " << typeName(elem.type()),
             elem.type() == BSONType::Object);
     auto specObj = elem.embeddedObject();
-
     // If kMongotQueryFieldName is present, this is the case that we re-create the
     // DocumentSource from a serialized DocumentSourceSearch that was originally parsed on a
     // router.
@@ -98,6 +108,14 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
         specObj.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)
         ? InternalSearchMongotRemoteSpec::parse(IDLParserContext(kStageName), specObj)
         : InternalSearchMongotRemoteSpec(specObj.getOwned());
+    // TODO SERVER-100566 store view info directly on $search.
+    if (auto view = spec.getView()) {
+        auto resolvedView =
+            ResolvedView{expCtx->getNamespaceString(), view->getEffectivePipeline(), BSONObj()};
+        search_helpers::addResolvedNamespaceForSearch(view->getViewNss(), resolvedView, expCtx);
+    }
+
+
     return make_intrusive<DocumentSourceSearch>(expCtx, std::move(spec));
 }
 

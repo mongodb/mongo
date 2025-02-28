@@ -34,6 +34,24 @@ imports:
   - "mongo/db/pipeline/visitors/docs_needed_bounds.idl"
 
 structs:
+  MongotQueryOnShardedView:
+      description: "If the query is on a sharded view, mongos will use this struct to serialize the view information before sending the requests to the shards."
+      strict: true
+      fields:
+          viewNss: 
+              description: >-
+                  Atlas requires just the name of the view. However, when mongos serializes the view information, 
+                  we need to include the entire NSS in order to add the corresponding view pipeline to the 
+                  resolvedNamespaces dict on the expression context.
+              type: namespacestring
+              optional: false           
+          effectivePipeline:
+              description: >-
+                  An array of agg stages gathered from the current and associated views. 
+                  This field is only required for createSearchIndexes commands, though 
+                  it is being added to all search index command requests for easier debugability.
+              type: array<object>
+              optional: false
   InternalSearchMongotRemoteSpec:
     description: Specification for a $_internalSearchMongotRemote stage given in the full, explicit format.
     # Because the specification is internal only, we permit extra fields. This avoids some upgrade/downngrade
@@ -79,3 +97,9 @@ structs:
         description: Bounds to describe the minimum and maximum number of documents needed from mongot to satisfy the overall query.
         optional: true
         type: DocsNeededBounds
+      view:
+        description: >-
+          For requests on views over sharded collections, mongos must serialize the view NSS, the view name and pipeline as part of
+          the mongot stage.
+        optional: true
+        type: MongotQueryOnShardedView

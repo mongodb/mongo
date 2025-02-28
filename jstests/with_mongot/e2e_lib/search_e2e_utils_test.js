@@ -6,7 +6,7 @@ import {
     defaultFuzzingStrategy,
     defaultTolerancePercentage,
     FuzzingStrategy,
-} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
+} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 function assertResultsExpectedFuzzyTest() {
     // Helper function for testing when an assertion within 'assertResultsExpectedFuzzy()' function

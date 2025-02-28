@@ -88,12 +88,14 @@ BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, Comman
     const auto [collUUID, resolvedNss, viewName, viewPipeline] =
         retrieveCollectionUUIDAndResolveViewOrThrow(opCtx, cmd);
 
+    // Run the search index command against the remote search index management server.
+    auto searchIndexManagerResponse = getSearchIndexManagerResponse(
+        opCtx, resolvedNss, collUUID, cmd.toBSON(), viewName, viewPipeline);
+
     search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(
         opCtx, resolvedNss, cmd.toBSON(), viewName, viewPipeline);
 
-    // Run the search index command against the remote search index management server.
-    return getSearchIndexManagerResponse(
-        opCtx, resolvedNss, collUUID, cmd.toBSON(), viewName, viewPipeline);
+    return searchIndexManagerResponse;
 }
 
 }  // namespace

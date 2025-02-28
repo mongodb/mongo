@@ -13,7 +13,7 @@ import {
     assertUnionWithSearchPipelinesApplyViews,
     assertViewAppliedCorrectly,
     extractUnionWithSubPipelineExplainOutput
-} from "jstests/with_mongot/e2e/lib/explain_utils.js";
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const bestPictureColl = db["best_picture"];
 const bestActressColl = db["best_actress"];
@@ -77,7 +77,7 @@ let explain = bestActressView.explain().aggregate(pipeline);
  * stages.
  */
 assertUnionWithSearchPipelinesApplyViews(
-    explain.stages, bestActressViewPipeline, bestPicturesViewPipeline);
+    explain, bestActressViewPipeline, bestPicturesViewPipeline);
 
 let expectedResults = [
     {
@@ -118,7 +118,7 @@ pipeline = [
  */
 createSearchIndex(bestPictureColl,
                   {name: "bestPicture", definition: {"mappings": {"dynamic": true}}});
-explain = bestActressView.explain().aggregate(pipeline).stages;
+explain = bestActressView.explain().aggregate(pipeline);
 // Only the outer collection is a view, and this call will confirm that the top-level search
 // contains the view in idLookup.
 assertViewAppliedCorrectly(explain, pipeline, bestActressViewPipeline);
@@ -159,8 +159,8 @@ pipeline = [
     {$unionWith: {coll: bestPictureView.getName(), pipeline: unionWithSubPipe}}
 ];
 // Confirm $unionWith.$search subpipeline applies the view stages during idLookup.
-explain = bestActressColl.explain().aggregate(pipeline).stages;
-let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain);
+explain = bestActressColl.explain().aggregate(pipeline);
+let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain.stages);
 assertViewAppliedCorrectly(unionWithSubPipeExplain, unionWithSubPipe, bestPicturesViewPipeline);
 
 expectedResults = [

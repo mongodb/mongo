@@ -143,26 +143,4 @@ testMergeAtLocation("localOnly", testColl, false, 3);
 testMergeAtLocation("localOnly", testColl, false, 5);
 testMergeAtLocation("localOnly", testColl, false, 10);
 
-// Repeat, but the collection is a view.
-testDB.createView(
-    collName + "viewColl", testColl.getName(), [{$vectorSearch: vectorSearchQuery}], {});
-let viewColl = testDB.getCollection(collName + "viewColl");
-
-testMergeAtLocation(routerMergeType, viewColl, true);
-testMergeAtLocation(routerMergeType, viewColl, true, 3);
-testMergeAtLocation(routerMergeType, viewColl, true, 5);
-testMergeAtLocation(routerMergeType, viewColl, true, 10);
-testMergeAtLocation("anyShard", viewColl, true);
-testMergeAtLocation("anyShard", viewColl, true, 3);
-testMergeAtLocation("anyShard", viewColl, true, 5);
-testMergeAtLocation("anyShard", viewColl, true, 10);
-testMergeAtLocation(owningShardMerge, viewColl, true);
-testMergeAtLocation(owningShardMerge, viewColl, true, 3);
-testMergeAtLocation(owningShardMerge, viewColl, true, 5);
-testMergeAtLocation(owningShardMerge, viewColl, true, 10);
-testMergeAtLocation("localOnly", viewColl, true);
-testMergeAtLocation("localOnly", viewColl, true, 3);
-testMergeAtLocation("localOnly", viewColl, true, 5);
-testMergeAtLocation("localOnly", viewColl, true, 10);
-
 stWithMock.stop();

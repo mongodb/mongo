@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional.hpp>
 #include <memory>
 #include <string>
 
@@ -64,6 +65,7 @@ namespace {
 class ShardSvrRunSearchIndexCommand : public TypedCommand<ShardSvrRunSearchIndexCommand> {
 public:
     using Request = ShardsvrRunSearchIndex;
+    using Response = ShardsvrRunSearchIndexCommandReply;
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
@@ -82,33 +84,54 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {
-            auto cmd = request();
+        Response typedRun(OperationContext* opCtx) {
+            auto& cmd = request();
             generic_argument_util::prepareRequestForSearchIndexManagerPassthrough(cmd);
-
+            Response res;
             // TODO SERVER-98535 remove and replace with better way to identify if mongot mock is
             // running.
             if (globalSearchIndexParams.host.empty()) {
-                return;
+                return res;
             }
-
             auto alreadyInformedMongot = cmd.getMongotAlreadyInformed();
-            if (globalSearchIndexParams.host == alreadyInformedMongot) {
+            bool cmdIsListSearchIx = std::string(cmd.getUserCmd().firstElement().fieldName())
+                                         .compare("$listSearchIndexes") == 0;
+            // mongos executes $listSearchIndexes on all hosts after multicasting the initial
+            // create/update command, to ensure the initial command has completed and the index is
+            // queryable. Therefore we want to allow running $listSearchIndexes on the shared mongot
+            // in order to help ensure the index is queryable on all mongots.
+            if (globalSearchIndexParams.host == alreadyInformedMongot && !cmdIsListSearchIx) {
                 // This mongod shares its mongot with a mongos that originally received the user's
                 // search index command. We therefore can return early as this mongod's mongot has
-                // already been issued the search index command.
-                return;
+                // already been issued the create, drop, or update, search index command.
+                res.setOk(1);
+                return res;
             }
 
             auto catalog = CollectionCatalog::get(opCtx);
             auto resolvedNamespace = cmd.getResolvedNss();
+            boost::optional<NamespaceString> viewNss = boost::none;
+            boost::optional<std::vector<BSONObj>> viewPipeline = boost::none;
+
+            if (cmd.getView()) {
+                viewNss = boost::make_optional(cmd.getView()->getViewNss());
+                viewPipeline = boost::make_optional(cmd.getView()->getEffectivePipeline());
+            }
+
 
             BSONObj manageSearchIndexResponse =
                 getSearchIndexManagerResponse(opCtx,
                                               resolvedNamespace,
                                               *catalog->lookupUUIDByNSS(opCtx, resolvedNamespace),
                                               cmd.getUserCmd(),
-                                              cmd.getViewName());
+                                              viewNss,
+                                              viewPipeline);
+
+            auto searchIdxResp = SearchIndexManagerResponse::parse(
+                IDLParserContext("_shardsvrRunSearchIndexCommand"), manageSearchIndexResponse);
+            res.setSearchIndexManagerResponse(searchIdxResp);
+            res.setOk(1.0);
+            return res;
         }
 
     private:

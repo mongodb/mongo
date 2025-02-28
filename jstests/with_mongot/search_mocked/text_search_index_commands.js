@@ -7,6 +7,8 @@ import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.j
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
+// TODO SERVER-98535 reenable once we have solid way of identifying when the mock is running or not
+quit();
 const dbName = jsTestName();
 const shardedCollName = "testColl";
 const unshardedCollName = shardedCollName + "_unsharded";

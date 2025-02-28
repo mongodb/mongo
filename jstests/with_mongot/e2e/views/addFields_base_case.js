@@ -11,7 +11,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
+import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
@@ -45,7 +45,7 @@ let pipeline = [{
         }
     }
 }];
-let explain = assert.commandWorked(addFieldsView.explain().aggregate(pipeline)).stages;
+let explain = assert.commandWorked(addFieldsView.explain().aggregate(pipeline));
 // Make sure view transform is last stage of the pipeline.
 assertViewAppliedCorrectly(explain, pipeline, viewPipeline);
 
@@ -74,19 +74,17 @@ pipeline = [
     },
     {$project: {pop: 1, _id: 1}}
 ];
-explain = assert.commandWorked(addFieldsView.explain().aggregate(pipeline)).stages;
+explain = assert.commandWorked(addFieldsView.explain().aggregate(pipeline));
 // Ensure view pipeline is directly after $search stages and before the rest of the user pipeline.
 assertViewAppliedCorrectly(explain, pipeline, viewPipeline);
 
 // Test a non-search query on a view indexed by mongot and ensure view transforms are correctly
 // applied.
 pipeline = [{$match: {pop: {$gt: 4}}}];
-let explainResults =
-    assert.commandWorked(addFieldsView.explain().aggregate(pipeline)).command.pipeline;
-
+let explainResults = assert.commandWorked(addFieldsView.explain().aggregate(pipeline));
 // This utility function will validate that the user pipeline was appended to end of the view
 // pipeline.
-assertViewAppliedCorrectly(explainResults, pipeline, viewPipeline);
+assertViewAppliedCorrectly(explainResults.command.pipeline, pipeline, viewPipeline);
 
 expectedResults = [
     {"_id": "New York", "state": "NY", "pop": 7},

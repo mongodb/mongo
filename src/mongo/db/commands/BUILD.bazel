@@ -111,6 +111,22 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "shardsvr_run_search_index_command_idl",
+    srcs = [
+        ":shardsvr_run_search_index_command_gen",
+    ],
+    hdrs = [
+        "//src/mongo/db/auth:authorization_contract.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
 idl_generator(
     name = "shardsvr_resolve_view_command_gen",
     src = "shardsvr_resolve_view_command.idl",
@@ -1126,7 +1142,6 @@ mongo_cc_library(
         ":parameters_gen",
         ":sessions_commands_gen",
         ":shardsvr_resolve_view_command_gen",
-        ":shardsvr_run_search_index_command_gen",
     ],
     hdrs = [
         "fle2_compact.h",
@@ -1135,6 +1150,7 @@ mongo_cc_library(
     ],
     deps = [
         ":server_status_core",
+        ":shardsvr_run_search_index_command_idl",
         ":test_commands_enabled",
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/crypto:fle_crypto",

@@ -4,8 +4,10 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+// TODO SERVER-100355 remove import
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewNotApplied} from "jstests/with_mongot/e2e/lib/explain_utils.js";
+import {assertViewNotApplied} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
@@ -69,7 +71,7 @@ let pipeline = [
 ];
 
 let explain = addFieldsView.explain().aggregate(pipeline);
-assertViewNotApplied(explain.stages, viewPipeline);
+assertViewNotApplied(explain, viewPipeline);
 
 let expectedResults = [
     {
@@ -99,14 +101,17 @@ let expectedResults = [
 let results = addFieldsView.aggregate(pipeline).toArray();
 assertArrayEq({actual: results, expected: expectedResults});
 
-// Make sure if storedSource query is part of a inner subpipeline, the view transforms aren't
-// applied by mongod.
-const baseColl = testDb.baseColl;
-baseColl.drop();
-assert.commandWorked(
-    baseColl.insertMany([{state: "AK"}, {state: "CA"}, {state: "NY"}, {state: "NJ"}]));
+// TODO SERVER-100355 the below aggregation should always run once we support mongot queries in
+// subpipelines on sharded, mongot-indexed views.
+if (!FixtureHelpers.isSharded(coll)) {
+    // Make sure if storedSource query is part of a inner subpipeline, the view transforms aren't
+    // applied by mongod.
+    const baseColl = testDb.baseColl;
+    baseColl.drop();
+    assert.commandWorked(
+        baseColl.insertMany([{state: "AK"}, {state: "CA"}, {state: "NY"}, {state: "NJ"}]));
 
-let storedSourceAsSubPipe = [
+    let storedSourceAsSubPipe = [
     {
         $lookup: {
             from: viewName,
@@ -117,38 +122,39 @@ let storedSourceAsSubPipe = [
         }
     }, {$project: {_id: 0, "state_facts.state": 0}}
 ];
-explain = baseColl.explain().aggregate(storedSourceAsSubPipe);
-assertViewNotApplied(explain.stages, viewPipeline);
+    explain = baseColl.explain().aggregate(storedSourceAsSubPipe);
+    assertViewNotApplied(explain, viewPipeline);
 
-expectedResults = [
-    {
-        state: "AK",
-        state_facts:
-            [{pop: 3000000, facts: {state_motto: "Regnat Populus", official_state_colors: []}}]
-    },
-    {
-        state: "CA",
-        state_facts: [
-            {pop: 39000000,
-             facts: {state_motto: "Eureka", official_state_colors: ["blue", "gold"]}}
-        ]
-    },
-    {
-        state: "NY",
-        state_facts: [{pop: 19000000, facts: {state_motto: "Excelsior", official_state_colors: []}}]
-    },
-    {
-        state: "NJ",
-        state_facts: [{
-            pop: 9000000,
-            facts: {
-                state_motto: "Liberty and Prosperity",
-                official_state_colors: ["jersey blue", "bluff"]
-            }
-        }]
-    }
-];
-results = baseColl.aggregate(storedSourceAsSubPipe).toArray();
-assertArrayEq({actual: results, expected: expectedResults});
-
+    expectedResults = [
+        {
+            state: "AK",
+            state_facts:
+                [{pop: 3000000, facts: {state_motto: "Regnat Populus", official_state_colors: []}}]
+        },
+        {
+            state: "CA",
+            state_facts: [{
+                pop: 39000000,
+                facts: {state_motto: "Eureka", official_state_colors: ["blue", "gold"]}
+            }]
+        },
+        {
+            state: "NY",
+            state_facts:
+                [{pop: 19000000, facts: {state_motto: "Excelsior", official_state_colors: []}}]
+        },
+        {
+            state: "NJ",
+            state_facts: [{
+                pop: 9000000,
+                facts: {
+                    state_motto: "Liberty and Prosperity",
+                    official_state_colors: ["jersey blue", "bluff"]
+                }
+            }]
+        }
+    ];
+    results = baseColl.aggregate(storedSourceAsSubPipe).toArray();
+    assertArrayEq({actual: results, expected: expectedResults});
+}
 dropSearchIndex(addFieldsView, {name: "storedSourceIx"});

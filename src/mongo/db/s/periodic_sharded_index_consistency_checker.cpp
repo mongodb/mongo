@@ -207,6 +207,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                                 LiteParsedPipeline{request},
                                 PrivilegeVector(),
                                 cri,
+                                boost::none /* ResolvedView */,
                                 boost::none /* verbosity */,
                                 &responseBuilder);
 

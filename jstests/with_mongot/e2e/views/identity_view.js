@@ -4,8 +4,10 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+// TODO SERVER-100355 remove import
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
+import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const localColl = testDb.localColl;
@@ -57,37 +59,43 @@ let searchQuery = {
         }
     }
 };
+// TODO SERVER-100355 the below aggregation should always run once we support mongot queries in
+// subpipelines on sharded, mongot-indexed views.
+if (!FixtureHelpers.isSharded(localColl)) {
+    let lookupPipeline = [{
+        $lookup: {
+            from: identityView.getName(),
+            localField: "_id",
+            foreignField: "state",
+            pipeline: [
+                searchQuery,
+                {$sort : {city: 1}},
+                {$project: {_id: 0}}],
+                as: "stateFacts"
+            }
+        },
+        {$sort: {_id: 1}},
+        {$project: {"stateFacts.state": 0}}
+    ];
 
-let lookupPipeline = [{
-    $lookup: {
-        from: identityView.getName(),
-        localField: "_id",
-        foreignField: "state",
-        pipeline: [
-            searchQuery,
-            {$sort : {city: 1}},
-            {$project: {_id: 0}}],
-            as: "stateFacts"
-        }
-    },
-    {$sort: {_id: 1}},
-    {$project: {"stateFacts.state": 0}}
-];
-
-let expectedResults = [
-    {
-        _id: "California",
-        stateFacts: [
-            {city: "Berkeley"},
-            {city: "Oakland", sportsTeam: "Golden State Valkyries", pop: 6},
-            {city: "Richmond", pop: 4}
-        ]
-    },
-    {_id: "Kansas", stateFacts: [{city: "Kansas City", sportsTeam: "KC Current"}]},
-    {_id: "Missouri", stateFacts: [{city: "St Louis", sportsTeam: "St Louis Slam"}]},
-    {_id: "New Jersey", stateFacts: [{city: "Harrison", sportsTeam: "NJ/NY Gotham FC", pop: 5}]},
-    {_id: "New York", stateFacts: [{city: "New York", sportsTeam: "NY Liberty", pop: 7}]}
-];
-let results = localColl.aggregate(lookupPipeline).toArray();
-assert.eq(results, expectedResults);
+    let expectedResults = [
+        {
+            _id: "California",
+            stateFacts: [
+                {city: "Berkeley"},
+                {city: "Oakland", sportsTeam: "Golden State Valkyries", pop: 6},
+                {city: "Richmond", pop: 4}
+            ]
+        },
+        {_id: "Kansas", stateFacts: [{city: "Kansas City", sportsTeam: "KC Current"}]},
+        {_id: "Missouri", stateFacts: [{city: "St Louis", sportsTeam: "St Louis Slam"}]},
+        {
+            _id: "New Jersey",
+            stateFacts: [{city: "Harrison", sportsTeam: "NJ/NY Gotham FC", pop: 5}]
+        },
+        {_id: "New York", stateFacts: [{city: "New York", sportsTeam: "NY Liberty", pop: 7}]}
+    ];
+    let results = localColl.aggregate(lookupPipeline).toArray();
+    assert.eq(results, expectedResults);
+}
 dropSearchIndex(identityView, {name: "identityViewIx"});

@@ -5,12 +5,12 @@
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {getRentalData, getRentalSearchIndexSpec} from "jstests/with_mongot/e2e/lib/data/rentals.js";
+import {getRentalData, getRentalSearchIndexSpec} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 import {
     assertDocArrExpectedFuzzy,
     buildExpectedResults,
     datasets,
-} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
+} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const collName = "search_rank_fusion";
 const coll = db.getCollection(collName);

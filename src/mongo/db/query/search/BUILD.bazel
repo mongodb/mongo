@@ -145,6 +145,7 @@ mongo_cc_library(
         "search_index_command_testing_helper.h",
     ],
     deps = [
+        "//src/mongo/db/commands:shardsvr_run_search_index_command_idl",
         "//src/mongo/executor:async_multicaster",
     ],
 )

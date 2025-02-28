@@ -40,6 +40,7 @@
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/views/resolved_view.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -115,8 +116,23 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
 
     // We don't want router to make a remote call to mongot even though it can generate explain
     // output.
-    if (!opts.isSerializingForExplain() || pExpCtx->getInRouter()) {
-        return Value(Document{{kStageName, _originalSpec}});
+    if (!opts.verbosity || pExpCtx->getInRouter()) {
+        MutableDocument spec{Document(_originalSpec)};
+        // If the request is on a view, include the view information when mongos is serializing the
+        // query to the shards, but do not include in explain output for this stage as the view
+        // information will be present in $_internalSearchIdLookup and thus would be redundant.
+        if (!opts.verbosity && pExpCtx->getInRouter()) {
+            // TODO SERVER-100566 inspect vectorSearch to see if it contains a view name data member
+            // and skip inspecting the expCtx.
+            if (auto viewName = pExpCtx->getViewNSForMongotIndexedView()) {
+                MongotQueryOnShardedView view;
+                view.setViewNss(*viewName);
+                auto resolvedNamespace = pExpCtx->getResolvedNamespace(*viewName);
+                view.setEffectivePipeline(resolvedNamespace.pipeline);
+                spec["view"] = Value(view.toBSON());
+            }
+        }
+        return Value(Document{{kStageName, spec.freezeToValue()}});
     }
 
     // If the query is an explain that executed the query, we obtain the explain object from the
@@ -127,13 +143,19 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
         explainResponse = _cursor->getCursorExplain();
     }
 
+    auto explainSpec = _originalSpec;
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
+        // If the request was on a view over a sharded collection, _originalSpec will include the
+        // view field. Remove it from explain output as it will be included in $_internalIdLookup
+        // and thus redundant.
+        if (explainSpec.hasField("view")) {
+            explainSpec = explainSpec.removeField("view");
+        }
         return search_helpers::getVectorSearchExplainResponse(
-            pExpCtx, _originalSpec, _taskExecutor.get());
+            pExpCtx, explainSpec, _taskExecutor.get());
     });
 
-    auto explainObj =
-        _originalSpec.addFields(BSON("explain" << opts.serializeLiteral(explainInfo)));
+    auto explainObj = explainSpec.addFields(BSON("explain" << opts.serializeLiteral(explainInfo)));
 
     // Redact queryVector (embeddings field) if it exists to avoid including all
     // embeddings values and keep explainObj data concise.
@@ -222,6 +244,16 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
             str::stream() << kStageName
                           << " value must be an object. Found: " << typeName(elem.type()),
             elem.type() == BSONType::Object);
+
+    auto spec = elem.embeddedObject();
+    // TODO SERVER-100566 store view name directly on $vectorSearch.
+    if (spec.hasField("view") && spec["view"].type() == BSONType::Object) {
+        auto view = MongotQueryOnShardedView::parse(
+            IDLParserContext("unpack MongotQueryOnShardedView"), spec["view"].embeddedObject());
+        auto resolvedView =
+            ResolvedView{expCtx->getNamespaceString(), view.getEffectivePipeline(), BSONObj()};
+        search_helpers::addResolvedNamespaceForSearch(view.getViewNss(), resolvedView, expCtx);
+    }
 
     auto serviceContext = expCtx->getOperationContext()->getServiceContext();
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {

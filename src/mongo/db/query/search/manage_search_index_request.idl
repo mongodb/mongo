@@ -34,15 +34,18 @@ imports:
 
 structs:
     SearchIndexRequestView:
-        description: "If the query is on a view, the request to mongot will include this struct that contains the name of the view and the effective pipeline"
+        description: "If the index command is on a view, the request to mongot will include this struct that contains the name of the view and the effective pipeline"
         strict: true
         fields:
             name:
                 description: "The name of the view"
                 type: string
-                optional: false
+                optional: false          
             effectivePipeline:
-                description: "An array of pipelines gathered from the current and associated views. This field is only required for createSearchIndexes commands, though it is being added to all search index command requests for easier debugability."
+                description: >-
+                    An array of agg stages gathered from the current and associated views. 
+                    This field is only required for createSearchIndexes commands, though 
+                    it is being added to all search index command requests for easier debugability.
                 type: array<object>
                 optional: true
     ManageSearchIndexRequest:

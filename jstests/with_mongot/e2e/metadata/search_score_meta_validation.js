@@ -8,7 +8,7 @@ import {
     getMoviePlotEmbeddingById,
     getMovieVectorSearchIndexSpec,
     makeMovieVectorQuery
-} from "jstests/with_mongot/e2e/lib/data/movies.js";
+} from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const coll = db.search_score_meta_validation;
 coll.drop();

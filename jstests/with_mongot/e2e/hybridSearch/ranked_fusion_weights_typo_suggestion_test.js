@@ -10,7 +10,7 @@
 import {
     getMovieData,
     getMovieSearchIndexSpec,
-} from "jstests/with_mongot/e2e/lib/data/movies.js";
+} from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);

@@ -110,38 +110,20 @@ function _runListSearchIndexOnNode(
         return;
     }
 
-    assert.soon(() => testColl.aggregate([{$listSearchIndexes: {name}}]).toArray()[0]["queryable"]);
+    assert.soon(() => {
+        searchIndexArray = testColl.aggregate([{$listSearchIndexes: {name}}]).toArray();
+        if (searchIndexArray[0]["queryable"]) {
+            if (latestDefinition == null) {
+                return true;
+            }
+            return bsonWoCompare(searchIndexArray[0].latestDefinition, latestDefinition) === 0;
+        }
+    });
 }
 
 function runListSearchIndexHelper(coll, keys, blockOnIndexQueryable, latestDefinition) {
     // Please see block comment at the top of this file to understand the sharded implementation.
-    if (isShardedHelper(coll)) {
-        let topology = DiscoverTopology.findConnectedNodes(coll.getDB().getMongo());
-        if (isShardedView(coll)) {
-            // if its a view, run listSearchIndexe on view
-            topology.mongos.nodes.forEach((node) => {
-                let sconn = new Mongo(node);
-                // To ensure we return the initial response from calling the specified search index
-                // command (in this case create), we do not modify response here with these
-                // listSearchIndex calls on a specified host.
-                _runListSearchIndexOnNode(
-                    coll, keys, blockOnIndexQueryable, sconn, latestDefinition);
-            });
-        } else {
-            // Call $listSearchIndex on every mongod to ensure the create command was propogated to
-            // each mongod (and therefore to each mongot).
-            for (const shardName of Object.keys(topology.shards)) {
-                topology.shards[shardName].nodes.forEach((node) => {
-                    let sconn = new Mongo(node);
-                    // To ensure we return the initial response from calling the specified search
-                    // index command (in this case create), we do not modify response here with
-                    // these listSearchIndex calls on a specified host.
-                    _runListSearchIndexOnNode(
-                        coll, keys, blockOnIndexQueryable, sconn, latestDefinition);
-                });
-            }
-        }
-    } else {
+    if (!isShardedHelper(coll)) {
         // To ensure we return the initial response from calling the specified search index command
         // (in this case create), we do not modify response here with this listSearchIndex call.
         _runListSearchIndexOnNode(coll, keys, blockOnIndexQueryable, null, latestDefinition);

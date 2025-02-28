@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 
+#include "mongo/db/query/search/search_index_command_testing_helper.h"
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
 #include <boost/optional/optional.hpp>
@@ -38,7 +39,10 @@ namespace mongo {
 namespace {
 // Whereas create/update/drop search index commands throw if the collection doesn't exist,
 // $listSearchIndexes just returns 0 documents.
-std::tuple<boost::optional<UUID>, const NamespaceString, boost::optional<NamespaceString>>
+std::tuple<boost::optional<UUID>,
+           const NamespaceString,
+           boost::optional<NamespaceString>,
+           boost::optional<std::vector<BSONObj>>>
 retrieveCollectionUUIDAndResolveView(const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     auto* opCtx = pExpCtx->getOperationContext();
     // TLDR: on mongod, pass the viewName saved to expCtx. On mongos, pass the NSS saved to
@@ -61,6 +65,7 @@ retrieveCollectionUUIDAndResolveView(const boost::intrusive_ptr<ExpressionContex
     // the current NS.
     auto sourceCollectionNss = currentOperationNss;
     boost::optional<NamespaceString> viewNss;
+    boost::optional<std::vector<BSONObj>> viewPipeline;
     boost::optional<UUID> collUUID = collUUIDResolvedViewPair.first;
     if (auto resolvedView = collUUIDResolvedViewPair.second) {
         uassert(
@@ -74,9 +79,10 @@ retrieveCollectionUUIDAndResolveView(const boost::intrusive_ptr<ExpressionContex
         // NS and the namespace on resolvedView refers to the underlying source collection.
         sourceCollectionNss = resolvedView.value().getNamespace();
         viewNss.emplace(currentOperationNss);
+        viewPipeline.emplace(resolvedView.value().getPipeline());
     }
 
-    return std::make_tuple(collUUID, sourceCollectionNss, viewNss);
+    return std::make_tuple(collUUID, sourceCollectionNss, viewNss, viewPipeline);
 }
 }  // namespace
 
@@ -149,7 +155,7 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     // We cannot use 'pExpCtx->getUUID()' like other aggregation stages, because this stage can run
     // directly on mongos. 'pExpCtx->getUUID()' will always be null on mongos.
     if (!_collectionUUID) {
-        std::tie(_collectionUUID, _resolvedNamespace, _viewName) =
+        std::tie(_collectionUUID, _resolvedNamespace, _viewName, _viewPipeline) =
             retrieveCollectionUUIDAndResolveView(pExpCtx);
     }
 
@@ -168,10 +174,12 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     if (_searchIndexes.empty()) {
         BSONObjBuilder bob;
         bob.append(kStageName, _cmdObj);
+        auto cmdBson = bob.done();
         // Sends a manageSearchIndex command and returns a cursor with index information.
-        BSONObj manageSearchIndexResponse = runSearchIndexCommand(
-            opCtx, *_resolvedNamespace, bob.done(), *_collectionUUID, _viewName);
-
+        BSONObj manageSearchIndexResponse =
+            runSearchIndexCommand(opCtx, *_resolvedNamespace, cmdBson, *_collectionUUID, _viewName);
+        search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(
+            opCtx, *_resolvedNamespace, cmdBson, _viewName, _viewPipeline);
         /**
          * 'mangeSearchIndex' returns a cursor with the following fields:
          * cursor: {

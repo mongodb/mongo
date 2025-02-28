@@ -7,8 +7,8 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieVectorSearchIndexSpec
-} from "jstests/with_mongot/e2e/lib/data/movies.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
+} from "jstests/with_mongot/e2e_lib/data/movies.js";
+import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const collName = "search_views";
 const coll = db.getCollection(collName);
@@ -34,7 +34,7 @@ let pipeline = [{
         "index": "moviesPlotIndex",
     }
 }];
-const explainResults = addFieldsView.explain().aggregate(pipeline)["stages"];
+const explainResults = addFieldsView.explain().aggregate(pipeline);
 // Assert $addFields is the last stage of the pipeline, which ensures that the view pipeline follows
 // the vectorSearch related stages (eg $_internalSearchMongotRemote, $_internalSearchIdLookup,
 // $vectorSearch)

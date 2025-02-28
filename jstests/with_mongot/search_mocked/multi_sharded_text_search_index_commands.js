@@ -7,6 +7,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {prepCollection} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
+// TODO SERVER-98535 reenable once we have solid way of identifying when the mock is running or not
+quit();
+
 const mongotMock = new MongotMock();
 mongotMock.start();
 const mockConn = mongotMock.getConnection();

@@ -306,22 +306,12 @@ testMergeAtLocation("localOnly", testColl, false);
 testMergeAtLocationSearchMeta(routerMergeType, testColl, false);
 testMergeAtLocationSearchMeta("anyShard", testColl, false);
 testMergeAtLocationSearchMeta(owningShardMerge, testColl, false);
-// Repeat, but the collection is a view.
-assert.commandWorked(
-    testDB.createView(collName + "viewColl", testColl.getName(), [{$search: mongotQuery}], {}));
-let viewColl = testDB.getCollection(collName + "viewColl");
-testMergeAtLocation(routerMergeType, viewColl, true);
-testMergeAtLocation("anyShard", viewColl, true);
-testMergeAtLocation(owningShardMerge, viewColl, true);
-testMergeAtLocation("localOnly", viewColl, true);
-
-assert(viewColl.drop());
 
 // Create a view that does not use $search. Verify that we can detect an invalid use of
 // $$SEARCH_META.
 assert.commandWorked(testDB.createView(
     collName + "viewColl", testColl.getName(), [{$match: {_id: {$gt: -1000}}}], {}));
-viewColl = testDB.getCollection(collName + "viewColl");
+let viewColl = testDB.getCollection(collName + "viewColl");
 testSearchMetaFailure(routerMergeType, viewColl, true);
 testSearchMetaFailure("anyShard", viewColl, true);
 testSearchMetaFailure(owningShardMerge, viewColl, true);

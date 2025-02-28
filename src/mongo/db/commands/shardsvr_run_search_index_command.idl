@@ -27,20 +27,105 @@
 #
 
 global:
-    cpp_namespace: 'mongo'
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
+
+structs:
+    MongotCursorResponse:
+        description: "This response from the cursor opened on mongot for a given search index command"
+        fields:
+            id:
+                type: int
+                optional: false
+            ns:
+                type: namespacestring
+                optional: false
+            firstBatch:
+                description: "array of BSONObjs where each element conveys the information of a single search index on mongot"
+                type: array<object_owned>
+                optional: false     
+    SearchIndexManagerResponse:
+        description: >-
+            The SearchIndexManager's response from running the search index command specified 
+            in shardsvrRunSearchIndexCommand.userCmd.
+        fields:
+            ok:
+                description: 'Result of the command execution.'
+                type: safeDouble
+                validator: { gte: 0.0, lte: 1.0 }
+                optional: false
+            cursor:
+                description: "Mongot responds with this field only for $listSearchIndexes"
+                type: MongotCursorResponse
+                optional: true
+            indexesCreated:
+                description: >-
+                    Mongot responds with this field only for createSearchindexes command.
+                type: array<object_owned>
+                optional: true
+    SearchIndexRequestOnShardedView:
+        description: >-
+            If the index command is on a view over a sharded collection, mongos will use this struct
+            to forward the view information that mongot requires of index commands, to the shards.
+        strict: true
+        fields:
+            viewNss:
+                description: "The view's namespace"
+                type: namespacestring
+                optional: false          
+            effectivePipeline:
+                description: >-
+                    An array of agg stages gathered from the current and associated views. 
+                    This field is only required for createSearchIndexes commands, though 
+                    it is being added to all search index command requests for easier debugability.
+                type: array<object_owned>
+                optional: false
+    ShardsvrRunSearchIndexCommandReply:
+        description: "The response that the shard returns to mongos upon receiving a response from the search index manager"
+        fields:
+            searchIndexManagerResponse:
+                type: SearchIndexManagerResponse
+                optional: true
+            ok:
+                description: 'Result of the command execution.'
+                type: safeDouble
+                validator: { gte: 0.0, lte: 1.0 }
+                optional: false
+            $configTime:
+                description: The time component that represents the config time.
+                type: timestamp
+                cpp_name: dollarConfigTime
+                optional: true
+            $topologyTime:
+                description: The time component that represents the topology time.
+                type: timestamp
+                cpp_name: dollarTopologyTime
+                optional: true
+            $clusterTime:
+                description: The time component that represents the cluster time.
+                type: ClusterTime
+                cpp_name: dollarClusterTime
+                optional: true
+            operationTime:
+                type: logicalTime
+                optional: true
+            
 
 commands:
     shardsvrRunSearchIndexCommand:
         command_name: _shardsvrRunSearchIndexCommand
         cpp_name: ShardsvrRunSearchIndex
-        description: "Command request for search index management host"
+        description: >-
+            This test-only command is used by mongos to replicate a search index command on all 
+            shards so they may forward said command to their coupled mongot. This is only required
+            for testing search index commands. Please see src/mongo/db/query/search/search_index_command_testing_helper.h 
+            for more details.
         namespace: ignored
         api_version: ""
         strict: true
-        reply_type: OkReply
+        reply_type: ShardsvrRunSearchIndexCommandReply
         fields:
             resolvedNss:
                 description: "collection name value."
@@ -50,11 +135,11 @@ commands:
                 description: "The original user search index command request."
                 type: object
                 optional: false
-            viewName:
-                description: >-
-                    If the command is being run on a view namespace, this field must be set to the 
-                    name of the view.
-                type: namespacestring
+            view:
+                description: >- 
+                    If the search index command is being run on a sharded view, mongos will use this field to forward the view 
+                    information required to issue an index command on mongot
+                type: SearchIndexRequestOnShardedView
                 optional: true
             # TODO SERVER-100553: Add an optional view struct that contains required fields viewName and effectivePipeline.
             mongotAlreadyInformed:

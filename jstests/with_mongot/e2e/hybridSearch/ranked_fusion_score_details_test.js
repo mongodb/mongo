@@ -11,7 +11,7 @@ import {
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
     getMovieVectorSearchIndexSpec
-} from "jstests/with_mongot/e2e/lib/data/movies.js";
+} from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const collName = "search_rank_fusion";
 const coll = db.getCollection(collName);

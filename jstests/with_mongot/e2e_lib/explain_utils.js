@@ -6,6 +6,9 @@ import {
     getAggPlanStages,
 } from "jstests/libs/query/analyze_plan.js";
 import {
+    checkSbeRestrictedOrFullyEnabled,
+} from "jstests/libs/query/sbe_util.js";
+import {
     validateMongotStageExplainExecutionStats,
     verifyShardsPartExplainOutput
 } from "jstests/with_mongot/common_utils.js";
@@ -26,7 +29,7 @@ function assertIdLookupContainsViewPipeline(explainStages, viewPipeline) {
     }
 }
 
-function assertToplevelAggContainsView(explainStages, viewPipeline) {
+export function assertToplevelAggContainsView(explainStages, viewPipeline) {
     for (let i = 0; i < viewPipeline.length; i++) {
         let stageName = Object.keys(viewPipeline[i])[0];
         assert(explainStages[i].hasOwnProperty(stageName));
@@ -37,27 +40,66 @@ function assertToplevelAggContainsView(explainStages, viewPipeline) {
  * If the top-level aggregation contains a mongot stage, it asserts that the view transforms are
  * contained in _idLookup's subpipeline.  If the top-level aggregation doesn't have a mongot stage,
  * it asserts that the view stages were applied to the beginning of the top-level pipeline.
- * @param {Array} explainStages The list of stages returned from explain().
+ * @param {Array} explainOutput The explain obj containing a list of stages returned from explain().
  * @param {Array} userPipeline The request/query that was run on the view.
  * @param {Object} viewPipeline The pipeline used to define the view.
  */
-export function assertViewAppliedCorrectly(explainStages, userPipeline, viewPipeline) {
+function assertViewAppliedCorrectlyInExplainStages(explainOutput, userPipeline, viewPipeline) {
     if (userPipeline[0].hasOwnProperty("$search") ||
         userPipeline[0].hasOwnProperty("$vectorSearch")) {
-        return assertIdLookupContainsViewPipeline(explainStages, viewPipeline);
+        // The view pipeline is pushed down to a desugared stage, $_internalSearchdLookup. Therefore
+        // we inspect the stages (which represent the fully desugared pipeline from the user) to
+        // ensure the view was successfully pushed down.
+        return assertIdLookupContainsViewPipeline(explainOutput.stages, viewPipeline);
     }
-    return assertToplevelAggContainsView(explainStages, viewPipeline);
+    // Whereas view transforms for mongot queries happen after desugaring, regular queries apply the
+    // view transforms during query expansion. For this reason, we can just inspect the explain's
+    // command obj, which represents the expanded query (eg the query after
+    // ResolvedView::asExpandedViewAggregation() was called). This also makes it easier to keep
+    // explain checks simpler/more consistent between variants that run with SBE turned on and SBE
+    // turned off, as SBE greatly changes how the stages are portrayed.
+    return assertToplevelAggContainsView(explainOutput, viewPipeline);
+}
+
+/**
+ * This helper is intended for inspecting $search and $vectorSearch explain outputs. $searchMeta is
+ * excluded because such queries should not invoke view pipelines. The reasoning being that results
+ * provide meta data on the enriched collection, they don't have/display the enriched fields
+ * themselves. Furthermore, on an implementation level, $searchMeta doesn't desugar to
+ * $_internalSearchIdLookup (which performs view transforms for other mongot operators).
+ */
+export function assertViewAppliedCorrectly(explainOutput, userPipeline, viewPipeline) {
+    if (explainOutput.hasOwnProperty("splitPipeline")) {
+        // This is a mongot query on a mongot-indexed view over a sharded collection.
+        Object.keys(explainOutput.shards).forEach((shardKey) => {
+            assertViewAppliedCorrectlyInExplainStages(
+                explainOutput.shards[shardKey], userPipeline, viewPipeline);
+        });
+        return;
+    }
+    // A mongot query on a mongot-indexed view on non-sharded collection.
+    assertViewAppliedCorrectlyInExplainStages(explainOutput, userPipeline, viewPipeline);
 }
 /**
  * This helper inspects explain.stages to ensure the view pipeline wasn't applied to the final
  * execution pipeline.
  */
-export function assertViewNotApplied(explainStages, viewPipeline) {
+export function assertViewNotApplied(explainOutput, viewPipeline) {
+    if (explainOutput.hasOwnProperty("splitPipeline")) {
+        Object.keys(explainOutput.shards).forEach((shardKey) => {
+            /**
+             * Assert that the view pipeline wasn't pushed down to $_internalSearchIdLookup by
+             * ensuring there is no $_internalSearchIdLookup stage.
+             */
+            assertViewNotApplied(explainOutput.shards[shardKey], viewPipeline);
+        });
+        return;
+    }
     /**
      * Assert that the view pipeline wasn't pushed down to $_internalSearchIdLookup by ensuring
      * there is no $_internalSearchIdLookup stage.
      */
-    assert(!explainStages[1].hasOwnProperty("$_internalSearchIdLookup"));
+    assert(!explainOutput.stages[1].hasOwnProperty("$_internalSearchIdLookup"));
     /**
      * If a view pipeline isn't pushed down to idLookup, there is a risk it was appened to the user
      * pipeline (as is the case for non-search queries on views). It's important to call out that
@@ -65,14 +107,14 @@ export function assertViewNotApplied(explainStages, viewPipeline) {
      * pipeline isn't desugared and none of the view stages are pushed down or otherwise rearranged
      * during optimization.
      */
-    assert.neq(explainStages.slice(0, viewPipeline.length), viewPipeline);
+    assert.neq(explainOutput.stages.slice(0, viewPipeline.length), viewPipeline);
 }
 
 export function extractUnionWithSubPipelineExplainOutput(explainStages) {
     for (const stage of explainStages) {
         // Found the $unionWith stage in the explain output.
         if (stage["$unionWith"]) {
-            return stage["$unionWith"].pipeline;
+            return {"stages": stage["$unionWith"].pipeline};
         }
     }
 }
@@ -83,12 +125,12 @@ export function extractUnionWithSubPipelineExplainOutput(explainStages) {
  * asserts that the $unionWith $search subpipeline contains the innerView pipeline in its idLookup.
  */
 export function assertUnionWithSearchPipelinesApplyViews(
-    explainStages, outerViewPipeline, innerViewPipeline) {
+    explain, outerViewPipeline, innerViewPipeline) {
     // This will assert that the top-level search has the view correctly pushed down to idLookup.
-    assertIdLookupContainsViewPipeline(explainStages, outerViewPipeline);
-    let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explainStages);
+    assertIdLookupContainsViewPipeline(explain.stages, outerViewPipeline);
+    let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain.stages);
     // Make sure the $unionWith.search subpipeline has the view correctly pushed down to idLookup.
-    assertIdLookupContainsViewPipeline(unionWithSubPipeExplain, innerViewPipeline);
+    assertIdLookupContainsViewPipeline(unionWithSubPipeExplain.stages, innerViewPipeline);
 }
 
 /**

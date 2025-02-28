@@ -385,6 +385,32 @@ std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
     return newPipeline;
 }
 
+void mongotIndexedViewHelper(boost::intrusive_ptr<ExpressionContext> expCtx,
+                             std::unique_ptr<Pipeline, PipelineDeleter>& pipeline,
+                             ResolvedView resolvedView,
+                             const NamespaceString& viewName) {
+    if (expCtx->isFeatureFlagMongotIndexedViewsEnabled() &&
+        search_helpers::isMongotPipeline(pipeline.get())) {
+        if (search_helpers::isStoredSource(pipeline.get())) {
+            // For returnStoredSource queries, the documents returned by mongot already include the
+            // fields transformed by the view pipeline. As such, mongod doesn't need to apply the
+            // view pipeline after idLookup.
+            return;
+        } else {
+            // Search queries on views behave differently than non-search aggregations on views.
+            // When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
+            // view transforms as part of its subpipeline. In this way, the view stages will always
+            // be applied directly after $_internalSearchMongotRemote and before the remaining
+            // stages of the user pipeline. This is to ensure the stages following
+            // $search/$vectorSearch in the user pipeline will receive the modified documents: when
+            // storedSource is disabled, idLookup will retrieve full/unmodified documents during
+            // (from the _id values returned by mongot), apply the view's data transforms, and pass
+            // said transformed documents through the rest of the user pipeline.
+            search_helpers::addResolvedNamespaceForSearch(viewName, resolvedView, expCtx);
+        }
+    }
+}
+
 /**
  * Builds an expCtx with which to parse the request's pipeline, then parses the pipeline and
  * registers the pre-optimized pipeline with query stats collection.
@@ -392,12 +418,13 @@ std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
 std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
     const stdx::unordered_set<NamespaceString>& involvedNamespaces,
-    const NamespaceString& executionNss,
+    const ClusterAggregate::Namespaces& nsStruct,
     AggregateCommandRequest& request,
     boost::optional<CollectionRoutingInfo> cri,
     bool hasChangeStream,
     bool shouldDoFLERewrite,
     bool requiresCollationForParsingUnshardedAggregate,
+    boost::optional<ResolvedView> resolvedView,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     // Populate the collation. If this is a change stream, take the user-defined collation if one
     // exists, or an empty BSONObj otherwise. Change streams never inherit the collection's default
@@ -408,7 +435,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                                         : cluster_aggregation_planner::getCollation(
                                               opCtx,
                                               cri ? boost::make_optional(cri->cm) : boost::none,
-                                              executionNss,
+                                              nsStruct.executionNss,
                                               request.getCollation().value_or(BSONObj()),
                                               requiresCollationForParsingUnshardedAggregate);
 
@@ -419,31 +446,35 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         makeExpressionContext(opCtx,
                               request,
                               cri,
-                              executionNss,
+                              nsStruct.executionNss,
                               collationObj,
                               boost::none /* uuid */,
                               resolveInvolvedNamespaces(involvedNamespaces),
                               hasChangeStream,
                               verbosity);
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+    // TODO SERVER-100566 call view helper on raw bson obj vector, before parsing call above.
+    if (resolvedView) {
+        mongotIndexedViewHelper(expCtx, pipeline, *resolvedView, nsStruct.requestedNss);
+    }
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     // In case query settings have already been looked up (in case the agg request is
     // running over a view) we avoid performing query settings lookup.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
-            request, executionNss, involvedNamespaces, *pipeline, expCtx);
+            request, nsStruct.executionNss, involvedNamespaces, *pipeline, expCtx);
     }};
     expCtx->setQuerySettingsIfNotPresent(std::move(request.getQuerySettings()).value_or_eval([&] {
         return query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
-            expCtx, deferredShape, executionNss);
+            expCtx, deferredShape, nsStruct.executionNss);
     }));
 
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
         query_stats::registerRequest(
             opCtx,
-            executionNss,
+            nsStruct.executionNss,
             [&]() {
                 uassert(8472505, "Failed computing query shape", deferredShape());
                 return std::make_unique<query_stats::AggKey>(
@@ -494,8 +525,15 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const PrivilegeVector& privileges,
                                       boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result) {
-    return runAggregate(
-        opCtx, namespaces, request, liteParsedPipeline, privileges, boost::none, verbosity, result);
+    return runAggregate(opCtx,
+                        namespaces,
+                        request,
+                        liteParsedPipeline,
+                        privileges,
+                        boost::none /*CollectionRoutingInfo*/,
+                        boost::none /*ResolvedView*/,
+                        verbosity,
+                        result);
 }
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -504,6 +542,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const LiteParsedPipeline& liteParsedPipeline,
                                       const PrivilegeVector& privileges,
                                       boost::optional<CollectionRoutingInfo> cri,
+                                      boost::optional<ResolvedView> resolvedView,
                                       boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result) {
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
@@ -573,12 +612,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 auto pipeline = parsePipelineAndRegisterQueryStats(
                     opCtx,
                     involvedNamespaces,
-                    namespaces.executionNss,
+                    namespaces,
                     request,
                     cri,
                     hasChangeStream,
                     shouldDoFLERewrite,
                     requiresCollationForParsingUnshardedAggregate,
+                    resolvedView,
                     verbosity);
                 pipeline->validateCommon(false);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
@@ -615,12 +655,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         auto pipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
                                                involvedNamespaces,
-                                               namespaces.executionNss,
+                                               namespaces,
                                                request,
                                                cri,
                                                hasChangeStream,
                                                shouldDoFLERewrite,
                                                requiresCollationForParsingUnshardedAggregate,
+                                               resolvedView,
                                                verbosity);
         expCtx = pipeline->getContext();
 
@@ -899,6 +940,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                                  {resolvedAggRequest},
                                                  privileges,
                                                  snapshotCri,
+                                                 boost::make_optional(resolvedView),
                                                  verbosity,
                                                  result);
 

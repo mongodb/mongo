@@ -131,6 +131,7 @@ private:
     // information is not otherwise accessible for sharded views, we cache the viewName to avoid
     // retrieving on each getNext.
     boost::optional<NamespaceString> _viewName;
+    boost::optional<std::vector<BSONObj>> _viewPipeline;
 };
 
 }  // namespace mongo

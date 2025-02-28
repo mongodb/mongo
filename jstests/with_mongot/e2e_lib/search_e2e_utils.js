@@ -2,8 +2,8 @@
  * Contains common test utilities for e2e search tests involving mongot.
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
-import {getMovieData} from "jstests/with_mongot/e2e/lib/data/movies.js";
-import {getRentalData} from "jstests/with_mongot/e2e/lib/data/rentals.js";
+import {getMovieData} from "jstests/with_mongot/e2e_lib/data/movies.js";
+import {getRentalData} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 
 /**
  * This function is used in place of direct assertions between expected and actual document array

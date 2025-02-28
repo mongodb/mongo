@@ -11,7 +11,7 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     assertViewNotApplied,
     extractUnionWithSubPipelineExplainOutput
-} from "jstests/with_mongot/e2e/lib/explain_utils.js";
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const primaryStateFacts = testDb.primaryStateFacts;
@@ -161,12 +161,12 @@ let pipeline = [
     }
 ];
 
-let explain = officialStateColorsView.explain().aggregate(pipeline).stages;
+let explain = officialStateColorsView.explain().aggregate(pipeline);
 // Confirm top-level aggregation doesn't include view stages as it's a stored source query, mongot
 // should be returning the transformed fields.
 assertViewNotApplied(explain, stateColorViewPipeline);
 // Confirm unionWith subpipeline doesn't include view stages as it's also a stored source query.
-let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain);
+let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain.stages);
 assertViewNotApplied(unionWithSubPipeExplain, halloweenCandyViewPipeline);
 
 /**

@@ -10,8 +10,8 @@ import {
     getMoviePlotEmbeddingById,
     getMovieVectorSearchIndexSpec,
     makeMovieVectorQuery
-} from "jstests/with_mongot/e2e/lib/data/movies.js";
-import {waitUntilDocIsVisibleByQuery} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
+} from "jstests/with_mongot/e2e_lib/data/movies.js";
+import {waitUntilDocIsVisibleByQuery} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 // Main testing function that runs all sub-tests.
 // Input parameter is the name of the meta field that should be sorted on
