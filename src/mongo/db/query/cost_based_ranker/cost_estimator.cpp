@@ -171,13 +171,28 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             break;
         }
         case STAGE_LIMIT: {
+            nodeCost = childCosts[0];
             const auto& inCE = childCEs[0];
-            nodeCost = limitStartup * oneCE + limitIncrement * inCE;
+            auto limitNode = static_cast<const LimitNode*>(node);
+            auto limitCE = CardinalityEstimate{
+                CardinalityType{static_cast<double>(limitNode->limit)}, EstimationSource::Metadata};
+            auto adjLimitCE = std::min(limitCE, inCE);
+            nodeCost += limitStartup * oneCE + limitIncrement * adjLimitCE;
             break;
         }
         case STAGE_SKIP: {
+            nodeCost = childCosts[0];
             const auto& inCE = childCEs[0];
-            nodeCost = skipStartup * oneCE + skipIncrement * inCE;
+            auto skipNode = static_cast<const SkipNode*>(node);
+            auto skipCE = CardinalityEstimate{CardinalityType{static_cast<double>(skipNode->skip)},
+                                              EstimationSource::Metadata};
+            auto adjSkipCE = std::min(skipCE, inCE);
+            auto passCE = inCE - adjSkipCE;
+            // Use different coefficients for documents that are skipped and documents that are
+            // passed to the parent stage. Skipping documents seems to be slightly more expensive
+            // than passing them to the parent stage.
+            // TODO: SERVER-101425 Calibrate cost model for SKIP.
+            nodeCost += skipStartup * oneCE + skipIncrement * adjSkipCE + passIncrement * passCE;
             break;
         }
         default:
@@ -260,5 +275,6 @@ const CostCoefficient CostEstimator::limitIncrement = CostCoefficient{CostCoeffi
 
 const CostCoefficient CostEstimator::skipStartup = CostCoefficient{CostCoefficientType{655.1_ms}};
 const CostCoefficient CostEstimator::skipIncrement = CostCoefficient{CostCoefficientType{62.4_ms}};
+const CostCoefficient CostEstimator::passIncrement = CostCoefficient{CostCoefficientType{41.2_ms}};
 
 }  // namespace mongo::cost_based_ranker

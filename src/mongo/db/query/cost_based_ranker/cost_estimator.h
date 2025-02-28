@@ -106,6 +106,7 @@ private:
 
     static const CostCoefficient skipStartup;
     static const CostCoefficient skipIncrement;
+    static const CostCoefficient passIncrement;
 
     EstimateMap& _estimateMap;
 };

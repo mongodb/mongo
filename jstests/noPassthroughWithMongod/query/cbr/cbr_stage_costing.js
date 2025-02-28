@@ -62,11 +62,8 @@ function rootStageCost(cursor) {
 
     if (winningPlan.inputStage) {
         const rootStageCost = winningPlan.costEstimate - winningPlan.inputStage.costEstimate;
-        if (winningPlan.stage !== "LIMIT") {
-            assert.gt(rootStageCost,
-                      0,
-                      "root stage cost is expected to be greater than the inputStage cost");
-        }
+        assert.gt(
+            rootStageCost, 0, "root stage cost is expected to be greater than the inputStage cost");
         return rootStageCost;
     } else {
         return winningPlan.costEstimate;
@@ -257,24 +254,30 @@ function runTest(planRankerMode) {
     // rootStageCost(coll.find().sort({a:1}).hint({$natural: 1})));
 
     /*
-     * Cost of stand-alone LIMIT
+     * Cost of stand-alone LIMIT.
      */
 
-    // LIMIT cost should not depend on the size of the collection.
-    // TODO(SERVER-100647): assert.eq(rootStageCost(coll.find().limit(1).hint({$natural: 1}),
-    // false), rootStageCost(collOneRow.find().limit(1).hint({$natural: 1}), false));
-    // TODO(SERVER-100647): IN DOC assert.eq(rootStageCost(coll.find().limit(1).hint({a: 1}),
-    // false), rootStageCost(collOneRow.find().limit(1).hint({a: 1}),false));
+    // Plan with limit(1) should have smaller cost than the same plan with limit(1000).
+    assert.lt(planCost(coll.find().limit(1).hint({$natural: 1})),
+              planCost(coll.find().limit(1000).hint({$natural: 1})));
+    // The cost of limit stage should depend on the limit itself, as long as it is smaller than the
+    // cardinality of its child. LIMIT cost should not depend on the type of input (COLLSCAN vs.
+    // FETCH + IXSCAN).
+    assert.lt(rootStageCost(coll.find().limit(1).hint({$natural: 1})),
+              rootStageCost(coll.find().limit(100).hint({$natural: 1})));
+    assert.lt(rootStageCost(coll.find().limit(1).hint({a: 1})),
+              rootStageCost(coll.find().limit(100).hint({a: 1})));
 
-    // LIMIT cost should depend on the limit itself
-    // TODO(SERVER-100647): assert.lt(rootStageCost(coll.find().limit(1).hint({$natural: 1})),
-    // rootStageCost(collOneRow.find().limit(10).hint({$natural: 1})));
-    // TODO(SERVER-100647): assert.lt(rootStageCost(coll.find().limit(1).hint({a: 1})),
-    // rootStageCost(collOneRow.find().limit(10).hint({a: 1})));
+    assert.close(rootStageCost(coll.find().limit(1).hint({$natural: 1})),
+                 rootStageCost(collOneRow.find().limit(1).hint({$natural: 1})));
+    assert.close(rootStageCost(coll.find().limit(1).hint({a: 1})),
+                 rootStageCost(collOneRow.find().limit(1).hint({a: 1})));
+    assert.close(rootStageCost(coll.find().limit(1).hint({$natural: 1})),
+                 rootStageCost(coll.find().limit(1).hint({a: 1})));
 
-    // LIMIT cost should not depend on the type of input (COLLSCAN vs. FETCH + IXSCAN)
-    // TODO(SERVER-100647): assert.eq(rootStageCost(coll.find().limit(100).hint({$natural: 1})),
-    // rootStageCost(collOneRow.find().limit(100).hint({a: 1})));
+    // The cost of limit stage is capped by the input cardinality.
+    assert.eq(rootStageCost(collOneRow.find().limit(1).hint({$natural: 1})),
+              rootStageCost(collOneRow.find().limit(10).hint({$natural: 1})));
 
     // LIMIT 0 is equivalent to no limit and should be optimized away to not appear in the plan at
     // all
@@ -283,17 +286,27 @@ function runTest(planRankerMode) {
     assert.eq(planCost(coll.find().hint({a: 1})), planCost(coll.find().limit(0).hint({a: 1})));
 
     /*
-     * Cost of stand-alone SKIP
+     * Cost of stand-alone SKIP.
      */
 
-    // Large SKIP should be equivalent to reading the entire input
-    // TODO(SERVER-100651): assert.eq(planCost(coll.find().skip(10000000).hint({$natural: 1})),
-    // planCost(coll.find().hint({$natural: 1})));
-    // TODO(SERVER-100651): assert.eq(planCost(coll.find().skip(10000000).hint({a: 1})),
-    // planCost(coll.find().hint({a: 1})));
+    // Skipping documents seems to be slightly more expensive than passing them to the parent stage.
+    // Plan with skip(1) should have lower cost than the same plan with skip(1000).
+    assert.lt(planCost(coll.find().skip(1).hint({$natural: 1})),
+              planCost(coll.find().skip(1000).hint({$natural: 1})));
+
+    // Costs of SKIP stage with skip parameter larger than the input size are the same.
+    assert.eq(rootStageCost(coll.find().skip(5000).hint({$natural: 1})),
+              rootStageCost(coll.find().skip(10000).hint({$natural: 1})));
+    assert.eq(rootStageCost(coll.find({a: {$lt: 1000}}).skip(2000).hint({a: 1})),
+              rootStageCost(coll.find({a: {$lt: 1000}}).skip(5000).hint({a: 1})));
+
+    // In indexed plans without predicate the higher the skip parameter the lower the cost of the
+    // root stage FETCH above the SKIP.
+    assert.gt(rootStageCost(coll.find().skip(100).hint({a: 1})),
+              rootStageCost(coll.find().skip(1000).hint({a: 1})));
 
     // skip(0) is equivalent to no skip() and should be optimized away to not appear in the plan at
-    // all
+    // all.
     assert.eq(planCost(coll.find().hint({$natural: 1})),
               planCost(coll.find().skip(0).hint({$natural: 1})));
     assert.eq(planCost(coll.find().hint({a: 1})), planCost(coll.find().skip(0).hint({a: 1})));

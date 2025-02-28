@@ -191,9 +191,13 @@ try {
     // In the presence of non-selective find() + sort(), we pick the index on the sort
     assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}).sort({b: 1})), "b_1");
     assert.eq(winningIndexFromCursor(coll.find({b: {$gte: 0}}).sort({unique1: 1})), "unique1_1");
-    assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}).sort({b: 1}).limit(1)), "b_1");
-    assert.eq(winningIndexFromCursor(coll.find({b: {$gte: 0}}).sort({unique1: 1}).limit(1)),
+
+    // In the presence of sort() + limit(1) we pick the index on the predicate.
+    assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}).sort({b: 1}).limit(1)),
               "unique1_1");
+    assert.eq(winningIndexFromCursor(coll.find({b: {$gte: 0}}).sort({unique1: 1}).limit(1)), "b_1");
+
+    // In the presence of sort() + large limit, we pick again the index on the sort field.
     assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}).sort({b: 1}).limit(10000)),
               "b_1");
     assert.eq(winningIndexFromCursor(coll.find({b: {$gte: 0}}).sort({unique1: 1}).limit(10000)),
