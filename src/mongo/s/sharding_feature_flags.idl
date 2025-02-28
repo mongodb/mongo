@@ -131,13 +131,6 @@ feature_flags:
     default: true
     version: 7.3
     shouldBeFCVGated: true
-  featureFlagStopDDLCoordinatorsDuringTopologyChanges:
-    description: "Feature flag to stop ShardingDDLCoordinators during sharding topology changes (i.e.
-                  addShard and removeShard)."
-    cpp_varname: feature_flags::gStopDDLCoordinatorsDuringTopologyChanges
-    default: true
-    version: 8.0
-    shouldBeFCVGated: true
   featureFlagCreateDatabaseDDLCoordinator:
     description: "Feature flag for enabling the sharding DDL coordinator for database creation."
     cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator

@@ -762,10 +762,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         // Block new ShardingDDLCoordinators on the cluster and join ongoing ones.
         ScopeGuard unblockDDLCoordinatorsGuard([&] { scheduleAsyncUnblockDDLCoordinators(opCtx); });
-        if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
-        }
+        topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
 
         // Tick clusterTime to get a new topologyTime for this mutation of the topology.
         auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
@@ -833,18 +830,16 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         shardMembershipLock.unlock();
 
         // Unblock ShardingDDLCoordinators on the cluster.
-        if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
-            // alongside the RSEndpoint.
-            // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
-            // the FixedFCVRegion and others take the FixedFCVRegion before the
-            // _kClusterCardinalityParameterLock lock. However, all paths take the
-            // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
-            // problem. See SERVER-99708 for more information.
-            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-            topology_change_helpers::unblockDDLCoordinators(opCtx);
-        }
+
+        // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
+        // alongside the RSEndpoint.
+        // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
+        // the FixedFCVRegion and others take the FixedFCVRegion before the
+        // _kClusterCardinalityParameterLock lock. However, all paths take the
+        // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
+        // problem. See SERVER-99708 for more information.
+        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+        topology_change_helpers::unblockDDLCoordinators(opCtx);
         unblockDDLCoordinatorsGuard.dismiss();
 
         auto updateStatus = _updateClusterCardinalityParameterAfterAddShardIfNeeded(
@@ -1022,10 +1017,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     // Prevent new ShardingDDLCoordinators operations from starting across the cluster.
     ScopeGuard unblockDDLCoordinatorsGuard([&] { scheduleAsyncUnblockDDLCoordinators(opCtx); });
-    if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
-    }
+    topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
 
     hangRemoveShardAfterDrainingDDL.pauseWhileSet(opCtx);
 
@@ -1112,18 +1104,16 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
         // Unset the addOrRemoveShardInProgress cluster parameter. Note that
         // _removeShardInTransaction has already waited for the commit to be majority-acknowledged.
-        if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
-            // alongside the RSEndpoint.
-            // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
-            // the FixedFCVRegion and others take the FixedFCVRegion before the
-            // _kClusterCardinalityParameterLock lock. However, all paths take the
-            // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
-            // problem. See SERVER-99708 for more information.
-            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-            topology_change_helpers::unblockDDLCoordinators(opCtx);
-        }
+
+        // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
+        // alongside the RSEndpoint.
+        // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
+        // the FixedFCVRegion and others take the FixedFCVRegion before the
+        // _kClusterCardinalityParameterLock lock. However, all paths take the
+        // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
+        // problem. See SERVER-99708 for more information.
+        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+        topology_change_helpers::unblockDDLCoordinators(opCtx);
         unblockDDLCoordinatorsGuard.dismiss();
 
         // The shard which was just removed must be reflected in the shard registry, before the
@@ -1328,11 +1318,6 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
 }
 
 void ShardingCatalogManager::scheduleAsyncUnblockDDLCoordinators(OperationContext* opCtx) {
-    if (!mongo::feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return;
-    }
-
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     const auto serviceContext = opCtx->getServiceContext();
     AsyncTry([this, serviceContext] {
