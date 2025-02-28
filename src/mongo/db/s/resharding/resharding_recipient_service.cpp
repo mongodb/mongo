@@ -39,6 +39,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 #include <mutex>
 #include <string>
 
@@ -1904,8 +1905,20 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
 void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetrics(
     OperationContext* opCtx) {
     try {
-        AutoGetCollection tempReshardingColl(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
-        auto indexCatalog = tempReshardingColl->getIndexCatalog();
+        auto tempReshardingColl = acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest(
+                _metadata.getTempReshardingNss(),
+                // We just want to read the local catalog this resharding recipient is using
+                // so we don't care about placement and read concern.
+                PlacementConcern{},
+                repl::ReadConcernArgs::kLocal,
+                AcquisitionPrerequisites::OperationType::kRead));
+        uassert(ErrorCodes::NamespaceNotFound,
+                fmt::format("{} not found", _metadata.getTempReshardingNss().toStringForErrorMsg()),
+                tempReshardingColl.exists());
+
+        auto indexCatalog = tempReshardingColl.getCollectionPtr()->getIndexCatalog();
         invariant(indexCatalog,
                   str::stream() << "Collection is missing index catalog: "
                                 << _metadata.getTempReshardingNss().toStringForErrorMsg());
