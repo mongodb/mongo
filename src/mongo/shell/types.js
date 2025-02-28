@@ -861,9 +861,6 @@ toEJSON = function(x) {
         // ancestors = [{"x": 1, "y": {"z": 2}}, {"z": 2}]
         let ancestors = [];
         return function(key, value) {
-            if (value === undefined) {
-                return {"$undefined": true};
-            }
             if (value instanceof Error) {
                 return {"$error": value.message};
             }
