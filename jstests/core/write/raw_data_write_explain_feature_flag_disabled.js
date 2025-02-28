@@ -15,3 +15,6 @@ assert.throwsWithCode(() => coll.explain().update({key: 1}, {key: 2}, {rawData: 
                       ErrorCodes.InvalidOptions);
 assert.throwsWithCode(() => coll.explain().remove({key: 1}, {rawData: true, justOne: true}),
                       ErrorCodes.InvalidOptions);
+assert.throwsWithCode(
+    () => coll.explain().findAndModify({query: {key: 1}, update: {key: 2}, rawData: true}),
+    ErrorCodes.InvalidOptions);

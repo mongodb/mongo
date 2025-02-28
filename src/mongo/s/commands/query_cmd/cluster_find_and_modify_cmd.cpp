@@ -85,6 +85,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_ddl.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/grid.h"
@@ -694,13 +695,37 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
 
 bool FindAndModifyCmd::run(OperationContext* opCtx,
                            const DatabaseName& dbName,
-                           const BSONObj& cmdObj,
+                           const BSONObj& originalCmdObj,
                            BSONObjBuilder& result) {
-    NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+    NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, originalCmdObj));
 
-    if (processFLEFindAndModify(opCtx, cmdObj, result) == FLEBatchResult::kProcessed) {
+    if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
         return true;
     }
+
+    auto cmdObj = [&] {
+        auto rawData = OptionalBool::parseFromBSON(
+            originalCmdObj[write_ops::FindAndModifyCommandRequest::kRawDataFieldName]);
+
+        if (!rawData ||
+            !CollectionRoutingInfoTargeter{opCtx, nss}.timeseriesNamespaceNeedsRewrite(nss)) {
+            return originalCmdObj;
+        }
+
+        nss = nss.makeTimeseriesBucketsNamespace();
+
+        // Rewrite the command object to use the buckets namespace.
+        BSONObjBuilder builder{originalCmdObj.objsize()};
+        for (auto&& [fieldName, elem] : originalCmdObj) {
+            if (fieldName == write_ops::FindAndModifyCommandRequest::kCommandName) {
+                builder.append(fieldName, nss.coll());
+            } else {
+                builder.append(elem);
+            }
+        }
+
+        return builder.obj();
+    }();
 
     // Collect metrics.
     _updateMetrics->collectMetrics(cmdObj);

@@ -795,6 +795,10 @@ DBCollection.prototype.findOneAndDelete = function(filter, options) {
         cmd.collation = opts.collation;
     }
 
+    if (opts.rawData) {
+        cmd.rawData = opts.rawData;
+    }
+
     // Get the write concern
     var writeConcern = this._createWriteConcern(opts);
 
@@ -860,6 +864,10 @@ DBCollection.prototype.findOneAndReplace = function(filter, replacement, options
 
     if (opts.hint) {
         cmd.hint = opts.hint;
+    }
+
+    if (opts.rawData) {
+        cmd.rawData = opts.rawData;
     }
 
     // Set flags
@@ -937,6 +945,10 @@ DBCollection.prototype.findOneAndUpdate = function(filter, update, options) {
 
     if (opts.hint) {
         cmd.hint = opts.hint;
+    }
+
+    if (opts.rawData) {
+        cmd.rawData = opts.rawData;
     }
 
     // Set flags

@@ -92,6 +92,10 @@ public:
         return true;
     }
 
+    bool supportsRawData() const override {
+        return true;
+    }
+
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level,
                                                  bool isImplicitDefault) const override {

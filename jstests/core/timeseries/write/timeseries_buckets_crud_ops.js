@@ -108,17 +108,14 @@ crudTest(() => {
 
 // findAndModify()
 crudTest(() => {
-    const newBucket = bucketsColl.findAndModify({
-        query: {"control.count": 2},
-        update: {$set: {meta: "3"}},
-        new: true,
-    });
+    const newBucket = coll.findAndModify(
+        {query: {"control.count": 2}, update: {$set: {meta: "3"}}, new: true, rawData: true});
     assert.eq(newBucket.meta, "3");
 });
 
 // findOneAndDelete()
 crudTest(() => {
-    const deletedBucket = bucketsColl.findOneAndDelete({"control.count": 2});
+    const deletedBucket = coll.findOneAndDelete({"control.count": 2}, {rawData: true});
     assert.eq(deletedBucket.control.count, 2);
     assert.eq(bucketsColl.count({"control.count": 2}), 0);
 });
@@ -127,14 +124,16 @@ crudTest(() => {
 crudTest(() => {
     const updatedBucket = bucketsColl.findOne({"control.count": 2});
     updatedBucket.meta = "3";
-    const replacedBucket = bucketsColl.findOneAndReplace({"control.count": 2}, updatedBucket);
+    const replacedBucket =
+        coll.findOneAndReplace({"control.count": 2}, updatedBucket, {rawData: true});
     assert.eq(replacedBucket.meta, "1");
     assert.eq(bucketsColl.findOne({"control.count": 2}).meta, "3");
 });
 
 // findOneAndUpdate()
 crudTest(() => {
-    const updatedBucket = bucketsColl.findOneAndUpdate({"control.count": 2}, {$set: {meta: "3"}});
+    const updatedBucket =
+        coll.findOneAndUpdate({"control.count": 2}, {$set: {meta: "3"}}, {rawData: true});
     assert.eq(updatedBucket.meta, "1");
     assert.eq(bucketsColl.findOne({"control.count": 2}).meta, "3");
 });

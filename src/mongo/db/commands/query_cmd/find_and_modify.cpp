@@ -290,6 +290,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const final {
+            return true;
+        }
+
         bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
@@ -499,7 +503,10 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         }
     }
 
-    const NamespaceString& nsString = req.getNamespace();
+    auto nsString = req.getNamespace();
+    if (request().getRawData()) {
+        nsString = timeseries::isTimeseriesViewRequest(opCtx, this->request()).second;
+    }
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
 
     static_cast<const CmdFindAndModify*>(definition())->collectMetrics(req);

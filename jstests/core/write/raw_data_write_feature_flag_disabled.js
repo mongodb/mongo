@@ -16,3 +16,5 @@ assert.commandFailedWithCode(coll.update({key: 1}, {key: 2}, {rawData: true}),
                              ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(coll.remove({key: 1}, {rawData: true, justOne: true}),
                              ErrorCodes.InvalidOptions);
+assert.throwsWithCode(() => coll.findOneAndDelete({key: 1}, {rawData: true}),
+                      ErrorCodes.InvalidOptions);
