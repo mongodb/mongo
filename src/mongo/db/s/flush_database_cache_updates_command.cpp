@@ -139,7 +139,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
-                    !opCtx->readOnly());
+                    !storageGlobalParams.readOnly);
 
             if (_dbName() == NamespaceString::kAdminDb || _dbName() == NamespaceString::kConfigDb) {
                 // The admin and config databases have fixed metadata that does not need to be

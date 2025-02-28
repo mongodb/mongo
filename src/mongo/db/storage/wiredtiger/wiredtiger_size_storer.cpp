@@ -48,8 +48,17 @@
 
 namespace mongo {
 
-WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri)
-    : _conn(conn), _storageUri(storageUri), _tableId(WiredTigerSession::genTableId()) {
+WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn,
+                                           const std::string& storageUri,
+                                           bool readOnly)
+    : _conn(conn),
+      _storageUri(storageUri),
+      _tableId(WiredTigerSession::genTableId()),
+      _readOnly(readOnly) {
+    if (_readOnly) {
+        return;
+    }
+
     std::string config = WiredTigerCustomizationHooks::get(getGlobalServiceContext())
                              ->getTableCreateConfig(_storageUri);
 
@@ -61,7 +70,7 @@ WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn, const std::strin
 
 void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeInfo) {
     // If the SizeInfo is still dirty, we're done.
-    if (sizeInfo->_dirty.load())
+    if (sizeInfo->_dirty.load() || _readOnly)
         return;
 
     // Ordering is important: as the entry may be flushed concurrently, set the dirty flag last.

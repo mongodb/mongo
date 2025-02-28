@@ -287,9 +287,10 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  StringData ident,
                                  KeyFormat rsKeyFormat,
                                  const IndexDescriptor* desc,
-                                 bool isLogged)
+                                 bool isLogged,
+                                 bool isReadOnly)
     : SortedDataInterface(ident,
-                          _handleVersionInfo(ctx, uri, ident, desc, isLogged),
+                          _handleVersionInfo(ctx, uri, ident, desc, isLogged, isReadOnly),
                           Ordering::make(desc->keyPattern()),
                           rsKeyFormat),
       _uri(uri),
@@ -800,7 +801,8 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                        const std::string& uri,
                                                        StringData ident,
                                                        const IndexDescriptor* desc,
-                                                       bool isLogged) {
+                                                       bool isLogged,
+                                                       bool isReadOnly) {
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
         ctx, uri, kMinimumIndexVersion, kMaximumIndexVersion);
     if (!version.isOK()) {
@@ -829,7 +831,9 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         fassertFailedWithStatusNoTrace(31179, versionStatus);
     }
 
-    uassertStatusOK(WiredTigerUtil::setTableLogging(ctx, uri, isLogged));
+    if (!isReadOnly) {
+        uassertStatusOK(WiredTigerUtil::setTableLogging(ctx, uri, isLogged));
+    }
 
     /*
      * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format 8, 12, and
@@ -1669,8 +1673,10 @@ WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              StringData ident,
                                              KeyFormat rsKeyFormat,
                                              const IndexDescriptor* desc,
-                                             bool isLogged)
-    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isLogged), _partial(desc->isPartial()) {
+                                             bool isLogged,
+                                             bool isReadOnly)
+    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isLogged, isReadOnly),
+      _partial(desc->isPartial()) {
     // _id indexes must use WiredTigerIdIndex
     invariant(!isIdIndex());
     // All unique indexes should be in the timestamp-safe format version as of version 4.2.
@@ -1756,8 +1762,9 @@ WiredTigerIdIndex::WiredTigerIdIndex(OperationContext* ctx,
                                      const std::string& uri,
                                      StringData ident,
                                      const IndexDescriptor* desc,
-                                     bool isLogged)
-    : WiredTigerIndex(ctx, uri, ident, KeyFormat::Long, desc, isLogged) {
+                                     bool isLogged,
+                                     bool isReadOnly)
+    : WiredTigerIndex(ctx, uri, ident, KeyFormat::Long, desc, isLogged, isReadOnly) {
     invariant(isIdIndex());
 }
 
@@ -2059,8 +2066,9 @@ WiredTigerIndexStandard::WiredTigerIndexStandard(OperationContext* ctx,
                                                  StringData ident,
                                                  KeyFormat rsKeyFormat,
                                                  const IndexDescriptor* desc,
-                                                 bool isLogged)
-    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isLogged) {}
+                                                 bool isLogged,
+                                                 bool isReadOnly)
+    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isLogged, isReadOnly) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexStandard::newCursor(
     OperationContext* opCtx, bool forward) const {

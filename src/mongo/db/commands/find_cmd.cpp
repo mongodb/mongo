@@ -138,7 +138,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                                           CurOp::get(opCtx)->dbProfileLevel() > 0,  // mayDbProfile
                                           verbosity,
                                           allowDiskUseByDefault.load());
-    if (opCtx->readOnly()) {
+    if (storageGlobalParams.readOnly) {
         // Disallow disk use if in read-only mode.
         expCtx->allowDiskUse = false;
     }
@@ -364,7 +364,6 @@ public:
                 // Create the agg request equivalent of the find operation, with the explain
                 // verbosity included.
                 auto aggRequest = aggregation_request_helper::parseFromBSON(
-                    opCtx,
                     nss,
                     viewAggCmd,
                     verbosity,

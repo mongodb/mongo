@@ -449,7 +449,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     expCtx->collationMatchesDefault = collationMatchesDefault;
     expCtx->forPerShardCursor = request.getPassthroughToShard().has_value();
     expCtx->allowDiskUse = request.getAllowDiskUse().value_or(allowDiskUseByDefault.load());
-    if (opCtx->readOnly()) {
+    if (storageGlobalParams.readOnly) {
         // Disallow disk use if in read-only mode.
         expCtx->allowDiskUse = false;
     }

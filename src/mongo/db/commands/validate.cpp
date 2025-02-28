@@ -236,7 +236,7 @@ public:
         }
 
         const bool repair = cmdObj["repair"].trueValue();
-        if (opCtx->readOnly() && repair) {
+        if (storageGlobalParams.readOnly && repair) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with { repair: true } in"
                                     << " read-only mode is not supported.");
@@ -314,7 +314,7 @@ public:
         }();
 
         auto repairMode = [&] {
-            if (opCtx->readOnly()) {
+            if (storageGlobalParams.readOnly) {
                 // On read-only mode we can't make any adjustments.
                 return CollectionValidation::RepairMode::kNone;
             }

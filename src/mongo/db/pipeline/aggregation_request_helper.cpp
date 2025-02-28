@@ -49,17 +49,15 @@ namespace aggregation_request_helper {
 /**
  * Validate the aggregate command object.
  */
-void validate(OperationContext* opCtx,
-              const BSONObj& cmdObj,
+void validate(const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity);
 
-AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
-                                      const std::string& dbName,
+AggregateCommandRequest parseFromBSON(const std::string& dbName,
                                       const BSONObj& cmdObj,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                       bool apiStrict) {
-    return parseFromBSON(opCtx, parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict);
+    return parseFromBSON(parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict);
 }
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
@@ -68,7 +66,7 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
     try {
-        return parseFromBSON(/*opCtx=*/nullptr, nss, cmdObj, explainVerbosity, apiStrict);
+        return parseFromBSON(nss, cmdObj, explainVerbosity, apiStrict);
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
@@ -80,14 +78,13 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
     try {
-        return parseFromBSON(/*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict);
+        return parseFromBSON(dbName, cmdObj, explainVerbosity, apiStrict);
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
 }
 
-AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
-                                      NamespaceString nss,
+AggregateCommandRequest parseFromBSON(NamespaceString nss,
                                       const BSONObj& cmdObj,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                       bool apiStrict) {
@@ -114,7 +111,7 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
         request.setExplain(explainVerbosity);
     }
 
-    validate(opCtx, cmdObj, nss, explainVerbosity);
+    validate(cmdObj, nss, explainVerbosity);
     return request;
 }
 
@@ -152,8 +149,7 @@ Document serializeToCommandDoc(const AggregateCommandRequest& request) {
     return Document(request.toBSON(BSONObj()).getOwned());
 }
 
-void validate(OperationContext* opCtx,
-              const BSONObj& cmdObj,
+void validate(const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     bool hasCursorElem = cmdObj.hasField(AggregateCommandRequest::kCursorFieldName);

@@ -115,12 +115,9 @@ public:
      * Marks the beginning of a unit of work. Each call must be matched with exactly one call to
      * either commitUnitOfWork or abortUnitOfWork.
      *
-     * When called with readOnly=true, no unit of work is started. Calling commitUnitOfWork or
-     * abortUnitOfWork will invariant.
-     *
      * Should be called through WriteUnitOfWork rather than directly.
      */
-    void beginUnitOfWork(bool readOnly);
+    virtual void beginUnitOfWork(OperationContext* opCtx) = 0;
 
     /**
      * Marks the end of a unit of work and commits all changes registered by calls to onCommit or
@@ -128,7 +125,10 @@ public:
      *
      * Should be called through WriteUnitOfWork rather than directly.
      */
-    void commitUnitOfWork();
+    void commitUnitOfWork() {
+        doCommitUnitOfWork();
+        assignNextSnapshotId();
+    }
 
     /**
      * Marks the end of a unit of work and rolls back all changes registered by calls to onRollback
@@ -137,14 +137,10 @@ public:
      *
      * Should be called through WriteUnitOfWork rather than directly.
      */
-    void abortUnitOfWork();
-
-    /**
-     * Cleans up any state set for this unit of work.
-     *
-     * Should be called through WriteUnitOfWork rather than directly.
-     */
-    void endReadOnlyUnitOfWork();
+    void abortUnitOfWork() {
+        doAbortUnitOfWork();
+        assignNextSnapshotId();
+    }
 
     /**
      * Transitions the active unit of work to the "prepared" state. Must be called after
@@ -811,7 +807,6 @@ private:
     // Sets the snapshot associated with this RecoveryUnit to a new globally unique id number.
     void assignNextSnapshotId();
 
-    virtual void doBeginUnitOfWork() = 0;
     virtual void doAbandonSnapshot() = 0;
     virtual void doCommitUnitOfWork() = 0;
     virtual void doAbortUnitOfWork() = 0;
@@ -825,7 +820,6 @@ private:
     std::unique_ptr<Change> _changeForCatalogVisibility;
     State _state = State::kInactive;
     uint64_t _mySnapshotId;
-    bool _readOnly = false;
 };
 
 /**

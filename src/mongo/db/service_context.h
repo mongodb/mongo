@@ -603,24 +603,6 @@ public:
         _catalogGeneration.fetchAndAdd(1);
     }
 
-    void disallowUserWrites() {
-        _userWritesAllowed.store(false);
-    }
-
-    /**
-     * Returns true if user writes are allowed.
-     *
-     * User writes are disallowed when starting with queryableBackupMode or
-     * recoverFromOplogAsStandalone to prevent users from writing to replicated collections in
-     * standalone mode.
-     *
-     * To determine whether an operation must run in read-only mode, use
-     * OperationContext::readOnly().
-     */
-    bool userWritesAllowed() const {
-        return _userWritesAllowed.load();
-    }
-
     LockedClient getLockedClient(OperationId id);
 
 private:
@@ -766,9 +748,6 @@ private:
 
     // When the catalog is restarted, the generation goes up by one each time.
     AtomicWord<uint64_t> _catalogGeneration{0};
-
-    // Server-wide flag indicating whether users' writes are allowed.
-    AtomicWord<bool> _userWritesAllowed{true};
 
     bool _startupComplete = false;
     stdx::condition_variable _startupCompleteCondVar;

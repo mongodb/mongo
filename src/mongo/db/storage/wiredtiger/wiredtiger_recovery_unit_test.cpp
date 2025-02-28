@@ -60,7 +60,8 @@ public:
                   0,                      // .maxCacheOverflowFileSizeMB
                   false,                  // .durable
                   false,                  // .ephemeral
-                  false                   // .repair
+                  false,                  // .repair
+                  false                   // .readOnly
           ) {
         repl::ReplicationCoordinator::set(
             getGlobalServiceContext(),
@@ -112,6 +113,7 @@ public:
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
         params.tracksSizeAdjustments = true;
+        params.isReadOnly = false;
         params.forceUpdateWithFullDocument = false;
 
         auto ret = std::make_unique<StandardWiredTigerRecordStore>(&_engine, opCtx, params);
@@ -277,7 +279,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
 TEST_F(WiredTigerRecoveryUnitTestFixture,
        LocalReadOnADocumentBeingPreparedWithoutIgnoringPreparedTriggersPrepareConflict) {
     // Prepare but don't commit a transaction
-    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
@@ -287,7 +289,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     ru1->prepareUnitOfWork();
 
     // The transaction read default enforces prepare conflicts and triggers a WT_PREPARE_CONFLICT.
-    ru2->beginUnitOfWork(clientAndCtx2.second->readOnly());
+    ru2->beginUnitOfWork(clientAndCtx2.second.get());
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);
@@ -300,7 +302,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
 TEST_F(WiredTigerRecoveryUnitTestFixture,
        LocalReadOnADocumentBeingPreparedDoesntTriggerPrepareConflict) {
     // Prepare but don't commit a transaction
-    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
@@ -311,7 +313,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
 
     // A transaction that chooses to ignore prepare conflicts does not see the record instead of
     // returning a prepare conflict.
-    ru2->beginUnitOfWork(clientAndCtx2.second->readOnly());
+    ru2->beginUnitOfWork(clientAndCtx2.second.get());
     ru2->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
@@ -324,7 +326,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
     // Prepare but don't commit a transaction
-    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key1");
@@ -335,7 +337,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
 
     // A transaction that chooses to ignore prepare conflicts with kIgnoreConflictsAllowWrites does
     // not see the record
-    ru2->beginUnitOfWork(clientAndCtx2.second->readOnly());
+    ru2->beginUnitOfWork(clientAndCtx2.second.get());
     ru2->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
     // The prepared write is not visible.
@@ -356,7 +358,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersWTRollback) {
     // Prepare but don't commit a transaction
-    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
@@ -366,7 +368,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersW
     ru1->prepareUnitOfWork();
 
     // Another transaction with write triggers WT_ROLLBACK
-    ru2->beginUnitOfWork(clientAndCtx2.second->readOnly());
+    ru2->beginUnitOfWork(clientAndCtx2.second.get());
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value2");
@@ -790,7 +792,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState
     Timestamp ts2(2, 2);
 
     OperationContext* opCtx = clientAndCtx1.second.get();
-    ru1->beginUnitOfWork(opCtx->readOnly());
+    ru1->beginUnitOfWork(opCtx);
 
     // Perform an non timestamped write.
     WT_CURSOR* cursor;
@@ -811,7 +813,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState
     // Committing the unit of work should reset the internal state for the multi timestamp
     // constraint checks.
     ru1->commitUnitOfWork();
-    ru1->beginUnitOfWork(opCtx->readOnly());
+    ru1->beginUnitOfWork(opCtx);
 
     // Perform a write at ts2.
     cursor->set_key(cursor, "key3");
@@ -829,7 +831,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotAbortMode) {
     const char* const key = "key";
 
     {
-        ru1->beginUnitOfWork(opCtx->readOnly());
+        ru1->beginUnitOfWork(opCtx);
 
         WT_CURSOR* cursor;
         getCursor(ru1, &cursor);
@@ -867,7 +869,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
     Timestamp ts2(2, 2);
 
     OperationContext* opCtx = clientAndCtx1.second.get();
-    ru1->beginUnitOfWork(opCtx->readOnly());
+    ru1->beginUnitOfWork(opCtx);
 
     auto writeTest = [&]() {
         // Perform an non timestamped write.

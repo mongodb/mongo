@@ -40,7 +40,7 @@ namespace mongo {
 TimestampBlock::TimestampBlock(OperationContext* opCtx, Timestamp ts) : _opCtx(opCtx), _ts(ts) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot timestamp a write operation in read-only mode",
-            !_opCtx->readOnly());
+            !storageGlobalParams.readOnly);
     if (!_ts.isNull()) {
         _opCtx->recoveryUnit()->setCommitTimestamp(_ts);
     }

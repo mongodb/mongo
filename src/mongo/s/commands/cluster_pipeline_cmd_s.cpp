@@ -54,15 +54,11 @@ struct ClusterPipelineCommandS {
     }
 
     static AggregateCommandRequest parseAggregationRequest(
-        OperationContext* opCtx,
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity,
         bool apiStrict) {
-        return aggregation_request_helper::parseFromBSON(opCtx,
-                                                         opMsgRequest.getDatabase().toString(),
-                                                         opMsgRequest.body,
-                                                         explainVerbosity,
-                                                         apiStrict);
+        return aggregation_request_helper::parseFromBSON(
+            opMsgRequest.getDatabase().toString(), opMsgRequest.body, explainVerbosity, apiStrict);
     }
 };
 ClusterPipelineCommandBase<ClusterPipelineCommandS> clusterPipelineCmdS;

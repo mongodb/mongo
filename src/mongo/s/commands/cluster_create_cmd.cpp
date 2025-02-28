@@ -108,7 +108,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassertStatusOK(auth::checkAuthForCreate(
-                opCtx, AuthorizationSession::get(opCtx->getClient()), request(), true));
+                AuthorizationSession::get(opCtx->getClient()), request(), true));
         }
 
         CreateCommandReply typedRun(OperationContext* opCtx) final {

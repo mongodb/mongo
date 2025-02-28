@@ -105,7 +105,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         boost::none,                             // let
         CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
     );
-    if (opCtx->readOnly()) {
+    if (storageGlobalParams.readOnly) {
         // Disallow disk use if in read-only mode.
         expCtx->allowDiskUse = false;
     }

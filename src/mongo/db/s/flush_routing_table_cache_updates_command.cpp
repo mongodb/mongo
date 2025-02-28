@@ -110,7 +110,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "Can't call " << Derived::Request::kCommandName
                                   << " if in read-only mode",
-                    !opCtx->readOnly());
+                    !storageGlobalParams.readOnly);
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "Can only call " << Derived::Request::kCommandName

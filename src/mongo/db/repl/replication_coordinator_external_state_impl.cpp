@@ -399,7 +399,8 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     // primary shutdown. Stepdown is similarly safe from holes and halts updates to and clears
     // the truncate point. The other replication states do need truncation if the truncate point
     // is set: e.g. interruption mid batch application can leave oplog holes.
-    if (_replicationProcess->getConsistencyMarkers()
+    if (!storageGlobalParams.readOnly &&
+        _replicationProcess->getConsistencyMarkers()
             ->isOplogTruncateAfterPointBeingUsedForPrimary()) {
         _stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
     }

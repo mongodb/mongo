@@ -143,7 +143,12 @@ boost::filesystem::path getOngoingBackupPath() {
 
 }  // namespace
 
-bool WiredTigerFileVersion::shouldDowngrade(bool hasRecoveryTimestamp) {
+bool WiredTigerFileVersion::shouldDowngrade(bool readOnly, bool hasRecoveryTimestamp) {
+    if (readOnly) {
+        // A read-only state must not have upgraded. Nor could it downgrade.
+        return false;
+    }
+
     const auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
     if (replCoord && replCoord->getMemberState().arbiter()) {
         // SERVER-35361: Arbiters will no longer downgrade their data files. To downgrade
@@ -299,7 +304,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        size_t maxHistoryFileSizeMB,
                                        bool durable,
                                        bool ephemeral,
-                                       bool repair)
+                                       bool repair,
+                                       bool readOnly)
     : _clockSource(cs),
       _oplogManager(std::make_unique<WiredTigerOplogManager>()),
       _canonicalName(canonicalName),
@@ -308,6 +314,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _durable(durable),
       _ephemeral(ephemeral),
       _inRepairMode(repair),
+      _readOnly(readOnly),
       _keepDataHistory(serverGlobalParams.enableMajorityReadConcern) {
     _pinnedOplogTimestamp.store(Timestamp::max().asULL());
     boost::filesystem::path journalPath = path;
@@ -352,7 +359,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     // The setting may have a later setting override it if not using the journal.  We make it
     // unconditional here because even nojournal may need this setting if it is a transition
     // from using the journal.
-    ss << "log=(enabled=true,remove=true,path=journal,compressor=";
+    ss << "log=(enabled=true,remove=" << (_readOnly ? "false" : "true")
+       << ",path=journal,compressor=";
     ss << wiredTigerGlobalOptions.journalCompressor << "),";
     ss << "builtin_extension_config=(zstd=(compression_level="
        << wiredTigerGlobalOptions.zstdCompressorLevel << ")),";
@@ -529,7 +537,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     setOldestActiveTransactionTimestampCallback(
         [](Timestamp) { return StatusWith(boost::make_optional(Timestamp::min())); });
 
-    if (!_ephemeral) {
+    if (!_readOnly && !_ephemeral) {
         if (!_recoveryTimestamp.isNull()) {
             // If the oldest/initial data timestamps were unset (there was no persisted durable
             // history), initialize them to the recovery timestamp.
@@ -574,7 +582,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     _sizeStorerUri = _uri("sizeStorer");
     WiredTigerSession session(_conn);
-    if (repair && _hasUri(session.getSession(), _sizeStorerUri)) {
+    if (!_readOnly && repair && _hasUri(session.getSession(), _sizeStorerUri)) {
         LOGV2(22316, "Repairing size cache");
 
         auto status = _salvageIfNeeded(_sizeStorerUri.c_str());
@@ -582,7 +590,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             fassertNoTrace(28577, status);
     }
 
-    _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri);
+    _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
     _runTimeConfigParam.reset(makeServerParameter<WiredTigerEngineRuntimeConfigParameter>(
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
     _runTimeConfigParam->_data.second = this;
@@ -738,7 +746,9 @@ void WiredTigerKVEngine::cleanShutdown() {
 
     _sessionCache->shuttingDown();
 
-    syncSizeInfo(/*syncToDisk=*/true);
+    if (!_readOnly) {
+        syncSizeInfo(/*syncToDisk=*/true);
+    }
 
     // The size storer has to be destructed after the session cache has shut down. This sets the
     // shutdown flag internally in the session cache. As operations get interrupted during shutdown,
@@ -778,7 +788,7 @@ void WiredTigerKVEngine::cleanShutdown() {
         quickExit(EXIT_SUCCESS);
     }
 
-    if (_fileVersion.shouldDowngrade(!_recoveryTimestamp.isNull())) {
+    if (_fileVersion.shouldDowngrade(_readOnly, !_recoveryTimestamp.isNull())) {
         auto startTime = Date_t::now();
         LOGV2(22324,
               "Closing WiredTiger in preparation for reconfiguring",
@@ -1619,6 +1629,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     params.isLogged = isLogged;
     params.cappedCallback = nullptr;
     params.sizeStorer = _sizeStorer.get();
+    params.isReadOnly = _readOnly;
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = options.timeseries != boost::none;
 
@@ -1727,21 +1738,33 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
     if (desc->isIdIndex()) {
         invariant(!collOptions.clusteredIndex);
         return std::make_unique<WiredTigerIdIndex>(
-            opCtx, _uri(ident), ident, desc, WiredTigerUtil::useTableLogging(nss));
+            opCtx, _uri(ident), ident, desc, WiredTigerUtil::useTableLogging(nss), _readOnly);
     }
     auto keyFormat = (collOptions.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
     if (desc->unique()) {
-        return std::make_unique<WiredTigerIndexUnique>(
-            opCtx, _uri(ident), ident, keyFormat, desc, WiredTigerUtil::useTableLogging(nss));
+        return std::make_unique<WiredTigerIndexUnique>(opCtx,
+                                                       _uri(ident),
+                                                       ident,
+                                                       keyFormat,
+                                                       desc,
+                                                       WiredTigerUtil::useTableLogging(nss),
+                                                       _readOnly);
     }
 
-    return std::make_unique<WiredTigerIndexStandard>(
-        opCtx, _uri(ident), ident, keyFormat, desc, WiredTigerUtil::useTableLogging(nss));
+    return std::make_unique<WiredTigerIndexStandard>(opCtx,
+                                                     _uri(ident),
+                                                     ident,
+                                                     keyFormat,
+                                                     desc,
+                                                     WiredTigerUtil::useTableLogging(nss),
+                                                     _readOnly);
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                           StringData ident,
                                                                           KeyFormat keyFormat) {
+    invariant(!_readOnly || !recoverToOplogTimestamp.empty());
+
     _ensureIdentPath(ident);
     WiredTigerSession wtSession(_conn);
 
@@ -1782,6 +1805,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     params.sizeStorer = nullptr;
     // Temporary collections do not need to reconcile collection size/counts.
     params.tracksSizeAdjustments = false;
+    params.isReadOnly = false;
     params.forceUpdateWithFullDocument = false;
 
     std::unique_ptr<WiredTigerRecordStore> rs;
@@ -1947,7 +1971,7 @@ bool WiredTigerKVEngine::haveDropsQueued() const {
     Date_t now = _clockSource->now();
     Milliseconds delta = now - Date_t::fromMillisSinceEpoch(_previousCheckedDropsQueued.load());
 
-    if (_sizeStorerSyncTracker.intervalHasElapsed()) {
+    if (!_readOnly && _sizeStorerSyncTracker.intervalHasElapsed()) {
         _sizeStorerSyncTracker.resetLastTime();
         syncSizeInfo(false);
     }
@@ -2495,7 +2519,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
         _highestSeenDurableTimestamp = stableTimestamp.asULL();
     }
 
-    _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri);
+    _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
 
     // SERVER-85167: restart the cache after resetting the size storer.
     _sessionCache->restart();
@@ -2580,6 +2604,10 @@ StatusWith<Timestamp> WiredTigerKVEngine::getOplogNeededForRollback() const {
 
 boost::optional<Timestamp> WiredTigerKVEngine::getOplogNeededForCrashRecovery() const {
     if (_ephemeral) {
+        return boost::none;
+    }
+
+    if (_readOnly) {
         return boost::none;
     }
 

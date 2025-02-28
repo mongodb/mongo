@@ -91,7 +91,7 @@ TEST_F(EphemeralForTestRecoveryUnitTestHarness, AbandonSnapshotAbortMode) {
 
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     opCtx->lockState()->beginWriteUnitOfWork();
-    ru->beginUnitOfWork(opCtx->readOnly());
+    ru->beginUnitOfWork(opCtx.get());
     StatusWith<RecordId> rid1 = rs->insertRecord(opCtx.get(), "ABC", 3, Timestamp());
     StatusWith<RecordId> rid2 = rs->insertRecord(opCtx.get(), "123", 3, Timestamp());
     ASSERT_TRUE(rid1.isOK());

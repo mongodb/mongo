@@ -40,6 +40,8 @@ class OperationContext;
 
 class RecoveryUnitNoop : public RecoveryUnit {
 public:
+    void beginUnitOfWork(OperationContext* opCtx) final {}
+
     bool waitUntilDurable(OperationContext* opCtx) override {
         return true;
     }
@@ -57,8 +59,6 @@ public:
     }
 
 private:
-    void doBeginUnitOfWork() final {}
-
     void doCommitUnitOfWork() final {
         _executeCommitHandlers(boost::none);
     }

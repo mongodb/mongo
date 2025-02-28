@@ -83,7 +83,7 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
         JournalFlusher::get(serviceContext)->go();
     }
 
-    if (!storageEngine->isEphemeral() && !storageGlobalParams.queryableBackupMode) {
+    if (!storageEngine->isEphemeral() && !storageGlobalParams.readOnly) {
         std::unique_ptr<Checkpointer> checkpointer =
             std::make_unique<Checkpointer>(storageEngine->getEngine());
         checkpointer->go();

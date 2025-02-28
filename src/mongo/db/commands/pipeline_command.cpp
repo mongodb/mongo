@@ -74,7 +74,6 @@ public:
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
         const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
-            opCtx,
             opMsgRequest.getDatabase().toString(),
             opMsgRequest.body,
             explainVerbosity,

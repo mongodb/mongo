@@ -679,7 +679,7 @@ Status Pipeline::_pipelineCanRunOnMongoS() const {
         const bool mustWriteToDisk =
             (constraints.diskRequirement == DiskUseRequirement::kWritesPersistentData);
         const bool mayWriteTmpDataAndDiskUseIsAllowed =
-            (pCtx->allowDiskUse && !pCtx->opCtx->readOnly() &&
+            (pCtx->allowDiskUse && !storageGlobalParams.readOnly &&
              constraints.diskRequirement == DiskUseRequirement::kWritesTmpData);
         const bool needsDisk = (mustWriteToDisk || mayWriteTmpDataAndDiskUseIsAllowed);
 

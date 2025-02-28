@@ -92,29 +92,6 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
     _executeCommitHandlers(commitTimestamp);
 }
 
-void RecoveryUnit::beginUnitOfWork(bool readOnly) {
-    _readOnly = readOnly;
-    if (!_readOnly) {
-        doBeginUnitOfWork();
-    }
-}
-
-void RecoveryUnit::commitUnitOfWork() {
-    invariant(!_readOnly);
-    doCommitUnitOfWork();
-    assignNextSnapshotId();
-}
-
-void RecoveryUnit::abortUnitOfWork() {
-    invariant(!_readOnly);
-    doAbortUnitOfWork();
-    assignNextSnapshotId();
-}
-
-void RecoveryUnit::endReadOnlyUnitOfWork() {
-    _readOnly = false;
-}
-
 void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimestamp) {
     for (auto& change : _changes) {
         try {
@@ -181,8 +158,9 @@ void RecoveryUnit::_executeRollbackHandlers() {
 }
 
 void RecoveryUnit::validateInUnitOfWork() const {
-    invariant(_inUnitOfWork() || _readOnly,
-              fmt::format("state: {}, readOnly: {}", toString(_getState()), _readOnly));
+    invariant(_inUnitOfWork() || storageGlobalParams.readOnly,
+              fmt::format(
+                  "state: {}, readOnly: {}", toString(_getState()), storageGlobalParams.readOnly));
 }
 
 }  // namespace mongo

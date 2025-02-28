@@ -125,7 +125,8 @@ public:
                                                  wiredTigerGlobalOptions.getMaxHistoryFileSizeMB(),
                                                  params.dur,
                                                  params.ephemeral,
-                                                 params.repair);
+                                                 params.repair,
+                                                 params.readOnly);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
 
@@ -202,7 +203,7 @@ public:
         return builder.obj();
     }
 
-    bool supportsQueryableBackupMode() const final {
+    bool supportsReadOnly() const final {
         return true;
     }
 };

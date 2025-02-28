@@ -71,7 +71,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     string indexUri = WiredTigerKVEngine::kTableUriPrefix + "myindex";
-    WiredTigerSizeStorer ss(harnessHelper->conn(), indexUri);
+    const bool enableWtLogging = false;
+    WiredTigerSizeStorer ss(harnessHelper->conn(), indexUri, enableWtLogging);
     checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
 
     int N = 12;
@@ -113,6 +114,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.isLogged = false;
         params.cappedCallback = nullptr;
         params.sizeStorer = &ss;
+        params.isReadOnly = false;
         params.tracksSizeAdjustments = true;
         params.forceUpdateWithFullDocument = false;
 
@@ -141,7 +143,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     }
 
     {
-        WiredTigerSizeStorer ss2(harnessHelper->conn(), indexUri);
+        const bool enableWtLogging = false;
+        WiredTigerSizeStorer ss2(harnessHelper->conn(), indexUri, enableWtLogging);
         auto info = ss2.load(uri);
         ASSERT_EQUALS(N, info->numRecords.load());
     }
@@ -153,8 +156,11 @@ class SizeStorerUpdateTest : public mongo::unittest::Test {
 private:
     virtual void setUp() {
         harnessHelper.reset(new WiredTigerHarnessHelper());
-        sizeStorer.reset(new WiredTigerSizeStorer(
-            harnessHelper->conn(), WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
+        const bool enableWtLogging = false;
+        sizeStorer.reset(
+            new WiredTigerSizeStorer(harnessHelper->conn(),
+                                     WiredTigerKVEngine::kTableUriPrefix + "sizeStorer",
+                                     enableWtLogging));
         rs = harnessHelper->newRecordStore();
         WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
         wtrs->setSizeStorer(sizeStorer.get());
