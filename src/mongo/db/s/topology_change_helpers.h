@@ -132,16 +132,6 @@ enum UserWriteBlockingLevel {
 };
 
 /**
- * Deletes all documents in the given collection
- */
-void deleteAllDocumentsInCollection(
-    OperationContext* opCtx,
-    RemoteCommandTargeter& targeter,
-    const NamespaceString& nss,
-    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
-    std::shared_ptr<executor::TaskExecutor> executor);
-
-/**
  * Sets the user write blocking state on a given target
  *
  * @param opCtx: The operation context
@@ -175,13 +165,6 @@ std::vector<DatabaseName> getDBNamesListFromReplicaSet(
  * Removes the replica set monitor of the given connection
  */
 void removeReplicaSetMonitor(OperationContext* opCtx, const ConnectionString& connectionString);
-
-/**
- * Sends 'hello' to the given replica set, and gives back the answer
- */
-BSONObj greetReplicaSet(OperationContext* opCtx,
-                        RemoteCommandTargeter& targeter,
-                        std::shared_ptr<executor::TaskExecutor> executorForAddShard);
 
 /**
  * Validates that the specified endpoint can serve as a shard server. In particular, this
@@ -222,15 +205,6 @@ void createShardIdentity(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
     const std::string& shardName,
-    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
-    std::shared_ptr<executor::TaskExecutor> executor);
-
-/**
- * Remove all existing cluster parameters set on the replica set.
- */
-void removeAllClusterParametersFromReplicaSet(
-    OperationContext* opCtx,
-    RemoteCommandTargeter& targeter,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor);
 

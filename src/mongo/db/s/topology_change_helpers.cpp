@@ -526,6 +526,107 @@ std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
                          executor);
 }
 
+void deleteAllDocumentsInCollection(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    const NamespaceString& nss,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    // We need to fetch manually rather than using Shard::runExhaustiveCursorCommand because
+    // ShardRemote uses the FixedTaskExecutor which checks that the host being targeted is a
+    // fully added shard already
+    auto fetcherStatus =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+    std::vector<BSONObj> docsToDelete;
+    auto fetcher = createFindFetcher(
+        opCtx,
+        targeter,
+        nss,
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        [&](const std::vector<BSONObj>& docs) -> bool {
+            for (const BSONObj& doc : docs) {
+                docsToDelete.emplace_back(doc.getOwned());
+            }
+            return true;
+        },
+        [&](const Status& status) { fetcherStatus = status; },
+        executor);
+    uassertStatusOK(fetcher->schedule());
+    uassertStatusOK(fetcher->join(opCtx));
+    uassertStatusOK(fetcherStatus);
+
+    const auto sendDelete = [&](std::vector<mongo::write_ops::DeleteOpEntry>&& deleteOps) {
+        if (deleteOps.empty()) {
+            return;
+        }
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setDeletes(deleteOps);
+        generic_argument_util::setMajorityWriteConcern(deleteOp);
+        if (osiGenerator) {
+            auto const osi = (*osiGenerator)(opCtx);
+            generic_argument_util::setOperationSessionInfo(deleteOp, osi);
+        }
+
+        const auto commandResponse = topology_change_helpers::runCommandForAddShard(
+            opCtx, targeter, nss.dbName(), deleteOp.toBSON(), executor);
+        uassertStatusOK(getStatusFromWriteCommandReply(commandResponse.response));
+    };
+
+    std::vector<mongo::write_ops::DeleteOpEntry> deleteOps;
+    deleteOps.reserve(write_ops::kMaxWriteBatchSize);
+    for (auto& element : docsToDelete) {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(std::move(element));
+        entry.setMulti(false);
+        deleteOps.emplace_back(std::move(entry));
+
+        if (deleteOps.size() == write_ops::kMaxWriteBatchSize) {
+            sendDelete(std::move(deleteOps));
+            deleteOps = std::vector<mongo::write_ops::DeleteOpEntry>();
+            deleteOps.reserve(write_ops::kMaxWriteBatchSize);
+        }
+    }
+    sendDelete(std::move(deleteOps));
+}
+
+BSONObj greetReplicaSet(OperationContext* opCtx,
+                        RemoteCommandTargeter& targeter,
+                        std::shared_ptr<executor::TaskExecutor> executor) {
+
+    boost::optional<Shard::CommandResponse> commandResponse;
+    try {
+        commandResponse = topology_change_helpers::runCommandForAddShard(
+            opCtx, targeter, DatabaseName::kAdmin, BSON("hello" << 1), executor);
+    } catch (ExceptionFor<ErrorCodes::IncompatibleServerVersion>& ex) {
+        uassertStatusOK(ex.toStatus().withReason(
+            str::stream() << "Cannot add " << targeter.connectionString().toString()
+                          << " as a shard because its binary version is not compatible with the "
+                             "cluster's featureCompatibilityVersion."));
+    }
+
+    // Check for a command response error
+    uassertStatusOKWithContext(commandResponse->commandStatus,
+                               str::stream() << "Error running 'hello' against "
+                                             << targeter.connectionString().toString());
+
+    return std::move(commandResponse->response);
+}
+
+void removeAllClusterParametersFromReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    auto tenantsOnTarget =
+        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, targeter, executor));
+
+    // Remove possible leftovers config.clusterParameters documents from the new shard.
+    for (const auto& tenantId : tenantsOnTarget) {
+        const auto& nss = NamespaceString::makeClusterParametersNSS(tenantId);
+        deleteAllDocumentsInCollection(opCtx, targeter, nss, osiGenerator, executor);
+    }
+}
+
 }  // namespace
 
 namespace add_shard_util {
@@ -752,69 +853,6 @@ Shard::CommandResponse runCommandForAddShard(OperationContext* opCtx,
                                   std::move(writeConcernStatus));
 }
 
-void deleteAllDocumentsInCollection(
-    OperationContext* opCtx,
-    RemoteCommandTargeter& targeter,
-    const NamespaceString& nss,
-    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
-    std::shared_ptr<executor::TaskExecutor> executor) {
-    // We need to fetch manually rather than using Shard::runExhaustiveCursorCommand because
-    // ShardRemote uses the FixedTaskExecutor which checks that the host being targeted is a
-    // fully added shard already
-    auto fetcherStatus =
-        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
-    std::vector<BSONObj> docsToDelete;
-    auto fetcher = createFindFetcher(
-        opCtx,
-        targeter,
-        nss,
-        repl::ReadConcernLevel::kMajorityReadConcern,
-        [&](const std::vector<BSONObj>& docs) -> bool {
-            for (const BSONObj& doc : docs) {
-                docsToDelete.emplace_back(doc.getOwned());
-            }
-            return true;
-        },
-        [&](const Status& status) { fetcherStatus = status; },
-        executor);
-    uassertStatusOK(fetcher->schedule());
-    uassertStatusOK(fetcher->join(opCtx));
-    uassertStatusOK(fetcherStatus);
-
-    const auto sendDelete = [&](std::vector<mongo::write_ops::DeleteOpEntry>&& deleteOps) {
-        if (deleteOps.empty()) {
-            return;
-        }
-        write_ops::DeleteCommandRequest deleteOp(nss);
-        deleteOp.setDeletes(deleteOps);
-        generic_argument_util::setMajorityWriteConcern(deleteOp);
-        if (osiGenerator) {
-            auto const osi = (*osiGenerator)(opCtx);
-            generic_argument_util::setOperationSessionInfo(deleteOp, osi);
-        }
-
-        const auto commandResponse =
-            runCommandForAddShard(opCtx, targeter, nss.dbName(), deleteOp.toBSON(), executor);
-        uassertStatusOK(getStatusFromWriteCommandReply(commandResponse.response));
-    };
-
-    std::vector<mongo::write_ops::DeleteOpEntry> deleteOps;
-    deleteOps.reserve(write_ops::kMaxWriteBatchSize);
-    for (auto& element : docsToDelete) {
-        write_ops::DeleteOpEntry entry;
-        entry.setQ(std::move(element));
-        entry.setMulti(false);
-        deleteOps.emplace_back(std::move(entry));
-
-        if (deleteOps.size() == write_ops::kMaxWriteBatchSize) {
-            sendDelete(std::move(deleteOps));
-            deleteOps = std::vector<mongo::write_ops::DeleteOpEntry>();
-            deleteOps.reserve(write_ops::kMaxWriteBatchSize);
-        }
-    }
-    sendDelete(std::move(deleteOps));
-}
-
 void setUserWriteBlockingState(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
@@ -907,29 +945,6 @@ void removeReplicaSetMonitor(OperationContext* opCtx, const ConnectionString& co
         // added, it will be recreated.
         ReplicaSetMonitor::remove(connectionString.getSetName());
     }
-}
-
-BSONObj greetReplicaSet(OperationContext* opCtx,
-                        RemoteCommandTargeter& targeter,
-                        std::shared_ptr<executor::TaskExecutor> executor) {
-
-    boost::optional<Shard::CommandResponse> commandResponse;
-    try {
-        commandResponse = runCommandForAddShard(
-            opCtx, targeter, DatabaseName::kAdmin, BSON("hello" << 1), executor);
-    } catch (ExceptionFor<ErrorCodes::IncompatibleServerVersion>& ex) {
-        uassertStatusOK(ex.toStatus().withReason(
-            str::stream() << "Cannot add " << targeter.connectionString().toString()
-                          << " as a shard because its binary version is not compatible with the "
-                             "cluster's featureCompatibilityVersion."));
-    }
-
-    // Check for a command response error
-    uassertStatusOKWithContext(commandResponse->commandStatus,
-                               str::stream() << "Error running 'hello' against "
-                                             << targeter.connectionString().toString());
-
-    return std::move(commandResponse->response);
 }
 
 void validateHostAsShard(OperationContext* opCtx,
@@ -1177,23 +1192,6 @@ void createShardIdentity(
     uassertStatusOK(response.commandStatus);
 }
 
-void removeAllClusterParametersFromReplicaSet(
-    OperationContext* opCtx,
-    RemoteCommandTargeter& targeter,
-    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
-    std::shared_ptr<executor::TaskExecutor> executor) {
-    auto tenantsOnTarget =
-        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, targeter, executor));
-
-    // Remove possible leftovers config.clusterParameters documents from the new shard.
-    for (const auto& tenantId : tenantsOnTarget) {
-        const auto& nss = NamespaceString::makeClusterParametersNSS(tenantId);
-
-        topology_change_helpers::deleteAllDocumentsInCollection(
-            opCtx, targeter, nss, osiGenerator, executor);
-    }
-}
-
 void setClusterParametersOnReplicaSet(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
@@ -1201,8 +1199,7 @@ void setClusterParametersOnReplicaSet(
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor) {
     // First, remove all existing parameters from the new shard.
-    topology_change_helpers::removeAllClusterParametersFromReplicaSet(
-        opCtx, targeter, osiGenerator, executor);
+    removeAllClusterParametersFromReplicaSet(opCtx, targeter, osiGenerator, executor);
 
     LOGV2(6360600, "Pushing cluster parameters into new shard");
 
