@@ -203,7 +203,9 @@ server_parameters:
         description: >-
             Set this to specify the maximum number of times the oplog fetcher will
             consecutively restart the oplog tailing query on non-cancellation errors
-            during steady state replication.
+            during steady state replication. Exponential backoff is implemented between 
+            each restart, starting by waiting 5ms on the first restart and doubling 
+            the wait on each subsequent restart, with an upper limit of 500ms.
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogFetcherSteadyStateMaxFetcherRestarts
@@ -217,7 +219,11 @@ server_parameters:
             Set this to specify the maximum number of times the oplog fetcher will
             consecutively restart the oplog tailing query on non-cancellation errors
             during initial sync. By default we provide a generous amount of restarts
-            to avoid potentially restarting an entire initial sync from scratch.
+            to avoid potentially restarting an entire initial sync from scratch. 
+            Exponential backoff is implemented between each restart, starting
+            by waiting 5ms on the first restart and doubling the wait on each 
+            subsequent restart, with an upper limit of 500ms. As a result, the default 
+            of 10 total restarts will take approximately ~2 seconds total.
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogFetcherInitialSyncMaxFetcherRestarts

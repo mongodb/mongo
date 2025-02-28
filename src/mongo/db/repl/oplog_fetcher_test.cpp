@@ -2723,4 +2723,46 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesRequestResumeTokenWhenRequested
     oplogFetcher->join();
 }
 
+TEST_F(OplogFetcherTest, BSONObjectTooLargeShutsDownOplogFetcher) {
+    // Test that if find command succeeds, and second batch fails
+    // because large BSON document and metadata combined exceeds BSON size limit, the oplog fetcher
+    // does not retry and shuts down on error BSONObjectTooLarge.
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher with 10 retries to ensure the oplog fetcher shuts down without
+    // retrying on this error.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 10);
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto firstBatch = {firstEntry, secondEntry};
+
+    // Update lastFetched before it is updated by getting the next batch.
+    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+
+    // Creating the cursor will succeed.
+    auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
+                                          makeFirstBatch(cursorId, firstBatch, metadataObj),
+                                          true);
+
+    validateFindCommand(
+        m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    // Check that the first batch was successfully processed.
+    validateLastBatch(
+        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+
+    // Process second batch that throws BSONObjectTooLarge.
+    processSingleRequestResponse(
+        oplogFetcher->getDBClientConnection_forTest(),
+        mongo::Status{mongo::ErrorCodes::BSONObjectTooLarge, "BSONObjectTooLarge"});
+
+    oplogFetcher->join();
+
+    // Assert that the oplog fetcher shuts down with error BSONObjectTooLarge.
+    ASSERT_EQUALS(ErrorCodes::BSONObjectTooLarge, shutdownState.getStatus());
+}
+
 }  // namespace
