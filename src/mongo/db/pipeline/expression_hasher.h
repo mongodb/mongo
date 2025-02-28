@@ -204,6 +204,7 @@ public:
         kInternalIndexKey,
         kInternalKeyStringValue,
         kCurrentDate,
+        kUUID,
     };
 
     explicit ExpressionHashVisitor(H hashState) : _hashState(std::move(hashState)) {}
@@ -836,6 +837,10 @@ public:
 
     void visit(const ExpressionInternalKeyStringValue* expr) final {
         combine(OpType::kInternalKeyStringValue);
+    }
+
+    void visit(const ExpressionUUID* expr) final {
+        combine(OpType::kUUID);
     }
 
     H moveHashState() {

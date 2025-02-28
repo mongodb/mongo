@@ -233,6 +233,10 @@ public:
         _deps->needRandomGenerator = true;
     }
 
+    void visit(const ExpressionUUID* expr) final {
+        _deps->needRandomGenerator = true;
+    }
+
     void visit(const ExpressionFieldPath* expr) final {
         if (!expr->isVariableReference()) {  // includes CURRENT when it is equivalent to ROOT.
             if (expr->getFieldPath().getPathLength() == 1) {
@@ -294,6 +298,7 @@ public:
     void visit(const ExpressionLet* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
     void visit(const ExpressionRandom* expr) final {}
+    void visit(const ExpressionUUID* expr) final {}
     void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {}
 
 private:

@@ -224,3 +224,9 @@ feature_flags:
       cpp_varname: gFeatureFlagSbeUpgradeBinaryTrees
       default: false
       shouldBeFCVGated: false
+
+    featureFlagUUIDExpression:
+      description: "Feature flag to enable $uuid expression"
+      cpp_varname: gFeatureFlagUUIDExpression
+      default: false
+      shouldBeFCVGated: true

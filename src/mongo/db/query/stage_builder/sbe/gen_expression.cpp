@@ -430,6 +430,7 @@ public:
     void visit(const ExpressionInternalOwningShard* expr) final {}
     void visit(const ExpressionInternalIndexKey* expr) final {}
     void visit(const ExpressionInternalKeyStringValue* expr) final {}
+    void visit(const ExpressionUUID* expr) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -609,6 +610,7 @@ public:
     void visit(const ExpressionInternalOwningShard* expr) final {}
     void visit(const ExpressionInternalIndexKey* expr) final {}
     void visit(const ExpressionInternalKeyStringValue* expr) final {}
+    void visit(const ExpressionUUID* expr) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -3596,6 +3598,11 @@ public:
 
     void visit(const ExpressionSetField* expr) final {
         unsupportedExpression("$setField");
+    }
+
+    void visit(const ExpressionUUID* expr) final {
+        // TODO(SERVER-101161): Support $uuid in SBE.
+        unsupportedExpression("$uuid");
     }
 
     void visit(const ExpressionTsSecond* expr) final {

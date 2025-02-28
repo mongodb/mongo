@@ -4838,6 +4838,45 @@ Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables
     return exec::expression::evaluate(*this, root, variables);
 }
 
+/* -------------------------- ExpressionUUID ------------------------------ */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(uuid,
+                                      ExpressionUUID::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      feature_flags::gFeatureFlagUUIDExpression);
+
+ExpressionUUID::ExpressionUUID(ExpressionContext* const expCtx) : Expression(expCtx) {
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+}
+
+intrusive_ptr<Expression> ExpressionUUID::parse(ExpressionContext* const expCtx,
+                                                BSONElement exprElement,
+                                                const VariablesParseState& vps) {
+    uassert(10081900,
+            "$uuid not allowed inside collection validators",
+            !expCtx->getIsParsingCollectionValidator());
+
+    uassert(10081901, "$uuid does not accept arguments", exprElement.Obj().isEmpty());
+
+    return new ExpressionUUID(expCtx);
+}
+
+const char* ExpressionUUID::getOpName() const {
+    return "$uuid";
+}
+
+Value ExpressionUUID::evaluate(const Document& root, Variables* variables) const {
+    return Value(UUID::gen());
+}
+
+intrusive_ptr<Expression> ExpressionUUID::optimize() {
+    return intrusive_ptr<Expression>(this);
+}
+
+Value ExpressionUUID::serialize(const SerializationOptions& options) const {
+    return Value(DOC(getOpName() << Document()));
+}
+
 /* --------------------------------- Parenthesis --------------------------------------------- */
 
 REGISTER_STABLE_EXPRESSION(expr, parseParenthesisExprObj);
