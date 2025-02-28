@@ -299,6 +299,7 @@ struct TestOptions {
     bool noChunksToCopy;
     bool storeOplogFetcherProgress = true;
     bool performVerification = true;
+    bool isNoRefreshEnabled;
 
     BSONObj toBSON() const {
         BSONObjBuilder bob;
@@ -307,6 +308,7 @@ struct TestOptions {
         bob.append("noChunksToCopy", noChunksToCopy);
         bob.append("storeOplogFetcherProgress", storeOplogFetcherProgress);
         bob.append("performVerification", performVerification);
+        bob.append("isNoRefreshEnabled", isNoRefreshEnabled);
         return bob.obj();
     }
 };
@@ -315,7 +317,12 @@ std::vector<TestOptions> makeBasicTestOptions() {
     std::vector<TestOptions> testOptions;
     for (bool isAlsoDonor : {false, true}) {
         for (bool skipCloningAndApplying : {false, true}) {
-            testOptions.push_back({isAlsoDonor, skipCloningAndApplying});
+            for (bool isNoRefreshEnabled : {false, true}) {
+                RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+                    "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
+
+                testOptions.push_back({isAlsoDonor, isNoRefreshEnabled, skipCloningAndApplying});
+            }
         }
     }
     return testOptions;
@@ -328,15 +335,22 @@ std::vector<TestOptions> makeAllTestOptions() {
             for (bool noChunksToCopy : {false, true}) {
                 for (bool storeOplogFetcherProgress : {false, true}) {
                     for (bool performVerification : {false, true}) {
-                        if (skipCloningAndApplying && !noChunksToCopy) {
-                            // This is an invalid combination.
-                            continue;
+                        for (bool isNoRefreshEnabled : {false, true}) {
+                            if (skipCloningAndApplying && !noChunksToCopy) {
+                                // This is an invalid combination.
+                                continue;
+                            }
+
+                            RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+                                "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
+
+                            testOptions.push_back({isAlsoDonor,
+                                                   skipCloningAndApplying,
+                                                   noChunksToCopy,
+                                                   storeOplogFetcherProgress,
+                                                   performVerification,
+                                                   isNoRefreshEnabled});
                         }
-                        testOptions.push_back({isAlsoDonor,
-                                               skipCloningAndApplying,
-                                               noChunksToCopy,
-                                               storeOplogFetcherProgress,
-                                               performVerification});
                     }
                 }
             }
@@ -1161,18 +1175,10 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                                                           RecipientStateEnum::kStrictConsistency,
                                                           RecipientStateEnum::kDone};
     for (const auto& testOptions : makeBasicTestOptions()) {
-        bool isNoRefreshEnabled = false;
-        if (_random.nextInt32(2) == 0) {
-            isNoRefreshEnabled = true;
-        }
         LOGV2(5551106,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions,
-              "noRefreshEnabled"_attr = isNoRefreshEnabled);
-
-        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
+              "testOptions"_attr = testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
         auto doc = makeRecipientDocument(testOptions);
@@ -1728,18 +1734,10 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
                                                           RecipientStateEnum::kDone};
 
     for (auto& testOptions : makeAllTestOptions()) {
-        bool isNoRefreshEnabled = false;
-        if (_random.nextInt32(2) == 0) {
-            isNoRefreshEnabled = true;
-        }
         LOGV2(9297807,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions,
-              "noRefreshEnabled"_attr = isNoRefreshEnabled);
-
-        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
+              "testOptions"_attr = testOptions);
         setNoChunksToCopy(testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
@@ -1862,18 +1860,10 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                                                           RecipientStateEnum::kDone};
 
     for (const auto& testOptions : makeAllTestOptions()) {
-        bool isNoRefreshEnabled = false;
-        if (_random.nextInt32(2) == 0) {
-            isNoRefreshEnabled = true;
-        }
         LOGV2(9297808,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions,
-              "noRefreshEnabled"_attr = isNoRefreshEnabled);
-
-        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
+              "testOptions"_attr = testOptions);
         setNoChunksToCopy(testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
