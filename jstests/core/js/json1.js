@@ -56,8 +56,11 @@ assertToJson({
     assertMsg: "C3",
     logFormat: "json"
 });
-assertToJson(
-    {fn: () => toEJSON(x), expectedStr: '{"x":null,"y":true,"z":123,"w":"foo"}', assertMsg: "C4"});
+assertToJson({
+    fn: () => toEJSON(x),
+    expectedStr: '{"x":null,"y":true,"z":123,"w":"foo","a":{"$undefined":true}}',
+    assertMsg: "C4"
+});
 
 x = {
     "x": [],
@@ -405,7 +408,7 @@ assert.eq(
 assertToJson({
     fn: () => toEJSON(x),
     expectedStr:
-        '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_pointer":{"ns":"test","id":{"$oid":"579a70d9e249393f153b5bc1"}},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"},"data_date":{"$date":"1970-01-01T23:59:59.999+00:00"}}',
+        '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_pointer":{"ns":"test","id":{"$oid":"579a70d9e249393f153b5bc1"}},"data_undefined":{"$undefined":true},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"},"data_date":{"$date":"1970-01-01T23:59:59.999+00:00"}}',
     assertMsg: "N1"
 });
 // Serialize recursive object
@@ -452,4 +455,14 @@ assertToJson({
     fn: () => toEJSON(new SyntaxError(stringThatNeedsEscaping)),
     expectedStr: '{"$error":"ho\\\"la"}',
     assertMsg: "O6"
+});
+
+// Serialize 'undefined'
+assertToJson({fn: () => toEJSON(undefined), expectedStr: '{"$undefined":true}', assertMsg: "P1"});
+assertToJson(
+    {fn: () => toEJSON([undefined]), expectedStr: '[{"$undefined":true}]', assertMsg: "P2"});
+assertToJson({
+    fn: () => toEJSON({hello: undefined}),
+    expectedStr: '{"hello":{"$undefined":true}}',
+    assertMsg: "P3"
 });
