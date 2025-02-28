@@ -28,53 +28,66 @@
  */
 
 #include "mongo/db/version_context.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 
 using FCVSnapshot = ServerGlobalParams::FCVSnapshot;
 
-VersionContext::VersionContext(FCV fcv) {
-    _metadata.emplace(fcv);
-}
+VersionContext::VersionContext(FCV fcv)
+    : _metadataOrTag(std::in_place_type<VersionContextMetadata>, fcv) {}
 
-VersionContext::VersionContext(FCVSnapshot fcv) {
-    _metadata.emplace(fcv.getVersion());
-}
+VersionContext::VersionContext(FCVSnapshot fcv)
+    : _metadataOrTag(std::in_place_type<VersionContextMetadata>, fcv.getVersion()) {}
 
 VersionContext::VersionContext(const BSONObj& bsonObject) {
     if (bsonObject.isEmpty()) {
         return;
     }
-    _metadata =
+    _metadataOrTag =
         VersionContextMetadata::parse(IDLParserContext("VersionContextMetadata"), bsonObject);
 }
 
 VersionContext& VersionContext::operator=(const VersionContext& other) {
     _assertOFCVNotInitialized();
-    _metadata = other._metadata;
+    _metadataOrTag = other._metadataOrTag;
     return *this;
 }
 
 void VersionContext::setOperationFCV(FCV fcv) {
     _assertOFCVNotInitialized();
-    _metadata.emplace(fcv);
+    _metadataOrTag.emplace<VersionContextMetadata>(fcv);
 }
 
 void VersionContext::setOperationFCV(FCVSnapshot fcv) {
     _assertOFCVNotInitialized();
-    _metadata.emplace(fcv.getVersion());
+    _metadataOrTag.emplace<VersionContextMetadata>(fcv.getVersion());
 }
 
 boost::optional<FCVSnapshot> VersionContext::getOperationFCV() const {
-    return _metadata ? boost::optional<FCVSnapshot>{_metadata->getOFCV()} : boost::none;
+    return visit(OverloadedVisitor{[](const VersionContextMetadata& metadata) {
+                                       return boost::optional<FCVSnapshot>{metadata.getOFCV()};
+                                   },
+                                   [](auto&&) {
+                                       return boost::optional<FCVSnapshot>{};
+                                   }},
+                 _metadataOrTag);
 }
 
 BSONObj VersionContext::toBSON() const {
-    return _metadata ? _metadata->toBSON() : BSONObj();
+    return visit(
+        OverloadedVisitor{[](OperationWithoutOFCVTag) { return BSONObj(); },
+                          [](const VersionContextMetadata& metadata) { return metadata.toBSON(); },
+                          [](auto&&) -> BSONObj {
+                              MONGO_UNREACHABLE;
+                          }},
+        _metadataOrTag);
 }
 
 void VersionContext::_assertOFCVNotInitialized() const {
-    uassert(ErrorCodes::AlreadyInitialized, "The operation FCV has already been set.", !_metadata);
+    uassert(ErrorCodes::AlreadyInitialized,
+            "The operation FCV has already been set.",
+            std::holds_alternative<OperationWithoutOFCVTag>(_metadataOrTag));
 }
 
 }  // namespace mongo

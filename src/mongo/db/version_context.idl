@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/feature_compatibility_version_parser.h"
 
 imports:
      - "mongo/db/basic_types.idl"

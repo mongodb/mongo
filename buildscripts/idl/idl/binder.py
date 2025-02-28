@@ -1650,7 +1650,7 @@ def _bind_feature_flags(ctxt, param):
             ctxt.add_feature_flag_default_true_missing_version(param)
             return None
 
-        ast_param.cpp_vartype = "::mongo::FCVGatedFeatureFlag"
+        ast_param.cpp_vartype = "::mongo::LegacyContextUnawareFCVGatedFeatureFlag"
         expr.expr = f'{param.default.literal}, "{param.version or ""}"_sd'
     else:
         # Feature flags that should not be FCV gated must not have a version

@@ -75,6 +75,7 @@
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/db/update/pattern_cmp.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/pcre.h"
@@ -149,17 +150,17 @@ class BSONElement;
  * parser and enforce the 'sometimes' behavior during that invocation. No extra validation will be
  * done here.
  */
-#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                                  \
-    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)          \
-    REGISTER_EXPRESSION_CONDITIONALLY(                                          \
-        key,                                                                    \
-        parser,                                                                 \
-        allowedWithApiStrict,                                                   \
-        allowedClientType,                                                      \
-        featureFlag,                                                            \
-        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) { \
-            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(         \
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());  \
+#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                                                    \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)                            \
+    REGISTER_EXPRESSION_CONDITIONALLY(                                                            \
+        key,                                                                                      \
+        parser,                                                                                   \
+        allowedWithApiStrict,                                                                     \
+        allowedClientType,                                                                        \
+        featureFlag,                                                                              \
+        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {                   \
+            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                           \
+                kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()); \
         }))
 
 /**

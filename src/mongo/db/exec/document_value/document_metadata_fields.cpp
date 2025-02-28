@@ -36,6 +36,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -231,6 +233,15 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
             break;
         default:
             MONGO_UNREACHABLE_TASSERT(9733902);
+    }
+}
+
+void DocumentMetadataFields::setScore(double score, bool featureFlagAlreadyValidated) {
+    if (featureFlagAlreadyValidated ||
+        feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        _setCommon(MetaType::kScore);
+        _holder->score = score;
     }
 }
 

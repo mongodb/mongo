@@ -41,6 +41,14 @@ TEST(VersionContextTest, DefaultConstructorDoesNotInitializeOFCV) {
     ASSERT_FALSE(vCtx.getOperationFCV().has_value());
 }
 
+TEST(VersionContextTest, NoVersionContextHasNoOperationFCV) {
+    ASSERT_FALSE(kNoVersionContext.getOperationFCV().has_value());
+}
+
+TEST(VersionContextTest, VersionContextIgnoredHasNoOperationFCV) {
+    ASSERT_FALSE(kVersionContextIgnored.getOperationFCV().has_value());
+}
+
 TEST(VersionContextTest, FCVConstructorInitializesOFCVToLatest) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx(GenericFCV::kLatest);

@@ -734,7 +734,9 @@ if (feature_flags::featureFlagFork.isEnabled()) {
 Similarly, to check if an FCV-gated feature flag is enabled, we should do the following:
 
 ```c++
-if (feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+if (feature_flags::gFeatureFlagToaster.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
     // The feature flag is enabled and we are guaranteed to be only communicating to
     // nodes with binary versions greater than or equal to 4.9.0. Perform the new
     // feature behavior.
@@ -750,14 +752,19 @@ In this case, we must make sure to do these checks on the SAME `FCVSnapshot`:
 
 ```c++
 const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-if (fcvSnapshot.isVersionInitialized() && feature_flags::gFeatureFlagToaster.isEnabled(fcvSnapshot)) {
-
+if (fcvSnapshot.isVersionInitialized() &&
+    feature_flags::gFeatureFlagToaster.isEnabled(VersionContext::getDecoration(opCtx),
+                                                  fcvSnapshot)) {
 }
 ```
 
 This is because otherwise, if you use two different snapshots, the in-memory FCV may be uninitialized in between calling `isVersionInitialized` on the first snapshot, and checking `isEnabled` on the second snapshot, resulting in a race.
 This same principle applies in general. If you want to check multiple properties of the FCV/feature flag at a specific point in time (i.e. you are expecting the FCV value to be the same in all of your function calls), you must do the checks on the SAME `FCVSnapshot`.
 See the [section about checking the in-memory FCV for more information](#checking-the-in-memory-FCV)
+
+Furthermore, FCV-gated feature flag checks _must_ pass the `VersionContext` decoration associated with the `OperationContext`.
+This requires propagating the `OperationContext`/`VersionContext` all the way from the beginning of the operation to the point of the feature flag check.
+In the unusual case where a feature flag is checked outside of an operation (e.g. during startup), the `kNoVersionContext` constant should be passed.
 
 This does not apply to feature flags where `shouldBeFCVGated` is set to false, since `isEnabled`
 always returns the same value after it is initialized during startup.
@@ -775,7 +782,9 @@ To build generic infrastructure which can accept both binary-compatible and FCV-
 ```c++
 CheckableFeatureFlagRef CheckableFeatureFlagRef(feature_flags::gFeatureFlagToaster);
 if (CheckableFeatureFlagRef.isEnabled([](auto& fcvGatedFlag) {
-        return fcvGatedFlag.isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        return fcvGatedFlag.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     })) {
     // Feature is enabled
 }
@@ -788,7 +797,8 @@ CheckableFeatureFlagRef CheckableFeatureFlagRef(feature_flags::gFeatureFlagToast
 auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
 if (feature_flags::gFeatureFlagFryer.isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot) &&
     CheckableFeatureFlagRef.isEnabled([&](auto& fcvGatedFlag) {
-        return fcvGatedFlag.isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
+        return fcvGatedFlag.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
     })) {
     // Both features are enabled
 }
@@ -831,6 +841,12 @@ here.
 you checked if the feature flag was enabled multiple times within a single operation, it's possible
 that the feature flag and FCV might have become enabled/disabled during that time, which would
 result in only part of the operation being executed.
+For more details see [SERVER-88965](https://jira.mongodb.org/browse/SERVER-88965) and its linked issues.
+
+This rule also applies to sharded operations, which span multiple `OperationContext` instances across different nodes.
+There is an ongoing effort to streamline this scenario through _operation FCV_, where, upon operation start,
+the FCV is snapshotted into a `VersionContext` decoration and used for all feature flag checks through its runtime.
+Currently, _operation FCV_ is only used by DDLs on a sharded cluster.
 
 ### Feature Flag Gating in Tests
 

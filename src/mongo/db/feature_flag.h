@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/version/releases.h"
 
@@ -71,32 +72,37 @@ private:
  * threshold version and it is defined as enabled by default. It is not implicitly convertible to
  * bool to force all call sites to make a decision about what check to use.
  */
-// TODO(SERVER-99351): Review the API exposed for FCV-gated feature flags
 class FCVGatedFeatureFlag {
     friend class FeatureFlagServerParameter;  // For set(...)
 
 public:
     FCVGatedFeatureFlag(bool enabled, StringData versionString);
 
+    // Non-copyable, non-movable
+    FCVGatedFeatureFlag(const FCVGatedFeatureFlag&) = delete;
+    FCVGatedFeatureFlag& operator=(const FCVGatedFeatureFlag&) = delete;
+
     /**
      * Returns true if the flag is set to true and enabled for this FCV version.
      * If the functionality of this function changes, make sure that the
      * isEnabled/isPresentAndEnabled functions in feature_flag_util.js also incorporate the change.
      */
-    bool isEnabled(ServerGlobalParams::FCVSnapshot fcv) const;
+    bool isEnabled(const VersionContext& vCtx, ServerGlobalParams::FCVSnapshot fcv) const;
 
     /**
      * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
      * is unset, instead checks against the default last LTS FCV version.
      */
-    bool isEnabledUseLastLTSFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
+    bool isEnabledUseLastLTSFCVWhenUninitialized(const VersionContext& vCtx,
+                                                 ServerGlobalParams::FCVSnapshot fcv) const;
 
 
     /**
      * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
      * is unset, instead checks against the latest FCV version.
      */
-    bool isEnabledUseLatestFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
+    bool isEnabledUseLatestFCVWhenUninitialized(const VersionContext& vCtx,
+                                                ServerGlobalParams::FCVSnapshot fcv) const;
 
     /**
      * Returns true if this flag is enabled regardless of the current FCV version. When using this
@@ -147,6 +153,28 @@ private:
 private:
     bool _enabled;
     multiversion::FeatureCompatibilityVersion _version;
+};
+
+/**
+ * Like FCVGatedFeatureFlag, but contains overloads that allow checking if an FCV-gated feature flag
+ * is enabled, ignoring the context's operation FCV.
+ *
+ * This is a transitional solution to allow old FCV-gated feature flag checks to work until they
+ * are adapted to the operation FCV aware API.
+ */
+class LegacyContextUnawareFCVGatedFeatureFlag : public FCVGatedFeatureFlag {
+public:
+    using FCVGatedFeatureFlag::FCVGatedFeatureFlag;
+
+    // Provide methods compatible with the old API, which didn't take a VersionContext parameter
+    bool isEnabled(ServerGlobalParams::FCVSnapshot fcv) const;
+    bool isEnabledUseLastLTSFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
+    bool isEnabledUseLatestFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
+
+    // Avoid shadowing the original overloads with the compatibility stubs above
+    using FCVGatedFeatureFlag::isEnabled;
+    using FCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized;
+    using FCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized;
 };
 
 /**

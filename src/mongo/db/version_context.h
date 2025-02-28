@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <variant>
+
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context_gen.h"
 
@@ -45,9 +47,15 @@ public:
     using FCV = multiversion::FeatureCompatibilityVersion;
     using FCVSnapshot = ServerGlobalParams::FCVSnapshot;
 
+    struct OperationWithoutOFCVTag {};
+    struct OutsideOperationTag {};
+    struct IgnoreOFCVTag {};
+
     static VersionContext& getDecoration(OperationContext*);
 
-    VersionContext() = default;
+    VersionContext() : _metadataOrTag(OperationWithoutOFCVTag{}) {}
+    explicit VersionContext(OutsideOperationTag tag) : _metadataOrTag(tag) {}
+    explicit VersionContext(IgnoreOFCVTag tag) : _metadataOrTag(tag) {}
 
     explicit VersionContext(FCV fcv);
 
@@ -70,7 +78,21 @@ public:
 private:
     void _assertOFCVNotInitialized() const;
 
-    boost::optional<VersionContextMetadata> _metadata;
+    std::
+        variant<OperationWithoutOFCVTag, OutsideOperationTag, IgnoreOFCVTag, VersionContextMetadata>
+            _metadataOrTag;
 };
+
+/**
+ * Use this when running outside of an operation (for example, during startup, or in unit tests).
+ */
+inline const VersionContext kNoVersionContext{VersionContext::OutsideOperationTag{}};
+
+/**
+ * Use this if you want to deliberately bypass Operation FCV and make feature flag checks against
+ * the node's local FCV only. This should be used with a lot of care, only if you can ensure none
+ * of your current or future callers acts incorrectly due to ignoring their Operation FCV.
+ */
+inline const VersionContext kVersionContextIgnored{VersionContext::IgnoreOFCVTag{}};
 
 }  // namespace mongo

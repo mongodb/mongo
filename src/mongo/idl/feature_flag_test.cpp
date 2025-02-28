@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -182,12 +183,14 @@ static const ServerGlobalParams::FCVSnapshot kUninitializedFCVSnapshot(
 TEST_F(FeatureFlagTest, IsEnabledTrue) {
     // Test FCV checks with enabled flag
     // Test newest version
-    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
-    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(kLatestFCVSnapshot));
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
+    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
 
     // Test oldest version
-    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLastLTSFCVSnapshot));
-    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(kLastLTSFCVSnapshot));
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
 }
 
 // Test feature flags are disabled regardless of fcv
@@ -197,33 +200,76 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
     ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     ASSERT_OK(_featureFlagSpoon->setFromString("false", boost::none));
 
-    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
-    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(kLatestFCVSnapshot));
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
+    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
 
     // Test oldest version
-    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLastLTSFCVSnapshot));
-    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(kLastLTSFCVSnapshot));
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagSpoon.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
 }
 
 // Test isEnabled variants with a fallback for uninitialized FCV
 TEST_F(FeatureFlagTest, IsEnabledUseLastLTSFCVWhenUninitialized) {
     ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabledUseLastLTSFCVWhenUninitialized(
-        kLastLTSFCVSnapshot));
+        kNoVersionContext, kLastLTSFCVSnapshot));
     ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabledUseLastLTSFCVWhenUninitialized(
-        kLatestFCVSnapshot));
+        kNoVersionContext, kLatestFCVSnapshot));
 
     ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabledUseLastLTSFCVWhenUninitialized(
-        kUninitializedFCVSnapshot));
+        kNoVersionContext, kUninitializedFCVSnapshot));
 }
 
 TEST_F(FeatureFlagTest, IsEnabledUseLatestFCVWhenUninitialized) {
     ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabledUseLatestFCVWhenUninitialized(
-        kLastLTSFCVSnapshot));
+        kNoVersionContext, kLastLTSFCVSnapshot));
     ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabledUseLatestFCVWhenUninitialized(
-        kLatestFCVSnapshot));
+        kNoVersionContext, kLatestFCVSnapshot));
 
     ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabledUseLatestFCVWhenUninitialized(
-        kUninitializedFCVSnapshot));
+        kNoVersionContext, kUninitializedFCVSnapshot));
+}
+
+// (Generic FCV reference): feature flag test
+static const VersionContext kLastLTSVersionContext{multiversion::GenericFCV::kLastLTS};
+static const VersionContext kLatestVersionContext{multiversion::GenericFCV::kLatest};
+
+// Test operation FCV during downgrade (FCV is kLastLTS but operations can still run on kLatest)
+TEST_F(FeatureFlagTest, OperationFCVDowngrading) {
+    // Both feature flags are enabled, as the effective FCV is kLatest
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kLatestVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagSpoon.isEnabled(kLatestVersionContext, kLastLTSFCVSnapshot));
+}
+
+// Test operation FCV when fully upgraded (both FCV and all operations running on kLatest)
+TEST_F(FeatureFlagTest, OperationFCVFullyUpgraded) {
+    // Both feature flags are enabled, as the effective FCV is kLatest
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kLatestVersionContext, kLatestFCVSnapshot));
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagSpoon.isEnabled(kLatestVersionContext, kLatestFCVSnapshot));
+}
+
+// Test operation FCV when fully downgraded (both FCV and all operations running on kLastLTS)
+TEST_F(FeatureFlagTest, OperationFCVFullyDowngraded) {
+    // Feature flags with version=kLatest are disabled, as the effective FCV is kLastLTS
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kLastLTSVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagSpoon.isEnabled(kLastLTSVersionContext, kLastLTSFCVSnapshot));
+}
+
+// Test operation FCV during upgrade (FCV is kLatest but operations can still run on kLastLTS)
+TEST_F(FeatureFlagTest, OperationFCVUpgrade) {
+    // Feature flags with version=kLatest are disabled, as the effective FCV is kLastLTS
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kLastLTSVersionContext, kLatestFCVSnapshot));
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagSpoon.isEnabled(kLastLTSVersionContext, kLatestFCVSnapshot));
 }
 
 // Test that the RAIIServerParameterControllerForTest works correctly on a feature flag.
@@ -232,17 +278,21 @@ TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
     ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     {
         RAIIServerParameterControllerForTest controller("featureFlagBlender", true);
-        ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
+        ASSERT_TRUE(
+            feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
     }
-    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
 
     // Set true feature flag to false
     ASSERT_OK(_featureFlagBlender->setFromString("true", boost::none));
     {
         RAIIServerParameterControllerForTest controller("featureFlagBlender", false);
-        ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
+        ASSERT_FALSE(
+            feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
     }
-    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
 }
 
 // Test feature flags that should not be FCV Gated

@@ -61,34 +61,33 @@ FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled, StringData versionString)
 
 // If the functionality of this function changes, make sure that the isEnabled/isPresentAndEnabled
 // functions in feature_flag_util.js also incorporate the change.
-bool FCVGatedFeatureFlag::isEnabled(const ServerGlobalParams::FCVSnapshot fcv) const {
-    if (!_enabled) {
-        return false;
-    }
+bool FCVGatedFeatureFlag::isEnabled(const VersionContext& vCtx,
+                                    const ServerGlobalParams::FCVSnapshot fcv) const {
+    const auto currentFcv = vCtx.getOperationFCV().value_or(fcv);
 
-    // If the feature flag is enabled, return whether the server's FCV is >= to the version the
-    // feature flag was enabled on.
-    return fcv.isGreaterThanOrEqualTo(_version);
+    return isEnabledOnVersion(currentFcv.getVersion());
 }
 
 bool FCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
-    const ServerGlobalParams::FCVSnapshot fcv) const {
-    if (fcv.isVersionInitialized()) {
-        return isEnabled(fcv);
-    } else {
-        // (Generic FCV reference): This reference is needed for the feature flag check API.
-        return isEnabledOnVersion(multiversion::GenericFCV::kLastLTS);
-    }
+    const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot fcv) const {
+    const auto currentFcv = vCtx.getOperationFCV().value_or(fcv);
+    // (Generic FCV reference): This reference is needed for the feature flag check API.
+    const auto applicableFcv = currentFcv.isVersionInitialized()
+        ? currentFcv
+        : ServerGlobalParams::FCVSnapshot(multiversion::GenericFCV::kLastLTS);
+
+    return isEnabledOnVersion(applicableFcv.getVersion());
 }
 
 bool FCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
-    const ServerGlobalParams::FCVSnapshot fcv) const {
-    if (fcv.isVersionInitialized()) {
-        return isEnabled(fcv);
-    } else {
-        // (Generic FCV reference): This reference is needed for the feature flag check API.
-        return isEnabledOnVersion(multiversion::GenericFCV::kLatest);
-    }
+    const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot fcv) const {
+    const auto currentFcv = vCtx.getOperationFCV().value_or(fcv);
+    // (Generic FCV reference): This reference is needed for the feature flag check API.
+    const auto applicableFcv = currentFcv.isVersionInitialized()
+        ? currentFcv
+        : ServerGlobalParams::FCVSnapshot(multiversion::GenericFCV::kLatest);
+
+    return isEnabledOnVersion(applicableFcv.getVersion());
 }
 
 // isEnabledAndIgnoreFCVUnsafe should NOT be used in general, as it checks if the feature flag is
@@ -145,4 +144,17 @@ void FCVGatedFeatureFlag::set(bool enabled) {
     _enabled = enabled;
 }
 
+bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabled(ServerGlobalParams::FCVSnapshot fcv) const {
+    return isEnabled(kVersionContextIgnored, fcv);
+}
+
+bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
+    ServerGlobalParams::FCVSnapshot fcv) const {
+    return isEnabledUseLastLTSFCVWhenUninitialized(kVersionContextIgnored, fcv);
+}
+
+bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
+    ServerGlobalParams::FCVSnapshot fcv) const {
+    return isEnabledUseLatestFCVWhenUninitialized(kVersionContextIgnored, fcv);
+}
 }  // namespace mongo

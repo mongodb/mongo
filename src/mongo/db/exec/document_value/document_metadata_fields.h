@@ -40,8 +40,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
@@ -414,14 +412,7 @@ public:
     }
 
     // TODO SERVER-85426 Remove all feature flag logic.
-    void setScore(double score, bool featureFlagAlreadyValidated = false) {
-        if (featureFlagAlreadyValidated ||
-            feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            _setCommon(MetaType::kScore);
-            _holder->score = score;
-        }
-    }
+    void setScore(double score, bool featureFlagAlreadyValidated = false);
 
     bool hasScoreDetails() const {
         return _holder && _holder->metaFields.test(MetaType::kScoreDetails);

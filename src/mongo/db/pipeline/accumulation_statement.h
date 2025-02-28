@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -77,32 +78,32 @@ namespace mongo {
  * enabled. We store featureFlag in the parseMap, so that it can be checked at runtime
  * to correctly enable/disable the accumulator.
  */
-#define REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag)       \
-    REGISTER_ACCUMULATOR_CONDITIONALLY(                                         \
-        key,                                                                    \
-        factory,                                                                \
-        AllowedWithApiStrict::kAlways,                                          \
-        AllowedWithClientType::kAny,                                            \
-        featureFlag,                                                            \
-        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) { \
-            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(         \
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());  \
+#define REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag)                         \
+    REGISTER_ACCUMULATOR_CONDITIONALLY(                                                           \
+        key,                                                                                      \
+        factory,                                                                                  \
+        AllowedWithApiStrict::kAlways,                                                            \
+        AllowedWithClientType::kAny,                                                              \
+        featureFlag,                                                                              \
+        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {                   \
+            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                           \
+                kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()); \
         }))
 
 /**
  * Like REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG, except the accumulator will be set with
  * AllowedWithApiStrict::kNeverInVersion1 to exclude the accumulator from the stable API.
  */
-#define REGISTER_UNSTABLE_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag) \
-    REGISTER_ACCUMULATOR_CONDITIONALLY(                                            \
-        key,                                                                       \
-        factory,                                                                   \
-        AllowedWithApiStrict::kNeverInVersion1,                                    \
-        AllowedWithClientType::kAny,                                               \
-        featureFlag,                                                               \
-        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {    \
-            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(            \
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());     \
+#define REGISTER_UNSTABLE_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag)                \
+    REGISTER_ACCUMULATOR_CONDITIONALLY(                                                           \
+        key,                                                                                      \
+        factory,                                                                                  \
+        AllowedWithApiStrict::kNeverInVersion1,                                                   \
+        AllowedWithClientType::kAny,                                                              \
+        featureFlag,                                                                              \
+        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {                   \
+            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                           \
+                kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()); \
         }))
 
 /**

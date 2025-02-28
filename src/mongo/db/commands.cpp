@@ -57,6 +57,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
@@ -1224,7 +1225,9 @@ void CommandConstructionPlan::execute(CommandRegistry* registry,
             continue;
         }
         if (!entry->featureFlag.isEnabled([](auto& fcvGatedFlag) {
+                // TODO(SERVER-100448): This check should not depend on the current FCV
                 return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(
+                    kVersionContextIgnored,
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
             })) {
             LOGV2_DEBUG(8043402, 3, "Skipping FeatureFlag gated command", "entry"_attr = *entry);
