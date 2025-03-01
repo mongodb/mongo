@@ -120,6 +120,14 @@ repos:
       - yum/redhat/8/mongodb-org
       - yum/redhat/8Server/mongodb-org
 
+  - name: rhel9
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - yum/redhat/9/mongodb-org
+      - yum/redhat/9Server/mongodb-org
+
   - name: rhel90
     type: rpm
     edition: org
