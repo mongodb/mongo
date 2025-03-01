@@ -549,25 +549,6 @@ BSONObj calculateFinalScore(
     return BSON("$addFields" << BSON("score" << allInputs()));
 }
 
-boost::intrusive_ptr<DocumentSource> calculateFinalScoreMetadata(
-    const auto& expCtx,
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
-    // Generate an array of all the fields containing a score for a given pipeline.
-    Expression::ExpressionVector allInputScores;
-    for (auto it = inputs.begin(); it != inputs.end(); it++) {
-        allInputScores.push_back(ExpressionFieldPath::createPathFromString(
-            expCtx.get(), it->first + "_score", expCtx->variablesParseState));
-    }
-
-    // Return a $setMetadata stage that sets score to an $add object that takes the generated array
-    // of each pipeline's score fieldpaths as an input.
-    // Ex: {"$setMetadata": {"score": {"$add": ["$pipeline_name_score"]}}},
-    return DocumentSourceSetMetadata::create(
-        expCtx,
-        make_intrusive<ExpressionAdd>(expCtx.get(), std::move(allInputScores)),
-        DocumentMetadataFields::MetaType::kScore);
-}
-
 boost::intrusive_ptr<DocumentSource> calculateFinalScoreDetails(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs,
     const StringMap<double>& weights,
@@ -681,12 +662,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
                                     expCtx->variablesParseState),
             DocumentMetadataFields::kScoreDetails);
         return {group, addFields, addFieldsDetails, setDetails, sort, restoreUserDocs};
-    }
-    // TODO SERVER-85426: Remove this check once all feature flags have been removed.
-    if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto setScore = calculateFinalScoreMetadata(expCtx, inputPipelines);
-        return {group, addFields, setScore, sort, restoreUserDocs};
     }
     return {group, addFields, sort, restoreUserDocs};
 }

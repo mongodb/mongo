@@ -63,7 +63,7 @@ let testQuery = [
             scoreDetails: true,
         },
     },
-    {$addFields: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
+    {$addFields: {details: {$meta: "scoreDetails"}}},
     {$project: {plot_embedding: 0}}
 ];
 
@@ -74,16 +74,11 @@ function fieldPresent(field, containingObj) {
 }
 
 for (const foundDoc of results) {
-    // Assert that the score metadata has been set.
-    assert(fieldPresent("score", foundDoc), foundDoc);
-    const score = foundDoc["score"];
     assert(fieldPresent("details", foundDoc), foundDoc);
     const details = foundDoc["details"];
     assert(fieldPresent("value", details), details);
     // We don't care about the actual score, just assert that its been calculated.
     assert.gt(details["value"], 0, details);
-    // Assert that the score metadata is the same value as what scoreDetails set.
-    assert.eq(details["value"], score);
     assert(fieldPresent("description", details), details);
     assert.eq(details["description"], scoreDetailsDescription);
 
@@ -131,22 +126,17 @@ testQuery = [
             scoreDetails: true,
         },
     },
-    {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
+    {$project: {details: {$meta: "scoreDetails"}}}
 ];
 results = coll.aggregate(testQuery).toArray();
 
 for (const foundDoc of results) {
-    // Assert that the score metadata has been set.
-    assert(fieldPresent("score", foundDoc), foundDoc);
-    const score = foundDoc["score"];
     assert(fieldPresent("details", foundDoc), foundDoc);
     const details = foundDoc["details"];
     assert(fieldPresent("value", details), details);
     // The output of the rank calculation.
     // We don't care about the actual score, just assert that its been calculated.
     assert.gt(details["value"], 0);
-    // Assert that the score metadata is the same value as what scoreDetails set.
-    assert.eq(details["value"], score);
     assert(fieldPresent("description", details), details);
     assert.eq(details["description"], scoreDetailsDescription);
 
@@ -182,7 +172,7 @@ for (const foundDoc of results) {
     assert.eq(vectorDetails["weight"], 0.5);
 }
 
-// Test search/vectorSearch where search scoreDetails is off but $rankFusion's scoreDetails is on.
+// Test search/vectorSearch where search scoreDetails is off.
 const searchStageSpecNoDetails = {
     index: getMovieSearchIndexSpec().name,
     text: {query: "ape", path: ["fullplot", "title"]},
@@ -202,22 +192,17 @@ testQuery = [
             scoreDetails: true,
         },
     },
-    {$addFields: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
+    {$addFields: {details: {$meta: "scoreDetails"}}},
     {$project: {plot_embedding: 0}}
 ];
 
 results = coll.aggregate(testQuery).toArray();
 for (const foundDoc of results) {
-    // Assert that the score metadata has been set.
-    assert(fieldPresent("score", foundDoc), foundDoc);
-    const score = foundDoc["score"];
     assert(fieldPresent("details", foundDoc), foundDoc);
     const details = foundDoc["details"];
     assert(fieldPresent("value", details), details);
     // We don't care about the actual score, just assert that its been calculated.
     assert.gt(details["value"], 0);
-    // Assert that the score metadata is the same value as what scoreDetails set.
-    assert.eq(details["value"], score);
     assert(fieldPresent("description", details), details);
     assert.eq(details["description"], scoreDetailsDescription);
 
@@ -252,28 +237,6 @@ for (const foundDoc of results) {
     assertFieldPresent("rank", vectorDetails);
     assertFieldPresent("weight", vectorDetails);
     assert.eq(vectorDetails["weight"], 1);
-}
-
-// Test search/vectorSearch where search scoreDetails is off and $rankFusion's scoreDetails is off.
-testQuery = [
-    {
-        $rankFusion: {
-            input: {
-                pipelines: {vector: [vectorStage], search: [searchStageNoDetails, {$limit: limit}]}
-            },
-            scoreDetails: false,
-        },
-    },
-    {$addFields: {score: {$meta: "score"}}},
-    {$project: {plot_embedding: 0}}
-];
-
-results = coll.aggregate(testQuery).toArray();
-for (const foundDoc of results) {
-    // Assert that the score metadata has been set.
-    assert(fieldPresent("score", foundDoc), foundDoc);
-    const score = foundDoc["score"];
-    assert.gte(score, 0);
 }
 
 // TODO SERVER-93218 Test scoreDetails with nested rankFusion.
