@@ -81,6 +81,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries:timeseries_test_fixture",
         "//src/mongo/idl:server_parameter_test_util",
     ],
 )

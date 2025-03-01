@@ -28,39 +28,20 @@
  */
 
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/timeseries_test_fixture.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::timeseries::write_ops::internal {
 namespace {
-static constexpr uint64_t kDefaultStorageCacheSizeBytes = 1024 * 1024 * 1024;
-static constexpr uint64_t kLimitedStorageCacheSizeBytes = 1024;
-
-class TimeseriesWriteOpsInternalTest : public CatalogTestFixture {
-public:
-    explicit TimeseriesWriteOpsInternalTest(Options options = {})
-        : CatalogTestFixture(options.useReplSettings(true)) {}
-
+class TimeseriesWriteOpsInternalTest : public TimeseriesTestFixture {
 protected:
-    void setUp() override;
-
-    virtual BSONObj _makeTimeseriesOptionsForCreate() const;
-
-    std::vector<BSONObj> _generateMeasurementsWithRolloverReason(
-        bucket_catalog::RolloverReason reason) const;
-
-    TimeseriesOptions _getTimeseriesOptions(const NamespaceString& ns) const;
-
-    const CollatorInterface* _getCollator(const NamespaceString& ns) const;
-
-    uint64_t _getStorageCacheSizeBytes() const;
-
     void _testBuildBatchedInsertContextWithMetaField(
         std::vector<BSONObj>& userMeasurementsBatch,
         stdx::unordered_map<std::string, std::vector<size_t>>& metaFieldValueToCorrectIndexOrderMap,
@@ -74,19 +55,6 @@ protected:
     void _testStageInsertBatch(std::vector<BSONObj> batchOfMeasurements,
                                std::vector<size_t> numWriteBatches) const;
 
-    OperationContext* _opCtx;
-    bucket_catalog::BucketCatalog* _bucketCatalog;
-    NamespaceString _ns = NamespaceString::createNamespaceString_forTest(
-        "db_timeseries_write_ops_internal_test", "ts");
-
-    StringData _timeField = "time";
-    StringData _metaField = "meta";
-    StringData _metaValue = "a";
-    StringData _metaValue2 = "b";
-    uint64_t _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
-
-    UUID _uuid = UUID::gen();
-
     // Strings used to simulate kSize/kCachePressure rollover reason.
     std::string _bigStr = std::string(1000, 'a');
 
@@ -94,139 +62,23 @@ protected:
     CompressAndWriteBucketFunc _compressBucket = nullptr;
 };
 
-void TimeseriesWriteOpsInternalTest::setUp() {
-    CatalogTestFixture::setUp();
-
-    _opCtx = operationContext();
-    _bucketCatalog = &bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext());
-
-    ASSERT_OK(createCollection(
-        _opCtx,
-        _ns.dbName(),
-        BSON("create" << _ns.coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    _uuid = autoColl.getCollection()->uuid();
-}
-
-BSONObj TimeseriesWriteOpsInternalTest::_makeTimeseriesOptionsForCreate() const {
-    return BSON("timeField" << _timeField << "metaField" << _metaField);
-}
-
-TimeseriesOptions TimeseriesWriteOpsInternalTest::_getTimeseriesOptions(
-    const NamespaceString& ns) const {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    return *autoColl->getTimeseriesOptions();
-}
-
-const CollatorInterface* TimeseriesWriteOpsInternalTest::_getCollator(
-    const NamespaceString& ns) const {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    return autoColl->getDefaultCollator();
-}
-
-uint64_t TimeseriesWriteOpsInternalTest::_getStorageCacheSizeBytes() const {
-    return _opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
-        1024;
-}
-
-// _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that have
-// the input RolloverReason.
-// We require that when we call with kCachePressure, _storageCacheSizeBytes =
-// kLimitedStorageCacheSizeBytes (must be set in the unit test) so that we properly trigger
-// kCachePressure. Otherwise, _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes.
-std::vector<BSONObj> TimeseriesWriteOpsInternalTest::_generateMeasurementsWithRolloverReason(
-    const bucket_catalog::RolloverReason reason) const {
-    invariant((_storageCacheSizeBytes == kDefaultStorageCacheSizeBytes &&
-               reason != bucket_catalog::RolloverReason::kCachePressure) ||
-              (_storageCacheSizeBytes == kLimitedStorageCacheSizeBytes &&
-               reason == bucket_catalog::RolloverReason::kCachePressure));
-    std::vector<BSONObj> batchOfMeasurements;
-    switch (reason) {
-        case bucket_catalog::RolloverReason::kNone:
-            for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << Date_t::now() << _metaField << _metaValue));
-            }
-            return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kCount:
-            for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << Date_t::now() << _metaField << _metaValue));
-            }
-            return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kTimeForward:
-            for (auto i = 0; i < (gTimeseriesBucketMaxCount - 1); i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << Date_t::now() << _metaField << _metaValue));
-            }
-            batchOfMeasurements.emplace_back(
-                BSON(_timeField << Date_t::now() + Hours(2) << _metaField << _metaValue));
-            return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kSchemaChange:
-            for (auto i = 0; i < (gTimeseriesBucketMaxCount - 1); i++) {
-                batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField
-                                                                 << _metaValue << "deathGrips"
-                                                                 << "isOnline"));
-            }
-            // We want to guarantee that this measurement with different schema is at the
-            // end of the BatchedInsertContext, so we make it's time greater than the rest
-            // of the measurements.
-            batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() + Seconds(1)
-                                                             << _metaField << _metaValue
-                                                             << "deathGrips" << 100));
-            return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kTimeBackward:
-            for (auto i = 0; i < (gTimeseriesBucketMaxCount - 1); i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << Date_t::now() << _metaField << _metaValue));
-            }
-            batchOfMeasurements.emplace_back(
-                BSON(_timeField << Date_t::now() - Hours(1) << _metaField << _metaValue));
-            return batchOfMeasurements;
-        // kCachePressure and kSize are caused by the same measurements, but we have kCachePressure
-        // when the cacheDerivedBucketSize < kLargeMeasurementsMaxBucketSize.
-        // We can simulate this by lowering the _storageCacheSizeBytes or increasing the number of
-        // active buckets.
-        //
-        // Note that we will need less large measurements to trigger kCachePressure because we use
-        // _storageCacheSizeBytes to determine if we want to keep the bucket open due to large
-        // measurements.
-        case bucket_catalog::RolloverReason::kCachePressure:
-            for (auto i = 0; i < 4; i++) {
-                batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField
-                                                                 << _metaValue << "big_field"
-                                                                 << _bigStr));
-            }
-            return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kSize:
-            for (auto i = 0; i < 125; i++) {
-                batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField
-                                                                 << _metaValue << "big_field"
-                                                                 << _bigStr));
-            }
-            return batchOfMeasurements;
-    }
-    return batchOfMeasurements;
-}
-
 void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithMetaField(
     std::vector<BSONObj>& userMeasurementsBatch,
     stdx::unordered_map<std::string, std::vector<size_t>>& metaFieldValueToCorrectIndexOrderMap,
     stdx::unordered_set<size_t>& expectedIndicesWithErrors) const {
-    AutoGetCollection bucketsColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection bucketsColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     tracking::Context trackingContext;
     timeseries::bucket_catalog::ExecutionStatsController stats;
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
     auto batchedInsertContextVector =
-        timeseries::write_ops::internal::buildBatchedInsertContextsWithMetaField(
-            *_bucketCatalog,
-            bucketsColl->uuid(),
-            bucketsColl->getTimeseriesOptions().get(),
-            userMeasurementsBatch,
-            stats,
-            trackingContext,
-            errorsAndIndices);
+        buildBatchedInsertContextsWithMetaField(*_bucketCatalog,
+                                                bucketsColl->uuid(),
+                                                bucketsColl->getTimeseriesOptions().get(),
+                                                userMeasurementsBatch,
+                                                stats,
+                                                trackingContext,
+                                                errorsAndIndices);
 
     ASSERT_EQ(batchedInsertContextVector.size(), metaFieldValueToCorrectIndexOrderMap.size());
 
@@ -268,21 +120,20 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaFi
     std::vector<BSONObj>& userMeasurementsBatch,
     std::vector<size_t>& correctIndexOrder,
     stdx::unordered_set<size_t>& expectedIndicesWithErrors) const {
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
     tracking::Context trackingContext;
     timeseries::bucket_catalog::ExecutionStatsController stats;
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
     auto batchedInsertContextVector =
-        timeseries::write_ops::internal::buildBatchedInsertContextsNoMetaField(
-            *_bucketCatalog,
-            bucketsColl->uuid(),
-            bucketsColl->getTimeseriesOptions().get(),
-            userMeasurementsBatch,
-            stats,
-            trackingContext,
-            errorsAndIndices);
+        buildBatchedInsertContextsNoMetaField(*_bucketCatalog,
+                                              bucketsColl->uuid(),
+                                              bucketsColl->getTimeseriesOptions().get(),
+                                              userMeasurementsBatch,
+                                              stats,
+                                              trackingContext,
+                                              errorsAndIndices);
 
     // Since we are inserting measurements with metadata values, all of the measurements should
     // fit into one batch. The only exception here will be when all of the measurements are
@@ -328,7 +179,7 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaFi
 // batchOfMeasurements = [
 //                         {_timeField: Date_t::now(), _metaField: "a",  "deathGrips": "isOnline"},
 //                         {_timeField: Date_t::now(), _metaField: "a",  "deathGrips": "isOffline"},
-//                         {_timeField: Date_t::now() + Second(1), _metaField: "a",  "deathGrips":
+//                         {_timeField: Date_t::now() + Seconds(1), _metaField: "a",  "deathGrips":
 //                         100},
 //                         {_timeField: Date_t::now(), _metaField: "b",  "deathGrips": "isOffline"},
 //                       ]
@@ -339,7 +190,7 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaFi
 //                              "isOnline"},
 //                              {_timeField: Date_t::now(), _metaField: "a",  "deathGrips":
 //                              "isOffline"},
-//                              {_timeField: Date_t::now() + Second(1), _metaField: "a",
+//                              {_timeField: Date_t::now() + Seconds(1), _metaField: "a",
 //                              "deathGrips": 100},
 //                          ]},
 //                       {bucketKey: [...], stripeNumber: 1, options: [...], stats: [...],
@@ -371,13 +222,13 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaFi
 // = kDefaultStorageCacheSizeBytes.
 void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
     std::vector<BSONObj> batchOfMeasurements, std::vector<size_t> numWriteBatches) const {
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
-    auto timeseriesOptions = _getTimeseriesOptions(_ns);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
     auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog, _uuid, timeseriesOptions, batchOfMeasurements, errorsAndIndices);
+        *_bucketCatalog, _uuid1, timeseriesOptions, batchOfMeasurements, errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     ASSERT_EQ(batchedInsertContexts.size(), numWriteBatches.size());
@@ -417,11 +268,11 @@ TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsOneBatchNoMetaf
 
 TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsOneBatchWithMetafield) {
     std::vector<BSONObj> userMeasurementsBatch{
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "meta":"a", "x":1})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:04:00.000Z"}, "meta":"a", "x":2})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "meta":"a", "x":3})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "meta":"a", "x":4})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "meta":"a", "x":5})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "tag":"a", "x":1})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:04:00.000Z"}, "tag":"a", "x":2})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "tag":"a", "x":3})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "tag":"a", "x":4})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "tag":"a", "x":5})"),
     };
 
     stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
@@ -434,13 +285,13 @@ TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsOneBatchWithMet
 
 TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsMultipleBatchesWithMetafield) {
     std::vector<BSONObj> userMeasurementsBatch{
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "meta":"b", "x":1})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:04:00.000Z"}, "meta":"c", "x":2})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "meta":"a", "x":3})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:07:00.000Z"}, "meta":"a", "x":4})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "meta":"b", "x":5})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "meta":"c", "x":7})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:06:00.000Z"}, "meta":"a", "x":6})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "tag":"b", "x":1})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:04:00.000Z"}, "tag":"c", "x":2})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "tag":"a", "x":3})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:07:00.000Z"}, "tag":"a", "x":4})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "tag":"b", "x":5})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "tag":"c", "x":7})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:06:00.000Z"}, "tag":"a", "x":6})"),
     };
     stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
     metaFieldValueToCorrectIndexOrderMap.try_emplace("a", std::initializer_list<size_t>{2, 6, 3});
@@ -469,11 +320,11 @@ TEST_F(TimeseriesWriteOpsInternalTest,
 TEST_F(TimeseriesWriteOpsInternalTest,
        BuildBatchedInsertContextsWithMetaReportsMalformedMeasurements) {
     std::vector<BSONObj> userMeasurementsBatch{
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "meta":"a", "x":1})"),
-        mongo::fromjson(R"({"meta":"a", "x":2})"),  // Malformed measurement, missing time field
-        mongo::fromjson(R"({"x":3,"meta":"a"})"),   // Malformed measurement, missing time field
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "meta":"b", "x":4})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "meta":"a", "x":5})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "tag":"a", "x":1})"),
+        mongo::fromjson(R"({"tag":"a", "x":2})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"x":3,"tag":"a"})"),   // Malformed measurement, missing time field
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "tag":"b", "x":4})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "tag":"a", "x":5})"),
     };
     stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
     metaFieldValueToCorrectIndexOrderMap.try_emplace(_metaValue.toString(),
@@ -498,8 +349,8 @@ TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsAllMeasurements
 
 TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsAllMeasurementsErrorWithMeta) {
     std::vector<BSONObj> userMeasurementsBatch{
-        mongo::fromjson(R"({"meta":"a", "x":2})"),  // Malformed measurement, missing time field
-        mongo::fromjson(R"({"meta":"a", "x":3})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"tag":"a", "x":2})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"tag":"a", "x":3})"),  // Malformed measurement, missing time field
     };
     stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
     stdx::unordered_set<size_t> expectedIndicesWithErrors{0, 1};
@@ -508,15 +359,15 @@ TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsAllMeasurements
 };
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchFillsUpSingleBucket) {
-    std::vector<BSONObj> batchOfMeasurements =
-        _generateMeasurementsWithRolloverReason(bucket_catalog::RolloverReason::kNone);
+    std::vector<BSONObj> batchOfMeasurementsTimeseriesBucketMaxCount =
+        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kNone});
     std::vector<size_t> numWriteBatches{1};
-    _testStageInsertBatch(batchOfMeasurements, numWriteBatches);
+    _testStageInsertBatch(batchOfMeasurementsTimeseriesBucketMaxCount, numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkCount) {
     auto batchOfMeasurementsWithCount =
-        _generateMeasurementsWithRolloverReason(bucket_catalog::RolloverReason::kCount);
+        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kCount});
 
     // batchOfMeasurements will be 2 * gTimeseriesBucketMaxCount measurements with all the
     // measurements having the same meta field and time, which means we should have two buckets.
@@ -525,28 +376,70 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkCou
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkTimeForward) {
-    auto batchOfMeasurementsWithTimeForward =
-        _generateMeasurementsWithRolloverReason(bucket_catalog::RolloverReason::kTimeForward);
+    // Max bucket size with only the last measurement having kTimeForward.
+    auto batchOfMeasurementsWithTimeForwardAtEnd = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kTimeForward, .metaValue = _metaValue});
 
-    // The last measurement will be outside of the bucket range, which will mean it should be in a
-    // different bucket.
+    // The last measurement in batchOfMeasurementsWithTimeForwardAtEnd will have a timestamp outside
+    // of the bucket range encompassing the previous measurements, which means that this
+    // measurement will be in a different bucket.
     std::vector<size_t> numWriteBatches{2};
-    _testStageInsertBatch(batchOfMeasurementsWithTimeForward, numWriteBatches);
+    _testStageInsertBatch(batchOfMeasurementsWithTimeForwardAtEnd, numWriteBatches);
+
+    // Max bucket size with measurements[1:gTimeseriesBucketMaxCount] having kTimeForward.
+    // We declare a different meta field so we don't attempt to use the buckets created above.
+    auto batchOfMeasurementsWithTimeForwardAfterFirstMeasurement =
+        _generateMeasurementsWithRolloverReason(
+            {.reason = bucket_catalog::RolloverReason::kTimeForward,
+             .idxWithDiffMeasurement = 1,
+             .metaValue = _metaValue2});
+    _testStageInsertBatch(batchOfMeasurementsWithTimeForwardAfterFirstMeasurement, numWriteBatches);
+
+    // 50 measurements with measurements[25:50] having kTimeForward.
+    // We declare a different meta field so we don't attempt to use the buckets created above.
+    auto batchOfMeasurementsWithTimeForwardInMiddle = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kTimeForward,
+         .numMeasurements = 50,
+         .idxWithDiffMeasurement = 25,
+         .metaValue = _metaValue3});
+    _testStageInsertBatch(batchOfMeasurementsWithTimeForwardInMiddle, numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkSchemaChange) {
-    auto batchOfMeasurementsWithSchemaChange =
-        _generateMeasurementsWithRolloverReason(bucket_catalog::RolloverReason::kSchemaChange);
+    // Max bucket size with only the last measurement having kSchemaChange.
+    auto batchOfMeasurementsWithSchemaChangeAtEnd = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kSchemaChange, .metaValue = _metaValue});
 
-    // The last measurement in the batch will have a int value rather than a string for field
-    // "deathGrips", which means it will be in a different bucket.
+    // The last measurement in batchOfMeasurementsWithSchemaChangeAtEnd will have a int rather than
+    // a string for field "deathGrips", which means this measurement will be in a different
+    // bucket.
     std::vector<size_t> numWriteBatches{2};
-    _testStageInsertBatch(batchOfMeasurementsWithSchemaChange, numWriteBatches);
+    _testStageInsertBatch(batchOfMeasurementsWithSchemaChangeAtEnd, numWriteBatches);
+
+    // Max bucket size with measurements[1:gTimeseriesBucketMaxCount] having kSchemaChange.
+    // We declare a different meta field so we don't attempt to use a bucket created above.
+    auto batchOfMeasurementsWithSchemaChangeAfterFirstMeasurement =
+        _generateMeasurementsWithRolloverReason(
+            {.reason = bucket_catalog::RolloverReason::kSchemaChange,
+             .idxWithDiffMeasurement = 1,
+             .metaValue = _metaValue2});
+    _testStageInsertBatch(batchOfMeasurementsWithSchemaChangeAfterFirstMeasurement,
+                          numWriteBatches);
+
+    // 50 measurements with measurements[25:50] having kSchemaChange.
+    // We declare a different meta field so we don't attempt to use a bucket created above.
+    auto batchOfMeasurementsWithTimeForwardInMiddle = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kSchemaChange,
+         .numMeasurements = 50,
+         .idxWithDiffMeasurement = 25,
+         .metaValue = _metaValue3});
+
+    _testStageInsertBatch(batchOfMeasurementsWithTimeForwardInMiddle, numWriteBatches);
 }
 
-TEST_F(TimeseriesWriteOpsInternalTest, InsertBatchHandlesRolloverReasonkSize) {
+TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkSize) {
     auto batchOfMeasurementsWithSize =
-        _generateMeasurementsWithRolloverReason(bucket_catalog::RolloverReason::kSize);
+        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kSize});
 
     // The last measurement will exceed the size that the bucket can store, which will mean it
     // should be in a different bucket.
@@ -558,8 +451,8 @@ TEST_F(TimeseriesWriteOpsInternalTest, InsertBatchHandlesRolloverReasonkCachePre
     // Artificially lower _storageCacheSizeBytes so we can simulate kCachePressure.
     _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes;
 
-    auto batchOfMeasurementsWithSize =
-        _generateMeasurementsWithRolloverReason(bucket_catalog::RolloverReason::kCachePressure);
+    auto batchOfMeasurementsWithSize = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kCachePressure});
 
     // The last measurement will exceed the size that the bucket can store. Coupled with the lowered
     // cache size, we will trigger kCachePressure, so the measurement will be in a different bucket.
@@ -570,11 +463,126 @@ TEST_F(TimeseriesWriteOpsInternalTest, InsertBatchHandlesRolloverReasonkCachePre
     _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
 }
 
-TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
-        "db_timeseries_write_ops_internal_test", "ts");
+TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonMixed1) {
+    std::vector<BSONObj> batchOfMeasurements =
+        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kNone,
+                                                 .numMeasurements = 50,
+                                                 .timeValue = Date_t::now()});
 
-    auto tsOptions = _getTimeseriesOptions(_ns);
+    auto batchOfMeasurementsWithCount =
+        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kCount,
+                                                 .timeValue = Date_t::now() + Seconds(1)});
+
+    auto batchOfMeasurementsWithTimeForward = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kTimeForward,
+         .numMeasurements = 50,
+         .idxWithDiffMeasurement = 25,
+         .timeValue = Date_t::now() + Seconds(2)});
+
+
+    std::vector<BSONObj> mixedRolloverReasonsMeasurements = _getFlattenedVector(
+        std::vector<std::vector<BSONObj>>({batchOfMeasurements,
+                                           batchOfMeasurementsWithCount,
+                                           batchOfMeasurementsWithTimeForward}));
+    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+              batchOfMeasurements.size() + batchOfMeasurementsWithCount.size() +
+                  batchOfMeasurementsWithTimeForward.size());
+
+    // The first bucket will consist of all 50 measurements from batchOfMeasurements.
+    // We will then insert gTimeseriesBucketMaxCount - 50 measurements from
+    // batchOfMeasurementsWithCountA before rolling over due to kCount.
+    // We will create a second bucket that will have the gTimeseriesBucketMaxCount measurements
+    // from batchOfMeasurementsWithCount, and then roll over due to kCount.
+    // We will then create a third bucket that will have the last 50 measurements from
+    // batchOfMeasurementsWithCount.
+    // We will then insert 25 measurements from batchOfMeasurementsWithTimeForward into the third
+    // bucket before encountering kTimeForward and add the remaining 25 measurements into a fourth
+    // bucket.
+    std::vector<size_t> numWriteBatches{4};
+    _testStageInsertBatch(mixedRolloverReasonsMeasurements, numWriteBatches);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonMixed2) {
+    auto batchOfMeasurementsWithSize = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kSize, .timeValue = Date_t::now()});
+
+    std::vector<BSONObj> batchOfMeasurements =
+        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kNone,
+                                                 .numMeasurements = 50,
+                                                 .timeValue = Date_t::now() + Seconds(1)});
+
+    auto batchOfMeasurementsWithSchemaChange = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kSchemaChange,
+         .timeValue = Date_t::now() + Seconds(2)});
+
+    std::vector<BSONObj> mixedRolloverReasonsMeasurements =
+        _getFlattenedVector(std::vector<std::vector<BSONObj>>{
+            batchOfMeasurementsWithSize, batchOfMeasurements, batchOfMeasurementsWithSchemaChange});
+    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+              batchOfMeasurementsWithSize.size() + batchOfMeasurements.size() +
+                  batchOfMeasurementsWithSchemaChange.size());
+
+    // The first bucket will consist of 124 measurements before we rollover due to kSize from
+    // batchOfMeasurementsWithSize.
+    // The second bucket will consist of one measurement from batchOfMeasurementsWithSize with
+    // the 50 measurements from batchOfMeasurements. We will then insert
+    // gTimeseriesBucketMaxCount - 50 - 1 measurements from batchOfMeasurementsWithSchemaChange
+    // into this second bucket, and rollover due to kCount. The third bucket will be created and
+    // we will insert the measurements
+    // batchOfMeasurementsWithSchemaChange[gTimeseriesBucketMaxCount - 50 -
+    // 1:gTimeseriesBucketMaxCount-1].
+    // Finally, the fourth bucket created to insert the last measurement
+    // batchOfMeasurementsWithSchemaChange due to kSchemaChange.
+    std::vector<size_t> numWriteBatches{4};
+    _testStageInsertBatch(mixedRolloverReasonsMeasurements, numWriteBatches);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonMixed3) {
+    // Artificially lower _storageCacheSizeBytes so we can simulate kCachePressure.
+    _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes;
+
+    auto batchOfMeasurements =
+        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kNone,
+                                                 .numMeasurements = 10,
+                                                 .timeValue = Date_t::now()});
+
+    std::vector<BSONObj> batchOfMeasurementsWithTimeForward =
+        _generateMeasurementsWithRolloverReason(
+            {.reason = bucket_catalog::RolloverReason::kTimeForward,
+             .numMeasurements = 10,
+             .idxWithDiffMeasurement = 5,
+             .timeValue = Date_t::now() + Seconds(1)});
+
+    auto batchOfMeasurementsWithCachePressure = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kCachePressure,
+         .timeValue = Date_t::now() + Seconds(2)});
+
+    std::vector<BSONObj> mixedRolloverReasonsMeasurements = _getFlattenedVector(
+        std::vector<std::vector<BSONObj>>{batchOfMeasurements,
+                                          batchOfMeasurementsWithTimeForward,
+                                          batchOfMeasurementsWithCachePressure});
+    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+              batchOfMeasurements.size() + batchOfMeasurementsWithTimeForward.size() +
+                  batchOfMeasurementsWithCachePressure.size());
+
+    // The first bucket will consist of 10 measurements from batchOfMeasurements. We will then
+    // insert 5 measurements from batchOfMeasurementsWithTimeForward until we rollover due to
+    // kTimeForward.
+    // The second bucket will consist of the remaining 5 measurements from
+    // batchOfMeasurementsWithTimeForward. We will then insert 4 measurements from
+    // batchOfMeasurementsWithCachePressure into the second bucket and will rollover due to
+    // kCachePressure.
+    // We will insert the last measurement from batchOfMeasurementsWithCachePressure into a
+    // third bucket.
+    std::vector<size_t> numWriteBatches{3};
+    _testStageInsertBatch(mixedRolloverReasonsMeasurements, numWriteBatches);
+
+    // Reset _storageCacheSizeBytes back to a representative value.
+    _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
+    auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<BSONObj> userBatch;
     for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
         userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << _metaValue));
@@ -582,7 +590,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucke
 
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -590,7 +598,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucke
                                                   bucketsColl,
                                                   tsOptions,
                                                   _opCtx->getOpID(),
-                                                  _getCollator(_ns),
+                                                  _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
                                                   _compressBucket,
                                                   userBatch,
@@ -610,17 +618,14 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucke
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsOneMeta) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
-        "db_timeseries_write_ops_internal_test", "ts");
-
-    auto tsOptions = _getTimeseriesOptions(_ns);
+    auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<BSONObj> userBatch;
     for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
         userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << _metaValue));
     }
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -628,7 +633,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsOne
                                                   bucketsColl,
                                                   tsOptions,
                                                   _opCtx->getOpID(),
-                                                  _getCollator(_ns),
+                                                  _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
                                                   _compressBucket,
                                                   userBatch,
@@ -648,10 +653,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsOne
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetas) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
-        "db_timeseries_write_ops_internal_test", "ts");
-
-    auto tsOptions = _getTimeseriesOptions(_ns);
+    auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<BSONObj> userBatch;
     for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
         userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << _metaValue));
@@ -661,7 +663,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsMul
     }
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -669,7 +671,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsMul
                                                   bucketsColl,
                                                   tsOptions,
                                                   _opCtx->getOpID(),
-                                                  _getCollator(_ns),
+                                                  _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
                                                   _compressBucket,
                                                   userBatch,
@@ -690,10 +692,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsMul
 
 TEST_F(TimeseriesWriteOpsInternalTest,
        PrepareInsertsToBucketsMultipleBucketsMultipleMetasInterleaved) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
-        "db_timeseries_write_ops_internal_test", "ts");
-
-    auto tsOptions = _getTimeseriesOptions(_ns);
+    auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<BSONObj> userBatch;
     for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
         userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField
@@ -701,7 +700,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
     }
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -709,7 +708,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
                                                   bucketsColl,
                                                   tsOptions,
                                                   _opCtx->getOpID(),
-                                                  _getCollator(_ns),
+                                                  _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
                                                   _compressBucket,
                                                   userBatch,
@@ -729,17 +728,14 @@ TEST_F(TimeseriesWriteOpsInternalTest,
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsAll) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
-        "db_timeseries_write_ops_internal_test", "ts");
-
-    auto tsOptions = _getTimeseriesOptions(_ns);
+    auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
     std::vector<BSONObj> userMeasurementsBatch{
-        mongo::fromjson(R"({"meta":"a", "x":2})"),  // Malformed measurement, missing time field
-        mongo::fromjson(R"({"meta":"a", "x":3})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"tag":"a", "x":2})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"tag":"a", "x":3})"),  // Malformed measurement, missing time field
     };
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -747,7 +743,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsAll) {
                                                   bucketsColl,
                                                   tsOptions,
                                                   _opCtx->getOpID(),
-                                                  _getCollator(_ns),
+                                                  _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
                                                   _compressBucket,
                                                   userMeasurementsBatch,
@@ -758,21 +754,18 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsAll) {
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsSome) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
-        "db_timeseries_write_ops_internal_test", "ts");
-
-    auto tsOptions = _getTimeseriesOptions(_ns);
+    auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
     std::vector<BSONObj> userMeasurementsBatch{
-        mongo::fromjson(R"({"meta":"a", "x":2})"),  // Malformed measurement, missing time field
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "meta":"a", "x":3})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "meta":"a", "x":3})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "meta":"b", "x":3})"),
-        mongo::fromjson(R"({"meta":"b", "x":3})"),  // Malformed measurement, missing time field
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T09:02:00.000Z"}, "meta":"b", "x":3})"),
+        mongo::fromjson(R"({"tag":"a", "x":2})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "tag":"a", "x":3})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "tag":"a", "x":3})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "tag":"b", "x":3})"),
+        mongo::fromjson(R"({"tag":"b", "x":3})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T09:02:00.000Z"}, "tag":"b", "x":3})"),
     };
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -780,7 +773,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsSome) {
                                                   bucketsColl,
                                                   tsOptions,
                                                   _opCtx->getOpID(),
-                                                  _getCollator(_ns),
+                                                  _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
                                                   _compressBucket,
                                                   userMeasurementsBatch,

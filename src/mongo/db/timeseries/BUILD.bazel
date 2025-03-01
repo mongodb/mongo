@@ -71,6 +71,26 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "timeseries_test_fixture",
+    srcs = [
+        "timeseries_test_fixture.cpp",
+    ],
+    hdrs = [
+        "timeseries_test_fixture.h",
+    ],
+    deps = [
+        ":bucket_compression",
+        ":timeseries_options",
+        "//src/mongo:base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/timeseries/bucket_catalog",
+    ],
+)
+
+mongo_cc_library(
     name = "bucket_compression_failure",
     srcs = [
         "bucket_compression_failure.cpp",

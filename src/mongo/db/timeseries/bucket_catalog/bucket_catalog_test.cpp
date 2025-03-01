@@ -43,22 +43,20 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
-#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
@@ -78,10 +76,7 @@ constexpr StringData kNumClosedDueToReopening = "numBucketsClosedDueToReopening"
 constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
 constexpr StringData kNumClosedDueToMemoryThreshold = "numBucketsClosedDueToMemoryThreshold"_sd;
 
-static constexpr uint64_t kDefaultStorageCacheSizeBytes = 1024 * 1024 * 1024;
-static constexpr uint64_t kLimitedStorageCacheSizeBytes = 1024;
-
-class BucketCatalogTest : public CatalogTestFixture {
+class BucketCatalogTest : public TimeseriesTestFixture {
 protected:
     class RunBackgroundTaskAndWaitForFailpoint {
         stdx::thread _taskThread;
@@ -92,17 +87,8 @@ protected:
         ~RunBackgroundTaskAndWaitForFailpoint();
     };
 
-    void setUp() override;
-    void tearDown() override;
-    virtual std::vector<NamespaceString> getNamespaceStrings();
-
     std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
     _makeOperationContext();
-
-    virtual BSONObj _makeTimeseriesOptionsForCreate() const;
-
-    TimeseriesOptions _getTimeseriesOptions(const NamespaceString& ns) const;
-    const CollatorInterface* _getCollator(const NamespaceString& ns) const;
 
     void _commit(const NamespaceString& ns,
                  const std::shared_ptr<WriteBatch>& batch,
@@ -112,30 +98,27 @@ protected:
                              const UUID& uuid,
                              uint16_t numPreviouslyCommittedMeasurements);
 
-    StatusWith<mongo::timeseries::bucket_catalog::InsertResult> _insertOneHelper(
+    StatusWith<InsertResult> _insertOneHelper(OperationContext* opCtx,
+                                              BucketCatalog& catalog,
+                                              const mongo::NamespaceString& nss,
+                                              const UUID& uuid,
+                                              const mongo::BSONObj& doc);
+
+    StatusWith<InsertResult> _tryInsertOneHelper(OperationContext* opCtx,
+                                                 BucketCatalog& catalog,
+                                                 const mongo::NamespaceString& nss,
+                                                 const UUID& uuid,
+                                                 const mongo::BSONObj& doc);
+
+    StatusWith<InsertResult> _insertOneWithReopeningContextHelper(
         OperationContext* opCtx,
-        mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
+        BucketCatalog& catalog,
         const mongo::NamespaceString& nss,
         const UUID& uuid,
-        const mongo::BSONObj& doc);
-
-    StatusWith<mongo::timeseries::bucket_catalog::InsertResult> _tryInsertOneHelper(
-        OperationContext* opCtx,
-        mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
-        const mongo::NamespaceString& nss,
-        const UUID& uuid,
-        const mongo::BSONObj& doc);
-
-    StatusWith<mongo::timeseries::bucket_catalog::InsertResult>
-    _insertOneWithReopeningContextHelper(OperationContext* opCtx,
-                                         mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
-                                         const mongo::NamespaceString& nss,
-                                         const UUID& uuid,
-                                         const mongo::BSONObj& doc,
-                                         ReopeningContext& reopeningContext);
+        const mongo::BSONObj& doc,
+        ReopeningContext& reopeningContext);
 
     long long _getExecutionStat(const UUID& uuid, StringData stat);
-
 
     // Check that each group of objects has compatible schema with itself, but that inserting the
     // first object in new group closes the existing bucket and opens a new one
@@ -159,89 +142,16 @@ protected:
     void _testBucketMetadataFieldOrdering(const BSONObj& inputMetadata,
                                           const BSONObj& expectedMetadata);
 
-    std::vector<BSONObj> _generateMeasurementsWithRolloverReason(RolloverReason reason) const;
-
     void _testStageInsertBatchIntoEligibleBucket(std::vector<BSONObj> batchOfMeasurements,
                                                  std::vector<size_t> currBatchedInsertContextsIndex,
                                                  std::vector<size_t> numMeasurementsInWriteBatch,
                                                  size_t numBatchedInsertContexts) const;
-
-    OperationContext* _opCtx;
-    BucketCatalog* _bucketCatalog;
-
-    StringData _timeField = "time";
-    StringData _metaField = "tag";
-    StringData _metaValue = "a";
-    uint64_t _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
-
-    // Strings used to simulate kSize/kCachePressure rollover reason.
-    std::string _bigStr = std::string(1000, 'a');
-
-    NamespaceString _ns1 =
-        NamespaceString::createNamespaceString_forTest("bucket_catalog_test_1", "t_1");
-    NamespaceString _ns2 =
-        NamespaceString::createNamespaceString_forTest("bucket_catalog_test_1", "t_2");
-    NamespaceString _ns3 =
-        NamespaceString::createNamespaceString_forTest("bucket_catalog_test_2", "t_1");
-
-    UUID _uuid1 = UUID::gen();
-    UUID _uuid2 = UUID::gen();
-    UUID _uuid3 = UUID::gen();
-
-    BSONObj _measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
 };
 
 class BucketCatalogWithoutMetadataTest : public BucketCatalogTest {
 protected:
     BSONObj _makeTimeseriesOptionsForCreate() const override;
 };
-
-std::vector<NamespaceString> BucketCatalogTest::getNamespaceStrings() {
-    return {_ns1, _ns2, _ns3};
-}
-
-void BucketCatalogTest::setUp() {
-    CatalogTestFixture::setUp();
-
-    _opCtx = operationContext();
-    _bucketCatalog = &GlobalBucketCatalog::get(_opCtx->getServiceContext());
-
-    for (auto&& [ns, uuid] : std::initializer_list<std::pair<NamespaceString*, UUID*>>{
-             {&_ns1, &_uuid1}, {&_ns2, &_uuid2}, {&_ns3, &_uuid3}}) {
-        ASSERT_OK(createCollection(
-            _opCtx,
-            ns->dbName(),
-            BSON("create" << ns->coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
-        AutoGetCollection autoColl(_opCtx, ns->makeTimeseriesBucketsNamespace(), MODE_IS);
-        *uuid = autoColl.getCollection()->uuid();
-    }
-}
-
-void BucketCatalogTest::tearDown() {
-    // Validate that all tracked execution stats adds up to what is being tracked globally.
-    ExecutionStats accumulated;
-    for (auto&& execStats : _bucketCatalog->executionStats) {
-
-        addCollectionExecutionGauges(accumulated, *execStats.second);
-    }
-
-    // Compare as BSON, this allows us to avoid enumerating all the individual stats in this
-    // function and makes it robust to adding further stats in the future.
-    auto execStatsToBSON = [](const ExecutionStats& stats) {
-        BSONObjBuilder builder;
-        appendExecutionStatsToBuilder(stats, builder);
-        return builder.obj();
-    };
-
-    ExecutionStats global;
-
-    // Filter out the gauges only
-    addCollectionExecutionGauges(global, _bucketCatalog->globalExecutionStats);
-
-    ASSERT_EQ(0, execStatsToBSON(global).woCompare(execStatsToBSON(accumulated)));
-
-    CatalogTestFixture::tearDown();
-}
 
 BucketCatalogTest::RunBackgroundTaskAndWaitForFailpoint::RunBackgroundTaskAndWaitForFailpoint(
     const std::string& failpointName, std::function<void()>&& fn) {
@@ -267,22 +177,9 @@ BucketCatalogTest::_makeOperationContext() {
     return {std::move(client), std::move(opCtx)};
 }
 
-BSONObj BucketCatalogTest::_makeTimeseriesOptionsForCreate() const {
-    return BSON("timeField" << _timeField << "metaField" << _metaField);
-}
 
 BSONObj BucketCatalogWithoutMetadataTest::_makeTimeseriesOptionsForCreate() const {
     return BSON("timeField" << _timeField);
-}
-
-TimeseriesOptions BucketCatalogTest::_getTimeseriesOptions(const NamespaceString& ns) const {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    return *autoColl->getTimeseriesOptions();
-}
-
-const CollatorInterface* BucketCatalogTest::_getCollator(const NamespaceString& ns) const {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    return autoColl->getDefaultCollator();
 }
 
 void BucketCatalogTest::_commit(const NamespaceString& ns,
@@ -316,19 +213,18 @@ void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
                          _getCollator(ns),
                          BSON(_timeField << time),
                          _opCtx->getOpID(),
-                         std::get<bucket_catalog::InsertContext>(insertContextAndTime),
+                         std::get<InsertContext>(insertContextAndTime),
                          std::get<Date_t>(insertContextAndTime),
                          _storageCacheSizeBytes);
     auto& batch = get<SuccessfulInsertion>(result.getValue()).batch;
     _commit(ns, batch, numPreviouslyCommittedMeasurements);
 }
 
-StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_insertOneHelper(
-    OperationContext* opCtx,
-    mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
-    const mongo::NamespaceString& nss,
-    const UUID& uuid,
-    const mongo::BSONObj& doc) {
+StatusWith<InsertResult> BucketCatalogTest::_insertOneHelper(OperationContext* opCtx,
+                                                             BucketCatalog& catalog,
+                                                             const mongo::NamespaceString& nss,
+                                                             const UUID& uuid,
+                                                             const mongo::BSONObj& doc) {
 
     auto insertContextAndTime =
         uassertStatusOK(prepareInsert(catalog, uuid, _getTimeseriesOptions(nss), doc));
@@ -337,17 +233,16 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
                   _getCollator(nss),
                   doc,
                   opCtx->getOpID(),
-                  std::get<bucket_catalog::InsertContext>(insertContextAndTime),
+                  std::get<InsertContext>(insertContextAndTime),
                   std::get<Date_t>(insertContextAndTime),
                   _storageCacheSizeBytes);
 }
 
-StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_tryInsertOneHelper(
-    OperationContext* opCtx,
-    mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
-    const mongo::NamespaceString& nss,
-    const UUID& uuid,
-    const mongo::BSONObj& doc) {
+StatusWith<InsertResult> BucketCatalogTest::_tryInsertOneHelper(OperationContext* opCtx,
+                                                                BucketCatalog& catalog,
+                                                                const mongo::NamespaceString& nss,
+                                                                const UUID& uuid,
+                                                                const mongo::BSONObj& doc) {
 
     auto insertContextAndTime =
         uassertStatusOK(prepareInsert(catalog, uuid, _getTimeseriesOptions(nss), doc));
@@ -356,15 +251,14 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
                      _getCollator(nss),
                      doc,
                      _opCtx->getOpID(),
-                     std::get<bucket_catalog::InsertContext>(insertContextAndTime),
+                     std::get<InsertContext>(insertContextAndTime),
                      std::get<Date_t>(insertContextAndTime),
                      _storageCacheSizeBytes);
 }
 
-StatusWith<mongo::timeseries::bucket_catalog::InsertResult>
-BucketCatalogTest::_insertOneWithReopeningContextHelper(
+StatusWith<InsertResult> BucketCatalogTest::_insertOneWithReopeningContextHelper(
     OperationContext* opCtx,
-    mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
+    BucketCatalog& catalog,
     const mongo::NamespaceString& nss,
     const UUID& uuid,
     const mongo::BSONObj& doc,
@@ -378,7 +272,7 @@ BucketCatalogTest::_insertOneWithReopeningContextHelper(
                                       doc,
                                       _opCtx->getOpID(),
                                       reopeningContext,
-                                      std::get<bucket_catalog::InsertContext>(insertContextAndTime),
+                                      std::get<InsertContext>(insertContextAndTime),
                                       std::get<Date_t>(insertContextAndTime),
                                       _storageCacheSizeBytes);
 }
@@ -632,85 +526,6 @@ void BucketCatalogTest::_testBucketMetadataFieldOrdering(const BSONObj& inputMet
     auto metadata = swBucketKeyAndTime.getValue().first.metadata.toBSON();
     ASSERT_EQ(metadata.woCompare(BSON(_metaField << expectedMetadata)), 0);
 }
-// _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that have
-// the input RolloverReason.
-// We require that when we call with kCachePressure, _storageCacheSizeBytes =
-// kLimitedStorageCacheSizeBytes (must be set in the unit test) so that we properly trigger
-// kCachePressure. Otherwise, _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes.
-std::vector<BSONObj> BucketCatalogTest::_generateMeasurementsWithRolloverReason(
-    const RolloverReason reason) const {
-    invariant((_storageCacheSizeBytes == kDefaultStorageCacheSizeBytes &&
-               reason != bucket_catalog::RolloverReason::kCachePressure) ||
-              (_storageCacheSizeBytes == kLimitedStorageCacheSizeBytes &&
-               reason == bucket_catalog::RolloverReason::kCachePressure));
-    std::vector<BSONObj> batchOfMeasurements;
-    switch (reason) {
-        case RolloverReason::kNone:
-            for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << Date_t::now() << _metaField << _metaValue));
-            }
-            return batchOfMeasurements;
-        case RolloverReason::kCount:
-            for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << Date_t::now() << _metaField << _metaValue));
-            }
-            return batchOfMeasurements;
-        case RolloverReason::kTimeForward:
-            for (auto i = 0; i < (gTimeseriesBucketMaxCount - 1); i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << Date_t::now() << _metaField << _metaValue));
-            }
-            batchOfMeasurements.emplace_back(
-                BSON(_timeField << Date_t::now() + Hours(2) << _metaField << _metaValue));
-            return batchOfMeasurements;
-        case RolloverReason::kSchemaChange:
-            for (auto i = 0; i < (gTimeseriesBucketMaxCount - 1); i++) {
-                batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField
-                                                                 << _metaValue << "deathGrips"
-                                                                 << "isOnline"));
-            }
-            // We want to guarantee that this measurement with different schema is at the
-            // end of the BatchedInsertContext, so we make its time greater than the rest
-            // of the measurements.
-            batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() + Seconds(1)
-                                                             << _metaField << _metaValue
-                                                             << "deathGrips" << 100));
-            return batchOfMeasurements;
-        case RolloverReason::kTimeBackward:
-            for (auto i = 0; i < (gTimeseriesBucketMaxCount - 1); i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << Date_t::now() << _metaField << _metaValue));
-            }
-            batchOfMeasurements.emplace_back(
-                BSON(_timeField << Date_t::now() - Hours(1) << _metaField << _metaValue));
-            return batchOfMeasurements;
-        // kCachePressure and kSize are caused by the same measurements, but we have kCachePressure
-        // when the cacheDerivedBucketSize < kLargeMeasurementsMaxBucketSize.
-        // We can simulate this by lowering the _storageCacheSizeBytes or increasing the number of
-        // active buckets.
-        //
-        // Note that we will need less large measurements to trigger kCachePressure because we use
-        // _storageCacheSizeBytes to determine if we want to keep the bucket open due to large
-        // measurements.
-        case RolloverReason::kCachePressure:
-            for (auto i = 0; i < 4; i++) {
-                batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField
-                                                                 << _metaValue << "big_field"
-                                                                 << _bigStr));
-            }
-            return batchOfMeasurements;
-        case RolloverReason::kSize:
-            for (auto i = 0; i < 125; i++) {
-                batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField
-                                                                 << _metaValue << "big_field"
-                                                                 << _bigStr));
-            }
-            return batchOfMeasurements;
-    }
-    return batchOfMeasurements;
-}
 
 // currBatchedInsertContextsIndex is the index in batchedInsertContexts that the current write
 // batch should be accessing.
@@ -816,6 +631,7 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                                                      currentPosition,
                                                      writeBatch);
     currentPositionFromNumMeasurementsInBatch += numMeasurementsInWriteBatch[0];
+    ASSERT_EQ(currentPosition, currentPositionFromNumMeasurementsInBatch);
 
     if (numMeasurementsInWriteBatch.size() == 1) {
         ASSERT(successfulInsertion);
@@ -2373,8 +2189,8 @@ TEST_F(BucketCatalogTest,
 
 TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressure) {
     // Initialize the side bucket catalog.
-    auto sideBucketCatalog = std::make_unique<timeseries::bucket_catalog::BucketCatalog>(
-        1, getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes);
+    auto sideBucketCatalog =
+        std::make_unique<BucketCatalog>(1, getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes);
 
     // Create dummy bucket and populate bucket state registry.
     auto dummyUUID = UUID::gen();
@@ -2412,7 +2228,7 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     stdx::lock_guard stripeLock{stripe.mutex};
 
     // Create execution stats controller.
-    auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
+    auto collectionStats = std::make_shared<ExecutionStats>();
     auto statsController =
         ExecutionStatsController(collectionStats, sideBucketCatalog->globalExecutionStats);
 
@@ -2509,12 +2325,11 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     auto doc = BSON(_timeField << time << _metaField << "B");
     // Get the insertContext so that we can get the key signature for the BucketID — again, to
     // trigger a collision of our frozen bucketID with the bucketID of the bucket we will allocate.
-    auto insertContext = std::get<bucket_catalog::InsertContext>(
+    auto insertContext = std::get<InsertContext>(
         uassertStatusOK(prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), doc)));
 
     // Get the next sequential OID so that we can trigger an ID collision down the line.
-    auto OIDAndRoundedTime =
-        bucket_catalog::internal::generateBucketOID(time, insertContext.options);
+    auto OIDAndRoundedTime = internal::generateBucketOID(time, insertContext.options);
     OID nextBucketOID = std::get<OID>(OIDAndRoundedTime);
 
     BucketId nextBucketId{_uuid1, nextBucketOID, insertContext.key.signature()};
@@ -3021,20 +2836,19 @@ TEST_F(BucketCatalogTest, UseAlternateBucketSkipsFrozenBucket) {
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketFillsUpSingleBucket) {
-    std::vector<BSONObj> batchOfMeasurements =
-        _generateMeasurementsWithRolloverReason(RolloverReason::kNone);
-
-    std::vector<size_t> numMeasurementsInWriteBatch{static_cast<size_t>(gTimeseriesBucketMaxCount)};
+    std::vector<BSONObj> batchOfMeasurementsTimeseriesBucketMaxCount =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone});
     std::vector<size_t> currBatchedInsertContextsIndex{0};
-    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurements,
+    std::vector<size_t> numMeasurementsInWriteBatch{static_cast<size_t>(gTimeseriesBucketMaxCount)};
+    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsTimeseriesBucketMaxCount,
                                             currBatchedInsertContextsIndex,
                                             numMeasurementsInWriteBatch,
-                                            1 /* numBatchedInsertContexts */);
+                                            /*numBatchedInsertContexts=*/1);
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkCount) {
     std::vector<BSONObj> batchOfMeasurementsWithCount =
-        _generateMeasurementsWithRolloverReason(RolloverReason::kCount);
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kCount});
 
     // batchOfMeasurements will be 2 * gTimeseriesBucketMaxCount measurements with all the
     // measurements having the same meta field and time, which means we should have two buckets.
@@ -3044,72 +2858,105 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkCoun
     _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithCount,
                                             currBatchedInsertContextsIndex,
                                             numMeasurementsInWriteBatch,
-                                            1 /* numBatchedInsertContexts */);
+                                            /*numBatchedInsertContexts=*/1);
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkTimeForward) {
-    std::vector<BSONObj> batchOfMeasurementsWithTimeForward =
-        _generateMeasurementsWithRolloverReason(RolloverReason::kTimeForward);
+    std::vector<BSONObj> batchOfMeasurementsWithTimeForwardAtEnd =
+        _generateMeasurementsWithRolloverReason(
+            {.reason = RolloverReason::kTimeForward, .metaValue = _metaValue});
 
-    // The last measurement will be outside of the bucket range, which will mean it should be in a
-    // different bucket.
-    std::vector<size_t> numMeasurementsInWriteBatch{
-        static_cast<size_t>(gTimeseriesBucketMaxCount - 1), 1};
+    // The last measurement in batchOfMeasurementsWithTimeForwardAtEnd will have a timestamp outside
+    // of the bucket range encompassing the previous measurements, which means that this
+    // measurement will be in a different bucket.
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
-    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithTimeForward,
+    std::vector<size_t> numMeasurementsInWriteBatchAtEnd{
+        static_cast<size_t>(gTimeseriesBucketMaxCount - 1), 1};
+    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithTimeForwardAtEnd,
                                             currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            1 /* numBatchedInsertContexts */);
+                                            numMeasurementsInWriteBatchAtEnd,
+                                            /*numBatchedInsertContexts=*/1);
+
+    // Max bucket size with measurements[1:gTimeseriesBucketMaxCount] having kTimeForward.
+    // We declare a different meta field so we don't attempt to use a bucket created above.
+    auto batchOfMeasurementsWithTimeForwardAfterFirstMeasurement =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
+                                                 .idxWithDiffMeasurement = 1,
+                                                 .metaValue = _metaValue2});
+    std::vector<size_t> numMeasurementsInWriteBatchAfterFirstMeasurement{
+        1, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
+    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithTimeForwardAfterFirstMeasurement,
+                                            currBatchedInsertContextsIndex,
+                                            numMeasurementsInWriteBatchAfterFirstMeasurement,
+                                            /*numBatchedInsertContexts=*/1);
+
+    // 50 measurements with measurements[25:50] having kTimeForward.
+    // We declare a different meta field so we don't attempt to use the buckets created above.
+    std::vector<size_t> numMeasurementsInWriteBatchInMiddle{25, 25};
+    auto batchOfMeasurementsWithTimeForwardInMiddle =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
+                                                 .numMeasurements = 50,
+                                                 .idxWithDiffMeasurement = 25,
+                                                 .metaValue = _metaValue3});
+    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithTimeForwardInMiddle,
+                                            currBatchedInsertContextsIndex,
+                                            numMeasurementsInWriteBatchInMiddle,
+                                            /*numBatchedInsertContexts=*/1);
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkSchemaChange) {
-    std::vector<BSONObj> batchOfMeasurementsWithSchemaChange =
-        _generateMeasurementsWithRolloverReason(RolloverReason::kSchemaChange);
+    // Max bucket size with only the last measurement having kSchemaChange.
+    auto batchOfMeasurementsWithSchemaChangeAtEnd = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kSchemaChange, .metaValue = _metaValue});
 
-    // The last measurement in the batch will have a int value rather than a string for field
-    // "deathGrips", which means it will be in a different bucket.
-    std::vector<size_t> numMeasurementsInWriteBatch{
+    // The last measurement in batchOfMeasurementsWithSchemaChangeAtEnd will have a int rather
+    // than a string for field "deathGrips", which means this measurement will be in a different
+    // bucket.
+    std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
+    std::vector<size_t> numMeasurementsInWriteBatchAtEnd{
         static_cast<size_t>(gTimeseriesBucketMaxCount - 1), 1};
-    std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
-    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithSchemaChange,
+    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithSchemaChangeAtEnd,
                                             currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            1 /* numBatchedInsertContexts */);
-}
+                                            numMeasurementsInWriteBatchAtEnd,
+                                            /*numBatchedInsertContexts=*/1);
 
-TEST_F(BucketCatalogTest, BucketMetadataNormalization) {
-    _testBucketMetadataFieldOrdering(BSON("a" << 1 << "b" << 1), BSON("a" << 1 << "b" << 1));
-    _testBucketMetadataFieldOrdering(BSON("b" << 1 << "a" << 1), BSON("a" << 1 << "b" << 1));
-    _testBucketMetadataFieldOrdering(BSON("nested" << BSON("a" << 1 << "b" << 1)),
-                                     BSON("nested" << BSON("a" << 1 << "b" << 1)));
-    _testBucketMetadataFieldOrdering(BSON("nested" << BSON("b" << 1 << "a" << 1)),
-                                     BSON("nested" << BSON("a" << 1 << "b" << 1)));
-}
+    // Max bucket size with measurements[1:gTimeseriesBucketMaxCount] having kSchemaChange.
+    // We declare a different meta field so we don't attempt to use the buckets created above.
+    auto batchOfMeasurementsWithSchemaChangeAfterFirstMeasurement =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
+                                                 .idxWithDiffMeasurement = 1,
+                                                 .metaValue = _metaValue2});
+    std::vector<size_t> numMeasurementsInWriteBatchAfterFirstMeasurement{
+        1, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
+    _testStageInsertBatchIntoEligibleBucket(
+        batchOfMeasurementsWithSchemaChangeAfterFirstMeasurement,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatchAfterFirstMeasurement,
+        /*numBatchedInsertContexts=*/1);
 
-
-TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkSize) {
-    std::vector<BSONObj> batchOfMeasurementsWithSize =
-        _generateMeasurementsWithRolloverReason(RolloverReason::kSize);
-
-    // The last measurement will exceed the size that the bucket can store, which will mean it
-    // should be in a different bucket.
-    std::vector<size_t> numMeasurementsInWriteBatch{124, 1};
-    std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
-    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithSize,
+    // 50 measurements with measurements[25:50] having kSchemaChange.
+    // We declare a different meta field so we don't attempt to use the buckets created above.
+    auto batchOfMeasurementsWithTimeForwardInMiddle =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
+                                                 .numMeasurements = 50,
+                                                 .idxWithDiffMeasurement = 25,
+                                                 .metaValue = _metaValue3});
+    std::vector<size_t> numMeasurementsInWriteBatchInMiddle{25, 25};
+    _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithTimeForwardInMiddle,
                                             currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            1 /* numBatchedInsertContexts */);
+                                            numMeasurementsInWriteBatchInMiddle,
+                                            /*numBatchedInsertContexts=*/1);
 }
-
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkCachePressure) {
     // Artificially lower _storageCacheSizeBytes so we can simulate kCachePressure.
     _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes;
 
     std::vector<BSONObj> batchOfMeasurementsWithSize =
-        _generateMeasurementsWithRolloverReason(RolloverReason::kCachePressure);
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kCachePressure});
 
-    // The last measurement will exceed the size that the bucket can store. Coupled with the lowered
-    // cache size, we will trigger kCachePressure, so the measurement will be in a different bucket.
+    // The last measurement will exceed the size that the bucket can store. Coupled with the
+    // lowered cache size, we will trigger kCachePressure, so the measurement will be in a
+    // different bucket.
     std::vector<size_t> numMeasurementsInWriteBatch{3, 1};
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
     _testStageInsertBatchIntoEligibleBucket(batchOfMeasurementsWithSize,
@@ -3119,6 +2966,160 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkCach
 
     // Reset _storageCacheSizeBytes back to a representative value.
     _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
+}
+
+TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed1) {
+    auto batchOfMeasurementsWithCount = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kCount, .timeValue = Date_t::now()});
+
+    auto batchOfMeasurementsWithSchemaChange =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
+                                                 .numMeasurements = 50,
+                                                 .idxWithDiffMeasurement = 25,
+                                                 .timeValue = Date_t::now() + Seconds(1)});
+
+    // Generating measurements with kSchema change will require us to add an additional
+    // Seconds(1) to all subsequent measurement vectors because we ensure the measurements with
+    // schema change are at the end of the measurements vector by adding Seconds(1) to the time
+    // field of those measurements.
+    std::vector<BSONObj> batchOfMeasurements = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kNone, .timeValue = Date_t::now() + Seconds(3)});
+
+    std::vector<BSONObj> mixedRolloverReasonsMeasurements =
+        _getFlattenedVector(std::vector<std::vector<BSONObj>>({batchOfMeasurementsWithCount,
+                                                               batchOfMeasurementsWithSchemaChange,
+                                                               batchOfMeasurements}));
+    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+              batchOfMeasurementsWithCount.size() + batchOfMeasurementsWithSchemaChange.size() +
+                  batchOfMeasurements.size());
+
+    std::vector<size_t> numWriteBatches{5};
+    std::vector<size_t> currBatchedInsertContextsIndex{0, 0, 0, 0, 0};
+
+    // We first fill up two buckets with gTimeseriesBucketMaxCount measurements due to the
+    // batchOfMeasurementsWithCount.
+    // We then fill up a third bucket with 25 measurements before encountering a
+    // kSchemaChange in batchOfMeasurementsWithSchemaChange.
+    // We then fill up a fourth bucket with the rest of the 25 measurements from
+    // batchOfMeasurementsWithSchemaChange and the measurements from batchOfMeasurements.
+    // Because batchOfMeasurements has gTimeseriesBucketMaxCount measurements, we write
+    // gTimeseriesBucketMaxCount - 25 measurements before rolling over due to count and opening
+    // a fifth bucket to insert the last 25 measurements.
+    //
+    // Note that the testing behavior is a bit different from stageInsertBatch (in
+    // _testStageInsertBatchIntoEligibleBucket, as soon as we encounter a RolloverReason, we
+    // rollover) and we would expect the third bucket to be reopened and written to with the
+    // last 25 measurements in batchOfMeasurements in stageInsertBatch.
+    std::vector<size_t> numMeasurementsInWriteBatch{static_cast<size_t>(gTimeseriesBucketMaxCount),
+                                                    static_cast<size_t>(gTimeseriesBucketMaxCount),
+                                                    25,
+                                                    static_cast<size_t>(gTimeseriesBucketMaxCount),
+                                                    25};
+    _testStageInsertBatchIntoEligibleBucket(mixedRolloverReasonsMeasurements,
+                                            currBatchedInsertContextsIndex,
+                                            numMeasurementsInWriteBatch,
+                                            /*numBatchedInsertContexts=*/1);
+}
+
+TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed2) {
+    auto batchOfMeasurementsWithSize = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kSize, .timeValue = Date_t::now()});
+
+    std::vector<BSONObj> batchOfMeasurements =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone,
+                                                 .numMeasurements = 50,
+                                                 .timeValue = Date_t::now() + Seconds(1)});
+
+    auto batchOfMeasurementsWithTimeForward =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
+                                                 .idxWithDiffMeasurement = 1,
+                                                 .timeValue = Date_t::now() + Seconds(2)});
+
+    std::vector<BSONObj> mixedRolloverReasonsMeasurements =
+        _getFlattenedVector(std::vector<std::vector<BSONObj>>{
+            batchOfMeasurementsWithSize, batchOfMeasurements, batchOfMeasurementsWithTimeForward});
+    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+              batchOfMeasurementsWithSize.size() + batchOfMeasurements.size() +
+                  batchOfMeasurementsWithTimeForward.size());
+
+    std::vector<size_t> numWriteBatches{3};
+    std::vector<size_t> currBatchedInsertContextsIndex{0, 0, 0};
+
+    // We will insert the first 124 measurements from batchOfMeasurementsWithSize into our first
+    // bucket until we encounter the last measurement making us rollover due to size.
+    // We write this last measurement from batchOfMeasurementsWithSize into the second bucket,
+    // and then write all of the measurements from batchOfMeasurements into the second bucket.
+    // We then insert the first measurement from batchOfMeasurementsWithTimeForward into the
+    // second bucket. We then encounter kTimeForward and create a third bucket to write the
+    // remaining gTimeseriesBucketMaxCount - 1 measurements from
+    // batchOfMeasurementsWithTimeForward.
+    std::vector<size_t> numMeasurementsInWriteBatch{
+        124, 52, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
+    _testStageInsertBatchIntoEligibleBucket(mixedRolloverReasonsMeasurements,
+                                            currBatchedInsertContextsIndex,
+                                            numMeasurementsInWriteBatch,
+                                            /*numBatchedInsertContexts=*/1);
+}
+
+TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed3) {
+    // Artificially lower _storageCacheSizeBytes so we can simulate kCachePressure.
+    _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes;
+
+    auto batchOfMeasurementsWithSchemaChange =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
+                                                 .numMeasurements = 10,
+                                                 .idxWithDiffMeasurement = 1,
+                                                 .timeValue = Date_t::now()});
+
+    // Generating measurements with kSchema change will require us to add an additional
+    // Seconds(1) to all subsequent measurement vectors because we ensure the measurements with
+    // schema change are at the end of the measurements vector by adding Seconds(1) to the time
+    // field of those measurements.
+    auto batchOfMeasurementsWithCachePressure = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kCachePressure, .timeValue = Date_t::now() + Seconds(2)});
+
+    auto batchOfMeasurements =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone,
+                                                 .numMeasurements = 10,
+                                                 .timeValue = Date_t::now() + Seconds(3)});
+
+    std::vector<BSONObj> mixedRolloverReasonsMeasurements =
+        _getFlattenedVector(std::vector<std::vector<BSONObj>>{batchOfMeasurementsWithSchemaChange,
+                                                              batchOfMeasurementsWithCachePressure,
+                                                              batchOfMeasurements});
+    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+              batchOfMeasurementsWithSchemaChange.size() +
+                  batchOfMeasurementsWithCachePressure.size() + batchOfMeasurements.size());
+
+    std::vector<size_t> numWriteBatches{3};
+    std::vector<size_t> currBatchedInsertContextsIndex{0, 0, 0};
+
+    // The first bucket will consist of one  measurement from
+    // batchOfMeasurementsWithSchemaChange. We will then rollover due to kSchemaChange. The
+    // second bucket will consist of the remaining 9 measurements from
+    // batchOfMeasurementsWithSchemaChange. We will then insert two measurements from
+    // batchOfMeasurementsWithCachePressure into the second bucket and will rollover due to
+    // kCachePressure.
+    // We will insert the last two measurements from batchOfMeasurementsWithCachePressure into a
+    // third bucket. Finally, we insert all 10 measurements from batchOfMeasurements into the
+    // third bucket.
+    std::vector<size_t> numMeasurementsInWriteBatch{1, 11, 12};
+    _testStageInsertBatchIntoEligibleBucket(mixedRolloverReasonsMeasurements,
+                                            currBatchedInsertContextsIndex,
+                                            numMeasurementsInWriteBatch,
+                                            /*numBatchedInsertContexts=*/1);
+
+    // Reset _storageCacheSizeBytes back to a representative value.
+    _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
+}
+
+TEST_F(BucketCatalogTest, BucketMetadataNormalization) {
+    _testBucketMetadataFieldOrdering(BSON("a" << 1 << "b" << 1), BSON("a" << 1 << "b" << 1));
+    _testBucketMetadataFieldOrdering(BSON("b" << 1 << "a" << 1), BSON("a" << 1 << "b" << 1));
+    _testBucketMetadataFieldOrdering(BSON("nested" << BSON("a" << 1 << "b" << 1)),
+                                     BSON("nested" << BSON("a" << 1 << "b" << 1)));
+    _testBucketMetadataFieldOrdering(BSON("nested" << BSON("b" << 1 << "a" << 1)),
+                                     BSON("nested" << BSON("a" << 1 << "b" << 1)));
 }
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
