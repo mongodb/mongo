@@ -473,9 +473,10 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     dropDatabaseParticipantCmd.setDbName(_dbName);
                     generic_argument_util::setMajorityWriteConcern(dropDatabaseParticipantCmd);
 
-                    // The database needs to be dropped first on the db primary shard
-                    // because otherwise changestreams won't receive the drop event.
+                    // Perform the database drop on the local catalog of the primary shard.
                     {
+                        dropDatabaseParticipantCmd.setFromMigrate(false);
+
                         DBDirectClient dbDirectClient(opCtx);
                         const auto commandResponse = dbDirectClient.runCommand(
                             OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
@@ -494,29 +495,32 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                                                 &ignoreResult));
                     }
 
-                    // Remove primary shard from participants
-                    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-                    auto participants = allShardIds;
-                    participants.erase(
-                        std::remove(participants.begin(), participants.end(), primaryShardId),
-                        participants.end());
+                    // Perform the database drop on the local catalog of any other shard;
+                    // the dbVersion is attached to each request to ensure idempotency.
+                    {
+                        dropDatabaseParticipantCmd.setFromMigrate(true);
 
-                    generic_argument_util::setMajorityWriteConcern(dropDatabaseParticipantCmd);
-                    generic_argument_util::setDbVersionIfPresent(dropDatabaseParticipantCmd,
-                                                                 *metadata().getDatabaseVersion());
-                    // Drop DB on all other shards, attaching the dbVersion to the request to ensure
-                    // idempotency.
-                    auto opts = std::make_shared<
-                        async_rpc::AsyncRPCOptions<ShardsvrDropDatabaseParticipant>>(
-                        **executor, token, dropDatabaseParticipantCmd);
-                    try {
-                        sharding_ddl_util::sendAuthenticatedCommandToShards(
-                            opCtx, opts, participants);
-                    } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
-                        // The DB metadata could have been removed by a network-partitioned former
-                        // primary
+                        const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+                        auto participants = allShardIds;
+                        participants.erase(
+                            std::remove(participants.begin(), participants.end(), primaryShardId),
+                            participants.end());
+
+                        generic_argument_util::setMajorityWriteConcern(dropDatabaseParticipantCmd);
+                        generic_argument_util::setDbVersionIfPresent(
+                            dropDatabaseParticipantCmd, *metadata().getDatabaseVersion());
+
+                        auto opts = std::make_shared<
+                            async_rpc::AsyncRPCOptions<ShardsvrDropDatabaseParticipant>>(
+                            **executor, token, dropDatabaseParticipantCmd);
+                        try {
+                            sharding_ddl_util::sendAuthenticatedCommandToShards(
+                                opCtx, opts, participants);
+                        } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
+                            // The DB metadata could have been removed by a network-partitioned
+                            // former primary
+                        }
                     }
-
                     // Clear the database sharding state info before exiting the critical section so
                     // that all subsequent write operations with the old database version will fail
                     // due to StaleDbVersion.

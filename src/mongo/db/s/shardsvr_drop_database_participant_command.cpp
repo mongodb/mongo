@@ -82,9 +82,10 @@ public:
                                                           opCtx->getWriteConcern());
 
             const auto& dbName = request().getDbName();
+            const bool fromMigrate = request().getFromMigrate();
 
             try {
-                uassertStatusOK(dropDatabase(opCtx, dbName));
+                uassertStatusOK(dropDatabase(opCtx, dbName, fromMigrate));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_DEBUG(5281101,
                             1,

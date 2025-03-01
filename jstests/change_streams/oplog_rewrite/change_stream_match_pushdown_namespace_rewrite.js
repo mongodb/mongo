@@ -1061,13 +1061,13 @@ verifyOnWholeCluster(secondResumeAfterToken,
 verifyOnWholeCluster(
     secondResumeAfterToken,
     {$match: {ns: {db: dbName}}},
-    {change_stream_match_pushdown_and_rewrite_and_rewrite: {dropDatabase: [dbName, dbName]}},
-    1 /* expectedOplogRetDocsForEachShard */);
+    {change_stream_match_pushdown_and_rewrite_and_rewrite: {dropDatabase: [dbName]}},
+    [1, 0] /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(
     secondResumeAfterToken,
     {$match: {$expr: {$eq: ["$ns", {db: dbName}]}}},
-    {change_stream_match_pushdown_and_rewrite_and_rewrite: {dropDatabase: [dbName, dbName]}},
-    1 /* expectedOplogRetDocsForEachShard */);
+    {change_stream_match_pushdown_and_rewrite_and_rewrite: {dropDatabase: [dbName]}},
+    [1, 0] /* expectedOplogRetDocsForEachShard */);
 
 // Create two sharded collections in the main test database, then start a new change stream to get a
 // fresh resume token.

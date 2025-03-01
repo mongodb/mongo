@@ -510,6 +510,12 @@ commands:
         cpp_name: ShardsvrDropDatabaseParticipant
         strict: false
         reply_type: OkReply
+        fields:
+            fromMigrate:
+                type: optionalBool
+                description: "When set to true, the recipient is expected to generate
+                              a not user visible version of the op entry that marks the completion of the request."
+                default: false
 
     _shardsvrDropCollection:
         description: "Parser for the _shardsvrDropCollection command"
