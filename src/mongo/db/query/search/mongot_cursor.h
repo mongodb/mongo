@@ -94,7 +94,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     boost::optional<int64_t> userBatchSize = boost::none,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
-        searchIdLookupMetrics = nullptr);
+        searchIdLookupMetrics = nullptr,
+    boost::optional<NamespaceString> viewNss = boost::none);
 
 /**
  * Parallel to establishCursorsForSearchStage() but limited to the arguments expected for
@@ -105,7 +106,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     const boost::optional<int>& protocolVersion = boost::none,
-    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr,
+    boost::optional<NamespaceString> viewNss = boost::none);
 
 /**
  * Gets the explain information by issuing an explain command to mongot and blocking
@@ -121,7 +123,8 @@ BSONObj getExplainResponse(const ExpressionContext* expCtx,
  */
 BSONObj getSearchExplainResponse(const ExpressionContext* expCtx,
                                  const BSONObj& query,
-                                 executor::TaskExecutor* taskExecutor);
+                                 executor::TaskExecutor* taskExecutor,
+                                 boost::optional<NamespaceString> viewNss = boost::none);
 
 /**
  * Send the search command `cmdObj` to the remote search server this process is connected to.

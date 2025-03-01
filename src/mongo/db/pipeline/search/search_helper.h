@@ -88,6 +88,16 @@ void addResolvedNamespaceForSearch(const NamespaceString& origNss,
                                    boost::optional<UUID> uuid = boost::none);
 
 /**
+ * A wrapper around addResolvedNamespaceForSearch that additionally checks that the pipeline
+ * contains a search stage.
+ */
+void checkAndAddResolvedNamespaceForSearch(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                           std::vector<mongo::BSONObj> pipelineObj,
+                                           ResolvedView resolvedView,
+                                           const NamespaceString& viewName,
+                                           boost::optional<UUID> uuid = boost::none);
+
+/**
  * Check if this is a stored source $search or $_internalSearchMongot pipeline.
  */
 bool isStoredSource(const Pipeline* pipeline);
@@ -190,6 +200,8 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
     const ExpressionContext* expCtx,
     const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline);
 
+boost::optional<MongotQueryViewInfo> getViewFromBSONObj(
+    boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec);
 /**
  * Create the initial search pipeline which can be used for both $search and $searchMeta. The
  * returned list is unique and mutable.
@@ -202,6 +214,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> createInitialSearchPipeline(
             "Running search command in non-allowed context (update pipeline)",
             !expCtx->getIsParsingPipelineUpdate());
 
+    auto view = search_helpers::getViewFromBSONObj(expCtx, specObj);
+
     // This is only called from user pipelines during desugaring of $search/$searchMeta, so the
     // `specObj` should be the search query itself.
     auto executor =
@@ -210,7 +224,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> createInitialSearchPipeline(
          !expCtx->getMongoProcessInterface()->inShardedEnvironment(
              expCtx->getOperationContext())) ||
         MONGO_unlikely(searchReturnEofImmediately.shouldFail())) {
-        return {make_intrusive<TargetSearchDocumentSource>(std::move(specObj), expCtx, executor)};
+        return {
+            make_intrusive<TargetSearchDocumentSource>(std::move(specObj), expCtx, executor, view)};
     }
 
     // Send a planShardedSearch command to mongot to get the relevant planning information,
@@ -218,9 +233,15 @@ std::list<boost::intrusive_ptr<DocumentSource>> createInitialSearchPipeline(
     InternalSearchMongotRemoteSpec remoteSpec(specObj.getOwned());
     planShardedSearch(expCtx, &remoteSpec);
 
-    return {make_intrusive<TargetSearchDocumentSource>(std::move(remoteSpec), expCtx, executor)};
+    return {
+        make_intrusive<TargetSearchDocumentSource>(std::move(remoteSpec), expCtx, executor, view)};
 }
 
-void validateViewPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+/**
+ * Assert that the mongot stage is allowed to run on the view pipeline (i.e. the pipeline doesn't
+ * involve other namespaces).
+ */
+void validateViewPipeline(MongotQueryViewInfo view);
+
 }  // namespace search_helpers
 }  // namespace mongo

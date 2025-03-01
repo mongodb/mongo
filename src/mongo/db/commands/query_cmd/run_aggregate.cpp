@@ -162,30 +162,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
         // TODO SERVER-82101 Re-organize timeseries rewrites so timeseries can follow the
         // same pattern here as other views
         return Pipeline::parse(aggExState.getRequest().getPipeline(), expCtx);
+    } else if (search_helpers::isMongotPipeline(pipeline.get()) &&
+               expCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
+        // For search queries on views don't do any of the pipeline stitching that is done for
+        // normal views.
+        return pipeline;
     }
 
-    else if (search_helpers::isMongotPipeline(pipeline.get()) &&
-             expCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
-        if (search_helpers::isStoredSource(pipeline.get())) {
-            // For returnStoredSource queries, the documents returned by mongot already include the
-            // fields transformed by the view pipeline. As such, mongod doesn't need to apply the
-            // view pipeline after idLookup.
-            return pipeline;
-        } else {
-            // Search queries on views behave differently than non-search aggregations on views.
-            // When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
-            // view transforms as part of its subpipeline. In this way, the view stages will always
-            // be applied directly after $_internalSearchMongotRemote and before the remaining
-            // stages of the user pipeline. This is to ensure the stages following
-            // $search/$vectorSearch in the user pipeline will receive the modified documents: when
-            // storedSource is disabled, idLookup will retrieve full/unmodified documents during
-            // (from the _id values returned by mongot), apply the view's data transforms, and pass
-            // said transformed documents through the rest of the user pipeline.
-            search_helpers::addResolvedNamespaceForSearch(
-                aggExState.getOriginalNss(), aggExState.getResolvedView().value(), expCtx, uuid);
-            return pipeline;
-        }
-    }
     // Parse the view pipeline, then stitch the user pipeline and view pipeline together
     // to build the total aggregation pipeline.
     auto userPipeline = std::move(pipeline);
@@ -907,6 +890,20 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     const AggExState& aggExState,
     const AggCatalogState& aggCatalogState,
     boost::intrusive_ptr<ExpressionContext> expCtx) {
+    // If applicable, ensure that the resolved namespace is added to the resolvedNamespaces map on
+    // the expCtx before calling Pipeline::parse(). This is necessary for search on views as
+    // Pipeline::parse() will first check if a view exists directly on the stage specification and
+    // if none is found, will then check for the view using the expCtx. As such, it's necessary to
+    // add the resolved namespace to the expCtx prior to any call to Pipeline::parse().
+    if (aggExState.getResolvedView()) {
+        search_helpers::checkAndAddResolvedNamespaceForSearch(
+            expCtx,
+            aggExState.getOriginalRequest().getPipeline(),
+            *aggExState.getResolvedView(),
+            aggExState.getOriginalNss(),
+            aggCatalogState.getUUID());
+    }
+
     // If we're operating over a view, we first parse just the original user-given request
     // for the sake of registering query stats. Then, we'll parse the view pipeline and stitch
     // the two pipelines together below.

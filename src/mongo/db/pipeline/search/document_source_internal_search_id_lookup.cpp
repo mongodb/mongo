@@ -47,17 +47,13 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchIdLookup, DocumentSourceInternalSearc
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& expCtx,
     long long limit,
-    ExecShardFilterPolicy shardFilterPolicy)
-    : DocumentSource(kStageName, expCtx), _limit(limit), _shardFilterPolicy(shardFilterPolicy) {
-
-    // When search query is being run on a view, we need to store the view pipeline to append to
-    // the end of the idLookup's subpipeline.
-    if (expCtx->getViewNSForMongotIndexedView()) {
-        auto resolvedNamespace =
-            expCtx->getResolvedNamespace(*expCtx->getViewNSForMongotIndexedView());
-        _viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
-    }
-    // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
+    ExecShardFilterPolicy shardFilterPolicy,
+    boost::optional<std::vector<BSONObj>> viewPipeline)
+    : DocumentSource(kStageName, expCtx),
+      _limit(limit),
+      _shardFilterPolicy(shardFilterPolicy),
+      _viewPipeline(viewPipeline ? Pipeline::parse(*viewPipeline, pExpCtx) : nullptr) {
+    // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state sharedby the
     // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
     // part of a $lookup sub-pipeline, the sub-pipeline gets parsed anew for every document the
@@ -96,11 +92,12 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
         std::vector<BSONObj> pipeline = {
             BSON("$match" << Document({{"_id", Value("_id placeholder"_sd)}}))};
 
-        if (pExpCtx->getViewNSForMongotIndexedView()) {
-            auto viewPipeline =
-                pExpCtx->getResolvedNamespace(*pExpCtx->getViewNSForMongotIndexedView()).pipeline;
-            pipeline.insert(pipeline.end(), viewPipeline.begin(), viewPipeline.end());
+        // Append the view pipeline if it exists.
+        if (_viewPipeline) {
+            auto bsonViewPipeline = _viewPipeline->serializeToBson();
+            pipeline.insert(pipeline.end(), bsonViewPipeline.begin(), bsonViewPipeline.end());
         }
+
         outputSpec["subPipeline"] =
             Value(Pipeline::parse(pipeline, pExpCtx)->serializeToBson(opts));
 
@@ -148,15 +145,12 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
             auto pipeline =
                 Pipeline::makePipeline({BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
 
-            if (pExpCtx->getViewNSForMongotIndexedView()) {
+            if (_viewPipeline) {
                 // When search query is being run on a view, we append the view pipeline to the end
                 // of the idLookup's subpipeline. This allows idLookup to retrieve the
                 // full/unmodified documents (from the _id values returned by mongot), apply the
                 // view's data transforms, and pass said transformed documents through the rest of
                 // the user pipeline.
-                tassert(9475500,
-                        "We should have a _viewPipeline if pExpCtx references a view",
-                        _viewPipeline);
                 pipeline->appendPipeline(_viewPipeline->clone(pExpCtx));
             }
 

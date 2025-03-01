@@ -67,9 +67,11 @@ public:
         return constraints;
     }
 
-    DocumentSourceInternalSearchMongotRemote(InternalSearchMongotRemoteSpec spec,
-                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             std::shared_ptr<executor::TaskExecutor> taskExecutor);
+    DocumentSourceInternalSearchMongotRemote(
+        InternalSearchMongotRemoteSpec spec,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::shared_ptr<executor::TaskExecutor> taskExecutor,
+        boost::optional<MongotQueryViewInfo> view = boost::none);
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         return getSearchDefaultConstraints();
@@ -98,7 +100,7 @@ public:
         auto spec = InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName),
                                                                _spec.toBSON());
         return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-            std::move(spec), expCtx, _taskExecutor);
+            std::move(spec), expCtx, _taskExecutor, _view);
     }
 
     const InternalSearchMongotRemoteSpec& getMongotRemoteSpec() const {
@@ -213,12 +215,19 @@ protected:
 
     /**
      * This stage may need to merge the metadata it generates on the merging half of the pipeline.
-     * Until we know if the merge needs to be done, we hold the pipeline containig the merging
+     * Until we know if the merge needs to be done, we hold the pipeline containing the merging
      * logic here.
      */
     std::unique_ptr<Pipeline, PipelineDeleter> _mergingPipeline;
 
     std::unique_ptr<executor::TaskExecutorCursor> _cursor;
+
+    /**
+     * For mongot queries on views, $_internalSearchMongotRemote is only required to know the
+     * view's nss. However, DocumentSourceSearchMeta derives from this class and needs both the
+     * view name and the view pipeline. As such, we keep track of the entire view struct.
+     */
+    boost::optional<MongotQueryViewInfo> _view;
 
 private:
     /**

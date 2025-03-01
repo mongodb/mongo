@@ -49,6 +49,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer.h"
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -86,11 +87,13 @@ using executor::TaskExecutorCursor;
 DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemote(
     InternalSearchMongotRemoteSpec spec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::shared_ptr<executor::TaskExecutor> taskExecutor)
+    std::shared_ptr<executor::TaskExecutor> taskExecutor,
+    boost::optional<MongotQueryViewInfo> view)
     : DocumentSource(kStageName, expCtx),
       _mergingPipeline(spec.getMergingPipeline().has_value()
                            ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
                            : nullptr),
+      _view(view),
       _spec(std::move(spec)),
       _taskExecutor(taskExecutor) {
     LOGV2_DEBUG(9497006,
@@ -171,7 +174,10 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
 
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
         return mongot_cursor::getSearchExplainResponse(
-            pExpCtx.get(), _spec.getMongotQuery(), _taskExecutor.get());
+            pExpCtx.get(),
+            _spec.getMongotQuery(),
+            _taskExecutor.get(),
+            _view ? boost::make_optional(_view->getViewNss()) : boost::none);
     });
 
     MutableDocument mDoc;
@@ -340,7 +346,13 @@ DocumentSourceInternalSearchMongotRemote::establishCursor() {
     // DocumentSourceInternalSearchMongotRemote if we establish the cursors during search_helper
     // pipeline preparation instead.
     auto cursors = mongot_cursor::establishCursorsForSearchStage(
-        pExpCtx, _spec, _taskExecutor, boost::none, nullptr, getSearchIdLookupMetrics());
+        pExpCtx,
+        _spec,
+        _taskExecutor,
+        boost::none,
+        nullptr,
+        getSearchIdLookupMetrics(),
+        _view ? boost::make_optional(_view->getViewNss()) : boost::none);
     // Should be called only in unsharded scenario, therefore only expect a results cursor and no
     // metadata cursor.
     tassert(5253301, "Expected exactly one cursor from mongot", cursors.size() == 1);

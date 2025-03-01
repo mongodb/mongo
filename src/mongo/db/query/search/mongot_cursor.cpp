@@ -51,11 +51,11 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     const boost::optional<UUID>& uuid,
     const boost::optional<ExplainOptions::Verbosity>& explain,
     const BSONObj& query,
+    const boost::optional<NamespaceString> viewName = boost::none,
     const boost::optional<int> protocolVersion = boost::none,
     const boost::optional<long long> docsRequested = boost::none,
     const boost::optional<long long> batchSize = boost::none,
-    const bool requiresSearchSequenceToken = false,
-    const boost::optional<NamespaceString> viewName = boost::none) {
+    const bool requiresSearchSequenceToken = false) {
     BSONObjBuilder cmdBob;
     cmdBob.append(kSearchField, nss.coll());
     uassert(
@@ -263,7 +263,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     boost::optional<int64_t> userBatchSize,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
-        searchIdLookupMetrics) {
+        searchIdLookupMetrics,
+    boost::optional<NamespaceString> viewNss) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
     if (!expCtx->getUUID()) {
@@ -316,11 +317,11 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                               expCtx->getUUID(),
                                               expCtx->getExplain(),
                                               query,
+                                              viewNss,
                                               protocolVersion,
                                               docsRequested,
                                               batchSize,
-                                              spec.getRequiresSearchSequenceToken(),
-                                              expCtx->getViewNSForMongotIndexedView()),
+                                              spec.getRequiresSearchSequenceToken()),
         taskExecutor,
         std::move(getMoreStrategy),
         std::move(yieldPolicy));
@@ -331,7 +332,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     const BSONObj& query,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     const boost::optional<int>& protocolVersion,
-    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy,
+    boost::optional<NamespaceString> viewNss) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
     if (!expCtx->getUUID()) {
@@ -347,6 +349,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                                                   expCtx->getUUID(),
                                                                   expCtx->getExplain(),
                                                                   query,
+                                                                  viewNss,
                                                                   protocolVersion),
                             taskExecutor,
                             std::move(getMoreStrategy),
@@ -382,12 +385,14 @@ BSONObj getExplainResponse(const ExpressionContext* expCtx,
 
 BSONObj getSearchExplainResponse(const ExpressionContext* expCtx,
                                  const BSONObj& query,
-                                 executor::TaskExecutor* taskExecutor) {
+                                 executor::TaskExecutor* taskExecutor,
+                                 boost::optional<NamespaceString> viewNss) {
     const auto request = getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),
                                                                expCtx->getNamespaceString(),
                                                                expCtx->getUUID(),
                                                                expCtx->getExplain(),
-                                                               query);
+                                                               query,
+                                                               viewNss);
     return getExplainResponse(expCtx, request, taskExecutor);
 }
 

@@ -55,7 +55,8 @@ public:
     DocumentSourceInternalSearchIdLookUp(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long limit = 0,
-        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{},
+        boost::optional<std::vector<BSONObj>> viewPipeline = boost::none);
 
     const char* getSourceName() const final;
 

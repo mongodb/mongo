@@ -42,6 +42,7 @@
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/views/resolved_view.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -73,15 +74,8 @@ Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
         // of whether we're on a router or a data-bearing node. Otherwise, we only need the mongot
         if (_spec.getMetadataMergeProtocolVersion().has_value()) {
             MutableDocument spec{Document(_spec.toBSON())};
-            // TODO SERVER-100566 inspect vectorSearch directly to see if it contains a view name
-            // data member store, skip inspecting the expCtx.
-            if (auto viewName = pExpCtx->getViewNSForMongotIndexedView()) {
-                MongotQueryOnShardedView view;
-                view.setViewNss(*pExpCtx->getViewNSForMongotIndexedView());
-                auto resolvedNamespace =
-                    pExpCtx->getResolvedNamespace(*pExpCtx->getViewNSForMongotIndexedView());
-                view.setEffectivePipeline(resolvedNamespace.pipeline);
-                spec["view"] = Value(view.toBSON());
+            if (_view) {
+                spec["view"] = Value(_view->toBSON());
             }
             return Value(Document{{getSourceName(), spec.freezeToValue()}});
         }
@@ -108,22 +102,17 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
         specObj.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)
         ? InternalSearchMongotRemoteSpec::parse(IDLParserContext(kStageName), specObj)
         : InternalSearchMongotRemoteSpec(specObj.getOwned());
-    // TODO SERVER-100566 store view info directly on $search.
-    if (auto view = spec.getView()) {
-        auto resolvedView =
-            ResolvedView{expCtx->getNamespaceString(), view->getEffectivePipeline(), BSONObj()};
-        search_helpers::addResolvedNamespaceForSearch(view->getViewNss(), resolvedView, expCtx);
-    }
 
+    auto view = search_helpers::getViewFromBSONObj(expCtx, specObj);
 
-    return make_intrusive<DocumentSourceSearch>(expCtx, std::move(spec));
+    return make_intrusive<DocumentSourceSearch>(expCtx, std::move(spec), view);
 }
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
-    if (pExpCtx->getViewNSForMongotIndexedView()) {
+    if (_view) {
         // This function will throw if the view violates validation rules for supporting
         // mongot-indexed views.
-        search_helpers::validateViewPipeline(pExpCtx);
+        search_helpers::validateViewPipeline(*_view);
     }
 
     auto executor =
@@ -144,8 +133,15 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     // DocumentSourceInternalSearchMongotRemote.
     spec.setMergingPipeline(boost::none);
 
+    // Extract the viewPipeline to share with DocumentSourceInternalSearchIdLookUp as it is required
+    // for mongot-indexed views.
+    boost::optional<std::vector<BSONObj>> viewPipeline;
+    if (_view) {
+        viewPipeline = boost::make_optional(_view->getEffectivePipeline());
+    }
+
     auto mongoTRemoteStage = make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-        std::move(spec), pExpCtx, executor);
+        std::move(spec), pExpCtx, executor, _view);
     desugaredPipeline.push_back(mongoTRemoteStage);
 
     // If 'returnStoredSource' is true, we don't want to do idLookup. Instead, promote the fields in
@@ -170,7 +166,10 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
         // idLookup must always be immediately after the $mongotRemote stage, which is always first
         // in the pipeline.
         auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
-            pExpCtx, _spec.getLimit().value_or(0), buildExecShardFilterPolicy(shardFilterer));
+            pExpCtx,
+            _spec.getLimit().value_or(0),
+            buildExecShardFilterPolicy(shardFilterer),
+            viewPipeline);
         desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
         // In this case, connect the shared search state of these two stages of the pipeline
         // for batch size tuning.

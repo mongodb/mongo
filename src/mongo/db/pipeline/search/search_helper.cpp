@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/plan_sharded_search_gen.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
@@ -265,6 +266,32 @@ void addResolvedNamespaceForSearch(const NamespaceString& origNss,
                                                    uuid,
                                                    true /*involvedNamespaceIsAView*/));
     expCtx->setViewNSForMongotIndexedView(boost::make_optional(origNss));
+}
+
+void checkAndAddResolvedNamespaceForSearch(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                           const std::vector<mongo::BSONObj> pipelineObj,
+                                           ResolvedView resolvedView,
+                                           const NamespaceString& viewName,
+                                           boost::optional<UUID> uuid) {
+    auto lpp = LiteParsedPipeline(viewName, pipelineObj);
+
+    // Search queries on views behave differently than non-search aggregations on views.
+    // When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
+    // view transforms as part of its subpipeline. In this way, the view stages will always
+    // be applied directly after $_internalSearchMongotRemote and before the remaining
+    // stages of the user pipeline. This is to ensure the stages following
+    // $search/$vectorSearch in the user pipeline will receive the modified documents: when
+    // storedSource is disabled, idLookup will retrieve full/unmodified documents during
+    // (from the _id values returned by mongot), apply the view's data transforms, and pass
+    // said transformed documents through the rest of the user pipeline.
+
+    // For returnStoredSource queries, the documents returned by mongot already include the
+    // fields transformed by the view pipeline. As such, mongod doesn't need to apply the
+    // view pipeline after idLookup.
+    if (expCtx->isFeatureFlagMongotIndexedViewsEnabled() && lpp.hasSearchStage() &&
+        !search_helper_bson_obj::isStoredSource(pipelineObj)) {
+        search_helpers::addResolvedNamespaceForSearch(viewName, resolvedView, expCtx, uuid);
+    }
 }
 
 bool isStoredSource(const Pipeline* pipeline) {
@@ -615,18 +642,13 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
 }
 
 
-void validateViewPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // mongot stages cannot run on a view involving other namespaces. This can occur when the view's
-    // pipeline contains $lookup, $unionWith, another mongot stage, etc. For safety, this error will
-    // throw even when these stages involve the same collection that the mongot stage is running on.
-    tassert(9475800,
-            str::stream() << "validateViewPipeline must be called while a search operation is "
-                             "operating on a view",
-            expCtx->getViewNSForMongotIndexedView());
+void validateViewPipeline(MongotQueryViewInfo view) {
+    // mongot stages cannot run on a view involving other namespaces. This can occur when the
+    // view's pipeline contains $lookup, $unionWith, another mongot stage, etc. For safety, this
+    // error will throw even when these stages involve the same collection that the mongot stage
+    // is running on.
+    LiteParsedPipeline lpp(view.getViewNss(), view.getEffectivePipeline());
 
-    ResolvedNamespace resolvedNamespace =
-        expCtx->getResolvedNamespace(expCtx->getViewNSForMongotIndexedView().get());
-    LiteParsedPipeline lpp(resolvedNamespace.ns, resolvedNamespace.pipeline);
     if (!lpp.getInvolvedNamespaces().empty()) {
         if (lpp.hasSearchStage()) {
             uassert(
@@ -639,11 +661,31 @@ void validateViewPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx)
             uassert(
                 9475802,
                 str::stream()
-                    << "mongot stages cannot be executed on a view if the view's  pipeline "
-                       "includes stages that involve other namespaces ($lookup, $unionWith, etc.)",
+                    << "mongot stages cannot be executed on a view if the view's pipeline includes "
+                       "stages that involve other namespaces ($lookup, $unionWith, etc.)",
                 false);
         }
     }
+}
+
+boost::optional<MongotQueryViewInfo> getViewFromBSONObj(
+    boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec) {
+    // First, check if the view is held on the spec object (sharded scenarios).
+    boost::optional<MongotQueryViewInfo> view;
+    if (spec.hasField("view") && spec["view"].type() == BSONType::Object) {
+        view = MongotQueryViewInfo::parse(IDLParserContext("unpack MongotQueryViewInfo"),
+                                          spec["view"].embeddedObject());
+    }
+
+    // If the view struct is not found on the spec document, check the expression context to see
+    // if the command is being executed on a view (non-sharded scenarios).
+    if (!view && expCtx->getViewNSForMongotIndexedView()) {
+        view = boost::make_optional(MongotQueryViewInfo(
+            *expCtx->getViewNSForMongotIndexedView(),
+            expCtx->getResolvedNamespace(*expCtx->getViewNSForMongotIndexedView()).pipeline));
+    }
+
+    return view;
 }
 }  // namespace search_helpers
 }  // namespace mongo

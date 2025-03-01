@@ -69,6 +69,7 @@
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -385,32 +386,6 @@ std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
     return newPipeline;
 }
 
-void mongotIndexedViewHelper(boost::intrusive_ptr<ExpressionContext> expCtx,
-                             std::unique_ptr<Pipeline, PipelineDeleter>& pipeline,
-                             ResolvedView resolvedView,
-                             const NamespaceString& viewName) {
-    if (expCtx->isFeatureFlagMongotIndexedViewsEnabled() &&
-        search_helpers::isMongotPipeline(pipeline.get())) {
-        if (search_helpers::isStoredSource(pipeline.get())) {
-            // For returnStoredSource queries, the documents returned by mongot already include the
-            // fields transformed by the view pipeline. As such, mongod doesn't need to apply the
-            // view pipeline after idLookup.
-            return;
-        } else {
-            // Search queries on views behave differently than non-search aggregations on views.
-            // When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
-            // view transforms as part of its subpipeline. In this way, the view stages will always
-            // be applied directly after $_internalSearchMongotRemote and before the remaining
-            // stages of the user pipeline. This is to ensure the stages following
-            // $search/$vectorSearch in the user pipeline will receive the modified documents: when
-            // storedSource is disabled, idLookup will retrieve full/unmodified documents during
-            // (from the _id values returned by mongot), apply the view's data transforms, and pass
-            // said transformed documents through the rest of the user pipeline.
-            search_helpers::addResolvedNamespaceForSearch(viewName, resolvedView, expCtx);
-        }
-    }
-}
-
 /**
  * Builds an expCtx with which to parse the request's pipeline, then parses the pipeline and
  * registers the pre-optimized pipeline with query stats collection.
@@ -452,11 +427,19 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                               resolveInvolvedNamespaces(involvedNamespaces),
                               hasChangeStream,
                               verbosity);
-    auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-    // TODO SERVER-100566 call view helper on raw bson obj vector, before parsing call above.
+
     if (resolvedView) {
-        mongotIndexedViewHelper(expCtx, pipeline, *resolvedView, nsStruct.requestedNss);
+        // If applicable, ensure that the resolved namespace is added to the resolvedNamespaces map
+        // on the expCtx before calling Pipeline::parse(). This is necessary for search on views as
+        // Pipeline::parse() will first check if a view exists directly on the stage specification
+        // and if none is found, will then check for the view using the expCtx. As such, it's
+        // necessary to add the resolved namespace to the expCtx prior to any call to
+        // Pipeline::parse().
+        search_helpers::checkAndAddResolvedNamespaceForSearch(
+            expCtx, request.getPipeline(), *resolvedView, nsStruct.requestedNss);
     }
+
+    auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     // In case query settings have already been looked up (in case the agg request is

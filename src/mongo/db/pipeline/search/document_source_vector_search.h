@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo {
@@ -49,7 +50,8 @@ public:
 
     DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                               BSONObj originalSpec);
+                               BSONObj originalSpec,
+                               boost::optional<MongotQueryViewInfo> view = boost::none);
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -93,7 +95,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
         return make_intrusive<DocumentSourceVectorSearch>(
-            expCtx, _taskExecutor, _originalSpec.copy());
+            expCtx, _taskExecutor, _originalSpec.copy(), _view);
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -172,5 +174,8 @@ private:
     // Keep track of the original request BSONObj's extra fields in case there were fields mongod
     // doesn't know about that mongot will need later.
     BSONObj _originalSpec;
+
+    // If applicable, hold the view information.
+    boost::optional<MongotQueryViewInfo> _view;
 };
 }  // namespace mongo

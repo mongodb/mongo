@@ -80,6 +80,10 @@ public:
             transactionNotSupported(getParseTimeName());
         }
 
+        bool isSearchStage() const final {
+            return true;
+        }
+
         explicit LiteParsedListSearchIndexes(std::string parseTimeName, NamespaceString nss)
             : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
 

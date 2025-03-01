@@ -38,6 +38,7 @@
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -84,22 +85,27 @@ DocumentSourceSearchMeta::distributedPlanLogic() {
 }
 
 std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establishCursor() {
-    if (pExpCtx->getViewNSForMongotIndexedView()) {
+    if (_view) {
         // This function will throw if the view violates validation rules for supporting
         // mongot-indexed views.
-        search_helpers::validateViewPipeline(pExpCtx);
+        search_helpers::validateViewPipeline(*_view);
     }
 
     // TODO SERVER-94875 We should be able to remove any cursor establishment logic from
     // DocumentSourceSearchMeta if we establish the cursors during search_helper
     // pipeline preparation instead.
     auto cursors = mongot_cursor::establishCursorsForSearchMetaStage(
-        pExpCtx, getSearchQuery(), getTaskExecutor(), getIntermediateResultsProtocolVersion());
+        pExpCtx,
+        getSearchQuery(),
+        getTaskExecutor(),
+        getIntermediateResultsProtocolVersion(),
+        nullptr,
+        _view ? boost::make_optional(_view->getViewNss()) : boost::none);
 
-    // TODO SERVER-91594: Since mongot will no longer only return explain, remove this block. Mongot
-    // can return only an explain object or an explain with a cursor. If mongot returned the explain
-    // object only, the cursor will not have attached vars. Since there's a possibility of not
-    // having vars for explain, we skip the check.
+    // TODO SERVER-91594: Since mongot will no longer only return explain, remove this block.
+    // Mongot can return only an explain object or an explain with a cursor. If mongot returned
+    // the explain object only, the cursor will not have attached vars. Since there's a
+    // possibility of not having vars for explain, we skip the check.
     if (pExpCtx->getExplain() && cursors.size() == 1) {
         return std::move(*cursors.begin());
     }
@@ -160,6 +166,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
             elem.type() == BSONType::Object);
 
     auto specObj = elem.embeddedObject();
+    auto view = search_helpers::getViewFromBSONObj(expCtx, specObj);
 
     // Note that the $searchMeta stage has two parsing options: one for the user visible stage and
     // the second (longer) form which is serialized from mongos to the shards and includes more
@@ -172,7 +179,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
     if (expCtx->getIsParsingViewDefinition()) {
         auto executor =
             executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
-        return {make_intrusive<DocumentSourceSearchMeta>(specObj.getOwned(), expCtx, executor)};
+        return {
+            make_intrusive<DocumentSourceSearchMeta>(specObj.getOwned(), expCtx, executor, view)};
     }
 
     // If we have this field it suggests we were serialized from a mongos process. We should parse
@@ -183,7 +191,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
         LOGV2_DEBUG(8569405, 4, "Parsing as $internalSearchMongotRemote", "params"_attr = params);
         auto executor =
             executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
-        return {make_intrusive<DocumentSourceSearchMeta>(std::move(params), expCtx, executor)};
+        return {
+            make_intrusive<DocumentSourceSearchMeta>(std::move(params), expCtx, executor, view)};
     }
 
     // Otherwise, we need to call this helper to determine if this is a sharded environment. If so,

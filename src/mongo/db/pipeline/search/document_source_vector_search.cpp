@@ -58,10 +58,12 @@ ALLOCATE_DOCUMENT_SOURCE_ID(vectorSearch, DocumentSourceVectorSearch::id)
 DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    BSONObj originalSpec)
+    BSONObj originalSpec,
+    boost::optional<MongotQueryViewInfo> view)
     : DocumentSource(kStageName, expCtx),
       _taskExecutor(taskExecutor),
-      _originalSpec(originalSpec.getOwned()) {
+      _originalSpec(originalSpec.getOwned()),
+      _view(view) {
     if (auto limitElem = _originalSpec.getField(kLimitFieldName)) {
         uassert(
             8575100, "Expected limit field to be a number in $vectorSearch", limitElem.isNumber());
@@ -122,14 +124,8 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
         // query to the shards, but do not include in explain output for this stage as the view
         // information will be present in $_internalSearchIdLookup and thus would be redundant.
         if (!opts.verbosity && pExpCtx->getInRouter()) {
-            // TODO SERVER-100566 inspect vectorSearch to see if it contains a view name data member
-            // and skip inspecting the expCtx.
-            if (auto viewName = pExpCtx->getViewNSForMongotIndexedView()) {
-                MongotQueryOnShardedView view;
-                view.setViewNss(*viewName);
-                auto resolvedNamespace = pExpCtx->getResolvedNamespace(*viewName);
-                view.setEffectivePipeline(resolvedNamespace.pipeline);
-                spec["view"] = Value(view.toBSON());
+            if (_view) {
+                spec["view"] = Value(_view->toBSON());
             }
         }
         return Value(Document{{kStageName, spec.freezeToValue()}});
@@ -246,19 +242,13 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
             elem.type() == BSONType::Object);
 
     auto spec = elem.embeddedObject();
-    // TODO SERVER-100566 store view name directly on $vectorSearch.
-    if (spec.hasField("view") && spec["view"].type() == BSONType::Object) {
-        auto view = MongotQueryOnShardedView::parse(
-            IDLParserContext("unpack MongotQueryOnShardedView"), spec["view"].embeddedObject());
-        auto resolvedView =
-            ResolvedView{expCtx->getNamespaceString(), view.getEffectivePipeline(), BSONObj()};
-        search_helpers::addResolvedNamespaceForSearch(view.getViewNss(), resolvedView, expCtx);
-    }
+
+    auto view = search_helpers::getViewFromBSONObj(expCtx, spec);
 
     auto serviceContext = expCtx->getOperationContext()->getServiceContext();
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
         make_intrusive<DocumentSourceVectorSearch>(
-            expCtx, executor::getMongotTaskExecutor(serviceContext), elem.embeddedObject())};
+            expCtx, executor::getMongotTaskExecutor(serviceContext), elem.embeddedObject(), view)};
 
     // TODO: SERVER-85426 Remove this block of code (it's the original location id lookup
     // was added to $vectorSearch, but that needed to be changed to support sharded
@@ -274,9 +264,13 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
              !expCtx->getMongoProcessInterface()->inShardedEnvironment(
                  expCtx->getOperationContext())) ||
             OperationShardingState::isComingFromRouter(expCtx->getOperationContext())) {
-            desugaredPipeline.insert(std::next(desugaredPipeline.begin()),
-                                     make_intrusive<DocumentSourceInternalSearchIdLookUp>(
-                                         expCtx, 0, buildExecShardFilterPolicy(shardFilterer)));
+            desugaredPipeline.insert(
+                std::next(desugaredPipeline.begin()),
+                make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+                    expCtx,
+                    0,
+                    buildExecShardFilterPolicy(shardFilterer),
+                    view ? boost::make_optional(view->getEffectivePipeline()) : boost::none));
             if (shardFilterer)
                 desugaredPipeline.push_back(std::move(shardFilterer));
         }
@@ -287,21 +281,25 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
 
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
-    if (pExpCtx->getViewNSForMongotIndexedView()) {
+    if (_view) {
         // This function will throw if the view violates validation rules for supporting
         // mongot-indexed views.
-        search_helpers::validateViewPipeline(pExpCtx);
+        search_helpers::validateViewPipeline(*_view);
     }
 
     auto executor =
         executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
 
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
-        make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _originalSpec.getOwned())};
+        make_intrusive<DocumentSourceVectorSearch>(
+            pExpCtx, executor, _originalSpec.getOwned(), _view)};
 
     auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(pExpCtx);
     auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
-        pExpCtx, _limit.value_or(0), buildExecShardFilterPolicy(shardFilterer));
+        pExpCtx,
+        _limit.value_or(0),
+        buildExecShardFilterPolicy(shardFilterer),
+        _view ? boost::make_optional(_view->getEffectivePipeline()) : boost::none);
     desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
     if (shardFilterer)
         desugaredPipeline.push_back(std::move(shardFilterer));
