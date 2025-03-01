@@ -187,14 +187,13 @@ const MetaFields = Object.freeze({
         shouldBeValidated: true,
         debugName: "score",
         validSortKey: true,
-        // TODO SERVER-100209 $rankFusion should always populate "score" regardless of
-        // "scoreDetails".
         firstStageRequired: [
             FirstStageOptions.FTS_MATCH,
             FirstStageOptions.SCORE,
             FirstStageOptions.VECTOR_SEARCH,
             FirstStageOptions.SEARCH,
             FirstStageOptions.SEARCH_W_DETAILS,
+            FirstStageOptions.RANK_FUSION,
             FirstStageOptions.RANK_FUSION_W_DETAILS,
         ]
     },
