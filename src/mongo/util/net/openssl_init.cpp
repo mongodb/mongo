@@ -193,7 +193,15 @@ void setupFIPS() {
 // Turn on FIPS mode if requested, OPENSSL_FIPS must be defined by the OpenSSL headers
 #if defined(_SUPPORT_FIPS)
     initFIPS();
-    LOGV2(23172, "FIPS 140-2 mode activated");
+
+#if OPENSSL_VERSION_NUMBER > 0x30000000L
+#define _FIPS_ACTIVATED_MSG "FIPS 140 mode activated"
+#else
+#define _FIPS_ACTIVATED_MSG "FIPS 140-2 mode activated"
+#endif
+
+    LOGV2(23172, _FIPS_ACTIVATED_MSG);
+
 #else
     LOGV2_FATAL_NOTRACE(23174, "this version of mongodb was not compiled with FIPS support");
 #endif
