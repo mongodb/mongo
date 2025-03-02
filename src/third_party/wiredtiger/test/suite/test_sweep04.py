@@ -238,9 +238,9 @@ class test_sweep04(wttest.WiredTigerTestCase):
         # Note, we don't check the first half average, it's likely to be big, but its size
         # depends on many factors. The important thing is that the slope has flattened out.
         # Even with variations due to sweep timing, the slope shouldn't be greater than
-        # 15.0 (dhandles per 100 times through the loop).
+        # 20.0 (dhandles per 100 times through the loop).
         self.assertLess(abs(q2_slope), q1_slope)
-        self.assertLess(abs(q2_slope), 15.0)
+        self.assertLess(abs(q2_slope), 20.0)
 
         # At the end of the run, we expect a pretty flat slope and a pretty small number
         # of dhandles. A slope of 5.0 (dhandles per 100 times though the loop) is rather

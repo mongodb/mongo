@@ -123,7 +123,7 @@ def session_compact_replace(orig_session_compact, session_self, uri, config):
     # of a tiered table.  Note this isn't a precise match for when we did/didn't create
     # a tiered table, but we don't have the create config around to check.
     ret = 0
-    if not uri.startswith("table:"):
+    if not uri or not uri.startswith("table:"):
         ret = orig_session_compact(session_self, uri, config)
     return ret
 
