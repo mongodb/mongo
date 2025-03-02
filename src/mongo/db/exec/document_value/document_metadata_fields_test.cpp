@@ -55,6 +55,9 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
                                         << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
     metadata.setVectorSearchScore(7.6);
+    metadata.setScore(2.5);
+    metadata.setScoreDetails(Value(BSON("value" << 3 << "otherDetails"
+                                                << "foo")));
 
     Date_t time;
     metadata.setTimeseriesBucketMinTime(time);
@@ -82,23 +85,6 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     ASSERT_EQ(deserialized.getVectorSearchScore(), 7.6);
     ASSERT_EQ(deserialized.getTimeseriesBucketMinTime(), time);
     ASSERT_EQ(deserialized.getTimeseriesBucketMaxTime(), time);
-}
-
-// TODO SERVER-94570 Merge these test cases with the test above.
-TEST(DocumentMetadataFieldsTest, FFGuardedMetadataRoundtripThroughSerialization) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-
-    DocumentMetadataFields metadata;
-    metadata.setScore(2.5);
-    metadata.setScoreDetails(Value(BSON("value" << 3 << "otherDetails"
-                                                << "foo")));
-
-    BufBuilder builder;
-    metadata.serializeForSorter(builder);
-    DocumentMetadataFields deserialized;
-    BufReader reader(builder.buf(), builder.len());
-    DocumentMetadataFields::deserializeForSorter(reader, &deserialized);
-
     ASSERT_EQ(deserialized.getScore(), 2.5);
     ASSERT_VALUE_EQ(deserialized.getScoreDetails(),
                     Value(BSON("value" << 3 << "otherDetails"
@@ -122,19 +108,21 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
     ASSERT_FALSE(metadata.hasScore());
     ASSERT_FALSE(metadata.hasTimeseriesBucketMinTime());
     ASSERT_FALSE(metadata.hasTimeseriesBucketMaxTime());
-}
-
-// TODO SERVER-94570 Merge these test cases with the test above.
-TEST(DocumentMetadataFieldsTest, FFGuardedReturnFalseForEmptyMetadata) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-
-    DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasScore());
     ASSERT_FALSE(metadata.hasScoreDetails());
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
     DocumentMetadataFields metadata;
+
+    ASSERT_FALSE(metadata.hasScore());
+    metadata.setScore(2);
+    ASSERT_TRUE(metadata.hasScore());
+
+    ASSERT_FALSE(metadata.hasScoreDetails());
+    metadata.setScoreDetails(Value(BSON("foo"
+                                        << "detail")));
+    ASSERT_TRUE(metadata.hasScoreDetails());
 
     ASSERT_FALSE(metadata.hasTextScore());
     metadata.setTextScore(9.9);
@@ -192,24 +180,6 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
     ASSERT_TRUE(metadata.hasTimeseriesBucketMaxTime());
 }
 
-// TODO SERVER-94570 Merge these test cases with the test above.
-TEST(DocumentMetadataFieldsTest, FFGuardedReturnTrueForInitializedMetadata) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-
-    DocumentMetadataFields metadata;
-
-    ASSERT_FALSE(metadata.hasScore());
-    metadata.setScore(2);
-    ASSERT_TRUE(metadata.hasScore());
-
-
-    ASSERT_FALSE(metadata.hasScoreDetails());
-    metadata.setScoreDetails(Value(BSON("foo"
-                                        << "detail")));
-    ASSERT_TRUE(metadata.hasScoreDetails());
-}
-
-
 TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     DocumentMetadataFields metadata;
     metadata.setTextScore(9.9);
@@ -227,6 +197,8 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     Date_t time;
     metadata.setTimeseriesBucketMinTime(time);
     metadata.setTimeseriesBucketMaxTime(time);
+    metadata.setScore(5);
+    metadata.setScoreDetails(Value(BSON("foo" << 1)));
 
     DocumentMetadataFields moveConstructed(std::move(metadata));
     ASSERT_TRUE(moveConstructed);
@@ -246,21 +218,6 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     ASSERT_EQ(moveConstructed.getVectorSearchScore(), 7.6);
     ASSERT_EQ(moveConstructed.getTimeseriesBucketMinTime(), time);
     ASSERT_EQ(moveConstructed.getTimeseriesBucketMaxTime(), time);
-
-    ASSERT_FALSE(metadata);  // NOLINT(bugprone-use-after-move)
-}
-
-
-// TODO SERVER-94570 Merge these test cases with the test above.
-TEST(DocumentMetadataFieldsTest, FFGuardedMoveConstructor) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-
-    DocumentMetadataFields metadata;
-    metadata.setScore(5);
-    metadata.setScoreDetails(Value(BSON("foo" << 1)));
-
-    DocumentMetadataFields moveConstructed(std::move(metadata));
-    ASSERT_TRUE(moveConstructed);
     ASSERT_EQ(moveConstructed.getScore(), 5);
     ASSERT_VALUE_EQ(moveConstructed.getScoreDetails(), Value(BSON("foo" << 1)));
 
@@ -284,6 +241,8 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     Date_t time = Date_t::min();
     metadata.setTimeseriesBucketMinTime(time);
     metadata.setTimeseriesBucketMaxTime(time);
+    metadata.setScore(3.5);
+    metadata.setScoreDetails(Value(BSON("details" << BSON_ARRAY(10 << 20))));
 
     DocumentMetadataFields moveAssigned;
     moveAssigned.setTextScore(12.3);
@@ -306,22 +265,6 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     ASSERT_EQ(moveAssigned.getVectorSearchScore(), 7.6);
     ASSERT_EQ(moveAssigned.getTimeseriesBucketMinTime(), time);
     ASSERT_EQ(moveAssigned.getTimeseriesBucketMaxTime(), time);
-
-    ASSERT_FALSE(metadata);  // NOLINT(bugprone-use-after-move)
-}
-
-// TODO SERVER-94570 Merge these test cases with the test above.
-TEST(DocumentMetadataFieldsTest, FFGuardedMoveAssigmentOperator) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-
-    DocumentMetadataFields metadata;
-    metadata.setScore(3.5);
-    metadata.setScoreDetails(Value(BSON("details" << BSON_ARRAY(10 << 20))));
-
-    DocumentMetadataFields moveAssigned;
-    moveAssigned = std::move(metadata);
-    ASSERT_TRUE(moveAssigned);
-
     ASSERT_EQ(moveAssigned.getScore(), 3.5);
     ASSERT_VALUE_EQ(moveAssigned.getScoreDetails(), Value(BSON("details" << BSON_ARRAY(10 << 20))));
 
@@ -440,19 +383,6 @@ TEST(DocumentMetadataFieldsTest, MetadataIsMarkedModifiedOnSetMetadataField) {
         [](DocumentMetadataFields& md) { md.setTimeseriesBucketMinTime(Date_t::now()); });
     testFieldSetter(
         [](DocumentMetadataFields& md) { md.setTimeseriesBucketMaxTime(Date_t::max()); });
-}
-
-// TODO SERVER-94570 Merge these test cases with the test above.
-TEST(DocumentMetadataFieldsTest, FFGuardedMetadataIsMarkedModifiedOnSetMetadataField) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-
-    auto testFieldSetter = [](std::function<void(DocumentMetadataFields&)> invokeSetter) {
-        DocumentMetadataFields metadata;
-        ASSERT_FALSE(metadata.isModified());
-        invokeSetter(metadata);
-        ASSERT_TRUE(metadata.isModified());
-    };
-
     testFieldSetter([](DocumentMetadataFields& md) { md.setScore(80.0); });
     testFieldSetter([](DocumentMetadataFields& md) {
         md.setScoreDetails(Value(BSON("details"
@@ -604,8 +534,10 @@ TEST(DocumentMetadataFieldsTest, ScoreMetadataSetOnOtherMetadataTest) {
     }
 }
 
-// TODO SERVER-94570 Remove this test when featureFlagRankFusionFull is enabled.
+// TODO SERVER-85426 Remove this test when the feature flag is removed.
 TEST(DocumentMetadataFieldsTest, FFGatedFieldsNotSetWithoutFlag) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", false);
+
     DocumentMetadataFields metadata;
     metadata.setScore(10);
     metadata.setScoreDetails(Value(BSON("foo"

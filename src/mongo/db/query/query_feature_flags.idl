@@ -184,7 +184,8 @@ feature_flags:
       description: "Feature flag to finish up $rankFusion features as well as introduce $score and
                    $scoreDetails stages. (Second milestone of Vector Search Hybrid Scoring)"
       cpp_varname: gFeatureFlagRankFusionFull
-      default: false
+      default: true
+      version: 8.1
       shouldBeFCVGated: true
 
     featureFlagSearchHybridScoringFull:

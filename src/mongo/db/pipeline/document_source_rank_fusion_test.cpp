@@ -45,7 +45,8 @@ namespace {
 class DocumentSourceRankFusionTest : service_context_test::WithSetupTransportLayer,
                                      public AggregationContextFixture {
 private:
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagRankFusionBasic", true};
+    RAIIServerParameterControllerForTest featureFlagController1{"featureFlagRankFusionBasic", true};
+    RAIIServerParameterControllerForTest featureFlagController2{"featureFlagRankFusionFull", true};
 };
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoInputsField) {
@@ -119,7 +120,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMissingPipeline) {
                        ErrorCodes::IDLFailedToParse);
 }
 
-TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
+TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowedBasicRankFusion) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", false);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -317,7 +319,10 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyPipeline) {
                        9834300);
 }
 
-TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
+TEST_F(DocumentSourceRankFusionTest,
+       CheckMultiplePipelinesAndOptionalArgumentsAllowedBasicRankFusion) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", false);
+
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
         {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
@@ -926,6 +931,16 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                     }
                 },
                 {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$sample_score",
+                                "$unionWith_score"
+                            ]
+                        }
+                    }
+                },
+                {
                     "$sort": {
                         "score": -1,
                         "_id": 1
@@ -1187,6 +1202,16 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                 },
                 {
                     "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$agatha_score",
+                                "$geo_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$agatha_score",
@@ -1809,6 +1834,16 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                     }
                 },
                 {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$matchAuthor_score",
+                                "$matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
                     "$sort": {
                         "score": -1,
                         "_id": 1
@@ -2014,6 +2049,16 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                 },
                 {
                     "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$matchAuthor_score",
+                                "$matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$matchAuthor_score",
@@ -2410,6 +2455,18 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                 },
                 {
                     "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$matchAuthor_score",
+                                "$matchDistance_score",
+                                "$matchGenres_score",
+                                "$matchPlot_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$matchAuthor_score",
@@ -3250,6 +3307,16 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                     }
                 },
                 {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$HASH<matchAuthor_score>",
+                                "$HASH<matchDistance_score>"
+                            ]
+                        }
+                    }
+                },
+                {
                     "$sort": {
                         "HASH<score>": -1,
                         "HASH<_id>": 1
@@ -3448,6 +3515,16 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                 },
                 {
                     "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$matchAuthor_score",
+                                "$matchDistance_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$matchAuthor_score",

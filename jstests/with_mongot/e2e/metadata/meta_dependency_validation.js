@@ -14,9 +14,13 @@
  * stages.
  *
  * featureFlagRankFusionFull is required to enable use of "score".
- * featureFlagHybridScoringFull is required to enable use of $score.
+ * featureFlagSearchHybridScoringFull is required to enable use of $score.
  * The $rankFusion feature flag is required to enable use of "score" and "searchScore".
- * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull, featureFlagHybridScoringFull ]
+ * @tags: [
+ *   featureFlagRankFusionBasic,
+ *   featureFlagRankFusionFull,
+ *   featureFlagSearchHybridScoringFull,
+ * ]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";

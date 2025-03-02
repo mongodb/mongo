@@ -1116,28 +1116,6 @@ TEST(ExpressionMetaTest, ExpressionMetaScoreDetailsAPIStrict) {
                        ErrorCodes::APIStrictError);
 }
 
-TEST(ExpressionMetaTest, ExpressionMetaScoreFFNotEnabled) {
-    auto expCtx = ExpressionContextForTest{};
-    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(false);
-    VariablesParseState vps = expCtx.variablesParseState;
-    BSONObj expr = fromjson("{$meta: \"score\"}");
-    // Should throw because 'featureFlagRankFusionFull' is not enabled.
-    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
-                       AssertionException,
-                       ErrorCodes::FailedToParse);
-}
-
-TEST(ExpressionMetaTest, ExpressionMetaScoreDetailsFFNotEnabled) {
-    auto expCtx = ExpressionContextForTest{};
-    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(false);
-    VariablesParseState vps = expCtx.variablesParseState;
-    BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
-    // Should throw because 'featureFlagRankFusionFull' is not enabled.
-    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
-                       AssertionException,
-                       ErrorCodes::FailedToParse);
-}
-
 TEST(ExpressionMetaTest, ExpressionMetasearchHighlightsAPIStrict) {
     auto expCtx = ExpressionContextForTest{};
     APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);
@@ -2162,48 +2140,7 @@ TEST(ExpressionParseParenthesisExpressionObjTest, EmptyObject) {
     ASSERT_EQ(expr->serialize().toString(), "{$const: {}}");
 }
 
-/**
- * This helper allows the manual registration of the $sigmoid expression to add it to the parserMap
- * without guarding it behind a feature flag (note the boost::none argument below). This is required
- * for some unit tests. Normally, expressions are added at server startup time via macros and the
- * manual registration is not necessary. However, $sigmoid is gated behind a feature flag and does
- * not get put into the map as the flag is off by default. Changing the value of the feature flag
- * with RAIIServerParameterControllerForTest() does not solve the issue because the registration
- * logic is not re-hit.
- *
- * TODO SERVER-94570: delete this manual registration of the $sigmoid expression and any callers
- * once the feature flag is enabled. Should also be able to delete the ExpressionSigmoidTest class.
- *
- * TODO SERVER-93426: delete this manual registration of the $sigmoid expression and any callers.
- * Should be able to use RAIIServerParameterControllerForTest as a private member of
- * ExpressionSigmoidTest to enable the feature flag. Even if we unconditionally register the
- * expression, we currently cannot use RAIIServerParameterControllerForTest here because that
- * enables a different instance of the feature flag than the one that is found inside the parse map
- * (and the parse map instance is checked during parsing to see if the feature is allowed).
- */
-void registerSigmoidExpression() {
-    try {
-        Expression::registerExpression("$sigmoid",
-                                       ExpressionSigmoid::parseExpressionSigmoid,
-                                       AllowedWithApiStrict::kNeverInVersion1,
-                                       AllowedWithClientType::kAny,
-                                       kDoesNotRequireFeatureFlag);
-    } catch (...) {
-        // registerSigmoidExpression() will throw if a duplicate registration is attempted. We catch
-        // and ignore this here. This is so that we can add registerSigmoidExpression() to each test
-        // that could require it, so that we don't rely on the ordering of the tests to ensure the
-        // expression is registered.
-    }
-}
-
-class ExpressionSigmoidTest : public unittest::Test {
-public:
-    void setUp() override {
-        registerSigmoidExpression();
-    }
-};
-
-TEST_F(ExpressionSigmoidTest, RoundTripSerialization) {
+TEST(ExpressionSigmoidTest, RoundTripSerialization) {
     auto expCtx = ExpressionContextForTest{};
 
     auto spec = BSON("$sigmoid" << 100);
@@ -2223,7 +2160,7 @@ TEST_F(ExpressionSigmoidTest, RoundTripSerialization) {
     ASSERT_VALUE_EQ(roundTrip, serialized);
 }
 
-TEST_F(ExpressionSigmoidTest, CorrectRedaction) {
+TEST(ExpressionSigmoidTest, CorrectRedaction) {
     auto expCtx = ExpressionContextForTest{};
 
     auto spec = BSON("$sigmoid" << 100);

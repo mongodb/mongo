@@ -14,6 +14,10 @@ const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
 
 const viewName = "rank_fusion_view";
 const rankFusionPipeline = [{$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}}}];
+const rankFusionPipelineWithScoreDetails = [
+    {$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}, scoreDetails: true}},
+    {$project: {scoreDetails: {$meta: "scoreDetails"}, score: {$meta: "score"}}}
+];
 
 function setupCollection(primaryConn, shardingTest = null) {
     const coll = assertDropAndRecreateCollection(getDB(primaryConn), collName);
@@ -35,9 +39,18 @@ function assertRankFusionCompletelyRejected(primaryConn) {
         db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}),
         [40324, ErrorCodes.QueryFeatureNotAllowed]);
 
+    // $rankFusion with scoreDetails is still rejected.
+    assert.commandFailedWithCode(
+        db.runCommand(
+            {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
+        [40324, ErrorCodes.QueryFeatureNotAllowed]);
+
     // View creation is rejected when view pipeline has $rankFusion.
     assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipeline),
                                  [40324, ErrorCodes.QueryFeatureNotAllowed]);
+    assert.commandFailedWithCode(
+        db.createView(viewName, collName, rankFusionPipelineWithScoreDetails),
+        [40324, ErrorCodes.QueryFeatureNotAllowed]);
 }
 
 function assertRankFusionCompletelyAccepted(primaryConn) {
@@ -47,6 +60,10 @@ function assertRankFusionCompletelyAccepted(primaryConn) {
     // $rankFusion succeeds in an aggregation command.
     assert.commandWorked(
         db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}));
+
+    // $rankFusion with scoreDetails succeeds in an aggregation command.
+    assert.commandWorked(db.runCommand(
+        {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
 
     // View creation succeeds with $rankFusion in the view pipeline, and queries on that view
     // succeed.
@@ -63,8 +80,13 @@ function assertRankFusionAcceptedButNotInView(primaryConn) {
     // $rankFusion in the view pipeline.
     assert.commandWorked(
         db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}));
+    assert.commandWorked(db.runCommand(
+        {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
     assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipeline),
                                  [40324, ErrorCodes.QueryFeatureNotAllowed]);
+    assert.commandFailedWithCode(
+        db.createView(viewName, collName, rankFusionPipelineWithScoreDetails),
+        [40324, ErrorCodes.QueryFeatureNotAllowed]);
 }
 
 testPerformUpgradeDowngradeReplSet({
