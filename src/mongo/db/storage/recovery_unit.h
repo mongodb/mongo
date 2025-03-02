@@ -814,12 +814,12 @@ public:
         return _getState();
     }
 
-    void setNoEvictionAfterRollback() {
-        _noEvictionAfterRollback = true;
+    void setNoEvictionAfterCommitOrRollback() {
+        _noEvictionAfterCommitOrRollback = true;
     }
 
-    bool getNoEvictionAfterRollback() const {
-        return _noEvictionAfterRollback;
+    bool getNoEvictionAfterCommitOrRollback() const {
+        return _noEvictionAfterCommitOrRollback;
     }
 
     void setDataCorruptionDetectionMode(DataCorruptionDetectionMode mode) {
@@ -954,7 +954,7 @@ protected:
      */
     void _executeRollbackHandlers();
 
-    bool _noEvictionAfterRollback = false;
+    bool _noEvictionAfterCommitOrRollback = false;
 
     AbandonSnapshotMode _abandonSnapshotMode = AbandonSnapshotMode::kAbort;
 

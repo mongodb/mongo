@@ -38,6 +38,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -99,7 +100,10 @@ void WiredTigerConnection::waitUntilPreparedUnitOfWorkCommitsOrAborts(Interrupti
     // other prepared transactions committing or aborting, we could reach a deadlock. Since the
     // caller is already expecting spurious wakeups, we impose a large timeout to periodically force
     // the caller to retry its operation.
-    const auto deadline = Date_t::now() + Seconds(1);
+    // TODO SERVER-82334: remove the wake up logic.
+    const auto deadline = feature_flags::gStorageEngineInterruptibility.isEnabled()
+        ? Date_t::max()
+        : Date_t::now() + Seconds(1);
     stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
     if (lastCount == _prepareCommitOrAbortCounter.loadRelaxed()) {
         interruptible.waitForConditionOrInterruptUntil(

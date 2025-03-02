@@ -1462,8 +1462,8 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     readConcernArgs = _readConcernArgs;
 }
 
-void TransactionParticipant::TxnResources::setNoEvictionAfterRollback() {
-    _recoveryUnit->setNoEvictionAfterRollback();
+void TransactionParticipant::TxnResources::setNoEvictionAfterCommitOrRollback() {
+    _recoveryUnit->setNoEvictionAfterCommitOrRollback();
 }
 
 TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx)
@@ -2593,8 +2593,8 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
 
     stdx::unique_lock<Client> lk(*opCtx->getClient());
     if (o().txnResourceStash &&
-        shard_role_details::getRecoveryUnit(opCtx)->getNoEvictionAfterRollback()) {
-        o(lk).txnResourceStash->setNoEvictionAfterRollback();
+        shard_role_details::getRecoveryUnit(opCtx)->getNoEvictionAfterCommitOrRollback()) {
+        o(lk).txnResourceStash->setNoEvictionAfterCommitOrRollback();
     }
 
     _resetRetryableWriteState(lk);

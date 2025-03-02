@@ -43,6 +43,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
@@ -161,6 +162,14 @@ void WiredTigerRecoveryUnit::prepareUnitOfWork() {
     const std::string conf = "prepare_timestamp=" + unsignedHex(_prepareTimestamp.asULL());
     // Prepare the transaction.
     invariantWTOK(session->prepare_transaction(conf.c_str()), *session);
+    if (feature_flags::gStorageEngineInterruptibility.isEnabled()) {
+        // Avoids a situation where committing or rolling back a prepared transaction hangs with
+        // concurrent operations trying to read documents modified by the prepared transaction. This
+        // avoids the prepared transaction from being opted into optional eviction to avoid the
+        // situation where it's unable to evict anything due to pages being pinned by the concurrent
+        // operations hitting a prepare conflict.
+        setNoEvictionAfterCommitOrRollback();
+    }
 }
 
 void WiredTigerRecoveryUnit::doCommitUnitOfWork() {
@@ -336,24 +345,34 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             _session->timestamp_transaction_uint(WT_TS_TXN_TYPE_DURABLE, _durableTimestamp.asULL());
         }
 
+        if (_noEvictionAfterCommitOrRollback) {
+            // The only point at which commit_transaction() can time out is in the bonus-eviction
+            // phase. If the timeout expires here, the function will stop the eviction and return
+            // success. It cannot return an error due to timeout.
+            _session->modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
+        }
+
         wtRet = _session->commit_transaction(nullptr);
 
         LOGV2_DEBUG(
             22412, 3, "WT commit_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
     } else {
         invariant(_abandonSnapshotMode == AbandonSnapshotMode::kAbort);
-        const char* config = nullptr;
-        if (_noEvictionAfterRollback) {
+        if (_noEvictionAfterCommitOrRollback) {
             // The only point at which rollback_transaction() can time out is in the bonus-eviction
             // phase. If the timeout expires here, the function will stop the eviction and return
             // success. It cannot return an error due to timeout.
-            config = "operation_timeout_ms=1,";
+            _session->modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
         }
 
-        wtRet = _session->rollback_transaction(config);
+        wtRet = _session->rollback_transaction(nullptr);
 
         LOGV2_DEBUG(
             22413, 3, "WT rollback_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
+    }
+
+    if (_noEvictionAfterCommitOrRollback) {
+        _session->modifyConfiguration("cache_max_wait_ms=0", "cache_max_wait_ms=0");
     }
 
     if (_isTimestamped) {
@@ -385,6 +404,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _durableTimestamp = Timestamp();
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
+    _noEvictionAfterCommitOrRollback = false;
     if (_untimestampedWriteAssertionLevel !=
         RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressAlways) {
         _untimestampedWriteAssertionLevel =

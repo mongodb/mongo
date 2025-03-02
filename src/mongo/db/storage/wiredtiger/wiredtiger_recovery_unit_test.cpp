@@ -63,6 +63,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -1095,6 +1096,41 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, AbortSnapshotChange) {
 
     // A snapshot is closed, reconstructing our decoration.
     ASSERT_EQ(0, getSnapshotDecoration(ru1->getSnapshot()).getHits());
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, PreparedTransactionSkipsOptionalEviction) {
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "featureFlagStorageEngineInterruptibility", true};
+
+    // A snapshot is already open from when the RU was constructed.
+    ASSERT(ru1->getSession());
+    ASSERT(!ru1->getNoEvictionAfterCommitOrRollback());
+
+    // Abort WUOW.
+    ru1->beginUnitOfWork(/*readOnly=*/false);
+    ASSERT(!ru1->getNoEvictionAfterCommitOrRollback());
+
+    ru1->setPrepareTimestamp({1, 1});
+    ru1->prepareUnitOfWork();
+
+    ASSERT(ru1->getNoEvictionAfterCommitOrRollback());
+
+    ru1->abortUnitOfWork();
+    ASSERT(!ru1->getNoEvictionAfterCommitOrRollback());
+
+    // Commit WUOW.
+    ru1->beginUnitOfWork(/*readOnly=*/false);
+    ru1->setDurableTimestamp({1, 1});
+    ASSERT(!ru1->getNoEvictionAfterCommitOrRollback());
+
+    ru1->setPrepareTimestamp({1, 1});
+    ru1->prepareUnitOfWork();
+
+    ASSERT(ru1->getNoEvictionAfterCommitOrRollback());
+
+    ru1->setCommitTimestamp({1, 1});
+    ru1->commitUnitOfWork();
+    ASSERT(!ru1->getNoEvictionAfterCommitOrRollback());
 }
 
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,

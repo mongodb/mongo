@@ -270,7 +270,7 @@ public:
             return _readConcernArgs;
         }
 
-        void setNoEvictionAfterRollback();
+        void setNoEvictionAfterCommitOrRollback();
 
     private:
         bool _released = false;

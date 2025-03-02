@@ -235,6 +235,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:storage_engine_metadata",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/kv:kv_engine_test_harness",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:clock_source_mock",
     ],
 )

@@ -125,7 +125,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
 
             // This thread needs storage rollback to complete timely, so instruct the storage
             // engine to not do any extra eviction for this thread, if supported.
-            shard_role_details::getRecoveryUnit(opCtx.get())->setNoEvictionAfterRollback();
+            shard_role_details::getRecoveryUnit(opCtx.get())->setNoEvictionAfterCommitOrRollback();
 
             try {
                 int64_t numKills = 0;
