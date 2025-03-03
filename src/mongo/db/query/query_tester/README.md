@@ -1,6 +1,6 @@
 # QueryTester
 
-**QueryTester** is a test harness designed to streamline E2E logic testing of MongoDB queries. It validates query results by executing them against a live MongoDB instance (i.e. `mongod`, `mongos`, or any system that implements the MongoDB wire protocol) and comparing the output to pre-defined expected results.
+**QueryTester** is a test harness designed to streamline E2E logic testing of MongoDB queries. It validates query results by executing them against a live MongoDB instance (e.g. `mongod`, `mongos`, or any system that implements the MongoDB wire protocol) and comparing the output to pre-defined expected results.
 
 QueryTester is ideal for small, reproducible test cases that verify query behavior with minimal setup. This tool follows a focused paradigm, exclusively supporting queries and DML operations with configurable settings. Support for passthroughs may be added in the future.
 
@@ -10,10 +10,10 @@ Each QueryTester use case expects three files to work together: a `.test`, a `.r
 
 ## Getting Started
 
-You can compile the tester using the following ninja command:
+You can compile the tester using the following command:
 
 ```sh
-ninja install-mongotest
+bazel build install-mongotest
 ```
 
 ## Running Tests
@@ -23,10 +23,10 @@ The tester expects a mongod/mongos to be running, and will execute tests against
 To run a single test for the first time, try using the following command from the root of the mongo repo:
 
 ```sh
-mongotest -t <QueryTesterDir>/sampleTests/testA.test --drop --load --mode compare
+mongotest -t <QueryTesterDir>/tests/manual_tests/example/testA.test --drop --load --mode compare
 ```
 
-This will run testA and verify the results are correct, assuming that `testA.results` exists.
+This will run `testA` and verify the results are correct, assuming that `testA.results` exists.
 
 To perform other operations, consult the table below.
 
@@ -53,7 +53,7 @@ To perform other operations, consult the table below.
 
 ### .test
 
-See sampleTests/testA.test. The file format is as follows:
+See `tests/manual_tests/example/testA.test`. The file format is as follows:
 First line must be the testName (matching the filename without the extension).
 Second line is the database to run the test against.
 Third line is a list of collection files to load. All collections are expected to be in a `collections` directory somewhere along the path to the test file.
@@ -91,7 +91,7 @@ The template is as follows:
 
 ### .results
 
-See `sampleTests/testA.results`.
+See `tests/manual_tests/example/testA.results`.
 These have the same format as .test files above, with the exception that each test must be followed by a line with the expected documents. These are allowed to be on multiple lines, and a result array is read as the line after the test until the next newline.
 
 The template is as follows:
@@ -112,7 +112,7 @@ The template is as follows:
 
 ### .coll
 
-See `sampleTests/basic.coll`.
+See `tests/manual_tests/example/basic.coll`.
 These files are split into two sections divided by an empty line.
 Above the empty line are index definitions, one per line. They can be of the form:
 
@@ -148,3 +148,7 @@ Comments in input `.test` and `.results` files will be persisted in the output a
 For files containing result set output, comments interleaved between result set lines will be
 **ignored** and absent from the output file (see `normalizedCommentsTest.pre` and
 `normalizedCommentsTest.results` for an example).
+
+---
+
+[Return to Cover Page](../README_QO.md)
