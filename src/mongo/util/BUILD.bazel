@@ -5,7 +5,12 @@ load("//bazel/config:render_template.bzl", "render_template")
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
-    glob(["*.h"]) + glob(["*.cpp"]),
+    glob([
+        "*.h",
+        "*.cpp",
+        "*.py",
+        "*.in",
+    ]),
 )
 
 # Headers designed to be used without source code. Split these out

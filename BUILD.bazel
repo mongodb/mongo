@@ -211,6 +211,11 @@ mongo_install(
         "//bazel/config:include_mongot_enabled": ["//:mongot_folder"],
         "//conditions:default": [],
     }),
+    pretty_printer_tests = {
+        "//src/mongo/util:pretty_printer_test.py": "//src/mongo/util:pretty_printer_test_program",
+        "//src/mongo/db/concurrency:lock_gdb_test.py": "//src/mongo/db:mongod",
+        "//src/mongo/db/query/optimizer:optimizer_gdb_test.py": "//src/mongo/db/query/optimizer:optimizer_gdb_test_program",
+    },
     deps = [
         "//src/mongo/db/modules/enterprise:dist-test",
     ],

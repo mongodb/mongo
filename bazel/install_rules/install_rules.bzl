@@ -7,6 +7,8 @@ load("@rules_pkg//pkg:providers.bzl", "PackageFilesInfo")
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//bazel:mongo_src_rules.bzl", "SANITIZER_DATA", "SANITIZER_ENV")
 load("//bazel:separate_debug.bzl", "TagInfo")
+load("//bazel/install_rules:pretty_printer_tests.bzl", "mongo_pretty_printer_test")
+load("//bazel/install_rules:providers.bzl", "TestBinaryInfo")
 
 MongoInstallInfo = provider(
     doc = "A install rule provider to pass around deps files",
@@ -40,13 +42,6 @@ TEST_TAGS = {
     "storage_bm": 1,
 }
 
-TestBinaryInfo = provider(
-    doc = "Test binaries returned by this target.",
-    fields = {
-        "test_binaries": "group of all test binaries",
-    },
-)
-
 def test_binary_aspect_impl(target, ctx):
     """Collect all test binaries from transitive srcs and deps
 
@@ -58,6 +53,9 @@ def test_binary_aspect_impl(target, ctx):
         struct containing collected test binaries
     """
     transitive_deps = []
+
+    if TestBinaryInfo in target:
+        return []
 
     if TagInfo in target:
         for tag in target[TagInfo].tags:
@@ -171,7 +169,7 @@ def sort_file(ctx, file, install_dir, file_map, is_directory):
     bin_install = install_dir + "/bin/" + basename
     lib_install = install_dir + "/lib/" + basename
 
-    if is_binary_file(ctx, basename):
+    if is_binary_file(ctx, basename) or basename.endswith(".py"):
         if not is_debug_file(ctx, basename):
             if ctx.attr.debug != "debug":
                 file_map["binaries"][file] = declare_output(ctx, bin_install, is_directory)
@@ -245,7 +243,7 @@ def mongo_install_rule_impl(ctx):
     input_deps = []
     installed_tests = []
     for file in test_files:
-        if not is_debug_file(ctx, file.basename):
+        if not is_debug_file(ctx, file.basename) and ctx.attr.debug != "debug":
             installed_tests.append(file_map["binaries"][file.path].path)
 
     installed_test_list_file = None
@@ -256,6 +254,8 @@ def mongo_install_rule_impl(ctx):
             content = "\n".join(installed_tests),
         )
         input_deps.append(installed_test_list_file)
+        real_test_list_output_location = ctx.actions.declare_file(install_dir + "/" + installed_test_list_file.basename)
+        outputs.append(real_test_list_output_location)
 
     # create a dep file for passing all the files we intend to install
     # to the python script
@@ -363,6 +363,7 @@ def mongo_install(
         deps = [],
         target_compatible_with = [],
         testonly = False,
+        pretty_printer_tests = {},
         **kwargs):
     """Perform install actions
 
@@ -390,6 +391,7 @@ def mongo_install(
     # stripped: only install bins, only available with separate_debug=True
     # debug: only install debug, only available with separate_debug=True
     for install_type in ["", "-stripped", "-debug"]:
+        modified_srcs = srcs
         install_target = "install-" + name + install_type
         debug = ""
         if install_type:
@@ -421,9 +423,21 @@ def mongo_install(
         if install_type:
             seperate_debug_incompat = ["@platforms//:incompatible"]
 
+        if len(pretty_printer_tests) > 0 and install_type != "-debug":
+            for test_script, test_binary in pretty_printer_tests.items():
+                pretty_printer_name = install_target + "-" + test_script.split(":")[-1].split(".")[0]
+                mongo_pretty_printer_test(
+                    name = pretty_printer_name,
+                    test_script = test_script,
+                    test_binary = test_binary,
+                    testonly = True,
+                )
+                modified_srcs = modified_srcs + [pretty_printer_name]
+            testonly = True
+
         mongo_install_rule(
             name = install_target,
-            srcs = srcs,
+            srcs = modified_srcs,
             debug = debug,
             deps = select({
                 "//bazel/config:build_enterprise_enabled": dep_targets,
