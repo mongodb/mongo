@@ -132,8 +132,6 @@ def list_files_without_targets(
         "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist/mongocxx/test_util/client_helpers.cpp",
         # TODO(SERVER-101371): Remove the exemptions below once resolved.
         "src/mongo/db/modules/enterprise/src/streams/util/tests/concurrent_memory_aggregator_test.cpp",
-        # TODO(SERVER-101372): Remove the exemptions below once resolved.
-        "src/mongo/executor/network_interface_perf_test.cpp",
         # TODO(SERVER-101373): Remove the exemptions below once resolved.
         "src/mongo/executor/network_interface_thread_pool_test.cpp",
         # TODO(SERVER-101375): Remove the exemptions below once resolved.
