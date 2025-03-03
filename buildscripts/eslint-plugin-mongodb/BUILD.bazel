@@ -6,7 +6,7 @@ npm_package(
         "package.json",
         "plugin.js",
         "rules/no-print-fn.js",
-        "rules/no-tojson-fn.js",
+        "rules/no-printing-tojson.js",
     ],
     package = "eslint-plugin-mongodb",
     visibility = ["//visibility:public"],
