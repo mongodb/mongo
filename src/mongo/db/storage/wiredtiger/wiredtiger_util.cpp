@@ -116,62 +116,49 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
 StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& session,
                                                           StringData uri) {
     WT_CURSOR* cursor = nullptr;
-    invariantWTOK(session.open_cursor("metadata:create", nullptr, "", &cursor), session);
-    invariant(cursor);
-    ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
-
-    return _getMetadata(cursor, uri);
-}
-
-StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit& ru,
-                                                          StringData uri) {
-    auto session = ru.getSessionNoTxn();
-
-    WT_CURSOR* cursor = nullptr;
     try {
         const std::string metadataURI = "metadata:create";
-        cursor = session->getCachedCursor(kMetadataCreateTableId, "");
+        cursor = session.getCachedCursor(kMetadataCreateTableId, "");
         if (!cursor) {
-            cursor = session->getNewCursor(metadataURI);
+            cursor = session.getNewCursor(metadataURI);
         }
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         LOGV2_FATAL_NOTRACE(51257, "Cursor not found", "error"_attr = ex);
     }
     invariant(cursor);
     ScopeGuard releaser = [&] {
-        session->releaseCursor(kMetadataCreateTableId, cursor, "");
+        session.releaseCursor(kMetadataCreateTableId, cursor, "");
     };
 
     return _getMetadata(cursor, uri);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, StringData uri) {
-    WT_CURSOR* cursor = nullptr;
-    invariantWTOK(session.open_cursor("metadata:", nullptr, "", &cursor), session);
-    invariant(cursor);
-    ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
-
-    return _getMetadata(cursor, uri);
+StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit& ru,
+                                                          StringData uri) {
+    return getMetadataCreate(*ru.getSessionNoTxn(), uri);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerRecoveryUnit& ru, StringData uri) {
-    auto session = ru.getSessionNoTxn();
+StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, StringData uri) {
     WT_CURSOR* cursor = nullptr;
     try {
         const std::string metadataURI = "metadata:";
-        cursor = session->getCachedCursor(kMetadataTableId, "");
+        cursor = session.getCachedCursor(kMetadataTableId, "");
         if (!cursor) {
-            cursor = session->getNewCursor(metadataURI);
+            cursor = session.getNewCursor(metadataURI);
         }
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         LOGV2_FATAL_NOTRACE(31293, "Cursor not found", "error"_attr = ex);
     }
     invariant(cursor);
     ScopeGuard releaser = [&] {
-        session->releaseCursor(kMetadataTableId, cursor, "");
+        session.releaseCursor(kMetadataTableId, cursor, "");
     };
 
     return _getMetadata(cursor, uri);
+}
+
+StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerRecoveryUnit& ru, StringData uri) {
+    return getMetadata(*ru.getSessionNoTxn(), uri);
 }
 
 Status WiredTigerUtil::getApplicationMetadata(WiredTigerRecoveryUnit& ru,
