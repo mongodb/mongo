@@ -5,6 +5,10 @@
  * 1. outer collection and inner view.
  * 2. outer view and inner collection.
  * 3. outer collection and inner view.
+ *
+ * TODO SERVER-100355 Once sharded support is in, re-enable running subpipelines on mongot-indexed
+ * views in both sharded and non-sharded environments
+ *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -71,13 +75,19 @@ let pipeline = [
         }
     }
 ];
-let explain = bestActressView.explain().aggregate(pipeline);
+
+assert.commandFailedWithCode(
+    db.runCommand(
+        {aggregate: bestActressView.getName(), pipeline: pipeline, cursor: {}, explain: true}),
+    ErrorCodes.QueryFeatureNotAllowed);
+
+// let explain = bestActressView.explain().aggregate(pipeline);
 /**
  * This call will confirm that the outer and inner search pipelines have idLookup applying the view
  * stages.
  */
-assertUnionWithSearchPipelinesApplyViews(
-    explain, bestActressViewPipeline, bestPicturesViewPipeline);
+// assertUnionWithSearchPipelinesApplyViews(
+//     explain, bestActressViewPipeline, bestPicturesViewPipeline);
 
 let expectedResults = [
     {
@@ -93,8 +103,11 @@ let expectedResults = [
         source: "bestPictureAwardsWithRottenTomatoScore"
     }
 ];
-let results = bestActressView.aggregate(pipeline).toArray();
-assertArrayEq({actual: results, expected: expectedResults});
+assert.commandFailedWithCode(
+    db.runCommand({aggregate: bestActressView.getName(), pipeline: pipeline, cursor: {}}),
+    ErrorCodes.QueryFeatureNotAllowed);
+// let results = bestActressView.aggregate(pipeline).toArray();
+// assertArrayEq({actual: results, expected: expectedResults});
 
 //$unionWith on an outer view and inner collection.
 pipeline = [
@@ -118,7 +131,11 @@ pipeline = [
  */
 createSearchIndex(bestPictureColl,
                   {name: "bestPicture", definition: {"mappings": {"dynamic": true}}});
-explain = bestActressView.explain().aggregate(pipeline);
+// assert.commandFailedWithCode(
+//     db.runCommand(
+//         {aggregate: bestActressView.getName(), pipeline: pipeline, cursor: {}, explain: true}),
+//     ErrorCodes.QueryFeatureNotAllowed);
+let explain = bestActressView.explain().aggregate(pipeline);
 // Only the outer collection is a view, and this call will confirm that the top-level search
 // contains the view in idLookup.
 assertViewAppliedCorrectly(explain, pipeline, bestActressViewPipeline);
@@ -132,7 +149,11 @@ expectedResults = [
     },
     {"title": "Terms of Endearment", "year": 1983, "source": "best_picture"}
 ];
-results = bestActressView.aggregate(pipeline).toArray();
+// assert.commandFailedWithCode(
+//     db.runCommand(
+//         {aggregate: bestActressView.getName(), pipeline: pipeline, cursor: {}}),
+//     ErrorCodes.QueryFeatureNotAllowed);
+let results = bestActressView.aggregate(pipeline).toArray();
 assertArrayEq({actual: results, expected: expectedResults});
 
 // $unionWith on an outer collection and inner view.
@@ -158,10 +179,14 @@ pipeline = [
     {$project: {_id: 0}},
     {$unionWith: {coll: bestPictureView.getName(), pipeline: unionWithSubPipe}}
 ];
+assert.commandFailedWithCode(
+    db.runCommand(
+        {aggregate: bestActressColl.getName(), pipeline: pipeline, cursor: {}, explain: true}),
+    ErrorCodes.QueryFeatureNotAllowed);
 // Confirm $unionWith.$search subpipeline applies the view stages during idLookup.
-explain = bestActressColl.explain().aggregate(pipeline);
-let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain.stages);
-assertViewAppliedCorrectly(unionWithSubPipeExplain, unionWithSubPipe, bestPicturesViewPipeline);
+// explain = bestActressColl.explain().aggregate(pipeline);
+// let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain.stages);
+// assertViewAppliedCorrectly(unionWithSubPipeExplain, unionWithSubPipe, bestPicturesViewPipeline);
 
 expectedResults = [
     {
@@ -177,8 +202,11 @@ expectedResults = [
         "source": "bestPictureAwardsWithRottenTomatoScore"
     }
 ];
-results = bestActressColl.aggregate(pipeline).toArray();
-assertArrayEq({actual: results, expected: expectedResults});
+assert.commandFailedWithCode(
+    db.runCommand({aggregate: bestActressColl.getName(), pipeline: pipeline, cursor: {}}),
+    ErrorCodes.QueryFeatureNotAllowed);
+// results = bestActressColl.aggregate(pipeline).toArray();
+// assertArrayEq({actual: results, expected: expectedResults});
 
 dropSearchIndex(bestActressView, {name: "default"});
 dropSearchIndex(bestPictureView, {name: "default"});

@@ -4,6 +4,10 @@
  * subpipelines on views, doesn't apply the view stages to the top-level agg or to idLookup. This is
  * because mongot returns the full, transformed document for storedSource queries so mongod should
  * never apply the view.
+ *
+ * TODO SERVER-100355 Once sharded support is in, re-enable running subpipelines on mongot-indexed
+ * views in both sharded and non-sharded environments
+ *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -161,13 +165,17 @@ let pipeline = [
     }
 ];
 
-let explain = officialStateColorsView.explain().aggregate(pipeline);
+assert.commandFailedWithCode(
+    officialStateColorsView.runCommand("aggregate", {pipeline, cursor: {}, explain: true}),
+    ErrorCodes.QueryFeatureNotAllowed);
+
+// let explain = officialStateColorsView.explain().aggregate(pipeline);
 // Confirm top-level aggregation doesn't include view stages as it's a stored source query, mongot
 // should be returning the transformed fields.
-assertViewNotApplied(explain, stateColorViewPipeline);
+// assertViewNotApplied(explain, stateColorViewPipeline);
 // Confirm unionWith subpipeline doesn't include view stages as it's also a stored source query.
-let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain.stages);
-assertViewNotApplied(unionWithSubPipeExplain, halloweenCandyViewPipeline);
+// let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain.stages);
+// assertViewNotApplied(unionWithSubPipeExplain, halloweenCandyViewPipeline);
 
 /**
  * The results should not include facts.state_flower or facts.state_bird but should include
@@ -245,8 +253,12 @@ let expectedResults = [
     }
 ];
 
-let results = officialStateColorsView.aggregate(pipeline).toArray();
-assertArrayEq({actual: results, expected: expectedResults});
+assert.commandFailedWithCode(
+    officialStateColorsView.runCommand("aggregate", {pipeline, cursor: {}}),
+    ErrorCodes.QueryFeatureNotAllowed);
+
+// let results = officialStateColorsView.aggregate(pipeline).toArray();
+// assertArrayEq({actual: results, expected: expectedResults});
 
 dropSearchIndex(officialStateColorsView, {name: "excludeStateFlower"});
 dropSearchIndex(halloweenCandyView, {name: "excludeStateBird"});

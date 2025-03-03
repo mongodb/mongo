@@ -75,69 +75,74 @@ let expectedResults = [{
 let results = totalPriceView.aggregate(facetQuery).toArray();
 assert.eq(results, expectedResults);
 
-// TODO SERVER-100355 the below aggregations should always run once we support mongot queries in
-// subpipelines on sharded, mongot-indexed views.
-if (!FixtureHelpers.isSharded(coll)) {
-    // $lookup.$searchMeta for good measure!
-    const collBase = testDb.base;
-    collBase.drop();
-    assert.commandWorked(collBase.insert({_id: 0}));
-    assert.commandWorked(collBase.insert({_id: 1}));
+// TODO SERVER-100355 Re-enable the below aggregations once we support mongot queries in
+// subpipelines.
+// $lookup.$searchMeta for good measure!
+const collBase = testDb.base;
+collBase.drop();
+assert.commandWorked(collBase.insert({_id: 0}));
+assert.commandWorked(collBase.insert({_id: 1}));
 
-    /**
-     * $lookup doesn't include any details about its subpipeline in the explain output. Therefore
-     there
-     * isn't any chance that the $lookup subpipeline will include the view pipeline in the explain
-     * output. Instead, we just verify that the top-level agg doesn't contain the view transforms.
-     */
-    explain = collBase.explain().aggregate(
-        [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}]);
-    /**
-     * The first stage is a $cursor, which represents the intermediate results of the outer coll
-     * that will be streamed through the rest of the pipeline. But we don't need it to validate how
-     * the view was applied.
-     */
-    explain.stages.shift();
-    assert(explain.stages.length == 1);
-    assert(Object.keys(explain.stages[0])[0], "$lookup");
+/**
+ * $lookup doesn't include any details about its subpipeline in the explain output. Therefore
+ there
+ * isn't any chance that the $lookup subpipeline will include the view pipeline in the explain
+ * output. Instead, we just verify that the top-level agg doesn't contain the view transforms.
+ */
+// explain = collBase.explain().aggregate(
+// [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}]);
+/**
+ * The first stage is a $cursor, which represents the intermediate results of the outer coll
+ * that will be streamed through the rest of the pipeline. But we don't need it to validate how
+ * the view was applied.
+ */
+// explain.stages.shift();
+// assert(explain.stages.length == 1);
+// assert(Object.keys(explain.stages[0])[0], "$lookup");
 
-    expectedResults = [
-        {
-            _id: 0,
-            meta_facet: [{
-                count: {lowerBound: NumberLong(5)},
-                facet: {
-                    priceRanges: {
-                        buckets: [
-                            {_id: 300, count: NumberLong(2)},
-                            {_id: 400, count: NumberLong(1)},
-                            {_id: 500, count: NumberLong(2)}
-                        ]
-                    }
+expectedResults = [
+    {
+        _id: 0,
+        meta_facet: [{
+            count: {lowerBound: NumberLong(5)},
+            facet: {
+                priceRanges: {
+                    buckets: [
+                        {_id: 300, count: NumberLong(2)},
+                        {_id: 400, count: NumberLong(1)},
+                        {_id: 500, count: NumberLong(2)}
+                    ]
                 }
-            }]
-        },
-        {
-            _id: 1,
-            meta_facet: [{
-                count: {lowerBound: NumberLong(5)},
-                facet: {
-                    priceRanges: {
-                        buckets: [
-                            {_id: 300, count: NumberLong(2)},
-                            {_id: 400, count: NumberLong(1)},
-                            {_id: 500, count: NumberLong(2)}
-                        ]
-                    }
+            }
+        }]
+    },
+    {
+        _id: 1,
+        meta_facet: [{
+            count: {lowerBound: NumberLong(5)},
+            facet: {
+                priceRanges: {
+                    buckets: [
+                        {_id: 300, count: NumberLong(2)},
+                        {_id: 400, count: NumberLong(1)},
+                        {_id: 500, count: NumberLong(2)}
+                    ]
                 }
-            }]
-        }
-    ];
+            }
+        }]
+    }
+];
 
-    results =
-        collBase
-            .aggregate([{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}])
-            .toArray();
-    assert.eq(expectedResults, results);
-}
+assert.commandFailedWithCode(collBase.runCommand("aggregate", {
+    pipeline: [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}],
+    cursor: {}
+}),
+                             ErrorCodes.QueryFeatureNotAllowed);
+
+// results =
+//     collBase
+//         .aggregate([{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}])
+//         .toArray();
+// assert.eq(expectedResults, results);
+
 dropSearchIndex(totalPriceView, {name: "totalPriceIndex"});

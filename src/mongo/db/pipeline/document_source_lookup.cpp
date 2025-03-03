@@ -322,6 +322,14 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
     if (_fromNsIsAView && search_helper_bson_obj::isMongotPipeline(pipeline) &&
         expCtx->isFeatureFlagMongotIndexedViewsEnabled() &&
         !search_helper_bson_obj::isMongotPipeline(_resolvedPipeline)) {
+
+        // TODO SERVER-100355 Re-enable running subpipelines on a mongot-indexed view. Running over
+        // an empty view is allowed.
+        uassert(ErrorCodes::QueryFeatureNotAllowed,
+                "$search, $searchMeta, and $vectorSearch queries on a view in a subpipeline is "
+                "not supported",
+                _resolvedPipeline.empty());
+
         // The user pipeline is a mongot pipeline but the view pipeline is not - so we assume it's a
         // mongot-indexed view. As such, we overwrite the view pipeline. This is because in the case
         // of mongot queries on mongot-indexed views, idLookup applies the view transforms as part

@@ -1045,6 +1045,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
 
     if (search_helper_bson_obj::isMongotPipeline(currentPipeline) &&
         subPipelineExpCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
+        // TODO SERVER-100355 Re-enable running subpipelines on a mongot-indexed view (with
+        // viewPipelineHelperForSearch).
+        uasserted(ErrorCodes::QueryFeatureNotAllowed,
+                  "$search, $searchMeta, and $vectorSearch queries on a view in a subpipeline is "
+                  "not supported");
         return Pipeline::viewPipelineHelperForSearch(
             subPipelineExpCtx, resolvedNs, currentPipeline, opts, originalNs);
     }

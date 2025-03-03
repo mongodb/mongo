@@ -9,6 +9,10 @@
  *
  * This test ensures the ordering of stages for a $lookup.$search query, where the foreign coll is a
  * view, is correct.
+ *
+ * TODO SERVER-100355 Once sharded support is in, re-enable running subpipelines on mongot-indexed
+ * views in both sharded and non-sharded environments
+ *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -117,6 +121,11 @@ let expectedResults = [
         }]
     }
 ];
-let results = localColl.aggregate(lookupPipeline).toArray();
-assertArrayEq({actual: results, expected: expectedResults});
+
+assert.commandFailedWithCode(
+    localColl.runCommand("aggregate", {pipeline: lookupPipeline, cursor: {}}),
+    ErrorCodes.QueryFeatureNotAllowed);
+
+// let results = localColl.aggregate(lookupPipeline).toArray();
+// assertArrayEq({actual: results, expected: expectedResults});
 dropSearchIndex(addFieldsView, {name: "populationAddFieldsIndex"});

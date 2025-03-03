@@ -2,6 +2,10 @@
  * This file tests a $unionWith + $lookup combination across a view and collection respectively. The
  * purpose is to verify that running a $search operation on a $unionWith in such a situation
  * returns the correct results.
+ *
+ * TODO SERVER-100355 Once sharded support is in, re-enable running subpipelines on mongot-indexed
+ * views in both sharded and non-sharded environments
+ *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -97,8 +101,11 @@ let expectedResults = [
     }
 ];
 
-let results = bestActressView.aggregate(pipeline).toArray();
-assertArrayEq({actual: results, expected: expectedResults});
+assert.commandFailedWithCode(bestActressView.runCommand("aggregate", {pipeline, cursor: {}}),
+                             ErrorCodes.QueryFeatureNotAllowed);
+
+// let results = bestActressView.aggregate(pipeline).toArray();
+// assertArrayEq({actual: results, expected: expectedResults});
 
 dropSearchIndex(bestActressView, {name: "default"});
 dropSearchIndex(bestPictureView, {name: "default"});
