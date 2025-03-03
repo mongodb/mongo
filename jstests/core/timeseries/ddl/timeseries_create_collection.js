@@ -10,69 +10,77 @@
  *   requires_timeseries,
  * ]
  */
+
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
 const timeFieldName = 'time';
-const coll = testDB.t;
+const collName = 'ts';
+const coll = testDB[collName];
+const bucketsName = TimeseriesTest.getBucketsCollName(collName);
 
-// Fails to create a time-series collection with null-embedded timeField or metaField.
-assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: '\0time'}}),
-    ErrorCodes.BadValue);
-assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(),
-                            {timeseries: {timeField: timeFieldName, metaField: 't\0ag'}}),
-    ErrorCodes.BadValue);
+function assertCollExists(
+    exists,
+    db,
+    collName,
+) {
+    let collections =
+        new DBCommandCursor(
+            db, assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}})))
+            .toArray();
+    if (exists) {
+        assert.eq(1,
+                  collections.length,
+                  `Collection '${collName}' was not found through listCollections command`);
+    } else {
+        assert.eq(0,
+                  collections.length,
+                  `Collection '${
+                      collName}' should not exists, but it was found through listCollections: ${
+                      tojson(collections)}`);
+    }
+}
 
 // Create a timeseries collection, listCollection should show view and bucket collection
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-let collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-jsTestLog('Checking listCollections result: ' + tojson(collections));
-assert(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
-assert(collections.find(entry => entry.name === coll.getName()));
+assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeFieldName}}));
+assertCollExists(true, testDB, collName);
+assertCollExists(true, testDB, bucketsName);
 
 // Drop timeseries collection, both view and bucket collection should be dropped
 coll.drop();
-collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-jsTestLog('Checking listCollections result: ' + tojson(collections));
-assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
-assert.isnull(collections.find(entry => entry.name === coll.getName()));
+assertCollExists(false, testDB, collName);
+assertCollExists(false, testDB, bucketsName);
 
 // Create a regular collection on the same namespace and verify result
-assert.commandWorked(testDB.createCollection(coll.getName()));
-collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-jsTestLog('Checking listCollections result: ' + tojson(collections));
-assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
-assert(collections.find(entry => entry.name === coll.getName()));
+assert.commandWorked(testDB.createCollection(collName));
+assertCollExists(true, testDB, collName);
+assertCollExists(false, testDB, bucketsName);
 
 // Create timeseries collection when regular collection already exist on namespace. Command should
 // fail with NamespaceExists and no bucket collection should be created
 assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    testDB.createCollection(collName, {timeseries: {timeField: timeFieldName}}),
     ErrorCodes.NamespaceExists);
-collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-jsTestLog('Checking listCollections result: ' + tojson(collections));
-assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
-assert(collections.find(entry => entry.name === coll.getName()));
+assertCollExists(true, testDB, collName);
+assertCollExists(false, testDB, bucketsName);
+
 coll.drop();
+assertCollExists(false, testDB, collName);
+assertCollExists(false, testDB, bucketsName);
 
 // Create a regular view on the same namespace and verify result
 testDB.getCollection("other");
-assert.commandWorked(testDB.runCommand(
-    {create: coll.getName(), viewOn: "other", pipeline: [{$match: {field: "A"}}]}));
-collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-jsTestLog('Checking listCollections result: ' + tojson(collections));
-assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
-assert(collections.find(entry => entry.name === coll.getName()));
+assert.commandWorked(
+    testDB.runCommand({create: collName, viewOn: "other", pipeline: [{$match: {field: "A"}}]}));
+assertCollExists(true, testDB, collName);
+assertCollExists(false, testDB, bucketsName);
 
 // Create timeseries collection when view already exist on namespace. Command should fail with
 // NamespaceExists and no bucket collection should be created
 assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    testDB.createCollection(collName, {timeseries: {timeField: timeFieldName}}),
     ErrorCodes.NamespaceExists);
-collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-jsTestLog('Checking listCollections result: ' + tojson(collections));
-assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
-assert(collections.find(entry => entry.name === coll.getName()));
+assertCollExists(true, testDB, collName);
+assertCollExists(false, testDB, bucketsName);

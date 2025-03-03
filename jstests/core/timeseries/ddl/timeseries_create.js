@@ -178,6 +178,10 @@ testInvalidTimeseriesOptions(
     {timeField: "time", metaField: "meta", granularity: 'minutes', bucketMaxSpanSeconds: 3600},
     bucketMaxSpanSecondsError);
 
+// Fails to create a time-series collection with null-embedded timeField or metaField.
+testInvalidTimeseriesOptions({timeField: '\0time'}, ErrorCodes.BadValue);
+testInvalidTimeseriesOptions({timeField: 'time', metaField: 't\0ag'}, ErrorCodes.BadValue);
+
 testCompatibleCreateOptions({expireAfterSeconds: NumberLong(100)});
 testCompatibleCreateOptions({storageEngine: {}}, false);
 if (TestData.storageEngine !== undefined)
