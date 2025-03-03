@@ -13,8 +13,6 @@
  *
  * @tags: [
  *   requires_fcv_53,
- *   # TODO (SERVER-80568): Re-enable this test once redness is resolved in multiversion suites.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  * ]
  */
 

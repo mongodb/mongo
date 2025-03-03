@@ -2,8 +2,6 @@
  * Tests that test-only replica-set only commands are truly test-only.
  *
  * @tags: [
- *   # TODO (SERVER-80568): Re-enable this test in multiversion suites once it has been fixed.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  *   disables_test_commands,
  * ]
  */
