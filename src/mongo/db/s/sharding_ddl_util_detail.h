@@ -42,6 +42,7 @@
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/async_rpc_shard_retry_policy.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace sharding_ddl_util_detail {
@@ -55,7 +56,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
     const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
-    const ReadPreferenceSetting readPref,
+    ReadPreferenceSetting readPref,
     bool throwOnError) {
     if (shardIds.size() == 0) {
         return {};
@@ -141,6 +142,37 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
             .get();
     }
 }
+
+// `sendAuthenticatedCommandToShards` instantiation uses a lot of memory. Make the template
+// instantiation explicit, so that we can offload them to a different translation unit.
+// These three instantiations in particular are used in `sharding_ddl_util.cpp`.
+
+extern template std::vector<AsyncRequestsSender::Response>
+sendAuthenticatedCommandToShards<write_ops::UpdateCommandRequest>(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>> originalOpts,
+    const std::vector<ShardId>& shardIds,
+    const boost::optional<std::vector<ShardVersion>>& shardVersions,
+    ReadPreferenceSetting readPref,
+    bool throwOnError);
+
+extern template std::vector<AsyncRequestsSender::Response>
+sendAuthenticatedCommandToShards<ShardsvrDropCollectionParticipant>(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>> originalOpts,
+    const std::vector<ShardId>& shardIds,
+    const boost::optional<std::vector<ShardVersion>>& shardVersions,
+    ReadPreferenceSetting readPref,
+    bool throwOnError);
+
+extern template std::vector<AsyncRequestsSender::Response>
+sendAuthenticatedCommandToShards<ShardsvrCommitToShardLocalCatalog>(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitToShardLocalCatalog>> originalOpts,
+    const std::vector<ShardId>& shardIds,
+    const boost::optional<std::vector<ShardVersion>>& shardVersions,
+    ReadPreferenceSetting readPref,
+    bool throwOnError);
 
 }  // namespace sharding_ddl_util_detail
 }  // namespace mongo
