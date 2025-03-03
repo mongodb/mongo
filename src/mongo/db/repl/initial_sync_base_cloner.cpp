@@ -125,9 +125,6 @@ void InitialSyncBaseCloner::handleStageAttemptFailed(BaseClonerStage* stage, Sta
         // error occurred and it's safe to continue (which will cause another retry).
         if (!checkSyncSourceIsStillValid().isOK())
             return;
-        // After successfully checking the sync source validity, the client should
-        // always be OK.
-        invariant(!getClient()->isFailed());
     }
 }
 
