@@ -45,6 +45,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -80,6 +81,12 @@ public:
     // No-op.
     void killCursor(const NamespaceString& ns, long long cursorID) override {
         LOGV2(20131, "Killing cursor in DBClientConnectionForTest");
+        _killedCursorIds.insert(cursorID);
+    }
+
+    // Used to check if we tried to kill a cursor.
+    bool killedCursor(long long cursorID) {
+        return _killedCursorIds.contains(cursorID);
     }
 
     void setCallResponse(Message reply) {
@@ -120,6 +127,7 @@ private:
     Message _mockCallResponse;
     Message _mockRecvResponse;
     Message _lastSent;
+    stdx::unordered_set<long long> _killedCursorIds;
 };
 
 class DBClientCursorTest : public unittest::Test {
@@ -132,6 +140,15 @@ protected:
                              std::vector<BSONObj> firstBatch) {
         auto cursorRes = CursorResponse(nss, cursorId, firstBatch);
         return OpMsg{cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse)}.serialize();
+    }
+
+    /**
+     * An OP_MSG response to a 'aggregate' command.
+     */
+    Message mockAggregateResponse(NamespaceString nss,
+                                  long long cursorId,
+                                  std::vector<BSONObj> firstBatch) {
+        return mockFindResponse(nss, cursorId, firstBatch);
     }
 
     /**
@@ -903,6 +920,144 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
     ASSERT_FALSE(cursor.moreInCurrentBatch());
     ASSERT_FALSE(cursor.isDead());
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_FindRequest) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    FindCommandRequest findCmd{nss};
+
+    auto cursor = std::make_unique<DBClientCursor>(
+        &conn, findCmd, ReadPreferenceSetting{}, false /* isExhaust*/);
+    cursor->setBatchSize(1);
+
+    // Set up mock 'find' response.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {docObj(1)});
+    conn.setCallResponse(findResponseMsg);
+
+    // Trigger a find command.
+    ASSERT(cursor->init());
+
+    cursor.reset();
+    ASSERT(conn.killedCursor(cursorId));
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_AggRequest) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSONObj()));
+    AggregateCommandRequest aggCmd{nss, pipeline};
+
+    // Set up mock 'aggregate' response.
+    const long long cursorId = 42;
+    Message aggResponseMsg = mockAggregateResponse(nss, cursorId, {docObj(1)});
+    conn.setCallResponse(aggResponseMsg);
+
+    auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        &conn, aggCmd, false /* secondaryOk */, false /* useExhaust */));
+
+    cursor.reset();
+    ASSERT(conn.killedCursor(cursorId));
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_ExistingCursor) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const long long cursorId = 42;
+
+    // Set up mock 'getMore' response.
+    auto getMoreResponseMsg = mockGetMoreResponse(nss, cursorId, {docObj(1)});
+    conn.setRecvResponse(getMoreResponseMsg);
+
+    auto cursor = std::make_unique<DBClientCursor>(&conn, nss, cursorId, false /* isExhaust */);
+
+    cursor.reset();
+    ASSERT(conn.killedCursor(cursorId));
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_FindRequest) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    FindCommandRequest findCmd{nss};
+
+    long long cursorId = 42;
+
+    for (bool keepCursorOpen : {true, false}) {
+        auto cursor = std::make_unique<DBClientCursor>(
+            &conn, findCmd, ReadPreferenceSetting{}, false /* isExhaust*/, keepCursorOpen);
+        cursor->setBatchSize(1);
+
+        // Set up mock 'find' response.
+        Message findResponseMsg = mockFindResponse(nss, cursorId, {docObj(1)});
+        conn.setCallResponse(findResponseMsg);
+
+        // Trigger a find command.
+        ASSERT(cursor->init());
+
+        cursor.reset();
+        ASSERT_EQ(conn.killedCursor(cursorId), !keepCursorOpen);
+
+        cursorId++;
+    }
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_AggRequest) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSONObj()));
+    AggregateCommandRequest aggCmd{nss, pipeline};
+
+    long long cursorId = 42;
+
+    for (bool keepCursorOpen : {true, false}) {
+        // Set up mock 'aggregate' response.
+        Message aggResponseMsg = mockAggregateResponse(nss, cursorId, {docObj(1)});
+        conn.setCallResponse(aggResponseMsg);
+
+        auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+            &conn, aggCmd, false /* secondaryOk */, false /* useExhaust */, keepCursorOpen));
+
+        cursor.reset();
+        ASSERT_EQ(conn.killedCursor(cursorId), !keepCursorOpen);
+
+        cursorId++;
+    }
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_ExistingCursor) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+
+    long long cursorId = 42;
+
+    for (bool keepCursorOpen : {true, false}) {
+        // Set up mock 'getMore' response.
+        auto getMoreResponseMsg = mockGetMoreResponse(nss, cursorId, {docObj(1)});
+        conn.setRecvResponse(getMoreResponseMsg);
+
+        auto cursor = std::make_unique<DBClientCursor>(&conn,
+                                                       nss,
+                                                       cursorId,
+                                                       false /* isExhaust */,
+                                                       std::vector<BSONObj>{} /* initialBatch */,
+                                                       boost::none /* operationTime */,
+                                                       boost::none /* operationTime */,
+                                                       keepCursorOpen);
+
+        cursor.reset();
+        ASSERT_EQ(conn.killedCursor(cursorId), !keepCursorOpen);
+
+        cursorId++;
+    }
 }
 
 }  // namespace

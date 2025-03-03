@@ -348,7 +348,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                bool isExhaust,
                                std::vector<BSONObj> initialBatch,
                                boost::optional<Timestamp> operationTime,
-                               boost::optional<BSONObj> postBatchResumeToken)
+                               boost::optional<BSONObj> postBatchResumeToken,
+                               bool keepCursorOpen)
     : _batch{std::move(initialBatch)},
       _client(client),
       _originalHost(_client->getServerAddress()),
@@ -358,12 +359,14 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _cursorId(cursorId),
       _isExhaust(isExhaust),
       _operationTime(operationTime),
-      _postBatchResumeToken(postBatchResumeToken) {}
+      _postBatchResumeToken(postBatchResumeToken),
+      _keepCursorOpen(keepCursorOpen) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                FindCommandRequest findRequest,
                                const ReadPreferenceSetting& readPref,
-                               bool isExhaust)
+                               bool isExhaust,
+                               bool keepCursorOpen)
     : _client(client),
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(findRequest.getNamespaceOrUUID()),
@@ -371,7 +374,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _batchSize(findRequest.getBatchSize().value_or(0)),
       _findRequest(std::move(findRequest)),
       _readPref(readPref),
-      _isExhaust(isExhaust) {
+      _isExhaust(isExhaust),
+      _keepCursorOpen(keepCursorOpen) {
     // Internal clients should always pass an explicit readConcern. If the caller did not already
     // pass a readConcern than we must explicitly initialize an empty readConcern so that it ends up
     // in the serialized version of the find command which will be sent across the wire.
@@ -384,7 +388,8 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
     DBClientBase* client,
     const AggregateCommandRequest& aggRequest,
     bool secondaryOk,
-    bool useExhaust) {
+    bool useExhaust,
+    bool keepCursorOpen) {
     BSONObj ret;
     try {
         if (!client->runCommand(aggRequest.getNamespace().dbName(),
@@ -427,11 +432,19 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
                                              useExhaust,
                                              std::move(firstBatch),
                                              operationTime,
-                                             std::move(postBatchResumeToken))};
+                                             std::move(postBatchResumeToken),
+                                             keepCursorOpen)};
 }
 
 DBClientCursor::~DBClientCursor() {
-    kill();
+    if (!_keepCursorOpen) {
+        LOGV2_DEBUG(
+            10154801,
+            1,
+            "Skip killing the cursor since the 'DBClientCursor' was created with 'keepCursorOpen' "
+            "true");
+        kill();
+    }
 }
 
 void DBClientCursor::kill() {
