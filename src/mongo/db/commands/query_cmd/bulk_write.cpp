@@ -1293,6 +1293,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const override {
+            return true;
+        }
+
         bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
@@ -1363,6 +1367,14 @@ public:
 
         Reply typedRun(OperationContext* opCtx) final {
             auto& req = request();
+
+            if (req.getRawData()) {
+                for (auto& nsEntry : req.getNsInfo()) {
+                    TimeseriesBucketNamespace tsNs(nsEntry.getNs(),
+                                                   nsEntry.getIsTimeseriesNamespace());
+                    nsEntry.setNs(timeseries::isTimeseriesViewRequest(opCtx, tsNs).second);
+                }
+            }
 
             // Apply all of the write operations.
             auto [replies, retriedStmtIds, summaryFields] = bulk_write::performWrites(opCtx, req);

@@ -209,6 +209,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const override {
+            return true;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             try {
                 doCheckAuthorizationHook(AuthorizationSession::get(opCtx->getClient()));

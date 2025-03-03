@@ -13,6 +13,7 @@ export const BulkWriteUtils = (function() {
     let ordered = true;
     let bypassDocumentValidation = null;
     let hasUpsert = false;
+    let rawData = false;
 
     function canProcessAsBulkWrite(cmdName) {
         return commandsToBulkWriteOverride.has(cmdName);
@@ -27,6 +28,7 @@ export const BulkWriteUtils = (function() {
         bypassDocumentValidation = null;
         ordered = true;
         hasUpsert = false;
+        rawData = false;
     }
 
     function getCurrentBatchSize() {
@@ -39,6 +41,7 @@ export const BulkWriteUtils = (function() {
             bypassDocumentValidation: bypassDocumentValidation,
             letObj: letObj,
             ordered: ordered,
+            rawData: rawData,
         };
     }
 
@@ -53,6 +56,7 @@ export const BulkWriteUtils = (function() {
             "nsInfo": nsInfos,
             "ordered": (ordered != null) ? ordered : true,
             "bypassDocumentValidation": bypassDocumentValidation,
+            "rawData": rawData,
         };
     }
 
@@ -67,6 +71,7 @@ export const BulkWriteUtils = (function() {
             "nsInfo": nsInfos,
             "ordered": (ordered != null) ? ordered : true,
             "bypassDocumentValidation": bypassDocumentValidation,
+            "rawData": rawData,
         };
 
         if (wc != null) {
@@ -424,6 +429,8 @@ export const BulkWriteUtils = (function() {
         if (cmdObj.hasOwnProperty("writeConcern")) {
             wc = cmdObj.writeConcern;
         }
+
+        rawData = cmdObj.hasOwnProperty("rawData") ? cmdObj.rawData : false;
 
         let nsInfoEntry = dbName + "." + cmdObj[cmdName];
         let nsInfoIdx = getNsInfoIdx(nsInfoEntry,

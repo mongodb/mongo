@@ -89,6 +89,12 @@ function opCompatibleWithCurrentBatch(dbName, collName, cmdObj) {
         return false;
     }
 
+    const newRawData = cmdObj.hasOwnProperty("rawData") ? cmdObj.rawData : false;
+    const currentRawData = state.rawData;
+    if (currentRawData != newRawData) {
+        return false;
+    }
+
     return true;
 }
 
