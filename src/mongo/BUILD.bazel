@@ -483,7 +483,7 @@ filegroup(
         "//src/mongo/db:feature_compatibility_version_parser.h",
         "//src/mongo/db:feature_flag.h",
         "//src/mongo/db:version_context.h",
-        "//src/mongo/db:version_context_gen",
+        "//src/mongo/db:version_context_metadata_gen",
         "//src/mongo/db:feature_flag_server_parameter.h",
         "//src/mongo/db:field_ref.h",
         "//src/mongo/db:index_names.h",

@@ -1664,6 +1664,14 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "version_context_metadata_gen",
+    src = "version_context_metadata.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "version_context_gen",
     src = "version_context.idl",
     deps = [
@@ -1878,7 +1886,7 @@ mongo_cc_library(
         "shutdown_in_progress_quiesce_info.cpp",
         "tenant_id.cpp",
         "version_context.cpp",
-        "version_context_gen",
+        "version_context_metadata_gen",
         "write_concern_idl.cpp",
         "write_concern_options.cpp",
         ":basic_types_gen",

@@ -34,6 +34,7 @@ global:
 
 imports:
      - "mongo/db/basic_types.idl"
+     - "mongo/db/version_context.idl"
      - "mongo/rpc/metadata/audit_attrs.idl"
      - "mongo/rpc/metadata/audit_metadata.idl"
 
@@ -66,4 +67,10 @@ structs:
             validatedTenancyScopeToken:
                 type: string
                 description: "Token used to validate and create a new ValidatedTenancyScope."
+                optional: true
+            versionContext:
+                type: version_context
+                description: "Snapshot of the FCV used by the operation,
+                              which ensures that feature flag checks are stable through its execution."
+                # TODO SERVER-101449: make non-optional after 9.0 becomes last LTS.
                 optional: true

@@ -32,7 +32,7 @@
 #include <variant>
 
 #include "mongo/db/server_options.h"
-#include "mongo/db/version_context_gen.h"
+#include "mongo/db/version_context_metadata_gen.h"
 
 namespace mongo {
 
@@ -75,8 +75,12 @@ public:
 
     BSONObj toBSON() const;
 
+    friend bool operator==(const VersionContext& lhs, const VersionContext& rhs);
+
 private:
     void _assertOFCVNotInitialized() const;
+
+    bool _isMatchingOFCV(FCV fcv) const;
 
     std::
         variant<OperationWithoutOFCVTag, OutsideOperationTag, IgnoreOFCVTag, VersionContextMetadata>

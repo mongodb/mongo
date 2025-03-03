@@ -27,18 +27,31 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/version_context.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+      - "mongo/db/feature_compatibility_version_parser.h"
 
 imports:
-    - "mongo/db/basic_types.idl"
+     - "mongo/db/basic_types.idl"
 
 types:
-    version_context:
-      bson_serialization_type: object
-      description: "Holds metadata related to snapshots of the system state taken by OFCV-aware operations."
-      cpp_type: "mongo::VersionContext"
-      serializer: "mongo::VersionContext::toBSON"
-      deserializer: "mongo::VersionContext"
-      is_view: false
+    ofcv_string:
+        bson_serialization_type: string
+        description: >-
+            Enables the serialization and deserialization of multiversion::FeatureCompatibilityVersion values.
+            Is able to represent the transitional Upgrading* and Downgrading* states,
+            as well as the stable FCV states that are also supported by fcv_string.
+        cpp_type: "multiversion::FeatureCompatibilityVersion"
+        serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersionForOfcvString"
+        deserializer: "::mongo::FeatureCompatibilityVersionParser::parseVersionForOfcvString"
+        is_view: false
+
+structs:
+    VersionContextMetadata:
+        description: "Holds metadata related to snapshots of the system state taken by OFCV-aware operations"
+        strict: false
+        fields:
+            OFCV:
+                type: ofcv_string
+                description: "The operation FCV snapshot."
+                optional: false

@@ -49,19 +49,24 @@ VersionContext::VersionContext(const BSONObj& bsonObject) {
 }
 
 VersionContext& VersionContext::operator=(const VersionContext& other) {
+    if (*this == other) {
+        return *this;
+    }
     _assertOFCVNotInitialized();
     _metadataOrTag = other._metadataOrTag;
     return *this;
 }
 
 void VersionContext::setOperationFCV(FCV fcv) {
+    if (_isMatchingOFCV(fcv)) {
+        return;
+    }
     _assertOFCVNotInitialized();
     _metadataOrTag.emplace<VersionContextMetadata>(fcv);
 }
 
 void VersionContext::setOperationFCV(FCVSnapshot fcv) {
-    _assertOFCVNotInitialized();
-    _metadataOrTag.emplace<VersionContextMetadata>(fcv.getVersion());
+    setOperationFCV(fcv.getVersion());
 }
 
 boost::optional<FCVSnapshot> VersionContext::getOperationFCV() const {
@@ -84,10 +89,29 @@ BSONObj VersionContext::toBSON() const {
         _metadataOrTag);
 }
 
+bool VersionContext::_isMatchingOFCV(FCV fcv) const {
+    return std::holds_alternative<VersionContextMetadata>(_metadataOrTag) &&
+        std::get<VersionContextMetadata>(_metadataOrTag).getOFCV() == fcv;
+}
+
 void VersionContext::_assertOFCVNotInitialized() const {
     uassert(ErrorCodes::AlreadyInitialized,
             "The operation FCV has already been set.",
             std::holds_alternative<OperationWithoutOFCVTag>(_metadataOrTag));
+}
+
+bool operator==(const VersionContext& lhs, const VersionContext& rhs) {
+    return visit(
+        OverloadedVisitor{[](const VersionContextMetadata& lhsMetadata,
+                             const VersionContextMetadata& rhsMetadata) {
+                              return lhsMetadata.getOFCV() == rhsMetadata.getOFCV();
+                          },
+                          [](auto&& lhsMetadataOrTag, auto&& rhsMetadataOrTag) {
+                              return std::is_same_v<std::decay_t<decltype(lhsMetadataOrTag)>,
+                                                    std::decay_t<decltype(rhsMetadataOrTag)>>;
+                          }},
+        lhs._metadataOrTag,
+        rhs._metadataOrTag);
 }
 
 }  // namespace mongo

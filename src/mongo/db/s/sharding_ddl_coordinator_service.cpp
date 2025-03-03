@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/s/add_shard_coordinator.h"
@@ -68,8 +69,10 @@
 #include "mongo/db/s/set_allow_migrations_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/untrack_unsplittable_collection_coordinator.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_cluster_parameters_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
@@ -339,7 +342,13 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
         coorMetadata.setDatabaseVersion(clientDbVersion);
     }
 
-    coorMetadata.setForwardableOpMetadata(boost::optional<ForwardableOperationMetadata>(opCtx));
+    FixedFCVRegion fixedFcvRegion(opCtx);
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    ForwardableOperationMetadata forwardableOpMetadata(opCtx);
+    if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(fcv)) {
+        forwardableOpMetadata.setVersionContext(VersionContext{fcv});
+    }
+    coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);
     const auto patchedCoorDoc = coorDoc.addFields(coorMetadata.toBSON());
 
     auto [coordinator, created] = [&] {

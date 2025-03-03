@@ -71,6 +71,11 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
         setAuditClientMetadata(std::move(auditClientAttrs));
     }
 
+    // TODO SERVER-101449: update once 9.0 becomes last LTS.
+    if (auto vCtx = VersionContext::getDecoration(opCtx); vCtx.getOperationFCV()) {
+        setVersionContext(VersionContext::getDecoration(opCtx));
+    }
+
     boost::optional<StringData> originalSecurityToken = boost::none;
     const auto vts = auth::ValidatedTenancyScope::get(opCtx);
     if (vts != boost::none && !vts->getOriginalToken().empty()) {
@@ -96,6 +101,11 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
 
     if (const auto& optAuditClientMetadata = getAuditClientMetadata()) {
         rpc::AuditClientAttrs::set(client, optAuditClientMetadata.value());
+    }
+
+    // TODO SERVER-101449: update once versionContext becomes a required field.
+    if (const auto& vCtx = getVersionContext()) {
+        VersionContext::getDecoration(opCtx) = vCtx.value();
     }
 
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());
