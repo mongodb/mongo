@@ -72,10 +72,6 @@ WiredTigerSession& WiredTigerManagedSession::operator*() const {
     return *_session;
 }
 
-bool WiredTigerManagedSession::operator!() const {
-    return _session == nullptr;
-}
-
 WiredTigerManagedSession::operator bool() const {
     return _session != nullptr;
 }

@@ -74,16 +74,10 @@ public:
     WiredTigerSession* get() const;
 
     /**
-     * Overloaded ! operator to check if the enclosed session has been released.
-     * This mimics std::unique_ptr behavior.
-     */
-    bool operator!() const;
-
-    /**
      * Overloaded bool() operator to check if the enclosed session has not been released.
      * This mimics std::unique_ptr behavior.
      */
-    operator bool() const;
+    explicit operator bool() const;
 
 
 private:

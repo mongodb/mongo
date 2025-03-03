@@ -275,7 +275,7 @@ private:
 
     WiredTigerConnection* _connection;      // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
-    WiredTigerManagedSession _managed_sesion;
+    WiredTigerManagedSession _managedSession;
     WiredTigerSession* _session = nullptr;
     bool _isTimestamped = false;
 

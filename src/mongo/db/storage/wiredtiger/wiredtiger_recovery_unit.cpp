@@ -183,15 +183,17 @@ void WiredTigerRecoveryUnit::doAbortUnitOfWork() {
 }
 
 void WiredTigerRecoveryUnit::_ensureSession() {
-    if (!_managed_sesion) {
-        invariant(!_session);
-        if (_opCtx) {
-            _managed_sesion = _connection->getSession(*this);
-        } else {
-            _managed_sesion = _connection->getUninterruptibleSession();
-        }
-        _session = _managed_sesion.get();
+    if (_managedSession) {
+        return;
     }
+
+    invariant(!_session);
+    if (_opCtx) {
+        _managedSession = _connection->getSession(*this);
+    } else {
+        _managedSession = _connection->getUninterruptibleSession();
+    }
+    _session = _managedSession.get();
 }
 
 void WiredTigerRecoveryUnit::setPrefetching(bool enable) {
