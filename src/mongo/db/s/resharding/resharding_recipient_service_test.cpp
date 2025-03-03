@@ -299,7 +299,7 @@ struct TestOptions {
     bool noChunksToCopy;
     bool storeOplogFetcherProgress = true;
     bool performVerification = true;
-    bool isNoRefreshEnabled;
+    bool driveCloneNoRefresh;
 
     BSONObj toBSON() const {
         BSONObjBuilder bob;
@@ -308,7 +308,7 @@ struct TestOptions {
         bob.append("noChunksToCopy", noChunksToCopy);
         bob.append("storeOplogFetcherProgress", storeOplogFetcherProgress);
         bob.append("performVerification", performVerification);
-        bob.append("isNoRefreshEnabled", isNoRefreshEnabled);
+        bob.append("driveCloneNoRefresh", driveCloneNoRefresh);
         return bob.obj();
     }
 };
@@ -317,11 +317,11 @@ std::vector<TestOptions> makeBasicTestOptions() {
     std::vector<TestOptions> testOptions;
     for (bool isAlsoDonor : {false, true}) {
         for (bool skipCloningAndApplying : {false, true}) {
-            for (bool isNoRefreshEnabled : {false, true}) {
-                RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-                    "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
+            for (bool driveCloneNoRefresh : {false, true}) {
+                RAIIServerParameterControllerForTest cloneNoRefreshFeatureFlagController(
+                    "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
 
-                testOptions.push_back({isAlsoDonor, isNoRefreshEnabled, skipCloningAndApplying});
+                testOptions.push_back({isAlsoDonor, skipCloningAndApplying, driveCloneNoRefresh});
             }
         }
     }
@@ -335,21 +335,22 @@ std::vector<TestOptions> makeAllTestOptions() {
             for (bool noChunksToCopy : {false, true}) {
                 for (bool storeOplogFetcherProgress : {false, true}) {
                     for (bool performVerification : {false, true}) {
-                        for (bool isNoRefreshEnabled : {false, true}) {
+                        for (bool driveCloneNoRefresh : {false, true}) {
                             if (skipCloningAndApplying && !noChunksToCopy) {
                                 // This is an invalid combination.
                                 continue;
                             }
 
-                            RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-                                "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
+                            RAIIServerParameterControllerForTest
+                                cloneNoRefreshFeatureFlagController(
+                                    "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
 
                             testOptions.push_back({isAlsoDonor,
                                                    skipCloningAndApplying,
                                                    noChunksToCopy,
                                                    storeOplogFetcherProgress,
                                                    performVerification,
-                                                   isNoRefreshEnabled});
+                                                   driveCloneNoRefresh});
                         }
                     }
                 }
@@ -553,7 +554,7 @@ public:
                               RecipientStateMachine& recipient,
                               const ReshardingRecipientDocument& recipientDoc) {
         auto driveCloneNoRefresh =
-            resharding::gFeatureFlagReshardingNoRefresh.isEnabledAndIgnoreFCVUnsafe();
+            resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabledAndIgnoreFCVUnsafe();
 
         if (driveCloneNoRefresh) {
             CancellationSource cancelSource;
@@ -800,7 +801,7 @@ protected:
         auto expectedApproxBytesToCopy = testOptions.noChunksToCopy ? 0 : approxBytesToCopy;
 
         auto driveCloneNoRefresh =
-            resharding::gFeatureFlagReshardingNoRefresh.isEnabledAndIgnoreFCVUnsafe();
+            resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabledAndIgnoreFCVUnsafe();
         if (driveCloneNoRefresh) {
             // Unit tests rely on resharding fields to set the copy metrics. With no refresh
             // enabled, the coordinator sends copy metrics according to the chunk manager, which

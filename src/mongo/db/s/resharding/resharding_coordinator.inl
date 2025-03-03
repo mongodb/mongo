@@ -346,7 +346,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
                    .then([this, executor] {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kCloning) {
-                           if (resharding::gFeatureFlagReshardingNoRefresh.isEnabled(
+                           if (resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
                                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                                _tellAllRecipientsToClone(executor);
                            } else {

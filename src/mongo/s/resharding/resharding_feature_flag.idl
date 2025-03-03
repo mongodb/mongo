@@ -86,8 +86,9 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingVerification
         default: false
         shouldBeFCVGated: true
-    featureFlagReshardingNoRefresh:
+    featureFlagReshardingCloneNoRefresh:
         description: "Feature flag to enable not using shard version refresh for resharding."
-        cpp_varname: gFeatureFlagReshardingNoRefresh
-        default: false
+        cpp_varname: gFeatureFlagReshardingCloneNoRefresh
+        default: true
+        version: 8.1
         shouldBeFCVGated: true

@@ -544,7 +544,7 @@ public:
                 opCtx, kTemporaryReshardingNss, temporaryCollMetadata, reshardingFields);
 
             auto driveCloneNoRefresh =
-                resharding::gFeatureFlagReshardingNoRefresh.isEnabledAndIgnoreFCVUnsafe();
+                resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabledAndIgnoreFCVUnsafe();
             if (driveCloneNoRefresh) {
                 auto recipientDoc = getPersistedRecipientDocument(opCtx, kReshardingUUID);
                 ASSERT(!recipientDoc.getCloneTimestamp());
@@ -1179,7 +1179,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsForCloningNoRefresh) {
     RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-        "featureFlagReshardingNoRefresh", true);
+        "featureFlagReshardingCloneNoRefresh", true);
 
     testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,

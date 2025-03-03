@@ -728,7 +728,7 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto coordinatorState = reshardingFields.getState();
-    auto driveCloneViaRefresh = !resharding::gFeatureFlagReshardingNoRefresh.isEnabled(
+    auto driveCloneViaRefresh = !resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     if (driveCloneViaRefresh && coordinatorState >= CoordinatorStateEnum::kCloning) {
@@ -2023,7 +2023,7 @@ void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancell
 
 void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup(
     boost::optional<mongo::ReshardingRecipientMetrics> metrics) {
-    if (!resharding::gFeatureFlagReshardingNoRefresh.isEnabled(
+    if (!resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         _recipientCtx.getState() <= RecipientStateEnum::kAwaitingFetchTimestamp) {
         return;
