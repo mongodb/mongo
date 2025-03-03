@@ -1,0 +1,32 @@
+systemLog:
+  verbosity: 2
+  destination: file
+  path: "/home/ubuntu/mongo/install/log/mongod.log"
+  component:
+    ftdc:
+      verbosity: 0
+net:
+  port: 27017
+  serviceExecutor: "adaptive"
+  enableCoroutine: true
+  reservedThreadNum: 2
+  adaptiveThreadNum: 1
+storage:
+  dbPath: "/home/ubuntu/mongo/install/data"
+  engine: "eloq"
+  eloq:
+    txService:
+      coreNum: 2
+      checkpointerIntervalSec: 10
+      nodeMemoryLimitMB: 8192
+      nodeLogLimitMB: 8192
+      realtimeSampling: true
+      collectActiveTxTsIntervalSec: 2
+      checkpointerDelaySec: 5
+    storage:
+      keyspaceName: "mongo_test"
+      cassHosts: 127.0.0.1
+setParameter:
+  diagnosticDataCollectionEnabled: false
+  disableLogicalSessionCacheRefresh: true
+  ttlMonitorEnabled: false
