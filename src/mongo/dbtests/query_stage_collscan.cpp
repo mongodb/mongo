@@ -670,6 +670,30 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
     ASSERT_THROWS_CODE(ps->work(&id), DBException, ErrorCodes::KeyNotFound);
 }
 
+// Verify that using resume tokens in collscan fails with a backward natural scan.
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeFailsBackwardScan) {
+    dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns_forTest());
+    auto coll = ctx.getCollection();
+
+    std::vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::BACKWARD;
+    params.resumeScanPoint =
+        ResumeScanPoint{recordIds[numObj() / 2], true /* tolerateKeyNotFound */};
+
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    auto constructCollectionScan = [&]() {
+        return std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, ws.get(), nullptr);
+    };
+
+    ASSERT_THROWS_WITH_CHECK(constructCollectionScan(), DBException, [](const DBException& ex) {
+        ASSERT_EQUALS(ex.code(), 6521003);
+        // TODO SERVER-101657: Do not decrement tassert count manually.
+        assertionCount.tripwire.subtractAndFetch(1);
+    });
+}
 
 // Verify resuming with tolerateKeyNotFound set to true can handle deleted records by skipping to
 // next valid one.
