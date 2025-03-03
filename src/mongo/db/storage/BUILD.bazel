@@ -224,9 +224,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "duplicate_key_error_info.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo:core_headers",
     ],
     deps = [
         "//src/mongo:base",

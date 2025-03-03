@@ -840,6 +840,11 @@ filegroup(
         "//src/mongo/util/version:releases_header",
         #Extras
         "//src/mongo/db/query:explain_options.h",
+        "//src/mongo/db/auth:cluster_auth_mode.h",
+        "//src/mongo/db:cluster_role.h",
+        "//src/mongo/db/concurrency:flow_control_ticketholder.h",
+        "//src/mongo/db/stats:counter_ops.h",
+        "//src/mongo/db/query/datetime:date_time_support.h",
     ],
 )
 

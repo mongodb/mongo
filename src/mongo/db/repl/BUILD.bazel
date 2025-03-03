@@ -647,8 +647,6 @@ mongo_cc_library(
     header_deps = [
         "//src/mongo/bson/column",
         "//src/mongo/db/auth:cluster_auth_mode",
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
-        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
         "//src/mongo/db/fts/unicode:unicode",
         "//src/mongo/db/fts:fts_query_noop",
     ],
@@ -737,11 +735,9 @@ mongo_cc_library(
     hdrs = [
         "initial_sync_shared_data.h",
         "repl_sync_shared_data.h",
+        "//src/mongo:core_headers",
         "//src/mongo/db:wire_version.h",
         "//src/mongo/db/query/client_cursor:cursor_id.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
     ],
     deps = [
         "//src/mongo:base",
@@ -836,11 +832,11 @@ mongo_cc_library(
     ],
     hdrs = [
         "speculative_majority_read_info.h",
+        "//src/mongo:core_headers",
     ],
     deps = [
         ":optime",
         "//src/mongo:base",
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
     ],
 )
 
