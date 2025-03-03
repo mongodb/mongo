@@ -33,31 +33,24 @@ const sourceCollection = reshardingTest.createShardedCollection({
 assert.commandWorked(sourceCollection.insert({oldKey: 1, newKey: 2}));
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-const reshardingOptions = {
-    newShardKeyPattern: {newKey: 1},
-    newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
-};
-const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-if (!isMultiversion) {
-    // TODO (SERVER-101440): Re-enable resharding verification. 'performVerification' defaults to
-    // true when the feature flag is enabled. Currently, resharding verification makes this test
-    // hang.
-    reshardingOptions.performVerification = false;
-}
+reshardingTest.withReshardingInBackground(
+    {
+        newShardKeyPattern: {newKey: 1},
+        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+    },
+    () => {
+        // We use awaitCloneTimestampChosen() for syntactic convenience to wait for the
+        // _shardsvrReshardCollection command to have been received by the primary shard.
+        reshardingTest.awaitCloneTimestampChosen();
 
-reshardingTest.withReshardingInBackground(reshardingOptions, () => {
-    // We use awaitCloneTimestampChosen() for syntactic convenience to wait for the
-    // _shardsvrReshardCollection command to have been received by the primary shard.
-    reshardingTest.awaitCloneTimestampChosen();
-
-    // Mongos uses the ARS for running the _shardsvrReshardCollection command and will retry up
-    // to 3 times on a network error. We restart the server more than that many times to
-    // exercise the logic of the ReshardingTest fixture needing to retry the whole
-    // reshardCollection command.
-    const numRestarts = 5;
-    for (let i = 0; i < numRestarts; ++i) {
-        reshardingTest.shutdownAndRestartPrimaryOnShard(primaryShard);
-    }
-});
+        // Mongos uses the ARS for running the _shardsvrReshardCollection command and will retry up
+        // to 3 times on a network error. We restart the server more than that many times to
+        // exercise the logic of the ReshardingTest fixture needing to retry the whole
+        // reshardCollection command.
+        const numRestarts = 5;
+        for (let i = 0; i < numRestarts; ++i) {
+            reshardingTest.shutdownAndRestartPrimaryOnShard(primaryShard);
+        }
+    });
 
 reshardingTest.teardown();
