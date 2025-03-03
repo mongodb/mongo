@@ -796,12 +796,18 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         // Wait for majority can only be done after dismissing the `stopMonitoringGuard`.
         if (opCtx->getWriteConcern().isMajority()) {
-            WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajorityForWrite(
-                    repl::ReplicationCoordinator::get(opCtx->getServiceContext())
-                        ->getMyLastAppliedOpTime(),
-                    opCtx->getCancellationToken())
-                .get();
+            const auto majorityWriteStatus =
+                WaitForMajorityService::get(opCtx->getServiceContext())
+                    .waitUntilMajorityForWrite(
+                        repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                            ->getMyLastAppliedOpTime(),
+                        opCtx->getCancellationToken())
+                    .getNoThrow();
+
+            if (majorityWriteStatus == ErrorCodes::CallbackCanceled) {
+                uassertStatusOK(opCtx->checkForInterruptNoAssert());
+            }
+            uassertStatusOK(majorityWriteStatus);
         }
 
         // Record in changelog
