@@ -36,20 +36,10 @@ export function concreteQueryFromFamily(queryShape, leafId) {
     return queryShape;
 }
 
-function isCollTS(coll) {
-    const res =
-        assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: coll.getName()}}));
-    const colls = res.cursor.firstBatch;
-    assert.eq(colls.length, 1);
-    return colls[0].type === 'timeseries';
-}
-
-export function getPlanCache(coll) {
-    const collName = coll.getName();
-    if (isCollTS(coll)) {
-        return db.system.buckets[collName].getPlanCache();
-    }
-    return db[collName].getPlanCache();
+function createColl(coll, isTS = false) {
+    const db = coll.getDB();
+    const args = isTS ? {timeseries: {timeField: 't', metaField: 'm'}} : {};
+    assert.commandWorked(db.createCollection(coll.getName(), args));
 }
 
 /*
@@ -71,13 +61,23 @@ export function getPlanCache(coll) {
  * TODO SERVER-98132 redesign getQuery to be more opaque about how many query shapes and constants
  * there are.
  */
-function runProperty(experimentColl, propertyFn, indexes, queries) {
-    // Clear all state and create indexes.
-    getPlanCache(experimentColl).clear();
-    assert.commandWorked(experimentColl.dropIndexes());
-    for (const index of indexes) {
+function runProperty(propertyFn, namespaces, collectionSpec, queries) {
+    const {controlColl, experimentColl} = namespaces;
+
+    // Setup the control/experiment collections, define the helper functions, then run the property.
+    if (controlColl) {
+        assert(controlColl.drop());
+        createColl(controlColl);
+        assert.commandWorked(controlColl.insert(collectionSpec.docs));
+    }
+
+    assert(experimentColl.drop());
+    createColl(experimentColl, collectionSpec.isTS);
+    assert.commandWorked(experimentColl.insert(collectionSpec.docs));
+    for (const index of collectionSpec.indexes) {
         experimentColl.createIndex(index.def, index.options);
     }
+
     const testHelpers = {
         comp: _resultSetsEqualUnordered,
         numQueryShapes: queries.length,
@@ -97,15 +97,15 @@ function runProperty(experimentColl, propertyFn, indexes, queries) {
  * We need a custom reporter function to get more details on the failure. The default won't show
  * what property failed very clearly, or provide more details beyond the counterexample.
  */
-function reporter(experimentColl, propertyFn) {
+function reporter(propertyFn, namespaces) {
     return function(runDetails) {
         if (runDetails.failed) {
             // Print the fast-check failure summary, the counterexample, and additional details
             // about the property failure.
             jsTestLog(runDetails);
-            const [indexes, queries] = runDetails.counterexample[0];
-            jsTestLog({indexes, queries});
-            jsTestLog(runProperty(experimentColl, propertyFn, indexes, queries));
+            const {collSpec, queries} = runDetails.counterexample[0];
+            jsTestLog({collSpec, queries});
+            jsTestLog(runProperty(propertyFn, namespaces, collSpec, queries));
             jsTestLog('Failed property: ' + propertyFn.name);
             assert(false);
         }
@@ -119,21 +119,34 @@ function reporter(experimentColl, propertyFn) {
  * failed property.
  */
 export function testProperty(
-    propertyFn, experimentColl, {aggModel, indexModel, numRuns, numQueriesPerRun}) {
-    const nPipelinesArb =
+    propertyFn, namespaces, {collModel, aggModel}, {numRuns, numQueriesPerRun}) {
+    const nPipelinesModel =
         fc.array(aggModel, {minLength: numQueriesPerRun, maxLength: numQueriesPerRun});
-    const nIndexesModel = fc.array(indexModel, {minLength: 0, maxLength: 7});
-    const scenarioArb = fc.tuple(nIndexesModel, nPipelinesArb);
+    const scenarioArb = fc.record({collSpec: collModel, queries: nPipelinesModel});
 
-    fc.assert(
-        fc.property(scenarioArb,
-                    ([indexes, pipelines]) => {
-                        // Only return if the property passed or not. On failure,
-                        // `runProperty` is called again and more details are exposed.
-                        return runProperty(experimentColl, propertyFn, indexes, pipelines).passed;
-                    }),
-        // TODO SERVER-91404 randomize in waterfall.
-        {seed: 4, numRuns, reporter: reporter(experimentColl, propertyFn)});
+    fc.assert(fc.property(scenarioArb,
+                          ({collSpec, queries}) => {
+                              // Only return if the property passed or not. On failure,
+                              // `runProperty` is called again and more details are exposed.
+                              return runProperty(propertyFn, namespaces, collSpec, queries).passed;
+                          }),
+              // TODO SERVER-91404 randomize in waterfall.
+              {seed: 4, numRuns, reporter: reporter(propertyFn, namespaces)});
+}
+
+function isCollTS(collName) {
+    const res = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+    const colls = res.cursor.firstBatch;
+    assert.eq(colls.length, 1);
+    return colls[0].type === 'timeseries';
+}
+
+export function getPlanCache(coll) {
+    const collName = coll.getName();
+    if (isCollTS(collName)) {
+        return db.system.buckets[collName].getPlanCache();
+    }
+    return db[collName].getPlanCache();
 }
 
 function unoptimize(q) {
@@ -155,32 +168,4 @@ export function runDeoptimizedQuery(controlColl, query) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: initialFrameworkSetting}));
     return controlResults;
-}
-
-/*
- * Default documents to use for the core PBT model schema.
- * TODO SERVER-93816 remove this function and model documents as an arbitrary so that documents can
- * be minimized.
- */
-export function defaultPbtDocuments() {
-    const datePrefix = 1680912440;
-    const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-    const docs = [];
-    let id = 0;
-    for (let m = 0; m < 10; m++) {
-        let currentDate = 0;
-        for (let i = 0; i < 10; i++) {
-            docs.push({
-                _id: id,
-                t: new Date(datePrefix + currentDate - 100),
-                m: {m1: m, m2: 2 * m},
-                array: [i, i + 1, 2 * i],
-                a: NumberInt(10 - i),
-                b: alphabet.charAt(i)
-            });
-            currentDate += 25;
-            id += 1;
-        }
-    }
-    return docs;
 }

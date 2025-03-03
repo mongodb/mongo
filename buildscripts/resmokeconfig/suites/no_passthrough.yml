@@ -9,6 +9,7 @@ description: |
 selector:
   roots:
     - jstests/noPassthrough/**/*.js
+    - jstests/libs/property_test_helpers/pbt_self_test.js
     - src/mongo/db/modules/*/jstests/hot_backups/**/*.js
     - src/mongo/db/modules/*/jstests/live_import/*.js
     - src/mongo/db/modules/*/jstests/live_restore/*.js

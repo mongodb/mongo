@@ -1,22 +1,19 @@
 /*
- * Fast-check models for aggregation pipelines. Works for time-series
- * collections but also is general enough for regular collections.
+ * Fast-check models for aggregation pipelines for our core property tests.
  *
  * For our agg model, we generate query shapes with a list of concrete values the parameters could
  * take on at the leaves. We call this a "query family". This way, our properties have access to
  * many varying query shapes, but also variations of the same query shape.
+ *
+ * See property_test_helpers/README.md for more detail on the design.
  */
+import {
+    assignableFieldArb,
+    fieldArb,
+    scalarArb
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
-// ------------------------------------- Aggregation Arbitraries -----------------------------------
-// .oneof() arguments are ordered from least complex to most, since fast-check uses this ordering to
-// shrink.
-const scalarArb = fc.oneof(fc.constant(null),
-                           fc.boolean(),
-                           fc.integer({min: -30, max: 30}),
-                           // Strings starting with `$` can be confused with fields.
-                           fc.string().filter(s => !s.startsWith('$')),
-                           fc.date());
 export const leafParametersPerFamily = 10;
 export class LeafParameter {
     constructor(concreteValues) {
@@ -31,8 +28,6 @@ const leafParameterArb =
         return new LeafParameter(constants);
     });
 
-const fieldArb = fc.constantFrom('t', 'm', 'm.m1', 'm.m2', 'a', 'b', 'array');
-const assignableFieldArb = fc.constantFrom('m', 't', 'a', 'b');
 const dollarFieldArb = fieldArb.map(f => "$" + f);
 const comparisonArb = fc.constantFrom('$eq', '$lt', '$lte', '$gt', '$gte');
 const accumulatorArb =

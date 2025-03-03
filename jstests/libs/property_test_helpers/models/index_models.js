@@ -1,5 +1,6 @@
 /*
  * Fast-check models for indexes.
+ * See property_test_helpers/README.md for more detail on the design.
  */
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -61,7 +62,7 @@ const wildcardIndexDefAndOptionsArb =
     fc.record({def: fc.constant({"$**": 1}), options: fc.constant({})});
 
 // Map to an object with the definition and options, so it's more clear what each object is.
-export const indexModel = fc.oneof(
+export const defaultIndexModel = fc.oneof(
     simpleIndexDefAndOptionsArb, wildcardIndexDefAndOptionsArb, hashedIndexDefAndOptionsArb);
 
 function isMultikey(indexDef) {

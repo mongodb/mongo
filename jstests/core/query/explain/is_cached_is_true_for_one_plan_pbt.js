@@ -11,10 +11,9 @@
  *   does_not_support_stepdowns
  * ]
  */
-import {indexModel} from "jstests/libs/property_test_helpers/models/index_models.js";
+import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {
-    defaultPbtDocuments,
     getPlanCache,
     testProperty
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
@@ -52,11 +51,8 @@ function isCachedIsTrueForOnePlan(getQuery, testHelpers) {
     return {passed: true};
 }
 
-const aggModel = getAggPipelineModel({allowOrs: true});
-
 // Run the property with a regular collection.
-experimentColl.drop();
-assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
 testProperty(isCachedIsTrueForOnePlan,
-             experimentColl,
-             {aggModel, indexModel, numRuns: 200, numQueriesPerRun: 20});
+             {experimentColl},
+             {collModel: getCollectionModel({isTS: false}), aggModel: getAggPipelineModel()},
+             {numRuns: 200, numQueriesPerRun: 20});

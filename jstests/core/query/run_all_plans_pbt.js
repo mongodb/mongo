@@ -25,13 +25,9 @@
  * requires_getmore,
  * ]
  */
-import {
-    indexModel,
-    timeseriesIndexModel
-} from "jstests/libs/property_test_helpers/models/index_models.js";
+import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {
-    defaultPbtDocuments,
     runDeoptimizedQuery,
     testProperty
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
@@ -42,6 +38,7 @@ if (isSlowBuild(db)) {
     numRuns = 5;
     jsTestLog('Trying less examples because debug is on, opt is off, or a sanitizer is enabled.');
 }
+const numQueriesPerRun = 20;
 
 const controlColl = db.run_all_plans_control;
 const experimentColl = db.run_all_plans_experiment;
@@ -87,31 +84,39 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
     return {passed: true};
 }
 
-// TODO SERVER-99889 reenable testing for hashed indexes.
-const indexModelNoHashed = indexModel.filter(index => {
-    const isHashed = Object.values(index.def).includes('hashed');
-    return !isHashed;
-});
-
 const aggModel = getAggPipelineModel();
 
-assert(controlColl.drop());
-assert.commandWorked(controlColl.insert(defaultPbtDocuments()));
-
-// Run the property with a regular collection.
-assert(experimentColl.drop());
-assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
-testProperty(hintedQueryHasSameResultsAsControlCollScan,
-             experimentColl,
-             {aggModel, indexModel: indexModelNoHashed, numRuns, numQueriesPerRun: 20});
+// Test with a regular collection.
+{
+    // TODO SERVER-99889 reenable testing for hashed indexes.
+    let collModel = getCollectionModel().filter(({isTS, docs, indexes}) => {
+        for (const index of indexes) {
+            if (Object.values(index.def).includes('hashed')) {
+                return false;
+            }
+        }
+        return true;
+    });
+    testProperty(hintedQueryHasSameResultsAsControlCollScan,
+                 {controlColl, experimentColl},
+                 {collModel, aggModel},
+                 {numRuns, numQueriesPerRun});
+}
 
 // TODO SERVER-101271 re-enable PBT testing for time-series
-// Run the property with a TS collection.
-// assert(experimentColl.drop());
-// assert.commandWorked(db.createCollection(experimentColl.getName(), {
-//     timeseries: {timeField: 't', metaField: 'm'},
-// }));
-// assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
-// testProperty(hintedQueryHasSameResultsAsControlCollScan,
-//              experimentColl,
-//              {aggModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun: 20});
+// // Test with a TS collection.
+// {
+//     // TODO SERVER-83072 re-enable $group in this test, by removing the filter below.
+//     const tsAggModel = aggModel.filter(query => {
+//         for (const stage of query) {
+//             if (Object.keys(stage).includes('$group')) {
+//                 return false;
+//             }
+//         }
+//         return true;
+//     });
+//     testProperty(hintedQueryHasSameResultsAsControlCollScan,
+//                  {controlColl, experimentColl},
+//                  {collModel: getCollectionModel({isTS: true}), aggModel: tsAggModel},
+//                  {numRuns, numQueriesPerRun});
+// }

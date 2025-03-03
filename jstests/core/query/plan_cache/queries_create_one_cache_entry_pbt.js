@@ -13,13 +13,9 @@
  *   does_not_support_stepdowns
  * ]
  */
-import {
-    indexModel,
-    timeseriesIndexModel
-} from "jstests/libs/property_test_helpers/models/index_models.js";
+import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {
-    defaultPbtDocuments,
     getPlanCache,
     testProperty
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
@@ -30,6 +26,7 @@ if (isSlowBuild(db)) {
     numRuns = 20;
     jsTestLog('Trying less examples because debug is on, opt is off, or a sanitizer is enabled.');
 }
+const numQueriesPerRun = 20;
 
 const experimentColl = db[jsTestName()];
 
@@ -63,19 +60,11 @@ function identicalQueryCreatesAtMostOneCacheEntry(getQuery, testHelpers) {
 
 const aggModel = getAggPipelineModel({allowOrs: false});
 
-// Run the property with a regular collection.
-assert(experimentColl.drop());
-assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
 testProperty(identicalQueryCreatesAtMostOneCacheEntry,
-             experimentColl,
-             {aggModel, indexModel, numRuns, numQueriesPerRun: 20});
-
-// Run the property with a TS collection.
-assert(experimentColl.drop());
-assert.commandWorked(db.createCollection(experimentColl.getName(), {
-    timeseries: {timeField: 't', metaField: 'm'},
-}));
-assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
+             {experimentColl},
+             {collModel: getCollectionModel({isTS: false}), aggModel},
+             {numRuns, numQueriesPerRun});
 testProperty(identicalQueryCreatesAtMostOneCacheEntry,
-             experimentColl,
-             {aggModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun: 20});
+             {experimentColl},
+             {collModel: getCollectionModel({isTS: true}), aggModel},
+             {numRuns, numQueriesPerRun});

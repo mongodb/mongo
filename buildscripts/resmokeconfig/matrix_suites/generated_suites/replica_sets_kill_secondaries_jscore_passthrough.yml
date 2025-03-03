@@ -48,6 +48,9 @@ selector:
     - jstests/core/**/capped_large_docs.js
     - jstests/core/**/capped_resize.js
     - jstests/core/**/query/exhaust.js
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/plan_cache/cache_correctness_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
     - jstests/core/**/explain_execution_error.js
     - jstests/core/**/sortb.js
     - jstests/core/**/sortg.js
