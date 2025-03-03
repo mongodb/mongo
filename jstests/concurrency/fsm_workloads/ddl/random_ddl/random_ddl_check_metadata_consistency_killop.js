@@ -61,9 +61,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         db = this.getRandomDb(db);
         jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
         withCatchAndIgnoreInterrupted(() => {
-            const inconsistencies = db.getSiblingDB("admin")
-                                        .checkMetadataConsistency({comment: kMarkerComment})
-                                        .toArray();
+            const inconsistencies =
+                db.checkMetadataConsistency({comment: kMarkerComment}).toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         });
     };
