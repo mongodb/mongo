@@ -90,27 +90,6 @@ function _convertExceptionToReturnStatus(func, excMsg) {
     return safeFunc;
 }
 
-/**
- * Declare a new 'Error' subclass that can carry additional data from our custom asserts in
- * the 'extraAttr' property.
- */
-var AssertionError = class extends Error {
-    name = "AssertionError";
-    constructor(message, attr) {
-        super(message);
-        // Property 'extraAttr' can be empty.
-        this.extraAttr = attr;
-    }
-    tojson(indent, nolint, depth, sortKeys) {
-        const escapedMsg = JSON.stringify(this.message);
-        if (!this.extraAttr) {
-            return `new ${this.name}(${escapedMsg})`;
-        }
-        return `new ${this.name}(${escapedMsg},${
-            tojson(this.extraAttr, indent, nolint, depth + 1, sortKeys)})`;
-    }
-};
-
 assert = (function() {
     // Wrapping the helper function in an IIFE to avoid polluting the global namespace.
 
@@ -136,7 +115,7 @@ assert = (function() {
                     ...(attr.res._mongo && {connection: attr.res._mongo})
                 };
             }
-            throw new AssertionError(_buildAssertionMessage(msg, prefixOverride || prefix), attr);
+            doassert(_buildAssertionMessage(msg, prefixOverride || prefix), attr);
         }
         doassert(_buildAssertionMessage(msg, prefix), attr?.res);
     }
@@ -809,7 +788,7 @@ assert = (function() {
         _validateCommandResponse(res, "commandWorked");
 
         // Keep this as a function so we don't call tojson if not necessary.
-        const makeFailPrefix = () => {
+        const makeFailPrefix = (res) => {
             let prefix = "command failed: " + tojson(res);
             if (typeof res._commandObj === "object" && res._commandObj !== null) {
                 prefix += " with original command request: " + tojson(res._commandObj);
@@ -818,6 +797,12 @@ assert = (function() {
                 prefix += " on connection: " + res._mongo;
             }
             return prefix;
+        };
+        const makeFailPrefixOverride = (res) => {
+            if (res.hasOwnProperty("errmsg")) {
+                return `command failed: ${res.errmsg}`;
+            }
+            return "command failed";
         };
 
         if (_isWriteResultType(res)) {
@@ -829,7 +814,7 @@ assert = (function() {
             // A WriteCommandError implies ok:0.
             // Error objects may have a `code` property added (e.g.
             // DBCollection.prototype.mapReduce) without a `ok` property.
-            _doassert(msg, makeFailPrefix(), {res}, "command failed");
+            _doassert(msg, makeFailPrefix(res), {res}, makeFailPrefixOverride(res));
         } else if (res.hasOwnProperty("ok")) {
             // Handle raw command responses or cases like MapReduceResult which extend command
             // response.
@@ -838,7 +823,7 @@ assert = (function() {
                     ignoreWriteConcernErrors: ignoreWriteConcernErrors
                 })) {
                 _runHangAnalyzerForSpecificFailureTypes(res);
-                _doassert(msg, makeFailPrefix(), {res}, "command failed");
+                _doassert(msg, makeFailPrefix(res), {res}, makeFailPrefixOverride(res));
             }
         } else if (res.hasOwnProperty("acknowledged")) {
             // CRUD api functions return plain js objects with an acknowledged property.
@@ -846,7 +831,7 @@ assert = (function() {
         } else {
             _doassert(msg,
                       "unknown type of result, cannot check ok: " + tojson(res),
-                      res,
+                      {res},
                       "unknown type of result");
         }
         return res;
@@ -863,14 +848,31 @@ assert = (function() {
         }
 
         // Keep this as a function so we don't call tojson if not necessary.
-        const makeFailPrefix = () => {
+        const makeFailPrefix = (res) => {
             return "command worked when it should have failed: " + tojson(res);
         };
+        const makeFailPrefixOverride = (res) => {
+            if (res.hasOwnProperty("errmsg")) {
+                return `command worked when it should have failed: ${res.errmsg}`;
+            }
+            return "command worked when it should have failed";
+        };
 
-        const makeFailCodePrefix = () => {
+        const makeFailCodePrefix = (res, expectedCode) => {
             return (expectedCode !== assert._kAnyErrorCode)
                 ? "command did not fail with any of the following codes " + tojson(expectedCode) +
                     " " + tojson(res)
+                : null;
+        };
+        const makeFailCodePrefixOverride = (res, expectedCode) => {
+            if (res.hasOwnProperty("errmsg")) {
+                return (expectedCode !== assert._kAnyErrorCode)
+                    ? "command did not fail with any of the following codes " +
+                        tojson(expectedCode) + " " + res.errmsg
+                    : null;
+            }
+            return (expectedCode !== assert._kAnyErrorCode)
+                ? "command did not fail with any of the following codes " + tojson(expectedCode)
                 : null;
         };
 
@@ -884,17 +886,19 @@ assert = (function() {
             if (expectedCode !== assert._kAnyErrorCode) {
                 if (!res.hasOwnProperty("code") || !expectedCode.includes(res.code)) {
                     _doassert(msg,
-                              makeFailCodePrefix(),
+                              makeFailCodePrefix(res, expectedCode),
                               {res, expectedCode},
-                              "command did not fail with any of the following codes");
+                              makeFailCodePrefixOverride(res, expectedCode));
                 }
             }
         } else if (res.hasOwnProperty("ok")) {
             // Handle raw command responses or cases like MapReduceResult which extend command
             // response.
             if (_rawReplyOkAndNoWriteErrors(res)) {
-                _doassert(
-                    msg, makeFailPrefix(), {res}, "command worked when it should have failed");
+                _doassert(msg,
+                          makeFailPrefix(res, expectedCode),
+                          {res},
+                          makeFailPrefixOverride(res, expectedCode));
             }
 
             if (expectedCode !== assert._kAnyErrorCode) {
@@ -910,14 +914,17 @@ assert = (function() {
                 if (!foundCode) {
                     _runHangAnalyzerForSpecificFailureTypes(res);
                     _doassert(msg,
-                              makeFailCodePrefix(),
+                              makeFailCodePrefix(res, expectedCode),
                               {res, expectedCode},
-                              "command did not fail with any of the following codes");
+                              makeFailCodePrefixOverride(res, expectedCode));
                 }
             }
         } else if (res.hasOwnProperty("acknowledged")) {
             // CRUD api functions return plain js objects with an acknowledged property.
-            _doassert(msg, makeFailPrefix(), {res}, "command worked when it should have failed");
+            _doassert(msg,
+                      makeFailPrefix(res, expectedCode),
+                      {res},
+                      makeFailPrefixOverride(res, expectedCode));
         } else {
             _doassert(msg,
                       "unknown type of result, cannot check error: " + tojson(res),

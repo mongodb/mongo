@@ -116,24 +116,24 @@ assert.eq(tojson(a.getTimestamp()), tojson(b.getTimestamp()), "ObjectId.fromDate
 // tojsonObject
 
 // Empty object
-assert.eq('{\n\t\n}', tojsonObject({}));
+assert.eq('{\n\t\n}', tojsonObject({}, '', false));
 assert.eq('{  }', tojsonObject({}, '', true));
-assert.eq('{\n\t\t\t\n\t\t}', tojsonObject({}, '\t\t'));
+assert.eq('{\n\t\t\t\n\t\t}', tojsonObject({}, '\t\t', false));
 
 // Single field
-assert.eq('{\n\t"a" : 1\n}', tojsonObject({a: 1}));
+assert.eq('{\n\t"a" : 1\n}', tojsonObject({a: 1}, '', false));
 assert.eq('{ "a" : 1 }', tojsonObject({a: 1}, '', true));
-assert.eq('{\n\t\t\t"a" : 1\n\t\t}', tojsonObject({a: 1}, '\t\t'));
+assert.eq('{\n\t\t\t"a" : 1\n\t\t}', tojsonObject({a: 1}, '\t\t', false));
 
 // Multiple fields
-assert.eq('{\n\t"a" : 1,\n\t"b" : 2\n}', tojsonObject({a: 1, b: 2}));
+assert.eq('{\n\t"a" : 1,\n\t"b" : 2\n}', tojsonObject({a: 1, b: 2}, '', false));
 assert.eq('{ "a" : 1, "b" : 2 }', tojsonObject({a: 1, b: 2}, '', true));
-assert.eq('{\n\t\t\t"a" : 1,\n\t\t\t"b" : 2\n\t\t}', tojsonObject({a: 1, b: 2}, '\t\t'));
+assert.eq('{\n\t\t\t"a" : 1,\n\t\t\t"b" : 2\n\t\t}', tojsonObject({a: 1, b: 2}, '\t\t', false));
 
 // Nested fields
 assert.eq('{\n\t"a" : 1,\n\t"b" : {\n\t\t"bb" : 2,\n\t\t"cc" : 3\n\t}\n}',
-          tojsonObject({a: 1, b: {bb: 2, cc: 3}}));
+          tojsonObject({a: 1, b: {bb: 2, cc: 3}}, '', false));
 assert.eq('{ "a" : 1, "b" : { "bb" : 2, "cc" : 3 } }',
           tojsonObject({a: 1, b: {bb: 2, cc: 3}}, '', true));
 assert.eq('{\n\t\t\t"a" : 1,\n\t\t\t"b" : {\n\t\t\t\t"bb" : 2,\n\t\t\t\t"cc" : 3\n\t\t\t}\n\t\t}',
-          tojsonObject({a: 1, b: {bb: 2, cc: 3}}, '\t\t'));
+          tojsonObject({a: 1, b: {bb: 2, cc: 3}}, '\t\t', false));

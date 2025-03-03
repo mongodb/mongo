@@ -51,7 +51,7 @@ declare module assert {
      * const expected = 'foobar';
      * assert.eq(actual, expected);
      * 
-     * @throws AssertionError upon failure.
+     * @throws Error upon failure.
      */
     export function eq(a, b, msg?: string | function | object, attr?: object): void
     export function neq(a, b, msg, attr): void
@@ -105,7 +105,7 @@ declare module assert {
      * const res = dbTest.createCollection("coll1");
      * assert.commandWorked(res);
      * 
-     * @throws AssertionError upon failure.
+     * @throws Error upon failure.
      * @returns The result object to continue any chaining.
      */
     export function commandWorked(

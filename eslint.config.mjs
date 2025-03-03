@@ -50,7 +50,6 @@ export default [
                             getFCVConstants: true,
                             removeFCVDocument: true,
                             targetFCV: true,
-                            AssertionError: true,
                             assert: true,
                             doassert: true,
                             authutil: true,
