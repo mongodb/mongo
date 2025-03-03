@@ -73,12 +73,6 @@ struct PlannerDataForSBE final : public PlannerData {
 
     // If true, runtime planners will use the SBE plan cache rather than the classic plan cache.
     const bool useSbePlanCache;
-
-    // Used to determine whether a replanned plan is the same as the plan that has already been
-    // cached. Slightly different from PlannerData::cachedPlanHash because that member can only be
-    // set if there is a solution in the cache as well, but plans in the SBE plan cache only store
-    // the PlanStage root and the solution hash, not the solution itself.
-    boost::optional<size_t> cachedPlanSolutionHash = boost::none;
 };
 
 class PlannerBase : public PlannerInterface {
@@ -142,12 +136,6 @@ protected:
         return _plannerData.cachedPlanHash;
     }
 
-    // See comments in PlannerDataForSBE about why this is necessary and distinct from
-    // cachedPlanHash.
-    boost::optional<size_t> cachedPlanSolutionHash() const {
-        return _plannerData.cachedPlanSolutionHash;
-    }
-
     WorkingSet* ws() {
         return _plannerData.workingSet.get();
     }
@@ -202,12 +190,10 @@ private:
 
 class MultiPlanner final : public PlannerBase {
 public:
-    MultiPlanner(
-        PlannerDataForSBE plannerData,
-        std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
-        bool shouldWriteToPlanCache,
-        const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb = []() {},
-        boost::optional<std::string> replanReason = boost::none);
+    MultiPlanner(PlannerDataForSBE plannerData,
+                 std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
+                 bool shouldWriteToPlanCache,
+                 boost::optional<std::string> replanReason = boost::none);
 
     /**
      * Picks the best plan given by the classic engine multiplanner and returns a plan executor. If
@@ -232,7 +218,6 @@ private:
 
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
     const bool _shouldWriteToPlanCache;
-    const std::function<void()>& _incrementReplannedPlanIsCachedPlanCounterCb;
     boost::optional<std::string> _replanReason;
 
     // The SBE plan is constructed from the callback we pass to the 'MultiPlanStage' so that it can

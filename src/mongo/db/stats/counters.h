@@ -635,10 +635,6 @@ public:
         classicReplanned.incrementRelaxed();
     }
 
-    void incrementClassicReplannedPlanIsCachedPlanCounter() {
-        classicReplannedPlanIsCachedPlan.incrementRelaxed();
-    }
-
     void incrementSbeHitsCounter() {
         sbeHits.incrementRelaxed();
     }
@@ -655,10 +651,6 @@ public:
         sbeReplanned.incrementRelaxed();
     }
 
-    void incrementSbeReplannedPlanIsCachedPlanCounter() {
-        sbeReplannedPlanIsCachedPlan.incrementRelaxed();
-    }
-
 private:
     static Counter64& _makeMetric(std::string name) {
         return *MetricBuilder<Counter64>("query.planCache." + std::move(name));
@@ -667,21 +659,17 @@ private:
     // Counters that track the number of times a query plan is:
     // a) found in the cache (hits),
     // b) not found in cache (misses), or
-    // c) not considered for caching hence we don't even look for it in the cache (skipped);
-    // d) failed to finish trial run within budget, so we decided to replan it (replanned);
-    // e) replanned only to produce the same plan as what's in the plan cache.
+    // c) not considered for caching hence we don't even look for it in the cache (skipped).
+    // d) failed to finish trial run within budget, so we decided to replan it (replanned).
     // Split into classic and SBE, depending on which execution engine is used.
     Counter64& classicHits = _makeMetric("classic.hits");
     Counter64& classicMisses = _makeMetric("classic.misses");
     Counter64& classicSkipped = _makeMetric("classic.skipped");
     Counter64& classicReplanned = _makeMetric("classic.replanned");
-    Counter64& classicReplannedPlanIsCachedPlan =
-        _makeMetric("classic.replanned_plan_is_cached_plan");
     Counter64& sbeHits = _makeMetric("sbe.hits");
     Counter64& sbeMisses = _makeMetric("sbe.misses");
     Counter64& sbeSkipped = _makeMetric("sbe.skipped");
     Counter64& sbeReplanned = _makeMetric("sbe.replanned");
-    Counter64& sbeReplannedPlanIsCachedPlan = _makeMetric("sbe.replanned_plan_is_cached_plan");
 };
 extern PlanCacheCounters planCacheCounters;
 

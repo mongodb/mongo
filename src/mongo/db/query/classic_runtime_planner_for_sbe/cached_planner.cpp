@@ -157,13 +157,11 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
 
 // TODO SERVER-87466 Trigger replanning by throwing an exception, instead of creating another
 // planner.
-std::unique_ptr<PlannerInterface> replan(
-    PlannerDataForSBE plannerData,
-    const AllIndicesRequiredChecker& indexExistenceChecker,
-    std::string replanReason,
-    bool shouldCache,
-    const std::function<void()>& incrementReplanCounterCb,
-    const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb) {
+std::unique_ptr<PlannerInterface> replan(PlannerDataForSBE plannerData,
+                                         const AllIndicesRequiredChecker& indexExistenceChecker,
+                                         std::string replanReason,
+                                         bool shouldCache,
+                                         const std::function<void()>& incrementReplanCounterCb) {
     incrementReplanCounterCb();
 
     // The trial run might have allowed DDL commands to be executed during yields. Check if the
@@ -195,11 +193,8 @@ std::unique_ptr<PlannerInterface> replan(
                 "Query plan after replanning and its cache status",
                 "query"_attr = redact(plannerData.cq->toStringShort()),
                 "shouldCache"_attr = (shouldCache ? "yes" : "no"));
-    return std::make_unique<MultiPlanner>(std::move(plannerData),
-                                          std::move(solutions),
-                                          shouldCache,
-                                          incrementReplannedPlanIsCachedPlanCounterCb,
-                                          std::move(replanReason));
+    return std::make_unique<MultiPlanner>(
+        std::move(plannerData), std::move(solutions), shouldCache, std::move(replanReason));
 }
 
 std::unique_ptr<PlannerInterface> attemptToUsePlan(
@@ -210,8 +205,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
     std::unique_ptr<QuerySolution> solution,
     const AllIndicesRequiredChecker& indexExistenceChecker,
     const std::function<void(const PlannerData&)>& deactivateCb,
-    const std::function<void()>& incrementReplanCounterCb,
-    const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb) {
+    const std::function<void()>& incrementReplanCounterCb) {
     const bool isPinnedCacheEntry = !decisionReads.has_value();
     if (isPinnedCacheEntry) {
         auto sbePlanAndData = std::make_pair(std::move(sbePlan), std::move(planStageData));
@@ -246,8 +240,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                       indexExistenceChecker,
                       std::move(replanReason),
                       /* shouldCache */ false,
-                      incrementReplanCounterCb,
-                      incrementReplannedPlanIsCachedPlanCounterCb);
+                      incrementReplanCounterCb);
     }
 
     if (candidate.exitedEarly) {
@@ -276,8 +269,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                       indexExistenceChecker,
                       std::move(replanReason),
                       /* shouldCache */ true,
-                      incrementReplanCounterCb,
-                      incrementReplannedPlanIsCachedPlanCounterCb);
+                      incrementReplanCounterCb);
     }
 
     // If the trial run did not exit early, it means no replanning is necessary and can return this
@@ -321,16 +313,14 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromClassicCacheEntry::makePla
         classicPlanCache->deactivate(classicCacheKey);
     };
 
-    return attemptToUsePlan(
-        std::move(_plannerData),
-        _decisionReads,
-        std::move(_sbePlan),
-        std::move(*_planStageData),
-        std::move(_solution),
-        indexExistenceChecker,
-        deactivateEntry,
-        []() { planCacheCounters.incrementClassicReplannedCounter(); },
-        []() { planCacheCounters.incrementClassicReplannedPlanIsCachedPlanCounter(); });
+    return attemptToUsePlan(std::move(_plannerData),
+                            _decisionReads,
+                            std::move(_sbePlan),
+                            std::move(*_planStageData),
+                            std::move(_solution),
+                            indexExistenceChecker,
+                            deactivateEntry,
+                            []() { planCacheCounters.incrementClassicReplannedCounter(); });
 }
 
 std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner() {
@@ -360,15 +350,13 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner
             tassert(8832901, "Foreign collection must exist", collectionInfo->second.exists);
 
             if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
-                return replan(
-                    std::move(_plannerData),
-                    indexExistenceChecker,
-                    str::stream() << "Foreign collection "
-                                  << foreignCollection.toStringForErrorMsg()
-                                  << " is not eligible for hash join anymore",
-                    /* shouldCache */ true,
-                    []() { planCacheCounters.incrementSbeReplannedCounter(); },
-                    []() { planCacheCounters.incrementSbeReplannedPlanIsCachedPlanCounter(); });
+                return replan(std::move(_plannerData),
+                              indexExistenceChecker,
+                              str::stream() << "Foreign collection "
+                                            << foreignCollection.toStringForErrorMsg()
+                                            << " is not eligible for hash join anymore",
+                              /* shouldCache */ true,
+                              []() { planCacheCounters.incrementSbeReplannedCounter(); });
             }
         }
     }
@@ -380,23 +368,18 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner
             plan_cache_key_factory::make(*plannerData.cq, plannerData.collections));
     };
 
-    return attemptToUsePlan(
-        std::move(_plannerData),
-        decisionReads,
-        std::move(sbePlan),
-        std::move(planStageData),
-        nullptr, /* solution */
-        indexExistenceChecker,
-        deactivateEntry,
-        []() { planCacheCounters.incrementSbeReplannedCounter(); },
-        []() { planCacheCounters.incrementSbeReplannedPlanIsCachedPlanCounter(); });
+    return attemptToUsePlan(std::move(_plannerData),
+                            decisionReads,
+                            std::move(sbePlan),
+                            std::move(planStageData),
+                            nullptr, /* solution */
+                            indexExistenceChecker,
+                            deactivateEntry,
+                            []() { planCacheCounters.incrementSbeReplannedCounter(); });
 }
 
 std::unique_ptr<PlannerInterface> makePlannerForSbeCacheEntry(
     PlannerDataForSBE plannerData, std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder) {
-    plannerData.cachedPlanSolutionHash =
-        cachedPlanHolder->cachedPlan->solutionHash;  // For determining whether the replanned plan
-                                                     // is the same plan as what's already cached.
     PlannerGeneratorFromSbeCacheEntry generator(std::move(plannerData),
                                                 std::move(cachedPlanHolder));
     return generator.makePlanner();
@@ -406,9 +389,6 @@ std::unique_ptr<PlannerInterface> makePlannerForClassicCacheEntry(
     PlannerDataForSBE plannerData,
     std::unique_ptr<QuerySolution> solution,
     boost::optional<size_t> decisionReads) {
-    plannerData.cachedPlanSolutionHash =
-        solution->hash();  // For determining whether the replanned plan is the same plan as what's
-                           // already cached.
     PlannerGeneratorFromClassicCacheEntry generator(
         std::move(plannerData), std::move(solution), decisionReads);
     return generator.makePlanner();

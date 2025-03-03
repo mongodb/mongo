@@ -70,8 +70,7 @@ public:
                     WorkingSet* ws,
                     CanonicalQuery* cq,
                     size_t decisionWorks,
-                    std::unique_ptr<PlanStage> root,
-                    size_t cachedPlanHash = 0);
+                    std::unique_ptr<PlanStage> root);
 
     bool isEOF() const final;
 
@@ -134,10 +133,6 @@ private:
     // The number of work cycles taken to decide on a winning plan when the plan was first
     // cached.
     size_t _decisionWorks;
-
-    // The hash of the QuerySolution that was retrieved from the plan cache. It is used to compare
-    // against the result of replanning for metrics gathering purposes.
-    const size_t _cachedPlanHash;
 
     // If we fall back to re-planning the query, and there is just one resulting query solution,
     // that solution is owned here.
