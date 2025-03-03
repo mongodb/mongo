@@ -1108,45 +1108,48 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         // require taking this lock.
         shardMembershipLock.unlock();
 
-        // Unset the addOrRemoveShardInProgress cluster parameter. Note that
-        // _removeShardInTransaction has already waited for the commit to be majority-acknowledged.
-
-        // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
-        // alongside the RSEndpoint.
-        // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
-        // the FixedFCVRegion and others take the FixedFCVRegion before the
-        // _kClusterCardinalityParameterLock lock. However, all paths take the
-        // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
-        // problem. See SERVER-99708 for more information.
-        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-        topology_change_helpers::unblockDDLCoordinators(opCtx);
-        unblockDDLCoordinatorsGuard.dismiss();
-
-        // The shard which was just removed must be reflected in the shard registry, before the
-        // replica set monitor is removed, otherwise the shard would be referencing a dropped RSM.
-        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-
-        if (shardId != ShardId::kConfigServerId) {
-            // Don't remove the config shard's RSM because it is used to target the config server.
-            ReplicaSetMonitor::remove(replicaSetName);
-        }
-
-        // Record finish in changelog
-        ShardingLogging::get(opCtx)->logChange(opCtx,
-                                               "removeShard",
-                                               NamespaceString::kEmpty,
-                                               BSON("shard" << shardName),
-                                               ShardingCatalogClient::kLocalWriteConcern,
-                                               _localConfigShard,
-                                               _localCatalogClient.get());
-
-        hangRemoveShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
-
-        uassertStatusOK(_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
-            clusterCardinalityParameterLock, opCtx));
-
-        return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
+        // Release also the fixedFCVRegion since it is not needed after this and prevents us from
+        // blocking FCV change for a long time if the following setClusterParameter takes a while.
     }
+
+    // Unset the addOrRemoveShardInProgress cluster parameter. Note that
+    // _removeShardInTransaction has already waited for the commit to be majority-acknowledged.
+
+    // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
+    // alongside the RSEndpoint.
+    // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
+    // the FixedFCVRegion and others take the FixedFCVRegion before the
+    // _kClusterCardinalityParameterLock lock. However, all paths take the
+    // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
+    // problem. See SERVER-99708 for more information.
+    DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+    topology_change_helpers::unblockDDLCoordinators(opCtx);
+    unblockDDLCoordinatorsGuard.dismiss();
+
+    // The shard which was just removed must be reflected in the shard registry, before the
+    // replica set monitor is removed, otherwise the shard would be referencing a dropped RSM.
+    Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+
+    if (shardId != ShardId::kConfigServerId) {
+        // Don't remove the config shard's RSM because it is used to target the config server.
+        ReplicaSetMonitor::remove(replicaSetName);
+    }
+
+    // Record finish in changelog
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "removeShard",
+                                           NamespaceString::kEmpty,
+                                           BSON("shard" << shardName),
+                                           ShardingCatalogClient::kLocalWriteConcern,
+                                           _localConfigShard,
+                                           _localCatalogClient.get());
+
+    hangRemoveShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
+
+    uassertStatusOK(_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
+        clusterCardinalityParameterLock, opCtx));
+
+    return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
 }
 
 void ShardingCatalogManager::appendDBAndCollDrainingInfo(OperationContext* opCtx,
