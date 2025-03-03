@@ -229,6 +229,9 @@ mongo_cc_library(
         "//src/mongo/db/query/util:hash_roaring_set.h",
         "//src/mongo/util:roaring_bitmaps.h",
     ],
+    tags = [
+        "compile_requires_large_memory_gcc_fission",
+    ],
     deps = [
         ":query_sbe",
         ":query_sbe_plan_stats",
