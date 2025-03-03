@@ -958,6 +958,8 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                           const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
                           ExecutionStatsController& stats) {
     Status reopeningStatus = Status::OK();
+    auto numReopeningsAttempted = 0;
+    auto reopeningLimit = 3;
     do {
         auto allowQueryBasedReopening = internal::AllowQueryBasedReopening::kAllow;
         // 1. Try to find an eligible open bucket for the next measurement.
@@ -997,7 +999,8 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
 
         reopeningStatus = swReopenedBucket.getStatus();
         // Try again when reopening or the reopened bucket encounters a conflict.
-    } while (reopeningStatus.code() == ErrorCodes::WriteConflict);
+    } while (reopeningStatus.code() == ErrorCodes::WriteConflict &&
+             ++numReopeningsAttempted < reopeningLimit);
 
     // 3. Reopening can release and reacquire the stripe lock. Look for an eligible open bucket
     // again. If not found, allocate a new bucket this time.
