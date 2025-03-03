@@ -141,8 +141,27 @@ public:
         return _validateTs;
     }
 
+    /**
+     * Returns a scoped object, which holds the 'validateLock' in exclusive mode for
+     * the given scope. It must only be used to coordinate validation with concurrent
+     * oplog batch applications.
+     */
+    static Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx);
+
+    /**
+     * Returns a scoped object, which holds the 'validateLock' in shared mode for
+     * the given scope. It must only be used to coordinate validation with concurrent
+     * oplog batch applications.
+     */
+    static Lock::SharedLock obtainSharedValidationLock(OperationContext* opCtx);
+
 private:
     ValidateState() = delete;
+
+    // This lock needs to be obtained before the global lock. Initialise in the validation
+    // constructor. Oplog Batch Applier takes this lock in exclusive mode when applying the batch.
+    // Foreground validation waits on this lock to begin.
+    boost::optional<Lock::SharedLock> _validateLock;
 
     // To avoid racing with shutdown/rollback, this lock must be initialized early.
     Lock::GlobalLock _globalLock;
