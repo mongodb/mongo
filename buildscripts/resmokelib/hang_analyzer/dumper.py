@@ -459,7 +459,9 @@ class GDBDumper(Dumper):
     def _find_debugger(self):
         """Find the installed debugger."""
         debugger = "gdb"
-        return find_program(debugger, ["/opt/mongodbtoolchain/v4/bin", "/usr/bin"])
+        return find_program(
+            debugger, ["/opt/mongodbtoolchain/v5/bin", "/opt/mongodbtoolchain/v4/bin", "/usr/bin"]
+        )
 
     def _prefix(self):
         """Return the commands to set up a debugger process."""

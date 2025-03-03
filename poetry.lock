@@ -1039,15 +1039,15 @@ tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
 
 [[package]]
 name = "gdbmongo"
-version = "0.15.2"
+version = "0.16.0"
 description = "GDB pretty printers and commands for debugging the MongoDB Server"
 optional = false
 python-versions = ">=3.9"
 groups = ["testing"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
-    {file = "gdbmongo-0.15.2-py3-none-any.whl", hash = "sha256:c061974d8af27c2f552df4034efef934cf78c3eb71411efba95cd57748b290ae"},
-    {file = "gdbmongo-0.15.2.tar.gz", hash = "sha256:64cef74b35ff6417909a8e4e567d31dcdc8ea10861a58916e080dc71cb45890a"},
+    {file = "gdbmongo-0.16.0-py3-none-any.whl", hash = "sha256:7bafacaf8a0930010f495ae708bfe7e47420eca4d767bf2dc053307109065ae5"},
+    {file = "gdbmongo-0.16.0.tar.gz", hash = "sha256:5bab61e2ec5b52b7f8374ee1834fc9cf0c7bf628acb1fda1132969073cd64660"},
 ]
 
 [[package]]
@@ -5322,4 +5322,4 @@ oldcrypt = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "8ff6e91d1b0c712296d60e4eae2b53d7e4c3ce2cbc50ae69d546b83c7e111398"
+content-hash = "d0314a12da4a869d84cf94cb92db74b8ca11af77c6b401d383344aebb9f978f0"
