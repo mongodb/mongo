@@ -75,7 +75,7 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const TimeseriesOptions& options,
                            const StringDataComparator* comparator);
 
-using TimeseriesBatches = std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>;
+using TimeseriesWriteBatches = std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>;
 using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::vector<StmtId>>;
 
 /**

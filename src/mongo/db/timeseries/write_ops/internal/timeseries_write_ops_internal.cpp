@@ -1121,10 +1121,10 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
                                                                    errorsAndIndices);
 }
 
-std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
+TimeseriesWriteBatches stageInsertBatch(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
-    const CollectionPtr& bucketsColl,
+    const Collection* bucketsColl,
     const OperationId& opId,
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
@@ -1138,7 +1138,7 @@ std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
     const auto catalogEra = getCurrentEra(bucketCatalog.bucketStateRegistry);
     auto& stripe = *bucketCatalog.stripes[batch.stripeNumber];
     stdx::unique_lock<stdx::mutex> stripeLock{stripe.mutex};
-    std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> writeBatches;
+    TimeseriesWriteBatches writeBatches;
     size_t currentPosition = 0;
     bool needsAnotherBucket = true;
 
@@ -1182,14 +1182,15 @@ std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
 }
 
 
-StatusWith<std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>> prepareInsertsToBuckets(
+StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
-    const CollectionPtr& bucketsColl,
+    const Collection* bucketsColl,
     const TimeseriesOptions& timeseriesOptions,
     OperationId opId,
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
+    bool earlyReturnOnError,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     const std::vector<BSONObj>& userMeasurementsBatch,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
@@ -1199,12 +1200,12 @@ StatusWith<std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>> prepareInse
                                                             userMeasurementsBatch,
                                                             errorsAndIndices);
 
-    // Any errors in the user batch will early-exit and be attempted one-at-a-time.
-    if (!errorsAndIndices.empty()) {
+    if (earlyReturnOnError && !errorsAndIndices.empty()) {
+        // Any errors in the user batch will early-exit and be attempted one-at-a-time.
         return errorsAndIndices.front().error;
     }
 
-    std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> results;
+    TimeseriesWriteBatches results;
 
     for (auto& batchedInsertContext : batchedInsertContexts) {
         auto writeBatches = stageInsertBatch(opCtx,

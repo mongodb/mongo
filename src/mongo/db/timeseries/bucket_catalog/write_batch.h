@@ -40,6 +40,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
@@ -129,8 +130,9 @@ struct WriteBatch {
     ExecutionStatsController stats;
 
     // Indices for measurements in the original user batch. Used for retryability and
-    // error-handling.
+    // error-handling. These two should be the same length when entering commit.
     std::vector<UserBatchIndex> userBatchIndices;
+    std::vector<StmtId> stmtIds;
 
     // Marginal numbers for this batch only.
     // Sizes.uncommittedMeasurementEstimate is a rough estimate of data in this batch,

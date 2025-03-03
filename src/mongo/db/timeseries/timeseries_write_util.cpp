@@ -407,7 +407,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
     MONGO_UNREACHABLE;
 }
 
-TimeseriesBatches insertIntoBucketCatalogForUpdate(
+TimeseriesWriteBatches insertIntoBucketCatalogForUpdate(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
     const CollectionPtr& bucketsColl,
@@ -415,7 +415,7 @@ TimeseriesBatches insertIntoBucketCatalogForUpdate(
     const NamespaceString& bucketsNs,
     TimeseriesOptions& timeSeriesOptions,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
-    TimeseriesBatches batches;
+    TimeseriesWriteBatches batches;
 
     for (const auto& measurement : measurements) {
         auto result =
@@ -515,7 +515,7 @@ void commitTimeseriesBucketsAtomically(
     const RecordId& recordId,
     const boost::optional<std::variant<write_ops::UpdateCommandRequest,
                                        write_ops::DeleteCommandRequest>>& modificationOp,
-    TimeseriesBatches* batches,
+    TimeseriesWriteBatches* batches,
     const NamespaceString& bucketsNs,
     bool fromMigrate,
     StmtId stmtId,

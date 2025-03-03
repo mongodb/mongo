@@ -163,10 +163,10 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
  * attempting to stage a measurement into a bucket, the function will find another eligible
  * buckets until all measurements are inserted.
  */
-std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
+TimeseriesWriteBatches stageInsertBatch(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
-    const CollectionPtr& bucketsColl,
+    const Collection* bucketsColl,
     const OperationId& opId,
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
@@ -178,15 +178,18 @@ std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
  * Returns a non-success status if any measurements are malformed, and further
  * returns the index into 'userMeasurementsBatch' of each failure in 'errorsAndIndices'.
  * Returns a write batch per bucket that the measurements are staged to.
+ * 'earlyReturnOnError' decides whether or not staging should happen in the case of any malformed
+ * measurements.
  */
-StatusWith<std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>> prepareInsertsToBuckets(
+StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
-    const CollectionPtr& bucketsColl,
+    const Collection* bucketsColl,
     const TimeseriesOptions& timeseriesOptions,
     OperationId opId,
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
+    bool earlyReturnOnError,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     const std::vector<BSONObj>& userMeasurementsBatch,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);

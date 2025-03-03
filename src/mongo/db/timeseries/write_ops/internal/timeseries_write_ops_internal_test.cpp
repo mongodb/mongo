@@ -242,7 +242,7 @@ void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
         auto writeBatches =
             write_ops::internal::stageInsertBatch(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl,
+                                                  bucketsColl.get(),
                                                   _opCtx->getOpID(),
                                                   nullptr /*comparator*/,
                                                   _storageCacheSizeBytes,
@@ -595,11 +595,12 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucke
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl,
+                                                  bucketsColl.get(),
                                                   tsOptions,
                                                   _opCtx->getOpID(),
                                                   _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userBatch,
                                                   errorsAndIndices);
@@ -630,11 +631,12 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsOne
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl,
+                                                  bucketsColl.get(),
                                                   tsOptions,
                                                   _opCtx->getOpID(),
                                                   _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userBatch,
                                                   errorsAndIndices);
@@ -668,11 +670,12 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsMul
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl,
+                                                  bucketsColl.get(),
                                                   tsOptions,
                                                   _opCtx->getOpID(),
                                                   _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userBatch,
                                                   errorsAndIndices);
@@ -705,11 +708,12 @@ TEST_F(TimeseriesWriteOpsInternalTest,
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl,
+                                                  bucketsColl.get(),
                                                   tsOptions,
                                                   _opCtx->getOpID(),
                                                   _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userBatch,
                                                   errorsAndIndices);
@@ -740,11 +744,12 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsAll) {
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl,
+                                                  bucketsColl.get(),
                                                   tsOptions,
                                                   _opCtx->getOpID(),
                                                   _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userMeasurementsBatch,
                                                   errorsAndIndices);
@@ -770,11 +775,12 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsSome) {
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl,
+                                                  bucketsColl.get(),
                                                   tsOptions,
                                                   _opCtx->getOpID(),
                                                   _getCollator(_ns1),
                                                   _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userMeasurementsBatch,
                                                   errorsAndIndices);
