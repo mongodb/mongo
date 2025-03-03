@@ -263,10 +263,10 @@ buildvariants:
       compile_variant: *commit-queue-toolchain-v5
     depends_on: []
     tasks:
-      # TODO SERVER-99531 Replace compile_test_parallel_core_stream_TG with
-      # compile_test_parallel_core_stream_and_pretty_printer_tests_TG and compile_all_but_not_unittests_TG
-      # when pretty printer tests are supported on v5.
-      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
+        distros:
+          - amazon2-arm64-xlarge-commitqueue
+      - name: compile_all_but_not_unittests_TG
         distros:
           - amazon2-arm64-xlarge-commitqueue
       - name: compile_test_parallel_unittest_stream_TG
