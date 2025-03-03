@@ -12,5 +12,8 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": []
+  },
+  "dependencies": {
+    "eslint-plugin-mongodb": "file:buildscripts/eslint-plugin-mongodb"
   }
 }
