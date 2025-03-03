@@ -682,9 +682,11 @@ single document reads, since linearizability is only defined as a property on si
 
 Linearizable read concern is not allowed within a multi-document transaction.
 
-**Snapshot** read concern can only be run within a multi-document transaction. See the
-[Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions) section for
-more information.
+**Snapshot** read concern is available outside of transactions for select read commands on
+the primary and secondary. They are `find`, `aggregate`, and `distinct` (on unsharded
+collections). For more information about snapshot reads within transactions, see the
+[Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions)
+section.
 
 **Available** read concern behaves identically to local read concern in most cases. The exception is
 reads for sharded collections from secondary shard nodes. Local read concern will wait to refresh
