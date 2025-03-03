@@ -91,3 +91,36 @@ server_parameters:
     default: 10
     validator: { gte: 10, lte: 100 }
     redact: false
+
+  catalogCacheDatabaseMaxEntries:
+    description: >-
+        Maximum number of entries allowed in the catalog cache for databases.
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: "gCatalogCacheDatabaseMaxEntries"
+    default: 10000
+    validator:
+      gt: 0
+    redact: false
+
+  catalogCacheCollectionMaxEntries:
+    description: >-
+        Maximum number of entries allowed in the catalog cache for collections.
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: "gCatalogCacheCollectionMaxEntries"
+    default: 10000
+    validator:
+      gt: 0
+    redact: false
+
+  catalogCacheIndexMaxEntries:
+    description: >-
+        Maximum number of entries allowed in the catalog cache for indexes.
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: "gCatalogCacheIndexMaxEntries"
+    default: 10000
+    validator:
+      gt: 0
+    redact: false
