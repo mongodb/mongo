@@ -90,7 +90,7 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
     // each function. For the default [unbounded, unbounded] window type, each function uses memory
     // usage comparable to it's $group counterpart.
     let expectedFunctionMemUsages = {
-        count: 72,
+        count: 176,
         push: nDocs * 1024,
         set: 1024,
     };
@@ -115,7 +115,7 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
         },
     ];
     expectedFunctionMemUsages = {
-        count: 72,
+        count: 176,
         push: (nDocs / nPartitions) * 1056 + 56,  // 56 constant state size. Uses 1056 per document.
         set: 1144,                                // 1024 for the string, rest is constant state.
     };

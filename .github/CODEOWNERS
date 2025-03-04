@@ -1522,7 +1522,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/memory_tracking/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @svc-auto-approve-bot
 /src/mongo/db/memory_tracking/**/memory_usage_tracker* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/memory_tracking/**/op_memory_use* @10gen/query-integration-observability @svc-auto-approve-bot
-/src/mongo/db/memory_tracking/**/operation_memory_usage_tracker.h @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/memory_tracking/**/operation_memory_usage_tracker* @10gen/query-integration-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/OWNERS.yml
 /src/mongo/db/modules/enterprise/BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot

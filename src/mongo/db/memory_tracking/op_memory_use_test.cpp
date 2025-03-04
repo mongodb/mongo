@@ -30,6 +30,7 @@
 #include "mongo/db/memory_tracking/op_memory_use.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 namespace {
@@ -46,17 +47,22 @@ public:
 };
 
 TEST_F(MemoryTrackingTest, OpMemoryUseCanAttachToOpCtx) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               true);
+
     auto opCtx = makeOpCtx();
 
-    // Attach mock memory usage stats to the opCtx and validate that the decoration was set.
-    auto mockMemoryStats = std::make_unique<OperationMemoryUsageTracker>(10 /*currentMemoryBytes*/,
-                                                                         15 /*maxUsedMemoryBytes*/);
-    OpMemoryUse::operationMemoryAggregator(opCtx.get()) = std::move(mockMemoryStats);
+    auto tracker = std::make_unique<OperationMemoryUsageTracker>(opCtx.get());
+    tracker->add(15);
+    tracker->add(-5);
+
+    OpMemoryUse::operationMemoryAggregator(opCtx.get()) = std::move(tracker);
     OperationMemoryUsageTracker* memoryTracker =
         OpMemoryUse::operationMemoryAggregator(opCtx.get()).get();
     ASSERT(memoryTracker);
     ASSERT_EQ(memoryTracker->currentMemoryBytes(), 10);
-    ASSERT_EQ(memoryTracker->maxUsedMemoryBytes(), 15);
+    ASSERT_EQ(memoryTracker->maxMemoryBytes(), 15);
 }
+
 }  // namespace
 }  // namespace mongo

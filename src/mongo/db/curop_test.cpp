@@ -412,12 +412,12 @@ TEST(CurOpTest, ShouldUpdateMemoryStats) {
     ASSERT_EQ(15, curop->getMaxUsedMemoryBytes());
 
     // The max memory usage is updated if the new max is greater than the current max.
-    curop->setMemoryTrackingStats(11 /*currentMemoryBytes*/, 20 /*maxUsedMemoryBytes*/);
+    curop->setMemoryTrackingStats(21 /*currentMemoryBytes*/, 20 /*maxUsedMemoryBytes*/);
     ASSERT_EQ(21, curop->getInUseMemoryBytes());
     ASSERT_EQ(20, curop->getMaxUsedMemoryBytes());
 
     // The max memory usage is not updated if the new max is not greater than the current max.
-    curop->setMemoryTrackingStats(10 /*currentMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
+    curop->setMemoryTrackingStats(31 /*currentMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
     ASSERT_EQ(31, curop->getInUseMemoryBytes());
     ASSERT_EQ(20, curop->getMaxUsedMemoryBytes());
 }

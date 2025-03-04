@@ -482,13 +482,16 @@ void CurOp::setMemoryTrackingStats(const int64_t inUseMemoryBytes,
     tassert(9897000,
             "featureFlagQueryMemoryTracking must be turned on before writing memory stats to CurOp",
             feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled());
-    _inUseMemoryBytes.fetchAndAdd(inUseMemoryBytes);
-
     // We recompute the max here (the memory tracker that calls this method will already computing
     // the max) in order to avoid writing to the atomic if the max does not change.
+    //
+    // Set the max first, so that we can maintain the invariant that the max is always equal to or
+    // greater than the current in-use tally.
     if (maxUsedMemoryBytes > _maxUsedMemoryBytes.load()) {
-        _maxUsedMemoryBytes.swap(maxUsedMemoryBytes);
+        _maxUsedMemoryBytes.store(maxUsedMemoryBytes);
     }
+
+    _inUseMemoryBytes.store(inUseMemoryBytes);
 }
 
 void CurOp::setNS(WithLock, NamespaceString nss) {

@@ -29,26 +29,42 @@
 #pragma once
 #include <cstdint>
 
+#include "mongo/db/curop.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
+
 namespace mongo {
-// TODO SERVER-100671 Replace this.
-class OperationMemoryUsageTracker {
+
+/**
+ * A memory usage tracker class that aggregates memory statistics for the entire operation. Stages
+ * that track memory will report to an instance of this class, which in turn will update statistics
+ * in CurOp.
+ */
+class OperationMemoryUsageTracker : public SimpleMemoryUsageTracker {
+    OperationMemoryUsageTracker() = delete;
+
 public:
-    OperationMemoryUsageTracker(int64_t currentMemoryBytes = 0, int64_t maxUsedMemoryBytes = 0)
-        : _currentMemoryBytes(currentMemoryBytes), _maxUsedMemoryBytes(maxUsedMemoryBytes) {}
+    /**
+     * When constructing a stage containing a SimpleMemoryUsageTracker, use this method to ensure
+     * that we aggregate operation-wide memory stats.
+     */
+    static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerForStage(
+        const ExpressionContext& expCtx,
+        int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
 
-    int64_t currentMemoryBytes() const {
-        return _currentMemoryBytes;
-    }
+    /**
+     * When constructing a stage containing a MemoryUsageTracker, use this method to ensure that we
+     * aggregate operation-wide memory stats.
+     */
+    static MemoryUsageTracker createMemoryUsageTrackerForStage(
+        const ExpressionContext& expCtx,
+        bool allowDiskUse = false,
+        int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
 
-    int64_t maxUsedMemoryBytes() const {
-        return _maxUsedMemoryBytes;
-    }
+    explicit OperationMemoryUsageTracker(OperationContext* opCtx) : _opCtx(opCtx) {}
 
 private:
-    // Current amount of memory in use by all blocking stages.
-    int64_t _currentMemoryBytes = 0;
+    static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
 
-    // High-water mark: the highest amount of memory that has been allocated at one time so far.
-    int64_t _maxUsedMemoryBytes = 0;
+    OperationContext* _opCtx;
 };
 }  // namespace mongo

@@ -53,8 +53,10 @@ public:
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base, int64_t maxAllowedMemoryUsageBytes)
         : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes) {}
 
-    SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes)
+    explicit SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes)
         : SimpleMemoryUsageTracker(nullptr, maxAllowedMemoryUsageBytes) {}
+
+    SimpleMemoryUsageTracker() : SimpleMemoryUsageTracker(std::numeric_limits<int64_t>::max()) {}
 
     void add(int64_t diff) {
         _currentMemoryBytes += diff;
@@ -67,6 +69,10 @@ public:
         }
         if (_base) {
             _base->add(diff);
+        }
+
+        if (_doExtraBookkeeping) {
+            _doExtraBookkeeping(_currentMemoryBytes, _maxMemoryBytes);
         }
     }
 
@@ -90,6 +96,15 @@ public:
         return _maxAllowedMemoryUsageBytes;
     }
 
+protected:
+    /**
+     * Provide an extra function that is called whenever add() is invoked. Let it be set via this
+     * method instead in the constructor to allow subclasses to capture "this."
+     */
+    void setDoExtraBookkeeping(std::function<void(int64_t, int64_t)> doExtraBookkeeping) {
+        _doExtraBookkeeping = std::move(doExtraBookkeeping);
+    }
+
 private:
     SimpleMemoryUsageTracker* _base = nullptr;
 
@@ -99,6 +114,11 @@ private:
     int64_t _currentMemoryBytes = 0;
 
     int64_t _maxAllowedMemoryUsageBytes;
+
+    // Allow for some extra bookkeeping to be done when add() is called. If set, this function will
+    // be invoked with _currentMemoryBytes and _maxMemoryBytes. This mechanism exists to avoid
+    // making add() virtual, since it has been shown to have an effect on performance in some cases.
+    std::function<void(int64_t, int64_t)> _doExtraBookkeeping;
 };
 
 /**
@@ -120,8 +140,13 @@ private:
  */
 class MemoryUsageTracker {
 public:
+    MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
+                       bool allowDiskUse = false,
+                       int64_t maxMemoryUsageBytes = 0)
+        : _allowDiskUse(allowDiskUse), _baseTracker(baseParent, maxMemoryUsageBytes) {}
+
     MemoryUsageTracker(bool allowDiskUse = false, int64_t maxMemoryUsageBytes = 0)
-        : _allowDiskUse(allowDiskUse), _baseTracker(nullptr, maxMemoryUsageBytes) {}
+        : MemoryUsageTracker(nullptr, allowDiskUse, maxMemoryUsageBytes) {}
 
     /**
      * Sets the new total for 'name', and updates the current total memory usage.
@@ -198,10 +223,6 @@ public:
     }
 
 private:
-    SimpleMemoryUsageTracker& _tracker() {
-        return _baseTracker;
-    }
-
     static absl::string_view _key(StringData s) {
         return {s.rawData(), s.size()};
     }

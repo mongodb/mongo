@@ -13,6 +13,7 @@ mongo_cc_library(
     name = "memory_tracking",
     srcs = [
         "op_memory_use.cpp",
+        "operation_memory_usage_tracker.cpp",
     ],
     hdrs = [
         "memory_usage_tracker.h",
@@ -20,6 +21,8 @@ mongo_cc_library(
         "operation_memory_usage_tracker.h",
     ],
     deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
     ],
 )
@@ -29,10 +32,14 @@ mongo_cc_unit_test(
     srcs = [
         "memory_usage_tracker_test.cpp",
         "op_memory_use_test.cpp",
+        "operation_memory_usage_tracker_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [
         ":memory_tracking",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:document_source_mock",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )
