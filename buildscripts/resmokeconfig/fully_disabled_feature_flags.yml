@@ -22,3 +22,5 @@
 # TODO SERVER-99433: Delete featureFlagReplicaSetEndpoint.
 - featureFlagReplicaSetEndpoint
 - featureFlagGaplessFTDC
+# TODO SERVER-97315: Enable featureFlagSnapshotFCVInDDLCoordinators
+- featureFlagSnapshotFCVInDDLCoordinators
