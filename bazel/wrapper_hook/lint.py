@@ -115,11 +115,6 @@ def list_files_without_targets(
         "src/mongo/db/auth/authz_manager_external_state_s.cpp",
         # TODO(SERVER-101362): Remove the exemptions below once resolved.
         "src/mongo/db/exec/expression/evaluate_index_test.cpp",
-        # TODO(SERVER-101364): Remove the exemptions below once resolved.
-        "src/mongo/db/ftdc/ftdc_system_stats_freebsd.cpp",
-        "src/mongo/db/ftdc/ftdc_system_stats_macOS.cpp",
-        "src/mongo/db/ftdc/ftdc_system_stats_openbsd.cpp",
-        "src/mongo/db/ftdc/ftdc_system_stats_solaris.cpp",
         # TODO(SERVER-101365): Remove the exemptions below once resolved.
         "src/mongo/db/service_entry_point_test_fixture.cpp",
         # TODO(SERVER-101366): Remove the exemptions below once resolved.
