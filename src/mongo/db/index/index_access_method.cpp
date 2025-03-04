@@ -64,6 +64,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -1476,9 +1477,3 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
 }
 
 }  // namespace mongo
-
-#undef MONGO_LOGV2_DEFAULT_COMPONENT
-#include "mongo/db/sorter/sorter.cpp"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-MONGO_CREATE_SORTER(mongo::key_string::Value, mongo::NullValue, mongo::BtreeExternalSortComparison);

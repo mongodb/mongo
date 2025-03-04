@@ -21,6 +21,7 @@ mongo_cc_library(
     ],
     deps = [
         ":working_set",
+        "//src/mongo/db/pipeline/spilling:spilling_stats",
         "//src/mongo/db/query:sort_pattern",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:spill_util",
         "//src/mongo/db/sorter:sorter_base",

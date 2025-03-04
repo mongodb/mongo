@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/sbe/stages/sort_stage_sort_impl.h"
 
-#include "mongo/db/exec/sort_executor.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/sorter/sorter_template_defs.h"
-
-namespace mongo {
-template class SortExecutor<Document>;
-template class SortExecutor<SortableWorkingSetMember>;
-template class SortExecutor<BSONObj>;
-}  // namespace mongo
+namespace mongo::sbe {
+template class SortStage::SortImpl<value::FixedSizeRow<1>, value::FixedSizeRow<1>>;
+template class SortStage::SortImpl<value::FixedSizeRow<1>, value::MaterializedRow>;
+template class SortStage::SortImpl<value::FixedSizeRow<2>, value::FixedSizeRow<1>>;
+template class SortStage::SortImpl<value::FixedSizeRow<2>, value::MaterializedRow>;
+template class SortStage::SortImpl<value::FixedSizeRow<3>, value::FixedSizeRow<1>>;
+template class SortStage::SortImpl<value::FixedSizeRow<3>, value::MaterializedRow>;
+template class SortStage::SortImpl<value::MaterializedRow, value::FixedSizeRow<1>>;
+template class SortStage::SortImpl<value::MaterializedRow, value::MaterializedRow>;
+}  // namespace mongo::sbe

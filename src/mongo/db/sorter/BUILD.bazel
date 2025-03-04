@@ -39,10 +39,10 @@ mongo_cc_library(
         "sorter_gen",
     ],
     hdrs = [
-        "sorter.cpp",  # Intentionally in hdrs.
         "sorter.h",
         "sorter_checksum_calculator.h",
         "sorter_file_name.h",
+        "sorter_template_defs.h",
         "//src/mongo/db/query/util:spill_util.h",
     ],
     deps = [

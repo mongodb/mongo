@@ -42,16 +42,13 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"  // IWYU pragma: keep
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-
-
-// Need access to internal classes
-#include "mongo/db/sorter/sorter.cpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -384,7 +381,7 @@ private:
             sorter.addAlreadySorted(i, -i);
             currentBufSize += sizeof(i) + sizeof(-i);
 
-            if (currentBufSize > static_cast<int>(kSortedFileBufferSize)) {
+            if (currentBufSize > static_cast<int>(sorter::kSortedFileBufferSize)) {
                 // File size only increases if buffer size exceeds limit and spills. Each spill
                 // includes the buffer and the size of the spill.
                 currentFileSize += currentBufSize + sizeof(uint32_t);
@@ -871,7 +868,7 @@ public:
     }
 
     size_t correctNumRanges() const override {
-        return std::max(static_cast<std::size_t>(DATA_MEM_LIMIT / kSortedFileBufferSize),
+        return std::max(static_cast<std::size_t>(DATA_MEM_LIMIT / sorter::kSortedFileBufferSize),
                         static_cast<std::size_t>(2));
     }
 

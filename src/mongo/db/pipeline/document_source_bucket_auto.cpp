@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -566,6 +567,3 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
 }
 
 }  // namespace mongo
-
-#include "mongo/db/sorter/sorter.cpp"
-// Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

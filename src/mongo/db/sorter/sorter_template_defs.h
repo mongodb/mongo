@@ -27,24 +27,7 @@
  *    it in the license file.
  */
 
-/**
- * This is the implementation for the Sorter.
- *
- * It is intended to be included in other cpp files like this:
- *
- * #include <normal/include/files.h>
- *
- * #include "mongo/db/sorter/sorter.h"
- *
- * namespace mongo {
- *     // Your code
- * }
- *
- * #include "mongo/db/sorter/sorter.cpp"
- * MONGO_CREATE_SORTER(MyKeyType, MyValueType, MyComparatorType);
- *
- * Do this once for each unique set of parameters to MONGO_CREATE_SORTER.
- */
+#pragma once
 
 #include "mongo/db/sorter/sorter.h"
 
@@ -88,20 +71,29 @@
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 
+/**
+ * Template definitions for Sorter implementations.
+ * Separated from sorter.h because these definitions
+ * are used in the definitions of Sorter callers, not
+ * necessary for their public interface.
+ */
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
+namespace sorter {
 
-namespace {
+constexpr inline std::size_t kSortedFileBufferSize = size_t{64} << 10;
 
-void checkNoExternalSortOnMongos(const SortOptions& opts) {
+inline void checkNoExternalSortOnMongos(const SortOptions& opts) {
     // This should be checked by consumers, but if it isn't try to fail early.
     uassert(16947,
             "Attempting to use external sort from mongos. This is not allowed.",
@@ -114,7 +106,7 @@ void checkNoExternalSortOnMongos(const SortOptions& opts) {
  * Returns nullptr if the service context is not available; or if the EncyptionHooks
  * registered is not enabled.
  */
-EncryptionHooks* getEncryptionHooksIfEnabled() {
+inline EncryptionHooks* getEncryptionHooksIfEnabled() {
     // Some tests may not run with a global service context.
     if (!hasGlobalServiceContext()) {
         return nullptr;
@@ -127,18 +119,11 @@ EncryptionHooks* getEncryptionHooksIfEnabled() {
     return encryptionHooks;
 }
 
-constexpr std::size_t kSortedFileBufferSize = 64 * 1024;
-
-}  // namespace
-
-namespace sorter {
-
-// We need to use the "real" errno everywhere, not GetLastError() on Windows
-inline std::string myErrnoWithDescription() {
-    int errnoCopy = errno;
-    StringBuilder sb;
-    sb << "errno:" << errnoCopy << ' ' << strerror(errnoCopy);
-    return sb.str();
+inline SharedBufferFragmentBuilder makeMemPool() {
+    return SharedBufferFragmentBuilder(
+        gOperationMemoryPoolBlockInitialSizeKB.loadRelaxed() * static_cast<size_t>(1024),
+        SharedBufferFragmentBuilder::DoubleGrowStrategy(
+            gOperationMemoryPoolBlockMaxSizeKB.loadRelaxed() * static_cast<size_t>(1024)));
 }
 
 template <typename Key, typename Comparator>
@@ -156,6 +141,10 @@ void dassertCompIsSane(const Comparator& comp, const Key& lhs, const Key& rhs) {
     invariant(comp(rhs, rhs) == 0);
 #endif
 }
+
+//
+// Iterators
+//
 
 /**
  * Returns results from sorted in-memory storage.
@@ -353,7 +342,7 @@ private:
         _read(_buffer.get(), blockSize);
         uassert(16816, "file too short?", !_done);
 
-        if (auto encryptionHooks = getEncryptionHooksIfEnabled()) {
+        if (auto encryptionHooks = sorter::getEncryptionHooksIfEnabled()) {
             auto out = std::make_unique<char[]>(blockSize);
             size_t outLen;
             Status status =
@@ -610,6 +599,10 @@ private:
     size_t _maxFile = 0;                         // The maximum file identifier used thus far
 };
 
+//
+// Sorter types
+//
+
 template <typename Key, typename Value, typename Comparator>
 class MergeableSorter : public Sorter<Key, Value> {
 public:
@@ -639,8 +632,9 @@ protected:
      * limits. While merging, a chuck of 64KB from each spill is loaded to memory. The total size of
      * chunks loaded to memory should not exceed the available memory.
      */
-    size_t _spillsNumToRespectMemoryLimits = std::max(
-        this->_opts.maxMemoryUsageBytes / kSortedFileBufferSize, static_cast<std::size_t>(2));
+    size_t _spillsNumToRespectMemoryLimits =
+        std::max(this->_opts.maxMemoryUsageBytes / sorter::kSortedFileBufferSize,
+                 static_cast<std::size_t>(2));
 
     /**
      * An implementation of a k-way merge sort.
@@ -1316,14 +1310,9 @@ private:
 
 }  // namespace sorter
 
-namespace {
-SharedBufferFragmentBuilder makeMemPool() {
-    return SharedBufferFragmentBuilder(
-        gOperationMemoryPoolBlockInitialSizeKB.loadRelaxed() * static_cast<size_t>(1024),
-        SharedBufferFragmentBuilder::DoubleGrowStrategy(
-            gOperationMemoryPoolBlockMaxSizeKB.loadRelaxed() * static_cast<size_t>(1024)));
-}
-}  // namespace
+//
+// Sorter members
+//
 
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts)
@@ -1333,7 +1322,7 @@ Sorter<Key, Value>::Sorter(const SortOptions& opts)
                                       sorter::nextFileName(opts.tempDir), opts.sorterFileStats)
                                 : nullptr) {
     if (opts.useMemPool) {
-        _memPool.emplace(makeMemPool());
+        _memPool.emplace(sorter::makeMemPool());
     }
 }
 
@@ -1347,7 +1336,7 @@ Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
     invariant(!opts.tempDir.empty());
     invariant(!fileName.empty());
     if (opts.useMemPool) {
-        _memPool.emplace(makeMemPool());
+        _memPool.emplace(sorter::makeMemPool());
     }
 }
 
@@ -1364,6 +1353,10 @@ typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForSh
 
     return {_file->path().filename().string(), ranges};
 }
+
+//
+// SorterBase::File members
+//
 
 inline SorterBase::File::File(std::string path, SorterFileStats* stats)
     : _path(std::move(path)), _stats(stats) {
@@ -1430,7 +1423,7 @@ inline void SorterBase::File::read(std::streamoff offset, std::streamsize size, 
 
         uassert(5479100,
                 str::stream() << "Error flushing file " << _path.string() << ": "
-                              << sorter::myErrnoWithDescription(),
+                              << errorMessage(lastPosixError()),
                 _file);
     }
 
@@ -1439,7 +1432,7 @@ inline void SorterBase::File::read(std::streamoff offset, std::streamsize size, 
 
     uassert(16817,
             str::stream() << "Error reading file " << _path.string() << ": "
-                          << sorter::myErrnoWithDescription(),
+                          << errorMessage(lastPosixError()),
             _file);
 
     invariant(_file.gcount() == size,
@@ -1448,7 +1441,7 @@ inline void SorterBase::File::read(std::streamoff offset, std::streamsize size, 
 
     uassert(51049,
             str::stream() << "Error reading file " << _path.string() << ": "
-                          << sorter::myErrnoWithDescription(),
+                          << errorMessage(lastPosixError()),
             _file.tellg() >= 0);
 }
 
@@ -1468,11 +1461,11 @@ inline void SorterBase::File::write(const char* data, std::streamsize size) {
         }
         uasserted(5642403,
                   str::stream() << "Error writing to file " << _path.string() << ": "
-                                << sorter::myErrnoWithDescription());
+                                << errorMessage(lastPosixError()));
     } catch (const std::exception&) {
         uasserted(16821,
                   str::stream() << "Error writing to file " << _path.string() << ": "
-                                << sorter::myErrnoWithDescription());
+                                << errorMessage(lastPosixError()));
     }
 }
 
@@ -1494,7 +1487,7 @@ inline void SorterBase::File::_open() {
 
     uassert(16818,
             str::stream() << "Error opening file " << _path.string() << ": "
-                          << sorter::myErrnoWithDescription(),
+                          << errorMessage(lastPosixError()),
             _file.good());
 
     if (_stats) {
@@ -1544,7 +1537,7 @@ void SortedFileWriter<Key, Value>::addAlreadySorted(const Key& key, const Value&
     key.serializeForSorter(_buffer);
     val.serializeForSorter(_buffer);
 
-    if (_buffer.len() > static_cast<int>(kSortedFileBufferSize))
+    if (_buffer.len() > static_cast<int>(sorter::kSortedFileBufferSize))
         writeChunk();
 }
 
@@ -1573,7 +1566,7 @@ void SortedFileWriter<Key, Value>::writeChunk() {
     }
 
     std::unique_ptr<char[]> out;
-    if (auto encryptionHooks = getEncryptionHooksIfEnabled()) {
+    if (auto encryptionHooks = sorter::getEncryptionHooksIfEnabled()) {
         size_t protectedSizeMax = size + encryptionHooks->additionalBytesForProtectedBuffer();
         out = std::make_unique<char[]>(protectedSizeMax);
         size_t resultLen;
@@ -1615,6 +1608,10 @@ std::shared_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>:
                                                               _checksumCalculator.checksum(),
                                                               _checksumCalculator.version());
 }
+
+//
+// BoundedSorter members
+//
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
 BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptions& opts,
@@ -1817,7 +1814,7 @@ template <typename Comparator>
 std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make(const SortOptions& opts,
                                                              const Comparator& comp,
                                                              const Settings& settings) {
-    checkNoExternalSortOnMongos(opts);
+    sorter::checkNoExternalSortOnMongos(opts);
 
     uassert(17149,
             "Attempting to use external sort without setting SortOptions::tempDir",
@@ -1842,7 +1839,7 @@ std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::makeFromExistingRanges(
     const SortOptions& opts,
     const Comparator& comp,
     const Settings& settings) {
-    checkNoExternalSortOnMongos(opts);
+    sorter::checkNoExternalSortOnMongos(opts);
 
     invariant(opts.limit == 0,
               str::stream() << "Creating a Sorter from existing ranges is only available with the "

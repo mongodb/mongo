@@ -286,4 +286,8 @@ private:
     bool _isEOF = false;
     bool _paused = false;
 };
+
+extern template class SortExecutor<Document>;
+extern template class SortExecutor<SortableWorkingSetMember>;
+extern template class SortExecutor<BSONObj>;
 }  // namespace mongo

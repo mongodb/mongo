@@ -57,17 +57,12 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-using boost::intrusive_ptr;
-using std::make_pair;
-using std::string;
-using std::unique_ptr;
-using std::vector;
 
 namespace {
 struct BoundMakerMin {
@@ -456,8 +451,8 @@ void DocumentSourceSort::addVariableRefs(std::set<Variables::Id>* refs) const {
     // It's impossible for $sort or the find command's sort to refer to a variable.
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
-    BSONElement spec, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+boost::intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
+    BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(15973, "the $sort key specification must be an object", spec.type() == Object);
 
     auto specObj = spec.Obj();
@@ -482,19 +477,19 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
     return create(pExpCtx, {sortOrder.obj(), pExpCtx}, std::move(options));
 }
 
-intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx,
+boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const SortPattern& sortOrder,
     SortStageOptions options) {
     return make_intrusive<DocumentSourceSort>(pExpCtx, sortOrder, std::move(options));
 }
 
-intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
+boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     SortPattern pat,
     StringData boundBase,
     long long boundOffset,
     boost::optional<long long> limit,
-    const intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     auto ds = DocumentSourceSort::create(expCtx, pat);
 
@@ -542,8 +537,8 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     return ds;
 }
 
-intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
+    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(6369905,
             "the $_internalBoundedSort key specification must be an object",
             elem.type() == Object);
@@ -732,24 +727,3 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
     return false;
 }
 }  // namespace mongo
-
-#include "mongo/db/sorter/sorter.cpp"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-template class ::mongo::BoundedSorter<::mongo::DocumentSourceSort::SortableDate,
-                                      ::mongo::Document,
-                                      ::mongo::CompAsc,
-                                      ::mongo::BoundMakerMin>;
-template class ::mongo::BoundedSorter<::mongo::DocumentSourceSort::SortableDate,
-                                      ::mongo::Document,
-                                      ::mongo::CompAsc,
-                                      ::mongo::BoundMakerMax>;
-template class ::mongo::BoundedSorter<::mongo::DocumentSourceSort::SortableDate,
-                                      ::mongo::Document,
-                                      ::mongo::CompDesc,
-                                      ::mongo::BoundMakerMin>;
-template class ::mongo::BoundedSorter<::mongo::DocumentSourceSort::SortableDate,
-                                      ::mongo::Document,
-                                      ::mongo::CompDesc,
-                                      ::mongo::BoundMakerMax>;

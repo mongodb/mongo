@@ -666,37 +666,3 @@ private:
     SortOptions _opts;
 };
 }  // namespace mongo
-
-/**
- * #include "mongo/db/sorter/sorter.cpp" and call this in a single translation
- * unit once for each unique set of template parameters.
- */
-#define MONGO_CREATE_SORTER(Key, Value, Comparator)                                                \
-    namespace mongo {                                                                              \
-                                                                                                   \
-    /* public classes */                                                                           \
-    template class Sorter<Key, Value>;                                                             \
-    template class SortIteratorInterface<Key, Value>;                                              \
-    template class SortedFileWriter<Key, Value>;                                                   \
-    /* internal classes */                                                                         \
-    template class sorter::NoLimitSorter<Key, Value, Comparator>;                                  \
-    template class sorter::LimitOneSorter<Key, Value, Comparator>;                                 \
-    template class sorter::TopKSorter<Key, Value, Comparator>;                                     \
-    template class sorter::MergeIterator<Key, Value, Comparator>;                                  \
-    template class sorter::InMemIterator<Key, Value>;                                              \
-    template class sorter::FileIterator<Key, Value>;                                               \
-    /* factory functions */                                                                        \
-    template std::unique_ptr<SortIteratorInterface<Key, Value>>                                    \
-    SortIteratorInterface<Key, Value>::merge<Comparator>(                                          \
-        std::span<std::shared_ptr<SortIteratorInterface>> iters,                                   \
-        const SortOptions& opts,                                                                   \
-        const Comparator& comp);                                                                   \
-    template std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make<Comparator>(             \
-        const SortOptions& opts, const Comparator& comp, const Settings& settings);                \
-    template std::unique_ptr<Sorter<Key, Value>>                                                   \
-    Sorter<Key, Value>::makeFromExistingRanges<Comparator>(const std::string& fileName,            \
-                                                           const std::vector<SorterRange>& ranges, \
-                                                           const SortOptions& opts,                \
-                                                           const Comparator& comp,                 \
-                                                           const Settings& settings);              \
-    }

@@ -44,14 +44,6 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/sorter/sorter_stats.h"
 
-namespace mongo {
-template <typename Key, typename Value>
-class SortIteratorInterface;
-
-template <typename Key, typename Value>
-class Sorter;
-}  // namespace mongo
-
 namespace mongo::sbe {
 /**
  * Sorts the incoming data from the 'input' tree. The keys on which we are sorting are given by the
@@ -111,7 +103,7 @@ protected:
 private:
     class SortIface {
     public:
-        virtual ~SortIface() {}
+        virtual ~SortIface() = default;
         virtual void prepare(CompileCtx& ctx) = 0;
         virtual value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) = 0;
         virtual void open(bool reOpen) = 0;
@@ -119,41 +111,10 @@ private:
         virtual void close() = 0;
     };
 
+    /** Implements `SortIface`. Defined in `sort_stage_sort_impl.{h,cpp}`. */
     template <typename KeyRow, typename ValueRow>
-    class SortImpl : public SortIface {
-    public:
-        SortImpl(SortStage& stage);
-        ~SortImpl() override;
+    class SortImpl;
 
-        void prepare(CompileCtx& ctx) final;
-        value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
-        void open(bool reOpen) final;
-        PlanState getNext() final;
-        void close() final;
-
-    private:
-        int64_t runLimitCode();
-        void makeSorter();
-
-        using SorterIterator = SortIteratorInterface<KeyRow, ValueRow>;
-        using SorterData = std::pair<KeyRow, ValueRow>;
-
-        SortStage& _stage;
-
-        std::vector<value::SlotAccessor*> _inKeyAccessors;
-        std::vector<value::SlotAccessor*> _inValueAccessors;
-
-        value::SlotMap<std::unique_ptr<value::SlotAccessor>> _outAccessors;
-
-        std::unique_ptr<SorterIterator> _mergeIt;
-        SorterData _mergeData;
-        SorterData* _mergeDataIt{&_mergeData};
-        std::unique_ptr<Sorter<KeyRow, ValueRow>> _sorter;
-
-        std::unique_ptr<vm::CodeFragment> _limitCode;
-    };
-
-private:
     template <typename KeyType, typename ValueType>
     std::unique_ptr<SortIface> makeStageImplInternal();
     template <typename KeyType>
@@ -162,7 +123,6 @@ private:
 
     std::unique_ptr<SortIface> makeStageImpl();
 
-private:
     const value::SlotVector _obs;
     const std::vector<value::SortDirection> _dirs;
     const value::SlotVector _vals;
