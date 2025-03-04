@@ -184,18 +184,26 @@ functions:
         set -o errexit
         set -o verbose
         pushd wiredtiger
-        mongo_repo=https://github.com/mongodb/mongo
         # Find the equivalent mongodb branch that matches the same branch version to wiredtiger. In
         # the case of patch builds, it is possible that the developer has a branch name that doesn't
         # adhere to naming rules, therefore derive the base branch name from git.
         branch=$(git branch --contains | grep -e "mongodb" -e "develop" -e "evg-pr-test-")
         if [[ $branch =~ "mongodb-" ]]; then
+          mongo_repo=https://github.com/mongodb/mongo
           mongo_branch=v$(echo $branch | cut -d'-' -f 2)
         else
+          mongo_repo=https://github.com/mongodb/mongo
           mongo_branch=master
         fi
         popd
         git clone $mongo_repo -b $mongo_branch
+        # FIXME-WT-14185 The depreciation ticket requires changes from the private repository. As a
+        # workaround apply a manual patch onto the mongodb master branch.
+        if [[ $mongo_branch == "master" ]]; then
+          cd mongo
+          git checkout -b wt-13948-workaround
+          git apply ../wiredtiger/test/evergreen/wt-13948.patch
+        fi
   "import wiredtiger into mongo" :
     command: shell.exec
     type: setup
@@ -5073,7 +5081,6 @@ tasks:
 
   - name: perf-test-live-restore
     tags: ["long-perf"]
-    patch_only: true
     depends_on:
       - name: perf-test-long-500m-btree-populate
     commands:
@@ -5114,7 +5121,6 @@ tasks:
 
   - name: perf-test-live-restore-no-server
     tags: ["long-perf"]
-    patch_only: true
     depends_on:
       - name: perf-test-long-500m-btree-populate
     commands:
