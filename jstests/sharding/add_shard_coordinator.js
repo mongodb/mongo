@@ -8,6 +8,7 @@
  *   does_not_support_stepdowns,
  *   assumes_balancer_off,
  *   config_shard_incompatible,
+ *   requires_persistence,
  * ]
  */
 
