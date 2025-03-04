@@ -661,12 +661,13 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     auto shardVersion = cm.hasRoutingTable()
         ? boost::make_optional(cri.getShardVersion(*shardId))
         : boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED());
+    auto dbVersion = cm.hasRoutingTable() ? boost::none : boost::make_optional(cm.dbVersion());
 
     _runCommand(
         opCtx,
         *shardId,
         shardVersion,
-        cm.dbVersion(),
+        dbVersion,
         nss,
         applyReadWriteConcern(opCtx, false, false, makeExplainCmd(opCtx, cmdObj, verbosity)),
         true /* isExplain */,
