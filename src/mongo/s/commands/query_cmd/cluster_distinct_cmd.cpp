@@ -399,6 +399,13 @@ public:
             return true;
         }
 
+        // The construction of 'bsonCmp' below only accounts for a collection default collator when
+        // the targeted collection is sharded. In the event that the collection is unsharded (either
+        // untracked or unsplittable) and has a collection default collator, we can use binary
+        // comparison on the router as long as we obey the collection's default collator on the
+        // targeted shard.
+        // TODO SERVER-101576: Setting up the collation and aggregating shard responses can be
+        // avoided entirely when targeting a single shard.
         BSONObjComparator bsonCmp(BSONObj(),
                                   BSONObjComparator::FieldNamesMode::kConsider,
                                   !collation.isEmpty()

@@ -422,9 +422,13 @@ public:
             auto allShardsContainingChunksForNs =
                 getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest);
 
-            // If the request omits the collation use the collection default collation. If
-            // the collection just has the simple collation, we can leave the collation as
-            // an empty BSONObj.
+            // If the request omits the collation use the collection default collation. If the
+            // collection just has the simple collation, we can leave the collation as an empty
+            // BSONObj. Note that this block assumes that we have a routing table (if we do not, we
+            // cannot know the collection default collation without contacting the primary shard).
+            tassert(8557201,
+                    "This function should not be invoked if we do not have a routing table",
+                    cri.cm.hasRoutingTable());
             if (parsedInfoFromRequest.collation.isEmpty()) {
                 if (cri.cm.getDefaultCollator()) {
                     parsedInfoFromRequest.collation =

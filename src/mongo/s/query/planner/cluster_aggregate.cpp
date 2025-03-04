@@ -207,7 +207,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                         .canBeRejected(canBeRejected)
                         .build();
 
-    if ((!cri || !cri->cm.hasRoutingTable()) && collationObj.isEmpty()) {
+    if (!(cri && cri->cm.hasRoutingTable()) && collationObj.isEmpty()) {
         mergeCtx->setIgnoreCollator();
     }
 

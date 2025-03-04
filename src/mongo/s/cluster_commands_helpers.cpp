@@ -254,8 +254,6 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const BSONObj& query,
     const BSONObj& collation,
     bool eligibleForSampling = false) {
-    auto opCtx = expCtx->getOperationContext();
-
     const auto& cm = cri.cm;
     std::set<ShardId> shardIds;
     if (!cm.hasRoutingTable()) {
@@ -265,12 +263,6 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     } else {
         // The collection has a routing table. Target all shards that own chunks that match the
         // query.
-        std::unique_ptr<CollatorInterface> collator;
-        if (!collation.isEmpty()) {
-            collator = uassertStatusOK(
-                CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
-        }
-
         getShardIdsForQuery(expCtx, query, collation, cm, &shardIds);
     }
     for (const auto& shardToSkip : shardsToSkip) {
@@ -845,6 +837,12 @@ std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query
         std::set<ShardId> shardIds;
         getShardIdsForCanonicalQuery(query, cm, &shardIds);
         return shardIds;
+    }
+
+    // In the event of an untracked collection, we will discover the collection default collation on
+    // the primary shard. As such, we don't forward the simple collation.
+    if (query.getFindCommandRequest().getCollation().isEmpty()) {
+        query.getExpCtx()->setIgnoreCollator();
     }
 
     // The collection does not have a routing table. Target only the primary shard for the database.

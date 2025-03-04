@@ -264,8 +264,13 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     // the merge command, since the merging shard may not have the collection metadata.
     if (mergeCmd.peek()["collation"].missing()) {
         mergeCmd["collation"] = [&]() {
-            if (mergeCtx->getCollator()) {
-                return Value(mergeCtx->getCollator()->getSpec().toBSON());
+            // When getIgnoreCollator() returns 'false', we can guarantee that we have correctly
+            // obtained the collection-default collation (in the case of an untracked collection,
+            // this means that we contacted the primary shard). As such, we know that the `nullptr`
+            // collation really means the simple collation here.
+            if (!mergeCtx->getIgnoreCollator()) {
+                return Value(mergeCtx->getCollator() ? mergeCtx->getCollator()->getSpec().toBSON()
+                                                     : CollationSpec::kSimpleSpec);
             } else if (!cm.hasRoutingTable() && !nss.isCollectionlessAggregateNS()) {
                 // If we are dispatching a merging pipeline to a specific shard, and the main
                 // namespace is untracked, we must contact the primary shard to determine whether or
@@ -289,6 +294,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                         "Contacting primary shard for collation in unexpected case",
                         targetedShards.size() == 1 && targetedShards[0] == cm.dbPrimary() &&
                             hasSpecificMergeShard);
+
                 if (auto untrackedDefaultCollation =
                         getUntrackedCollectionCollation(mergeCtx->getOperationContext(), cm, nss);
                     !untrackedDefaultCollation.isEmpty()) {

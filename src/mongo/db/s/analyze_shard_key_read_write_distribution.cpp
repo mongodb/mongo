@@ -94,18 +94,19 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_getTarg
         return uassertStatusOK(
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     }();
+    const auto& cm = _getChunkManager();
     auto expCtx =
         ExpressionContextBuilder{}
             .opCtx(opCtx)
             .collator(std::move(cif))
-            .ns(_getChunkManager().getNss())
+            .ns(cm.getNss())
             .runtimeConstants(runtimeConstants.value_or(Variables::generateRuntimeConstants(opCtx)))
             .letParameters(letParameters)
             .build();
 
     std::set<ShardId> shardIds;  // This is not used.
     QueryTargetingInfo info;
-    getShardIdsAndChunksForQuery(expCtx, filter, collation, _getChunkManager(), &shardIds, &info);
+    getShardIdsAndChunksForQuery(expCtx, filter, collation, cm, &shardIds, &info);
 
     return info;
 }

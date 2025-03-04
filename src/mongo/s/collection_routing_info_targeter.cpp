@@ -716,6 +716,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_cano
     findCommand->setFilter(query);
     expCtx->setUUID(cm.getUUID());
 
+    tassert(8557200,
+            "This function should not be invoked if we do not have a routing table",
+            cm.hasRoutingTable());
     if (!collation.isEmpty()) {
         findCommand->setCollation(collation.getOwned());
     } else if (cm.getDefaultCollator()) {

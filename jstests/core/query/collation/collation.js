@@ -1156,6 +1156,34 @@ var mapReduceOut = coll.mapReduce(
 assert.commandWorked(mapReduceOut);
 assert.eq(mapReduceOut.results.length, 0);
 
+// mapReduce should correctly combine results when no collation is specified and the collection has
+// a default collation.
+coll = testDb.collation_mapreduce4;
+const outCollName = coll.getName() + "_outcoll";
+const outColl = testDb[outCollName];
+coll.drop();
+outColl.drop();
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(testDb.createCollection(outColl.getName()));
+assert.commandWorked(coll.insert({_id: 1, str: "foo", amt: 100}));
+assert.commandWorked(coll.insert({_id: 2, str: "FOO", amt: 200}));
+assert.commandWorked(coll.insert({_id: 3, str: "foo", amt: 300}));
+assert.commandWorked(coll.insert({_id: 4, str: "FOO", amt: 400}));
+assert.commandWorked(coll.mapReduce(
+    function() {
+        emit(this.str, this.amt);
+    },
+    function(key, values) {
+        return Array.sum(values);
+    },
+    {out: {reduce: outCollName}}));
+
+// Using the case insensitive collation should leave us with a single result.
+const mrResult = outColl.find().toArray();
+assert.eq(mrResult.length, 1, mrResult);
+assert.eq(mrResult[0].value, 1000, mrResult);
+
 //
 // Collation tests for remove.
 //
