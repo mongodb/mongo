@@ -277,7 +277,7 @@ let wcCommandsTests = {
                 lsid: getLSID()
             }),
             setupFunc: (coll) => {
-                assert.commandWorked(coll.getDB().adminCommand({
+                assert.commandWorked(coll.getDB().runCommand({
                     insert: collName,
                     documents: [{_id: 1}],
                     lsid: getLSID(),
@@ -294,7 +294,7 @@ let wcCommandsTests = {
                 }));
             },
             confirmFunc: (res, coll) => {
-                assert.commandFailedWithCode(res, ErrorCodes.TransactionTooOld);
+                assert.commandFailedWithCode(res, ErrorCodes.TransactionCommitted);
                 assert.eq(coll.find().itcount(), 1);
                 genNextTxnNumber();
             },
@@ -3864,14 +3864,12 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
 
         // TODO SERVER-100942 setDefaultRWConcern does not return WCE
 
-        // TODO SERVER-100943 abortTransaction does not return WCE
-
         // TODO SERVER-100938 createIndexes does not return WCE
         if (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-            command == "abortTransaction" || command == "createIndexes" ||
-            command == "createRole" || command == "createUser" || command == "dropRole" ||
-            command == "dropUser" || command == "grantRolesToUser" || command == "updateRole" ||
-            command == "updateUser" || command == "setDefaultRWConcern") {
+            command == "createIndexes" || command == "createRole" || command == "createUser" ||
+            command == "dropRole" || command == "dropUser" || command == "grantRolesToUser" ||
+            command == "updateRole" || command == "updateUser" ||
+            command == "setDefaultRWConcern") {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
@@ -3881,13 +3879,10 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
         // TODO SERVER-100935 updateRole does not return WCE
         // TODO SERVER-100935 updateUser does not return WCE
 
-        // TODO SERVER-100943 abortTransaction does not return WCE
-
         // TODO SERVER-100942 setDefaultRWConcern does not return WCE
         if (clusterType == "rs" &&
-            (command == "abortTransaction" || command == "dropRole" ||
-             command == "grantRolesToUser" || command == "updateRole" || command == "updateUser" ||
-             command == "setDefaultRWConcern")) {
+            (command == "dropRole" || command == "grantRolesToUser" || command == "updateRole" ||
+             command == "updateUser" || command == "setDefaultRWConcern")) {
             return true;
         }
     }
