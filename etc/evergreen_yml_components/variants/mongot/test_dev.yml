@@ -29,6 +29,7 @@ buildvariants:
       repo_edition: enterprise
       scons_cache_scope: shared
       compile_variant: amazon-linux-2023-x86-mongot-integration-cron-only
+      core_analyzer_distro_name: amazon2023.3-large
     tasks: &amazon-linux-2023-x86-mongot-distro-tasks
       - name: compile_and_archive_dist_test_TG
         distros:
