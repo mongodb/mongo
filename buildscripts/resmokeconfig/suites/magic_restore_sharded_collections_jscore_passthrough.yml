@@ -95,6 +95,12 @@ selector:
     # invalid views fail the data consistency checker.
     - jstests/core/catalog/list_catalog_stage_consistency.js
 
+    # These tests run many aggregations, and the override slows them down enough to hit the
+    # evergreen timeout. Since they do not provide valuable coverage in this passthrough we
+    # can exclude them.
+    - jstests/core/query/plan_cache/cache_correctness_pbt.js
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
