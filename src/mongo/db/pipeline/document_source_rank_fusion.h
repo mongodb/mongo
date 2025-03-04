@@ -95,6 +95,10 @@ public:
         bool isSearchStage() const final {
             return true;
         }
+
+        bool isRankFusionStage() const final {
+            return true;
+        }
     };
 
     static StageConstraints constraints() {

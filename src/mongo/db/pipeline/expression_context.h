@@ -947,6 +947,15 @@ public:
         return _params.isMapReduceCommand;
     }
 
+    void setIsRankFusion() {
+        _params.isRankFusion = true;
+    }
+
+    bool isRankFusion() const {
+        return _params.isRankFusion;
+    }
+
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;
@@ -1062,6 +1071,12 @@ protected:
         // for streams since this isn't allowed in MQL beyond some exemptions for internal
         // collection in the local database.
         bool allowGenericForeignDbLookup = false;
+
+        // Indicates that the pipeline is a desugared representation of a user's $rankFusion
+        // pipeline. This is necessary for guarding that $rankFusion is not yet allowed to be run
+        // over views.
+        // TODO SERVER-101661 Remove this internal flag once $rankFusion works on views.
+        bool isRankFusion = false;
     };
 
     ExpressionContextParams _params;

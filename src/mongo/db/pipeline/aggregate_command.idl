@@ -354,4 +354,12 @@ commands:
                 description: "Determines whether or not to include query stats metrics in the response."
                 type: optionalBool
                 stability: internal
+            # TODO SERVER-101661 Remove this internal flag once $rankFusion works on views.
+            $_isRankFusion:
+                description: Internal usage only. If present, indicates that the pipeline is the 
+                    desugared representation of a user's $rankFusion pipeline. This is necessary 
+                    for guarding that $rankFusion is not yet allowed to be run over views.
+                cpp_name: isRankFusion
+                type: optionalBool
+                stability: internal
 

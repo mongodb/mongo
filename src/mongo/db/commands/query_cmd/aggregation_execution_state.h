@@ -218,6 +218,21 @@ public:
     }
 
     /**
+     * True iff aggregation represents a $rankFusion pipeline.
+     *
+     * If the $rankFusion request came from the router, that will get annotated on the request from
+     * the router (which is necessary to distinguish it as $rankFusion since the pipeline dispatched
+     * will be the desugared representation). If the $rankFusion request came straight from the
+     * user, we'll identify via the lite-parsed pipeline.
+     *
+     * TODO SERVER-101661 Remove once $rankFusion works on views.
+     */
+    bool isRankFusionStage() const {
+        return _aggReqDerivatives->request.getIsRankFusion() ||
+            _aggReqDerivatives->liteParsedPipeline.startsWithRankFusionStage();
+    }
+
+    /**
      * True iff aggregation starts with a $collStats stage.
      */
     bool startsWithCollStats() const {

@@ -235,6 +235,14 @@ public:
     }
 
     /**
+     * Returns true if this is a $rankFusion pipeline
+     */
+    virtual bool isRankFusionStage() const {
+        return false;
+    }
+
+
+    /**
      * Returns true if this stage require knowledge of the collection default collation at parse
      * time, false otherwise. This is useful to know as it could save a network request to discern
      * the collation.

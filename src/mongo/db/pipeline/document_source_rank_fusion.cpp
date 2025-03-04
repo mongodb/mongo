@@ -720,6 +720,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
                           << typeName(elem.type()),
             elem.type() == BSONType::Object);
 
+    // It is currently necessary to annotate on the ExpressionContext that this is a $rankFusion
+    // query. Once desugaring happens, there's no way to identity from the (desugared) pipeline
+    // alone that it came from $rankFusion. We need to know if it came from $rankFusion so we can
+    // reject the query if it is run over a view.
+    // TODO SERVER-101661 Remove this when $rankFusion is enabled on views.
+    pExpCtx->setIsRankFusion();
+
     auto spec = RankFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
     // It's important to use an ordered map here, so that we get stability in the desugaring =>
