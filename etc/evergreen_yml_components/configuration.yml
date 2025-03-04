@@ -103,7 +103,6 @@ post:
   - func: "upload docker compose"
   - func: "attach docker logs"
   - func: "upload jstestfuzz minimized output"
-  - func: "upload clang tidy results"
   - func: "generate and upload network diagnostics"
   - func: "kill processes"
   - func: "save code coverage data"

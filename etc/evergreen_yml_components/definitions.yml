@@ -687,43 +687,6 @@ functions:
       content_type: text/plain
       display_name: Pip Requirements
 
-  "run clang tidy":
-    - *f_expansions_write
-    - command: subprocess.exec
-      type: test
-      params:
-        binary: bash
-        add_expansions_to_env: true
-        args:
-          - "src/evergreen/run_python_script.sh"
-          - "buildscripts/clang_tidy.py"
-          - "--split-jobs=4"
-          - "--split=${split}"
-
-  "upload clang tidy results":
-    - command: s3.put
-      display_name: "upload clang_tidy_fixes.tgz"
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/clang_tidy_fixes.tgz
-        remote_file: ${project}/${build_variant}/${version_id}/${task_id}/clang_tidy_fixes.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: clang_tidy_fixes.tgz
-    - command: s3.put
-      display_name: "upload clang_tidy_fixes.json"
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/clang_tidy_fixes/clang_tidy_fixes.json
-        remote_file: ${project}/${build_variant}/${version_id}/${task_id}/clang_tidy_fixes.json
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/json
-        display_name: clang_tidy_fixes.json
-
   "generate network diagnostics": &generate_network_diagnostics
     command: subprocess.exec
     display_name: "get network diagnostics"
@@ -1496,6 +1459,20 @@ functions:
     - *apply_version_expansions
     - *f_expansions_write
     - *bazel_compile_sh
+
+  "generate clang-tidy report sh": &generate_clang_tidy_report_sh
+    command: subprocess.exec
+    display_name: "generate clang-tidy report"
+    type: test
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "evergreen/generate_clang_tidy_report.py"
+
+  "generate clang-tidy report":
+    - *f_expansions_write
+    - *generate_clang_tidy_report_sh
 
   "bazel run sh": &bazel_run_sh
     command: subprocess.exec

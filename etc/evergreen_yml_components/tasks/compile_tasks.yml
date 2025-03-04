@@ -110,17 +110,6 @@ variables:
       - func: "run hang analyzer"
       - func: "wait for resmoke to shutdown"
 
-  - &clang_tidy_scons_compile_vars
-    task_compile_flags: >-
-      --build-profile=compiledb
-    targets: compiledb +mongo-tidy-tests
-    compiling_for_test: true
-    compile_flags: >-
-      --link-model=dynamic
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars
-    show_scons_timings: false
-
   - &clang_tidy_task_template
     tags:
       [
@@ -385,11 +374,13 @@ tasks:
     name: run_bazel_clang_tidy
     commands:
       - func: "do scons setup"
-      - func: "bazel compile (clang)"
+      - func: "bazel compile"
         vars:
           # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
           targets: //src/mongo/...
-          args: --config=clang-tidy --compiler_type=clang
+          args: --config=clang-tidy-${clang_tidy_toolchain|v4} --mongo_toolchain_version=${clang_tidy_toolchain|v4} --keep_going
+          run_for_clang_tidy: "true"
+      - func: "generate clang-tidy report"
 
   - name: run_bazel_program_windows
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
@@ -550,50 +541,6 @@ tasks:
             ${compile_all_but_not_unittests_flags|BAZEL_FLAGS=--linkopt=-s}
           skip_archive: on
           bazel_build_tags: --bazel-build-tag=-mongo_unittest --bazel-build-tag=mongo_binary --bazel-build-tag=mongo_benchmark --bazel-build-tag=mongo_integration_test
-
-  - <<: *clang_tidy_task_template
-    name: clang_tidy_1
-    commands:
-      - func: "do scons setup"
-      - func: "scons compile"
-        vars:
-          <<: *clang_tidy_scons_compile_vars
-      - func: "run clang tidy"
-        vars:
-          split: 1
-
-  - <<: *clang_tidy_task_template
-    name: clang_tidy_2
-    commands:
-      - func: "do scons setup"
-      - func: "scons compile"
-        vars:
-          <<: *clang_tidy_scons_compile_vars
-      - func: "run clang tidy"
-        vars:
-          split: 2
-
-  - <<: *clang_tidy_task_template
-    name: clang_tidy_3
-    commands:
-      - func: "do scons setup"
-      - func: "scons compile"
-        vars:
-          <<: *clang_tidy_scons_compile_vars
-      - func: "run clang tidy"
-        vars:
-          split: 3
-
-  - <<: *clang_tidy_task_template
-    name: clang_tidy_4
-    commands:
-      - func: "do scons setup"
-      - func: "scons compile"
-        vars:
-          <<: *clang_tidy_scons_compile_vars
-      - func: "run clang tidy"
-        vars:
-          split: 4
 
   ## compile_unittests ##
   - name: compile_unittests_future_git_tag_multiversion

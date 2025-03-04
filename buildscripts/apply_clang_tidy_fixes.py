@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 
@@ -92,7 +93,15 @@ def _combine_errors(dir: str) -> str:
                 fix_msg = fix["DiagnosticMessage"]
             fix_data = (
                 all_fixes.setdefault(fix["DiagnosticName"], {})
-                .setdefault(fix_msg.get("FilePath", "FilePath Not Found"), {})
+                .setdefault(
+                    re.sub(
+                        "^.*/src/mongo/",
+                        "src/mongo/",
+                        fix_msg.get("FilePath", "FilePath Not Found"),
+                        1,
+                    ),
+                    {},
+                )
                 .setdefault(
                     str(fix_msg.get("FileOffset", "FileOffset Not Found")),
                     {
@@ -103,13 +112,23 @@ def _combine_errors(dir: str) -> str:
                     },
                 )
             )
+
             for replacement in fix_data["replacements"]:
-                if replacement.get("FilePath") and os.path.exists(replacement.get("FilePath")):
-                    with open(replacement.get("FilePath"), "rb") as contents:
-                        replacement["FileContentsMD5"] = hashlib.md5(contents.read()).hexdigest()
+                if replacement.get("FilePath"):
+                    file_path = re.sub(
+                        "^.*/src/mongo/", "src/mongo/", replacement.get("FilePath"), 1
+                    )
+                    replacement["FilePath"] = file_path
+                    if os.path.exists(file_path):
+                        with open(file_path, "rb") as contents:
+                            replacement["FileContentsMD5"] = hashlib.md5(
+                                contents.read()
+                            ).hexdigest()
 
             fix_data["count"] += 1
-            fix_data["source_files"].append(fixes["MainSourceFile"])
+            fix_data["source_files"].append(
+                re.sub("^.*/src/mongo/", "src/mongo", fixes["MainSourceFile"], 1)
+            )
 
     fixes_file = os.path.join(dir, "clang_tidy_fixes.json")
     with open(fixes_file, "w") as files_file:
