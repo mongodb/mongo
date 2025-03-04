@@ -436,46 +436,38 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
             "joinPred must be MatchExpression::MatchType::AND or MatchExpression::MatchType::OR",
             joinPred == MatchExpression::MatchType::AND ||
                 joinPred == MatchExpression::MatchType::OR);
-    std::unique_ptr<ListOfMatchExpression> combinedME;
-    if (joinPred == MatchExpression::MatchType::AND) {
-        combinedME = std::make_unique<AndMatchExpression>();
-    } else {
-        combinedME = std::make_unique<OrMatchExpression>();
-    }
 
-    auto addPredicates = [&](std::unique_ptr<MatchExpression> matchExpr) {
-        const MatchExpression::MatchType type = matchExpr->matchType();
-
-        // If the top level MatchExpression has no children (e.g. {} or {a: 1}) or its MatchType
-        // doesn't match 'joinPred', just add it as a child to the new list of predicates.
-        if (matchExpr->numChildren() == 0 || type != joinPred) {
-            combinedME->add(std::move(matchExpr));
-        } else {
-            for (size_t i = 0; i < matchExpr->numChildren(); i++) {
-                const auto child = matchExpr->getChild(i);
-
-                // For 'joinPred' == AND: If 'child' is an AndMatchExpression, add its
-                // children directly to the new top-level $and to avoid nesting $and's. For
-                // 'joinPred' == OR: If 'child' is a OrMatchExpression, add its children
-                // directly to the new top-level $or to avoid nesting $or's. Otherwise, add
-                // 'child' itself.
-                if (child->numChildren() == 0 || child->matchType() != joinPred) {
-                    combinedME->add(child->clone());
-                } else {
-                    for (size_t j = 0; j < child->numChildren(); j++) {
-                        combinedME->add(child->getChild(j)->clone());
-                    }
+    BSONObjBuilder bob;
+    BSONArrayBuilder arrBob(
+        bob.subarrayStart(joinPred == MatchExpression::MatchType::AND ? "$and" : "$or"));
+    auto addPredicates = [&](const auto& predicates) {
+        if (predicates.isEmpty()) {
+            arrBob.append(predicates);
+        }
+        for (auto&& pred : predicates) {
+            // For 'joinPred' == $and: If 'pred' is an $and, add its children directly to the
+            // new top-level $and to avoid nesting $and's. For 'joinPred' == $or: If 'pred' is a
+            // $or, add its children directly to the new top-level $or to avoid nesting $or's.
+            // Otherwise, add 'pred' itself as a child.
+            if ((joinPred == MatchExpression::MatchType::AND &&
+                 pred.fieldNameStringData() == "$and") ||
+                (joinPred == MatchExpression::MatchType::OR &&
+                 pred.fieldNameStringData() == "$or")) {
+                for (auto& child : pred.Array()) {
+                    arrBob.append(child);
                 }
+            } else {
+                BSONObjBuilder childBob(arrBob.subobjStart());
+                childBob.append(pred);
             }
         }
     };
+    addPredicates(_backingBsonForPredicate);
+    addPredicates(other->_backingBsonForPredicate);
 
-    addPredicates(std::move(std::move(_matchProcessor->getExpression())));
-    addPredicates(std::move(std::move(other->_matchProcessor->getExpression())));
-
-    rebuild(combinedME->serialize());
+    arrBob.doneFast();
+    rebuild(bob.obj());
 }
-
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
 DocumentSourceMatch::splitSourceBy(const OrderedPathSet& fields,
                                    const StringMap<std::string>& renames) && {
@@ -612,6 +604,10 @@ bool DocumentSourceMatch::hasQuery() const {
 }
 
 BSONObj DocumentSourceMatch::getQuery() const {
+    // Note that we must return the backing BSON of the MatchExpression. This is because we use
+    // the result of 'getQuery' during pushdown to the find layer in order to keep alive the
+    // MatchExpression's backing BSON, since we use the MatchExpression to construct the
+    // CanonicalQuery and require that it holds pointers into valid BSON during execution.
     return _backingBsonForPredicate;
 }
 

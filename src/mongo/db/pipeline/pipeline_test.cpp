@@ -1262,7 +1262,7 @@ TEST_F(PipelineOptimizationTest, RemoveMultipleEmptyMatches) {
 TEST_F(PipelineOptimizationTest, RemoveEmptyMatchesAndKeepNonEmptyMatches) {
     std::string inputPipe = "[{$match: {}}, {$match: {}}, {$match: {a: 1}}]";
     std::string outputPipe = "[{$match: {a: {$eq: 1}}}]";
-    std::string serializedPipe = "[{$match: {$and: [{}, {}, {a: {$eq: 1}}]}}]";
+    std::string serializedPipe = "[{$match: {$and: [{}, {}, {a: 1}]}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
@@ -1298,8 +1298,7 @@ TEST_F(PipelineOptimizationTest, RemoveMatchWithTrueConstExpr) {
 TEST_F(PipelineOptimizationTest, RemoveMultipleMatchesWithTrueConstExpr) {
     std::string inputPipe = "[{$match: {$expr: true}}, {$match: {$expr: true}}]";
     std::string outputPipe = "[{$match: {}}]";
-    std::string serializedPipe =
-        "[{$match: {$and: [{$expr: {$const: true}}, {$expr: {$const: true}}]}}]";
+    std::string serializedPipe = "[{$match: {$and: [{$expr: true}, {$expr: true}]}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
@@ -2606,7 +2605,7 @@ TEST_F(PipelineOptimizationTest, NeighboringMatchesShouldCoalesce) {
         "[{$match: {x: 'x'}},"
         " {$match: {y: 'y'}}]";
     std::string outputPipe = "[{$match: {$and: [{x: {$eq: 'x'}}, {y: {$eq : 'y'}}]}}]";
-    std::string serializedPipe = "[{$match: {$and: [{x: {$eq: 'x'}}, {y: {$eq: 'y'}}]}}]";
+    std::string serializedPipe = "[{$match: {$and: [{x: 'x'}, {y: 'y'}]}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 

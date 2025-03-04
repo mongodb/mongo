@@ -1054,22 +1054,35 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
 
     // We cannot yet lower $LUM (combined $lookup + $unwind + $match) stages to SBE.
     _sbeCompatibility = SbeCompatibility::notCompatible;
+    bool needToOptimize = false;
     if (!_matchSrc) {
         _matchSrc = nextMatch;
     } else {
         // We have already absorbed a $match. We need to join it with the next one.
         _matchSrc->joinMatchWith(nextMatch, MatchExpression::MatchType::AND);
+        needToOptimize = true;
     }
 
     // Remove the original $match.
     container->erase(std::next(itr));
 
     // We have internalized a $match, but have not yet computed the descended $match that should
-    // be applied to our queries.
-    _additionalFilter = DocumentSourceMatch::descendMatchOnPath(
-                            _matchSrc->getMatchExpression(), _as.fullPath(), pExpCtx)
-                            ->getQuery()
-                            .getOwned();
+    // be applied to our queries. Note that we have to optimze the MatchExpression that we pass into
+    // 'descendMatchOnPath' because the call to 'joinMatchWith' rebuilds the new $match stage using
+    // each stage's unoptimized BSON predicate. The unoptimized BSON may contain predicates that
+    // were optimized away, so that the checks performed by 'computeWhetherMatchOnlyOnAs' may no
+    // longer be true for the combined $match's MatchExpression.
+    _additionalFilter =
+        DocumentSourceMatch::descendMatchOnPath(
+            needToOptimize ? MatchExpression::optimize(
+                                 std::move(_matchSrc->getMatchProcessor()->getExpression()),
+                                 /* enableSimplification */ false)
+                                 .get()
+                           : _matchSrc->getMatchExpression(),
+            _as.fullPath(),
+            pExpCtx)
+            ->getQuery()
+            .getOwned();
 
     // Add '_additionalFilter' to '_resolvedPipeline' if there is a pipeline. If there is no
     // pipeline, '_additionalFilter' can safely be added to the local/foreignField $match stage
