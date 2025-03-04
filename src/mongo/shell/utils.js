@@ -585,7 +585,7 @@ jsTestLog = function(
         if (attr && typeof attr === "object" && Object.keys(attr).length > 0) {
             new_msg["attr"] = attr;
         }
-        print(toEJSON(new_msg));
+        print(toJsonForLog(new_msg));
         return;
     }
 

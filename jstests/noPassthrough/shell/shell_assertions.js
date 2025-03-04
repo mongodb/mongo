@@ -773,7 +773,7 @@ function assertThrowsErrorWithJson(assertFailureTriggerFn, {msg, attr}) {
         assertFailureTriggerFn();
     } catch (e) {
         assert.eq(msg, e.message, "unexpected error message");
-        assert.eq(toEJSON(attr), toEJSON(e.extraAttr), "unexpected extra attributes");
+        assert.eq(toJsonForLog(attr), toJsonForLog(e.extraAttr), "unexpected extra attributes");
     } finally {
         TestData.logFormat = oldLogFormat;
     }

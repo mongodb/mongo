@@ -705,8 +705,8 @@ tojsononeline = function(x) {
 
 /**
  * Serializes the given argument 'x' to a string that can be used to deserialize it with 'eval()'.
- * The return value is not always a valid JSON string. Use 'toEJSON()' for valid JSON output and for
- * printing values into the logs.
+ * The return value is not always a valid JSON string. Use 'toJsonForLog()' for valid JSON output
+ * and for printing values into the logs.
  */
 tojson = function(x, indent, nolint, depth, sortKeys) {
     if (x === null)
@@ -754,7 +754,7 @@ tojson.MAX_DEPTH = 100;
 
 /**
  * Serializes the given object argument 'x' to a string, which can be used to deserialize it with
- * 'eval()'. The return value is not always a valid JSON string. Use 'toEJSON()' for valid JSON
+ * 'eval()'. The return value is not always a valid JSON string. Use 'toJsonForLog()' for valid JSON
  * output and for printing values into the logs.
  */
 tojsonObject = function(x, indent, nolint, depth, sortKeys) {
@@ -839,22 +839,22 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
 };
 
 /**
- * Serializes the given argument 'x' to an EJSON string (which is also a valid JSON string). The
- * results of 'toEJSON()' and 'tostrictjson()' should be equal for BSON objects and arrays. Unlike
- * 'tostrictjson()', 'toEJSON()' also accepts non-object types, recognizes recursive objects, and
- * provides more detailed serializations for commonly used JavaScript classes, which goes beyond
- * MongoDB EJSON serialization format, for instance:
+ * Serializes the given argument 'x' to a valid JSON string suitable for logging. The
+ * results of 'toJsonForLog()' and 'tostrictjson()' should be equal for BSON objects and arrays.
+ * Unlike 'tostrictjson()', 'toJsonForLog()' also accepts non-object types, recognizes recursive
+ * objects, and provides more detailed serializations for commonly used JavaScript classes, for
+ * instance:
  *  - Set instances serialize to {"$set": [<elem1>,...]}
  *  - Map instances serialize to {"$map": [[<key1>, <value1>],...]}
  *  - Errors instances serialize to {"$error": "<error_message>"}
  *
- * 'toEJSON()' must be used when serializing JavaScript values into JSON logs to adhere to the
+ * 'toJsonForLog()' must be used when serializing JavaScript values into JSON logs to adhere to the
  * format requirements.
  *
- * Unlike 'tojson()', the result of 'eval(toEJSON(x))' will not always evaluate into an object
+ * Unlike 'tojson()', the result of 'eval(toJsonForLog(x))' will not always evaluate into an object
  * equivalent to 'x' and may throw a syntax error.
  */
-toEJSON = function(x) {
+toJsonForLog = function(x) {
     function ensureEJSONAndStopOnRecursion() {
         // Stack of ancestors (objects) of the current 'value'.
         // eg, For {"x": 1, "y": {"z": 2}} and value = 2,

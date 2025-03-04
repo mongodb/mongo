@@ -57,7 +57,7 @@ export default [
                             tojsononeline: true,
                             tostrictjson: true,
                             tojsonObject: true,
-                            toEJSON: true,
+                            toJsonForLog: true,
                             print: true,
                             printjson: true,
                             printjsononeline: true,
