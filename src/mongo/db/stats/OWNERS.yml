@@ -19,3 +19,12 @@ filters:
   - "operation_latency_histogram*":
     approvers:
       - 10gen/query-integration-observability
+  - "read_preference*":
+    approvers:
+      - 10gen/server-replication
+  - "server_read_concern*":
+    approvers:
+      - 10gen/server-replication
+  - "server_write_concern*":
+    approvers:
+      - 10gen/server-replication

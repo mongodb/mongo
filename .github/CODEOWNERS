@@ -119,6 +119,17 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/queryable_wt* @10gen/server-backup-restore @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/read_only* @10gen/server-rss-sydney @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/no_passthrough_network* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/core_txns* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/cwrwc* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/fcv* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/jstestfuzz_replication* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/magic_restore* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/multiversion* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/replica_sets* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/read_concern* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/retryable_writes* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/rollback* @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/write_concern* @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/**/* @10gen/devprod-correctness @svc-auto-approve-bot
@@ -133,6 +144,15 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/change_streams.py @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/enable_change_stream.py @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/run_query_stats.py @10gen/query-integration-query-stats @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/fcv_upgrade_downgrade.py @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/initialsync.py @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/magic_restore.py @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/oplog.py @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/periodic_kill_secondaries.py @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/reconfig_background.py @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/secondary_lag.py @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/stepdown.py @10gen/server-replication @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/wait_for_replication.py @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/testcases/OWNERS.yml
 /buildscripts/resmokelib/testing/testcases/**/query_tester_server_test.py @10gen/query-optimization @svc-auto-approve-bot
@@ -392,6 +412,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/clustered/* @10gen/server-collection-write-path @svc-auto-approve-bot
 /jstests/core/**/version_api* @10gen/query-optimization-parsers @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core/administrative/OWNERS.yml
+/jstests/core/administrative/**/list_all_local_sessions.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/core/administrative/**/list_all_sessions.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/core/administrative/**/list_sessions.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/core/administrative/**/hello_response_validation.js @10gen/server-replication @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core/administrative/current_op/OWNERS.yml
 /jstests/core/administrative/current_op/**/* @10gen/query-integration-observability @svc-auto-approve-bot
 
@@ -435,6 +461,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/query/**/boolean_expression_simplification.js @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
 /jstests/core/query/**/noop_writes.js @10gen/query-execution-write-exec @svc-auto-approve-bot
 /jstests/core/query/**/write_change_stream_pit_preimage.js @10gen/query-execution-change-streams @svc-auto-approve-bot
+/jstests/core/query/**/read_after_optime.js @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/api/OWNERS.yml
 /jstests/core/query/api/**/* @10gen/query-optimization-parsers @svc-auto-approve-bot
@@ -612,6 +639,15 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/hooks/OWNERS.yml
 /jstests/hooks/**/run_analyze_shard_key_background.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/hooks/**/run_enable_change_stream.js @10gen/query-execution-change-streams @svc-auto-approve-bot
+/jstests/hooks/**/run_fcv_upgrade_downgrade_background.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/hooks/**/run_fuzzer_restore_settings.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/hooks/**/run_initial_sync_node_validation.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/hooks/**/run_inject_hello_failures.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/hooks/**/run_reconfig_background.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/hooks/**/lag_secondary_application.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/hooks/**/magic_restore* @10gen/server-replication @svc-auto-approve-bot
+/jstests/hooks/**/run_check_repl_oplogs.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/hooks/**/run_cleanup_hello_failures.js @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/httpinterface/OWNERS.yml
 /jstests/httpinterface/**/network_options.js @10gen/server-networking-and-observability @svc-auto-approve-bot
@@ -660,6 +696,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/override_methods/**/query_shape_hash_stability.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/libs/override_methods/**/rerun_queries.js @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /jstests/libs/override_methods/**/set_api* @10gen/query-optimization-parsers @svc-auto-approve-bot
+/jstests/libs/override_methods/**/send_command_to_initial_sync_node* @10gen/server-replication @svc-auto-approve-bot
+/jstests/libs/override_methods/**/txn_passthrough_cmd_massage.js @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/property_test_helpers/OWNERS.yml
 /jstests/libs/property_test_helpers/**/* @10gen/query-optimization @svc-auto-approve-bot
@@ -689,6 +727,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/genericBinVersion/**/*query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/multiVersion/genericBinVersion/**/keystring_index.js @10gen/query-execution-indexing @svc-auto-approve-bot
 /jstests/multiVersion/genericBinVersion/**/timeseries_collection_mixed_type.js @10gen/query-integration-timeseries @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/**/example_fcv_upgrade_downgrade_test.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/**/minor_version* @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/**/mixed_replica_set_with_latest_primary.js @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/genericChangeStreams/OWNERS.yml
 /jstests/multiVersion/genericChangeStreams/**/* @10gen/query-execution-change-streams @svc-auto-approve-bot
@@ -697,6 +738,35 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/rsm* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/bit_update_mixed_fcv.js @10gen/query-execution-write-exec @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/view_definition_feature_compatibility_version.js @10gen/query-optimization-views @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/1_test_launching_replset.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/3_upgrade_replset.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/abort_unprepared_transactions_on_FCV_downgrade.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/arbiter_always_has_latest_fcv.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/await_prepared_transactions_on_FCV_downgrade.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/can_upgrade_FCV_after_failed_downgrade.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/cannot_downgrade_from_latest_to_last_continuous.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/default_startup_FCV_parameter.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/do_upgrade_downgrade.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/downgrade_replset.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/fcv_upgrade_fails_during_is_cleaning_server_metadata.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/feature_compatibility_version_lagging_secondary.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/initial_sync* @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/major_version_upgrade.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/remove_feature_compatibility_version.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/repair_feature_compatibility_version.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/restart_during_downgrading_fcv.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/rollback* @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/run_feature_flag_multiversion_test.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/set_feature_compatibility_version.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/set_feature_compatibility_version_confirm.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/test_replica_set_startup_in_downgrading_state.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/test_sharding_startup_in_downgrading_state.js @10gen/server-replication @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/libs/OWNERS.yml
+/jstests/multiVersion/libs/**/initial_sync.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/libs/**/mixed_version_fixture_test.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/libs/**/multi_rs.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/libs/**/multiversion_rollback.js @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/OWNERS.yml
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/bindata_convert_numeric_view_upgrade_downgrade.js @10gen/query-execution-aggregation @svc-auto-approve-bot
@@ -1407,6 +1477,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/whats_my_sni_command.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/commands/**/whats_my_uri_cmd.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/commands/**/xray_commands.* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/db/commands/**/test_api_version_2_commands.cpp @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/commands/query_cmd/OWNERS.yml
 /src/mongo/db/commands/query_cmd/**/* @10gen/query @svc-auto-approve-bot
@@ -2049,6 +2120,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/resharding/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/resharding/**/coordinator_document.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/session/OWNERS.yml
+/src/mongo/db/session/**/* @10gen/server-replication @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/sorter/OWNERS.yml
 /src/mongo/db/sorter/**/* @10gen/server-external-sorter @svc-auto-approve-bot
 
@@ -2059,6 +2133,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/stats/**/latency_server_status_section.cpp @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/stats/**/*resource_consumption* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/stats/**/operation_latency_histogram* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/stats/**/read_preference* @10gen/server-replication @svc-auto-approve-bot
+/src/mongo/db/stats/**/server_read_concern* @10gen/server-replication @svc-auto-approve-bot
+/src/mongo/db/stats/**/server_write_concern* @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/storage/OWNERS.yml
 /src/mongo/db/storage/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
@@ -2124,6 +2201,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/query_stage_multiplan.cpp @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/dbtests/**/catalogtests.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/dbtests/**/socktests.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/dbtests/**/mock_replica_set* @10gen/server-replication @svc-auto-approve-bot
+/src/mongo/dbtests/**/replica_set_tests.cpp @10gen/server-replication @svc-auto-approve-bot
+/src/mongo/dbtests/**/repltests.cpp @10gen/server-replication @svc-auto-approve-bot
+/src/mongo/dbtests/**/rollbacktests.cpp @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/dbtests/mock/OWNERS.yml
 /src/mongo/dbtests/mock/**/mock_conn_registry.* @10gen/server-networking-and-observability @svc-auto-approve-bot
@@ -2377,9 +2458,19 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/shell/**/types.js @10gen/devprod-correctness @svc-auto-approve-bot
 /src/mongo/shell/**/utils* @10gen/devprod-correctness @svc-auto-approve-bot
 /src/mongo/shell/**/named_pipe_test_helper* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
+/src/mongo/shell/**/feature_compatibility_version.js @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/stdx/OWNERS.yml
 /src/mongo/stdx/**/* @10gen/server-programmability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/tla_plus/Replication/MongoReplReconfig/OWNERS.yml
+/src/mongo/tla_plus/Replication/MongoReplReconfig/**/* @10gen/server-replication @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/tla_plus/Replication/RaftMongo/OWNERS.yml
+/src/mongo/tla_plus/Replication/RaftMongo/**/* @10gen/server-replication @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/tla_plus/Replication/RaftMongoReplTimestamp/OWNERS.yml
+/src/mongo/tla_plus/Replication/RaftMongoReplTimestamp/**/* @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/tla_plus/Sharding/OWNERS.yml
 /src/mongo/tla_plus/Sharding/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot

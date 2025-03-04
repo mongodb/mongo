@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "initial_sync.js":
+    approvers:
+      - 10gen/server-replication
+  - "mixed_version_fixture_test.js":
+    approvers:
+      - 10gen/server-replication
+  - "multi_rs.js":
+    approvers:
+      - 10gen/server-replication
+  - "multiversion_rollback.js":
+    approvers:
+      - 10gen/server-replication

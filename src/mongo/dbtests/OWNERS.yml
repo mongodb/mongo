@@ -63,3 +63,15 @@ filters:
   - "socktests.cpp":
     approvers:
       - 10gen/server-networking-and-observability
+  - "mock_replica_set*":
+    approvers:
+      - 10gen/server-replication
+  - "replica_set_tests.cpp":
+    approvers:
+      - 10gen/server-replication
+  - "repltests.cpp":
+    approvers:
+      - 10gen/server-replication
+  - "rollbacktests.cpp":
+    approvers:
+      - 10gen/server-replication

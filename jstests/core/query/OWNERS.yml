@@ -12,3 +12,6 @@ filters:
   - "write_change_stream_pit_preimage.js":
     approvers:
       - 10gen/query-execution-change-streams
+  - "read_after_optime.js":
+    approvers:
+      - 10gen/server-replication

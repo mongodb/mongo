@@ -9,3 +9,72 @@ filters:
   - "view_definition_feature_compatibility_version.js":
     approvers:
       - 10gen/query-optimization-views
+  - "1_test_launching_replset.js":
+    approvers:
+      - 10gen/server-replication
+  - "3_upgrade_replset.js":
+    approvers:
+      - 10gen/server-replication
+  - "abort_unprepared_transactions_on_FCV_downgrade.js":
+    approvers:
+      - 10gen/server-replication
+  - "arbiter_always_has_latest_fcv.js":
+    approvers:
+      - 10gen/server-replication
+  - "await_prepared_transactions_on_FCV_downgrade.js":
+    approvers:
+      - 10gen/server-replication
+  - "can_upgrade_FCV_after_failed_downgrade.js":
+    approvers:
+      - 10gen/server-replication
+  - "cannot_downgrade_from_latest_to_last_continuous.js":
+    approvers:
+      - 10gen/server-replication
+  - "default_startup_FCV_parameter.js":
+    approvers:
+      - 10gen/server-replication
+  - "do_upgrade_downgrade.js":
+    approvers:
+      - 10gen/server-replication
+  - "downgrade_replset.js":
+    approvers:
+      - 10gen/server-replication
+  - "fcv_upgrade_fails_during_is_cleaning_server_metadata.js":
+    approvers:
+      - 10gen/server-replication
+  - "feature_compatibility_version_lagging_secondary.js":
+    approvers:
+      - 10gen/server-replication
+  - "initial_sync*":
+    approvers:
+      - 10gen/server-replication
+  - "major_version_upgrade.js":
+    approvers:
+      - 10gen/server-replication
+  - "remove_feature_compatibility_version.js":
+    approvers:
+      - 10gen/server-replication
+  - "repair_feature_compatibility_version.js":
+    approvers:
+      - 10gen/server-replication
+  - "restart_during_downgrading_fcv.js":
+    approvers:
+      - 10gen/server-replication
+  - "rollback*":
+    approvers:
+      - 10gen/server-replication
+  - "run_feature_flag_multiversion_test.js":
+    approvers:
+      - 10gen/server-replication
+  - "set_feature_compatibility_version.js":
+    approvers:
+      - 10gen/server-replication
+  - "set_feature_compatibility_version_confirm.js":
+    approvers:
+      - 10gen/server-replication
+  - "test_replica_set_startup_in_downgrading_state.js":
+    approvers:
+      - 10gen/server-replication
+  - "test_sharding_startup_in_downgrading_state.js":
+    approvers:
+      - 10gen/server-replication

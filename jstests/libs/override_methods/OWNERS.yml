@@ -30,3 +30,9 @@ filters:
   - "set_api*":
     approvers:
       - 10gen/query-optimization-parsers
+  - "send_command_to_initial_sync_node*":
+    approvers:
+      - 10gen/server-replication
+  - "txn_passthrough_cmd_massage.js":
+    approvers:
+      - 10gen/server-replication

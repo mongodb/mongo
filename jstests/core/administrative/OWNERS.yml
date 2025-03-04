@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "list_all_local_sessions.js":
+    approvers:
+      - 10gen/server-replication
+  - "list_all_sessions.js":
+    approvers:
+      - 10gen/server-replication
+  - "list_sessions.js":
+    approvers:
+      - 10gen/server-replication
+  - "hello_response_validation.js":
+    approvers:
+      - 10gen/server-replication
