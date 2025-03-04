@@ -7,19 +7,11 @@ The query system's parsing layer has two main components:
 1. [Command Parsing and Validation](#command-parsing-and-validation) is responsible for parsing the arguments to each command, verifying the expected number of arguments, and checking their types.
 1. [Query Language Parsing and Validation](#query-language-parsing-and-validation) is responsible for more query-specific parsing. This includes (but is not limited to) parsing query predicates and aggregation pipelines.
 
-Overall, the parsing layer translates from a client-facing command (e.g. find or aggregate) to a `CanonicalQuery`.
+Overall, the parsing layer translates from a client-facing command (e.g. find or aggregate) to a parsed command object (e.g. `ParsedFindCommand` or `Pipeline`). These parsed command objects are then normalized to form the input of query planning: `CanonicalQuery`, [if possible](#parsing-aggregations).
 
 > ### Aside: `CanonicalQuery`
 >
-> A [`CanonicalQuery`](../../query/canonical_query.h) is a parsed container for the original query message. The `CanonicalQuery` is also responsible for building and holding a reference to an abstract syntax tree ([`MatchExpression`](../../matcher/expression.h)). More details about `MatchExpression` are [here](TODO SERVER-100244). Canonicalization also performs some query normalization; this means that, for example, these queries all become equivalent CanonicalQueries because `$and` and `$or` are normalized away when they have only one child.
->
-> ```
-> db.c.find({a: 1})
-> db.c.find({$and: [{a: 4}]})
-> db.c.find({$or: [{a: 4}]})
-> ```
-
-> Note: If a `CanonicalQuery` [cannot be generated](#parsing-aggregations), we move the query straight to the Query Execution layer without optimization.
+> A [`CanonicalQuery`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/canonical_query.h#L79) is a container that represents a parsed and normalized query. This includes features such as the query's `filter`, `projection`, and `sort` elements. See [here](../../query/README_logical_models.md#canonicalquery) for more information regarding `CanonicalQuery` and its normalization.
 
 ## Command Parsing and Validation
 
@@ -39,10 +31,10 @@ The QO team maintains the following commands:
   - `update`
   - `findAndModify`
 
-Each command starts in a class that inherits from the [`Command`](../../commands.h) abstract class. These commands all live in the [`src/mongo/db/commands/`](..) directory. For example:
+Each command starts in a class that inherits from the [`Command`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands.h#L435) abstract class. These commands all live in the [`src/mongo/db/commands/`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands) directory. For example:
 
-- `FindCmd` lives in [find_cmd.cpp](find_cmd.cpp)
-- `aggregate`'s command (`PipelineCommand`) lives in [`pipeline_command.cpp`](pipeline_command.cpp).
+- `FindCmd` lives in [find_cmd.cpp](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_cmd.cpp)
+- `aggregate`'s command (`PipelineCommand`) lives in [`pipeline_command.cpp`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/pipeline_command.cpp).
 
 First, we piece apart the command into its components. We don't yet try to understand the meaning of the more complex MQL arguments, such as find's `filter`, `projection`, and `sort` arguments, or the individual stages in `aggregate`'s `pipeline` argument.
 
@@ -66,7 +58,7 @@ we generate a C++ struct that stores `filter`, `sort`, and `limit` as member var
 
 > ### Aside: The Interface Definition Language
 >
-> Below is a simplified snippet of the relevant portion of `find_command.idl`. The full file can be viewed [here](../../query/find_command.idl).
+> Below is a simplified snippet of the relevant portion of `find_command.idl`. The full file can be viewed [here](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/find_command.idl).
 >
 > ```yaml
 > commands:
@@ -100,11 +92,11 @@ we generate a C++ struct that stores `filter`, `sort`, and `limit` as member var
 
 #### `ExpressionContext`
 
-An [**`ExpressionContext`**](../../pipeline/expression_context.h#L124) stores various pieces of state and settings that are pertinent throughout the lifespan of a query but are not necessarily relevant to other types of operations. This includes elements such as the collation, a time zone database, and other configuration flags (feature flags, query knobs, etc.). Each command initializes its own `ExpressionContext`; our `find` example does so [here](find_cmd.cpp#L188).
+An [**`ExpressionContext`**](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/expression_context.h#L126) stores various pieces of state and settings that are pertinent throughout the lifespan of a query but are not necessarily relevant to other types of operations. This includes elements such as the collation, a time zone database, and other configuration flags (feature flags, query knobs, etc.). Each command initializes its own `ExpressionContext`; our `find` example does so [here](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_cmd.cpp#L189).
 
 #### Non-IDL Command Validation
 
-Occasionally, the IDL parsers will not be able to express certain command constraints. For example, the `findAndModify` command cannot specify `true` for both `remove` and `new`, but the [IDL parser](../../query/write_ops/write_ops.idl#L502) alone cannot restrict the user from doing this. In these cases, we add a [`validate`](find_and_modify.cpp#L131) function to perform these final checks.
+Occasionally, the IDL parsers will not be able to express certain command constraints. For example, the `findAndModify` command cannot specify `true` for both `remove` and `new`, but the [IDL parser](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/write_ops/write_ops.idl#L497) alone cannot restrict the user from doing this. In these cases, we add a [`validate`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_and_modify.cpp#L131) function to perform these final checks.
 
 ## Query Language Parsing and Validation
 
@@ -112,21 +104,21 @@ Occasionally, the IDL parsers will not be able to express certain command constr
 
 #### Parsing Find
 
-As discussed above, the IDL handles creation of a `FindCommandRequest`. With this `FindCommandRequest` struct, we can now call [`parsed_find_command::parse()`](find_cmd.cpp#L193), passing in the `ExpressionContext` and a new struct of type `ParsedFindCommandParams`, which contains the `FindCommandRequest` as a member. A few function calls later, we reach [`MatchExpressionParser::parse()`](parsed_find_command.cpp#L186) which recursively parses the `BSONObj` `filter` component of our `FindCommandRequest` by using the `parse()` function for each type of `MatchExpression` node. This AST structure assembles the `filter` in an easily optimizable format, as each subclass `MatchExpression` node knows which rewrites are possible given their place in the AST.
+As discussed above, the IDL handles creation of a `FindCommandRequest`. With this `FindCommandRequest` struct, we can now call [`parsed_find_command::parse()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_cmd.cpp#L194), passing in the `ExpressionContext` and a new struct of type `ParsedFindCommandParams`, which contains the `FindCommandRequest` as a member. A few function calls later, we reach [`MatchExpressionParser::parse()`](https://github.com/mongodb/mongo/blob/0a68308f0d39a928ed551f285ba72ca560c38576/src/mongo/db/query/parsed_find_command.cpp#L186) which recursively parses the `BSONObj` `filter` component of our `FindCommandRequest` by using the `parse()` function for each type of `MatchExpression` node. This AST structure assembles the `filter` in an easily optimizable format, as each subclass `MatchExpression` node knows which rewrites are possible given their place in the AST.
 
-> For more information on `MatchExpression`s, see [Logical Models](TODO SERVER-100244).
+> For more information on `MatchExpression`s, see [Logical Models](../../query/README_logical_models.md).
 
 After parsing our `MatchExpression` into a tree of `MatchExpression`s , we pass the full `MatchExpression` AST to a `ParsedFindCommand`. Note that `ParsedFindCommand`s only primary components are the `filter`, `projection`, and `sort`; all other parameters (e.g. `limit`, `skip`, `batchSize`, etc.) are held as raw types in the `FindCommandRequest`.
 
-Finally, we [create](find_cmd.cpp#L240) a `CanonicalQuery` by passing the `ParsedFindCommand` as an argument, thereby giving the `CanonicalQuery` the `filter`, `projection`, `sort`, and `FindCommandRequest`.
+Finally, we [create](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_cmd.cpp#L248) a `CanonicalQuery` by passing the `ParsedFindCommand` as an argument, thereby giving the `CanonicalQuery` the `filter`, `projection`, `sort`, and `FindCommandRequest`.
 
 #### Parsing Distinct and Count
 
 The process of parsing `distinct` and `count` queries is nearly identical to that of `find`.
 
-Distinct queries are parsed by IDL into a `DistinctCommandRequest`, which is in turn converted into a `ParsedDistinctCommand` by [`parsed_distinct_command::parse()`](../../query/parsed_distinct_command.cpp#L132). If a `filter` exists on the command, it is parsed using `MatchExpressionParser::parse()` like `find`. We then create a `CanonicalQuery` by an equivalent process to find, and [add a `CanonicalDistinct`](../../query/parsed_distinct_command.cpp#L277) property to the `CanonicalQuery` with the details of the `distinct` query, such as its distinct key.
+Distinct queries are parsed by IDL into a `DistinctCommandRequest`, which is in turn converted into a `ParsedDistinctCommand` by [`parsed_distinct_command::parse()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/parsed_distinct_command.cpp#L132). If a `filter` exists on the command, it is parsed using `MatchExpressionParser::parse()` like `find`. We then create a `CanonicalQuery` by an equivalent process to find, and [add a `CanonicalDistinct`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/parsed_distinct_command.cpp#L277) property to the `CanonicalQuery` with the details of the `distinct` query, such as its distinct key.
 
-Count queries are parsed using `ParsedFindCommand`'s [`parseFromCount()`](../../query/parsed_find_command.cpp#L348) function, which converts a `CountCommandRequest` into a `FindCommandRequest` and uses the same logic as `find` thereafter.
+Count queries are parsed using `ParsedFindCommand`'s [`parseFromCount()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/parsed_find_command.cpp#L349) function, which converts a `CountCommandRequest` into a `FindCommandRequest` and uses the same logic as `find` thereafter.
 
 ```mermaid
 flowchart LR
@@ -152,25 +144,25 @@ flowchart LR
 
 ### Parsing Aggregations
 
-After producing an `AggregateCommandRequest` via IDL, the request is [passed and parsed](../../pipeline/lite_parsed_pipeline.h#L68) into a `LiteParsedPipeline`.
+After producing an `AggregateCommandRequest` via IDL, the request is [passed and parsed](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/lite_parsed_pipeline.h#L70) into a `LiteParsedPipeline`.
 
 > ### Aside: `LiteParsedPipeline`
 >
-> A `LiteParsedPipeline` is a simple model of an aggregation pipeline that is constructed through a [semi-parse](../../pipeline/lite_parsed_document_source.h#L131) that proceeds just enough to tease apart the stages that are involved. `LiteParsedPipeline`s do not verify that the input is well-formed; instead, they can be used to _inspect_ queries before building a full model of the user's pipeline.
+> A `LiteParsedPipeline` is a simple model of an aggregation pipeline that is constructed through a [semi-parse](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/lite_parsed_document_source.h#L144) that proceeds just enough to tease apart the stages that are involved. `LiteParsedPipeline`s do not verify that the input is well-formed; instead, they can be used to _inspect_ queries before building a full model of the user's pipeline.
 >
-> - For example, on systems running with authorization, the `$currentOp` aggregation stage requires that the user has access that includes the [`inprog`](https://www.mongodb.com/docs/manual/reference/privilege-actions/#mongodb-authaction-inprog) privilege action. That means that if our `LiteParsedPipeline` finds a `$currentOp` that does not satisfy the [necessary privileges](../../pipeline/document_source_current_op.h#L103), we can [return an error](../../auth/authorization_checks.cpp#L88) and avoid the more expensive `DocumentSource` parsing process.
+> - For example, on systems running with authorization, the `$currentOp` aggregation stage requires that the user has access that includes the [`inprog`](https://www.mongodb.com/docs/manual/reference/privilege-actions/#mongodb-authaction-inprog) privilege action. That means that if our `LiteParsedPipeline` finds a `$currentOp` that does not satisfy the [necessary privileges](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source_current_op.h#L104), we can [return an error](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/auth/authorization_checks.cpp#L88) and avoid the more expensive `DocumentSource` parsing process.
 
-After confirming that the `LiteParsedPipeline` satisfies all the necessary permissions, the full `AggregateCommandRequest` is passed to [`Pipeline::parseCommon()`](../../pipeline/pipeline.cpp#L220) as a vector of pipeline stages (represented as raw `BSONObj`s). Each pipeline stage is then re-parsed using [`DocumentSource::parse()`](../../pipeline/document_source.cpp#L131), which calls on the `DocumentSource<Stage>::createFromBson()` parser for each stage. Note that this procedure is inefficient, as it requires parsing the original `AggregateCommandRequest` twice, rather than [utilizing the `LiteParsedPipeline`](https://jira.mongodb.org/browse/SERVER-93372) when creating `DocumentSource`s.
+After confirming that the `LiteParsedPipeline` satisfies all the necessary permissions, the full `AggregateCommandRequest` is passed to [`Pipeline::parseCommon()`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/pipeline.cpp#L220) as a vector of pipeline stages (represented as raw `BSONObj`s). Each pipeline stage is then re-parsed using [`DocumentSource::parse()`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source.cpp#L131), which calls on the `DocumentSource<Stage>::createFromBson()` parser for each stage. Note that this procedure is inefficient, as it requires parsing the original `AggregateCommandRequest` twice, rather than [utilizing the `LiteParsedPipeline`](https://jira.mongodb.org/browse/SERVER-93372) when creating `DocumentSource`s.
 
 > ### Aside: `DocumentSource`
 >
-> A `DocumentSource` represents one stage of an aggregation pipeline. Each `DocumentSource` lives in its own file with this form: [`src/mongo/db/pipeline/document_source_<stage>`](../../pipeline/), with a [`REGISTER_DOCUMENT_SOURCE`](../../pipeline/document_source.h#L117) macro at the top. Each `DocumentSource` also features a `createFromBson()` function; this is the main parsing function for each `DocumentSource`. By registering each document source with its lite parsing and full parsing functions, we can recursively parse the entire pipeline, stage by stage.
+> A `DocumentSource` represents one stage of an aggregation pipeline. Each `DocumentSource` lives in its own file with this form: [`src/mongo/db/pipeline/document_source_<stage>`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/), with a [`REGISTER_DOCUMENT_SOURCE`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source.h#L118) macro at the top. Each `DocumentSource` also features a `createFromBson()` function; this is the main parsing function for each `DocumentSource`. By registering each document source with its lite parsing and full parsing functions, we can recursively parse the entire pipeline, stage by stage.
 >
-> Important Note: Not all `DocumentSource`s get parsed into their own stages. Major stages like `$match` have a [`createFromBson()`](../../pipeline/document_source_match.cpp#L605) that returns a `DocumentSourceMatch`, but some stages are aliases for other `DocumentSource`s.
+> Important Note: Not all `DocumentSource`s get parsed into their own stages. Major stages like `$match` have a [`createFromBson()`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source_match.cpp#L603) that returns a `DocumentSourceMatch`, but some stages are aliases for other `DocumentSource`s.
 >
-> - For example, [`DocumentSourceBucket::createFromBson()`](../../pipeline/document_source_bucket.cpp#L74) returns two `DocumentSource`s: a `$group` stage and a `$sort` stage by calling on `DocumentSourceGroup` and `DocumentSourceSort`'s respective `createFromBson()` functions.
+> - For example, [`DocumentSourceBucket::createFromBson()`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source_bucket.cpp#L74) returns two `DocumentSource`s: a `$group` stage and a `$sort` stage by calling on `DocumentSourceGroup` and `DocumentSourceSort`'s respective `createFromBson()` functions.
 
-The [result](../../pipeline/pipeline.cpp#L240) of this parsing is a `Pipeline` object which contains a list of parsed `DocumentSource`s as a member. Our final goal, however, is to get a `CanonicalQuery`. This may or may not be possible depending on the type of aggregation. For example:
+The [result](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/pipeline.cpp#L240) of this parsing is a `Pipeline` object which contains a list of parsed `DocumentSource`s as a member. Our final goal, however, is to get a `CanonicalQuery`. This may or may not be possible depending on the type of aggregation. For example:
 
 > ```
 > // This query fully undergoes optimization as a CanonicalQuery.
@@ -179,11 +171,11 @@ The [result](../../pipeline/pipeline.cpp#L240) of this parsing is a `Pipeline` o
 > db.c.aggregate([{$addFields: {b: {$add: ["$a", 1]}}}])
 > ```
 
-If some component of the `Pipeline` can become a `CanonicalQuery` (i.e. it contains a filter, sort, projection, etc.), we will [create a `CanonicalQuery`](../../pipeline/pipeline_d.cpp#L1143) for this `Pipeline`, and proceed with optimization and execution as we would with a find command.
+If some component of the `Pipeline` can become a `CanonicalQuery` (i.e. it contains a filter, sort, projection, etc.), we will [create a `CanonicalQuery`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/pipeline_d.cpp#L1161) for this `Pipeline`, and proceed with optimization and execution as we would with a find command.
 
 #### Parsing MapReduce
 
-After parsing into a `MapReduceCommandRequest` via IDL, the `MapReduceCommandRequest` is [translated](map_reduce_agg.cpp#L174) into an equivalent pipeline using the same `DocumentSource<Stage>` parsing functions as aggregation.
+After parsing into a `MapReduceCommandRequest` via IDL, the `MapReduceCommandRequest` is [translated](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/map_reduce_agg.cpp#L175) into an equivalent pipeline using the same `DocumentSource<Stage>` parsing functions as aggregation.
 
 ```mermaid
 flowchart LR
@@ -212,9 +204,9 @@ flowchart LR
 
 Insert, Delete, Update, and FindAndModify are all parsed by IDL as described above and converted into a `BulkWriteCommandRequest`, `DeleteRequest`, `UpdateRequest`, `FindAndModifyCommandRequest`, respectively.
 
-Inserts are internally [represented](bulk_write.idl#L311) as a `BulkWriteCommandRequest` which contains an array of `BulkWriteInsertOp`s. No query optimization is needed for inserts beyond parsing, as insert is a write-only operation.
+Inserts are internally [represented](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/bulk_write.idl#L308) as a `BulkWriteCommandRequest` which contains an array of `BulkWriteInsertOp`s. No query optimization is needed for inserts beyond parsing, as insert is a write-only operation.
 
-`DeleteRequest`s are passed into a `ParsedDelete` constructor and `UpdateRequest`s are passed to a `ParsedUpdate` constructor. Both of these constructors will in turn pass the request to [`parseWriteQueryToCQ()`](../../query/write_ops/parsed_writes_common.h#L84). This function parses the `filter` component of the write query as if it were a `FindCommandRequest`, and the result is a `CanonicalQuery`, just as it is with `find`.
+`DeleteRequest`s are passed into a `ParsedDelete` constructor and `UpdateRequest`s are passed to a `ParsedUpdate` constructor. Both of these constructors will in turn pass the request to [`parseWriteQueryToCQ()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/write_ops/parsed_writes_common.h#L84). This function parses the `filter` component of the write query as if it were a `FindCommandRequest`, and the result is a `CanonicalQuery`, just as it is with `find`.
 
 `FindAndModifyCommandRequest`s can contain both find and update/delete syntax. For this reason, the query portion is entirely delegated to the `find` query parser. The update or delete portion is translated into a `ParsedUpdate` or `ParsedDelete`, each of which uses the corresponding codepath henceforth.
 
