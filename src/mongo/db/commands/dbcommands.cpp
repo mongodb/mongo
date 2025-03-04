@@ -530,9 +530,11 @@ public:
                     "to true simultaneously",
                     !(isChangeStreamPreAndPostImagesEnabled && isRecordPreImagesEnabled));
         } else {
+            // Do not allow 'changeStreamPreAndPostImages.enabled' option to be set to true without
+            // the feature flag being enabled.
             uassert(ErrorCodes::InvalidOptions,
-                    "BSON field 'changeStreamPreAndPostImages' is an unknown field.",
-                    !cmd->getChangeStreamPreAndPostImages().has_value());
+                    "Cannot set 'changeStreamPreAndPostImages.enabled' to true under FCV 5.0.",
+                    !isChangeStreamPreAndPostImagesEnabled);
         }
 
         // Updating granularity on sharded time-series collections is not allowed.

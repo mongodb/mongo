@@ -1,10 +1,6 @@
 /**
  * Verifies that it is possible to upgrade a replica set with collections with 'recordPreImages'
  * option to use 'changeStreamPreAndPostImages' option, and to do a corresponding downgrade.
- * @tags: [
- *  requires_fcv_60,
- *  featureFlagChangeStreamPreAndPostImages,
- * ]
  */
 (function() {
 'use strict';
@@ -57,8 +53,13 @@ function testCreateAndCollModCommandsInUpgradedDowngradedFCVStates(downgradeFCV)
                                 {"changeStreamPreAndPostImages": {enabled: false}}),
         ErrorCodes.InvalidOptions);
     assert.commandFailedWithCode(
-        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: false}}),
+        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: true}}),
         ErrorCodes.InvalidOptions);
+
+    // Verify that running collMod with 'changeStreamPreAndPostImages' option being set to false
+    // works on the downgraded FCV version.
+    assert.commandWorked(
+        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: false}}));
 
     // Set the FCV to the latest.
     assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
@@ -212,7 +213,7 @@ function testFCVDowngradeFailureWhenChangeStreamPreAndPostImagesEnabledForCollec
     // Pre-images collection must exist upon start-up with the latest FCV.
     assertPreImagesCollectionExists(testDB);
     assert.commandWorked(
-        testDB.createCollection("testCollection", {changeStreamPreAndPostImages: {enabled: true}}));
+        testDB.createCollection(collName, {changeStreamPreAndPostImages: {enabled: true}}));
 
     // Verify that a downgrade of the FCV fails when there is at least one collection with
     // {changeStreamPreAndPostImages: {enabled: true}} option set.
@@ -222,6 +223,31 @@ function testFCVDowngradeFailureWhenChangeStreamPreAndPostImagesEnabledForCollec
 
     // Verify that the pre-images collection is not dropped in case of a failed FCV downgrade.
     assertPreImagesCollectionExists(testDB);
+
+    // Verify that FCV incorrectly is set to 5.0.
+    let fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert.eq(fcvDoc.featureCompatibilityVersion.version,
+              downgradeFCV,
+              "Expected FCV value to be set to 5.0 on failed FCV downgrade");
+
+    // Issue "collMod" command in order to disable changeStreamPreAndPostImages option.
+    assert.commandWorked(
+        testDB.runCommand({"collMod": collName, changeStreamPreAndPostImages: {enabled: false}}));
+
+    // Downgrade the FCV version.
+    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+
+    // Verify that the pre-images collection is dropped.
+    assertPreImagesCollectionIsAbsent(testDB);
+
+    // Upgrade the FCV version.
+    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+
+    // Verify that FCV is set to 6.0.
+    fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert.eq(fcvDoc.featureCompatibilityVersion.version,
+              latestFCV,
+              "Expected FCV value to be set to 6.0 on successful FCV upgrade");
 
     rst.stopSet();
 }

@@ -923,8 +923,11 @@ Status _collModInternal(OperationContext* opCtx,
             }
         } else {
             // If the FCV has changed while executing the command to the version, where the feature
-            // flag is disabled, specifying changeStreamPreAndPostImagesOptions is not allowed.
-            if (cmrNew.changeStreamPreAndPostImagesOptions) {
+            // flag is disabled, specifying 'changeStreamPreAndPostImagesOptions' option being set
+            // to true is not allowed.
+            if (cmrNew.changeStreamPreAndPostImagesOptions
+                    .get_value_or(ChangeStreamPreAndPostImagesOptions(false))
+                    .getEnabled()) {
                 return Status(ErrorCodes::InvalidOptions,
                               "The 'changeStreamPreAndPostImages' is an unknown field.");
             }
