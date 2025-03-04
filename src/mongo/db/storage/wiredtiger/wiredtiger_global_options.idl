@@ -65,7 +65,7 @@ configs:
         cpp_varname: 'wiredTigerGlobalOptions.zstdCompressorLevel'
         short_name: zstdDefaultCompressionLevel
         validator:
-            gte: 1
+            gte: -7
             lte: 22
         default: 6
     "storage.wiredTiger.engineConfig.journalCompressor":
