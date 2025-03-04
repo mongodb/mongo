@@ -258,15 +258,28 @@ server_parameters:
             gte: 0
         redact: false
 
-    reshardingVerificationChangeStreamsEventsBatchSize:
+    reshardingVerificationChangeStreamsEventsBatchSizeLimit:
         description: >-
-            The number of events to process during verification before updating the change in the
-            number of documents and the resume token for the change stream.
+            The maximum number of events to process during verification before updating the change
+            in the number of documents and the resume token for the change stream.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: gReshardingVerificationChangeStreamsEventsBatchSize
+        cpp_varname: gReshardingVerificationChangeStreamsEventsBatchSizeLimit
         default:
             expr: 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds:
+        description: >-
+            The maximum number of seconds to process events during verification before updating the
+            change in the number of documents and the resume token for the change stream.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds
+        default:
+            expr: 5 * 60
         validator:
             gte: 0
         redact: false

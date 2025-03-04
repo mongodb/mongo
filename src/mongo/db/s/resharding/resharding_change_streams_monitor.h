@@ -28,21 +28,14 @@
  */
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/util/future_util.h"
 #include <future>
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/query/exec/establish_cursors.h"
-#include "mongo/util/cancellation.h"
+#include "mongo/util/future_util.h"
 
 namespace mongo {
 
@@ -53,8 +46,58 @@ namespace mongo {
 class ReshardingChangeStreamsMonitor
     : public std::enable_shared_from_this<ReshardingChangeStreamsMonitor> {
 public:
-    using BatchProcessedCallback =
-        std::function<void(int documentsDelta, BSONObj resumeToken, bool completed)>;
+    enum Role { kDonor, kRecipient };
+
+    class EventBatch {
+    public:
+        EventBatch(Role role);
+
+        /**
+         * Adds the event to the batch.
+         */
+        void add(const BSONObj& event);
+
+        /**
+         * Returns true if this monitor should stop adding more events to this batch, i.e. if one of
+         * the following is true.
+         * - The cursor has reached the final event.
+         * - The batch has reached the configured size limit.
+         * - The batch has reached the configured time limit.
+         */
+        bool shouldDispose();
+
+        /**
+         * Returns true if this batch contains the final event, i.e. it is the final batch.
+         */
+        bool containsFinalEvent() const;
+
+        /**
+         * Returns true if the batch is empty.
+         */
+        bool empty() const;
+
+        /**
+         * Getters.
+         */
+        int64_t numEvents() const;
+        int64_t documentsDelta() const;
+        BSONObj resumeToken() const;
+
+    private:
+        const Role _role;
+        // The timestamp at which the batch started.
+        const Date_t _createdAt;
+
+        bool _containsFinalEvent = false;
+        // The last event in this batch,
+        boost::optional<BSONObj> _lastEvent;
+        // The number of events in this batch.
+        int64_t _numEvents = 0;
+        // The change in documents based on the events in this batch.
+        int64_t _documentsDelta = 0;
+    };
+
+    using BatchProcessedCallback = std::function<void(const EventBatch& batch)>;
 
     ReshardingChangeStreamsMonitor(UUID reshardingUUID,
                                    NamespaceString monitorNss,
@@ -71,6 +114,7 @@ public:
      */
     SemiFuture<void> startMonitoring(std::shared_ptr<executor::TaskExecutor> executor,
                                      std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+                                     CancellationToken cancelToken,
                                      CancelableOperationContextFactory factory);
 
     /**
@@ -85,30 +129,54 @@ public:
      */
     SharedSemiFuture<void> awaitCleanup();
 
+    /**
+     * Used for testing only. Returns the number of events and batches consumed, respectively. Can
+     * only be called after the monitor is completed since there is no locking to prevent concurrent
+     * access to the variables.
+     */
+    int64_t numEventsTotalForTest();
+    int64_t numBatchesForTest();
+
 private:
     /**
-     * Creates the aggregation command request for the change streams.
+     * Creates the aggregation pipeline for the change streams monitor.
      */
-    AggregateCommandRequest _makeAggregateCommandRequest();
+    std::vector<BSONObj> _makeAggregatePipeline() const;
 
     /**
-     * Continuously fetch and process events from the change streams.
+     * Creates the aggregation command request for the change streams monitor from the pipeline
+     * created above.
      */
-    void _consumeChangeEvents(OperationContext* opCtx, const AggregateCommandRequest& aggRequest);
-    void _processChangeEvent(BSONObj changeEvent);
+    AggregateCommandRequest _makeAggregateCommandRequest() const;
+
+    /**
+     * If the monitor has already opened a change stream cursor, creates a DBClientCursor from the
+     * existing cursor id. Otherwise, creates a DBClientCursor by opening a change stream cursor
+     * through running the change stream aggregate command, and then stores the cursor id.
+     * Returns the resulting DBClientCursor.
+     */
+    std::unique_ptr<mongo::DBClientCursor> _makeDBClientCursor(DBDirectClient* client);
+
+    /**
+     * Continuously fetches and processes events from the change streams until the monitor has
+     * consumed the final change event or the 'executor' has been shut down or the cancellation
+     * source for 'factory' has been cancelled.
+     */
+    ExecutorFuture<void> _consumeChangeEvents(std::shared_ptr<executor::TaskExecutor> executor,
+                                              CancellationToken cancelToken,
+                                              CancelableOperationContextFactory factory);
 
     const UUID _reshardingUUID;
     const NamespaceString _monitorNss;
     const boost::optional<Timestamp> _startAt;
     const boost::optional<BSONObj> _startAfter;
-    const bool _isRecipient;
+    const Role _role;
     const BatchProcessedCallback _batchProcessedCallback;
 
-    // Records the change in documents as the events are observed.
-    int _documentsDelta = 0;
-
-    // Records the number of events processed.
-    int _numEventsProcessed = 0;
+    boost::optional<CursorId> _cursorId;
+    // The total number of events and batches consumed.
+    int64_t _numEventsTotal = 0;
+    int64_t _numBatches = 0;
 
     bool _receivedFinalEvent = false;
     std::unique_ptr<SharedPromise<void>> _finalEventPromise;

@@ -353,6 +353,7 @@ private:
 
     void _createAndStartChangeStreamsMonitor(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken,
         const CancelableOperationContextFactory& factory);
 
     ExecutorFuture<void> _awaitChangeStreamsMonitorCompleted(

@@ -27,19 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
-#include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/sharding_state.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
@@ -47,8 +43,9 @@
 namespace mongo {
 
 namespace {
+
 MONGO_FAIL_POINT_DEFINE(failReshardingChangeStreamsMonitorAfterProcessingBatch);
-MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeRecievingNextBatch);
+MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeReceivingNextBatch);
 
 const StringData kAggregateCommentFieldName = "reshardingChangeStreamsMonitor"_sd;
 const StringData kCommonUUIDFieldName = "commonUUID"_sd;
@@ -144,6 +141,15 @@ void fulfilledPromise(SharedPromise<void>& sp, Status status) {
     }
 }
 
+/**
+ * Returns the role for monitor based on the namespace it is monitoring.
+ */
+ReshardingChangeStreamsMonitor::Role getRole(NamespaceString monitorNss) {
+    return monitorNss.isTemporaryReshardingCollection()
+        ? ReshardingChangeStreamsMonitor::Role::kRecipient
+        : ReshardingChangeStreamsMonitor::Role::kDonor;
+}
+
 }  // namespace
 
 ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(UUID reshardingUUID,
@@ -153,7 +159,7 @@ ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(UUID reshardingUU
     : _reshardingUUID(reshardingUUID),
       _monitorNss(monitorNss),
       _startAt(startAtOperationTime),
-      _isRecipient(monitorNss.isTemporaryReshardingCollection()),
+      _role(getRole(monitorNss)),
       _batchProcessedCallback(callback) {}
 
 ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(UUID reshardingUUID,
@@ -163,22 +169,24 @@ ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(UUID reshardingUU
     : _reshardingUUID(reshardingUUID),
       _monitorNss(monitorNss),
       _startAfter(startAfterToken),
-      _isRecipient(monitorNss.isTemporaryReshardingCollection()),
+      _role(getRole(monitorNss)),
       _batchProcessedCallback(callback) {}
 
 SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+    CancellationToken cancelToken,
     CancelableOperationContextFactory factory) {
-    if (_finalEventPromise || _cleanupPromise) {
+    if (_finalEventPromise) {
         return SemiFuture<void>::makeReady(
             Status{ErrorCodes::Error{1006687}, "Cannot start monitoring more than once"});
     }
 
     _finalEventPromise = std::make_unique<SharedPromise<void>>();
     _cleanupPromise = std::make_unique<SharedPromise<void>>();
+
     return ExecutorFuture<void>(executor)
-        .then([this, executor, factory]() {
+        .then([this, executor, cancelToken, factory]() {
             tassert(1009071,
                     str::stream() << "Expected the change streams monitor to have 'startAt' or "
                                      "'startAfter' but it has neither of them",
@@ -198,10 +206,7 @@ SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
                       "The change streams monitor is resuming",
                       "reshardingUUID"_attr = _reshardingUUID);
             }
-
-            auto opCtx = factory.makeOperationContext(&cc());
-            auto aggRequest = _makeAggregateCommandRequest();
-            _consumeChangeEvents(opCtx.get(), aggRequest);
+            return _consumeChangeEvents(executor, cancelToken, factory);
         })
         .onCompletion([this, anchor = shared_from_this()](Status status) {
             LOGV2(9981901,
@@ -255,18 +260,26 @@ SharedSemiFuture<void> ReshardingChangeStreamsMonitor::awaitCleanup() {
     return _cleanupPromise->getFuture();
 }
 
-AggregateCommandRequest ReshardingChangeStreamsMonitor::_makeAggregateCommandRequest() {
+int64_t ReshardingChangeStreamsMonitor::numEventsTotalForTest() {
+    return _numEventsTotal;
+}
+
+int64_t ReshardingChangeStreamsMonitor::numBatchesForTest() {
+    return _numBatches;
+}
+
+std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() const {
     DocumentSourceChangeStreamSpec changeStreamSpec;
     changeStreamSpec.setAllowToRunOnSystemNS(_monitorNss.isSystem());
     // The monitor for a recipient needs to set 'showMigrationEvents' to true since the events
     // against the temporary resharding collection are only output when 'showMigrationEvents'
     // is true. The monitor for a donor needs to set 'showMigrationEvents' to false to avoid
     // capturing range deletions.
-    changeStreamSpec.setShowMigrationEvents(_isRecipient);
+    changeStreamSpec.setShowMigrationEvents(_role == Role::kRecipient);
     // The monitor for a donor needs to set "showSystemEvents" to true since the
     // 'reshardBlockingWrites' event, which is the final event on a donor, is only output when
     // "showSystemEvents" is true.
-    changeStreamSpec.setShowSystemEvents(!_isRecipient);
+    changeStreamSpec.setShowSystemEvents(_role == Role::kDonor);
     if (_startAt) {
         changeStreamSpec.setStartAtOperationTime(*_startAt);
     } else {
@@ -279,7 +292,7 @@ AggregateCommandRequest ReshardingChangeStreamsMonitor::_makeAggregateCommandReq
     BSONArrayBuilder operationTypesArrayBuilder;
     operationTypesArrayBuilder.append(DocumentSourceChangeStream::kInsertOpType);
     operationTypesArrayBuilder.append(DocumentSourceChangeStream::kDeleteOpType);
-    if (_isRecipient) {
+    if (_role == Role::kRecipient) {
         operationTypesArrayBuilder.append(DocumentSourceChangeStream::kReshardDoneCatchUpOpType);
     } else {
         operationTypesArrayBuilder.append(DocumentSourceChangeStream::kReshardBlockingWritesOpType);
@@ -287,76 +300,164 @@ AggregateCommandRequest ReshardingChangeStreamsMonitor::_makeAggregateCommandReq
     BSONObj matchStage = BSON("$match" << BSON(DocumentSourceChangeStream::kOperationTypeField
                                                << BSON("$in" << operationTypesArrayBuilder.arr())));
 
-    const std::vector<BSONObj> rawPipeline = {changeStreamStage, matchStage};
+    return {std::move(changeStreamStage), std::move(matchStage)};
+}
 
-    AggregateCommandRequest aggRequest(_monitorNss, std::move(rawPipeline));
+AggregateCommandRequest ReshardingChangeStreamsMonitor::_makeAggregateCommandRequest() const {
+    auto pipeline = _makeAggregatePipeline();
+    AggregateCommandRequest aggRequest(_monitorNss, std::move(pipeline));
+
+    auto batchSize = std::min(
+        (long long)resharding::gReshardingVerificationChangeStreamsEventsBatchSizeLimit.load(),
+        aggregation_request_helper::kDefaultBatchSize);
+    mongo::SimpleCursorOptions cursorOptions;
+    cursorOptions.setBatchSize(batchSize);
+    aggRequest.setCursor(std::move(cursorOptions));
+
     aggRequest.setComment(
         mongo::IDLAnyTypeOwned(BSON("" << makeAggregateComment(_reshardingUUID)).firstElement()));
+
     return aggRequest;
 }
 
-void ReshardingChangeStreamsMonitor::_consumeChangeEvents(
-    OperationContext* opCtx, const AggregateCommandRequest& aggRequest) {
-    DBDirectClient client(opCtx);
-    auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &client, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
+std::unique_ptr<mongo::DBClientCursor> ReshardingChangeStreamsMonitor::_makeDBClientCursor(
+    DBDirectClient* client) {
+    // Use exhaust to make the cursor eagerly generate the next batches as soon as the events are
+    // ready to make fetching faster.
+    bool useExhaust = true;
+    // Prevent the cursor from being killed after this DBClientCursor is thrown away after each
+    // iteration. The cursor will be killed at the end using the cleanup executor.
+    bool keepCursorOpen = true;
 
-    while (!_receivedFinalEvent) {
-        if (cursor->more()) {
-            auto doc = cursor->next();
-            _processChangeEvent(doc);
-
-            if (_receivedFinalEvent ||
-                _numEventsProcessed %
-                        resharding::gReshardingVerificationChangeStreamsEventsBatchSize.load() ==
-                    0) {
-                const auto resumeToken = doc.getObjectField("_id");
-
-                // Create an alternative client so the callback can create its own opCtx to do
-                // writes without impacting the opCtx used to open the change stream cursor above.
-                auto newClient =
-                    opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
-                AlternativeClientRegion acr(newClient);
-                _batchProcessedCallback(_documentsDelta, resumeToken, _receivedFinalEvent);
-                _documentsDelta = 0;
-
-                if (MONGO_unlikely(
-                        failReshardingChangeStreamsMonitorAfterProcessingBatch.shouldFail())) {
-                    uasserted(ErrorCodes::InternalError, "Failing for failpoint");
-                }
-            }
-
-            hangReshardingChangeStreamsMonitorBeforeRecievingNextBatch.pauseWhileSet();
-        } else {
-            // TODO (SERVER-101189): Make each getMore command in ReshardingChangeStreamsMonitor
-            // wait longer for change events.
-            opCtx->sleepFor(
-                Milliseconds(resharding::gReshardingVerificationChangeStreamsSleepMS.load()));
-        }
+    if (!_cursorId) {
+        auto aggRequest = _makeAggregateCommandRequest();
+        auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+            client, aggRequest, false /* secondaryOk */, useExhaust, keepCursorOpen));
+        _cursorId = cursor->getCursorId();
+        return cursor;
     }
+    return std::make_unique<DBClientCursor>(client,
+                                            _monitorNss,
+                                            *_cursorId,
+                                            useExhaust,
+                                            std::vector<BSONObj>{} /* initialBatch */,
+                                            boost::none /* operationTime*/,
+                                            boost::none /* postBatchResumeToken*/,
+                                            keepCursorOpen);
 }
 
-void ReshardingChangeStreamsMonitor::_processChangeEvent(const BSONObj changeEvent) {
+ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
+    std::shared_ptr<executor::TaskExecutor> executor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory factory) {
+    return AsyncTry([this, factory] {
+               EventBatch batch(_role);
+
+               auto opCtx = factory.makeOperationContext(&cc());
+               DBDirectClient client(opCtx.get());
+               auto cursor = _makeDBClientCursor(&client);
+
+               while (!batch.shouldDispose()) {
+                   if (cursor->more()) {
+                       auto doc = cursor->next();
+                       batch.add(doc);
+                   } else {
+                       // TODO (SERVER-101189): Make each getMore command in
+                       // ReshardingChangeStreamsMonitor wait longer for change events.
+                       opCtx->sleepFor(Milliseconds(
+                           resharding::gReshardingVerificationChangeStreamsSleepMS.load()));
+                   }
+               }
+
+               // If there are remaining events in the last getMore batch, process all of them
+               // unless we have reached the final event.
+               while (!batch.containsFinalEvent() && cursor->moreInCurrentBatch()) {
+                   auto doc = cursor->next();
+                   batch.add(doc);
+               }
+
+               if (!batch.empty()) {
+                   // Create an alternative client so the callback can create its own opCtx to do
+                   // writes without impacting the opCtx used to open the change stream cursor.
+                   auto newClient =
+                       opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
+                   AlternativeClientRegion acr(newClient);
+                   _batchProcessedCallback(batch);
+               }
+
+               _numEventsTotal += batch.numEvents();
+               _numBatches++;
+               _receivedFinalEvent = batch.containsFinalEvent();
+
+               if (MONGO_unlikely(
+                       failReshardingChangeStreamsMonitorAfterProcessingBatch.shouldFail())) {
+                   uasserted(ErrorCodes::InternalError, "Failing for failpoint");
+               }
+               hangReshardingChangeStreamsMonitorBeforeReceivingNextBatch.pauseWhileSet();
+           })
+        .until([this](Status status) { return _receivedFinalEvent || !status.isOK(); })
+        .on(executor, cancelToken);
+}
+
+ReshardingChangeStreamsMonitor::EventBatch::EventBatch(Role role)
+    : _role(role), _createdAt(Date_t::now()) {}
+
+void ReshardingChangeStreamsMonitor::EventBatch::add(const BSONObj& event) {
+    _lastEvent = event;
+
     const StringData eventOpType =
-        changeEvent.getStringField(DocumentSourceChangeStream::kOperationTypeField);
+        event.getStringField(DocumentSourceChangeStream::kOperationTypeField);
 
     if (eventOpType == DocumentSourceChangeStream::kInsertOpType) {
         _documentsDelta += 1;
     } else if (eventOpType == DocumentSourceChangeStream::kDeleteOpType) {
         _documentsDelta -= 1;
     } else if (eventOpType == DocumentSourceChangeStream::kReshardDoneCatchUpOpType &&
-               _isRecipient) {
-        _receivedFinalEvent = true;
+               _role == Role::kRecipient) {
+        _containsFinalEvent = true;
     } else if (eventOpType == DocumentSourceChangeStream::kReshardBlockingWritesOpType &&
-               !_isRecipient) {
-        _receivedFinalEvent = true;
+               _role == Role::kDonor) {
+        _containsFinalEvent = true;
     } else {
         LOGV2(9981902,
               "Unrecognized event while processing change stream event for resharding validation",
-              "Event"_attr = changeEvent.toString());
+              "Event"_attr = event.toString());
     }
 
-    _numEventsProcessed += 1;
+    _numEvents += 1;
 }
+
+bool ReshardingChangeStreamsMonitor::EventBatch::shouldDispose() {
+    if (_containsFinalEvent) {
+        return true;
+    }
+
+    auto batchSizeLimit =
+        resharding::gReshardingVerificationChangeStreamsEventsBatchSizeLimit.load();
+    auto batchTimeLimit =
+        Seconds(resharding::gReshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds.load());
+    return _numEvents >= batchSizeLimit || (Date_t::now() - _createdAt) >= batchTimeLimit;
+}
+
+bool ReshardingChangeStreamsMonitor::EventBatch::containsFinalEvent() const {
+    return _containsFinalEvent;
+}
+
+bool ReshardingChangeStreamsMonitor::EventBatch::empty() const {
+    return _numEvents == 0;
+}
+
+int64_t ReshardingChangeStreamsMonitor::EventBatch::numEvents() const {
+    return _numEvents;
+};
+
+int64_t ReshardingChangeStreamsMonitor::EventBatch::documentsDelta() const {
+    return _documentsDelta;
+};
+
+BSONObj ReshardingChangeStreamsMonitor::EventBatch::resumeToken() const {
+    return _lastEvent->getObjectField("_id");
+};
+
 
 }  // namespace mongo

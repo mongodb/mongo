@@ -368,7 +368,7 @@ private:
 
     // Set the batch size 1 to test multi-batch processing in unit tests with multiple events.
     RAIIServerParameterControllerForTest _batchSize{
-        "reshardingVerificationChangeStreamsEventsBatchSize", 1};
+        "reshardingVerificationChangeStreamsEventsBatchSizeLimit", 1};
 
 protected:
     // The clone timestamp is set per test case after creating the source collection.

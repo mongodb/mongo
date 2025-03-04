@@ -1040,20 +1040,19 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
             return ExecutorFuture<void>(**executor, Status::OK());
         })
         .then([this, executor, abortToken] {
-            auto batchCallback = [this, anchor = shared_from_this()](
-                                     int documentsDelta, BSONObj resumeToken, bool completed) {
+            auto batchCallback = [this, anchor = shared_from_this()](const auto& batch) {
                 LOGV2(9858404,
                       "Persisting change streams monitor's progress",
                       "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                      "documentsDelta"_attr = documentsDelta,
-                      "completed"_attr = completed);
+                      "documentsDelta"_attr = batch.documentsDelta(),
+                      "completed"_attr = batch.containsFinalEvent());
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
                 auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
-                changeStreamsMonitorCtx.setResumeToken(resumeToken.getOwned());
+                changeStreamsMonitorCtx.setResumeToken(batch.resumeToken().getOwned());
                 changeStreamsMonitorCtx.setDocumentsDelta(
-                    changeStreamsMonitorCtx.getDocumentsDelta() + documentsDelta);
-                changeStreamsMonitorCtx.setCompleted(completed);
+                    changeStreamsMonitorCtx.getDocumentsDelta() + batch.documentsDelta());
+                changeStreamsMonitorCtx.setCompleted(batch.containsFinalEvent());
 
                 _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
             };
@@ -1079,6 +1078,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                 _changeStreamsMonitor
                     ->startMonitoring(**executor,
                                       _donorService->getInstanceCleanupExecutor(),
+                                      abortToken,
                                       *_cancelableOpCtxFactory)
                     .share();
             _changeStreamsMonitorStarted.emplaceValue();

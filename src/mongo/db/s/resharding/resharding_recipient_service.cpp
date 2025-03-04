@@ -358,8 +358,8 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                 .then([this, executor, abortToken, &factory] {
                     return _buildIndexThenTransitionToApplying(executor, abortToken, factory);
                 })
-                .then([this, executor, &factory] {
-                    return _createAndStartChangeStreamsMonitor(executor, factory);
+                .then([this, executor, abortToken, &factory] {
+                    return _createAndStartChangeStreamsMonitor(executor, abortToken, factory);
                 })
                 .then([this, executor, abortToken, &factory] {
                     return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
@@ -992,6 +992,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
 
 void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStreamsMonitor(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
     if (!_metadata.getPerformVerification() || _skipCloningAndApplying ||
         inPotentialAbortScenario(_recipientCtx.getState()) ||
@@ -1000,22 +1001,21 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
         return;
     }
 
-    ReshardingChangeStreamsMonitor::BatchProcessedCallback batchCallback =
-        [this, factory](int documentsDelta, BSONObj resumeToken, bool completed) {
-            LOGV2(9858300,
-                  "Persisting change streams monitor's progress",
-                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                  "documentsDelta"_attr = documentsDelta,
-                  "completed"_attr = completed);
+    auto batchCallback = [this, factory](const auto& batch) {
+        LOGV2(9858300,
+              "Persisting change streams monitor's progress",
+              "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+              "documentsDelta"_attr = batch.documentsDelta(),
+              "completed"_attr = batch.containsFinalEvent());
 
-            invariant(_changeStreamsMonitorCtx);
-            auto newChangeStreamsCtx = *_changeStreamsMonitorCtx;
-            newChangeStreamsCtx.setResumeToken(resumeToken.getOwned());
-            newChangeStreamsCtx.setDocumentsDelta(newChangeStreamsCtx.getDocumentsDelta() +
-                                                  documentsDelta);
-            newChangeStreamsCtx.setCompleted(completed);
-            _updateRecipientDocument(newChangeStreamsCtx, factory);
-        };
+        invariant(_changeStreamsMonitorCtx);
+        auto newChangeStreamsCtx = *_changeStreamsMonitorCtx;
+        newChangeStreamsCtx.setResumeToken(batch.resumeToken().getOwned());
+        newChangeStreamsCtx.setDocumentsDelta(newChangeStreamsCtx.getDocumentsDelta() +
+                                              batch.documentsDelta());
+        newChangeStreamsCtx.setCompleted(batch.containsFinalEvent());
+        _updateRecipientDocument(newChangeStreamsCtx, factory);
+    };
 
     if (_changeStreamsMonitorCtx->getResumeToken()) {
         _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
@@ -1036,7 +1036,8 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
 
     _changeStreamsMonitorQuiesced =
         _changeStreamsMonitor
-            ->startMonitoring(**executor, _recipientService->getInstanceCleanupExecutor(), factory)
+            ->startMonitoring(
+                **executor, _recipientService->getInstanceCleanupExecutor(), abortToken, factory)
             .share();
     _changeStreamsMonitorStarted.emplaceValue();
 }
