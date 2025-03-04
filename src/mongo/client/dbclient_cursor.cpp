@@ -437,12 +437,13 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
 }
 
 DBClientCursor::~DBClientCursor() {
-    if (!_keepCursorOpen) {
+    if (_keepCursorOpen) {
         LOGV2_DEBUG(
             10154801,
             1,
             "Skip killing the cursor since the 'DBClientCursor' was created with 'keepCursorOpen' "
             "true");
+    } else {
         kill();
     }
 }
