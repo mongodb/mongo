@@ -184,56 +184,6 @@ std::string ScalarHistogram::toString() const {
     return os.str();
 }
 
-std::string ScalarHistogram::plot() const {
-    std::ostringstream os;
-    double maxFreq = 0;
-    const double maxBucketSize = 100;
-
-    for (const auto& bucket : _buckets) {
-        double maxBucketFreq = std::max(bucket._equalFreq, bucket._rangeFreq);
-        maxFreq = std::max(maxFreq, maxBucketFreq);
-    }
-
-    std::vector<std::pair<double, std::string>> headers;
-    size_t maxHeaderSize = 0;
-    for (size_t i = 0; i < _buckets.size(); ++i) {
-        std::ostringstream rngHeader;
-        std::ostringstream eqlHeader;
-        double scaledRngF = maxBucketSize * _buckets[i]._rangeFreq / maxFreq;
-        double scaledEqlF = maxBucketSize * _buckets[i]._equalFreq / maxFreq;
-        rngHeader << _bounds.getAt(i) << ": " << _buckets[i]._rangeFreq;
-        eqlHeader << _bounds.getAt(i) << ": " << _buckets[i]._equalFreq;
-        auto rngStr = rngHeader.str();
-        maxHeaderSize = std::max(maxHeaderSize, rngStr.size());
-        headers.emplace_back(scaledRngF, rngStr);
-        auto eqlStr = eqlHeader.str();
-        maxHeaderSize = std::max(maxHeaderSize, eqlStr.size());
-        headers.emplace_back(scaledEqlF, eqlStr);
-    }
-
-    const std::string maxLine(maxBucketSize + maxHeaderSize + 3, '-');
-    os << maxLine << "\n";
-    for (size_t j = 0; j < headers.size(); ++j) {
-        auto header = headers.at(j);
-        header.second.resize(maxHeaderSize, ' ');
-        const std::string bar(std::round(header.first), '*');
-        os << header.second << " | " << bar << "\n";
-    }
-    os << maxLine << "\n";
-
-    return os.str();
-}
-
-std::string ScalarHistogram::dump() const {
-    std::ostringstream os;
-    os << "Histogram:\n{";
-    for (size_t i = 0; i < _buckets.size(); i++) {
-        os << "{" << _bounds.getAt(i) << ", " << _buckets.at(i).dump() << "},\n";
-    }
-    os << "}";
-    return os.str();
-}
-
 const sbe::value::Array& ScalarHistogram::getBounds() const {
     return _bounds;
 }

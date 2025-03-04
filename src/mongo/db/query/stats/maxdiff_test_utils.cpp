@@ -158,39 +158,4 @@ std::string printValueArray(const std::vector<SBEValue>& values) {
     return strStream.str();
 }
 
-std::string plotArrayEstimator(const CEHistogram& estimator, const std::string& header) {
-    std::ostringstream os;
-    os << header << "\n";
-    if (!estimator.getScalar().empty()) {
-        os << "Scalar histogram:\n" << estimator.getScalar().plot();
-    }
-    if (!estimator.getArrayUnique().empty()) {
-        os << "Array unique histogram:\n" << estimator.getArrayUnique().plot();
-    }
-    if (!estimator.getArrayMin().empty()) {
-        os << "Array min histogram:\n" << estimator.getArrayMin().plot();
-    }
-    if (!estimator.getArrayMax().empty()) {
-        os << "Array max histogram:\n" << estimator.getArrayMax().plot();
-    }
-    if (!estimator.getTypeCounts().empty()) {
-        os << "Per scalar data type value counts: ";
-        for (auto tagCount : estimator.getTypeCounts()) {
-            os << tagCount.first << "=" << tagCount.second << " ";
-        }
-    }
-    if (!estimator.getArrayTypeCounts().empty()) {
-        os << "\nPer array data type value counts: ";
-        for (auto tagCount : estimator.getArrayTypeCounts()) {
-            os << tagCount.first << "=" << tagCount.second << " ";
-        }
-    }
-    if (estimator.isArray()) {
-        os << "\nEmpty array count: " << estimator.getEmptyArrayCount();
-    }
-    os << "\n";
-
-    return os.str();
-}
-
 }  // namespace mongo::stats

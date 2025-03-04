@@ -62,10 +62,4 @@ ScalarHistogram makeHistogram(std::vector<SBEValue>& randData, size_t nBuckets);
     Serialize a vector of values.
 */
 std::string printValueArray(const std::vector<SBEValue>& values);
-
-/**
-    Plot a set of statistics as stored in CEHistogram.
-*/
-std::string plotArrayEstimator(const CEHistogram& estimator, const std::string& header);
-
 }  // namespace mongo::stats
