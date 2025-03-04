@@ -1212,6 +1212,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: libfuzzer
+          exec_timeout_secs: 21600 # 6 hours
 
   - <<: *task_template
     name: fle
