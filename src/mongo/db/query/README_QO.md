@@ -9,8 +9,10 @@ _Disclaimer_: This guide (SPM-2301) is a work in progress.
 - [I. Parsing](../commands/query_cmd/README.md)
   - [Stable API](../STABLE_API_README.md)
 - [II. Logical Models](#)
-  - [Heuristic Rewrites](#)
   - [Views](../views/README.md)
+  - Heuristic Rewrites
+    - [`MatchExpression` Rewrites](../matcher/README.md)
+    - [Pipeline Rewrites](../pipeline/README.md)
 - [III. Index Selection](#)
   - [QueryPlanner and Plan Enumeration](#)
   - [Classic Runtime Planners](#)
