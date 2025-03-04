@@ -2217,5 +2217,147 @@ TEST(ExpressionFilterTest, CorrectRedactionWithLimit) {
         serialized);
 }
 
+// This test fails since featureFlagQETextSearchPreview is disabled by default.
+// TODO SERVER-65769: Remove when feature flag is enabled by default.
+TEST(ExpressionFLEStartsWithTest, FeatureFlagDisabled) {
+
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    {
+        auto expr = fromjson("{$encStrStartsWith: 12}");
+        ASSERT_THROWS_CODE(Parse::Object::parseObject(expr), DBException, 168);
+    }
+}
+
+TEST(ExpressionFLEStartsWithTest, ParseAssertConstraints) {
+
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrStartsWith: 12}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrStartsWith::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            10065);
+    }
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrStartsWith: {input: {}}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrStartsWith::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            14);
+    }
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrStartsWith: {input: 2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrStartsWith::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            14);
+    }
+
+    // Error, missing input field.
+    {
+        auto exprInvalidBson = fromjson("{$encStrStartsWith: {prefix: 2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrStartsWith::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            40414);
+    }
+
+    // Error, input must be a field path expression.
+    {
+        auto exprInvalidBson = fromjson("{$encStrStartsWith: {input: \"foo\", prefix:\"test\"}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrStartsWith::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            16873);
+    }
+
+    // Error, prefix must be string or bindata.
+    {
+        auto exprInvalidBson = fromjson("{$encStrStartsWith: {input: \"$foo\", prefix:2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrStartsWith::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            10111802);
+    }
+
+    // Success with string prefix.
+    {
+        auto exprBson = fromjson("{$encStrStartsWith: {input: \"$foo\", prefix:\"test\"}}");
+        auto parsedExpr = ExpressionEncStrStartsWith::parse(&expCtx, exprBson.firstElement(), vps);
+
+        auto* startsWith = dynamic_cast<ExpressionEncStrStartsWith*>(parsedExpr.get());
+        ASSERT_NE(startsWith, nullptr);
+    }
+
+    // Success with BinData prefix payload.
+    {
+        auto exprBson = fromjson(R"(
+            {$encStrStartsWith: {
+                input: "$foo", 
+                prefix: {
+                    "$binary" : {
+                        base64:
+                             "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                        subType: "6"
+                    }
+                }
+            }})");
+        auto parsedExpr = ExpressionEncStrStartsWith::parse(&expCtx, exprBson.firstElement(), vps);
+
+        auto* startsWith = dynamic_cast<ExpressionEncStrStartsWith*>(parsedExpr.get());
+        ASSERT_NE(startsWith, nullptr);
+    }
+}
+
+TEST(ExpressionFLEStartsWithTest, ParseStringPayloadRoundtrip) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto exprBson = fromjson("{$encStrStartsWith: {input: \"$foo\", prefix:\"test\"}}");
+
+    auto exprFle = ExpressionEncStrStartsWith::parse(&expCtx, exprBson.firstElement(), vps);
+    auto value = exprFle->serialize();
+    auto roundTripExpr =
+        fromjson("{$encStrStartsWith: {input: \"$foo\", prefix: {$const:\"test\"}}}");
+
+    ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
+}
+
+TEST(ExpressionFLEStartsWithTest, ParseBinDataPayloadRoundtrip) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto exprBson = fromjson(R"(
+        {$encStrStartsWith: {
+            input: "$foo", 
+            prefix: {
+                "$binary" : {
+                    base64:
+                         "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    subType: "6"
+                }
+            }
+        }})");
+    auto exprFle = ExpressionEncStrStartsWith::parse(&expCtx, exprBson.firstElement(), vps);
+    auto value = exprFle->serialize();
+
+    auto roundTripExpr = fromjson(R"(
+        {$encStrStartsWith: {
+            input: "$foo", 
+            prefix: {
+               "$const": {
+                "$binary" : {
+                    base64:
+                         "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    subType: "6"
+                }
+    }}
+        }})");
+
+    ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
+}
 }  // namespace ExpressionTests
 }  // namespace mongo

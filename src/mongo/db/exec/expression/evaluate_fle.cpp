@@ -70,5 +70,27 @@ Value evaluate(const ExpressionInternalFLEBetween& expr,
         }));
 }
 
+Value evaluate(const ExpressionEncStrStartsWith& expr, const Document& root, Variables* variables) {
+
+    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables);
+    if (fieldValue.nullish()) {
+        return Value(BSONNULL);
+    }
+    uassert(10111808,
+            "ExpressionEncTextSearch can't be evaluated without binary payload",
+            expr.canBeEvaluated());
+
+    // Hang on to the FLE2IndexedTextEncryptedValue object, because getRawMetadataBlock
+    // returns a view on its member.
+    boost::optional<FLE2IndexedTextEncryptedValue> value;
+    return Value(expr.getEncryptedPredicateEvaluator().evaluate(
+        fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
+            // TODO SERVER-101128: Implement this lambda expression's body which should extract the
+            // metadata blocks.
+            std::vector<ConstDataRange> metadataBlocks;
+            return metadataBlocks;
+        }));
+}
+
 }  // namespace exec::expression
 }  // namespace mongo

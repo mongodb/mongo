@@ -201,6 +201,7 @@ public:
     void visit(const ExpressionObject*) override {}
     void visit(const ExpressionInternalFLEBetween*) override {}
     void visit(const ExpressionInternalFLEEqual*) override {}
+    void visit(const ExpressionEncStrStartsWith*) override {}
     void visit(const ExpressionInternalRawSortKey*) override {}
     void visit(const ExpressionInternalOwningShard*) override {}
     void visit(const ExpressionInternalIndexKey*) override {}

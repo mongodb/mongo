@@ -4885,6 +4885,64 @@ private:
     explicit ExpressionUUID(ExpressionContext* expCtx);
 };
 
+/**
+ * ExpressionEncTextSearch is the base class for all encrypted text search expressions. The first
+ * operand (input) must be a field path expression, and the second operand (text) a constant
+ * literal expression. Note, specializations of this class can only be evaluated when their text
+ * operand is a BinData payload.
+ * The constant literal (text) can only be one of the following:
+ * 1) A string literal: In this case, the expression can't be evaluated, and is likely being used in
+ *    the context of query analysis to parse and analyze the query.
+ * 2) A BinData payload: In this case, the expression can be evaluated by the server.
+ */
+class ExpressionEncTextSearch : public Expression {
+public:
+    const auto& getEncryptedPredicateEvaluator() const {
+        return _evaluatorV2;
+    }
+
+    // If we didn't have an encrypted payload at instantiation time, then we can't be evaluated.
+    // We'll use this for guardrails around code we know shouldn't ever be called.
+    bool canBeEvaluated() const;
+
+protected:
+    ExpressionEncTextSearch(ExpressionContext* expCtx,
+                            boost::intrusive_ptr<Expression> input,
+                            boost::intrusive_ptr<Expression> text);
+
+    const ExpressionFieldPath& getInput() const;
+    const ExpressionConstant& getText() const;
+
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kTextOperand = 1;
+
+private:
+    EncryptedPredicateEvaluatorV2 _evaluatorV2;
+};
+
+class ExpressionEncStrStartsWith final : public ExpressionEncTextSearch {
+public:
+    ExpressionEncStrStartsWith(ExpressionContext* expCtx,
+                               boost::intrusive_ptr<Expression> input,
+                               boost::intrusive_ptr<Expression> prefix);
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+};
+
 static boost::intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* expCtx,
                                                                 BSONElement expr,
                                                                 const VariablesParseState& vpsIn);

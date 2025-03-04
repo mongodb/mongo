@@ -57,3 +57,16 @@ structs:
             description: "ServerZerosEncryptionTokens"
             type: array<bindata_encrypt>
             cpp_name: serverZerosEncryptionTokens
+
+    EncStrStartsWithStruct:
+        description: "Struct for $encStrStartsWith"
+        strict: true
+        fields:
+          input:
+            description: "Target field path expression"
+            type: string
+            cpp_name: input
+          prefix:
+            description: "Prefix expression"
+            type: IDLAnyType
+            cpp_name: prefix

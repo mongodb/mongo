@@ -100,6 +100,7 @@ public:
         kLog10,
         kInternalFLEBetween,
         kInternalFLEEqual,
+        kEncStrStartsWith,
         kInternalRawSortKey,
         kMap,
         kMeta,
@@ -413,6 +414,10 @@ public:
 
     void visit(const ExpressionInternalFLEEqual* expr) final {
         combine(OpType::kInternalFLEEqual);
+    }
+
+    void visit(const ExpressionEncStrStartsWith* expr) final {
+        combine(OpType::kEncStrStartsWith);
     }
 
     void visit(const ExpressionInternalRawSortKey* expr) final {

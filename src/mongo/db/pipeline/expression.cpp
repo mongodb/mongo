@@ -70,6 +70,7 @@
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
@@ -4884,6 +4885,100 @@ static intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* cons
                                                          BSONElement bsonExpr,
                                                          const VariablesParseState& vpsIn) {
     return Expression::parseOperand(expCtx, bsonExpr, vpsIn);
+}
+
+ExpressionEncTextSearch::ExpressionEncTextSearch(ExpressionContext* const expCtx,
+                                                 boost::intrusive_ptr<Expression> input,
+                                                 boost::intrusive_ptr<Expression> textOperand)
+    : Expression(expCtx, {std::move(input), std::move(textOperand)}) {
+    // This code block serves to assert the constraints of the expression as well as to initialize
+    // our encrypted predicate evaluator.
+    const auto& fieldPathExpression = getInput();
+    const auto& constant = getText();
+
+    // At this point, we know we have a constant, so let's figure out if the value is a String or
+    // BinData. If we have a BinData payload, we are running in the context of the server and the
+    // expression can be evaluated. Otherwise, we are running in the context of query analysis, and
+    // the expression can't be evaluated directly.
+    auto value = constant.getValue();
+    auto encryptedBinDataType = getEncryptedBinDataType(value);
+    if (encryptedBinDataType) {
+        // TODO SERVER-101128: Implement ParsedFindTextSearchPayload once SPM-2880 delivers the
+        // FLE2FindTextPayload. Initialize _evaluatorV2 with the zerosTokens.
+    } else {
+        uassert(10111802,
+                "Unexpected value type found on encrypted text search on field '" +
+                    fieldPathExpression.getFieldPathWithoutCurrentPrefix().fullPath() + "'.",
+                value.getType() == String);
+    }
+
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+}
+
+const ExpressionFieldPath& ExpressionEncTextSearch::getInput() const {
+    const auto* fieldPathExpression =
+        dynamic_cast<const ExpressionFieldPath*>(_children[_kInput].get());
+    uassert(10111800,
+            "ExpressionEncTextSearch expects a valid field path expression as its input.",
+            fieldPathExpression);
+    return *fieldPathExpression;
+}
+
+const ExpressionConstant& ExpressionEncTextSearch::getText() const {
+    const auto* constant = dynamic_cast<const ExpressionConstant*>(_children[_kTextOperand].get());
+    uassert(10111801, "ExpressionEncTextSearch expects a constant literal.", constant);
+    return *constant;
+}
+
+bool ExpressionEncTextSearch::canBeEvaluated() const {
+    return getEncryptedBinDataType(getText().getValue()) != boost::none;
+}
+
+/* --------------------------------- encStrStartsWith ------------------------------------------- */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrStartsWith,
+                                      ExpressionEncStrStartsWith::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      gFeatureFlagQETextSearchPreview);
+
+ExpressionEncStrStartsWith::ExpressionEncStrStartsWith(ExpressionContext* const expCtx,
+                                                       boost::intrusive_ptr<Expression> input,
+                                                       boost::intrusive_ptr<Expression> prefix)
+    : ExpressionEncTextSearch(expCtx, std::move(input), std::move(prefix)) {}
+
+constexpr auto kEncStrStartsWith = "$encStrStartsWith"_sd;
+intrusive_ptr<Expression> ExpressionEncStrStartsWith::parse(ExpressionContext* const expCtx,
+                                                            BSONElement expr,
+                                                            const VariablesParseState& vps) {
+
+    IDLParserContext ctx(kEncStrStartsWith);
+
+    auto fleEncStartsWith = EncStrStartsWithStruct::parse(ctx, expr.Obj());
+
+    auto inputExpr =
+        ExpressionFieldPath::parse(expCtx, fleEncStartsWith.getInput().toString(), vps);
+
+    auto prefixExpr =
+        Expression::parseOperand(expCtx, fleEncStartsWith.getPrefix().getElement(), vps);
+
+    return new ExpressionEncStrStartsWith(expCtx, std::move(inputExpr), std::move(prefixExpr));
+}
+
+Value ExpressionEncStrStartsWith::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kEncStrStartsWith,
+                           Document{{"input", _children[_kInput]->serialize(options)},
+                                    {"prefix", _children[_kTextOperand]->serialize(options)}}}});
+}
+
+const char* ExpressionEncStrStartsWith::getOpName() const {
+    return kEncStrStartsWith.rawData();
+}
+
+Value ExpressionEncStrStartsWith::evaluate(const Document& root, Variables* variables) const {
+    uassert(10111803,
+            "ExpressionEncTextSearch can't be evaluated without binary payload",
+            canBeEvaluated());
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 }  // namespace mongo
