@@ -2199,6 +2199,11 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
         FLE2IndexedTextEncryptedValue::fromUnencrypted(iupayload, tags, payload.counts);
     auto buf = uassertStatusOK(serverPayload.serialize());
 
+    const size_t expectedSize = 1 + UUID::kNumBytes + 1 + (3 * sizeof(uint32_t)) +
+        (crypto::aesCTRIVSize + iupayload.getValue().length()) +
+        (tagCount * sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+    ASSERT_EQ(buf.size(), expectedSize);
+
     FLE2IndexedTextEncryptedValue parsed(buf);
 
     ASSERT_EQ(parsed.getBsonType(), iupayload.getType());

@@ -166,6 +166,12 @@ bool mongocrypt_setopt_retry_kms(mongocrypt_t *crypt, bool enable) {
     return true;
 }
 
+bool mongocrypt_setopt_enable_multiple_collinfo(mongocrypt_t *crypt) {
+    ASSERT_MONGOCRYPT_PARAM_UNINIT(crypt);
+    crypt->multiple_collinfo_enabled = true;
+    return true;
+}
+
 bool mongocrypt_setopt_kms_provider_aws(mongocrypt_t *crypt,
                                         const char *aws_access_key_id,
                                         int32_t aws_access_key_id_len,

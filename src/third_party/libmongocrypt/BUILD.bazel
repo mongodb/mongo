@@ -96,6 +96,7 @@ mongo_cc_library(
         "dist/src/mc-range-mincover.c",
         "dist/src/mc-rangeopts.c",
         "dist/src/mc-reader.c",
+        "dist/src/mc-schema-broker.c",
         "dist/src/mc-str-encode-string-sets.c",
         "dist/src/mc-text-search-str-encode.c",
         "dist/src/mc-tokens.c",

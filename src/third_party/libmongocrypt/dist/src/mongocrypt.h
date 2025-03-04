@@ -323,6 +323,17 @@ MONGOCRYPT_EXPORT
 bool mongocrypt_setopt_retry_kms(mongocrypt_t *crypt, bool enable);
 
 /**
+ * Enable support for multiple collection schemas. Required to support $lookup.
+ *
+ * @param[in] crypt The @ref mongocrypt_t object.
+ * @pre @ref mongocrypt_init has not been called on @p crypt.
+ * @returns A boolean indicating success. If false, an error status is set.
+ * Retrieve it with @ref mongocrypt_ctx_status
+ */
+MONGOCRYPT_EXPORT
+bool mongocrypt_setopt_enable_multiple_collinfo(mongocrypt_t *crypt);
+
+/**
  * Configure an AWS KMS provider on the @ref mongocrypt_t object.
  *
  * This has been superseded by the more flexible:
