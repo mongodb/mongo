@@ -190,6 +190,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/expression:evaluate_field_path_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_find_internal_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_fle_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_index_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_logical_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_math_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_meta_test.cpp",
