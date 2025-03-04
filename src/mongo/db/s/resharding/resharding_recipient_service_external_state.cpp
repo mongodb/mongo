@@ -189,13 +189,9 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(
     StringData reason,
     const ShardId& fromShardId) {
     // Load the collection options from the specified shard for the database.
-    return _withShardVersionRetry(opCtx, nss, reason, [&] {
-        const auto nssOrUUID = NamespaceStringOrUUID{nss.dbName(), uuid};
-        const auto dbInfo = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nssOrUUID.dbName()));
-        return MigrationDestinationManager::getCollectionOptions(
-            opCtx, nssOrUUID, fromShardId, dbInfo->getVersion(), afterClusterTime);
-    });
+    const auto nssOrUUID = NamespaceStringOrUUID{nss.dbName(), uuid};
+    return MigrationDestinationManager::getCollectionOptions(
+        opCtx, nssOrUUID, fromShardId, boost::none, afterClusterTime);
 }
 
 MigrationDestinationManager::IndexesAndIdIndex
