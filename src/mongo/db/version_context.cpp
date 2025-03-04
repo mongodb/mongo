@@ -32,8 +32,6 @@
 
 namespace mongo {
 
-using FCVSnapshot = ServerGlobalParams::FCVSnapshot;
-
 VersionContext::VersionContext(FCV fcv)
     : _metadataOrTag(std::in_place_type<VersionContextMetadata>, fcv) {}
 
@@ -67,16 +65,6 @@ void VersionContext::setOperationFCV(FCV fcv) {
 
 void VersionContext::setOperationFCV(FCVSnapshot fcv) {
     setOperationFCV(fcv.getVersion());
-}
-
-boost::optional<FCVSnapshot> VersionContext::getOperationFCV() const {
-    return visit(OverloadedVisitor{[](const VersionContextMetadata& metadata) {
-                                       return boost::optional<FCVSnapshot>{metadata.getOFCV()};
-                                   },
-                                   [](auto&&) {
-                                       return boost::optional<FCVSnapshot>{};
-                                   }},
-                 _metadataOrTag);
 }
 
 BSONObj VersionContext::toBSON() const {

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <variant>
 
 #include "mongo/db/server_options.h"
@@ -53,9 +54,9 @@ public:
 
     static VersionContext& getDecoration(OperationContext*);
 
-    VersionContext() : _metadataOrTag(OperationWithoutOFCVTag{}) {}
-    explicit VersionContext(OutsideOperationTag tag) : _metadataOrTag(tag) {}
-    explicit VersionContext(IgnoreOFCVTag tag) : _metadataOrTag(tag) {}
+    constexpr VersionContext() : _metadataOrTag(OperationWithoutOFCVTag{}) {}
+    explicit constexpr VersionContext(OutsideOperationTag tag) : _metadataOrTag(tag) {}
+    explicit constexpr VersionContext(IgnoreOFCVTag tag) : _metadataOrTag(tag) {}
 
     explicit VersionContext(FCV fcv);
 
@@ -71,7 +72,12 @@ public:
 
     void setOperationFCV(FCVSnapshot fcv);
 
-    boost::optional<FCVSnapshot> getOperationFCV() const;
+    inline boost::optional<FCVSnapshot> getOperationFCV() const {
+        if (auto* metadata = std::get_if<VersionContextMetadata>(&_metadataOrTag)) {
+            return boost::optional<FCVSnapshot>{metadata->getOFCV()};
+        }
+        return boost::none;
+    }
 
     BSONObj toBSON() const;
 
