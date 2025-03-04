@@ -505,9 +505,8 @@ public:
         return getTimeseriesFields().has_value();
     }
 
-    // TODO (SERVER-100717): To be implemented
     bool isNewTimeseriesWithoutView() const {
-        return false;
+        return isTimeseriesCollection() && !nss().isTimeseriesBucketsCollection();
     }
 
 private:

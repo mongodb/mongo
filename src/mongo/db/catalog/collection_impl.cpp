@@ -854,9 +854,8 @@ bool CollectionImpl::isTimeseriesCollection() const {
     return getTimeseriesOptions().has_value();
 }
 
-// TODO (SERVER-100717): To be implemented
 bool CollectionImpl::isNewTimeseriesWithoutView() const {
-    return false;
+    return isTimeseriesCollection() && !ns().isTimeseriesBucketsCollection();
 }
 
 bool CollectionImpl::isTemporary() const {

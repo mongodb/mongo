@@ -380,6 +380,9 @@ public:
      * return true if this is a time-series collection with FCV 9.0 metadata format,
      * the time-series collection has a unified namespace (no view nor bucket collection, only the
      * main namespace)
+     *
+     * TODO SERVER-101588: remove this function and all its usages once 9.0 becomes last LTS.
+     * By then only viewless timeseries collection will exists.
      */
     virtual bool isNewTimeseriesWithoutView() const = 0;
 

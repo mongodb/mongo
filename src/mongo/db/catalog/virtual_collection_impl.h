@@ -268,7 +268,7 @@ public:
     }
 
     bool isNewTimeseriesWithoutView() const final {
-        return false;
+        return isTimeseriesCollection() && !ns().isTimeseriesBucketsCollection();
     }
 
     timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState() const final {
