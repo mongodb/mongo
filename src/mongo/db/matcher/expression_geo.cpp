@@ -197,10 +197,9 @@ bool GeoNearExpression::parseLegacyQuery(const BSONObj& obj) {
             if (!e.isABSONObj()) {
                 return false;
             }
-            BSONObj embeddedObj = e.embeddedObject();
 
             if (GeoParser::parseQueryPoint(e, centroid.get()).isOK() ||
-                GeoParser::parsePointWithMaxDistance(embeddedObj, centroid.get(), &maxDistance)) {
+                GeoParser::parsePointWithMaxDistance(e, centroid.get(), &maxDistance).isOK()) {
                 uassert(18522, "max distance must be non-negative", maxDistance >= 0.0);
                 hasGeometry = true;
                 isNearSphere = (e.fieldNameStringData() == kNearSphereField);

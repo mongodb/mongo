@@ -98,6 +98,54 @@ Status GeoParser::parseFlatPointCoordinates(const BSONElement& elem,
     return Status::OK();
 }
 
+// Convenience function to extract point coordinates and distance from enclosing element.
+// Note, coordinate and distance elements must not outlive the parent element.
+Status GeoParser::parseLegacyPointWithMaxDistance(const BSONElement& elem,
+                                                  BSONElement& lat,
+                                                  BSONElement& lng,
+                                                  BSONElement& maxDist) {
+    if (!elem.isABSONObj()) {
+        return BAD_VALUE("Point and distance must be an array or object, instead got type "
+                         << typeName(elem.type()));
+    }
+
+    BSONObjIterator it(elem.Obj());
+    if (!it.more()) {
+        return BAD_VALUE("Point with max distance must contain exactly three numeric elements");
+    }
+    lat = it.next();
+    if (!lat.isNumber()) {
+        return BAD_VALUE(
+            "Point with max distance must only contain numeric elements, instead got type "
+            << typeName(lat.type()));
+    }
+
+    if (!it.more()) {
+        return BAD_VALUE("Point with max distance must contain exactly three numeric elements");
+    }
+    lng = it.next();
+    if (!lng.isNumber()) {
+        return BAD_VALUE(
+            "Point with max distance must only contain numeric elements, instead got type "
+            << typeName(lng.type()));
+    }
+
+    if (!it.more()) {
+        return BAD_VALUE("Point with max distance must contain exactly three numeric elements");
+    }
+    maxDist = it.next();
+    if (!maxDist.isNumber()) {
+        return BAD_VALUE(
+            "Point with max distance must only contain numeric elements, instead got type "
+            << typeName(maxDist.type()));
+    }
+
+    if (it.more()) {
+        return BAD_VALUE("Point with max distance must contain exactly three numeric elements");
+    }
+    return Status::OK();
+}
+
 static Status parseFlatPoint(const BSONElement& elem, Point* out, bool allowAddlFields = false) {
     BSONElement x, y;
     auto status = GeoParser::parseFlatPointCoordinates(elem, x, y, allowAddlFields);
@@ -793,41 +841,19 @@ Status GeoParser::parseGeometryCollection(const BSONObj& obj,
     return Status::OK();
 }
 
-bool GeoParser::parsePointWithMaxDistance(const BSONObj& obj, PointWithCRS* out, double* maxOut) {
-    BSONObjIterator it(obj);
-    if (!it.more()) {
-        return false;
+Status GeoParser::parsePointWithMaxDistance(const BSONElement& elem,
+                                            PointWithCRS* out,
+                                            double* maxOut) {
+    BSONElement lat, lng, maxDist;
+    auto status = GeoParser::parseLegacyPointWithMaxDistance(elem, lng, lat, maxDist);
+    if (!status.isOK()) {
+        return status;
     }
-
-    BSONElement lng = it.next();
-    if (!lng.isNumber()) {
-        return false;
-    }
-    if (!it.more()) {
-        return false;
-    }
-
-    BSONElement lat = it.next();
-    if (!lat.isNumber()) {
-        return false;
-    }
-    if (!it.more()) {
-        return false;
-    }
-
-    BSONElement dist = it.next();
-    if (!dist.isNumber()) {
-        return false;
-    }
-    if (it.more()) {
-        return false;
-    }
-
-    out->oldPoint.x = lng.number();
-    out->oldPoint.y = lat.number();
+    out->oldPoint.x = lat.number();
+    out->oldPoint.y = lng.number();
     out->crs = FLAT;
-    *maxOut = dist.number();
-    return true;
+    *maxOut = maxDist.number();
+    return Status::OK();
 }
 
 GeoParser::GeoSpecifier GeoParser::parseGeoSpecifier(const BSONElement& type) {

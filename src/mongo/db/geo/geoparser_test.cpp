@@ -301,6 +301,32 @@ TEST(GeoParser, parseLegacyPoint) {
     ASSERT_NOT_OK(GeoParser::parseLegacyPoint(BSON_ELT(fromjson("{x: 5}")), &point));
 }
 
+TEST(GeoParser, parsePointWithMaxDistance) {
+    PointWithCRS point;
+    double maxDistance;
+    ASSERT_NOT_OK(GeoParser::parsePointWithMaxDistance(BSON_ELT("hi"), &point, &maxDistance));
+    ASSERT_NOT_OK(
+        GeoParser::parsePointWithMaxDistance(BSON_ELT(BSON_ARRAY(0)), &point, &maxDistance));
+    ASSERT_NOT_OK(
+        GeoParser::parsePointWithMaxDistance(BSON_ELT(BSON_ARRAY(0 << 1)), &point, &maxDistance));
+    ASSERT_OK(GeoParser::parsePointWithMaxDistance(
+        BSON_ELT(BSON_ARRAY(0 << 1 << 2)), &point, &maxDistance));
+    ASSERT_NOT_OK(GeoParser::parsePointWithMaxDistance(
+        BSON_ELT(BSON_ARRAY(0 << 1 << 2 << 3)), &point, &maxDistance));
+    ASSERT_NOT_OK(GeoParser::parsePointWithMaxDistance(
+        BSON_ELT(BSON_ARRAY(0 << "foo" << 2)), &point, &maxDistance));
+    ASSERT_NOT_OK(
+        GeoParser::parsePointWithMaxDistance(BSON_ELT(fromjson("{x: 5}")), &point, &maxDistance));
+    ASSERT_NOT_OK(GeoParser::parsePointWithMaxDistance(
+        BSON_ELT(fromjson("{x: 50, y:40}")), &point, &maxDistance));
+    ASSERT_OK(GeoParser::parsePointWithMaxDistance(
+        BSON_ELT(fromjson("{x: 5, y:40, z:50}")), &point, &maxDistance));
+    ASSERT_NOT_OK(GeoParser::parsePointWithMaxDistance(
+        BSON_ELT(fromjson("{x: 5, y:40, z:50, a: 100}")), &point, &maxDistance));
+    ASSERT_NOT_OK(GeoParser::parsePointWithMaxDistance(
+        BSON_ELT(fromjson("{x: 5, y: 'foo' , z:50}")), &point, &maxDistance));
+}
+
 TEST(GeoParser, parseLegacyPolygon) {
     PolygonWithCRS polygon;
 

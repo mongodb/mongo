@@ -305,6 +305,14 @@ void appendGeoNearOperator(BSONObjBuilder& bob,
                 appendGeoNearLegacyArray(bob, legacyCoordinates.firstElement(), opts);
                 return;
             }
+            BSONElement maxDist;
+            status = GeoParser::parseLegacyPointWithMaxDistance(geoNearElem, x, y, maxDist);
+            if (status.isOK()) {
+                BSONObj legacyCoordinates =
+                    BSON(fieldName << BSON_ARRAY(x.number() << y.number() << maxDist.number()));
+                appendGeoNearLegacyArray(bob, legacyCoordinates.firstElement(), opts);
+                return;
+            }
         }
 
         BSONObjBuilder subObj = BSONObjBuilder(bob.subobjStart(fieldName));

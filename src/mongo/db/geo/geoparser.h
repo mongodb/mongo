@@ -141,6 +141,11 @@ public:
                                             BSONElement& x,
                                             BSONElement& y,
                                             bool allowAddlFields = false);
+    static Status parseLegacyPointWithMaxDistance(const BSONElement& elem,
+                                                  BSONElement& lat,
+                                                  BSONElement& lng,
+                                                  BSONElement& maxDist);
+
     // Parse the BSON object after $box, $center, etc.
     static Status parseLegacyBox(const BSONObj& obj, BoxWithCRS* out);
     static Status parseLegacyCenter(const BSONObj& obj, CapWithCRS* out);
@@ -161,7 +166,9 @@ public:
     // For geo near
     static Status parseQueryPoint(const BSONElement& elem, PointWithCRS* out);
     static Status parseStoredPoint(const BSONElement& elem, PointWithCRS* out);
-    static bool parsePointWithMaxDistance(const BSONObj& obj, PointWithCRS* out, double* maxOut);
+    static Status parsePointWithMaxDistance(const BSONElement& elem,
+                                            PointWithCRS* out,
+                                            double* maxOut);
 };
 
 }  // namespace mongo
