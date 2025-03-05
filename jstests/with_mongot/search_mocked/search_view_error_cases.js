@@ -149,6 +149,9 @@ runTest({
     errorCode: 9475802
 });
 
+// TODO SERVER-101721 $rankFusion is currently banned in views outright. Re-enable these error case
+// tests when we re-enable it.
+/**
 runTest({
     name: "rankFusion_search_view",
     pipeline: [{$rankFusion: {input: {pipelines: {search: [{$search: {}}]}}}}],
@@ -160,6 +163,7 @@ runTest({
     pipeline: [{$rankFusion: {input: {pipelines: {search: [{$vectorSearch: {}}]}}}}],
     errorCode: 9475801
 });
+*/
 
 runTest({
     name: "scoreFusion_search_view",
