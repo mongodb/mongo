@@ -38,6 +38,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/express/express_plan.h"
@@ -833,7 +834,7 @@ boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
     std::vector<IndexEntry> indexes =
         QueryPlannerIXSelect::findRelevantIndices(fields, plannerParams.mainCollectionInfo.indexes);
 
-    int numFields = -1;
+    int fewestIdxKeys = Ordering::kMaxCompoundIndexKeys + 1;
     const IndexEntry* bestEntry = nullptr;
     for (const auto& e : indexes) {
         if (
@@ -849,17 +850,20 @@ boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
              !expression::isSubsetOf(cq.getPrimaryMatchExpression(), e.filterExpr))) {
             continue;
         }
-        const auto currNFields = e.keyPattern.nFields();
-        if (
-            // We cannot guarantee that the result has at most one result doc.
-            // TODO SERVER-87016: Support shard filtering for limitOne query with non-unique index.
-            ((!e.unique || currNFields != 1) && (!hasLimitOne || needsShardFilter)) ||
-            // This index is suitable but has more fields than the best so far.
-            (bestEntry && numFields <= currNFields)) {
-            continue;
+        // TODO SERVER-87016: Support shard filtering for limitOne query with non-unique index.
+        // Eligibility requires one of the following:
+        //   (1) Index is unique and on a single field; or
+        //   (2) No shard filtering needed and query has limit(1).
+        // Express executor cannot iterate (yet), so we can only support shard filtering
+        // when there is at most 1 possible result (a unique, single-key index).
+        const auto nIdxKeys = e.keyPattern.nFields();
+        const bool isEligible = (e.unique && nIdxKeys == 1) || (!needsShardFilter && hasLimitOne);
+        const bool hasFewestIdxKeysSoFar = fewestIdxKeys > nIdxKeys;
+
+        if (isEligible && hasFewestIdxKeysSoFar) {
+            bestEntry = &e;
+            fewestIdxKeys = nIdxKeys;
         }
-        bestEntry = &e;
-        numFields = currNFields;
     }
     return (bestEntry != nullptr) ? boost::make_optional(std::move(*bestEntry)) : boost::none;
 }
