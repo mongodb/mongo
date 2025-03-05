@@ -159,6 +159,7 @@ enums:
            performRawDataOperations: "performRawDataOperations" # allow operations that use the rawData field
            refineCollectionShardKey :  "refineCollectionShardKey"
            reIndex :  "reIndex"
+           releaseMemoryAnyCursor: "releaseMemoryAnyCursor"
            remove :  "remove"
            removeShard :  "removeShard"
            renameCollection :  "renameCollection"  # ID only

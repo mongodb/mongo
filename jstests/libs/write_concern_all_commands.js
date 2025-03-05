@@ -2019,6 +2019,7 @@ let wcCommandsTests = {
     },
     refreshLogicalSessionCacheNow: {skip: "does not accept write concern"},
     refreshSessions: {skip: "does not accept write concern"},
+    releaseMemory: {skip: "does not accept write concern"},
     removeShard: {skip: "unrelated"},
     removeShardFromZone: {skip: "does not accept write concern"},
     renameCollection: {

@@ -977,6 +977,7 @@ const allCommands = {
     reIndex: {
         skip: isDeprecated,
     },
+    releaseMemory: {skip: "requires instantiating a cursor"},
     removeShard: {skip: requiresMongoS},
     removeShardFromZone: {skip: requiresMongoS},
     renameCollection: {

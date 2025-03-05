@@ -204,9 +204,10 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     }
 
     ClientCursor* cursor = it->second;
-    uassert(ErrorCodes::CursorInUse,
-            str::stream() << "cursor id " << id << " is already in use",
-            !cursor->_operationUsingCursor);
+    if (cursor->_operationUsingCursor) {
+        return {ErrorCodes::CursorInUse,
+                str::stream() << "cursor id " << id << " is already in use"};
+    }
     if (cursor->getExecutor()->isMarkedAsKilled()) {
         // This cursor was killed while it was idle.
         Status error = cursor->getExecutor()->getKillStatus();
@@ -513,6 +514,18 @@ Status CursorManager::checkAuthForKillCursors(OperationContext* opCtx, CursorId 
     // reading from it because we hold the partition's lock.
     AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
     return auth::checkAuthForKillCursors(as, cursor->nss(), cursor->getAuthenticatedUser());
+}
+
+Status CursorManager::checkAuthForReleaseMemory(OperationContext* opCtx, CursorId id) {
+    auto lockedPartition = _cursorMap->lockOnePartition(id);
+    auto it = lockedPartition->find(id);
+    if (it == lockedPartition->end()) {
+        return {ErrorCodes::CursorNotFound, str::stream() << "cursor id " << id << " not found"};
+    }
+
+    ClientCursor* cursor = it->second;
+    AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
+    return auth::checkAuthForReleaseMemory(as, cursor->nss());
 }
 
 }  // namespace mongo

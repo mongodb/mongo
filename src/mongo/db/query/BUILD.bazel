@@ -529,6 +529,7 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:cursor_request.cpp",
         "//src/mongo/db/query/client_cursor:cursor_response.cpp",
         "//src/mongo/db/query/client_cursor:kill_cursors_gen",
+        "//src/mongo/db/query/client_cursor:release_memory_gen",
     ],
     hdrs = [
         "count_request.h",

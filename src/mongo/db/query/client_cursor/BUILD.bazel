@@ -109,6 +109,17 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "release_memory_gen",
+    src = "release_memory.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "cursor_manager_test",
     srcs = [

@@ -88,6 +88,12 @@ Status checkAuthForKillCursors(AuthorizationSession* authSession,
                                const NamespaceString& cursorNss,
                                const boost::optional<UserName>& cursorOwner);
 
+// Checks if this connection has the privileges necessary to perform a releaseMemory on
+// the identified cursor, supposing that cursor is associated with the supplied namespace
+// identifier.
+Status checkAuthForReleaseMemory(AuthorizationSession* authSession,
+                                 const NamespaceString& cursorNss);
+
 // Attempts to get the privileges necessary to run the aggregation pipeline specified in
 // 'request' on the namespace 'ns' either directly on mongoD or via mongoS.
 StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* authSession,

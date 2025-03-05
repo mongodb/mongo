@@ -129,6 +129,9 @@ public:
      * Returns ErrorCodes::CursorNotFound if the cursor does not exist or
      * ErrorCodes::QueryPlanKilled if the cursor was killed in between uses.
      *
+     * Returns ErrorCodes::CursorInUse if the cursor is already pinned. Only happens if several
+     * getMore and/or releaseMemory commands reference the same cursor.
+     *
      * 'checkPinAllowed' is a function which gives the caller the option to make checks about the
      * cursor before it is pinned. If 'checkPinAllowed' throws an exception, pinCursor() will
      * also throw and the cursor will be left in the cursor manager in the same state as it was
@@ -140,10 +143,6 @@ public:
      * nature of the inaccessability when the cursor is not accessible. If 'kNoCheckSession' is
      * passed for 'checkSessionAuth,' this function does not check if the current session is
      * authorized to access the cursor with the given id.
-     *
-     * Throws a AssertionException if the cursor is already pinned. Callers need not specially
-     * handle this error, as it should only happen if a misbehaving client attempts to
-     * simultaneously issue two operations against the same cursor id.
      */
     enum AuthCheck { kCheckSession = true, kNoCheckSession = false };
     StatusWith<ClientCursorPin> pinCursor(
@@ -168,6 +167,12 @@ public:
      * ErrorCodes::Unauthorized.
      */
     Status checkAuthForKillCursors(OperationContext* opCtx, CursorId id);
+
+    /**
+     * Returns an OK status if we're authorized to release memory from the cursor. Otherwise,
+     * returns ErrorCodes::Unauthorized.
+     */
+    Status checkAuthForReleaseMemory(OperationContext* opCtx, CursorId id);
 
     /**
      * Appends sessions that have open cursors in this cursor manager to the given set of lsids.

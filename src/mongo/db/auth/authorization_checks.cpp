@@ -226,6 +226,25 @@ Status checkAuthForKillCursors(AuthorizationSession* authSession,
                   str::stream() << "not authorized to kill cursor on " << ns.toStringForErrorMsg());
 }
 
+Status checkAuthForReleaseMemory(AuthorizationSession* authSession, const NamespaceString& ns) {
+    // Check whether the user is authorised to release memory in the cluster level.
+    if (authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(ns.tenantId()),
+            ActionType::releaseMemoryAnyCursor)) {
+        return Status::OK();
+    }
+
+    // Check whether the user is authorised to release memory in the database or collection level.
+    if (authSession->isAuthorizedForActionsOnResource(
+            CommandHelpers::resourcePatternForNamespace(ns), ActionType::releaseMemoryAnyCursor)) {
+        return Status::OK();
+    }
+
+    return Status(ErrorCodes::Unauthorized,
+                  str::stream() << "not authorized to release cursor memory on "
+                                << ns.toStringForErrorMsg());
+}
+
 Status checkAuthForCreate(OperationContext* opCtx,
                           AuthorizationSession* authSession,
                           const CreateCommand& cmd,

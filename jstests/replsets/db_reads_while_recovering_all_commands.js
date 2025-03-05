@@ -380,6 +380,7 @@ const allCommands = {
     refreshLogicalSessionCacheNow: {skip: isNotAUserDataRead},
     refreshSessions: {skip: isNotAUserDataRead},
     reIndex: {skip: isNotAUserDataRead},
+    releaseMemory: {skip: isNotAUserDataRead},
     renameCollection: {skip: isPrimaryOnly},
     repairShardedCollectionChunksHistory: {skip: isPrimaryOnly},
     replSetAbortPrimaryCatchUp: {skip: isNotAUserDataRead},
