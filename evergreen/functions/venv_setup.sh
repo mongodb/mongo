@@ -31,7 +31,11 @@ fi
 if uname -a | grep -q 's390x\|ppc64le'; then
   # s390x and ppc64le both require these old versions for some reason
   # They are pinned deps as well
-  EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
+  if uname -a | grep -q 'rhel9'; then
+    EXTRA_IBM_ARGS="cryptography==36.0.2 pyOpenSSL==22.0.0"
+  else
+    EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
+  fi
 fi
 poetry_dir="${workdir}/poetry_dir"
 mkdir -p $poetry_dir
@@ -40,7 +44,7 @@ export POETRY_DATA_DIR="$poetry_dir/data"
 export POETRY_CACHE_DIR="$poetry_dir/cache"
 export PIP_CACHE_DIR="$poetry_dir/pip_cache"
 for i in {1..5}; do
-  $POETRY_VENV_PYTHON -m pip install "poetry==1.5.1" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
+  $POETRY_VENV_PYTHON -m pip install "poetry==2.0.0" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
   echo "Python failed to install poetry, retrying..."
 done
 
@@ -119,7 +123,18 @@ cd src
 # We have seen weird network errors that can sometimes mess up the pip install
 # By retrying we would like to only see errors that happen consistently
 for i in {1..5}; do
-  $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+  yes | $POETRY_VENV_PYTHON -m poetry cache clear . --all
+  rm -rf $poetry_dir/*
+  if uname -a | grep -q 's390x\|ppc64le'; then
+    if uname -a | grep -q 'rhel9'; then
+      $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+    else
+      $POETRY_VENV_PYTHON -m poetry install --extras 'oldcrypt' --no-root --sync && RET=0 && break || RET=$? && sleep 1
+    fi
+  else
+    $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+  fi
+
   echo "Python failed install required deps with poetry, retrying..."
 done
 
@@ -134,8 +149,13 @@ fi
 # Here we go behing poetry's back and install with pip
 if uname -a | grep -q 's390x\|ppc64le'; then
   for i in {1..5}; do
-    python -m pip uninstall -y cryptography==2.3 || true
-    python -m pip install cryptography==2.3 && RET=0 && break || RET=$? && sleep 1
+    if uname -a | grep -q 'rhel9'; then
+      python -m pip uninstall -y cryptography==36.0.2
+      python -m pip install cryptography==36.0.2
+    else
+      python -m pip uninstall -y cryptography==2.3 || true
+      python -m pip install cryptography==2.3 && RET=0 && break || RET=$? && sleep 1
+    fi
   done
   if [ $RET -ne 0 ]; then
     echo "cryptography install error for full venv"

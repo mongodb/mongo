@@ -140,11 +140,13 @@ variables:
   - enterprise-macos
   - enterprise-macos-arm64
   - enterprise-rhel-81-ppc64le
+  - enterprise-rhel-9-ppc64le
   - enterprise-rhel-8-64-bit
   - enterprise-rhel-8-64-bit-coverage
   - enterprise-rhel-8-64-bit-suggested
   - enterprise-rhel-8-arm64
   - enterprise-rhel-83-s390x
+  - enterprise-rhel-9-s390x
   - enterprise-rhel-90-64-bit
   - enterprise-rhel-90-arm64
   - enterprise-rhel-93-64-bit
@@ -173,6 +175,7 @@ tasks:
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
+  exec_timeout_secs: 86400 # 24 hours
   commands:
   - func: "scons compile"
     vars:
@@ -412,6 +415,7 @@ tasks:
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
+  exec_timeout_secs: 86400 # 24 hours
   commands:
   - func: "scons compile"
     vars:
@@ -945,7 +949,7 @@ tasks:
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
-  exec_timeout_secs: 21600 # 6 hours
+  exec_timeout_secs: 86400 # 24 hours
   commands:
   - func: "scons compile"
     vars:
@@ -960,14 +964,14 @@ tasks:
     vars:
       suite: unittests_first_quarter
       install_dir: build/install/bin
-      exec_timeout_secs: 21600 # 6 hours
+      exec_timeout_secs: 86400 # 24 hours
 
 - name: compile_and_run_unittests_second_quarter
   tags: ["assigned_to_jira_team_devprod_build"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
-  exec_timeout_secs: 21600 # 6 hours
+  exec_timeout_secs: 86400 # 24 hours
   commands:
   - func: "scons compile"
     vars:
@@ -982,14 +986,14 @@ tasks:
     vars:
       suite: unittests_second_quarter
       install_dir: build/install/bin
-      exec_timeout_secs: 21600 # 6 hours
+      exec_timeout_secs: 86400 # 24 hours
 
 - name: compile_and_run_unittests_third_quarter
   tags: ["assigned_to_jira_team_devprod_build"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
-  exec_timeout_secs: 21600 # 6 hours
+  exec_timeout_secs: 86400 # 24 hours
   commands:
   - func: "scons compile"
     vars:
@@ -1004,14 +1008,14 @@ tasks:
     vars:
       suite: unittests_third_quarter
       install_dir: build/install/bin
-      exec_timeout_secs: 21600 # 6 hours
+      exec_timeout_secs: 86400 # 24 hours
 
 - name: compile_and_run_unittests_fourth_quarter
   tags: ["assigned_to_jira_team_devprod_build"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
-  exec_timeout_secs: 21600 # 6 hours
+  exec_timeout_secs: 86400 # 24 hours
   commands:
   - func: "scons compile"
     vars:
@@ -1026,7 +1030,7 @@ tasks:
     vars:
       suite: unittests_fourth_quarter
       install_dir: build/install/bin
-      exec_timeout_secs: 21600 # 6 hours
+      exec_timeout_secs: 86400 # 24 hours
 
 - <<: *compile_unittests
   name: compile_unittests_future_git_tag_multiversion
@@ -1242,6 +1246,7 @@ tasks:
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
+  exec_timeout_secs: 86400 # 24 hours
   commands:
   - func: "do scons setup"
   - func: "f_expansions_write"

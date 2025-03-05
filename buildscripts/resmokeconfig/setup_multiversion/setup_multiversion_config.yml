@@ -150,6 +150,11 @@ evergreen_buildvariants:
     platform: rhel81
     architecture: ppc64le
 
+  - name: enterprise-rhel-9-ppc64le
+    edition: enterprise
+    platform: rhel9
+    architecture: ppc64le
+
   - name: rhel-67-s390x
     edition: targeted
     platform: rhel67
