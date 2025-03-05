@@ -622,7 +622,6 @@ void executeWriteWithoutShardKey(
             opCtx, targeter->getNS(), std::move(cmdObj));
 
         BulkWriteCommandReply bulkWriteResponse;
-        // TODO (SERVER-81261): Handle writeConcernErrors.
         WriteConcernErrorDetail wcError;
         Status responseStatus = swRes.getStatus();
         if (swRes.isOK()) {
