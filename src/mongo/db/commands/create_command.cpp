@@ -136,12 +136,25 @@ void checkCollectionOptions(OperationContext* opCtx,
     const auto catalog = CollectionCatalog::get(opCtx);
     const auto coll = catalog->lookupCollectionByNamespace(opCtx, ns);
     if (coll) {
-        auto actualOptions = coll->getCollectionOptions();
+
+        auto requestedOptions = options;
+        auto existingOptions = coll->getCollectionOptions();
+
+        if (requestedOptions.timeseries) {
+            // When checking that the options for the timeseries collection are the same, filter out
+            // the options that were internally generated upon time-series collection creation (i.e.
+            // were not specified by the user).
+            uassertStatusOK(
+                timeseries::validateAndSetBucketingParameters(requestedOptions.timeseries.get()));
+            existingOptions = uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
+                false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions)));
+        }
+
         uassert(ErrorCodes::NamespaceExists,
                 str::stream() << "namespace " << ns.toStringForErrorMsg()
                               << " already exists, but with different options: "
-                              << actualOptions.toBSON(),
-                options.matchesStorageOptions(actualOptions, collatorFactory));
+                              << existingOptions.toBSON(),
+                requestedOptions.matchesStorageOptions(existingOptions, collatorFactory));
         return;
     }
 
@@ -292,6 +305,11 @@ public:
         CreateCommandReply typedRun(OperationContext* opCtx) final {
             // Intentional copy of request made here, as request object can be modified below.
             auto cmd = request();
+            auto createViewlessTimeseriesColl =
+                gFeatureFlagCreateViewlessTimeseriesCollections
+                    .isEnabledUseLastLTSFCVWhenUninitialized(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
             CreateCommandReply reply;
             if (cmd.getAutoIndexId()) {
@@ -527,7 +545,7 @@ public:
             if (createStatus == ErrorCodes::NamespaceExists &&
                 !opCtx->inMultiDocumentTransaction()) {
                 auto options = CollectionOptions::fromCreateCommand(cmd);
-                if (options.timeseries) {
+                if (options.timeseries && !createViewlessTimeseriesColl) {
                     const auto& bucketNss = cmd.getNamespace().isTimeseriesBucketsCollection()
                         ? cmd.getNamespace()
                         : cmd.getNamespace().makeTimeseriesBucketsNamespace();

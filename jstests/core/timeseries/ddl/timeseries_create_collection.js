@@ -12,7 +12,11 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    areViewlessTimeseriesEnabled
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
+const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(db);
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -46,7 +50,11 @@ function assertCollExists(
 // Create a timeseries collection, listCollection should show view and bucket collection
 assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeFieldName}}));
 assertCollExists(true, testDB, collName);
-assertCollExists(true, testDB, bucketsName);
+if (viewlessTimeseriesEnabled) {
+    assertCollExists(false, testDB, bucketsName);
+} else {
+    assertCollExists(true, testDB, bucketsName);
+}
 
 // Drop timeseries collection, both view and bucket collection should be dropped
 coll.drop();

@@ -1,0 +1,37 @@
+- name: enable_viewless_timeseries_feature_flag_mongod
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagCreateViewlessTimeseriesCollections: 1
+
+- name: enable_viewless_timeseries_feature_flag_mongos
+  value:
+    executor:
+      fixture:
+        mongos_options:
+          set_parameters:
+            featureFlagCreateViewlessTimeseriesCollections: 1
+
+- name: all_timeseries_tests_selector
+  value:
+    selector:
+      roots:
+        - jstests/core/timeseries/**/*.js
+      exclude_files:
+        # TODO SERVER-94428: Reenable this test.
+        # This test is currently incompatible with dbcheck.
+        - jstests/core/timeseries/write/timeseries_update_multi.js
+
+- name: only_validated_timeseries_tests_selector
+  value:
+    selector:
+      roots:
+        - jstests/core/timeseries/ddl/timeseries_create_collection.js
+      exclude_files:
+
+- name: exclude_viewless_timeseries_incompabile_tag
+  value:
+    exclude_with_any_tags:
+      - viewless_timeseries_incompatible

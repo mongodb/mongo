@@ -135,6 +135,13 @@ feature_flags:
          default: true
          version: 8.1
          shouldBeFCVGated: true
+    featureFlagCreateViewlessTimeseriesCollections:
+        description: "Enables the creation of viewless timeseries collections.
+        Viewless timeseries collections have only one associated namespace,
+        instead of a view namespace and a system.buckets namespace."
+        cpp_varname: gFeatureFlagCreateViewlessTimeseriesCollections
+        default: false
+        shouldBeFCVGated: true
     featureFlagMongodProxyProtocolSupport:
         description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
         cpp_varname: gFeatureFlagMongodProxyProtocolSupport

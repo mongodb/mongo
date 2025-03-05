@@ -24,3 +24,5 @@
 - featureFlagGaplessFTDC
 # TODO SERVER-97315: Enable featureFlagSnapshotFCVInDDLCoordinators
 - featureFlagSnapshotFCVInDDLCoordinators
+# TODO SERVER-101589: start testing viewless timeseries in allFeatureFlag variant
+- featureFlagCreateViewlessTimeseriesCollections

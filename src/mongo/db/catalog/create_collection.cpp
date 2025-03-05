@@ -190,7 +190,8 @@ Status validateCollectionOptions(OperationContext* opCtx,
     }
 
     if (auto clusteredIndex = collectionOptions.clusteredIndex) {
-        if (clustered_util::requiresLegacyFormat(nss) != clusteredIndex->getLegacyFormat()) {
+        if (clustered_util::requiresLegacyFormat(nss, collectionOptions) !=
+            clusteredIndex->getLegacyFormat()) {
             return Status(ErrorCodes::Error(5979703),
                           "The 'clusteredIndex' legacy format {clusteredIndex: <bool>} is only "
                           "supported for specific internal collections and vice versa");
@@ -496,8 +497,14 @@ Status _createTimeseries(OperationContext* opCtx,
     // primary. Secondaries replicate individual oplog entries.
     invariant(opCtx->writesAreReplicated());
 
-    const auto& bucketsNs =
-        (ns.isTimeseriesBucketsCollection()) ? ns : ns.makeTimeseriesBucketsNamespace();
+    const auto createViewlessTimeseriesColl =
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    const auto& bucketsNs = (createViewlessTimeseriesColl || ns.isTimeseriesBucketsCollection())
+        ? ns
+        : ns.makeTimeseriesBucketsNamespace();
 
     Status bucketsAllowedStatus = userAllowedCreateNS(opCtx, bucketsNs);
     if (!bucketsAllowedStatus.isOK()) {
@@ -524,7 +531,9 @@ Status _createTimeseries(OperationContext* opCtx,
     // strict/error defaults.
     auto timeField = options.timeseries->getTimeField();
     int bucketVersion = timeseries::kTimeseriesControlLatestVersion;
-    auto validatorObj = _generateTimeseriesValidator(bucketVersion, timeField);
+    auto validatorObj = createViewlessTimeseriesColl
+        ? BSONObj()
+        : _generateTimeseriesValidator(bucketVersion, timeField);
 
     bool existingBucketCollectionIsCompatible = false;
 
@@ -650,6 +659,8 @@ Status _createTimeseries(OperationContext* opCtx,
         // If the 'temp' flag is true, we are in the $out stage, and should return without creating
         // the view defintion.
         options.temp ||
+        // We are creating the new viewless timeseries collection type. So skip creation of view.
+        createViewlessTimeseriesColl ||
         // If the request came directly on the bucket namesapce we do not need to create the view.
         ns.isTimeseriesBucketsCollection()) {
         return bucketCreationStatus;
@@ -754,7 +765,8 @@ CollectionOptions clusterByDefaultIfNecessary(const NamespaceString& nss,
     if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
         !collectionOptions.isView() && !collectionOptions.timeseries &&
         !collectionOptions.clusteredIndex.has_value() && (!idIndex || idIndex->isEmpty()) &&
-        !collectionOptions.capped && !clustered_util::requiresLegacyFormat(nss)) {
+        !collectionOptions.capped &&
+        !clustered_util::requiresLegacyFormat(nss, collectionOptions)) {
         // Capped, clustered collections differ in behavior significantly from normal
         // capped collections. Notably, they allow out-of-order insertion.
         //

@@ -288,8 +288,9 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
             }
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
-            if (auto fp = globalFailPointRegistry().find("clusterAllCollectionsByDefault");
-                fp && fp->shouldFail() && !clustered_util::requiresLegacyFormat(ns)) {
+            if (auto fp = globalFailPointRegistry().find("clusterAllCollectionsByDefault"); fp &&
+                fp->shouldFail() &&
+                !clustered_util::requiresLegacyFormat(ns, defaultCollectionOptions)) {
                 defaultCollectionOptions.clusteredIndex =
                     clustered_util::makeDefaultClusteredIdIndex();
             }

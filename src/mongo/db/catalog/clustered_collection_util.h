@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -64,7 +65,7 @@ boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& e
 /**
  * Returns true if legacy format is required for the namespace.
  */
-bool requiresLegacyFormat(const NamespaceString& nss);
+bool requiresLegacyFormat(const NamespaceString& nss, const CollectionOptions& collOptions);
 
 /**
  * listIndexes requires the ClusteredIndexSpec be formatted with an additional field 'clustered:

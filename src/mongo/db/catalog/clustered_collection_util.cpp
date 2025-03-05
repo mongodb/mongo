@@ -101,8 +101,8 @@ boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& e
     return makeCanonicalClusteredInfo(std::move(indexSpec));
 }
 
-bool requiresLegacyFormat(const NamespaceString& nss) {
-    return nss.isTimeseriesBucketsCollection() || nss.isChangeStreamPreImagesCollection();
+bool requiresLegacyFormat(const NamespaceString& nss, const CollectionOptions& collOptions) {
+    return collOptions.timeseries || nss.isChangeStreamPreImagesCollection();
 }
 
 BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
