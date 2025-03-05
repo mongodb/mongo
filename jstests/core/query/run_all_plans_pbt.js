@@ -87,21 +87,10 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
 const aggModel = getAggPipelineModel();
 
 // Test with a regular collection.
-{
-    // TODO SERVER-99889 reenable testing for hashed indexes.
-    let collModel = getCollectionModel().filter(({isTS, docs, indexes}) => {
-        for (const index of indexes) {
-            if (Object.values(index.def).includes('hashed')) {
-                return false;
-            }
-        }
-        return true;
-    });
-    testProperty(hintedQueryHasSameResultsAsControlCollScan,
-                 {controlColl, experimentColl},
-                 {collModel, aggModel},
-                 {numRuns, numQueriesPerRun});
-}
+testProperty(hintedQueryHasSameResultsAsControlCollScan,
+             {controlColl, experimentColl},
+             {collModel: getCollectionModel(), aggModel},
+             {numRuns, numQueriesPerRun});
 
 // TODO SERVER-101271 re-enable PBT testing for time-series
 // // Test with a TS collection.

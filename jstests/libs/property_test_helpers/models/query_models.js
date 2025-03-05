@@ -12,6 +12,8 @@ import {
     fieldArb,
     scalarArb
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
+import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 export const leafParametersPerFamily = 10;
@@ -29,7 +31,6 @@ const leafParameterArb =
     });
 
 const dollarFieldArb = fieldArb.map(f => "$" + f);
-const comparisonArb = fc.constantFrom('$eq', '$lt', '$lte', '$gt', '$gte');
 const accumulatorArb =
     fc.constantFrom(undefined, '$count', '$min', '$max', '$minN', '$maxN', '$sum');
 
@@ -51,45 +52,6 @@ const addFieldsConstArb =
 const addFieldsVarArb = fc.tuple(fieldArb, dollarFieldArb).map(function([destField, sourceField]) {
     return {$addFields: {[destField]: sourceField}};
 });
-
-// Single leaf predicate of a $match. {a: {$eq: 5}}
-const simpleMatchLeafPredicate =
-    fc.tuple(fieldArb, comparisonArb, leafParameterArb).map(function([field, cmp, cmpValue]) {
-        return {[field]: {[cmp]: cmpValue}};
-    });
-// {a: {$in: [1,2,3]}}
-const inMatchPredicate =
-    fc.tuple(fieldArb, fc.array(leafParameterArb, {minLength: 0, maxLength: 5}))
-        .map(function([field, inVals]) {
-            return {[field]: {$in: inVals}};
-        });
-
-// Arbitrary $match expression that may contain nested logical operations, or just leaves.
-// {$match: {a: {$eq: 5}}}, {$match: {$and: [{a: {$eq: 5}}, {b: {$eq: 6}}]}}
-// $or, $nor and $in are only allowed if `allowOrs` is true.
-function getMatchArb(allowOrs) {
-    const logicalOpArb = allowOrs ? fc.constantFrom('$and', '$or', '$nor') : fc.constant('$and');
-
-    // $in is a form of OR, and shouldn't be generated when `allowOrs`=false.
-    const matchLeafPredicate =
-        allowOrs ? fc.oneof(simpleMatchLeafPredicate, inMatchPredicate) : simpleMatchLeafPredicate;
-    const predicateArb =
-        fc.letrec(
-              tie => ({
-                  compoundPred: fc.tuple(logicalOpArb,
-                                         fc.array(tie('predicate'), {minLength: 1, maxLength: 3}))
-                                    .map(([logicalOp, children]) => {
-                                        return {[logicalOp]: children};
-                                    }),
-                  predicate: fc.oneof({maxDepth: 5}, matchLeafPredicate, tie('compoundPred'))
-              }))
-            .predicate;
-    return fc.array(predicateArb, {minLength: 1, maxLength: 5}).map((predicates) => {
-        // Merge all the predicates into one object.
-        const mergedPredicates = Object.assign({}, ...predicates);
-        return {$match: mergedPredicates};
-    });
-}
 
 const sortArb = fc.tuple(fieldArb, fc.constantFrom(1, -1)).map(function([field, sortOrder]) {
     // TODO SERVER-91164 sort on multiple fields
@@ -161,7 +123,7 @@ function getAllowedStages(allowOrs, deterministicBag) {
  * and `deterministicBag`. By default, ORs are allowed and the bag of results will be deterministic.
  */
 export function getAggPipelineModel({allowOrs = true, deterministicBag = true} = {}) {
-    const aggStageArb = fc.oneof(...getAllowedStages(allowOrs, deterministicBag));
+    const aggStageArb = oneof(...getAllowedStages(allowOrs, deterministicBag));
     // Length 6 seems long enough to cover interactions between stages.
     return fc.array(aggStageArb, {minLength: 0, maxLength: 6});
 }

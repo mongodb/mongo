@@ -46,6 +46,14 @@ function mockProperty(collection) {
     return true;
 }
 
+const fullyMinimizedDoc = {
+    t: new Date(0),
+    m: {m1: 0, m2: 0},
+    array: 0,
+    a: 0,
+    b: 0
+};
+
 function testShrinking(isTS) {
     const collModel = getCollectionModel({isTS});
 
@@ -55,6 +63,9 @@ function testShrinking(isTS) {
         const {isTS, docs, indexes} = runDetails.counterexample[0];
         // Expect 1 doc for full minimization
         assert.eq(docs.length, 1, docs);
+        // _ids cannot be fully minimized because of how we assign them out uniquely.
+        delete docs[0]._id;
+        assert.eq(docs[0], fullyMinimizedDoc, docs);
         // Expect 0 indexes
         assert.eq(indexes.length, 0, indexes);
         reporterRan = true;
