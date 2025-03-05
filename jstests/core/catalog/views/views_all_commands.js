@@ -228,6 +228,7 @@ let viewsCommandTests = {
     streams_testOnlyGetFeatureFlags: {skip: isAnInternalCommand},
     streams_sendEvent: {skip: isAnInternalCommand},
     streams_writeCheckpoint: {skip: isAnInternalCommand},
+    streams_updateConnection: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     abortMoveCollection: {skip: isUnrelated},
     abortReshardCollection: {skip: isUnrelated},

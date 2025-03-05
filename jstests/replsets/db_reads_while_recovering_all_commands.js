@@ -156,6 +156,7 @@ const allCommands = {
     streams_testOnlyGetFeatureFlags: {skip: isAnInternalCommand},
     streams_writeCheckpoint: {skip: isAnInternalCommand},
     streams_sendEvent: {skip: "internal command"},
+    streams_updateConnection: {skip: isAnInternalCommand},
     _transferMods: {skip: isPrimaryOnly},
     abortMoveCollection: {skip: isPrimaryOnly},
     abortReshardCollection: {skip: isPrimaryOnly},
