@@ -43,6 +43,7 @@ enums:
             kCheckShardPreconditions: "checkShardPreconditions"
             kPrepareNewShard: "prepareNewShard"
             kCommit: "commit"
+            kCleanup: "cleanup"
             kFinal: "final"
 
 structs:

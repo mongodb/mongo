@@ -331,5 +331,13 @@ void updateClusterCardinalityParameter(const Lock::ExclusiveLock& clusterCardina
  */
 void hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(OperationContext* opCtx);
 
+/**
+ * Collects user write blocking state locally (cluster parameter) and propagates it to the given
+ * replica set
+ */
+void propagateClusterUserWriteBlockToReplicaSet(OperationContext* opCtx,
+                                                RemoteCommandTargeter& targeter,
+                                                std::shared_ptr<executor::TaskExecutor> executor);
+
 }  // namespace topology_change_helpers
 }  // namespace mongo

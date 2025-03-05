@@ -695,7 +695,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         }
 
         // Set the user-writes blocking state on the new shard.
-        _setUserWriteBlockingStateOnNewShard(opCtx, targeter.get());
+        topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
+            opCtx, *targeter, _executorForAddShard);
 
         // Determine the set of cluster parameters to be used.
         _standardizeClusterParameters(opCtx, *targeter);
@@ -1256,39 +1257,6 @@ Lock::ExclusiveLock ShardingCatalogManager::acquireClusterCardinalityParameterLo
 
 void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats* stats) {
     _executorForAddShard->appendConnectionStats(stats);
-}
-
-void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
-                                                                  RemoteCommandTargeter* targeter) {
-
-    uint8_t level = topology_change_helpers::UserWriteBlockingLevel::None;
-
-    // Propagate the cluster's current user write blocking state onto the new shard.
-    PersistentTaskStore<UserWriteBlockingCriticalSectionDocument> store(
-        NamespaceString::kUserWritesCriticalSectionsNamespace);
-    store.forEach(opCtx, BSONObj(), [&](const UserWriteBlockingCriticalSectionDocument& doc) {
-        invariant(doc.getNss() ==
-                  UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
-
-        if (doc.getBlockNewUserShardedDDL()) {
-            level |= topology_change_helpers::UserWriteBlockingLevel::DDLOperations;
-        }
-
-        if (doc.getBlockUserWrites()) {
-            invariant(doc.getBlockNewUserShardedDDL());
-            level |= topology_change_helpers::UserWriteBlockingLevel::Writes;
-        }
-
-        return true;
-    });
-
-    topology_change_helpers::setUserWriteBlockingState(
-        opCtx,
-        *targeter,
-        topology_change_helpers::UserWriteBlockingLevel(level),
-        true,
-        boost::none,
-        _executorForAddShard);
 }
 
 void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opCtx,

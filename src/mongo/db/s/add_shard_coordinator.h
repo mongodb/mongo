@@ -62,6 +62,10 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
+
     void _verifyInput() const;
 
     void _checkExistingDataOnShard(OperationContext* opCtx,
@@ -84,6 +88,12 @@ private:
     void _setFCVOnReplicaSet(OperationContext* opCtx,
                              mongo::ServerGlobalParams::FCVSnapshot::FCV fcv,
                              std::shared_ptr<executor::TaskExecutor> executor);
+
+    void _blockUserWrites(OperationContext* opCtx,
+                          std::shared_ptr<executor::TaskExecutor> executor);
+
+    void _unblockUserWrites(OperationContext* opCtx,
+                            std::shared_ptr<executor::TaskExecutor> executor);
 
     // Set on successful completion of the coordinator.
     boost::optional<std::string> _result;

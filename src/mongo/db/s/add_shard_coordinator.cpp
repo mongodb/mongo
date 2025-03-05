@@ -67,6 +67,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     _enterPhase(AddShardCoordinatorPhaseEnum::kFinal);
                 }
             }))
+        .onError([](const Status& status) { return status; })
         .then(_buildPhaseHandler(Phase::kCheckShardPreconditions,
                                  [this, &token, _ = shared_from_this(), executor]() {
                                      auto opCtxHolder = cc().makeOperationContext();
@@ -74,29 +75,32 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                                      auto& targeter = _getTargeter(opCtx);
 
-                                     _runWithRetries(
-                                         [&]() {
-                                             topology_change_helpers::validateHostAsShard(
-                                                 opCtx,
-                                                 targeter,
-                                                 _doc.getConnectionString(),
-                                                 _doc.getIsConfigShard(),
-                                                 **executor);
-                                         },
-                                         executor,
-                                         token);
+                                     try {
+                                         _runWithRetries(
+                                             [&]() {
+                                                 topology_change_helpers::validateHostAsShard(
+                                                     opCtx,
+                                                     targeter,
+                                                     _doc.getConnectionString(),
+                                                     _doc.getIsConfigShard(),
+                                                     **executor);
+                                             },
+                                             executor,
+                                             token);
+                                     } catch (const DBException&) {
+                                         // if we are not able to validate the host as a shard after
+                                         // multiple try, we don't want to continue, so we remove
+                                         // the replicaset monitor and give up.
+                                         topology_change_helpers::removeReplicaSetMonitor(
+                                             opCtx, _doc.getConnectionString());
+                                         _completeOnError = true;
+                                         throw;
+                                     }
 
                                      // TODO(SERVER-97997) Remove the check after promoting to
                                      // sharded cluster is implemented correctly
                                      if (!_isFirstShard(opCtx)) {
-                                         topology_change_helpers::setUserWriteBlockingState(
-                                             opCtx,
-                                             targeter,
-                                             topology_change_helpers::UserWriteBlockingLevel::All,
-                                             true, /* block writes */
-                                             _osiGenerator(),
-                                             **executor);
-
+                                         _blockUserWrites(opCtx, **executor);
                                          _checkExistingDataOnShard(opCtx, targeter, **executor);
                                      }
                                  }))
@@ -147,10 +151,14 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 // (Generic FCV reference): These FCV checks should exist across LTS binary
                 // versions.
                 if (fcvSnapshot.isUpgradingOrDowngrading()) {
-                    _completeOnError = true;
-                    uasserted(5563604, "Cannot add shard while in upgrading/downgrading FCV state");
+                    triggerCleanup(
+                        opCtx,
+                        Status(ErrorCodes::Error(5563604),
+                               "Cannot add shard while in upgrading/downgrading FCV state"));
                 }
 
+                // (Generic FCV reference): These FCV checks should exist across LTS binary
+                // versions.
                 const auto currentFCV = fcvSnapshot.getVersion();
                 invariant(currentFCV == multiversion::GenericFCV::kLatest ||
                           currentFCV == multiversion::GenericFCV::kLastContinuous ||
@@ -224,6 +232,15 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 topology_change_helpers::updateClusterCardinalityParameter(
                     clusterCardinalityParameterLock, opCtx);
             }))
+        .then(_buildPhaseHandler(
+            Phase::kCleanup,
+            [this, _ = shared_from_this(), executor]() {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+
+                topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
+                    opCtx, _getTargeter(opCtx), **executor);
+            }))
         .then(_buildPhaseHandler(Phase::kFinal,
                                  [this, _ = shared_from_this()]() {
                                      auto opCtxHolder = cc().makeOperationContext();
@@ -233,7 +250,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                      // was already added).
                                      // If we were not able to add anything then an assert should
                                      // had been thrown earlier.
-                                     tassert(10105000,
+                                     tassert(ErrorCodes::OperationFailed,
                                              "Final state is reached but no name was chosen.",
                                              _doc.getChosenName().has_value());
 
@@ -242,22 +259,28 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                                      _result = _doc.getChosenName().value().toString();
                                  }))
-        .onError([this, _ = shared_from_this(), executor](const Status& status) {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            auto& targeter = _getTargeter(opCtx);
-
-            topology_change_helpers::setUserWriteBlockingState(
-                opCtx,
-                targeter,
-                topology_change_helpers::UserWriteBlockingLevel::All,
-                false, /* unblock writes */
-                _osiGenerator(),
-                **executor);
-
-            topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
+        .onError([this, _ = shared_from_this()](const Status& status) {
+            if (!_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(status)) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                triggerCleanup(opCtx, status);
+            }
 
             return status;
+        });
+}
+
+ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, status, executor, _ = shared_from_this()] {
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+
+            _unblockUserWrites(opCtx, **executor);
+            topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
         });
 }
 
@@ -327,8 +350,7 @@ void AddShardCoordinator::_runWithRetries(std::function<void()>&& function,
                 return true;
             }
             failCounter++;
-            if (failCounter > kMaxFailedRetryCount) {
-                _completeOnError = true;
+            if (failCounter >= kMaxFailedRetryCount) {
                 return true;
             }
             return false;
@@ -395,6 +417,28 @@ void AddShardCoordinator::_setFCVOnReplicaSet(OperationContext* opCtx,
         topology_change_helpers::runCommandForAddShard(
             opCtx, _getTargeter(opCtx), DatabaseName::kAdmin, setFcvCmd.toBSON(), executor)
             .commandStatus);
+}
+
+void AddShardCoordinator::_blockUserWrites(OperationContext* opCtx,
+                                           std::shared_ptr<executor::TaskExecutor> executor) {
+    topology_change_helpers::setUserWriteBlockingState(
+        opCtx,
+        _getTargeter(opCtx),
+        topology_change_helpers::UserWriteBlockingLevel::All,
+        true, /* block writes */
+        _osiGenerator(),
+        executor);
+}
+
+void AddShardCoordinator::_unblockUserWrites(OperationContext* opCtx,
+                                             std::shared_ptr<executor::TaskExecutor> executor) {
+    topology_change_helpers::setUserWriteBlockingState(
+        opCtx,
+        _getTargeter(opCtx),
+        topology_change_helpers::UserWriteBlockingLevel::All,
+        false, /* unblock writes */
+        _osiGenerator(),
+        executor);
 }
 
 }  // namespace mongo

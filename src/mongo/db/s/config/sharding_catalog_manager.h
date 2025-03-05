@@ -741,12 +741,6 @@ private:
                                                       const std::string& zoneName);
 
     /**
-     * Sets the current cluster's user-write blocking state on the shard that is being added.
-     */
-    void _setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
-                                              RemoteCommandTargeter* targeter);
-
-    /**
      * Determines whether to absorb the cluster parameters on the newly added shard (if we're
      * converting from a replica set to a sharded cluster) or set the cluster parameters stored on
      * the config server in the newly added shard.

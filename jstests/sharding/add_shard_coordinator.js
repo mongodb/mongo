@@ -85,7 +85,7 @@ const clusterParameter4 = {
         _configsvrAddShardCoordinator: "some.nonexistent.host",
         "writeConcern": {"w": "majority"}
     }),
-                                 ErrorCodes.HostUnreachable);
+                                 ErrorCodes.OperationFailed);
 
     st.stop();
 }
@@ -127,7 +127,7 @@ const clusterParameter4 = {
     assert.commandWorked(st.s.adminCommand({setClusterParameter: clusterParameter1}));
     assert.commandWorked(st.s.adminCommand({setClusterParameter: clusterParameter3}));
 
-    const rs = new ReplSetTest({nodes: 1});
+    const rs = new ReplSetTest({nodes: 1, name: "rs"});
     rs.startSet();
     rs.initiate();
 
@@ -137,9 +137,6 @@ const clusterParameter4 = {
         rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     rs.restart(0, {shardsvr: ""});
-
-    assert.neq(rs.getPrimary().getDB("admin").system.version.findOne().version,
-               st.configRS.getPrimary().getDB("admin").system.version.findOne());
 
     assert.commandWorked(rs.getPrimary().getDB("foo").foo.insertOne({a: 1}));
 
@@ -170,12 +167,8 @@ const clusterParameter4 = {
         assert(response.shards.some(shard => shard._id === "hagymasbab"))
     }
 
-    jsTest.log("Non-first RS is locked for write");
-    try {
-        rs.getPrimary().getDB("bar").foo.insertOne({b: 1});
-    } catch (error) {
-        assert.commandFailedWithCode(error, ErrorCodes.UserWritesBlocked);
-    }
+    jsTest.log("Non-first RS is unlocked after write");
+    assert.commandWorked(rs.getPrimary().getDB("foo").foo.insertOne({b: 1}));
 
     jsTest.log("Shard identity must be valid");
     const shardIdentityDoc =
@@ -206,6 +199,34 @@ const clusterParameter4 = {
     assert.neq(rs.getPrimary().getDB("admin").system.version.findOne().version,
                st.configRS.getPrimary().getDB("admin").system.version.findOne());
 
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+
+    const rs2 = new ReplSetTest({nodes: 1, name: "rs2"});
+    rs2.startSet({shardsvr: ""});
+    rs2.initiate();
+
+    {
+        const response = st.configRS.getPrimary().adminCommand({
+            _configsvrAddShardCoordinator: rs2.getURL(),
+            name: "krumplishal",
+            "writeConcern": {"w": "majority"}
+        });
+        assert.commandWorked(response);
+        assert.eq(response.shardAdded, "krumplishal");
+    }
+
+    jsTest.log("Cluster-wide user write blocking is propagated");
+    try {
+        rs2.getPrimary().getDB("bar").foo.insertOne({b: 1});
+    } catch (error) {
+        assert.commandFailedWithCode(error, ErrorCodes.UserWritesBlocked);
+    }
+
+    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+
+    assert.commandWorked(rs2.getPrimary().getDB("bar").foo.insertOne({b: 1}));
+
     rs.stopSet();
     st.stop();
+    rs2.stopSet();
 }

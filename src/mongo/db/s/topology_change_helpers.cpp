@@ -80,6 +80,8 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/topology_change_helpers.h"
+#include "mongo/db/s/user_writes_critical_section_document_gen.h"
+#include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -1727,6 +1729,38 @@ void updateClusterCardinalityParameter(const Lock::ExclusiveLock&, OperationCont
 
 void hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(OperationContext* opCtx) {
     hangAddShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
+}
+
+void propagateClusterUserWriteBlockToReplicaSet(OperationContext* opCtx,
+                                                RemoteCommandTargeter& targeter,
+                                                std::shared_ptr<executor::TaskExecutor> executor) {
+    uint8_t level = topology_change_helpers::UserWriteBlockingLevel::None;
+
+    PersistentTaskStore<UserWriteBlockingCriticalSectionDocument> store(
+        NamespaceString::kUserWritesCriticalSectionsNamespace);
+    store.forEach(opCtx, BSONObj(), [&](const UserWriteBlockingCriticalSectionDocument& doc) {
+        invariant(doc.getNss() ==
+                  UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
+
+        if (doc.getBlockNewUserShardedDDL()) {
+            level |= topology_change_helpers::UserWriteBlockingLevel::DDLOperations;
+        }
+
+        if (doc.getBlockUserWrites()) {
+            invariant(doc.getBlockNewUserShardedDDL());
+            level |= topology_change_helpers::UserWriteBlockingLevel::Writes;
+        }
+
+        return true;
+    });
+
+    topology_change_helpers::setUserWriteBlockingState(
+        opCtx,
+        targeter,
+        topology_change_helpers::UserWriteBlockingLevel(level),
+        true,
+        boost::none,
+        executor);
 }
 
 }  // namespace topology_change_helpers
