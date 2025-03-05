@@ -9,6 +9,9 @@ filters:
   - "keyvault.js":
     approvers:
       - 10gen/server-security
+  - "README.md":
+    approvers:
+      - 10gen/devprod-correctness
   - "assert.js":
     approvers:
       - 10gen/devprod-correctness

@@ -2442,6 +2442,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/shell/**/kms_* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/encrypted* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/keyvault.js @10gen/server-security @svc-auto-approve-bot
+/src/mongo/shell/**/README.md @10gen/devprod-correctness @svc-auto-approve-bot
 /src/mongo/shell/**/assert.js @10gen/devprod-correctness @svc-auto-approve-bot
 /src/mongo/shell/**/bench* @10gen/devprod-correctness @svc-auto-approve-bot
 /src/mongo/shell/**/bridge.js @10gen/devprod-correctness @svc-auto-approve-bot
