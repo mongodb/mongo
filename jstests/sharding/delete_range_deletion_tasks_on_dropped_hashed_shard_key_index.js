@@ -71,6 +71,23 @@ assert.eq(1, st.shard0.getDB("config").getCollection("rangeDeletions").countDocu
     nss: coll.getFullName()
 }));
 
+const inMultiversionSuite = jsTestOptions().mixedBinVersions ||
+    jsTestOptions().shardMixedBinVersions || jsTestOptions().useRandomBinVersionsWithinReplicaSet;
+if (!inMultiversionSuite) {
+    // Set the FCV down and up to test that the upgrade does not get stuck when the hashed shard key
+    // index is absent (it should simply set `numOrphanDocs` to zero).
+    assert.eq(0, st.shard0.getDB("config").getCollection("rangeDeletions").countDocuments({
+        nss: coll.getFullName(),
+        numOrphanDocs: 0
+    }));
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.eq(1, st.shard0.getDB("config").getCollection("rangeDeletions").countDocuments({
+        nss: coll.getFullName(),
+        numOrphanDocs: 0
+    }));
+}
+
 // Rebuild the hashed shard key index for db.test and ensure the pending range deletion completes.
 assert.commandWorked(coll.createIndex({"_id": "hashed"}));
 assert.soon(() => {

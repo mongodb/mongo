@@ -692,28 +692,49 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
                                                                  keyPattern,
                                                                  /*requireSingleKey=*/false);
 
-                    uassert(ErrorCodes::IndexNotFound,
-                            str::stream() << "couldn't find index over shard key " << keyPattern
-                                          << " for collection " << deletionTask.getNss()
-                                          << " (uuid: " << deletionTask.getCollectionUuid() << ")",
-                            shardKeyIdx);
+                    int64_t numOrphansInRange = [&]() -> int64_t {
+                        if (!shardKeyIdx && ShardKeyPattern(keyPattern).isHashedPattern()) {
+                            // It is allowed not to have a shard key pattern for hashed shard keys.
+                            // In that case, set the orphans counter to zero to avoid blocking
+                            // upgrade.
+                            LOGV2_DEBUG(9625200,
+                                        1,
+                                        "Couldn't find hashed shareded key index, setting number of"
+                                        "orphaned docs to zero for this range",
+                                        "min"_attr = deletionTask.getRange().getMin(),
+                                        "max"_attr = deletionTask.getRange().getMax(),
+                                        "namespace"_attr = deletionTask.getNss().ns());
 
-                    const auto& range = deletionTask.getRange();
-                    auto forwardIdxScanner =
-                        InternalPlanner::shardKeyIndexScan(opCtx,
-                                                           &(*collection),
-                                                           *shardKeyIdx,
-                                                           range.getMin(),
-                                                           range.getMax(),
-                                                           BoundInclusion::kIncludeStartKeyOnly,
-                                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                           InternalPlanner::FORWARD);
-                    int64_t numOrphansInRange = 0;
-                    BSONObj indexEntry;
-                    while (forwardIdxScanner->getNext(&indexEntry, nullptr) !=
-                           PlanExecutor::IS_EOF) {
-                        ++numOrphansInRange;
-                    }
+                            return 0;
+                        }
+
+                        uassert(ErrorCodes::IndexNotFound,
+                                str::stream()
+                                    << "couldn't find index over shard key " << keyPattern
+                                    << " for collection " << deletionTask.getNss()
+                                    << " (uuid: " << deletionTask.getCollectionUuid() << ")",
+                                shardKeyIdx);
+
+                        const auto& range = deletionTask.getRange();
+                        auto forwardIdxScanner = InternalPlanner::shardKeyIndexScan(
+                            opCtx,
+                            &(*collection),
+                            *shardKeyIdx,
+                            range.getMin(),
+                            range.getMax(),
+                            BoundInclusion::kIncludeStartKeyOnly,
+                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                            InternalPlanner::FORWARD);
+
+                        int64_t docsInRange = 0;
+                        BSONObj indexEntry;
+                        while (forwardIdxScanner->getNext(&indexEntry, nullptr) !=
+                               PlanExecutor::IS_EOF) {
+                            ++docsInRange;
+                        }
+
+                        return docsInRange;
+                    }();
 
                     setNumOrphansOnTask(deletionTask, numOrphansInRange);
                     return true;

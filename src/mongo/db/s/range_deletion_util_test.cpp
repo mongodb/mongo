@@ -1087,6 +1087,51 @@ TEST_F(
         1);
 }
 
+TEST_F(RangeDeleterTest,
+       setOrphanCountersOnRangeDeletionTasksAddsZeroValueWhenHashedIndexNotFound) {
+    const BSONObj kHashedShardKeyPattern = BSON(kShardKey << "hashed");
+
+    DBDirectClient dbClient(_opCtx);
+    setFilteringMetadataWithUUID(uuid(), kHashedShardKeyPattern);
+
+    const auto orphanedRangeLowerBoud = std::numeric_limits<int64_t>::max() / 2;
+    const ChunkRange orphansRange(BSON(kShardKey << orphanedRangeLowerBoud),
+                                  BSON(kShardKey << MAXKEY));
+
+    auto t = insertRangeDeletionTask(_opCtx, uuid(), orphansRange);
+    const auto numDocInserted = 10;
+    auto numOrphansInRange = 0;
+    for (auto i = 0; i < numDocInserted; ++i) {
+        dbClient.insert(kNss.toString(), BSON(kShardKey << i));
+        const auto hashedDocId = BSONElementHasher::hash64(BSON("_id" << i).firstElement(),
+                                                           BSONElementHasher::DEFAULT_HASH_SEED);
+        if (hashedDocId >= orphanedRangeLowerBoud) {
+            ++numOrphansInRange;
+        }
+    }
+
+    ASSERT(numOrphansInRange > 0);
+
+    setOrphanCountersOnRangeDeletionTasks(_opCtx);
+
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    ASSERT_EQ(store.count(_opCtx, BSON(RangeDeletionTask::kNumOrphanDocsFieldName << 0)), 1);
+}
+
+TEST_F(RangeDeleterTest, setOrphanCountersOnRangeDeletionTasksErrorsWhenNonHashedIndexNotFound) {
+    const auto kShardKeyField = "notIndexedField";
+    const BSONObj kShardKeyPattern = BSON(kShardKeyField << 1);
+
+    DBDirectClient dbClient(_opCtx);
+    setFilteringMetadataWithUUID(uuid(), kShardKeyPattern);
+
+    const ChunkRange orphansRange(BSON(kShardKeyField << 0), BSON(kShardKeyField << MAXKEY));
+    insertRangeDeletionTask(_opCtx, uuid(), orphansRange);
+
+    ASSERT_THROWS_CODE(
+        setOrphanCountersOnRangeDeletionTasks(_opCtx), DBException, ErrorCodes::IndexNotFound);
+}
+
 TEST_F(RangeDeleterTest, setOrphanCountersOnRangeDeletionTasksAddsZeroValueWhenNamespaceNotFound) {
     NamespaceString unexistentCollection("foo", "iDontExist");
     auto collUuid = UUID::gen();
