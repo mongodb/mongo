@@ -137,17 +137,16 @@ public:
     int64_t numEventsTotalForTest();
     int64_t numBatchesForTest();
 
+    /**
+     * Creates the aggregation command request for the change streams monitor.
+     */
+    AggregateCommandRequest makeAggregateCommandRequest();
+
 private:
     /**
      * Creates the aggregation pipeline for the change streams monitor.
      */
     std::vector<BSONObj> _makeAggregatePipeline() const;
-
-    /**
-     * Creates the aggregation command request for the change streams monitor from the pipeline
-     * created above.
-     */
-    AggregateCommandRequest _makeAggregateCommandRequest() const;
 
     /**
      * If the monitor has already opened a change stream cursor, creates a DBClientCursor from the

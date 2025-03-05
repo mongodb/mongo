@@ -303,7 +303,7 @@ std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() co
     return {std::move(changeStreamStage), std::move(matchStage)};
 }
 
-AggregateCommandRequest ReshardingChangeStreamsMonitor::_makeAggregateCommandRequest() const {
+AggregateCommandRequest ReshardingChangeStreamsMonitor::makeAggregateCommandRequest() {
     auto pipeline = _makeAggregatePipeline();
     AggregateCommandRequest aggRequest(_monitorNss, std::move(pipeline));
 
@@ -330,7 +330,7 @@ std::unique_ptr<mongo::DBClientCursor> ReshardingChangeStreamsMonitor::_makeDBCl
     bool keepCursorOpen = true;
 
     if (!_cursorId) {
-        auto aggRequest = _makeAggregateCommandRequest();
+        auto aggRequest = makeAggregateCommandRequest();
         auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
             client, aggRequest, false /* secondaryOk */, useExhaust, keepCursorOpen));
         _cursorId = cursor->getCursorId();

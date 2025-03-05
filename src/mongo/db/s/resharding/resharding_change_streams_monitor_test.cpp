@@ -135,6 +135,39 @@ public:
                       false /*multi*/);
     }
 
+    /**
+     * Create a timeseris collection on 'nss' and inserts document with '_id' and 'x' ranging from
+     * minDocValue to maxDocValue (inclusive) and with a 'timestamp' set to the current time.
+     */
+    void createTimeseriesCollectionAndInsertDocuments(const NamespaceString& nss,
+                                                      int minDocValue,
+                                                      int maxDocValue) {
+        AutoGetDb autoDb(opCtx, nss.dbName(), LockMode::MODE_X);
+        autoDb.ensureDbExists(opCtx);
+
+        BSONObj timeseriesOptions = BSON("timeField"
+                                         << "timestamp");
+
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx);
+        uassertStatusOK(
+            createCollection(opCtx,
+                             nss.dbName(),
+                             BSON("create" << nss.coll() << "timeseries" << timeseriesOptions)));
+
+        DBDirectClient client(opCtx);
+        for (int i = minDocValue; i <= maxDocValue; i++) {
+            client.insert(nss, BSON("_id" << i << "x" << i << "timestamp" << Date_t::now()));
+        }
+
+        // Perform an update so change stream start time doesn't include the inserts above.
+        client.update(nss,
+                      BSON("x" << minDocValue),
+                      BSON("$set" << BSON("y" << minDocValue)),
+                      false /*upsert*/,
+                      false /*multi*/);
+    }
+
     template <typename Callable>
     void runInTransaction(bool abortTxn, Callable&& func) {
         DBDirectClient client(opCtx);
@@ -901,6 +934,72 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen)
 
     ASSERT_EQ(delta, numInserts);
     ASSERT_FALSE(hasIdleCursor(tempNss));
+}
+
+TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDonor) {
+    createCollectionAndInsertDocuments(sourceNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
+    Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+    auto donorMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, sourceNss, startAtTime, callback);
+
+    AggregateCommandRequest donorRequest = donorMonitor->makeAggregateCommandRequest();
+
+    ASSERT_EQ(donorRequest.getNamespace(), sourceNss);
+
+    ASSERT_TRUE(!donorRequest.getPipeline().empty());
+    BSONObj donorFirstStage = donorRequest.getPipeline().front();
+
+    auto donorChangeStreamSpec = DocumentSourceChangeStreamSpec::parse(
+        IDLParserContext("TestChangeStreamMonitorSettingsForDonor"),
+        donorFirstStage.getObjectField(DocumentSourceChangeStream::kStageName));
+
+    ASSERT_FALSE(donorChangeStreamSpec.getShowMigrationEvents());
+    ASSERT_TRUE(donorChangeStreamSpec.getShowSystemEvents());
+    ASSERT_FALSE(donorChangeStreamSpec.getAllowToRunOnSystemNS());
+}
+
+TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDonorTimeseries) {
+    createTimeseriesCollectionAndInsertDocuments(sourceNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
+    Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+    auto donorMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, sourceNss.makeTimeseriesBucketsNamespace(), startAtTime, callback);
+
+    AggregateCommandRequest donorRequest = donorMonitor->makeAggregateCommandRequest();
+
+    ASSERT_EQ(donorRequest.getNamespace(), sourceNss.makeTimeseriesBucketsNamespace());
+
+    ASSERT_TRUE(!donorRequest.getPipeline().empty());
+    BSONObj donorFirstStage = donorRequest.getPipeline().front();
+
+    auto donorChangeStreamSpec = DocumentSourceChangeStreamSpec::parse(
+        IDLParserContext("TestChangeStreamMonitorSettingsForDonorTimeseries"),
+        donorFirstStage.getObjectField(DocumentSourceChangeStream::kStageName));
+
+    ASSERT_FALSE(donorChangeStreamSpec.getShowMigrationEvents());
+    ASSERT_TRUE(donorChangeStreamSpec.getShowSystemEvents());
+    ASSERT_TRUE(donorChangeStreamSpec.getAllowToRunOnSystemNS());
+}
+
+TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForRecipient) {
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
+    Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+    auto recipientMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+
+    AggregateCommandRequest recipientRequest = recipientMonitor->makeAggregateCommandRequest();
+
+    ASSERT_EQ(recipientRequest.getNamespace(), tempNss);
+
+    ASSERT_TRUE(!recipientRequest.getPipeline().empty());
+    BSONObj recipientFirstStage = recipientRequest.getPipeline().front();
+
+    auto recipientChangeStreamSpec = DocumentSourceChangeStreamSpec::parse(
+        IDLParserContext("TestChangeStreamMonitorSettingsForRecipient"),
+        recipientFirstStage.getObjectField(DocumentSourceChangeStream::kStageName));
+
+    ASSERT_TRUE(recipientChangeStreamSpec.getShowMigrationEvents());
+    ASSERT_FALSE(recipientChangeStreamSpec.getShowSystemEvents());
+    ASSERT_TRUE(recipientChangeStreamSpec.getAllowToRunOnSystemNS());
 }
 
 }  // namespace
