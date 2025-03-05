@@ -1244,7 +1244,8 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
             stateTransitionsGuard.wait(state);
             stepDown();
 
-            ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+            ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                      ErrorCodes::InterruptedDueToReplStateChange);
 
             prevState = state;
 
@@ -1296,7 +1297,8 @@ TEST_F(ReshardingRecipientServiceTest, ReportForCurrentOpAfterCompletion) {
 
         // At this point, the resharding metrics will have been unregistered from the cumulative
         // metrics
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
 
         // Now call step up. The old recipient object has not yet been destroyed because we
         // still hold a shared pointer to it ('recipient') - this can happen in production after
@@ -1429,7 +1431,8 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         doneTransitionGuard->wait(RecipientStateEnum::kDone);
         stepDown();
 
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
 
         recipient.reset();
         stepUp(opCtx.get());
@@ -1538,7 +1541,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
 
         stepDown();
         stateTransitionsGuard.unset(RecipientStateEnum::kDone);
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
 
         DBDirectClient client(opCtx.get());
         NamespaceString sourceNss =
@@ -1600,7 +1604,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
 
         stepDown();
         stateTransitionsGuard.unset(RecipientStateEnum::kDone);
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
 
         DBDirectClient client(opCtx.get());
         NamespaceString sourceNss =
@@ -1946,7 +1951,8 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
 
             stepDown();
 
-            ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+            ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                      ErrorCodes::InterruptedDueToReplStateChange);
 
             prevState = state;
             if (state == RecipientStateEnum::kApplying ||
@@ -2110,7 +2116,8 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
         }
 
         stepDown();
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
         recipient.reset();
 
         stepUp(opCtx.get());
@@ -2153,7 +2160,8 @@ TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
         ASSERT_OK(localTransitionToErrorFuture.getNoThrow());
 
         stepDown();
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
         recipient.reset();
 
         stepUp(opCtx.get());
