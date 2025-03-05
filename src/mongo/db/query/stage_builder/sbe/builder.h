@@ -109,7 +109,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     RemoteCursorMap* remoteCursors = nullptr);
 
 std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContext* opCtx,
-                                                                 const CanonicalQuery& cq,
+                                                                 const ExpressionContext& expCtx,
                                                                  size_t remoteCursorId,
                                                                  RemoteCursorMap* remoteCursors,
                                                                  PlanYieldPolicySBE* yieldPolicy);

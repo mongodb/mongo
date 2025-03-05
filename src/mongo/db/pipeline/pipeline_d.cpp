@@ -1702,15 +1702,18 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
         // The $search is pushed down into SBE executor.
         if (auto cursor = search_helpers::getSearchMetadataCursor(searchStage)) {
             // Create a yield policy for metadata cursor.
+            // This pipeline does not hold any ShardRole resources, so pass an empty
+            // MultipleCollectionAccessor.
+            MultipleCollectionAccessor emptyMca;
             auto metadataYieldPolicy =
                 PlanYieldPolicyRemoteCursor::make(expCtx->getOperationContext(),
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                  collections,
+                                                  emptyMca,
                                                   nss);
             cursor->updateYieldPolicy(std::move(metadataYieldPolicy));
 
             additionalExecutors.push_back(uassertStatusOK(getSearchMetadataExecutorSBE(
-                expCtx->getOperationContext(), collections, nss, *cq, std::move(cursor))));
+                expCtx->getOperationContext(), nss, *expCtx, std::move(cursor))));
         }
     }
     return {std::move(executor), callback, std::move(additionalExecutors)};

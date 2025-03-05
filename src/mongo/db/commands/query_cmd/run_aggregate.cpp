@@ -523,6 +523,17 @@ void executeUntilFirstBatch(const AggExState& aggExState,
         std::vector<ClientCursorPin> pinnedCursors;
         for (auto&& exec : execs) {
             auto pinnedCursor = registerCursor(aggExState, expCtx, std::move(exec));
+
+            // The first executor is the main executor. The following ones are additionalExecutors.
+            // AdditionalExecutors must never have associated ShardRole resources – therefore, we
+            // stash empty TransactionResources to their stashed cursor.
+            if (!pinnedCursors.empty() &&
+                pinnedCursor->getExecutor()->lockPolicy() ==
+                    PlanExecutor::LockPolicy::kLocksInternally) {
+                pinnedCursor->stashTransactionResources(StashedTransactionResources{
+                    std::make_unique<shard_role_details::TransactionResources>(),
+                    shard_role_details::TransactionResources::State::EMPTY});
+            }
             pinnedCursors.emplace_back(std::move(pinnedCursor));
         }
         handleMultipleCursorsForExchange(aggExState, expCtx, pinnedCursors, result);

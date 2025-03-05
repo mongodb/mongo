@@ -366,18 +366,17 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 }  // prepareSlotBasedExecutableTree
 
 std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContext* opCtx,
-                                                                 const CanonicalQuery& cq,
+                                                                 const ExpressionContext& expCtx,
                                                                  size_t remoteCursorId,
                                                                  RemoteCursorMap* remoteCursors,
                                                                  PlanYieldPolicySBE* yieldPolicy) {
-    auto expCtx = cq.getExpCtxRaw();
     Environment env(std::make_unique<sbe::RuntimeEnvironment>());
     std::unique_ptr<PlanStageStaticData> data(std::make_unique<PlanStageStaticData>());
     sbe::value::SlotIdGenerator slotIdGenerator;
     data->resultSlot = slotIdGenerator.generate();
 
-    auto stage = sbe::SearchCursorStage::createForMetadata(expCtx->getNamespaceString(),
-                                                           expCtx->getUUID(),
+    auto stage = sbe::SearchCursorStage::createForMetadata(expCtx.getNamespaceString(),
+                                                           expCtx.getUUID(),
                                                            data->resultSlot,
                                                            remoteCursorId,
                                                            yieldPolicy,

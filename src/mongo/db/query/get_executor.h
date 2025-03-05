@@ -105,9 +105,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
     OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
-    const CanonicalQuery& cq,
+    const ExpressionContext& expCtx,
     std::unique_ptr<executor::TaskExecutorCursor> metadataCursor);
 
 /**
