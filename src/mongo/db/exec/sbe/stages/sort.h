@@ -111,17 +111,12 @@ private:
         virtual void close() = 0;
     };
 
-    /** Implements `SortIface`. Defined in `sort_stage_sort_impl.{h,cpp}`. */
+    /** Implements `SortIface`. Defined in `sort_stage_sort_impl.cpp`. */
     template <typename KeyRow, typename ValueRow>
     class SortImpl;
 
-    template <typename KeyType, typename ValueType>
-    std::unique_ptr<SortIface> makeStageImplInternal();
-    template <typename KeyType>
-    std::unique_ptr<SortIface> makeStageImplInternal(size_t valueSize);
-    std::unique_ptr<SortIface> makeStageImplInternal(size_t keySize, size_t valueSize);
-
-    std::unique_ptr<SortIface> makeStageImpl();
+    /** Defined in `sort_stage_sort_impl.cpp`. */
+    std::unique_ptr<SortIface> _makeStageImpl();
 
     const value::SlotVector _obs;
     const std::vector<value::SortDirection> _dirs;

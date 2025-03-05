@@ -40,9 +40,7 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
-#include "mongo/db/exec/sbe/stages/sort_stage_sort_impl.h"
 #include "mongo/db/exec/sbe/values/row.h"
-#include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -74,7 +72,7 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
 SortStage::~SortStage() {}
 
 void SortStage::prepare(CompileCtx& ctx) {
-    _stageImpl = makeStageImpl();
+    _stageImpl = _makeStageImpl();
     _stageImpl->prepare(ctx);
 }
 
@@ -105,39 +103,6 @@ std::unique_ptr<PlanStage> SortStage::clone() const {
                                        _yieldPolicy,
                                        _commonStats.nodeId,
                                        participateInTrialRunTracking());
-}
-
-template <typename KeyType, typename ValueType>
-std::unique_ptr<SortStage::SortIface> SortStage::makeStageImplInternal() {
-    return std::make_unique<SortImpl<KeyType, ValueType>>(*this);
-}
-
-template <typename KeyType>
-std::unique_ptr<SortStage::SortIface> SortStage::makeStageImplInternal(size_t valueSize) {
-    switch (valueSize) {
-        case 1:
-            return makeStageImplInternal<KeyType, value::FixedSizeRow<1>>();
-        default:
-            return makeStageImplInternal<KeyType, value::MaterializedRow>();
-    }
-}
-
-std::unique_ptr<SortStage::SortIface> SortStage::makeStageImplInternal(size_t keySize,
-                                                                       size_t valueSize) {
-    switch (keySize) {
-        case 1:
-            return makeStageImplInternal<value::FixedSizeRow<1>>(valueSize);
-        case 2:
-            return makeStageImplInternal<value::FixedSizeRow<2>>(valueSize);
-        case 3:
-            return makeStageImplInternal<value::FixedSizeRow<3>>(valueSize);
-        default:
-            return makeStageImplInternal<value::MaterializedRow>(valueSize);
-    }
-}
-
-std::unique_ptr<SortStage::SortIface> SortStage::makeStageImpl() {
-    return makeStageImplInternal(_obs.size(), _vals.size());
 }
 
 std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const {

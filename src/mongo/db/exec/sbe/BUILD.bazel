@@ -178,7 +178,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:search_cursor.cpp",
         "//src/mongo/db/exec/sbe/stages:sort.cpp",
         "//src/mongo/db/exec/sbe/stages:sort_stage_sort_impl.cpp",
-        "//src/mongo/db/exec/sbe/stages:sort_stage_sort_impl.h",
         "//src/mongo/db/exec/sbe/stages:sorted_merge.cpp",
         "//src/mongo/db/exec/sbe/stages:spool.cpp",
         "//src/mongo/db/exec/sbe/stages:traverse.cpp",
