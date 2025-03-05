@@ -2671,6 +2671,12 @@ __conn_config_file_system(WT_SESSION_IMPL *session, const char *cfg[])
 #endif
         }
     }
+
+#ifndef _MSC_VER
+    if (!live_restore_enabled)
+        WT_RET(__wt_live_restore_validate_non_lr_system(session));
+#endif
+
     return (__conn_chk_file_system(session, F_ISSET(conn, WT_CONN_READONLY)));
 }
 
@@ -3055,6 +3061,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     WT_ERR(__wt_conf_compile_init(session, cfg));
     WT_ERR(__wti_conn_statistics_config(session, cfg));
+#ifndef _MSC_VER
+    /* FIXME-WT-14051 Add windows support. */
+    __wt_live_restore_init_stats(session);
+#endif
     WT_ERR(__wti_sweep_config(session, cfg));
 
     /* Initialize the OS page size for mmap */
@@ -3128,17 +3138,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      */
     WT_ERR(__wt_logmgr_config(session, cfg, false));
     WT_ERR(__conn_version_verify(session));
-
-#ifndef _MSC_VER
-    /*
-     * Recovery replays the log files to rebuild the metadata file that live restore depends on,
-     * because of this we copy them across prior to recovery commencing. This also helps ensure that
-     * the system is in a valid state for the log subsystem as it does some less common file
-     * manipulations.
-     */
-    if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
-        WT_ERR(__wt_live_restore_setup_recovery(session));
-#endif
 
     /*
      * Configuration completed; optionally write a base configuration file.

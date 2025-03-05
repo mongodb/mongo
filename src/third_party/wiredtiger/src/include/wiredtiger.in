@@ -4090,8 +4090,8 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
 #define	WT_OLDEST_FOR_EVICTION	(-32004)
 /*!
  * Conflict performing operation due to running backup.
- * This sub-level error indicates that there is conflict perform the operation
- * because of a running backup in the system.
+ * This sub-level error indicates that there is a conflict performing the
+ * operation because of a running backup in the system.
  */
 #define	WT_CONFLICT_BACKUP	(-32005)
 /*!
@@ -4128,6 +4128,12 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  * checkpoint.
  */
 #define	WT_CONFLICT_CHECKPOINT_LOCK	(-32011)
+/*!
+ * Conflict performing operation due to an in-progress live restore.
+ * This sub-level error indicates that there is a conflict performing the
+ * operation because of a running live restore in the system.
+ */
+#define	WT_CONFLICT_LIVE_RESTORE	(-32013)
 /*
  * Sub-level error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.
@@ -5303,6 +5309,19 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define WT_BACKUP_FILE      1
 /*! File range. */
 #define WT_BACKUP_RANGE     2
+/*! @} */
+
+/*!
+ * @name Live restore states reported to the application
+ * @anchor live_restore_types
+ * @{
+ */
+/*! Live Restore is initializing. */
+#define WT_LIVE_RESTORE_INIT 0x0
+/*! The database is operational and files are being migrated from the source to the destination. */
+#define WT_LIVE_RESTORE_IN_PROGRESS 0x1
+/*! Live restore has completed and WiredTiger can be restarted in non-live restore mode. */
+#define WT_LIVE_RESTORE_COMPLETE 0x2
 /*! @} */
 
 /*!

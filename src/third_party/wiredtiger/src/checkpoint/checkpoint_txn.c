@@ -129,7 +129,7 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
                  * Check the table's last checkpoint time and only flush trees that have a
                  * checkpoint more recent than the last flush time.
                  */
-                WT_ERR(__wt_meta_checkpoint(session, key, NULL, &ckpt));
+                WT_ERR(__wt_meta_checkpoint(session, key, NULL, &ckpt, NULL));
                 ckpt_time = ckpt.sec;
                 __wt_checkpoint_free(session, &ckpt);
                 WT_ERR(__wt_config_getones(session, value, "flush_time", &cval));

@@ -28,52 +28,68 @@
 
 import os
 import wiredtiger, wttest
+from helper import copy_wiredtiger_home
+import glob
+import shutil
 
 # test_live_restore01.py
 # Test live restore compatibility with various other connection options.
+@wttest.skip_for_hook("tiered", "using multiple WT homes")
 class test_live_restore01(wttest.WiredTigerTestCase):
+
+    def expect_success(self, config_str):
+        self.open_conn("DEST", config=config_str)
+        self.close_conn()
+
+        # Clean out the destination. Subsequent live_restore opens will expect it to contain nothing.
+        shutil.rmtree("DEST")
+        os.mkdir("DEST")
+
+    def expect_failure(self, config_str, expected_error):
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.open_conn("DEST", config=config_str), expected_error)
+        # No need to clean up the destination as WiredTiger failed to open.
+
     def test_live_restore01(self):
         # Close the default connection.
         self.close_conn()
 
+        copy_wiredtiger_home(self, '.', "SOURCE")
+        # Remove everything but SOURCE / stderr / stdout.
+        for f in glob.glob("*"):
+            if not f == "SOURCE" and not f == "stderr.txt" and not f == "stdout.txt":
+                os.remove(f)
+
+        os.mkdir("DEST")
+
         # Test that live restore connection will fail on windows.
         if os.name == 'nt':
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda: self.open_conn(config="live_restore=(enabled=true,path=\".\")"),
-                "/Live restore is not supported on Windows/")
+            self.expect_failure("live_restore=(enabled=true,path=SOURCE)", "/Live restore is not supported on Windows/")
             return
 
         # Open a valid connection.
-        self.open_conn(config="live_restore=(enabled=true,path=\".\")")
-        self.close_conn()
+        self.expect_success("live_restore=(enabled=true,path=SOURCE)")
 
         # Specify an in memory connection with live restore.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.open_conn(config="in_memory=true,live_restore=(enabled=true,path=\".\")"),
-            "/Live restore is not compatible with an in-memory connection/")
+        self.expect_failure("in_memory=true,live_restore=(enabled=true,path=SOURCE)", "/Live restore is not compatible with an in-memory connection/")
 
         # Specify an in memory connection with live restore not enabled.
-        self.open_conn(config="in_memory=true,live_restore=(enabled=false,path=\".\")")
-        self.close_conn()
+        self.expect_success("in_memory=true,live_restore=(enabled=false,path=SOURCE)")
 
         # Specify an empty path string.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.open_conn(config="live_restore=(enabled=true,path=\"\")"),
-            "/No such file or directory/")
+        self.expect_failure("live_restore=(enabled=true,path=\"\")", "/No such file or directory/")
 
         # Specify a non existant path.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.open_conn(config="live_restore=(enabled=true,path=\"fake.fake.fake\")"),
-            "/fake.fake.fake/")
+        self.expect_failure("live_restore=(enabled=true,path=\"fake.fake.fake\")", "/fake.fake.fake/")
 
         # Specify the max number of threads
-        self.open_conn(config="live_restore=(enabled=true,path=\".\",threads_max=12)")
-        self.close_conn()
+        self.expect_success("live_restore=(enabled=true,path=SOURCE,threads_max=12)")
 
         # Specify one too many threads.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.open_conn(config="live_restore=(enabled=true,path=\".\",threads_max=13)"),
-            "/Value too large for key/")
+        self.expect_failure("live_restore=(enabled=true,path=SOURCE,threads_max=13)", "/Value too large for key/")
 
         # Specify the minimum allowed number of threads.
-        self.open_conn(config="live_restore=(enabled=true,path=\".\",threads_max=0)")
+        self.expect_success("live_restore=(enabled=true,path=SOURCE,threads_max=0)")
+
+        # Start in read only mode
+        self.expect_failure("readonly=true,live_restore=(enabled=true,path=SOURCE)", "/live restore is incompatible with readonly mode/")

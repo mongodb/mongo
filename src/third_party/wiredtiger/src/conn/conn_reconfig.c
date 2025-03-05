@@ -151,8 +151,10 @@ __wti_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
      * creating the connection. We do this after checking the required minimum version so that we
      * don't rewrite the turtle file if there is an error.
      */
-    if (reconfig)
-        WT_RET(__wt_metadata_turtle_rewrite(session));
+    if (reconfig) {
+        WT_WITH_TURTLE_LOCK(session, ret = __wt_metadata_turtle_rewrite(session));
+        WT_RET(ret);
+    }
 
     /*
      * The required maximum and minimum cannot be set via reconfigure and they are meaningless on a

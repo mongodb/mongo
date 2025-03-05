@@ -86,8 +86,11 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
       F_ISSET(S2C(session), WT_CONN_READONLY))
         F_SET(btree, WT_BTREE_READONLY);
 
+    WT_LIVE_RESTORE_FH_META lr_fh_meta;
+    WT_CLEAR(lr_fh_meta);
+
     /* Get the checkpoint information for this name/checkpoint pair. */
-    WT_RET(__wt_meta_checkpoint(session, dhandle->name, dhandle->checkpoint, &ckpt));
+    WT_ERR(__wt_meta_checkpoint(session, dhandle->name, dhandle->checkpoint, &ckpt, &lr_fh_meta));
 
     /* Set the order number. */
     dhandle->checkpoint_order = ckpt.order;
@@ -109,10 +112,11 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 
     /* Initialize and configure the WT_BTREE structure. */
     WT_ERR(__btree_conf(session, &ckpt, WT_DHANDLE_IS_CHECKPOINT(dhandle)));
+    lr_fh_meta.allocsize = btree->allocsize;
 
     /* Connect to the underlying block manager. */
-    WT_ERR(__wt_blkcache_open(
-      session, dhandle->name, dhandle->cfg, forced_salvage, false, btree->allocsize, &btree->bm));
+    WT_ERR(__wt_blkcache_open(session, dhandle->name, dhandle->cfg, forced_salvage, false,
+      btree->allocsize, &lr_fh_meta, &btree->bm));
 
     bm = btree->bm;
 
@@ -177,6 +181,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 err:
         WT_TRET(__wt_btree_close(session));
     }
+    __wt_free(session, lr_fh_meta.bitmap_str);
     __wt_checkpoint_free(session, &ckpt);
 
     __wt_scr_free(session, &tmp);

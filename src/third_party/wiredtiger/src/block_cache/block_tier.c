@@ -79,8 +79,8 @@ __wti_blkcache_tiered_open(
     if (!local_only)
         WT_ERR(__wt_fs_exist(session, object_name, &exist));
     if (exist)
-        WT_ERR(
-          __wt_block_open(session, object_name, objectid, cfg, false, readonly, false, 0, &block));
+        WT_ERR(__wt_block_open(
+          session, object_name, objectid, cfg, false, readonly, false, 0, NULL, &block));
     else {
         /* We expect a prefix. */
         WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.bucket_prefix", &pfx));
@@ -91,7 +91,8 @@ __wti_blkcache_tiered_open(
 
         bstorage = tiered->bstorage;
         WT_WITH_BUCKET_STORAGE(bstorage, session,
-          ret = __wt_block_open(session, tmp->mem, objectid, cfg, false, true, true, 0, &block));
+          ret =
+            __wt_block_open(session, tmp->mem, objectid, cfg, false, true, true, 0, NULL, &block));
         block->remote = true;
         WT_ERR(ret);
     }

@@ -99,9 +99,10 @@ __ckpt_load_blk_mods(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt
  *     Return a file's checkpoint information.
  */
 int
-__wt_meta_checkpoint(
-  WT_SESSION_IMPL *session, const char *fname, const char *checkpoint, WT_CKPT *ckpt)
+__wt_meta_checkpoint(WT_SESSION_IMPL *session, const char *fname, const char *checkpoint,
+  WT_CKPT *ckpt, WT_LIVE_RESTORE_FH_META *lr_fh_meta)
 {
+    WT_CONFIG_ITEM v;
     WT_DECL_RET;
     char *config;
 
@@ -126,6 +127,23 @@ __wt_meta_checkpoint(
     WT_ERR(__ckpt_version_chk(session, fname, config));
 #endif
 
+    if (lr_fh_meta != NULL) {
+        WT_ERR_NOTFOUND_OK(__wt_config_getones(session, config, "live_restore", &v), true);
+        if (ret != WT_NOTFOUND) {
+            WT_CONFIG_ITEM cval;
+            WT_ERR_NOTFOUND_OK(__wt_config_subgets(session, &v, "nbits", &cval), true);
+            if (ret != WT_NOTFOUND) {
+                lr_fh_meta->nbits = cval.val;
+                if (lr_fh_meta->nbits > 0) {
+                    WT_ERR(__wt_config_subgets(session, &v, "bitmap", &cval));
+                    WT_ERR(__wt_strndup(session, cval.str, cval.len, &lr_fh_meta->bitmap_str));
+                } else
+                    lr_fh_meta->bitmap_str = NULL;
+            }
+        }
+        /* All code paths that exist today overwrite ret but to be defensive we clear it here. */
+        WT_NOT_READ(ret, 0);
+    }
     /*
      * Retrieve the named checkpoint or the last checkpoint.
      *
@@ -1261,6 +1279,23 @@ err:
 }
 
 /*
+ * __meta_live_restore_to_meta --
+ *     Add relevant live restore information to the checkpoint metadata string.
+ */
+static int
+__meta_live_restore_to_meta(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_ITEM *buf)
+{
+    if (WT_PREFIX_MATCH(dhandle->name, "file:")) {
+        WT_BM *bm = ((WT_BTREE *)dhandle->handle)->bm;
+        WT_ASSERT(session, bm->is_multi_handle == false);
+        /* FIXME-WT-13897 Replace this with an API call into the block manager. */
+        WT_FILE_HANDLE *fh = bm->block->fh->handle;
+        WT_RET_NOTFOUND_OK(__wt_live_restore_fh_to_metadata(session, fh, buf));
+    }
+    return (0);
+}
+
+/*
  * __wt_meta_ckptlist_set --
  *     Set a file's checkpoint value from the WT_CKPT list.
  */
@@ -1278,6 +1313,11 @@ __wt_meta_ckptlist_set(
 
     WT_ERR(__wt_scr_alloc(session, 1024, &buf));
     WT_ERR(__wt_meta_ckptlist_to_meta(session, ckptbase, buf));
+
+#ifndef _MSC_VER
+    WT_ERR_NOTFOUND_OK(__meta_live_restore_to_meta(session, dhandle, buf), false);
+#endif
+
     /* Add backup block modifications for any added checkpoint. */
     WT_CKPT_FOREACH (ckptbase, ckpt)
         if (F_ISSET(ckpt, WT_CKPT_ADD))

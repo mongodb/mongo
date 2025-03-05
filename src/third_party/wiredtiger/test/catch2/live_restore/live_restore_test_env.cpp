@@ -9,20 +9,27 @@
 #include "live_restore_test_env.h"
 
 #include <fstream>
+#include <iostream>
 namespace utils {
 
 /*
- * This class sets up and tears down the testing environment for Live Restore. It spins up a normal
- * WiredTiger database and then removes all content to leave an empty destination and source folder.
- * Developers are expected to create the respective files in the these folders manually.
+ * This class sets up and tears down the testing environment for Live Restore. Developers are
+ * expected to create the respective files in the these folders manually.
  */
 live_restore_test_env::live_restore_test_env()
 {
     // Clean up any pre-existing folders. Make sure an empty DB_SOURCE exists
     // as it need to exist to open the connection in live restore mode.
-    testutil_remove(DB_DEST.c_str());
-    testutil_remove(DB_TEMP_BACKUP.c_str());
+    testutil_recreate_dir(DB_DEST.c_str());
     testutil_recreate_dir(DB_SOURCE.c_str());
+
+    // WiredTiger stores state in the turtle file so we always need to have a valid database in
+    // the source folder. Open and close a connection to initialize the source folder.
+    {
+        static std::string non_lr_config = "create=true";
+        conn = std::make_unique<connection_wrapper>(DB_SOURCE.c_str(), non_lr_config.c_str());
+        conn->clear_do_cleanup();
+    }
 
     /*
      * We're using a connection to set up the file system and let us print WT traces, but all of our
@@ -32,22 +39,11 @@ live_restore_test_env::live_restore_test_env()
      * _conn->close() is called.
      */
     static std::string cfg_string =
-      "create=true,live_restore=(enabled=true, path=" + DB_SOURCE + ")";
+      "create=true,live_restore=(enabled=true, path=" + DB_SOURCE + ",threads_max=0)";
     conn = std::make_unique<connection_wrapper>(DB_DEST.c_str(), cfg_string.c_str());
-    testutil_copy(DB_DEST.c_str(), DB_TEMP_BACKUP.c_str());
-    testutil_recreate_dir(DB_DEST.c_str());
 
     session = conn->create_session();
     lr_fs = (WTI_LIVE_RESTORE_FS *)conn->get_wt_connection_impl()->file_system;
-    lr_fs->finished = false;
-}
-
-live_restore_test_env::~live_restore_test_env()
-{
-    // Clean up directories on close. The connections destructor will remove the final
-    // destination folder.
-    testutil_remove(DB_SOURCE.c_str());
-    testutil_move(DB_TEMP_BACKUP.c_str(), DB_DEST.c_str());
 }
 
 std::string

@@ -63,7 +63,8 @@ class test_live_restore03(wttest.WiredTigerTestCase):
 
         # Open a connection with no live restore background threads to avoid opening file handles
         # in the background.
-        self.open_conn(config="statistics=(all),live_restore=(enabled=true,path=\"SOURCE\",threads_max=0)")
+        os.mkdir("DEST")
+        self.open_conn("DEST",config="statistics=(all),live_restore=(enabled=true,path=\"SOURCE\",threads_max=0)")
 
         # Query the data source block size statistic.
         for uri in uris:

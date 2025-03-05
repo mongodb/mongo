@@ -86,8 +86,10 @@ main(int argc, char *argv[])
     error_check(cursor->insert(cursor));
     error_check(session->close(session, NULL));
 
-    for (i = 0; i < NUM_THREADS; i++)
+    for (i = 0; i < NUM_THREADS; i++) {
+        threads[i].name_index = 0;
         error_check(__wt_thread_create(NULL, &threads[i], scan_thread, conn));
+    }
 
     for (i = 0; i < NUM_THREADS; i++)
         error_check(__wt_thread_join(NULL, &threads[i]));

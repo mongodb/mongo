@@ -197,8 +197,10 @@ run(const char *working_dir)
      */
     num_search_insert_threads = (uint32_t)(sysconf(_SC_NPROCESSORS_ONLN) - 1);
     thr = dmalloc(num_search_insert_threads * sizeof(wt_thread_t));
-    for (uint32_t i = 0; i < num_search_insert_threads; i++)
+    for (uint32_t i = 0; i < num_search_insert_threads; i++) {
+        thr[i].name_index = 0;
         testutil_check(__wt_thread_create(NULL, &thr[i], thread_search_insert_run, conn));
+    }
 
     while (active_search_insert_threads != num_search_insert_threads)
         ;

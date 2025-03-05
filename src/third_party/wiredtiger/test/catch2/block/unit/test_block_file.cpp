@@ -127,16 +127,16 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
     SECTION("Test block open and block close with default configuration")
     {
         WT_BLOCK *block = nullptr;
-        REQUIRE(
-          (__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-            WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, &block)) == 0);
+        REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
+                  &block)) == 0);
         validate_block(session, block, cp, 1, file_path);
 
         // Test already made item in hashmap.
         WT_BLOCK *block2 = nullptr;
-        REQUIRE(
-          (__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-            WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, &block2)) == 0);
+        REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
+                  &block2)) == 0);
         validate_block(session, block2, cp, 2, file_path);
 
         // Test block close, frees the block correctly.
@@ -158,7 +158,7 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
         // Open the file and return the block handle.
         REQUIRE(__wt_block_open(session->get_wt_session_impl(), file_path2.c_str(),
                   WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false,
-                  std::stoi(ALLOCATION_SIZE) * 2, &block) == 0);
+                  std::stoi(ALLOCATION_SIZE) * 2, nullptr, &block) == 0);
 
         // Changing configuration here for validation purposes.
         cp.insert_config("allocation_size", "1024");
@@ -170,7 +170,7 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
         // Test that no allocation size in configuration should fail.
         REQUIRE(cp.erase_config("allocation_size"));
         REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0,
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
                   &block)) == WT_NOTFOUND);
         REQUIRE(block == nullptr);
     }
@@ -180,9 +180,9 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
         // Test that block allocation is configured to first.
         cp.insert_config("block_allocation", "first");
         WT_BLOCK *block = nullptr;
-        REQUIRE(
-          (__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-            WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, &block)) == 0);
+        REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
+                  &block)) == 0);
         validate_block(session, block, cp, 1, file_path);
 
         REQUIRE(__wti_bm_close_block(session->get_wt_session_impl(), block) == 0);
@@ -191,7 +191,7 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
         // If block allocation is set to garbage, it should default back to "best".
         cp.insert_config("block_allocation", "garbage");
         REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 512,
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 512, nullptr,
                   &block)) == 0);
         // Changing configuration here for validation purposes.
         cp.insert_config("block_allocation", "best");
@@ -203,7 +203,7 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
         // Test when block allocation is not configured.
         REQUIRE(cp.erase_config("block_allocation"));
         REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0,
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
                   &block)) == WT_NOTFOUND);
         REQUIRE(block == nullptr);
     }
@@ -214,15 +214,15 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
         WT_BLOCK *block = nullptr;
         REQUIRE(cp.erase_config("os_cache_max"));
         REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0,
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
                   &block)) == WT_NOTFOUND);
         REQUIRE(block == nullptr);
 
         // Test when os_cache_max is configured to 512.
         cp.insert_config("os_cache_max", "512");
-        REQUIRE(
-          (__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-            WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, &block)) == 0);
+        REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
+                  &block)) == 0);
         validate_block(session, block, cp, 1, file_path);
 
         REQUIRE(__wti_bm_close_block(session->get_wt_session_impl(), block) == 0);
@@ -231,15 +231,15 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
         // Test when os_cache_dirty_max is not configured.
         REQUIRE(cp.erase_config("os_cache_dirty_max"));
         REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0,
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
                   &block)) == WT_NOTFOUND);
         REQUIRE(block == nullptr);
 
         // Test when os_cache_dirty_max is configured to 512.
         cp.insert_config("os_cache_dirty_max", "512");
-        REQUIRE(
-          (__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-            WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, &block)) == 0);
+        REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
+                  &block)) == 0);
         validate_block(session, block, cp, 1, file_path);
 
         REQUIRE(__wti_bm_close_block(session->get_wt_session_impl(), block) == 0);
@@ -249,9 +249,9 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
     SECTION("Test block open with read only configuration")
     {
         WT_BLOCK *block = nullptr;
-        REQUIRE(
-          (__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-            WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, true, false, 0, &block)) == 0);
+        REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, true, false, 0, nullptr,
+                  &block)) == 0);
         validate_block(session, block, cp, 1, file_path, true);
 
         REQUIRE(__wti_bm_close_block(session->get_wt_session_impl(), block) == 0);
@@ -268,9 +268,9 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
     SECTION("Test block close with block sync")
     {
         WT_BLOCK *block = nullptr;
-        REQUIRE(
-          (__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
-            WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, &block)) == 0);
+        REQUIRE((__wt_block_open(session->get_wt_session_impl(), file_path.c_str(),
+                  WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
+                  &block)) == 0);
         validate_block(session, block, cp, 1, file_path, false);
         block->sync_on_checkpoint = true;
 

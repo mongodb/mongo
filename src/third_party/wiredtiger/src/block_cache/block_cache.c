@@ -724,7 +724,8 @@ __blkcache_reconfig(WT_SESSION_IMPL *session, bool reconfig, size_t cache_size, 
  */
 int
 __wt_blkcache_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[],
-  bool forced_salvage, bool readonly, uint32_t allocsize, WT_BM **bmp)
+  bool forced_salvage, bool readonly, uint32_t allocsize, WT_LIVE_RESTORE_FH_META *lr_fh_meta,
+  WT_BM **bmp)
 {
     WT_BM *bm;
     WT_DECL_RET;
@@ -740,7 +741,7 @@ __wt_blkcache_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[],
     if (WT_PREFIX_MATCH(uri, "file:")) {
         uri += strlen("file:");
         WT_ERR(__wt_block_open(session, uri, WT_TIERED_OBJECTID_NONE, cfg, forced_salvage, readonly,
-          false, allocsize, &bm->block));
+          false, allocsize, lr_fh_meta, &bm->block));
     } else {
         bm->is_multi_handle = true;
         WT_ERR(__wt_rwlock_init(session, &bm->handle_array_lock));

@@ -231,19 +231,18 @@ test_bulk(THREAD_DATA *td)
     WT_CURSOR *c;
     WT_DECL_RET;
     WT_SESSION *session;
-    bool create;
+
+    /* Bulk operations are incompatible with transactions. */
+    if (use_txn)
+        return;
 
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
-    if (use_txn)
-        testutil_check(session->begin_transaction(session, NULL));
-    create = false;
     if ((ret = session->create(session, uri, config)) != 0)
         if (ret != EEXIST && ret != EBUSY)
             testutil_die(ret, "session.create");
 
     if (ret == 0) {
-        create = true;
         if ((ret = session->open_cursor(session, uri, NULL, "bulk", &c)) == 0) {
             __wt_yield();
             testutil_check(c->close(c));
@@ -251,18 +250,6 @@ test_bulk(THREAD_DATA *td)
             testutil_die(ret, "session.open_cursor bulk");
     }
 
-    if (use_txn) {
-        /* If create fails, rollback else will commit.*/
-        if (!create)
-            ret = session->rollback_transaction(session, NULL);
-        else
-            ret = session->commit_transaction(session, NULL);
-
-        if (ret == EINVAL) {
-            fprintf(stderr, "BULK: EINVAL on %s. ABORT\n", create ? "commit" : "rollback");
-            testutil_die(ret, "session.commit bulk");
-        }
-    }
     testutil_check(session->close(session, NULL));
 }
 
@@ -278,6 +265,10 @@ test_bulk_unique(THREAD_DATA *td, uint64_t unique_id, int force)
     WT_SESSION *session;
     char dropconf[128], new_uri[64];
 
+    /* Bulk operations are incompatible with transactions. */
+    if (use_txn)
+        return;
+
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
     /*
@@ -286,8 +277,6 @@ test_bulk_unique(THREAD_DATA *td, uint64_t unique_id, int force)
      */
     testutil_snprintf(new_uri, sizeof(new_uri), "%s.%" PRIu64, uri, unique_id);
 
-    if (use_txn)
-        testutil_check(session->begin_transaction(session, NULL));
     testutil_check(session->create(session, new_uri, config));
 
     __wt_yield();
@@ -308,8 +297,6 @@ test_bulk_unique(THREAD_DATA *td, uint64_t unique_id, int force)
         if (ret != EBUSY)
             testutil_die(ret, "session.drop: %s %s", new_uri, dropconf);
 
-    if (use_txn && (ret = session->commit_transaction(session, NULL)) != 0 && ret != EINVAL)
-        testutil_die(ret, "session.commit bulk unique");
     testutil_check(session->close(session, NULL));
 }
 

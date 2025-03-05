@@ -160,7 +160,7 @@ sub_errors = [
         transaction ID and needs to be rolled back.'''),
     Error('WT_CONFLICT_BACKUP', -32005,
         "Conflict performing operation due to running backup", '''
-        This sub-level error indicates that there is conflict perform the operation
+        This sub-level error indicates that there is a conflict performing the operation
         because of a running backup in the system.'''),
     Error('WT_CONFLICT_DHANDLE', -32006,
         "Another thread currently holds the data handle of the table", '''
@@ -184,6 +184,10 @@ sub_errors = [
         "Another thread currently holds the checkpoint lock", '''
         This sub-level error indicates that a concurrent operation is performing
         a checkpoint.'''),
+    Error('WT_CONFLICT_LIVE_RESTORE', -32013,
+        "Conflict performing operation due to an in-progress live restore", '''
+        This sub-level error indicates that there is a conflict performing the operation
+        because of a running live restore in the system.'''),
 ]
 
 # Update the #defines in the wiredtiger.in file.

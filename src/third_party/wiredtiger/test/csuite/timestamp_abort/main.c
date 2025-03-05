@@ -1412,6 +1412,7 @@ main(int argc, char *argv[])
     tmp = 0;
     use_backups = false;
     use_lazyfs = lazyfs_is_implicitly_enabled();
+    use_liverestore = false;
     use_ts = true;
     verify_model = false;
     verify_only = false;

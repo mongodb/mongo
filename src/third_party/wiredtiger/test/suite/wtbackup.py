@@ -196,7 +196,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     # backup_cur: A backup cursor that can be given into the function, but function caller
     #    holds responsibility of closing the cursor.
     #
-    def take_full_backup(self, backup_dir, backup_cur=None):
+    def take_full_backup(self, backup_dir, backup_cur=None, home=None):
         assert os.path.exists(backup_dir), f"The directory '{backup_dir}' does not exist"
         self.pr(f"Full backup to '{backup_dir}'")
         bkup_c = backup_cur
@@ -211,7 +211,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         # values and adding in get_values returns ENOTSUP and causes the usage to fail.
         # If that changes then this, and the use of the duplicate below can change.
         while bkup_c.next() == 0:
-            newfile = bkup_c.get_key()
+            newfile = bkup_c.get_key() if home is None else f'{self.conn.get_home()}/{bkup_c.get_key()}'
             sz = os.path.getsize(newfile)
             self.pr(f'Copy from: {newfile} ({sz}) to {backup_dir}')
             self.copy_file(newfile, backup_dir)

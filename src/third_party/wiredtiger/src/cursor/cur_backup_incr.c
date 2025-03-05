@@ -41,7 +41,7 @@ __curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BAC
     WT_ASSERT(session, cb->incr_src != NULL);
 
     /* Check if this is a file with no checkpointed content. */
-    ret = __wt_meta_checkpoint(session, btree->dhandle->name, 0, &ckpt);
+    ret = __wt_meta_checkpoint(session, btree->dhandle->name, 0, &ckpt, NULL);
     if (ret == 0 && ckpt.addr.size == 0)
         F_SET(cb, WT_CURBACKUP_CKPT_FAKE);
     __wt_checkpoint_free(session, &ckpt);

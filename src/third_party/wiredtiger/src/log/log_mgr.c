@@ -370,7 +370,7 @@ __log_remove_once_int(
     u_int i;
 
     for (i = 0; i < logcount; i++) {
-        WT_RET(__wt_log_extract_lognum(session, logfiles[i], &lognum));
+        WT_RET(__wti_log_extract_lognum(session, logfiles[i], &lognum));
         if (lognum < min_lognum)
             WT_RET(__wti_log_remove(session, WT_LOG_FILENAME, lognum));
     }
@@ -636,7 +636,7 @@ __log_file_server(void *arg)
          */
         WT_ACQUIRE_READ_WITH_BARRIER(close_fh, log->log_close_fh);
         if (close_fh != NULL) {
-            WT_ERR(__wt_log_extract_lognum(session, close_fh->name, &filenum));
+            WT_ERR(__wti_log_extract_lognum(session, close_fh->name, &filenum));
             /*
              * The closing file handle should have a correct close LSN.
              */

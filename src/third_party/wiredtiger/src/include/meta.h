@@ -64,6 +64,7 @@
 #define WT_METAFILE_ID 0 /* Metadata file ID */
 
 #define WT_METADATA_COMPAT "Compatibility version"
+#define WT_METADATA_LIVE_RESTORE "Live Restore"
 #define WT_METADATA_VERSION "WiredTiger version" /* Version keys */
 #define WT_METADATA_VERSION_STR "WiredTiger version string"
 

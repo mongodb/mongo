@@ -205,7 +205,7 @@ __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
  *     in the argument.
  */
 static WT_INLINE void
-__wt_timing_stress(WT_SESSION_IMPL *session, uint32_t flag, struct timespec *tsp)
+__wt_timing_stress(WT_SESSION_IMPL *session, uint64_t flag, struct timespec *tsp)
 {
 #ifdef ENABLE_ANTITHESIS
     const WT_NAME_FLAG *ft;

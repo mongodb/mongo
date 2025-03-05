@@ -123,8 +123,8 @@ This sub-level error indicates that a given transaction has the oldest transacti
 be rolled back.
 
 @par \c WT_CONFLICT_BACKUP
-This sub-level error indicates that there is conflict perform the operation because of a running
-backup in the system.
+This sub-level error indicates that there is a conflict performing the operation because of a
+running backup in the system.
 
 @par \c WT_CONFLICT_DHANDLE
 This sub-level error indicates that a concurrent operation is holding the data handle of the table.
@@ -144,6 +144,10 @@ This sub-level error indicates that a concurrent operation is performing a table
 
 @par \c WT_CONFLICT_CHECKPOINT_LOCK
 This sub-level error indicates that a concurrent operation is performing a checkpoint.
+
+@par \c WT_CONFLICT_LIVE_RESTORE
+This sub-level error indicates that there is a conflict performing the operation because of a
+running live restore in the system.
 
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
