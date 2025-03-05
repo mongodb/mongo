@@ -104,22 +104,39 @@ bool fieldNameOrArrayIndexPathMatches(const FieldRef& fieldNameOrArrayIndexPath,
     if (staticComparisonPath.numParts() > fieldNameOrArrayIndexPath.numParts()) {
         return false;
     }
-    size_t offset = 0;
-    for (size_t i = 0; i < fieldNameOrArrayIndexPath.numParts(); ++i) {
-        if (i - offset >= staticComparisonPath.numParts()) {
+    auto comparisonPathIndex = 0;         // Index into staticComparisonPath.
+    auto parentComponentIsArray = false;  // Whether the parent path component is an array.
+    for (auto pathIndex = 0;              // Index into fieldNameOrArrayIndexPath.
+         pathIndex < fieldNameOrArrayIndexPath.numParts();
+         ++pathIndex) {
+        auto incrementComparisonPathIndexBy = 1;
+        if (comparisonPathIndex >= staticComparisonPath.numParts()) {
+            // If we exceed the bounds of the static comparison path, then clearly the path doesn't
+            // match because of the trailing path components.
+            return false;
+        } else if (fieldNameOrArrayIndexPath.getPart(pathIndex) ==
+                   staticComparisonPath.getPart(comparisonPathIndex)) {
+            // Path component matches the comparison path verbatim. Check passes, move on to the
+            // next component.
+        } else if (parentComponentIsArray &&
+                   fieldNameOrArrayIndexPath.isNumericPathComponentStrict(pathIndex)) {
+            // Check whether the path component could be an array indexing component. Since
+            // parentComponentIsArray is never true on the first iteration, this will not underflow.
+            // We then decrease the comparison path index to account to re-compare against the field
+            // in the array field path.
+            incrementComparisonPathIndexBy = 0;
+        } else {
+            // Because the path is neither a verbatim match nor could it be an array index
+            // reference, the path does not match.
             return false;
         }
-        if (fieldNameOrArrayIndexPath.getPart(i) == staticComparisonPath.getPart(i - offset)) {
-            continue;
-        } else if (multikeyPathComponents.count(i - 1) &&
-                   fieldNameOrArrayIndexPath.isNumericPathComponentStrict(i)) {
-            ++offset;
-            continue;
-        }
-        return false;
+        // Cache whether this path component, soon to be the parent path component, is array-ish.
+        parentComponentIsArray = multikeyPathComponents.contains(pathIndex);
+        comparisonPathIndex += incrementComparisonPathIndexBy;
     }
+
     // Ensure that we matched the entire 'staticComparisonPath' dotted string.
-    return fieldNameOrArrayIndexPath.numParts() == staticComparisonPath.numParts() + offset;
+    return staticComparisonPath.numParts() == comparisonPathIndex;
 }
 
 /**
