@@ -57,7 +57,7 @@ class JsonLogFormatter(TimestampFormatter):
     prefixed_json_output_re = re.compile(r"^([a-z]+\d+)\| (.+)$")
 
     def format(self, record):
-        json_msg = dict()
+        json_msg = None
         raw_message = record.getMessage()
         prefix = None
 
@@ -69,10 +69,11 @@ class JsonLogFormatter(TimestampFormatter):
 
         try:
             json_msg = json.loads(raw_message)
-            json_msg["logger"] = record.name
-
         except json.JSONDecodeError:
-            # Not a json, put original message into json.msg
+            pass
+
+        # Not a json dict, put original message into json.msg
+        if not isinstance(json_msg, dict):
             json_msg = {
                 "t": {"$date": self.formatTime(record)},
                 "logger": record.name,
@@ -81,15 +82,18 @@ class JsonLogFormatter(TimestampFormatter):
                 "msg": raw_message,
             }
 
+        if "logger" not in json_msg:
+            json_msg["logger"] = record.name
+
         # If there is a process prefix, add it at the end of the logger name.
         if prefix is not None:
-            json_msg["logger"] = "{}:{}".format(json_msg["logger"], prefix)
+            json_msg["logger"] += ":" + prefix
 
         # Try to preserve order of keys in the dictionary across different log messages.
-        # The desired order is ["t", "logger", "process" , "s", "c", "ctx", "msg", everything else]
+        # The desired order is ["t", "logger", "s", "c", "ctx", "msg", everything else]
         def key_sorter(pair):
             (k, _) = pair
-            known_keys = ["t", "logger", "process", "s", "c", "ctx", "msg"]
+            known_keys = ["t", "logger", "s", "c", "ctx", "msg"]
             order = dict(zip(known_keys, range(len(known_keys))))
             if k in known_keys:
                 return order[k]
