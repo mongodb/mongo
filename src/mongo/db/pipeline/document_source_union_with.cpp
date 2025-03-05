@@ -121,6 +121,16 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
           expCtx,
           buildPipelineFromViewDefinition(
               expCtx, expCtx->getResolvedNamespace(unionNss), pipeline, unionNss)) {
+    // Save state regarding the resolved namespace in case we are running explain with
+    // 'executionStats' on a $unionWith with a view on a mongod. Otherwise we wouldn't be able to
+    // see details about the execution of the view pipeline in the explain result.
+    ResolvedNamespace resolvedNs = expCtx->getResolvedNamespace(unionNss);
+    if (expCtx->getExplain() &&
+        expCtx->getExplain().value() == explain::VerbosityEnum::kExecStats &&
+        !resolvedNs.pipeline.empty()) {
+        _resolvedNsForView = resolvedNs;
+    }
+
     _userNss = std::move(unionNss);
     _userPipeline = std::move(pipeline);
 }
@@ -421,7 +431,21 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             // TODO SERVER-94227 we probably don't need to do any validation as part of this parsing
             // pass?
             _variables.copyToExpCtx(_variablesParseState, _pipeline->getContext().get());
-            pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
+
+            // Resolve the view definition, if there is one.
+            if (_resolvedNsForView.has_value()) {
+                // This takes care of the case where this code is executing on a mongod and we have
+                // the full catalog information, so we can resolve the view.
+                pipeCopy =
+                    buildPipelineFromViewDefinition(
+                        pExpCtx,
+                        ResolvedNamespace{_resolvedNsForView->ns, _resolvedNsForView->pipeline},
+                        std::move(recoveredPipeline),
+                        _resolvedNsForView->ns)
+                        .release();
+            } else {
+                pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
+            }
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.
@@ -459,6 +483,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                 return preparePipelineAndExplain(pipeCopy);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
                 logShardedViewFound(e);
+                // This takes care of the case where this code is executing on mongos and we had to
+                // get the view pipeline from a shard.
                 auto resolvedPipeline = buildPipelineFromViewDefinition(
                     pExpCtx,
                     ResolvedNamespace{e->getNamespace(), e->getPipeline()},

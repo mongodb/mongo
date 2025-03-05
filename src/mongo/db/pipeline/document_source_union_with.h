@@ -270,6 +270,11 @@ private:
     // execution
     Variables _variables;
     VariablesParseState _variablesParseState;
+
+    // State that we preserve in the case where we are running explain with 'executionStats' on a
+    // $unionWith with a view. Otherwise we wouldn't be able to see details about the execution of
+    // the view pipeline in the explain result.
+    boost::optional<ResolvedNamespace> _resolvedNsForView;
 };
 
 }  // namespace mongo
