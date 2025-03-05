@@ -129,6 +129,8 @@ public:
     }
 
     const NamespaceString& getESCNss() const override {
+        uassert(
+            10026006, "Invalid request of escNss for unencrypted collection", !_nssEsc.isEmpty());
         return _nssEsc;
     }
     /**
@@ -145,9 +147,24 @@ public:
 
         tassert(9775506, "Invalid subpipeline expression context", subpipelineExpCtx);
         const auto iter = _escMap.find(collectionNss);
-        tassert(9775502,
-                "Unable to find esc for collection: " + collectionNss.toStringForErrorMsg(),
-                iter != _escMap.end());
+        if (iter == _escMap.end()) {
+            /**
+             * If we couldn't find an entry in the _escMap, we ass pipeline which involves both QE
+             * collections and unencrypted collections. In this case, we provide an empty namespace
+             * string, which will lead to an error if we try to request for the esc collection for
+             * the sub-pipeline when rewriting to the tag disjunction. In the unlikely event that we
+             * try to rewrite to a runtime comparison, there will be no error, but the query
+             * expression in question won't be rewritten, which is the intended behavior.
+             */
+            return QueryRewriter(std::move(subpipelineExpCtx),
+                                 _tagQueryInterface,
+                                 NamespaceString(),
+                                 _exprRewrites,
+                                 _matchRewrites,
+                                 _escMap,
+                                 _mode);
+        }
+        uassert(10026007, "Unexpected empty nssEsc for QE schema", !iter->second.isEmpty());
         return QueryRewriter(std::move(subpipelineExpCtx),
                              _tagQueryInterface,
                              iter->second,
@@ -210,7 +227,7 @@ private:
 
     const ExpressionToRewriteMap& _exprRewrites;
     const MatchTypeToRewriteMap& _matchRewrites;
-    const NamespaceString& _nssEsc;
+    const NamespaceString _nssEsc;
     FLETagQueryInterface* _tagQueryInterface;
     // Map of collection Ns to ESC metadata collection name.
     // Owned by caller. Lifetime must always exceed QueryRewriter.

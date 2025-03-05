@@ -215,7 +215,14 @@ void doFLERewriteInTxn(OperationContext* opCtx,
 }
 
 NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encryptInfo,
-                                              const NamespaceString& nss) {
+                                              const NamespaceString& nss,
+                                              bool allowEmptySchema) {
+    // In the case of PipelineRewrite, we must allow for unencrypted schemas alongside QE schemas,
+    // which manifest as collections without schemas in the provided encryptionInformation.
+    if (allowEmptySchema &&
+        !encryptInfo.getSchema().hasField(nss.serializeWithoutTenantPrefix_UNSAFE())) {
+        return NamespaceString();
+    }
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
     return NamespaceStringUtil::deserialize(nss.dbName(), efc.getEscCollection()->toString());
 }
@@ -246,9 +253,10 @@ std::map<NamespaceString, NamespaceString> generateEncryptInfoEscMap(
 
 RewriteBase::RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const NamespaceString& nss,
-                         const EncryptionInformation& encryptInfo)
+                         const EncryptionInformation& encryptInfo,
+                         bool allowEmptySchema)
     : expCtx(expCtx),
-      nssEsc(getAndValidateEscNsFromSchema(encryptInfo, nss)),
+      nssEsc(getAndValidateEscNsFromSchema(encryptInfo, nss, allowEmptySchema)),
       _escMap(generateEncryptInfoEscMap(nss.dbName(), encryptInfo)) {}
 
 FilterRewrite::FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -256,7 +264,7 @@ FilterRewrite::FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const EncryptionInformation& encryptInfo,
                              BSONObj toRewrite,
                              EncryptedCollScanModeAllowed mode)
-    : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
+    : RewriteBase(expCtx, nss, encryptInfo, false), userFilter(toRewrite), _mode(mode) {}
 
 void FilterRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
     rewrittenFilter =
@@ -266,7 +274,8 @@ void FilterRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
 PipelineRewrite::PipelineRewrite(const NamespaceString& nss,
                                  const EncryptionInformation& encryptInfo,
                                  std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
-    : RewriteBase(toRewrite->getContext(), nss, encryptInfo), _pipeline(std::move(toRewrite)) {}
+    : RewriteBase(toRewrite->getContext(), nss, encryptInfo, true),
+      _pipeline(std::move(toRewrite)) {}
 
 void PipelineRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
     auto rewriter = getQueryRewriterForEsc(queryImpl);

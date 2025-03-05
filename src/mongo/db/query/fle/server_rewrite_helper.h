@@ -60,7 +60,8 @@ public:
 protected:
     RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
                 const NamespaceString& nss,
-                const EncryptionInformation& encryptInfo);
+                const EncryptionInformation& encryptInfo,
+                bool allowEmptySchema);
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const NamespaceString nssEsc;
