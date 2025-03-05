@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <functional>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -56,6 +58,12 @@ protected:
 
     virtual BSONObj _makeTimeseriesOptionsForCreate() const;
 
+    virtual BSONObj _makeTimeseriesOptionsForCreateNoMetaField() const;
+
+    virtual void setUpCollectionsHelper(
+        std::initializer_list<std::pair<NamespaceString*, UUID*>> collectionMetadata,
+        std::function<BSONObj()> makeTimeseriesOptionsForCreateFn);
+
     TimeseriesOptions _getTimeseriesOptions(const NamespaceString& ns) const;
 
     const CollatorInterface* _getCollator(const NamespaceString& ns) const;
@@ -64,7 +72,7 @@ protected:
         const bucket_catalog::RolloverReason reason;
         size_t numMeasurements = static_cast<size_t>(gTimeseriesBucketMaxCount);
         size_t idxWithDiffMeasurement = static_cast<size_t>(numMeasurements - 1);
-        StringData metaValue = _metaValue;
+        boost::optional<StringData> metaValue = _metaValue;
         Date_t timeValue = Date_t::now();
     };
 
@@ -92,12 +100,12 @@ protected:
         NamespaceString::createNamespaceString_forTest("timeseries_test_fixture_1", "t_1");
     NamespaceString _ns2 =
         NamespaceString::createNamespaceString_forTest("timeseries_test_fixture_1", "t_2");
-    NamespaceString _ns3 =
-        NamespaceString::createNamespaceString_forTest("timeseries_test_fixture_2", "t_1");
+    NamespaceString _nsNoMeta = NamespaceString::createNamespaceString_forTest(
+        "timeseries_test_fixture_no_meta_field_1", "t_1");
 
     UUID _uuid1 = UUID::gen();
     UUID _uuid2 = UUID::gen();
-    UUID _uuid3 = UUID::gen();
+    UUID _uuidNoMeta = UUID::gen();
 
     BSONObj _measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
 };

@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
+#include <functional>
 #include <numeric>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -52,21 +54,35 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo::timeseries {
+void TimeseriesTestFixture::setUpCollectionsHelper(
+    std::initializer_list<std::pair<NamespaceString*, UUID*>> collectionMetadata,
+    std::function<BSONObj()> makeTimeseriesOptionsForCreateFn) {
+    for (auto&& [ns, uuid] : collectionMetadata) {
+        ASSERT_OK(createCollection(
+            _opCtx,
+            ns->dbName(),
+            BSON("create" << ns->coll() << "timeseries" << makeTimeseriesOptionsForCreateFn())));
+        AutoGetCollection autoColl(_opCtx, ns->makeTimeseriesBucketsNamespace(), MODE_IS);
+        *uuid = autoColl.getCollection()->uuid();
+    }
+}
+
 void TimeseriesTestFixture::setUp() {
     CatalogTestFixture::setUp();
 
     _opCtx = operationContext();
     _bucketCatalog = &bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext());
 
-    for (auto&& [ns, uuid] : std::initializer_list<std::pair<NamespaceString*, UUID*>>{
-             {&_ns1, &_uuid1}, {&_ns2, &_uuid2}, {&_ns3, &_uuid3}}) {
-        ASSERT_OK(createCollection(
-            _opCtx,
-            ns->dbName(),
-            BSON("create" << ns->coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
-        AutoGetCollection autoColl(_opCtx, ns->makeTimeseriesBucketsNamespace(), MODE_IS);
-        *uuid = autoColl.getCollection()->uuid();
-    }
+    // Create all collections with meta fields.
+    setUpCollectionsHelper(
+        std::initializer_list<std::pair<NamespaceString*, UUID*>>{{&_ns1, &_uuid1},
+                                                                  {&_ns2, &_uuid2}},
+        [this]() { return this->_makeTimeseriesOptionsForCreate(); });
+
+    // Create all collections without meta fields.
+    setUpCollectionsHelper(
+        std::initializer_list<std::pair<NamespaceString*, UUID*>>{{&_nsNoMeta, &_uuidNoMeta}},
+        [this]() { return this->_makeTimeseriesOptionsForCreateNoMetaField(); });
 }
 
 void TimeseriesTestFixture::tearDown() {
@@ -96,11 +112,15 @@ void TimeseriesTestFixture::tearDown() {
 }
 
 std::vector<NamespaceString> TimeseriesTestFixture::getNamespaceStrings() {
-    return {_ns1, _ns2, _ns3};
+    return {_ns1, _ns2, _nsNoMeta};
 }
 
 BSONObj TimeseriesTestFixture::_makeTimeseriesOptionsForCreate() const {
     return BSON("timeField" << _timeField << "metaField" << _metaField);
+}
+
+BSONObj TimeseriesTestFixture::_makeTimeseriesOptionsForCreateNoMetaField() const {
+    return BSON("timeField" << _timeField);
 }
 
 TimeseriesOptions TimeseriesTestFixture::_getTimeseriesOptions(const NamespaceString& ns) const {
@@ -141,7 +161,7 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
     const bucket_catalog::RolloverReason reason = options.reason;
     size_t numMeasurements = options.numMeasurements;
     size_t idxWithDiffMeasurement = options.idxWithDiffMeasurement;
-    StringData metaValue = options.metaValue;
+    boost::optional<StringData> metaValue = options.metaValue;
     Date_t timeValue = options.timeValue;
 
     // We don't want to enable specifying the number of measurements for kCount, kSize, and
@@ -171,77 +191,93 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
     // We need to ensure that the idxWithDiffMeasurement isn't the first element. Otherwise, we may
     // not create a vector that causes the input RolloverReason.
     invariant(idxWithDiffMeasurement >= 1 && idxWithDiffMeasurement <= numMeasurements);
+    auto measurement = (metaValue) ? BSON(_timeField << timeValue << _metaField << *metaValue)
+                                   : BSON(_timeField << timeValue);
 
     switch (reason) {
         case bucket_catalog::RolloverReason::kNone:
             for (size_t i = 0; i < numMeasurements; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << timeValue << _metaField << metaValue));
+                batchOfMeasurements.emplace_back(measurement);
             }
             return batchOfMeasurements;
         case bucket_catalog::RolloverReason::kCount:
             for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << timeValue << _metaField << metaValue));
+                batchOfMeasurements.emplace_back(measurement);
             }
             return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kTimeForward:
+        case bucket_catalog::RolloverReason::kTimeForward: {
             for (size_t i = 0; i < idxWithDiffMeasurement; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << timeValue << _metaField << metaValue));
+                batchOfMeasurements.emplace_back(measurement);
             }
+            auto kTimeForwardMeasurement = (metaValue)
+                ? BSON(_timeField << timeValue + Hours(2) << _metaField << *metaValue)
+                : BSON(_timeField << timeValue + Hours(2));
             for (size_t i = idxWithDiffMeasurement; i < numMeasurements; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << timeValue + Hours(2) << _metaField << metaValue));
+                batchOfMeasurements.emplace_back(kTimeForwardMeasurement);
             }
             return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kSchemaChange:
+        }
+        case bucket_catalog::RolloverReason::kSchemaChange: {
+            auto kSchemaChangeMeasurement1 = (metaValue)
+                ? BSON(_timeField << timeValue << _metaField << *metaValue << "deathGrips"
+                                  << "isOnline")
+                : BSON(_timeField << timeValue << "deathGrips"
+                                  << "isOnline");
             for (size_t i = 0; i < idxWithDiffMeasurement; i++) {
-                batchOfMeasurements.emplace_back(BSON(_timeField << timeValue << _metaField
-                                                                 << metaValue << "deathGrips"
-                                                                 << "isOnline"));
+                batchOfMeasurements.emplace_back(kSchemaChangeMeasurement1);
             }
             // We want to guarantee that this measurement with different schema is at the
             // end of the BatchedInsertContext, so we make its time greater than the rest
             // of the measurements.
+            auto kSchemaChangeMeasurement2 = (metaValue)
+                ? BSON(_timeField << timeValue + Seconds(1) << _metaField << *metaValue
+                                  << "deathGrips" << 100)
+                : BSON(_timeField << timeValue + Seconds(1) << "deathGrips" << 100);
             for (size_t i = idxWithDiffMeasurement; i < numMeasurements; i++) {
-                batchOfMeasurements.emplace_back(BSON(_timeField << timeValue + Seconds(1)
-                                                                 << _metaField << metaValue
-                                                                 << "deathGrips" << 100));
+                batchOfMeasurements.emplace_back(kSchemaChangeMeasurement2);
             }
             return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kTimeBackward:
+        }
+        case bucket_catalog::RolloverReason::kTimeBackward: {
             for (size_t i = 0; i < idxWithDiffMeasurement; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << timeValue << _metaField << metaValue));
+                batchOfMeasurements.emplace_back(measurement);
             }
+            auto kTimeBackwardMeasurement = (metaValue)
+                ? BSON(_timeField << timeValue - Hours(1) << _metaField << *metaValue)
+                : BSON(_timeField << timeValue - Hours(1));
             for (size_t i = idxWithDiffMeasurement; i < numMeasurements; i++) {
-                batchOfMeasurements.emplace_back(
-                    BSON(_timeField << timeValue - Hours(1) << _metaField << metaValue));
+                batchOfMeasurements.emplace_back(kTimeBackwardMeasurement);
             }
             return batchOfMeasurements;
+        }
         // kCachePressure and kSize are caused by the same measurements, but we have kCachePressure
         // when the cacheDerivedBucketSize < kLargeMeasurementsMaxBucketSize.
         // We can simulate this by lowering the _storageCacheSizeBytes or increasing the number of
         // active buckets.
-        // In this layer, it is hard to simulate kCachePressure because we would need to decrease
-        // the storageCacheSizeBytes or increase the number of active buckets to > 50.
         //
         // Note that we will need less large measurements to trigger kCachePressure because we use
         // _storageCacheSizeBytes to determine if we want to keep the bucket open due to large
         // measurements.
-        case bucket_catalog::RolloverReason::kCachePressure:
+        case bucket_catalog::RolloverReason::kCachePressure: {
+            auto bigMeasurement = (metaValue)
+                ? BSON(_timeField << timeValue << _metaField << *metaValue << "big_field"
+                                  << _bigStr)
+                : BSON(_timeField << timeValue << "big_field" << _bigStr);
             for (auto i = 0; i < 4; i++) {
-                batchOfMeasurements.emplace_back(BSON(
-                    _timeField << timeValue << _metaField << metaValue << "big_field" << _bigStr));
+                batchOfMeasurements.emplace_back(bigMeasurement);
             }
             return batchOfMeasurements;
-        case bucket_catalog::RolloverReason::kSize:
+        }
+        case bucket_catalog::RolloverReason::kSize: {
+            auto bigMeasurement = (metaValue)
+                ? BSON(_timeField << timeValue << _metaField << *metaValue << "big_field"
+                                  << _bigStr)
+                : BSON(_timeField << timeValue << "big_field" << _bigStr);
             for (auto i = 0; i < 125; i++) {
-                batchOfMeasurements.emplace_back(BSON(
-                    _timeField << timeValue << _metaField << metaValue << "big_field" << _bigStr));
+                batchOfMeasurements.emplace_back(bigMeasurement);
             }
             return batchOfMeasurements;
+        }
     }
     return batchOfMeasurements;
 }

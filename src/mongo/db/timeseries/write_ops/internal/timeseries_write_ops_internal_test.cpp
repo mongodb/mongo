@@ -52,7 +52,9 @@ protected:
         std::vector<size_t>& correctIndexOrder,
         stdx::unordered_set<size_t>& expectedIndicesWithErrors) const;
 
-    void _testStageInsertBatch(std::vector<BSONObj> batchOfMeasurements,
+    void _testStageInsertBatch(const NamespaceString& ns,
+                               const UUID& collectionUUID,
+                               std::vector<BSONObj> batchOfMeasurements,
                                std::vector<size_t> numWriteBatches) const;
 
     // Strings used to simulate kSize/kCachePressure rollover reason.
@@ -221,14 +223,17 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaFi
 // _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes. Otherwise, _storageCacheSizeBytes
 // = kDefaultStorageCacheSizeBytes.
 void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
-    std::vector<BSONObj> batchOfMeasurements, std::vector<size_t> numWriteBatches) const {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const NamespaceString& ns,
+    const UUID& collectionUUID,
+    std::vector<BSONObj> batchOfMeasurements,
+    std::vector<size_t> numWriteBatches) const {
+    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
-    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    auto timeseriesOptions = _getTimeseriesOptions(ns);
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
     auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog, _uuid1, timeseriesOptions, batchOfMeasurements, errorsAndIndices);
+        *_bucketCatalog, collectionUUID, timeseriesOptions, batchOfMeasurements, errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     ASSERT_EQ(batchedInsertContexts.size(), numWriteBatches.size());
@@ -362,7 +367,17 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchFillsUpSingleBucket) {
     std::vector<BSONObj> batchOfMeasurementsTimeseriesBucketMaxCount =
         _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kNone});
     std::vector<size_t> numWriteBatches{1};
-    _testStageInsertBatch(batchOfMeasurementsTimeseriesBucketMaxCount, numWriteBatches);
+    _testStageInsertBatch(
+        _ns1, _uuid1, batchOfMeasurementsTimeseriesBucketMaxCount, numWriteBatches);
+
+    // Testing the same configuration as above, but in a collection without a meta field.
+    std::vector<BSONObj> batchOfMeasurementsTimeseriesBucketMaxCountNoMetaField =
+        _generateMeasurementsWithRolloverReason(
+            {.reason = bucket_catalog::RolloverReason::kNone, .metaValue = boost::none});
+    _testStageInsertBatch(_nsNoMeta,
+                          _uuidNoMeta,
+                          batchOfMeasurementsTimeseriesBucketMaxCountNoMetaField,
+                          numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkCount) {
@@ -372,7 +387,13 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkCou
     // batchOfMeasurements will be 2 * gTimeseriesBucketMaxCount measurements with all the
     // measurements having the same meta field and time, which means we should have two buckets.
     std::vector<size_t> numWriteBatches{2};
-    _testStageInsertBatch(batchOfMeasurementsWithCount, numWriteBatches);
+    _testStageInsertBatch(_ns1, _uuid1, batchOfMeasurementsWithCount, numWriteBatches);
+
+    // Testing the same configuration as above, but in a collection without a meta field.
+    auto batchOfMeasurementsWithCountNoMetaField = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kCount, .metaValue = boost::none});
+    _testStageInsertBatch(
+        _nsNoMeta, _uuidNoMeta, batchOfMeasurementsWithCountNoMetaField, numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkTimeForward) {
@@ -384,16 +405,19 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkTim
     // of the bucket range encompassing the previous measurements, which means that this
     // measurement will be in a different bucket.
     std::vector<size_t> numWriteBatches{2};
-    _testStageInsertBatch(batchOfMeasurementsWithTimeForwardAtEnd, numWriteBatches);
+    _testStageInsertBatch(_ns1, _uuid1, batchOfMeasurementsWithTimeForwardAtEnd, numWriteBatches);
 
     // Max bucket size with measurements[1:gTimeseriesBucketMaxCount] having kTimeForward.
     // We declare a different meta field so we don't attempt to use the buckets created above.
-    auto batchOfMeasurementsWithTimeForwardAfterFirstMeasurement =
+    auto batchOfMeasurementsWithTimeForwardAfterFirstMeasurementNoMetaField =
         _generateMeasurementsWithRolloverReason(
             {.reason = bucket_catalog::RolloverReason::kTimeForward,
              .idxWithDiffMeasurement = 1,
-             .metaValue = _metaValue2});
-    _testStageInsertBatch(batchOfMeasurementsWithTimeForwardAfterFirstMeasurement, numWriteBatches);
+             .metaValue = boost::none});
+    _testStageInsertBatch(_nsNoMeta,
+                          _uuidNoMeta,
+                          batchOfMeasurementsWithTimeForwardAfterFirstMeasurementNoMetaField,
+                          numWriteBatches);
 
     // 50 measurements with measurements[25:50] having kTimeForward.
     // We declare a different meta field so we don't attempt to use the buckets created above.
@@ -401,8 +425,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkTim
         {.reason = bucket_catalog::RolloverReason::kTimeForward,
          .numMeasurements = 50,
          .idxWithDiffMeasurement = 25,
-         .metaValue = _metaValue3});
-    _testStageInsertBatch(batchOfMeasurementsWithTimeForwardInMiddle, numWriteBatches);
+         .metaValue = _metaValue2});
+    _testStageInsertBatch(
+        _ns2, _uuid2, batchOfMeasurementsWithTimeForwardInMiddle, numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkSchemaChange) {
@@ -414,16 +439,18 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkSch
     // a string for field "deathGrips", which means this measurement will be in a different
     // bucket.
     std::vector<size_t> numWriteBatches{2};
-    _testStageInsertBatch(batchOfMeasurementsWithSchemaChangeAtEnd, numWriteBatches);
+    _testStageInsertBatch(_ns1, _uuid1, batchOfMeasurementsWithSchemaChangeAtEnd, numWriteBatches);
 
     // Max bucket size with measurements[1:gTimeseriesBucketMaxCount] having kSchemaChange.
     // We declare a different meta field so we don't attempt to use a bucket created above.
-    auto batchOfMeasurementsWithSchemaChangeAfterFirstMeasurement =
+    auto batchOfMeasurementsWithSchemaChangeAfterFirstMeasurementNoMetaField =
         _generateMeasurementsWithRolloverReason(
             {.reason = bucket_catalog::RolloverReason::kSchemaChange,
              .idxWithDiffMeasurement = 1,
-             .metaValue = _metaValue2});
-    _testStageInsertBatch(batchOfMeasurementsWithSchemaChangeAfterFirstMeasurement,
+             .metaValue = boost::none});
+    _testStageInsertBatch(_nsNoMeta,
+                          _uuidNoMeta,
+                          batchOfMeasurementsWithSchemaChangeAfterFirstMeasurementNoMetaField,
                           numWriteBatches);
 
     // 50 measurements with measurements[25:50] having kSchemaChange.
@@ -432,9 +459,10 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkSch
         {.reason = bucket_catalog::RolloverReason::kSchemaChange,
          .numMeasurements = 50,
          .idxWithDiffMeasurement = 25,
-         .metaValue = _metaValue3});
+         .metaValue = _metaValue2});
 
-    _testStageInsertBatch(batchOfMeasurementsWithTimeForwardInMiddle, numWriteBatches);
+    _testStageInsertBatch(
+        _ns2, _uuid2, batchOfMeasurementsWithTimeForwardInMiddle, numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkSize) {
@@ -444,20 +472,32 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonkSiz
     // The last measurement will exceed the size that the bucket can store, which will mean it
     // should be in a different bucket.
     std::vector<size_t> numWriteBatches{2};
-    _testStageInsertBatch(batchOfMeasurementsWithSize, numWriteBatches);
+    _testStageInsertBatch(_ns1, _uuid1, batchOfMeasurementsWithSize, numWriteBatches);
+
+    // Testing the same configuration as above, but in a collection without a meta field.
+    auto batchOfMeasurementsWithSizeNoMetaField = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kSize, .metaValue = boost::none});
+    _testStageInsertBatch(
+        _nsNoMeta, _uuidNoMeta, batchOfMeasurementsWithSizeNoMetaField, numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, InsertBatchHandlesRolloverReasonkCachePressure) {
     // Artificially lower _storageCacheSizeBytes so we can simulate kCachePressure.
     _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes;
 
-    auto batchOfMeasurementsWithSize = _generateMeasurementsWithRolloverReason(
+    auto batchOfMeasurementsWithCachePressure = _generateMeasurementsWithRolloverReason(
         {.reason = bucket_catalog::RolloverReason::kCachePressure});
 
     // The last measurement will exceed the size that the bucket can store. Coupled with the lowered
     // cache size, we will trigger kCachePressure, so the measurement will be in a different bucket.
     std::vector<size_t> numWriteBatches{2};
-    _testStageInsertBatch(batchOfMeasurementsWithSize, numWriteBatches);
+    _testStageInsertBatch(_ns1, _uuid1, batchOfMeasurementsWithCachePressure, numWriteBatches);
+
+    // Testing the same configuration as above, but in a collection without a meta field.
+    auto batchOfMeasurementsWithCachePressureNoMetaField = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kCachePressure, .metaValue = boost::none});
+    _testStageInsertBatch(
+        _nsNoMeta, _uuidNoMeta, batchOfMeasurementsWithCachePressureNoMetaField, numWriteBatches);
 
     // Reset _storageCacheSizeBytes back to a representative value.
     _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
@@ -499,7 +539,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonMixe
     // bucket before encountering kTimeForward and add the remaining 25 measurements into a fourth
     // bucket.
     std::vector<size_t> numWriteBatches{4};
-    _testStageInsertBatch(mixedRolloverReasonsMeasurements, numWriteBatches);
+    _testStageInsertBatch(_ns1, _uuid1, mixedRolloverReasonsMeasurements, numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonMixed2) {
@@ -534,7 +574,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonMixe
     // Finally, the fourth bucket created to insert the last measurement
     // batchOfMeasurementsWithSchemaChange due to kSchemaChange.
     std::vector<size_t> numWriteBatches{4};
-    _testStageInsertBatch(mixedRolloverReasonsMeasurements, numWriteBatches);
+    _testStageInsertBatch(_ns1, _uuid1, mixedRolloverReasonsMeasurements, numWriteBatches);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonMixed3) {
@@ -575,7 +615,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonMixe
     // We will insert the last measurement from batchOfMeasurementsWithCachePressure into a
     // third bucket.
     std::vector<size_t> numWriteBatches{3};
-    _testStageInsertBatch(mixedRolloverReasonsMeasurements, numWriteBatches);
+    _testStageInsertBatch(_ns1, _uuid1, mixedRolloverReasonsMeasurements, numWriteBatches);
 
     // Reset _storageCacheSizeBytes back to a representative value.
     _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
