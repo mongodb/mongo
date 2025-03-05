@@ -9,6 +9,8 @@
  *   assumes_balancer_off,
  *   config_shard_incompatible,
  *   requires_persistence,
+ *   multiversion_incompatible,
+ *   featureFlagUseTopologyChangeCoordinators,
  * ]
  */
 
@@ -137,6 +139,9 @@ const clusterParameter4 = {
         rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     rs.restart(0, {shardsvr: ""});
+
+    assert.neq(rs.getPrimary().getDB("admin").system.version.findOne().version,
+               st.configRS.getPrimary().getDB("admin").system.version.findOne().version);
 
     assert.commandWorked(rs.getPrimary().getDB("foo").foo.insertOne({a: 1}));
 
