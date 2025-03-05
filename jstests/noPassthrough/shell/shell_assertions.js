@@ -1061,7 +1061,19 @@ tests.push(function assertWriteErrorJsonFormat() {
         const res =
             new WriteResult({nRemoved: 0, writeErrors: [], upserted: []}, 3, {w: "majority"});
         assert.writeError(res, "Oops!");
-    }, {msg: "no write error : Oops!", attr: {res: {nRemoved: 0}}});
+    }, {
+        msg: "no write error : Oops!",
+        attr: {
+            res: {
+                ok: {"$undefined": true},
+                nInserted: {"$undefined": true},
+                nUpserted: {"$undefined": true},
+                nMatched: {"$undefined": true},
+                nModified: {"$undefined": true},
+                nRemoved: 0
+            }
+        }
+    });
 });
 
 tests.push(function assertWriteErrorWithCodeJsonFormat() {
@@ -1073,7 +1085,14 @@ tests.push(function assertWriteErrorWithCodeJsonFormat() {
     }, {
         msg: "found code(s) does not match any of the expected codes : Oops!",
         attr: {
-            res: {nRemoved: 0},
+            res: {
+                ok: {"$undefined": true},
+                nInserted: {"$undefined": true},
+                nUpserted: {"$undefined": true},
+                nMatched: {"$undefined": true},
+                nModified: {"$undefined": true},
+                nRemoved: 0
+            },
             expectedCode: [ErrorCodes.BadValue],
             writeErrorCodes: [ErrorCodes.NetworkTimeout]
         }
