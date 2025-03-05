@@ -686,7 +686,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - rhel8.8-large
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       <<: *enterprise-rhel8-debug-tsan-expansions-template
@@ -733,7 +733,7 @@ buildvariants:
       - name: version_gen
         variant: generate-tasks-for-version
         omit_generated_tasks: true
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       <<: *enterprise-rhel8-debug-tsan-expansions-template
