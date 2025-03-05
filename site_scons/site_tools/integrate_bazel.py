@@ -1496,11 +1496,11 @@ def generate(env: SCons.Environment.Environment) -> None:
     if normalized_arch == "s390x":
         # s390x systems don't have enough RAM to handle the default job count and will
         # OOM unless we reduce it.
-        bazel_internal_flags.append("--jobs=3")
+        bazel_internal_flags.append("--jobs=8")
     elif normalized_arch == "ppc64le":
         # ppc64le builds are OOMing with default concurrency, but it's not clear if it's
         # an issue with the bazel client itself or in the compiler.
-        bazel_internal_flags.append("--jobs=32")
+        bazel_internal_flags.append("--jobs=48")
 
     public_release = False
     # Disable remote execution for public release builds.
