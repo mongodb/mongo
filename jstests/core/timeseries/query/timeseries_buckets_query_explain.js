@@ -10,6 +10,7 @@
  *   requires_timeseries,
  * ]
  */
+import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 const bucketsColl = db["system.buckets." + coll.getName()];
@@ -28,18 +29,33 @@ assert.commandWorked(coll.insert([
     {[timeField]: time, [metaField]: 2, a: "c"},
 ]));
 
-const assertExplain = function(explain) {
+const assertQueryPlannerNamespace = function(explain) {
     if (explain.shards) {
         for (const shardExplain of Object.values(explain.shards)) {
-            assert.eq(shardExplain.queryPlanner.namespace, bucketsColl.getFullName());
+            assert.eq(shardExplain.queryPlanner.namespace,
+                      bucketsColl.getFullName(),
+                      `Expected shard plan query planner namespace to be ${
+                          tojson(bucketsColl.getFullName())} but got ${tojson(shardExplain)}`);
         }
     } else if (explain.queryPlanner.namespace) {
-        assert.eq(explain.queryPlanner.namespace, bucketsColl.getFullName());
+        assert.eq(explain.queryPlanner.namespace,
+                  bucketsColl.getFullName(),
+                  `Expected query planner namespace to be ${
+                      tojson(bucketsColl.getFullName())} but got ${tojson(explain)}`);
     } else {
         for (const shardPlan of explain.queryPlanner.winningPlan.shards) {
-            assert.eq(shardPlan.namespace, bucketsColl.getFullName());
+            assert.eq(shardPlan.namespace,
+                      bucketsColl.getFullName(),
+                      `Expected winning shard plan query planner namespace to be ${
+                          tojson(bucketsColl.getFullName())} but got ${tojson(shardPlan)}`);
         }
     }
+};
+
+const assertExplain = function(explain) {
+    assertQueryPlannerNamespace(explain);
+    assert(!getPlanStage(explain, "UNPACK_TS_BUCKET"),
+           `Expected to find no unpack stage but got ${tojson(explain)}`);
 };
 
 assertExplain(bucketsColl.explain().aggregate([{$match: {"control.count": 2}}]));
