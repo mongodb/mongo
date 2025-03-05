@@ -645,7 +645,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem, false);
     }
 
-    enforceRequireAPIVersion(opCtx, command);
+    enforceRequireAPIVersion(opCtx, command, request);
 
     if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {
         auto& apiParams = APIParameters::get(opCtx);

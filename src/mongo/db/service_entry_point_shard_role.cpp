@@ -1831,7 +1831,7 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
-    enforceRequireAPIVersion(opCtx, command);
+    enforceRequireAPIVersion(opCtx, command, _execContext.getRequest());
 
     if (!opCtx->getClient()->isInDirectClient()) {
         const boost::optional<ShardVersion>& shardVersion = genericArgs.getShardVersion();

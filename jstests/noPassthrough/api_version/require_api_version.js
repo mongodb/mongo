@@ -158,7 +158,83 @@ function requireApiVersionOnShardOrConfigServerTest() {
     configsvrRS.stopSet();
 }
 
+function checkLogsForHelloFromReplCoordExternNetwork(logs) {
+    for (let logMsg of logs) {
+        let obj = JSON.parse(logMsg);
+        if (checkLog.compareLogs(
+                obj,
+                21965,  // Search for "About to run the command" logs.
+                "D2",
+                null,
+                {
+                    "commandArgs": {
+                        "hello": 1,
+                        "client": {"driver": {"name": "NetworkInterfaceTL-ReplCoordExternNetwork"}}
+                    }
+                },
+                true)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Test that internal "hello" commands bypass `requireApiVersion` checks. We drop connections before
+// certain internal commands to force "hello" to be sent. As an example, use `insert`
+// with "majority" write concern in order to trigger internal commands to be sent from the secondary
+// to the primary.
+function requireApiVersionDropConnectionTest() {
+    const rst = new ReplSetTest(
+        {nodes: 3, nodeOptions: {setParameter: {logComponentVerbosity: tojson({command: 2})}}});
+    rst.startSet();
+    rst.initiate();
+    const db = rst.getPrimary().getDB("admin");
+    const secondaries = rst.getSecondaries();
+
+    // Drop "ReplCoordExternNetwork" connections on secondary to force new connections and "hello"s
+    // to be sent.
+    for (const secondary of secondaries) {
+        assert.commandWorked(secondary.getDB("admin").runCommand({
+            configureFailPoint: "connectionPoolDropConnectionsBeforeGetConnection",
+            mode: "alwaysOn",
+            data: {"instance": "NetworkInterfaceTL-ReplCoordExternNetwork"}
+        }));
+    }
+
+    assert.commandWorked(db.runCommand({setParameter: 1, requireApiVersion: true}));
+    for (const secondary of secondaries) {
+        assert.commandWorked(secondary.adminCommand({setParameter: 1, requireApiVersion: true}));
+    }
+
+    // During internal `replSetUpdatePosition` from secondaries to the primary, connections will be
+    // dropped, and new "hello"s will be sent. These "hello"s should bypass any `requireApiVersion`
+    // check.
+    assert.commandWorked(db.runCommand({
+        insert: "testColl",
+        documents: [{a: 1, b: 2}],
+        apiVersion: "1",
+        writeConcern: {w: "majority"}
+    }));
+
+    // Check that internal "hello"s triggered by `replSetUpdatePosition` were processed.
+    var logs = assert.commandWorked(db.adminCommand({getLog: 'global', apiVersion: "1"})).log;
+    assert(checkLogsForHelloFromReplCoordExternNetwork(logs));
+
+    assert.commandWorked(
+        db.runCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}));
+    for (const secondary of rst.getSecondaries()) {
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}));
+    }
+
+    assert.commandWorked(db.runCommand(
+        {configureFailPoint: "connectionPoolDropConnectionsBeforeGetConnection", mode: "off"}));
+    rst.stopSet();
+}
+
 requireApiVersionOnShardOrConfigServerTest();
+
+requireApiVersionDropConnectionTest();
 
 const mongod = MongoRunner.runMongod();
 runTest(mongod.getDB("admin"), false /* supportsTransactions */);

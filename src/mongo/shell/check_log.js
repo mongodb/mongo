@@ -104,7 +104,7 @@ checkLog = (function() {
                 throw ex;
             }
 
-            if (_compareLogs(obj, id, severity, null, attrsDict)) {
+            if (compareLogs(obj, id, severity, null, attrsDict)) {
                 return true;
             }
         }
@@ -203,7 +203,7 @@ checkLog = (function() {
                 throw ex;
             }
 
-            if (_compareLogs(obj, id, severity, context, attrsDict, isRelaxed)) {
+            if (compareLogs(obj, id, severity, context, attrsDict, isRelaxed)) {
                 messages.push(obj);
             }
         }
@@ -444,12 +444,12 @@ checkLog = (function() {
     };
 
     /*
-     * Internal helper to check if a log's id, severity, and attributes match with what's expected.
+     * Check if a log's id, severity, and attributes match with what's expected.
      * If `isRelaxed` is true, then the `_deepEqual()` helper function will only check that the
      * fields specified in the attrsDict attribute are equal to those in the corresponding attribute
      * of obj. Otherwise, `_deepEqual()` checks that both subobjects are identical.
      */
-    const _compareLogs = function(obj, id, severity, context, attrsDict, isRelaxed = false) {
+    const compareLogs = function(obj, id, severity, context, attrsDict, isRelaxed = false) {
         if (obj.id !== id) {
             return false;
         }
@@ -497,6 +497,7 @@ checkLog = (function() {
         checkContainsWithCountJson: checkContainsWithCountJson,
         checkContainsWithAtLeastCountJson: checkContainsWithAtLeastCountJson,
         checkContainsOnceJsonStringMatch: checkContainsOnceJsonStringMatch,
+        compareLogs: compareLogs,
         contains: contains,
         containsLog: containsLog,
         containsJson: containsJson,
