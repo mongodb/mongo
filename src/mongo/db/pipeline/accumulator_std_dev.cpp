@@ -28,7 +28,6 @@
  */
 
 #include <cmath>
-#include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -44,7 +43,6 @@
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_stddev.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

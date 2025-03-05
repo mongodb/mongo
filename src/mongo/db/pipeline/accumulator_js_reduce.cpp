@@ -29,7 +29,6 @@
 
 #include <boost/none.hpp>
 #include <boost/smart_ptr.hpp>
-#include <type_traits>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

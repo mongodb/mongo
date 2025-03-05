@@ -30,7 +30,12 @@
 
 #pragma once
 
+#include <boost/container/flat_set.hpp>
+
+#include "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/percentile_algo_continuous.h"
+#include "mongo/db/pipeline/percentile_algo_discrete.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 
 namespace mongo {

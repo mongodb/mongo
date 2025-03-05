@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/percentile_algo.h"
 #include <boost/random/normal_distribution.hpp>
 #include <cmath>
 #include <cstddef>

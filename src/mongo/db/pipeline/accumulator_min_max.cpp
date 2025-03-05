@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -41,7 +40,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

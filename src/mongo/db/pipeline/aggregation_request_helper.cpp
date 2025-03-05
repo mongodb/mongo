@@ -31,9 +31,6 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
-#include <cstdint>
-#include <memory>
-#include <string>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -57,8 +54,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 

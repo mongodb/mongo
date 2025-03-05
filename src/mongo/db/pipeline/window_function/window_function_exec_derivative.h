@@ -34,7 +34,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <utility>
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
@@ -45,7 +44,6 @@
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/variables.h"
+
 namespace mongo {
 
 template <typename AccumulatorState>

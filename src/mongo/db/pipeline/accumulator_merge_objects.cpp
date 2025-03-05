@@ -28,7 +28,6 @@
  */
 
 #include <utility>
-#include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -41,7 +40,6 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

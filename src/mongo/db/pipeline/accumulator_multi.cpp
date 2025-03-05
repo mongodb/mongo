@@ -33,13 +33,10 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
 #include <iterator>
-#include <memory>
-#include <type_traits>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"

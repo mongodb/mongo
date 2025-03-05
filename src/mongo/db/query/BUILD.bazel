@@ -129,6 +129,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/query/stats",
     ],
 )
 

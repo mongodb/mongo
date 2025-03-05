@@ -44,8 +44,6 @@
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
-#include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

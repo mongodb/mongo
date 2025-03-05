@@ -30,7 +30,6 @@
 #pragma once
 
 #include <cstddef>
-#include <map>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -39,7 +38,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"

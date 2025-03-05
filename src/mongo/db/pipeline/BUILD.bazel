@@ -404,13 +404,8 @@ mongo_cc_library(
         ":field_path",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/exec:sort_executor",
-        "//src/mongo/db/exec/document_value",
         "//src/mongo/db/index:index_access_method",
-        "//src/mongo/db/query:query_knobs",
-        "//src/mongo/db/query/stats",
-        "//src/mongo/idl:idl_parser",
-        "//src/mongo/scripting:scripting_common",
-        "//src/mongo/util:summation",
+        "//src/mongo/db/query:sort_pattern",
     ],
 )
 
@@ -708,6 +703,7 @@ mongo_cc_library(
         "//src/mongo/db/query/search:mongot_options",
         "//src/mongo/db/query/search:search_index_common",
         "//src/mongo/db/query/search:search_index_process_interface",
+        "//src/mongo/db/query/stats",
         "//src/mongo/db/query/stats:stats_gen",
         "//src/mongo/db/query/util:query_string_util",
         "//src/mongo/db/repl:apply_ops_command_info",

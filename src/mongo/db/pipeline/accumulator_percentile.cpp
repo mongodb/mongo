@@ -30,14 +30,11 @@
 #include "mongo/db/pipeline/accumulator_percentile.h"
 
 #include "mongo/db/pipeline/percentile_algo.h"
-#include "mongo/db/pipeline/percentile_algo_accurate.h"
-#include <type_traits>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value.h"

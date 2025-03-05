@@ -38,7 +38,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
@@ -51,6 +50,7 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_range.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_shift.h"
+#include "mongo/db/pipeline/window_function/window_function_statement.h"
 
 namespace mongo {
 

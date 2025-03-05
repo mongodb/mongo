@@ -31,21 +31,17 @@
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
 #include <deque>
 #include <functional>
-#include <iterator>
 #include <map>
 #include <tuple>
 #include <utility>
-#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"

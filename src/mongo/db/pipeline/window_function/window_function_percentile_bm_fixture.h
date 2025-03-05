@@ -31,9 +31,6 @@
 #include <benchmark/benchmark.h>
 #include <vector>
 
-#include "mongo/db/pipeline/window_function/window_function_percentile.h"
-#include "mongo/platform/basic.h"
-
 namespace mongo {
 
 class WindowFunctionPercentileBenchmarkFixture : public benchmark::Fixture {

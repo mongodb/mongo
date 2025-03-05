@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/window_function/window_function_count.h"
 
 #include <boost/move/utility_core.hpp>
-#include <memory>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

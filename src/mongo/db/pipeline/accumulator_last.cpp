@@ -33,7 +33,6 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
