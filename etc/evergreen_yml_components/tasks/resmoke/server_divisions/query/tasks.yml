@@ -1168,14 +1168,13 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
+        "release_critical",
         "search_community_mongotmock",
-        "experimental",
         "incompatible_mac",
         "incompatible_windows",
         "incompatible_ppc",
         "incompatible_s390x",
         "requires_large_host",
-        "blocked_in_query_alias",
       ]
     commands:
       - func: "do setup"
@@ -1188,14 +1187,13 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
+        "release_critical",
         "search_community_mongotmock",
-        "experimental",
         "incompatible_mac",
         "incompatible_windows",
         "incompatible_ppc",
         "incompatible_s390x",
         "requires_large_host",
-        "blocked_in_query_alias",
       ]
     commands:
       - func: "do setup"
@@ -1259,8 +1257,7 @@ tasks:
         "assigned_to_jira_team_server_query_integration",
         "experimental",
         "incompatible_windows",
-        "search_community_e2e_tests",
-        "blocked_in_query_alias",
+        "search_e2e_tests",
       ]
     commands:
       - func: "do setup"
@@ -1274,8 +1271,7 @@ tasks:
         "assigned_to_jira_team_server_query_integration",
         "experimental",
         "incompatible_windows",
-        "search_community_e2e_tests",
-        "blocked_in_query_alias",
+        "search_e2e_tests",
       ]
     commands:
       - func: "do setup"

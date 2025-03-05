@@ -677,38 +677,6 @@ buildvariants:
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen !aggregation_sharded_collections_causally_consistent_passthrough !aggregation_sharded_collections_passthrough
       - name: .grpc_misc_js
 
-  - name: &enterprise-rhel8-debug-aubsan-search-grpc enterprise-rhel8-debug-aubsan-search-grpc
-    display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Search in Community with GRPC"
-    tags: ["experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    run_on:
-      - rhel80-large
-    expansions:
-      <<: *aubsan-lite-required-expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      has_packages: false
-      separate_debug: off
-      san_options: *grpc_aubsan_options
-      compile_flags: >-
-        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-        --dbg=on
-        --opt=on
-        --allocator=system
-        --sanitize=undefined,address
-        --ssl
-        --ocsp-stapling=off
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --link-model=dynamic
-        --disable-streams
-      compile_variant: *enterprise-rhel8-debug-aubsan-search-grpc
-      build_mongot: true
-    tasks:
-      - name: compile_test_parallel_core_stream_TG
-      - name: generate_buildid_to_debug_symbols_mapping
-      - name: .search_community_mongotmock
-      - name: .search_community_e2e_tests
-
   ###############################################
   # Temporary variants for v5 toolchain rollout #
   ###############################################
@@ -734,8 +702,6 @@ buildvariants:
         --link-model=dynamic
         -j$(grep -c ^processor /proc/cpuinfo)
     tasks:
-      - name: search_end_to_end_sharded_cluster
-      - name: search_end_to_end_single_node
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
@@ -777,6 +743,10 @@ buildvariants:
         --excludeWithAnyTags=tsan_incompatible
         --runAllFeatureFlagTests
     tasks:
+      - name: search_end_to_end_sharded_cluster
+      - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
@@ -924,6 +894,8 @@ buildvariants:
     tasks:
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:

@@ -39,8 +39,12 @@ buildvariants:
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
+      - name: search_community
+      - name: search_community_ssl
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
@@ -101,9 +105,13 @@ buildvariants:
       - name: set_downstream_expansions_for_mongot
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
+      - name: search_community
+      - name: search_community_ssl
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
@@ -158,8 +166,12 @@ buildvariants:
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_auth
+      - name: search_community
+      - name: search_community_ssl
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
@@ -218,9 +230,13 @@ buildvariants:
       - name: set_downstream_expansions_for_mongot
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
+      - name: search_community
+      - name: search_community_ssl
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
@@ -266,55 +282,5 @@ buildvariants:
           - rhel8.8-large
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
-
-  # The below variants test the search in community architecture with gRPC.
-  # TODO SERVER-99592: remove these separate build variants for gRPC.
-  - name: &al2023-arm64-search-with-grpc al2023-arm64-search-with-grpc
-    display_name: "~ AL2023.3 arm64 Enterprise Search in Community with GRPC"
-    tags: []
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-    stepback: false
-    run_on:
-      - amazon2023.3-arm64-large
-    expansions:
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      has_packages: false
-      evergreen_remote_exec: on
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      compile_variant: *al2023-arm64-search-with-grpc
-      build_mongot: true
-    tasks:
-      - name: compile_test_parallel_core_stream_TG
-      - name: generate_buildid_to_debug_symbols_mapping
-      - name: .search_community_mongotmock
-      - name: .search_community_e2e_tests
-
-  - name: &al2023-x86-search-with-grpc al2023-x86-search-with-grpc
-    display_name: "~ AL2023.3 x86 Enterprise Search in Community with GRPC"
-    tags: []
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-    stepback: false
-    run_on:
-      - amazon2023.3-large
-    expansions:
-      scons_cache_scope: shared
-      scons_cache_mode: all
-      evergreen_remote_exec: on
-      has_packages: false
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      compile_variant: *al2023-x86-search-with-grpc
-      build_mongot: true
-    tasks:
-      - name: compile_test_parallel_core_stream_TG
-      - name: generate_buildid_to_debug_symbols_mapping
-      - name: .search_community_mongotmock
-      - name: .search_community_e2e_tests
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node

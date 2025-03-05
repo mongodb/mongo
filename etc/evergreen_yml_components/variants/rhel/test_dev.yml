@@ -310,6 +310,8 @@ buildvariants:
       - name: retryable_writes_jscore_stepdown_passthrough_gen
       - name: sasl
       - name: search
+      - name: search_community
+      - name: search_community_ssl
       - name: search_auth
       - name: search_no_pinned_connections_auth
       - name: search_ssl

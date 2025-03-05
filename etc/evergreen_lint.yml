@@ -154,6 +154,8 @@ rules:
             # TODO: remove this exception when SERVER-94576 is resolved
             "search_end_to_end_sharded_cluster",
             "search_end_to_end_single_node",
+            "search_community_end_to_end_sharded_cluster",
+            "search_community_end_to_end_single_node",
             # TODO: remove this exception when SERVER-94572 is resolved
             "streams_kafka",
             "streams_kafka_gwproxy",

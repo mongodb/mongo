@@ -309,6 +309,8 @@ buildvariants:
     tasks:
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
@@ -364,7 +366,10 @@ buildvariants:
       - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - rhel8.8-large
-      - name: .search_e2e_tests
+      - name: search_end_to_end_sharded_cluster
+      - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-experimental
@@ -473,8 +478,6 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel8-debug-tsan-expansions-template
     tasks:
-      - name: search_end_to_end_sharded_cluster
-      - name: search_end_to_end_single_node
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
@@ -507,6 +510,10 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --excludeWithAnyTags=tsan_incompatible
     tasks:
+      - name: search_end_to_end_sharded_cluster
+      - name: search_end_to_end_single_node
+      - name: search_community_end_to_end_sharded_cluster
+      - name: search_community_end_to_end_single_node
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
