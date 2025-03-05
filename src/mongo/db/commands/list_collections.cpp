@@ -247,12 +247,20 @@ BSONObj buildCollectionBson(OperationContext* opCtx, const Collection* collectio
     if (!collection) {
         return {};
     }
-    auto nss = collection->ns();
-    auto collectionName = nss.coll();
+    const auto& nss = collection->ns();
 
     BSONObjBuilder b;
-    b.append("name", collectionName);
-    b.append("type", "collection");
+    b.append("name", nss.coll());
+
+    const auto collectionType = [&] {
+        if (collection->isTimeseriesCollection() && collection->isNewTimeseriesWithoutView()) {
+            return "timeseries";
+        } else {
+            return "collection";
+        }
+    }();
+
+    b.append("type", collectionType);
 
     if (nameOnly) {
         return b.obj();
@@ -409,6 +417,8 @@ public:
 
                                 std::shared_ptr<const ViewDefinition> view =
                                     catalog->lookupView(opCtx, nss);
+                                // TODO SERVER-101594: remove this once 9.0 becomes last LTS
+                                // legacy timeseries view won't exist anymore.
                                 if (view && view->timeseries()) {
                                     if (auto bucketsCollection =
                                             catalog->establishConsistentCollection(
@@ -432,7 +442,10 @@ public:
                         }
                     } else {
                         auto perCollectionWork = [&](const Collection* collection) {
-                            if (collection->getTimeseriesOptions()) {
+                            // TODO SERVER-101594: remove this once 9.0 becomes last LTS
+                            // buckets collection ('system.buckets') won't exists anymore.
+                            if (collection->isTimeseriesCollection() &&
+                                !collection->isNewTimeseriesWithoutView()) {
                                 auto viewNss = collection->ns().getTimeseriesViewNamespace();
                                 auto view =
                                     catalog->lookupViewWithoutValidatingDurable(opCtx, viewNss);
@@ -486,6 +499,8 @@ public:
                                 return true;
                             }
 
+                            // TODO SERVER-101594: remove once 9.0 becomes last LTS
+                            // legacy timeseries view won't exist anymore.
                             if (view.timeseries()) {
                                 if (!catalog->lookupCollectionByNamespace(opCtx, view.viewOn())) {
                                     // There is no buckets collection backing this time-series view,

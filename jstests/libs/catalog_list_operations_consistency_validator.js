@@ -48,7 +48,10 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
         ...nsRest
     } = listCatalogEntry;
 
-    if (nsType === 'collection') {
+    // TODO SERVER-101594 remove the viewOn condition once 9.0 becomes lastLTS
+    // Once only viewless timeseries collection exists we won't possibly have
+    // collection that have both "type=timeseries" and the viewOn property.
+    if (nsType === 'collection' || (nsType === 'timeseries' && !('viewOn' in nsRest))) {
         const {
             md: collMd,
             // Ident information can be safely thrown away.
@@ -124,6 +127,9 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
             info: {readOnly: true},
         };
     } else if (nsType === 'timeseries') {
+        // TODO SERVER-101594 remove once 9.0 becomes lastLTS
+        // Once only viewless timeseries collection exists,
+        // we can process timeseries collection and normal collection with the same code.
         const {
             _id: _ts1,
             viewOn: tsViewOn,

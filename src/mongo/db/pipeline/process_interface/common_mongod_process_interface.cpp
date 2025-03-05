@@ -223,7 +223,16 @@ void listDurableCatalog(OperationContext* opCtx,
             systemViewsNamespaces->push_back(ns);
         }
 
-        docs->push_back(createCommonNsFields(shardName, ns, obj).obj());
+        auto type = [&] {
+            // TODO SERVER-101594 remove `isTimeseriesBucketsCollection()` after 9.0 becomes lastLTS
+            // By then we will not have system buckets timeseries anymore,
+            // thus we can always return "timeseries" if the collection has timeseries options
+            if (obj["md"]["options"]["timeseries"].ok() && !ns.isTimeseriesBucketsCollection()) {
+                return "timeseries"_sd;
+            }
+            return "collection"_sd;
+        }();
+        docs->push_back(createCommonNsFields(shardName, ns, obj, type).obj());
     }
 }
 
@@ -355,6 +364,8 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
                     getShardName(opCtx),
                     ns,
                     obj,
+                    // TODO SERVER-101594 stop passing type once 9.0 becomes lastLTS.
+                    // By then we will not have anymore views for timeseries collection.
                     viewOnNs.isTimeseriesBucketsCollection() ? "timeseries" : "view");
                 builder.appendAs(obj["_id"], "ns");
                 docs.push_back(builder.obj());
