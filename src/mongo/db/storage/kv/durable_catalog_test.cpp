@@ -142,11 +142,9 @@ public:
 
         WriteUnitOfWork wuow(operationContext());
 
-        const bool allocateDefaultSpace = true;
         options.uuid = UUID::gen();
 
-        auto swColl =
-            getCatalog()->createCollection(operationContext(), nss, options, allocateDefaultSpace);
+        auto swColl = getCatalog()->createCollection(operationContext(), nss, options);
         ASSERT_OK(swColl.getStatus());
 
         std::pair<RecordId, std::unique_ptr<RecordStore>> coll = std::move(swColl.getValue());
@@ -255,8 +253,7 @@ protected:
         WriteUnitOfWork wuow{operationContext()};
 
         auto catalogId =
-            unittest::assertGet(getCatalog()->createCollection(operationContext(), nss, {}, true))
-                .first;
+            unittest::assertGet(getCatalog()->createCollection(operationContext(), nss, {})).first;
         ident = getCatalog()->getEntry(catalogId).ident;
 
         IndexDescriptor descriptor{"",

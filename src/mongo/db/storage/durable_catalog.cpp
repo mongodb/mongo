@@ -573,10 +573,7 @@ StatusWith<std::string> DurableCatalog::newOrphanedIdent(OperationContext* opCtx
 }
 
 StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::createCollection(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const CollectionOptions& options,
-    bool allocateDefaultSpace) {
+    OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
     invariant(nss.coll().size() > 0);
 

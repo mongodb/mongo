@@ -214,10 +214,7 @@ public:
      * in addition to ownership of the new RecordStore.
      */
     StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const CollectionOptions& options,
-        bool allocateDefaultSpace);
+        OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options);
 
     Status createIndex(OperationContext* opCtx,
                        const RecordId& catalogId,

@@ -740,8 +740,8 @@ Collection* DatabaseImpl::_createCollection(
 
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
-                uassertStatusOK(storageEngine->getCatalog()->createCollection(
-                    opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
+                uassertStatusOK(
+                    storageEngine->getCatalog()->createCollection(opCtx, nss, optionsWithUUID));
             auto& catalogId = catalogIdRecordStorePair.first;
 
             auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);

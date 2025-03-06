@@ -71,7 +71,7 @@ public:
         {
             WriteUnitOfWork wuow(opCtx);
             std::tie(catalogId, rs) = unittest::assertGet(
-                _storageEngine->getCatalog()->createCollection(opCtx, ns, options, true));
+                _storageEngine->getCatalog()->createCollection(opCtx, ns, options));
             wuow.commit();
         }
         std::shared_ptr<Collection> coll = std::make_shared<CollectionImpl>(
