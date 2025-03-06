@@ -32,6 +32,8 @@
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
 #include <boost/none.hpp>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <iterator>
 
 #include <boost/move/utility_core.hpp>
@@ -196,7 +198,9 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
     return expCtx;
 }
 
-std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
+namespace {
+
+std::vector<AsyncRequestsSender::Request> buildShardVersionedRequests(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
@@ -204,14 +208,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
     const BSONObj& cmdObj,
     bool eligibleForSampling) {
     const auto& cm = cri.cm;
-    auto cmdObjWithDbVersion = cmdObj;
-    bool needShardVersion = cm.hasRoutingTable();
-    if (!needShardVersion) {
-        cmdObjWithDbVersion = !cm.dbVersion().isFixed()
-            ? appendShardVersion(cmdObjWithDbVersion, ShardVersion::UNSHARDED())
-            : cmdObjWithDbVersion;
-        cmdObjWithDbVersion = appendDbVersionIfPresent(cmdObjWithDbVersion, cm.dbVersion());
-    }
+    tassert(10162100, "Expected to find a routing table", cm.hasRoutingTable());
 
     std::vector<AsyncRequestsSender::Request> requests;
     requests.reserve(shardIds.size());
@@ -223,17 +220,106 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
                                                          shardIds)
         : boost::none;
 
-    for (const ShardId& shardId : shardIds) {
-        auto shardCmdObj = needShardVersion
-            ? appendShardVersion(cmdObjWithDbVersion, cri.getShardVersion(shardId))
-            : cmdObjWithDbVersion;
-        if (targetedSampleId && targetedSampleId->isFor(shardId)) {
-            shardCmdObj = analyze_shard_key::appendSampleId(shardCmdObj, targetedSampleId->getId());
+    auto appendSampleId = [&](const BSONObj& command, const ShardId& shardId) -> BSONObj {
+        if (!targetedSampleId || !targetedSampleId->isFor(shardId)) {
+            return command;
         }
-        requests.emplace_back(shardId, std::move(shardCmdObj));
+        return analyze_shard_key::appendSampleId(command, targetedSampleId->getId());
+    };
+
+    if (cm.hasRoutingTable()) {
+        for (const auto& shardId : shardIds) {
+            BSONObj versionedCmd = appendShardVersion(cmdObj, cri.getShardVersion(shardId));
+            versionedCmd = appendSampleId(versionedCmd, shardId);
+            requests.emplace_back(shardId, std::move(versionedCmd));
+        }
     }
 
     return requests;
+}
+
+AsyncRequestsSender::Request buildDatabaseVersionedRequest(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const CollectionRoutingInfo& cri,
+    const ShardId& shardId,
+    const BSONObj& cmdObj,
+    bool eligibleForSampling) {
+    const auto& cm = cri.cm;
+    tassert(10162101, "Expected to not find a routing table", !cm.hasRoutingTable());
+
+    if (cm.dbVersion().isFixed()) {
+        // In case the database is fixed (e.g. 'admin' or 'config'), ignore the routing information
+        // and create a request to the given targetted shard.
+        return {shardId, cmdObj};
+    }
+
+    if (shardId != cm.dbPrimary()) {
+        // TODO (SERVER-101687): There are several places that call this API with a database version
+        // that does not match the targeted shard. This is an abuse of the database version
+        // protocol, and we should inspect each case and either use the correct routing information
+        // or not version the command.
+        return {shardId, cmdObj};
+    }
+
+    tassert(
+        10162102,
+        fmt::format("Expected exactly one shard matching the database primary shard when no shard "
+                    "version is required. Found shard: {}, expected: {}, for namespace: {}.",
+                    shardId.toString(),
+                    cm.dbPrimary().toString(),
+                    nss.toStringForErrorMsg()),
+        shardId == cm.dbPrimary());
+
+    BSONObj versionedCmd = appendShardVersion(cmdObj, ShardVersion::UNSHARDED());
+    versionedCmd = appendDbVersionIfPresent(versionedCmd, cm.dbVersion());
+
+    const auto targetedSampleId = eligibleForSampling
+        ? analyze_shard_key::tryGenerateTargetedSampleId(expCtx->getOperationContext(),
+                                                         nss,
+                                                         cmdObj.firstElementFieldNameStringData(),
+                                                         {shardId})
+        : boost::none;
+
+    if (targetedSampleId && targetedSampleId->isFor(shardId)) {
+        versionedCmd = analyze_shard_key::appendSampleId(versionedCmd, targetedSampleId->getId());
+    }
+
+    return {shardId, std::move(versionedCmd)};
+}
+}  // namespace
+
+std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const CollectionRoutingInfo& cri,
+    const std::set<ShardId>& shardIds,
+    const BSONObj& cmdObj,
+    bool eligibleForSampling) {
+    const auto& cm = cri.cm;
+    if (cm.hasRoutingTable()) {
+        return buildShardVersionedRequests(expCtx, nss, cri, shardIds, cmdObj, eligibleForSampling);
+    }
+
+    tassert(
+        10162103,
+        [&]() {
+            std::vector<std::string> shardsStr;
+            std::transform(shardIds.begin(),
+                           shardIds.end(),
+                           std::back_inserter(shardsStr),
+                           [](const auto& shard) { return shard.toString(); });
+
+            return fmt::format(
+                "Expected exactly one shard. Found shardIds: [{}] for namespace: {}.",
+                fmt::join(shardsStr, ", "),
+                nss.toStringForErrorMsg());
+        }(),
+        shardIds.size() == 1);
+
+    auto request = buildDatabaseVersionedRequest(
+        expCtx, nss, cri, *shardIds.begin(), cmdObj, eligibleForSampling);
+    return {std::move(request)};
 }
 
 namespace {
