@@ -27,64 +27,19 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
-#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/strong_alias.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
-#include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
-#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
-#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::stage_builder::abt {
 namespace {
 
-using namespace unit_test_abt_literals;
 using namespace optimizer;
 
 class AbtToSbeExpression : public sbe::EExpressionTestFixture {
 public:
-    ABT constFold(ABT tree) {
-        stage_builder::ExpressionConstEval{nullptr /* collator */}.optimize(tree);
-        return tree;
-    }
-
     // Helper that lowers and compiles an ABT expression and returns the evaluated result.
     // If the expression contains a variable, it will be bound to a slot along with its definition
     // before lowering.
@@ -379,120 +334,6 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
     checkCmp3w("ABC", "abc", 0);
     checkCmp3w("aCC", "abb", 1);
     checkCmp3w("AbX", "aBy", -1);
-}
-
-// The following nullability tests verify that ExpressionConstEval, which performs rewrites and
-// simplifications based on the nullability value of expressions, does not change the result of the
-// evaluation of And and Or. eval(E) == eval(ExpressionConstEval(E))
-
-TEST_F(AbtToSbeExpression, NonNullableLhsOrTrueConstFold) {
-    // E = non-nullable lhs (resolvable variable) || true
-    // eval(E) == eval(ExpressionConstEval(E))
-    auto tree = _binary("Or", _binary("Gt", "x"_var, "5"_cint32), _cbool(true))._n;
-    auto treeConstFold = constFold(tree);
-
-    auto var =
-        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
-
-    auto res = evalExpr(tree, var);
-    auto resConstFold = evalExpr(treeConstFold, var);
-
-    assertEqualValues(res, resConstFold);
-}
-
-TEST_F(AbtToSbeExpression, NonNullableLhsOrFalseConstFold) {
-    // E = non-nullable lhs (resolvable variable) || false
-    // eval(E) == eval(ExpressionConstEval(E))
-    auto tree = _binary("Or", _binary("Gt", "x"_var, "5"_cint32), _cbool(false))._n;
-    auto treeConstFold = constFold(tree);
-
-    auto var =
-        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
-
-    auto res = evalExpr(tree, var);
-    auto resConstFold = evalExpr(treeConstFold, var);
-
-    assertEqualValues(res, resConstFold);
-}
-
-TEST_F(AbtToSbeExpression, NullableLhsOrTrueConstFold) {
-    // E = nullable lhs (Nothing) || true
-    // eval(E) == eval(ExpressionConstEval(E))
-    auto tree = _binary("Or", _cnothing(), _cbool(true))._n;
-    auto treeConstFold = constFold(tree);
-
-    auto var = boost::none;
-    auto res = evalExpr(tree, var);
-    auto resConstFold = evalExpr(treeConstFold, var);
-
-    assertEqualValues(res, resConstFold);
-}
-
-TEST_F(AbtToSbeExpression, NullableLhsOrFalseConstFold) {
-    // E = nullable lhs (Nothing) || false
-    // eval(E) == eval(ExpressionConstEval(E))
-    auto tree = _binary("Or", _cnothing(), _cbool(false))._n;
-    auto treeConstFold = constFold(tree);
-
-    auto var = boost::none;
-    auto res = evalExpr(tree, var);
-    auto resConstFold = evalExpr(treeConstFold, var);
-
-    assertEqualValues(res, resConstFold);
-}
-
-TEST_F(AbtToSbeExpression, NonNullableLhsAndFalseConstFold) {
-    // E = non-nullable lhs (resolvable variable) && false
-    // eval(E) == eval(ExpressionConstEval(E))
-    auto tree = _binary("And", _binary("Gt", "x"_var, "5"_cint32), _cbool(false))._n;
-    auto treeConstFold = constFold(tree);
-
-    auto var =
-        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
-    auto res = evalExpr(tree, var);
-    auto resConstFold = evalExpr(treeConstFold, var);
-
-    assertEqualValues(res, resConstFold);
-}
-
-TEST_F(AbtToSbeExpression, NonNullableLhsAndTrueConstFold) {
-    // E = non-nullable lhs (resolvable variable) && true
-    // eval(E) == eval(ExpressionConstEval(E))
-    auto tree = _binary("And", _binary("Gt", "x"_var, "5"_cint32), _cbool(true))._n;
-    auto treeConstFold = constFold(tree);
-
-    auto var =
-        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
-    auto res = evalExpr(tree, var);
-    auto resConstFold = evalExpr(treeConstFold, var);
-
-    assertEqualValues(res, resConstFold);
-}
-
-TEST_F(AbtToSbeExpression, NullableLhsAndFalseConstFold) {
-    // E = nullable lhs (Nothing) && false
-    // eval(E) == eval(ExpressionConstEval(E))
-    auto tree = _binary("And", _cnothing(), _cbool(false))._n;
-    auto treeConstFold = constFold(tree);
-
-    auto var = boost::none;
-    auto res = evalExpr(tree, var);
-    auto resConstFold = evalExpr(treeConstFold, var);
-
-    assertEqualValues(res, resConstFold);
-}
-
-TEST_F(AbtToSbeExpression, NullableLhsAndTrueConstFold) {
-    // E = nullable lhs (Nothing) && true
-    // eval(E) == eval(ExpressionConstEval(E))
-    auto tree = _binary("And", _cnothing(), _cbool(true))._n;
-    auto treeConstFold = constFold(tree);
-
-    auto var = boost::none;
-    auto res = evalExpr(tree, var);
-    auto resConstFold = evalExpr(treeConstFold, var);
-
-    assertEqualValues(res, resConstFold);
 }
 }  // namespace
 }  // namespace mongo::stage_builder::abt

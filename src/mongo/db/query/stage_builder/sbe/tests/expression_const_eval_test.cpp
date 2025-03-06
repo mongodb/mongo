@@ -32,12 +32,17 @@
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::stage_builder {
@@ -45,6 +50,52 @@ namespace {
 
 using namespace optimizer;
 using namespace abt::unit_test_abt_literals;
+using namespace mongo::stage_builder::abt;
+
+class AbtToSbeExpression : public sbe::EExpressionTestFixture {
+public:
+    ABT constFold(ABT tree) {
+        stage_builder::ExpressionConstEval{nullptr /* collator */}.optimize(tree);
+        return tree;
+    }
+
+    // Helper that lowers and compiles an ABT expression and returns the evaluated result.
+    // If the expression contains a variable, it will be bound to a slot along with its
+    // definition before lowering.
+    std::pair<sbe::value::TypeTags, sbe::value::Value> evalExpr(
+        const ABT& tree,
+        boost::optional<
+            std::pair<ProjectionName, std::pair<sbe::value::TypeTags, sbe::value::Value>>> var) {
+        auto env = VariableEnvironment::build(tree);
+
+        SlotVarMap map;
+        sbe::value::OwnedValueAccessor accessor;
+        auto slotId = bindAccessor(&accessor);
+        if (var) {
+            auto& projName = var.get().first;
+            map[projName] = slotId;
+
+            auto [tag, val] = var.get().second;
+            accessor.reset(tag, val);
+        }
+
+        sbe::InputParamToSlotMap inputParamToSlotMap;
+        auto expr =
+            SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+                .optimize(tree);
+
+        auto compiledExpr = compileExpression(*expr);
+        return runCompiledExpression(compiledExpr.get());
+    }
+
+    void assertEqualValues(std::pair<sbe::value::TypeTags, sbe::value::Value> res,
+                           std::pair<sbe::value::TypeTags, sbe::value::Value> resConstFold) {
+        auto [tag, val] = sbe::value::compareValue(
+            res.first, res.second, resConstFold.first, resConstFold.second);
+        ASSERT_EQ(tag, sbe::value::TypeTags::NumberInt32);
+        ASSERT_EQ(val, 0);
+    }
+};
 
 Constant* constEval(ABT& tree, const CollatorInterface* collator = nullptr) {
     ExpressionConstEval evaluator{collator};
@@ -312,6 +363,120 @@ TEST(Optimizer, ConstFoldIf2) {
         "|   Variable [z]\n"
         "Variable [x]\n",
         tree);
+}
+
+// The following nullability tests verify that ExpressionConstEval, which performs rewrites and
+// simplifications based on the nullability value of expressions, does not change the result of
+// the evaluation of And and Or. eval(E) == eval(ExpressionConstEval(E))
+
+TEST_F(AbtToSbeExpression, NonNullableLhsOrTrueConstFold) {
+    // E = non-nullable lhs (resolvable variable) || true
+    // eval(E) == eval(ExpressionConstEval(E))
+    auto tree = _binary("Or", _binary("Gt", "x"_var, "5"_cint32), _cbool(true))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var =
+        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(AbtToSbeExpression, NonNullableLhsOrFalseConstFold) {
+    // E = non-nullable lhs (resolvable variable) || false
+    // eval(E) == eval(ExpressionConstEval(E))
+    auto tree = _binary("Or", _binary("Gt", "x"_var, "5"_cint32), _cbool(false))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var =
+        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(AbtToSbeExpression, NullableLhsOrTrueConstFold) {
+    // E = nullable lhs (Nothing) || true
+    // eval(E) == eval(ExpressionConstEval(E))
+    auto tree = _binary("Or", _cnothing(), _cbool(true))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var = boost::none;
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(AbtToSbeExpression, NullableLhsOrFalseConstFold) {
+    // E = nullable lhs (Nothing) || false
+    // eval(E) == eval(ExpressionConstEval(E))
+    auto tree = _binary("Or", _cnothing(), _cbool(false))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var = boost::none;
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(AbtToSbeExpression, NonNullableLhsAndFalseConstFold) {
+    // E = non-nullable lhs (resolvable variable) && false
+    // eval(E) == eval(ExpressionConstEval(E))
+    auto tree = _binary("And", _binary("Gt", "x"_var, "5"_cint32), _cbool(false))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var =
+        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(AbtToSbeExpression, NonNullableLhsAndTrueConstFold) {
+    // E = non-nullable lhs (resolvable variable) && true
+    // eval(E) == eval(ExpressionConstEval(E))
+    auto tree = _binary("And", _binary("Gt", "x"_var, "5"_cint32), _cbool(true))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var =
+        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(AbtToSbeExpression, NullableLhsAndFalseConstFold) {
+    // E = nullable lhs (Nothing) && false
+    // eval(E) == eval(ExpressionConstEval(E))
+    auto tree = _binary("And", _cnothing(), _cbool(false))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var = boost::none;
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(AbtToSbeExpression, NullableLhsAndTrueConstFold) {
+    // E = nullable lhs (Nothing) && true
+    // eval(E) == eval(ExpressionConstEval(E))
+    auto tree = _binary("And", _cnothing(), _cbool(true))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var = boost::none;
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
 }
 
 }  // namespace

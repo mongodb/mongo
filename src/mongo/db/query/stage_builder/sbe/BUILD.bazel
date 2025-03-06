@@ -61,13 +61,12 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe:sbe_unittest.h",
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_abt_test.cpp",
     ],
+    header_deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
-        ":abt_unit_test_utils",
         ":query_sbe_abt",
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
     ],
