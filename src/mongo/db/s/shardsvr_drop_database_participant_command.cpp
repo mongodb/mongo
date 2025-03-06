@@ -35,18 +35,14 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
@@ -74,10 +70,6 @@ public:
                "directly. Participates in droping a database.";
     }
 
-    bool supportsRetryableWrite() const final {
-        return true;
-    }
-
     using Request = ShardsvrDropDatabaseParticipant;
 
     class Invocation final : public InvocationBase {
@@ -91,43 +83,7 @@ public:
 
             const auto& dbName = request().getDbName();
             const bool fromMigrate = request().getFromMigrate();
-            if (TransactionParticipant::get(opCtx)) {
-                // Using the original operation context, the next operations to drop the database
-                // would use the same txnNumber, which would cause one of those to fail. A tactical
-                // solution is to use an alternative client as well as a new operation context.
 
-                // For the authoritative shards use the replay protection
-                auto newClient = opCtx->getServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("ShardsvrDropDatabaseParticipant");
-                AlternativeClientRegion acr(newClient);
-                auto cancelableOperationContext = CancelableOperationContext(
-                    cc().makeOperationContext(),
-                    opCtx->getCancellationToken(),
-                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
-                cancelableOperationContext->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-                _handleDropDatabase(cancelableOperationContext.get(), dbName, fromMigrate);
-
-                // Since no write that generated a retryable write oplog entry with this sessionId
-                // and txnNumber happened, we need to make a dummy write so that the session gets
-                // durably persisted on the oplog. This must be the last operation done on this
-                // command.
-                DBDirectClient dbClient(opCtx);
-                dbClient.update(NamespaceString::kServerConfigurationNamespace,
-                                BSON("_id" << Request::kCommandName),
-                                BSON("$inc" << BSON("count" << 1)),
-                                true /* upsert */,
-                                false /* multi */);
-            } else {
-                // For the non authoritative shards we do not care about replay protection
-                _handleDropDatabase(opCtx, dbName, fromMigrate);
-            }
-        }
-
-    private:
-        void _handleDropDatabase(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const bool& fromMigrate) {
             try {
                 uassertStatusOK(dropDatabase(opCtx, dbName, fromMigrate));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -139,6 +95,7 @@ public:
             }
         }
 
+    private:
         NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
