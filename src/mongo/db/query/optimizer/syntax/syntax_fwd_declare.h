@@ -45,6 +45,7 @@ class LambdaAbstraction;
 class LambdaApplication;
 class FunctionCall;
 class Source;
+class Switch;
 
 /**
  * Utility

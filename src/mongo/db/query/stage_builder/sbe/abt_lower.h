@@ -107,6 +107,8 @@ public:
                                                 std::unique_ptr<sbe::EExpression> cond,
                                                 std::unique_ptr<sbe::EExpression> thenBranch,
                                                 std::unique_ptr<sbe::EExpression> elseBranch);
+    std::unique_ptr<sbe::EExpression> transport(
+        const Switch& fn, std::vector<std::unique_ptr<sbe::EExpression>> args);
 
     void prepare(const Let& let);
     std::unique_ptr<sbe::EExpression> transport(const Let& let,

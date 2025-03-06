@@ -651,6 +651,163 @@ TEST(ValueLifetimeTest, ProcessIfOnMixedReferences) {
         tree2);
 }
 
+TEST(ValueLifetimeTest, ProcessSwitchOnReferences) {
+    // Both branches return references - no makeOwn expected
+    auto tree = make<Let>(
+        ProjectionName{"inputVar"},
+        make<FunctionCall>("newObj", makeSeq(Constant::str("a"), Constant::int32(9))),
+        make<Switch>(makeSeq(make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
+                             make<Variable>("inputVar"),
+                             make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
+                             make<Variable>("inputVar"),
+                             make<Variable>("inputVar"))));
+
+    ValueLifetime{}.validate(tree);
+
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"Let\", \n"
+        "    variable: \"inputVar\", \n"
+        "    bind: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"newObj\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"StringSmall\", \n"
+        "                value: \"a\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"NumberInt32\", \n"
+        "                value: 9\n"
+        "            }\n"
+        "        ]\n"
+        "    }, \n"
+        "    expression: {\n"
+        "        nodeType: \"Switch\", \n"
+        "        condition0: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"exists\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"inputVar\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        then0: {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }, \n"
+        "        condition1: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"exists\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"inputVar\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        then1: {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }, \n"
+        "        else: {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    }\n"
+        "}\n",
+        tree);
+}
+
+TEST(ValueLifetimeTest, ProcessSwitchOnMixedReferences) {
+    // One branch return reference, the other a constant - makeOwn expected
+    auto tree1 = make<Let>(
+        ProjectionName{"inputVar"},
+        make<FunctionCall>("newObj", makeSeq(Constant::str("a"), Constant::int32(9))),
+        make<Switch>(makeSeq(make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
+                             make<Variable>("inputVar"),
+                             make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
+                             make<Variable>("inputVar"),
+                             Constant::null())));
+
+    ValueLifetime{}.validate(tree1);
+
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"Let\", \n"
+        "    variable: \"inputVar\", \n"
+        "    bind: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"newObj\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"StringSmall\", \n"
+        "                value: \"a\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"NumberInt32\", \n"
+        "                value: 9\n"
+        "            }\n"
+        "        ]\n"
+        "    }, \n"
+        "    expression: {\n"
+        "        nodeType: \"Switch\", \n"
+        "        condition0: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"exists\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"inputVar\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        then0: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"makeOwn\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"inputVar\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        condition1: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"exists\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"inputVar\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        then1: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"makeOwn\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"inputVar\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        else: {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"Null\", \n"
+        "            value: null\n"
+        "        }\n"
+        "    }\n"
+        "}\n",
+        tree1);
+}
+
 TEST(ValueLifetimeTest, ProcessFillEmtpyOnReferences) {
     // Both branches return references - no makeOwn expected
     auto tree = make<Let>(

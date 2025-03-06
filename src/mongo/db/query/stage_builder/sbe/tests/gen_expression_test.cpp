@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
 #include <utility>
 #include <vector>
 
@@ -38,14 +36,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
-#include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::stage_builder {
@@ -66,6 +61,10 @@ public:
                  sbe::value::TypeTags expectedTag,
                  sbe::value::Value expectedVal,
                  StringData test) {
+        // TODO SERVER-100579 Remove this when feature flag is removed
+        RAIIServerParameterControllerForTest sbeUpgradeBinaryTreesFeatureFlag{
+            "featureFlagSbeUpgradeBinaryTrees", true};
+
         PlanStageSlots slots;
         auto sbExpr = generateExpression(*_state, expr, rootSlot, slots);
         GoldenSbeExprBuilderTestFixture::runTest(std::move(sbExpr), expectedTag, expectedVal, test);

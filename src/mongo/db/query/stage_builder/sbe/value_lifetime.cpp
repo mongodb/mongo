@@ -173,6 +173,33 @@ ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer:
     return ValueType::LocalValue;
 }
 
+ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer::Switch& op) {
+    std::vector<ValueType> branchTypes;
+    branchTypes.reserve(op.getNumBranches() + 1);
+    for (size_t i = 0; i < op.getNumBranches(); i++) {
+        op.getCondChild(i).visit(*this);
+        branchTypes.emplace_back(op.getThenChild(i).visit(*this));
+    }
+    branchTypes.emplace_back(op.getDefaultChild().visit(*this));
+
+    if (std::all_of(branchTypes.begin(), branchTypes.end(), [&](const ValueType& val) {
+            return val == branchTypes[0];
+        })) {
+        return branchTypes[0];
+    } else {
+        for (size_t i = 0; i < op.getNumBranches(); i++) {
+            if (branchTypes[i] == ValueType::Reference) {
+                wrapNode(op.getThenChild(i));
+            }
+        }
+        if (branchTypes.back() == ValueType::Reference) {
+            wrapNode(op.getDefaultChild());
+        }
+    }
+
+    return ValueType::LocalValue;
+}
+
 void ValueLifetime::wrapNode(optimizer::ABT& node) {
     optimizer::ABTVector arguments;
     arguments.push_back(std::exchange(node, optimizer::make<optimizer::Blackhole>()));

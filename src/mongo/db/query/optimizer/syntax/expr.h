@@ -285,6 +285,74 @@ public:
 };
 
 /**
+ * Branching operator with multiple condition expressions, one "then" expression for each
+ * condition, and a final "else" expression.
+ */
+class Switch final : public ABTOpDynamicArity<0>, public ExpressionSyntaxSort {
+    using Base = ABTOpDynamicArity<0>;
+
+public:
+    Switch(ABTVector exprs) : Base(std::move(exprs)) {
+        tassert(10130600,
+                "switch created with a wrong number of expressions",
+                nodes().size() > 1 && ((nodes().size() - 1) % 2) == 0);
+        for (auto&& expr : nodes()) {
+            assertExprSort(expr);
+        }
+    }
+
+    Switch(std::vector<std::pair<ABT, ABT>> branchExprs, ABT defaultExpr)
+        : Base(std::vector<ABT>()) {
+        tassert(10130601, "switch requires at least one condition", !branchExprs.empty());
+        nodes().reserve(branchExprs.size() * 2 + 1);
+        for (auto&& branch : branchExprs) {
+            assertExprSort(branch.first);
+            nodes().emplace_back(std::move(branch.first));
+            assertExprSort(branch.second);
+            nodes().emplace_back(std::move(branch.second));
+        }
+        assertExprSort(defaultExpr);
+        nodes().emplace_back(std::move(defaultExpr));
+    }
+
+    bool operator==(const Switch& other) const {
+        return nodes() == other.nodes();
+    }
+
+    size_t getNumBranches() const {
+        return (nodes().size() - 1) / 2;
+    }
+
+    const ABT& getCondChild(size_t idx) const {
+        tassert(10130602, "branch index out of bounds", idx < getNumBranches());
+        return nodes()[idx * 2];
+    }
+
+    ABT& getCondChild(size_t idx) {
+        tassert(10130603, "branch index out of bounds", idx < getNumBranches());
+        return nodes()[idx * 2];
+    }
+
+    const ABT& getThenChild(size_t idx) const {
+        tassert(10130604, "branch index out of bounds", idx < getNumBranches());
+        return nodes()[idx * 2 + 1];
+    }
+
+    ABT& getThenChild(size_t idx) {
+        tassert(10130605, "branch index out of bounds", idx < getNumBranches());
+        return nodes()[idx * 2 + 1];
+    }
+
+    const ABT& getDefaultChild() const {
+        return nodes().back();
+    }
+
+    ABT& getDefaultChild() {
+        return nodes().back();
+    }
+};
+
+/**
  * Defines a variable from one expression and a specified name which is available to be referenced
  * in a second expression.
  */

@@ -55,13 +55,12 @@ ExpressionFromAccumulator<AccumulatorStdDevSamp>
         if (typeMatch(l12.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l12.0) 
-            then 
+            if !(isNumber(l12.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l12.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprAccumulator
 ExpressionFromAccumulator<AccumulatorSum>

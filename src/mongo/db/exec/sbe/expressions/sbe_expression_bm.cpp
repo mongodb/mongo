@@ -95,7 +95,7 @@ public:
                              benchmark::State& benchmarkState,
                              const std::vector<Document>& documents) final {
         // TODO SERVER-100579 Remove this when feature flag is removed
-        RAIIServerParameterControllerForTest sbeUpgrageBinaryTreesFeatureFlag{
+        RAIIServerParameterControllerForTest sbeUpgradeBinaryTreesFeatureFlag{
             "featureFlagSbeUpgradeBinaryTrees", true};
 
         QueryTestServiceContext serviceContext;

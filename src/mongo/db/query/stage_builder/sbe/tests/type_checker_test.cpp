@@ -168,6 +168,43 @@ TEST(TypeCheckerTest, TypeCheckIf) {
     ASSERT(!TypeSignature::kNothingType.isSubset(sign));
 }
 
+TEST(TypeCheckerTest, TypeCheckSwitch1) {
+    // Single-case Switch is identical to an If
+    auto tree = make<Switch>(ABTVector{
+        make<BinaryOp>(Operations::And,
+                       make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
+                       make<FunctionCall>("isNumber", makeSeq(make<Variable>("inputVar")))),
+        make<BinaryOp>(Operations::Mult, Constant::int32(9), make<Variable>("inputVar")),
+        Constant::int32(0)});
+
+    TypeSignature sign = TypeChecker{}.typeCheck(tree);
+
+    ASSERT(!TypeSignature::kNothingType.isSubset(sign));
+}
+
+TEST(TypeCheckerTest, TypeCheckSwitch2) {
+    auto tree = make<Switch>(
+        ABTVector{make<FunctionCall>("isNumber", makeSeq(make<Variable>("inputVar"))),
+                  make<BinaryOp>(Operations::Mult, Constant::int32(9), make<Variable>("inputVar")),
+                  make<FunctionCall>("isDate", makeSeq(make<Variable>("inputVar"))),
+                  make<FunctionCall>("dateAdd",
+                                     makeSeq(make<Variable>("timezoneVar"),
+                                             make<Variable>("inputVar"),
+                                             Constant::str("hour"_sd),
+                                             Constant::int32(8),
+                                             Constant::str("UTC"_sd))),
+                  Constant::null()});
+
+    TypeSignature sign = TypeChecker{}.typeCheck(tree);
+
+    // The signature of a Switch is the union of all the possible branches, plus Nothing if it's a
+    // possible result of the test conditions.
+    ASSERT_EQ(sign.typesMask,
+              TypeSignature::kNothingType.include(TypeSignature::kNumericType.include(
+                  getTypeSignature(sbe::value::TypeTags::Date)
+                      .include(getTypeSignature(sbe::value::TypeTags::Null).typesMask))));
+}
+
 TEST(TypeCheckerTest, TypeCheckIsString) {
     // isString on an if() statement that would return a string in any case is always true.
     auto tree = make<FunctionCall>("isString",

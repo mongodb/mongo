@@ -59,17 +59,15 @@ ExpressionDateDiff
                 if (typeMatch(l21.0, 1088) ?: true) 
                 then null 
                 else 
-                    if isTimezone(s2, "America/New_York") 
-                    then 
-                        if typeMatch(l20.0, 131712) 
-                        then 
+                    if !(isTimezone(s2, "America/New_York")) 
+                    then fail(7157920, "$dateDiff parameter 'timezone' must be a valid timezone") 
+                    else 
+                        if !(typeMatch(l20.0, 131712)) 
+                        then fail(7157921, "$dateDiff parameter 'startDate' must be coercible to date") 
+                        else 
                             if typeMatch(l21.0, 131712) 
                             then dateDiff(s2, move(l20.0), move(l21.0), "week", "America/New_York") 
                             else fail(7157922, "$dateDiff parameter 'endDate' must be coercible to date") 
-                        
-                        else fail(7157921, "$dateDiff parameter 'startDate' must be coercible to date") 
-                    
-                    else fail(7157920, "$dateDiff parameter 'timezone' must be a valid timezone") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprDate
 ExpressionDateFromString

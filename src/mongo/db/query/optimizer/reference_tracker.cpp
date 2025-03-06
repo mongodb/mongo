@@ -435,6 +435,26 @@ struct LastRefsTransporter {
         return result;
     }
 
+    Result transport(const ABT& n, const Switch&, std::vector<Result> branchResults) {
+        Result result{};
+
+        // Only one of the 'then' or 'else' will be executed, so it's safe to union the last refs.
+        // Since the condition will be executed before either of the then/else, its last refs should
+        // be reset if there's a collision. We work backwards from the last condition to the first
+        // one.
+        size_t lastCond = branchResults.size() - 3;
+        unionLastRefs(result, branchResults[lastCond + 1]);
+        unionLastRefs(result, branchResults[lastCond + 2]);
+        mergeKeepLastRefs(result, branchResults[lastCond]);
+        while (lastCond >= 2) {
+            lastCond -= 2;
+            unionLastRefs(result, branchResults[lastCond + 1]);
+            mergeKeepLastRefs(result, branchResults[lastCond]);
+        }
+
+        return result;
+    }
+
     void collect(const ABT& n) {
         algebra::transport<true>(n, *this);
     }

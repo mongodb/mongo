@@ -30,11 +30,9 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <list>
 #include <utility>
 
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -106,6 +104,8 @@ public:
     TypeSignature operator()(optimizer::ABT& n, optimizer::FunctionCall& op, bool saveInference);
 
     TypeSignature operator()(optimizer::ABT& n, optimizer::If& op, bool saveInference);
+
+    TypeSignature operator()(optimizer::ABT& n, optimizer::Switch& op, bool saveInference);
 
     bool modified() const {
         return _changed;

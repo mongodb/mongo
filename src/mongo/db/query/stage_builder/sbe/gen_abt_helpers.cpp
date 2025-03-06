@@ -231,13 +231,19 @@ optimizer::ABT buildABTMultiBranchConditional(optimizer::ABT defaultCase) {
 
 optimizer::ABT buildABTMultiBranchConditionalFromCaseValuePairs(
     std::vector<ABTCaseValuePair> caseValuePairs, optimizer::ABT defaultValue) {
-    return std::accumulate(
-        std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.end())),
-        std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.begin())),
-        std::move(defaultValue),
-        [](auto&& expression, auto&& caseValuePair) {
-            return buildABTMultiBranchConditional(std::move(caseValuePair), std::move(expression));
-        });
+    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+        return std::accumulate(
+            std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.end())),
+            std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.begin())),
+            std::move(defaultValue),
+            [](auto&& expression, auto&& caseValuePair) {
+                return buildABTMultiBranchConditional(std::move(caseValuePair),
+                                                      std::move(expression));
+            });
+    } else {
+        return optimizer::make<optimizer::Switch>(std::move(caseValuePairs),
+                                                  std::move(defaultValue));
+    }
 }
 
 optimizer::ABT makeIfNullExpr(std::vector<optimizer::ABT> values,

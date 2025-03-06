@@ -84,6 +84,9 @@ public:
                    optimizer::ABT& cond,
                    optimizer::ABT& thenBranch,
                    optimizer::ABT& elseBranch);
+    void transport(optimizer::ABT& n,
+                   const optimizer::Switch& op,
+                   std::vector<optimizer::ABT>& args);
 
     void prepare(optimizer::ABT&, const optimizer::References& refs);
     void transport(optimizer::ABT& n,
@@ -91,7 +94,7 @@ public:
                    std::vector<optimizer::ABT>&);
 
     // The tree is passed in as NON-const reference as we will be updating it.
-    bool optimize(optimizer::ABT& n);
+    void optimize(optimizer::ABT& n);
 
 private:
     struct RefHash {

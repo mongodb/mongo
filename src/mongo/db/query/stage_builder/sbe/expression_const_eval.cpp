@@ -30,8 +30,6 @@
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 
 #include <cstdint>
-#include <memory>
-#include <string>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -39,15 +37,13 @@
 
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/util/assert_util.h"
 
-
 namespace mongo::stage_builder {
 using namespace std::string_literals;
-bool ExpressionConstEval::optimize(optimizer::ABT& n) {
+void ExpressionConstEval::optimize(optimizer::ABT& n) {
     invariant(_letRefs.empty());
     invariant(_singleRef.empty());
     invariant(!_inRefBlock);
@@ -64,9 +60,6 @@ bool ExpressionConstEval::optimize(optimizer::ABT& n) {
     invariant(_letRefs.empty());
 
     while (_changed) {
-        if (_singleRef.empty()) {
-            break;
-        }
         _changed = false;
         optimizer::algebra::transport<true>(n, *this);
     }
@@ -76,7 +69,6 @@ bool ExpressionConstEval::optimize(optimizer::ABT& n) {
 
     _staleDefs.clear();
     _staleABTs.clear();
-    return _changed;
 }
 
 void ExpressionConstEval::transport(optimizer::ABT& n, const optimizer::Variable& var) {
@@ -467,9 +459,9 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
     } else if (auto funct = cond.cast<optimizer::FunctionCall>(); funct &&
                funct->name() == "exists" && funct->nodes().size() == 1 &&
                funct->nodes()[0] == thenBranch && elseBranch.is<optimizer::Constant>()) {
-        // If the condition is an "exists" on an expression, the thenBranch is the same expression
-        // and the elseBranch is a constant, the node is actually a FillEmpty.
-        // Note that this is not true if the replacement value is an expression that can have side
+        // If the condition is an "exists" on an expression, the thenBranch is the same
+        // expression and the elseBranch is a constant, the node is actually a FillEmpty. Note
+        // that this is not true if the replacement value is an expression that can have side
         // effects, because FillEmpty has to evaluate both operands before deciding which one to
         // return: keeping the if(exists(..)) allows not to evaluate the elseBranch when the
         // condition returns true.
@@ -499,8 +491,63 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
                             optimizer::Operations::Not,
                             std::exchange(cond, optimizer::make<optimizer::Blackhole>())));
                 }
-                // "if (x) then true else true" and "if (x) then false else false" cannot be folded
-                // because we need to return Nothing if non-const 'x' is Nothing.
+                // "if (x) then true else true" and "if (x) then false else false" cannot be
+                // folded because we need to return Nothing if non-const 'x' is Nothing.
+            }
+        }
+    }
+}
+
+void ExpressionConstEval::transport(optimizer::ABT& n,
+                                    const optimizer::Switch& op,
+                                    std::vector<optimizer::ABT>& args) {
+    // Convert Switch into If if there is a single branch.
+    if (op.getNumBranches() == 1) {
+        swapAndUpdate(n,
+                      optimizer::make<optimizer::If>(
+                          std::exchange(args[0], optimizer::make<optimizer::Blackhole>()),
+                          std::exchange(args[1], optimizer::make<optimizer::Blackhole>()),
+                          std::exchange(args[2], optimizer::make<optimizer::Blackhole>())));
+    } else {
+        // If the condition is a boolean constant we can remove it from the branches.
+        for (size_t i = 0; i < args.size() - 1;) {
+            optimizer::ABT& cond = args[i];
+            if (auto condConst = cond.cast<optimizer::Constant>(); condConst) {
+                auto [condTag, condValue] = condConst->get();
+                if (condTag == sbe::value::TypeTags::Boolean &&
+                    sbe::value::bitcastTo<bool>(condValue)) {
+                    // if true -> remove this branch and the remaining ones, promote the
+                    // "thenBranch" to become the "defaultExpr".
+                    args.erase(std::next(args.begin(), i));
+                    args.erase(std::next(args.begin(), i + 1), args.end());
+                    _changed = true;
+                    continue;
+                } else if (condTag == sbe::value::TypeTags::Boolean &&
+                           !sbe::value::bitcastTo<bool>(condValue)) {
+                    // if false -> remove branch.
+                    args.erase(std::next(args.begin(), i), std::next(args.begin(), i + 2));
+                    _changed = true;
+                    continue;
+                }
+            }
+            i += 2;
+        }
+        // If we are left with no branches, replace the entire Switch with the default expression.
+        if (op.nodes().size() == 1) {
+            swapAndUpdate(n, std::exchange(args[0], optimizer::make<optimizer::Blackhole>()));
+        } else {
+            // Check if the last condition contains a Not that can be removed by swapping the
+            // branches.
+            auto& cond = args[args.size() - 3];
+            auto& thenBranch = args[args.size() - 2];
+            auto& elseBranch = args[args.size() - 1];
+            if (auto condNot = cond.cast<optimizer::UnaryOp>();
+                condNot && condNot->op() == optimizer::Operations::Not) {
+                // If the condition is a Not we can remove it and swap the branches.
+                swapAndUpdate(
+                    cond,
+                    std::exchange(condNot->get<0>(), optimizer::make<optimizer::Blackhole>()));
+                std::swap(thenBranch, elseBranch);
             }
         }
     }

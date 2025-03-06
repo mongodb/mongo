@@ -862,7 +862,6 @@ public:
         return printer;
     }
 
-
     ExplainPrinter transport(const ABT::reference_type /*n*/,
                              const If& expr,
                              ExplainPrinter condResult,
@@ -878,6 +877,25 @@ public:
             .print(thenResult)
             .fieldName("else", ExplainVersion::V3)
             .print(elseResult);
+        return printer;
+    }
+
+    ExplainPrinter transport(const ABT::reference_type /*n*/,
+                             const Switch& expr,
+                             std::vector<ExplainPrinter> argResults) {
+        ExplainPrinter printer("Switch");
+        printer.separator(" []").setChildCount(argResults.size()).maybeReverse();
+        for (size_t i = 0; i < expr.getNumBranches(); i++) {
+            std::stringstream ssCond;
+            ssCond << "condition" << i;
+            std::stringstream ssThen;
+            ssThen << "then" << i;
+            printer.fieldName(ssCond.str(), ExplainVersion::V3)
+                .print(argResults[i * 2])
+                .fieldName(ssThen.str(), ExplainVersion::V3)
+                .print(argResults[i * 2 + 1]);
+        }
+        printer.fieldName("else", ExplainVersion::V3).print(argResults.back());
         return printer;
     }
 

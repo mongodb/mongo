@@ -257,6 +257,19 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     return sbe::makeE<sbe::EIf>(std::move(cond), std::move(thenBranch), std::move(elseBranch));
 }
 
+std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
+    const Switch& fn, std::vector<std::unique_ptr<sbe::EExpression>> args) {
+    size_t lastCond = args.size() - 3;
+    auto expr = sbe::makeE<sbe::EIf>(
+        std::move(args[lastCond]), std::move(args[lastCond + 1]), std::move(args[lastCond + 2]));
+    while (lastCond >= 2) {
+        lastCond -= 2;
+        expr = sbe::makeE<sbe::EIf>(
+            std::move(args[lastCond]), std::move(args[lastCond + 1]), std::move(expr));
+    }
+    return expr;
+}
+
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
     return sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::fillEmpty,
                                         std::move(e),

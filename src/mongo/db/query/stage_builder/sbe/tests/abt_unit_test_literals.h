@@ -183,6 +183,37 @@ inline auto _if(ExprHolder condExpr, ExprHolder thenExpr, ExprHolder elseExpr) {
         make<If>(std::move(condExpr._n), std::move(thenExpr._n), std::move(elseExpr._n))};
 }
 
+inline auto _switch(ExprHolder condExpr, ExprHolder thenExpr, ExprHolder elseExpr) {
+    std::vector<std::pair<ABT, ABT>> conditions = {
+        std::make_pair(std::move(condExpr._n), std::move(thenExpr._n))};
+    return ExprHolder{make<Switch>(std::move(conditions), std::move(elseExpr._n))};
+}
+
+inline auto _switch(ExprHolder condExpr1,
+                    ExprHolder thenExpr1,
+                    ExprHolder condExpr2,
+                    ExprHolder thenExpr2,
+                    ExprHolder elseExpr) {
+    std::vector<std::pair<ABT, ABT>> conditions = {
+        std::make_pair(std::move(condExpr1._n), std::move(thenExpr1._n)),
+        std::make_pair(std::move(condExpr2._n), std::move(thenExpr2._n))};
+    return ExprHolder{make<Switch>(std::move(conditions), std::move(elseExpr._n))};
+}
+
+inline auto _switch(ExprHolder condExpr1,
+                    ExprHolder thenExpr1,
+                    ExprHolder condExpr2,
+                    ExprHolder thenExpr2,
+                    ExprHolder condExpr3,
+                    ExprHolder thenExpr3,
+                    ExprHolder elseExpr) {
+    std::vector<std::pair<ABT, ABT>> conditions = {
+        std::make_pair(std::move(condExpr1._n), std::move(thenExpr1._n)),
+        std::make_pair(std::move(condExpr2._n), std::move(thenExpr2._n)),
+        std::make_pair(std::move(condExpr3._n), std::move(thenExpr3._n))};
+    return ExprHolder{make<Switch>(std::move(conditions), std::move(elseExpr._n))};
+}
+
 inline auto _let(StringData pn, ExprHolder inBind, ExprHolder inExpr) {
     return ExprHolder{make<Let>(ProjectionName{pn}, std::move(inBind._n), std::move(inExpr._n))};
 }

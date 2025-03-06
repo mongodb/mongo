@@ -179,13 +179,12 @@ ExpressionCosine
         if (typeMatch(l34.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l34.0) 
-            then 
+            if !(isNumber(l34.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l34.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionSine
@@ -214,13 +213,12 @@ ExpressionSine
         if (typeMatch(l39.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l39.0) 
-            then 
+            if !(isNumber(l39.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l39.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionTangent
@@ -249,13 +247,12 @@ ExpressionTangent
         if (typeMatch(l44.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l44.0) 
-            then 
+            if !(isNumber(l44.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l44.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionArcCosine
@@ -284,13 +281,12 @@ ExpressionArcCosine
         if (typeMatch(l49.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l49.0) 
-            then 
+            if !(isNumber(l49.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l49.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionArcSine
@@ -319,13 +315,12 @@ ExpressionArcSine
         if (typeMatch(l54.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l54.0) 
-            then 
+            if !(isNumber(l54.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l54.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionArcTangent
@@ -347,13 +342,12 @@ ExpressionArcTangent
         if (typeMatch(l59.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l59.0) 
-            then 
+            if !(isNumber(l59.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l59.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionArcTangent2
@@ -379,13 +373,12 @@ ExpressionArcTangent2
         if (typeMatch(l65.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l65.0) 
-            then 
+            if !(isNumber(l65.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l65.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicArcTangent
@@ -414,13 +407,12 @@ ExpressionHyperbolicArcTangent
         if (typeMatch(l71.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l71.0) 
-            then 
+            if !(isNumber(l71.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l71.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicArcCosine
@@ -449,13 +441,12 @@ ExpressionHyperbolicArcCosine
         if (typeMatch(l76.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l76.0) 
-            then 
+            if !(isNumber(l76.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l76.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicArcSine
@@ -477,13 +468,12 @@ ExpressionHyperbolicArcSine
         if (typeMatch(l81.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l81.0) 
-            then 
+            if !(isNumber(l81.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l81.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicCosine
@@ -505,13 +495,12 @@ ExpressionHyperbolicCosine
         if (typeMatch(l86.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l86.0) 
-            then 
+            if !(isNumber(l86.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l86.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicSine
@@ -533,13 +522,12 @@ ExpressionHyperbolicSine
         if (typeMatch(l91.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l91.0) 
-            then 
+            if !(isNumber(l91.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l91.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicTangent
@@ -561,13 +549,12 @@ ExpressionHyperbolicTangent
         if (typeMatch(l96.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l96.0) 
-            then 
+            if !(isNumber(l96.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l96.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionDegreesToRadians
@@ -589,13 +576,12 @@ ExpressionDegreesToRadians
         if (typeMatch(l101.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l101.0) 
-            then 
+            if !(isNumber(l101.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((4 != trunc(4)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l101.0), 4) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionRadiansToDegrees
@@ -617,11 +603,10 @@ ExpressionRadiansToDegrees
         if (typeMatch(l106.0, 1088) ?: true) 
         then null 
         else 
-            if isNumber(l106.0) 
-            then 
+            if !(isNumber(l106.0)) 
+            then fail(5155300, "$trunc only supports numeric types") 
+            else 
                 if ((3 != trunc(3)) ?: true) 
                 then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
                 else trunc(move(l106.0), 3) 
-            
-            else fail(5155300, "$trunc only supports numeric types") 
 

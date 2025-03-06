@@ -82,6 +82,8 @@ public:
 
     ValueType operator()(optimizer::ABT& n, optimizer::If& op);
 
+    ValueType operator()(optimizer::ABT& n, optimizer::Switch& op);
+
     bool modified() const {
         return _changed;
     }

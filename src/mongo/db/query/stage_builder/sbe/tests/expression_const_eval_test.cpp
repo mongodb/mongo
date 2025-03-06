@@ -365,6 +365,121 @@ TEST(Optimizer, ConstFoldIf2) {
         tree);
 }
 
+TEST(Optimizer, ConstFoldSwitch) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _switch("x"_var, _cbool(true), _cbool(false))._n;
+    evaluator.optimize(tree);
+
+    // Simplify "switch (case x then true) else false" -> x.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldSwitch1) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _switch("x"_var, _cbool(false), _cbool(true))._n;
+    evaluator.optimize(tree);
+
+    // Simplify "switch (case x: then false) else true" -> NOT x.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "UnaryOp [Not]\n"
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldSwitch2) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _switch(_unary("Not", "x"_var), "y"_var, "z"_var)._n;
+    evaluator.optimize(tree);
+
+    // Simplify "switch (case not (x): then y) else z" -> "if (x) then z else y"
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "If []\n"
+        "|   |   Variable [y]\n"
+        "|   Variable [z]\n"
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldSwitch3) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _switch(_cbool(true), "q"_var, _unary("Not", "x"_var), "y"_var, "z"_var)._n;
+    evaluator.optimize(tree);
+
+    // Simplify "switch (case true: then q) (case not (x): then y) else z" -> "q"
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Variable [q]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldSwitch4) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _switch(_cbool(false), "q"_var, _unary("Not", "x"_var), "y"_var, "z"_var)._n;
+    evaluator.optimize(tree);
+
+    // Simplify "switch (case false: then q) (case not (x): then y) else z"
+    // -> "if (x) then z else y"
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "If []\n"
+        "|   |   Variable [y]\n"
+        "|   Variable [z]\n"
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldSwitch5) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _switch(_cbool(false),
+                        "impossible"_var,
+                        _unary("Not", "x"_var),
+                        "y"_var,
+                        _cbool(true),
+                        "q"_var,
+                        "z"_var)
+                    ._n;
+    evaluator.optimize(tree);
+
+    // Simplify "switch (case false: then impossible) (case not (x): then y) (case true: then q)
+    // else z"
+    // -> "if (x) then q else y"
+    // "q" takes the place of the "else" branch as it is always true
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "If []\n"
+        "|   |   Variable [y]\n"
+        "|   Variable [q]\n"
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldSwitch6) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _switch(_binary("Eq", "x"_var, "A"_cstr),
+                        "k"_var,
+                        _unary("Not", "x"_var),
+                        "y"_var,
+                        _cbool(false),
+                        "q"_var,
+                        "z"_var)
+                    ._n;
+    evaluator.optimize(tree);
+
+    // Simplify "switch (case x=A: then k) (case not (x): then y) (case false: then q)
+    // else z"
+    // -> "switch (case x=A: then k) (case x: then z) else y"
+    // the third branch is removed, and "z" takes the place of the "else" branch
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Switch []\n"
+        "|   |   |   |   Variable [y]\n"
+        "|   |   |   Variable [z]\n"
+        "|   |   Variable [x]\n"
+        "|   Variable [k]\n"
+        "BinaryOp [Eq]\n"
+        "|   Const [\"A\"]\n"
+        "Variable [x]\n",
+        tree);
+}
+
 // The following nullability tests verify that ExpressionConstEval, which performs rewrites and
 // simplifications based on the nullability value of expressions, does not change the result of
 // the evaluation of And and Or. eval(E) == eval(ExpressionConstEval(E))

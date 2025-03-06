@@ -32,7 +32,6 @@
 #include <list>
 
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
@@ -119,7 +118,16 @@ public:
 
     Tree operator()(const optimizer::ABT& n, const optimizer::If& op);
 
+    Tree operator()(const optimizer::ABT& n, const optimizer::Switch& op);
+
 private:
+    // Helper function that encapsules the logic to vectorize an If statement.
+    template <typename Cond, typename Then, typename Else>
+    Tree vectorizeCond(Cond condNode, Then thenNode, Else elseNode);
+
+    // Helper function that allows the recursive transformation of a Switch statement.
+    Tree vectorizeSwitchHelper(const optimizer::Switch& op, size_t branchIdx);
+
     // Ensure that the generated tree is representing a block of measures (i.e.
     // if it's a block expanded from a cell, fold it).
     void foldIfNecessary(Tree& tree, bool useFoldF = false);

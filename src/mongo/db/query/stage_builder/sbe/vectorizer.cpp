@@ -853,8 +853,9 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             body.sourceCell};
 }
 
-Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::If& op) {
-    auto test = op.getCondChild().visit(*this);
+template <typename Cond, typename Then, typename Else>
+Vectorizer::Tree Vectorizer::vectorizeCond(Cond condNode, Then thenNode, Else elseNode) {
+    auto test = condNode();
     if (!test.expr.has_value()) {
         return test;
     }
@@ -897,7 +898,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
         // The `then` side will use all the bitmaps seen so far AND the current bitmap.
         auto thenBranchBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
         _activeMasks.push_back(thenBranchBitmapVar);
-        auto thenBranch = op.getThenChild().visit(*this);
+        auto thenBranch = thenNode();
         _activeMasks.pop_back();
         if (!thenBranch.expr.has_value()) {
             return thenBranch;
@@ -913,7 +914,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
         // bitmap.
         auto elseBranchBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
         _activeMasks.push_back(elseBranchBitmapVar);
-        auto elseBranch = op.getElseChild().visit(*this);
+        auto elseBranch = elseNode();
         _activeMasks.pop_back();
         if (!elseBranch.expr.has_value()) {
             return elseBranch;
@@ -954,11 +955,11 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                 sameCell};
     } else {
         // Scalar test, keep it as it is.
-        auto thenBranch = op.getThenChild().visit(*this);
+        auto thenBranch = thenNode();
         if (!thenBranch.expr.has_value()) {
             return thenBranch;
         }
-        auto elseBranch = op.getElseChild().visit(*this);
+        auto elseBranch = elseNode();
         if (!elseBranch.expr.has_value()) {
             return elseBranch;
         }
@@ -1047,6 +1048,41 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             thenBranch.typeSignature.include(elseBranch.typeSignature),
             sameCell};
     }
+}
+
+Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::If& op) {
+    return vectorizeCond([&]() { return op.getCondChild().visit(*this); },
+                         [&]() { return op.getThenChild().visit(*this); },
+                         [&]() { return op.getElseChild().visit(*this); });
+}
+
+Vectorizer::Tree Vectorizer::vectorizeSwitchHelper(const optimizer::Switch& op, size_t branchIdx) {
+    return vectorizeCond([&]() { return op.getCondChild(branchIdx).visit(*this); },
+                         [&]() { return op.getThenChild(branchIdx).visit(*this); },
+                         [&]() {
+                             // When we need to process the last branch, break the recursion:
+                             // the "else" statement is just the final default statement.
+                             // Otherwise, the "else" statement is the next branch.
+                             return (branchIdx == op.getNumBranches() - 1)
+                                 ? op.getDefaultChild().visit(*this)
+                                 : vectorizeSwitchHelper(op, branchIdx + 1);
+                         });
+}
+
+Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::Switch& op) {
+    // A switch is syntactic sugar for if(cond0) then then0 else (if (cond1) then then1 else (...)).
+    // We process it using recursion so that we don't risk to generate a vectorized code that
+    // processes a branch on a value that has been guarded by a previous "if" branch.
+    //
+    // e.g.
+    // switch
+    //   case type(val) != number then fail("not a number")
+    //   case val == 0 then fail("division by zero")
+    //   default div(4, val)
+    //
+    // When processing a block { "string", 0, 89 } the branch performing the division should not
+    // attempt to process the first two values.
+    return vectorizeSwitchHelper(op, 0);
 }
 
 }  // namespace mongo::stage_builder

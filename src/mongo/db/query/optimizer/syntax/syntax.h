@@ -59,6 +59,7 @@ using ABT = algebra::PolyValue<Blackhole,
                                LambdaApplication,
                                FunctionCall,
                                Source,
+                               Switch,
                                References,  // utilities
                                ExpressionBinder>;
 

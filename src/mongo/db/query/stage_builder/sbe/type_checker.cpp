@@ -533,6 +533,30 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n, optimizer::If& op, bool
     return thenType.include(elseType).include(condType.intersect(TypeSignature::kNothingType));
 }
 
+TypeSignature TypeChecker::operator()(optimizer::ABT& n,
+                                      optimizer::Switch& op,
+                                      bool saveInference) {
+    TypeSignature globalType;
+    for (size_t i = 0; i < op.getNumBranches(); i++) {
+        // Define a new binding where the variables used inside the condition can be constrained by
+        // the assumption that the condition is either true or false.
+        enterLocalBinding();
+
+        TypeSignature condType = op.getCondChild(i).visit(*this, true);
+        TypeSignature thenType = op.getThenChild(i).visit(*this, false);
+
+        // Remove the binding associated with the condition being true.
+        exitLocalBinding();
+        // The signature of Switch is the mix of all branches, plus Nothing if the condition can
+        // produce it.
+        globalType =
+            globalType.include(thenType).include(condType.intersect(TypeSignature::kNothingType));
+    }
+
+    TypeSignature elseType = op.getDefaultChild().visit(*this, false);
+    return globalType.include(elseType);
+}
+
 void TypeChecker::swapAndUpdate(optimizer::ABT& n, optimizer::ABT newN) {
     // Do the swap.
     std::swap(n, newN);
