@@ -327,6 +327,15 @@ TEST_F(PlanCacheTest, ShouldNotCacheQueryTriviallyFalse) {
     assertShouldNotCacheQuery(*cq);
 }
 
+TEST_F(PlanCacheTest, ShouldNotCacheIfCachingDisabled) {
+    bool oldDisablePlanCache = internalQueryDisablePlanCache.load();
+    ON_BLOCK_EXIT(
+        [oldDisablePlanCache] { internalQueryDisablePlanCache.store(oldDisablePlanCache); });
+    internalQueryDisablePlanCache.store(true);
+    std::unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
+    assertShouldNotCacheQuery(*cq);
+}
+
 void addCacheEntryForShape(const CanonicalQuery& cq, PlanCache* planCache) {
     invariant(planCache);
     auto qs = getQuerySolutionForCaching();
@@ -2208,8 +2217,6 @@ protected:
                     staticSize + keyRepresentationSize + additionalCollectionSize);
     }
 
-private:
-    static const NamespaceString _nss;
 
     std::unique_ptr<CanonicalQuery> makeCQ(const BSONObj& query,
                                            const BSONObj& sort,
@@ -2248,6 +2255,8 @@ private:
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
+private:
+    static const NamespaceString _nss;
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
 
     ServiceContext::UniqueOperationContext _operationContext;
@@ -2268,5 +2277,21 @@ TEST_F(SbePlanCacheTest, SBEPlanCacheBudgetTest) {
         "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}", "{locale: 'mock_reverse_string'}");
 }
 
+TEST_F(SbePlanCacheTest, SBEPlanCacheKeyMakeAndCompare) {
+    std::unique_ptr<CanonicalQuery> cq1 = makeCQ("{a: 5}", "{}", "{_id: 1, a: 1}", "{}");
+    cq1->setSbeCompatible(true);
+    auto sbeKey1 = makeSbeKey(*cq1);
+    std::unique_ptr<CanonicalQuery> cq2 = makeCQ("{a: 5}", "{}", "{_id: 0, a: 1}", "{}");
+    cq2->setSbeCompatible(true);
+    auto sbeKey2 = makeSbeKey(*cq2);
+    ASSERT_NE(sbeKey1, sbeKey2);
+    ASSERT_NE(sbeKey1.planCacheKeyHash(), sbeKey2.planCacheKeyHash());
+}
+
+TEST_F(SbePlanCacheTest, SBEPlanCacheUpdateSize) {
+    ASSERT_OK(plan_cache_util::onPlanCacheSizeUpdate("10%"));
+    ASSERT_OK(plan_cache_util::onPlanCacheSizeUpdate("5MB"));
+    ASSERT_NOT_OK(plan_cache_util::onPlanCacheSizeUpdate("10&"));
+}
 }  // namespace
 }  // namespace mongo
