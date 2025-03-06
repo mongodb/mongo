@@ -80,8 +80,14 @@ public:
         return _stats;
     }
 
-    void forceSpill() {
-        spill(0);
+    /**
+     * Spills to disk until the memory usage does not exceed maximumMemoryUsageBytes. If no value
+     * is provided for maximumMemoryUsageBytes then it spills everything.
+     */
+    void spill(uint64_t maximumMemoryUsageBytes = 0);
+
+    uint64_t getApproximateSize() {
+        return _hashset.size() + _roaring.getApproximateSize();
     }
 
 private:
@@ -95,9 +101,7 @@ private:
 
     std::unique_ptr<TemporaryRecordStore> _diskStorageString;
     std::unique_ptr<TemporaryRecordStore> _diskStorageLong;
-    MemoryUsageTracker _memoryTracker;
 
-    void spill(uint64_t maximumMemoryUsageBytes);
     SpillingStats _stats;
 };
 }  // namespace mongo

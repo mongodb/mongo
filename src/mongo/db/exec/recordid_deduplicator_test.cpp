@@ -72,7 +72,7 @@ TEST_F(RecordIdDeduplicatorTest, spillNoDiskUsageTest) {
 
     ASSERT_TRUE(recordIdDeduplicator.insert(longRecordId));
     ASSERT_TRUE(recordIdDeduplicator.insert(stringRecordId));
-    ASSERT_THROWS_CODE(recordIdDeduplicator.forceSpill(),
+    ASSERT_THROWS_CODE(recordIdDeduplicator.spill(),
                        DBException,
                        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
@@ -94,7 +94,7 @@ TEST_F(RecordIdDeduplicatorTest, basicHashSpillTest) {
     ASSERT_TRUE(recordIdDeduplicator.insert(longRecordId));
     ASSERT_TRUE(recordIdDeduplicator.insert(stringRecordId));
 
-    recordIdDeduplicator.forceSpill();
+    recordIdDeduplicator.spill();
 
     // At this point it should have spilled.
     ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
@@ -136,16 +136,27 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     uint64_t expectedSpilledBytes = stringRecordId.memUsage();
     uint64_t expectedSpilledRecords = 1;  // The record with id null is not spilled.
 
+    // Create some recordIds.
+    std::vector<int64_t> recordIds;
+    recordIds.reserve(60 * 50);
+    int64_t number = 1;
+    for (int shiftNum = 0; shiftNum < 60; ++shiftNum) {
+        number <<= 1;
+        for (int64_t idx = 1; idx < 50; ++idx) {
+            number += idx * 3;
+            recordIds.emplace_back(number);
+        }
+    }
+
     // Add more recordIds to cause roaring to switch to bitmap.
-    for (int64_t idx = 1; idx < 3000; ++idx) {
-        int64_t number = idx * 3;
-        RecordId rid{number};
+    for (const auto& ridInt : recordIds) {
+        RecordId rid{ridInt};
         ASSERT_TRUE(recordIdDeduplicator.insert(rid));
         expectedSpilledBytes += rid.memUsage();
         ++expectedSpilledRecords;
     }
 
-    recordIdDeduplicator.forceSpill();
+    recordIdDeduplicator.spill();
 
     // At this point it should have spilled.
     ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
@@ -157,9 +168,16 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     ASSERT_FALSE(recordIdDeduplicator.insert(stringRecordId));
     ASSERT_FALSE(recordIdDeduplicator.insert(nullRecordId));
 
-    for (uint64_t idx = 1; idx < 50; ++idx) {
-        uint64_t number = idx * 3;
-        ASSERT_FALSE(recordIdDeduplicator.insert(RecordId(number)));
+    // Shuffle the recordIds.
+    std::random_device rd;
+    const unsigned int seed(12346);
+    std::mt19937 g(seed);
+
+    std::shuffle(recordIds.begin(), recordIds.end(), g);
+
+    for (const auto& ridInt : recordIds) {
+        RecordId rid{ridInt};
+        ASSERT_FALSE(recordIdDeduplicator.insert(rid));
     }
 
     // Insert new recordIds.
