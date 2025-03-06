@@ -93,6 +93,9 @@ public:
                            BSONObjBuilder& result) {
         NamespaceString collectionNss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
+        // This command is internal to the storage engine and should not block oplog application.
+        ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
+
         Lock::GlobalLock lk(opCtx,
                             MODE_IX,
                             Date_t::max(),
