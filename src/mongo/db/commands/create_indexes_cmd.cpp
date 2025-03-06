@@ -160,7 +160,7 @@ void appendFinalIndexFieldsToResult(CreateIndexesReply* reply,
  * Ensures that the options passed in for TTL indexes are valid.
  */
 void validateTTLOptions(OperationContext* opCtx,
-                        const NamespaceString& ns,
+                        const CollectionPtr& collection,
                         const CreateIndexesCommand& cmd) {
     if (MONGO_unlikely(skipTTLIndexValidationOnCreateIndex.shouldFail())) {
         LOGV2(
@@ -168,17 +168,8 @@ void validateTTLOptions(OperationContext* opCtx,
         return;
     }
 
-    const auto clusteredAndCapped = [&](LockMode mode) {
-        AutoGetCollection collection(
-            opCtx, ns, mode, AutoGetCollection::Options{}.expectedUUID(cmd.getCollectionUUID()));
-        if (collection) {
-            const auto c = collection.getCollection().get();
-            if (c->getClusteredInfo() && c->isCapped()) {
-                return true;
-            }
-        }
-        return false;
-    }(MODE_IS);
+    const auto clusteredAndCapped =
+        collection && collection->getClusteredInfo() && collection->isCapped();
 
     for (const auto& index : cmd.getIndexes()) {
         uassert(ErrorCodes::Error(6049202),
@@ -479,7 +470,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         reply.setCommitQuorum(commitQuorum);
     }
 
-    validateTTLOptions(opCtx, ns, cmd);
     checkEncryptedFieldIndexRestrictions(opCtx, ns, cmd);
     addNoteForColumnstoreIndexPreview(cmd, &reply);
 
@@ -512,6 +502,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 indexesAlreadyExist(opCtx, collection.getCollection(), specs, &reply)) {
                 return true;
             }
+
+            validateTTLOptions(opCtx, collection.getCollection(), cmd);
 
             if (collection &&
                 !UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, ns)) {
