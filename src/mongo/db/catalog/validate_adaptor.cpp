@@ -193,10 +193,12 @@ Status _validateTimeSeriesIdTimestamp(OperationContext* opCtx,
  * Checks the value of the bucket's version.
  */
 Status _validateTimeseriesControlVersion(const BSONObj& recordBson, int bucketVersion) {
-    if (bucketVersion != 1 && bucketVersion != 2) {
+    // Version 3 buckets are introduced in 8.0, but for backwards compatibility we recognize it as a
+    // valid version on 7.0 as well.
+    if (bucketVersion != 1 && bucketVersion != 2 && bucketVersion != 3) {
         return Status(
             ErrorCodes::BadValue,
-            fmt::format("Invalid value for 'control.version'. Expected 1 or 2, but got {}.",
+            fmt::format("Invalid value for 'control.version'. Expected 1, 2, or 3, but got {}.",
                         bucketVersion));
     }
     return Status::OK();
