@@ -276,8 +276,8 @@ tasks:
           args: >-
             --config=fastbuild
             --define GIT_COMMIT_HASH=nogitversion
-            --linkopt="-s"
-            --jobs 32
+            --output_groups=compilation_outputs
+            --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - name: hydrate_required_bazel_profile_opt
@@ -299,6 +299,7 @@ tasks:
             --config=opt
             --define GIT_COMMIT_HASH=nogitversion
             --output_groups=compilation_outputs
+            --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - name: hydrate_bazel_profile_dbg
@@ -320,8 +321,8 @@ tasks:
           args: >-
             --config=dbg
             --define GIT_COMMIT_HASH=nogitversion
-            --linkopt="-s"
-            --jobs 32
+            --output_groups=compilation_outputs
+            --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - name: hydrate_bazel_profile_dbg_aubsan
@@ -343,8 +344,8 @@ tasks:
           args: >-
             --config=dbg_aubsan
             --define GIT_COMMIT_HASH=nogitversion
-            --linkopt="-s"
-            --jobs 32
+            --output_groups=compilation_outputs
+            --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - name: hydrate_bazel_profile_dbg_tsan
@@ -366,8 +367,8 @@ tasks:
           args: >-
             --config=dbg_tsan
             --define GIT_COMMIT_HASH=nogitversion
-            --linkopt="-s"
-            --jobs 32
+            --output_groups=compilation_outputs
+            --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - <<: *clang_tidy_task_template

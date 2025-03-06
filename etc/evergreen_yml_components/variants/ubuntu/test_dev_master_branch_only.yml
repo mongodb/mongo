@@ -47,6 +47,7 @@ buildvariants:
       evergreen_remote_exec: on
     tasks:
       - name: hydrate_bazel_profile_TG
+      - name: .clang_tidy
 
   # TODO(SERVER-99213): Remove when CI is using fission by default
   - name: &workstation_required_bazel_cache_hydration_arm64 workstation_required_bazel_cache_hydration_arm64
@@ -74,6 +75,7 @@ buildvariants:
       evergreen_remote_exec: on
     tasks:
       - name: hydrate_bazel_profile_TG
+      - name: .clang_tidy
 
   ###############################################
   # Temporary variants for v5 toolchain rollout #
