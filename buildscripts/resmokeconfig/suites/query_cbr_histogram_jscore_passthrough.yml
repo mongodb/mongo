@@ -33,9 +33,6 @@ selector:
     - jstests/core/catalog/views/views_all_commands.js
     - jstests/core/catalog/agg_internal_list_collections_stage.js
     - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
-    # This test runs many queries. This passthrough runs analyze for each indexed field on every query,
-    # causing a > 1 hour runtime. Exclude this test to keep the suite runtime reasonable.
-    - jstests/core/timeseries/query/timeseries_group_aggregations.js
 
     # TODO SERVER-100451: $elemMatch estimation using histograms
     - jstests/core/query/boolean_expression_simplification.js

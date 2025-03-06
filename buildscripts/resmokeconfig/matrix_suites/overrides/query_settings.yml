@@ -66,6 +66,9 @@
       # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
       # is a design decision due to mongos lacking collation information.
       - jstests/aggregation/sources/bucket/collation_bucket.js
+      # This test runs many aggregations, and the PQS passthroughs slow down queries just enough to
+      # hit the timeout more easily.
+      - jstests/aggregation/timeseries/timeseries_group_aggregations.js
     exclude_with_any_tags:
       - assumes_standalone_mongod
       - does_not_support_repeated_reads
@@ -129,9 +132,6 @@
       - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
       - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js
       - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
-      # This test runs many aggregations, and the PQS passthroughs slow down queries just enough to
-      # hit the timeout more easily.
-      - jstests/core/timeseries/query/timeseries_group_aggregations.js
     exclude_with_any_tags:
       - uses_parallel_shell # interferes with plan cache check
 

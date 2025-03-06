@@ -9,6 +9,9 @@ selector:
     # TODO: Remove when SERVER-23229 is fixed.
     - jstests/aggregation/sources/group/groupMissing.js
     - jstests/aggregation/sources/graphLookup/variables.js
+    # This test executes many queries and has a long runtime. Since this passthrough doesn't provide
+    # additional valuable coverage, we can exclude it.
+    - jstests/aggregation/timeseries/timeseries_group_aggregations.js
   exclude_with_any_tags:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections
     # can't be created on `getCollection` call.

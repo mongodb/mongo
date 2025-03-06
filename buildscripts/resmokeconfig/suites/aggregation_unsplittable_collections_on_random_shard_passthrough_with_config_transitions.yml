@@ -109,6 +109,10 @@ selector:
     # This test expects a stable collection UUID, which isn't true with background moveCollections.
     - jstests/aggregation/sources/collection_uuid_coll_stats_index_stats.js
 
+    # This test runs many aggregations, and is especially slow in this passthrough. Since it doesn't
+    # provide additional useful coverage in this passthrough we can exclude it.
+    - jstests/aggregation/timeseries/timeseries_group_aggregations.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - requires_profiling

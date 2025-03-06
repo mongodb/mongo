@@ -304,6 +304,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/aggregation/timeseries/OWNERS.yml
 /jstests/aggregation/timeseries/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
+/jstests/aggregation/timeseries/**/timeseries_group_aggregations.js @10gen/query-execution-sbe @svc-auto-approve-bot
 /jstests/aggregation/timeseries/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/aggregation/variables/OWNERS.yml

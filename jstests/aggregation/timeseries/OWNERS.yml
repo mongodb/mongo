@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query-integration-timeseries
+  - "timeseries_group_aggregations.js":
+    approvers:
+      - 10gen/query-execution-sbe
   - "OWNERS.yml":
     approvers:
       - 10gen/query-integration-staff-leads

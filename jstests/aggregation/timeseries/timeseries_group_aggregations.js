@@ -6,9 +6,17 @@
  *
  * @tags: [
  *      requires_timeseries,
+ *       # We modify the value of a query knob. setParameter is not persistent.
  *      does_not_support_stepdowns,
+ *      # This test runs commands that are not allowed with security token: setParameter.
  *      not_allowed_with_signed_security_token,
- *      assumes_read_concern_unchanged
+ *      # Change in read concern and upgrade/downgrade make this test very expensive, and don't
+ *      # provide additional valuable coverage.
+ *      assumes_read_concern_unchanged,
+ *      cannot_run_during_upgrade_downgrade,
+ *      # This test runs many queries, and multiplanning single solutions in addition to repeating
+ *      # the queries is slow. Plan cache coverage is provided by other $group tests.
+ *      does_not_support_multiplanning_single_solutions,
  * ]
  */
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";

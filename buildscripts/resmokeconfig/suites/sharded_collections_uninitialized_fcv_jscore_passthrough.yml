@@ -95,8 +95,6 @@ selector:
     - jstests/core/testing/failcommand_failpoint.js
     # Starts MongoCryptD instead of mongod nodes
     - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
-    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
-    - jstests/core/timeseries/query/timeseries_group_aggregations.js
     - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
