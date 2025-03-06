@@ -209,7 +209,6 @@ public:
         }
 
         CountStage countStage(_expCtx.get(),
-                              _coll,
                               request.getLimit().value_or(0),
                               request.getSkip().value_or(0),
                               ws.get(),

@@ -211,12 +211,7 @@ void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
 void ClassicPlannerInterface::addCountStage(long long limit, long long skip) {
     invariant(_state == kNotInitialized);
     // Make a CountStage to be the new root.
-    _root = std::make_unique<CountStage>(cq()->getExpCtxRaw(),
-                                         collections().getMainCollection(),
-                                         limit,
-                                         skip,
-                                         ws(),
-                                         _root.release());
+    _root = std::make_unique<CountStage>(cq()->getExpCtxRaw(), limit, skip, ws(), _root.release());
 }
 
 Status ClassicPlannerInterface::plan() {

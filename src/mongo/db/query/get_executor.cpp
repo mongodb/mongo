@@ -1759,11 +1759,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const CollectionPtr* coll,
+    const CollectionAcquisition& coll,
     std::unique_ptr<ParsedFindCommand> parsedFind,
     const CountCommandRequest& count) {
-    const auto& collection = *coll;
-
     OperationContext* opCtx = expCtx->getOperationContext();
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
@@ -1784,13 +1782,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         CurOp::get(opCtx)->stopQueryPlanningTimer();
     });
 
-    if (!collection) {
+    if (!coll.exists()) {
         // Treat collections that do not exist as empty collections. Note that the explain reporting
         // machinery always assumes that the root stage for a count operation is a CountStage, so in
         // this case we put a CountStage on top of an EOFStage.
         std::unique_ptr<PlanStage> root = std::make_unique<CountStage>(
             expCtx.get(),
-            collection,
             limit,
             skip,
             ws.get(),
@@ -1807,7 +1804,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     // Can't encode plan cache key for non-existent collections. Add plan cache key information to
     // curOp here so both FastCountStage and multi-planner codepaths properly populate it.
-    auto planCache = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection);
+    auto planCache = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll.getCollectionPtr());
     setOpDebugPlanCacheInfo(opCtx,
                             PlanCacheInfo{.planCacheKey = planCache.planCacheKeyHash(),
                                           .planCacheShapeHash = planCache.planCacheShapeHash()});
@@ -1825,7 +1822,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     if (useRecordStoreCount) {
         std::unique_ptr<PlanStage> root =
-            std::make_unique<RecordStoreFastCountStage>(expCtx.get(), &collection, skip, limit);
+            std::make_unique<RecordStoreFastCountStage>(expCtx.get(), coll, skip, limit);
 
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),

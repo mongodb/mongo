@@ -158,7 +158,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const CollectionPtr* collection,
+    const CollectionAcquisition& collection,
     std::unique_ptr<ParsedFindCommand> parsedFind,
     const CountCommandRequest& count);
 

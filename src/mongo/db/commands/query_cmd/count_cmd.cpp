@@ -67,6 +67,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/count_command_gen.h"
@@ -111,13 +112,25 @@
 namespace mongo {
 namespace {
 
-std::unique_ptr<ExtensionsCallback> getExtensionsCallback(const CollectionPtr& collection,
-                                                          OperationContext* opCtx,
-                                                          const NamespaceString& nss) {
-    if (collection) {
+std::unique_ptr<ExtensionsCallback> getExtensionsCallback(
+    const CollectionOrViewAcquisition& collectionOrView,
+    OperationContext* opCtx,
+    const NamespaceString& nss) {
+    if (collectionOrView.collectionExists()) {
         return std::make_unique<ExtensionsCallbackReal>(ExtensionsCallbackReal(opCtx, &nss));
     }
     return std::make_unique<ExtensionsCallbackNoop>(ExtensionsCallbackNoop());
+}
+
+void initStatsTracker(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      boost::optional<AutoStatsTracker>& statsTracker) {
+    statsTracker.emplace(opCtx,
+                         nss,
+                         Top::LockType::ReadLocked,
+                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                         DatabaseProfileSettings::get(opCtx->getServiceContext())
+                             .getDatabaseProfileLevel(nss.dbName()));
 }
 
 // The # of documents returned is always 1 for the count command.
@@ -193,13 +206,16 @@ public:
                 processFLECountD(opCtx, _ns, request());
             }
 
+            boost::optional<AutoStatsTracker> statsTracker;
+            initStatsTracker(opCtx, _ns, statsTracker);
+
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
-            boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-            ctx.emplace(opCtx,
-                        _ns,
-                        AutoGetCollection::Options{}.viewMode(
-                            auto_get_collection::ViewMode::kViewsPermitted));
+            boost::optional<CollectionOrViewAcquisition> collOrViewAcquisition =
+                acquireCollectionOrViewMaybeLockFree(
+                    opCtx,
+                    CollectionOrViewAcquisitionRequest::fromOpCtx(
+                        opCtx, _ns, AcquisitionPrerequisites::OperationType::kRead));
 
             // Start the query planning timer.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
@@ -209,23 +225,28 @@ public:
                     auto [isTimeseriesViewRequest, ns] =
                         timeseries::isTimeseriesViewRequest(opCtx, request());
                     if (isTimeseriesViewRequest) {
-                        ctx.emplace(opCtx, ns);
+                        initStatsTracker(opCtx, ns, statsTracker);
+                        collOrViewAcquisition = acquireCollectionOrViewMaybeLockFree(
+                            opCtx,
+                            CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                opCtx, ns, AcquisitionPrerequisites::OperationType::kRead));
                         return ns;
                     }
                 }
                 return _ns;
             }();
 
-            if (ctx->getView()) {
+            if (collOrViewAcquisition->isView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
-                ctx.reset();
+                collOrViewAcquisition.reset();
+                statsTracker.reset();
                 return runExplainOnView(opCtx, request(), verbosity, replyBuilder);
             }
 
-            const auto& collection = ctx->getCollection();
-
-            // RAII object that prevents chunks from being cleaned on sharded collections.
-            auto rangePreverser = buildRangePreserverForShardedCollections(opCtx, collection);
+            tassert(10168300,
+                    "Expected ShardRole acquisition to be of type collection",
+                    collOrViewAcquisition->isCollection());
+            const auto& collection = collOrViewAcquisition->getCollection();
 
             auto expCtx = makeExpressionContextForGetExecutor(
                 opCtx, request().getCollation().value_or(BSONObj()), ns, verbosity);
@@ -235,12 +256,13 @@ public:
             ScopedDebugInfo expCtxDiagnostics(
                 "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
 
-            const auto extensionsCallback = getExtensionsCallback(collection, opCtx, ns);
+            const auto extensionsCallback =
+                getExtensionsCallback(*collOrViewAcquisition, opCtx, ns);
             auto parsedFind = uassertStatusOK(
                 parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, ns));
 
             auto statusWithPlanExecutor =
-                getExecutorCount(expCtx, &collection, std::move(parsedFind), request());
+                getExecutorCount(expCtx, collection, std::move(parsedFind), request());
             uassertStatusOK(statusWithPlanExecutor.getStatus());
 
             auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -271,13 +293,16 @@ public:
                 processFLECountD(opCtx, _ns, request());
             }
 
+            boost::optional<AutoStatsTracker> statsTracker;
+            initStatsTracker(opCtx, _ns, statsTracker);
+
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
-            boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-            ctx.emplace(opCtx,
-                        _ns,
-                        AutoGetCollection::Options{}.viewMode(
-                            auto_get_collection::ViewMode::kViewsPermitted));
+            boost::optional<CollectionOrViewAcquisition> collOrViewAcquisition =
+                acquireCollectionOrViewMaybeLockFree(
+                    opCtx,
+                    CollectionOrViewAcquisitionRequest::fromOpCtx(
+                        opCtx, _ns, AcquisitionPrerequisites::OperationType::kRead));
 
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, _ns);
@@ -287,7 +312,11 @@ public:
                     auto [isTimeseriesViewRequest, ns] =
                         timeseries::isTimeseriesViewRequest(opCtx, request());
                     if (isTimeseriesViewRequest) {
-                        ctx.emplace(opCtx, ns);
+                        initStatsTracker(opCtx, ns, statsTracker);
+                        collOrViewAcquisition = acquireCollectionOrViewMaybeLockFree(
+                            opCtx,
+                            CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                opCtx, ns, AcquisitionPrerequisites::OperationType::kRead));
                         return ns;
                     }
                 }
@@ -316,29 +345,33 @@ public:
             ScopedDebugInfo expCtxDiagnostics(
                 "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
 
-            const auto& collection = ctx->getCollection();
-            const auto extensionsCallback = getExtensionsCallback(collection, opCtx, ns);
+            const auto extensionsCallback =
+                getExtensionsCallback(*collOrViewAcquisition, opCtx, ns);
             auto parsedFind = uassertStatusOK(
                 parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, ns));
 
-            registerRequestForQueryStats(opCtx, expCtx, curOp, ctx, request(), *parsedFind);
+            registerRequestForQueryStats(
+                opCtx, expCtx, curOp, *collOrViewAcquisition, request(), *parsedFind);
 
-            if (ctx->getView()) {
+            if (collOrViewAcquisition->isView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
-                ctx.reset();
+                collOrViewAcquisition.reset();
+                statsTracker.reset();
                 return runCountOnView(opCtx, request());
             }
+
+            tassert(10168301,
+                    "Expected ShardRole acquisition to be of type collection",
+                    collOrViewAcquisition->isCollection());
+            const auto& collection = collOrViewAcquisition->getCollection();
 
             // Check whether we are allowed to read from this node after acquiring our locks.
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             uassertStatusOK(replCoord->checkCanServeReadsFor(
                 opCtx, _ns, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-            // RAII object that prevents chunks from being cleaned on sharded collections.
-            auto rangePreverser = buildRangePreserverForShardedCollections(opCtx, collection);
-
             auto statusWithPlanExecutor =
-                getExecutorCount(expCtx, &collection, std::move(parsedFind), request());
+                getExecutorCount(expCtx, collection, std::move(parsedFind), request());
             uassertStatusOK(statusWithPlanExecutor.getStatus());
 
             auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -370,7 +403,7 @@ public:
                 throw;
             }
             // Store metrics for current operation.
-            recordCurOpMetrics(opCtx, curOp, collection, *exec);
+            recordCurOpMetrics(opCtx, curOp, collection.getCollectionPtr(), *exec);
 
             // Store profiling data if profiling is enabled.
             collectProfilingDataIfNeeded(curOp, *exec);
@@ -440,24 +473,24 @@ public:
         }
 
     private:
-        void registerRequestForQueryStats(
-            OperationContext* opCtx,
-            const boost::intrusive_ptr<ExpressionContext>& expCtx,
-            CurOp* curOp,
-            const boost::optional<AutoGetCollectionForReadCommandMaybeLockFree>& ctx,
-            const CountCommandRequest& req,
-            const ParsedFindCommand& parsedFind) {
+        void registerRequestForQueryStats(OperationContext* opCtx,
+                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          CurOp* curOp,
+                                          const CollectionOrViewAcquisition& collectionOrView,
+                                          const CountCommandRequest& req,
+                                          const ParsedFindCommand& parsedFind) {
             if (feature_flags::gFeatureFlagQueryStatsCountDistinct
                     .isEnabledUseLastLTSFCVWhenUninitialized(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 query_stats::registerRequest(opCtx, _ns, [&]() {
-                    return std::make_unique<query_stats::CountKey>(expCtx,
-                                                                   parsedFind,
-                                                                   req.getLimit().has_value(),
-                                                                   req.getSkip().has_value(),
-                                                                   req.getReadConcern(),
-                                                                   req.getMaxTimeMS().has_value(),
-                                                                   ctx->getCollectionType());
+                    return std::make_unique<query_stats::CountKey>(
+                        expCtx,
+                        parsedFind,
+                        req.getLimit().has_value(),
+                        req.getSkip().has_value(),
+                        req.getReadConcern(),
+                        req.getMaxTimeMS().has_value(),
+                        collectionOrView.getCollectionType());
                 });
 
                 if (req.getIncludeQueryStatsMetrics() &&
@@ -502,21 +535,6 @@ public:
                         *sampleId, _ns, req.getQuery(), req.getCollation().value_or(BSONObj()))
                     .getAsync([](auto) {});
             }
-        }
-
-        // Prevent chunks from being cleaned up during yields - this allows us to only check the
-        // version on initial entry into count.
-        boost::optional<ScopedCollectionFilter> buildRangePreserverForShardedCollections(
-            OperationContext* opCtx, const CollectionPtr& collection) {
-            boost::optional<ScopedCollectionFilter> rangePreserver;
-            if (collection.isSharded_DEPRECATED()) {
-                rangePreserver.emplace(
-                    CollectionShardingState::acquire(opCtx, _ns)
-                        ->getOwnershipFilter(
-                            opCtx,
-                            CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
-            }
-            return rangePreserver;
         }
 
         // Build the return value for this command.
