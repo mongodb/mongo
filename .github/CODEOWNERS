@@ -2526,7 +2526,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/util/**/generate_icu_init_cpp.py @10gen/query-execution-collation @svc-auto-approve-bot
 /src/mongo/util/**/icu* @10gen/query-execution-collation @svc-auto-approve-bot
 /src/mongo/util/**/pcre* @10gen/query-execution-regex @svc-auto-approve-bot
-/src/mongo/util/**/regex_util* @10gen/query-execution-regex @svc-auto-approve-bot
 /src/mongo/util/**/log_with_sampling* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/util/**/roaring_bitmaps* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/util/**/latency_distribution* @10gen/server-workload-scheduling @svc-auto-approve-bot

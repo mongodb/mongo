@@ -35,9 +35,6 @@ filters:
   - "pcre*":
     approvers:
       - 10gen/query-execution-regex
-  - "regex_util*":
-    approvers:
-      - 10gen/query-execution-regex
   - "log_with_sampling*":
     approvers:
       - 10gen/query-integration-observability

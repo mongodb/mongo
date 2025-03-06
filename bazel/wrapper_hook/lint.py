@@ -138,8 +138,6 @@ def list_files_without_targets(
         "src/mongo/platform/stack_locator_unknown.cpp",
         # TODO(SERVER-101377): Remove the exemptions below once resolved.
         "src/mongo/util/icu_init_stub.cpp",
-        # TODO(SERVER-101378): Remove the exemptions below once resolved.
-        "src/mongo/util/regex_util.cpp",
         # TODO(SERVER-101377): Remove the exemptions below once resolved.
         "src/mongo/util/processinfo_emscripten.cpp",
         "src/mongo/util/processinfo_macOS.cpp",
