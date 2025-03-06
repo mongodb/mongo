@@ -279,7 +279,14 @@ bool isTimeseries(const boost::optional<CollectionAcquisition>& collection) {
         collection->getCollectionPtr()->getTimeseriesOptions().has_value();
 }
 
-void assertTimeseriesOptionsConsistency(const Collection* coll) {
+bool viewlessTimeseriesEnabled(OperationContext* opCtx) {
+    return gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+void assertTimeseriesOptionsConsistency(const Collection* coll,
+                                        const bool viewlessTimeseriesEnabled) {
     tassert(9934501,
             fmt::format("Encountered invalid state for target collection '{}'. ",
                         coll->ns().toStringForErrorMsg()) +
@@ -296,7 +303,7 @@ void assertTimeseriesOptionsConsistency(const Collection* coll) {
                 "associated time-series options. Please consider options to correct this, "
                 "including renaming the collection or dropping the collection after inspecting "
                 "and/or backing up its contents.",
-            coll->ns().isTimeseriesBucketsCollection() ||
+            viewlessTimeseriesEnabled || coll->ns().isTimeseriesBucketsCollection() ||
                 !coll->getTimeseriesOptions().has_value());
 }
 
@@ -550,6 +557,10 @@ void broadcastDropCollection(OperationContext* opCtx,
  * In all the other cases the acquisition for the @originalNss is returned.
  *
  * This function throw en error in case the namespace already exists and is a normal view.
+ *
+ * TODO SERVER-101614 once 9.0 becomes last LTS we can simplify this function.
+ * In fact in 9.0 we will not need to translated the originalNss to system.buckets collection
+ * anymore.
  **/
 CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
                                               const NamespaceString& originalNss,
@@ -617,10 +628,13 @@ CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
                                                repl::ReadConcernArgs::get(opCtx),
                                                AcquisitionPrerequisites::OperationType::kRead,
                                                AcquisitionPrerequisites::kCanBeView));
-        // In case the bucket collection is found or we are attempting to create an unexistent
-        // timeseries, return the bucket nss. This is done to provide nss translation when the
-        // collection does not exists.
-        if (bucketColl.collectionExists() || isTimeseries(request)) {
+        // In case the buckets collection is found return it.
+        //
+        // Also if we are attempting to create an unexistent legacy timeseries with a separate
+        // bucket collection we need to return the bucket collection as target namespace. This is
+        // done to provide nss translation when the collection does not exists.
+        if (bucketColl.collectionExists() ||
+            (isTimeseries(request) && !viewlessTimeseriesEnabled(opCtx))) {
             return bucketColl.getCollection();
         }
     }
@@ -652,7 +666,9 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
     tassert(9934500,
             "expected the target collection to exist",
             targetColl.has_value() && targetColl->exists());
-    assertTimeseriesOptionsConsistency(targetColl->getCollectionPtr().get());
+
+    assertTimeseriesOptionsConsistency(targetColl->getCollectionPtr().get(),
+                                       viewlessTimeseriesEnabled(opCtx));
 
     if (request.getRegisterExistingCollectionInGlobalCatalog()) {
         // No need to check for collection options when registering an existing collection

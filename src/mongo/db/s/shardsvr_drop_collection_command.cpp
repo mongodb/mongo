@@ -104,7 +104,8 @@ public:
                 uassert(ErrorCodes::IllegalOperation,
                         "Sharded time-series buckets collections cannot be dropped directly; drop "
                         "the logical namespace instead",
-                        !coll.getTimeseriesFields() || coll.getUnsplittable());
+                        !coll.getTimeseriesFields() || !ns().isTimeseriesBucketsCollection() ||
+                            coll.getUnsplittable());
 
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // The collection is not tracked or doesn't exist.
