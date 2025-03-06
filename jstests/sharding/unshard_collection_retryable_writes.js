@@ -6,8 +6,6 @@
  *  uses_atclustertime,
  *  requires_fcv_80,
  *  featureFlagUnshardCollection,
- *  # TODO (SERVER-87812) Remove multiversion_incompatible tag
- *  multiversion_incompatible,
  *  assumes_balancer_off,
  *   # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *   embedded_router_incompatible,

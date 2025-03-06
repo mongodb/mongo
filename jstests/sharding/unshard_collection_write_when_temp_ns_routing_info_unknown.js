@@ -7,8 +7,6 @@
  *   uses_transactions,
  *   requires_fcv_80,
  *   featureFlagUnshardCollection,
- *   # TODO (SERVER-87812) Remove multiversion_incompatible tag
- *   multiversion_incompatible
  * ]
  */
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";

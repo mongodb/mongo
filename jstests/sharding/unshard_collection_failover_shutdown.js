@@ -9,7 +9,7 @@
  *   requires_persistence,
  *   requires_fcv_80,
  *   featureFlagUnshardCollection,
- *   # TODO (SERVER-87812) Remove multiversion_incompatible tag
+ *   # TODO (SERVER-101835) Remove multiversion_incompatible tag
  *   multiversion_incompatible
  * ]
  */

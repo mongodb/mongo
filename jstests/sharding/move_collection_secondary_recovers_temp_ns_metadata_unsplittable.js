@@ -6,8 +6,6 @@
  *   uses_atclustertime,
  *   requires_fcv_80,
  *   featureFlagMoveCollection,
- *   # TODO (SERVER-87812) Remove multiversion_incompatible tag
- *   multiversion_incompatible,
  * ]
  */
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
