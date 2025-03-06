@@ -33,7 +33,7 @@ const exceptionFilteredBackgroundDbCheck = function(newMongoWithRetry, hosts) {
         const hostConn = newMongoWithRetry(host);
         assert.commandWorkedOrFailedWithCode(
             hostConn.getDB("admin").adminCommand(
-                {setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 30000}),
+                {setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 50000}),
             ErrorCodes.InvalidOptions);
         hostConn.close();
     });
