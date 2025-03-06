@@ -77,8 +77,7 @@ public:
 
     void incrementSpilledRanges();
     /**
-     * Sets the number of spilled ranges to the specified amount. Cannot be called after
-     * incrementSpilledRanges.
+     * Sets the number of spilled ranges to the specified amount.
      */
     void setSpilledRanges(uint64_t spills);
     uint64_t spilledRanges() const;

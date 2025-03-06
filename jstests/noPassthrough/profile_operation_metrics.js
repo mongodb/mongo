@@ -1178,7 +1178,10 @@ const operations = [
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
-            assert.eq(profileDoc.sorterSpills, 201);
+            // There are 100 documents and it spills for each one (100 spills). Since it does not
+            // have memory it can only have 1 file iterators, so from the second document it spills
+            // a second time for each document to merges the spills from 2 to 1 (99 spills).
+            assert.eq(profileDoc.sorterSpills, 199);
             assert.eq(profileDoc.docUnitsReturned, 100);
         },
     },

@@ -404,6 +404,9 @@ protected:
     std::shared_ptr<File> _file;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
+    size_t fileIteratorsMaxBytesSize =
+        1 * 1024 * 1024;  // Memory, Iterators for spilled data are allowed to use.
+    size_t fileIteratorsMaxNum;
 
     boost::optional<SharedBufferFragmentBuilder> _memPool;
 };

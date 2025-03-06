@@ -43,4 +43,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
         'sorter_stats',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
 )
