@@ -1084,17 +1084,16 @@ void rewritePipelineIfTimeseries(const AggExState& aggExState,
                                  const AggCatalogState& aggCatalogState) {
     // Conditions for enabling the viewless code path: feature flag is on, request does not use
     // the rawData flag, and we're querying against a viewless timeseries collection.
-    if (auto& request = aggExState.getRequest();
-        aggCatalogState.lockAcquired() && !isRawDataOperation(aggExState.getOpCtx())) {
+    if (aggCatalogState.lockAcquired()) {
         if (const auto& coll = aggCatalogState.getPrimaryCollection();
-            coll && coll->isTimeseriesCollection() && coll->isNewTimeseriesWithoutView()) {
+            timeseries::isEligibleForViewlessTimeseriesRewrites(aggExState.getOpCtx(), coll)) {
             const auto timeseriesOptions = coll->getTimeseriesOptions();
             tassert(10000200,
                     "Timeseries options must be present for timeseries collection",
                     timeseriesOptions);
             // Handle re-rewrite prevention in the callee.
             timeseries::rewriteRequestPipelineAndHintForTimeseriesCollection(
-                request, *coll.get(), *timeseriesOptions);
+                aggExState.getRequest(), *coll.get(), *timeseriesOptions);
         }
     }
 }

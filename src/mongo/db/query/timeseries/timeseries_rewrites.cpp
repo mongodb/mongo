@@ -32,6 +32,8 @@
 #include "mongo/db/pipeline/document_source_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/raw_data_operation.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace timeseries {
@@ -49,7 +51,51 @@ BSONObj buildConvertIndexStatsStage(const StringData timeField,
     }
     return BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << bob.obj());
 }
+
+/**
+ * Determine whether the catalog data indicates that the collection is a viewless timeseries
+ * collection.
+ */
+inline bool isViewlessTimeseriesCollection(const auto& catalogData) {
+    static_assert(
+        requires { catalogData.isTimeseriesCollection(); } &&
+            requires { catalogData.isNewTimeseriesWithoutView(); },
+        "Catalog information must provide isTimeseriesCollection() and "
+        "isNewTimeseriesWithoutView() when determining whether the collection is a viewless "
+        "timeseries collection.");
+    return catalogData.isTimeseriesCollection() && catalogData.isNewTimeseriesWithoutView();
+}
 }  // namespace
+
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
+                                             const CollectionRoutingInfo& cri) {
+    return !isRawDataOperation(opCtx) && cri.hasRoutingTable() &&
+        isViewlessTimeseriesCollection(cri.cm);
+}
+
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
+                                             const NamespaceString& nss) {
+    const auto& cri =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    return isEligibleForViewlessTimeseriesRewrites(opCtx, cri);
+}
+
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
+                                             const Collection& coll) {
+    return !isRawDataOperation(opCtx) && isViewlessTimeseriesCollection(coll);
+}
+
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
+                                             const CollectionPtr& collPtr) {
+    return collPtr && isEligibleForViewlessTimeseriesRewrites(opCtx, *collPtr.get());
+}
+
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
+                                             const CollectionOrViewAcquisition& collOrView) {
+    return collOrView.isCollection() &&
+        isEligibleForViewlessTimeseriesRewrites(opCtx,
+                                                collOrView.getCollection().getCollectionPtr());
+}
 
 std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
     const std::vector<BSONObj>& pipeline,

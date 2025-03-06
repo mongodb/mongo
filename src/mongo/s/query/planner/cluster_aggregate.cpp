@@ -469,13 +469,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     return pipeline;
 }
 
-void rewritePipelineIfTimeseries(OperationContext* opCtx,
+void rewritePipelineIfTimeseries(OperationContext* const opCtx,
                                  AggregateCommandRequest& request,
                                  const CollectionRoutingInfo& cri) {
-    // Conditions for enabling the viewless code path: feature flag is on, request does not use
-    // the rawData flag, and we're querying against a sharded viewless timeseries collection.
-    if (!isRawDataOperation(opCtx) && cri.cm.isTimeseriesCollection() &&
-        cri.cm.isNewTimeseriesWithoutView()) {
+    if (timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, cri)) {
         // TypeCollectionTimeseriesFields encapsulates TimeseriesOptions.
         const auto timeseriesFields = cri.cm.getTimeseriesFields();
         tassert(9949202,

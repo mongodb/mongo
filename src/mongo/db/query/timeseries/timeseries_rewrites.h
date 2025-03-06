@@ -36,6 +36,7 @@
 #include "mongo/db/timeseries/mixed_schema_buckets_state.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 
 namespace mongo {
@@ -54,6 +55,18 @@ inline bool canAssumeNoMixedSchemaData(const TypeCollectionTimeseriesFields& tim
     // Assume the worst case (that buckets may have mixed schema data) if none.
     return !timeseriesFields.getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true);
 }
+
+/**
+ * Determine whether the request is eligible for viewless timeseries rewrites.
+ *
+ * Basic conditions: isRawDataOperation must return false and the collection must be a viewless
+ * timeseries collection.
+ */
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext*, const CollectionRoutingInfo&);
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext*, const NamespaceString&);
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext*, const Collection&);
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext*, const CollectionPtr&);
+bool isEligibleForViewlessTimeseriesRewrites(OperationContext*, const CollectionOrViewAcquisition&);
 
 /**
  * Returns a rewritten pipeline that queries against a timeseries collection.
