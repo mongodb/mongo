@@ -406,15 +406,19 @@ boost::intrusive_ptr<Expression> exprRewriteDocumentKey(
     auto insertAndDeletePath = cloneWithSubstitution(expr, {{"documentKey", "o"}})
                                    ->getFieldPathWithoutCurrentPrefix()
                                    .fullPathWithPrefix();
-    opCases.push_back(
-        fromjson("{case: {$in: ['$op', ['i', 'd']]}, then: '" + insertAndDeletePath + "'}"));
+    auto insertFilter = BSON("case" << BSON("$in" << BSON_ARRAY("$op" << BSON_ARRAY("i"
+                                                                                    << "d")))
+                                    << "then" << insertAndDeletePath);
+    opCases.push_back(std::move(insertFilter));
 
     // Cases for 'update' and 'replace'.
     auto updateAndReplacePath = cloneWithSubstitution(expr, {{"documentKey", "o2"}})
                                     ->getFieldPathWithoutCurrentPrefix()
                                     .fullPathWithPrefix();
-    opCases.push_back(
-        fromjson("{case: {$eq: ['$op', 'u']}, then: '" + updateAndReplacePath + "'}"));
+    auto updateAndReplaceFilter = BSON("case" << BSON("$eq" << BSON_ARRAY("$op"
+                                                                          << "u"))
+                                              << "then" << updateAndReplacePath);
+    opCases.push_back(std::move(updateAndReplaceFilter));
 
     // The default case, if nothing matches.
     auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize();

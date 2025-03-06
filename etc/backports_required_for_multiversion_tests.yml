@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
+    ticket: SERVER-100345
   - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
     ticket: SERVER-88885
   - test_file: jstests/replsets/ignore_dbcheck_in_initial_sync.js
@@ -388,6 +390,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
+    ticket: SERVER-100345
   - test_file: jstests/replsets/dbcheck_skip_applying_batch_on_secondary_parameter.js
     ticket: SERVER-88885
   - test_file: jstests/replsets/ignore_dbcheck_in_initial_sync.js
