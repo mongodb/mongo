@@ -116,15 +116,15 @@ Status JParse::parseError(StringData msg) {
     return Status(ErrorCodes::FailedToParse, ossmsg.str());
 }
 
-Status JParse::value(StringData fieldName, BSONObjBuilder& builder) {
+Status JParse::value(StringData fieldName, BSONObjBuilder& builder, int depth) {
     MONGO_JSON_DEBUG("fieldName: " << fieldName);
     if (peekToken(LBRACE)) {
-        Status ret = object(fieldName, builder);
+        Status ret = object(fieldName, builder, true, depth + 1);
         if (ret != Status::OK()) {
             return ret;
         }
     } else if (peekToken(LBRACKET)) {
-        Status ret = array(fieldName, builder);
+        Status ret = array(fieldName, builder, true, depth + 1);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -164,7 +164,7 @@ Status JParse::value(StringData fieldName, BSONObjBuilder& builder) {
             return ret;
         }
     } else if (readToken("Dbref") || readToken("DBRef")) {
-        Status ret = dbRef(fieldName, builder);
+        Status ret = dbRef(fieldName, builder, depth + 1);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -205,11 +205,14 @@ Status JParse::value(StringData fieldName, BSONObjBuilder& builder) {
 }
 
 Status JParse::parse(BSONObjBuilder& builder) {
-    return isArray() ? array("UNUSED", builder, false) : object("UNUSED", builder, false);
+    return isArray() ? array("UNUSED", builder, false, 0) : object("UNUSED", builder, false, 0);
 }
 
-Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObject) {
+Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObject, int depth) {
     MONGO_JSON_DEBUG("fieldName: " << fieldName);
+    if (depth > kMaxDepth) {
+        return parseError("Reached nested object limit");
+    }
     if (!readToken(LBRACE)) {
         return parseError("Expecting '{'");
     }
@@ -291,7 +294,7 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
         if (!subObject) {
             return parseError("Reserved field name in base object: $ref");
         }
-        Status ret = dbRefObject(fieldName, builder);
+        Status ret = dbRefObject(fieldName, builder, depth + 1);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -366,7 +369,7 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
         if (!readToken(COLON)) {
             return parseError("Expecting ':'");
         }
-        Status valueRet = value(firstField, *objBuilder);
+        Status valueRet = value(firstField, *objBuilder, depth);
         if (valueRet != Status::OK()) {
             return valueRet;
         }
@@ -380,7 +383,7 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
             if (!readToken(COLON)) {
                 return parseError("Expecting ':'");
             }
-            Status valueRet = value(fieldName, *objBuilder);
+            Status valueRet = value(fieldName, *objBuilder, depth);
             if (valueRet != Status::OK()) {
                 return valueRet;
             }
@@ -710,7 +713,10 @@ Status JParse::regexObjectCanonical(StringData fieldName, BSONObjBuilder& builde
     return Status::OK();
 }
 
-Status JParse::dbRefObject(StringData fieldName, BSONObjBuilder& builder) {
+Status JParse::dbRefObject(StringData fieldName, BSONObjBuilder& builder, int depth) {
+    if (depth > kMaxDepth) {
+        return parseError("Reached nested object limit");
+    }
     BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
 
     if (!readToken(COLON)) {
@@ -734,7 +740,7 @@ Status JParse::dbRefObject(StringData fieldName, BSONObjBuilder& builder) {
     if (!readToken(COLON)) {
         return parseError("DBRef: Expecting ':'");
     }
-    Status valueRet = value("$id", subBuilder);
+    Status valueRet = value("$id", subBuilder, depth);
     if (valueRet != Status::OK()) {
         return valueRet;
     }
@@ -882,8 +888,11 @@ Status JParse::maxKeyObject(StringData fieldName, BSONObjBuilder& builder) {
     return Status::OK();
 }
 
-Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObject) {
+Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObject, int depth) {
     MONGO_JSON_DEBUG("fieldName: " << fieldName);
+    if (depth > kMaxDepth) {
+        return parseError("Reached nested object limit");
+    }
     if (!readToken(LBRACKET)) {
         return parseError("Expecting '['");
     }
@@ -898,7 +907,7 @@ Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObje
     if (!peekToken(RBRACKET)) {
         DecimalCounter<uint32_t> index;
         do {
-            Status ret = value(StringData{index}, *arrayBuilder);
+            Status ret = value(StringData{index}, *arrayBuilder, depth);
             if (!ret.isOK()) {
                 return ret;
             }
@@ -1074,7 +1083,10 @@ Status JParse::numberInt(StringData fieldName, BSONObjBuilder& builder) {
     return Status::OK();
 }
 
-Status JParse::dbRef(StringData fieldName, BSONObjBuilder& builder) {
+Status JParse::dbRef(StringData fieldName, BSONObjBuilder& builder, int depth) {
+    if (depth > kMaxDepth) {
+        return parseError("Reached nested object limit");
+    }
     BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
 
     if (!readToken(LPAREN)) {
@@ -1092,7 +1104,7 @@ Status JParse::dbRef(StringData fieldName, BSONObjBuilder& builder) {
         return parseError("Expecting ','");
     }
 
-    Status valueRet = value("$id", subBuilder);
+    Status valueRet = value("$id", subBuilder, depth);
     if (valueRet != Status::OK()) {
         return valueRet;
     }
