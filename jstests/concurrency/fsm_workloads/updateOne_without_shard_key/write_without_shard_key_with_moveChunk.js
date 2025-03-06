@@ -82,17 +82,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // migrated back in. The particular error code is replaced with a more generic one, so this is
     // identified by the failed migration's error message.
     $config.data.isMoveChunkErrorAcceptable = (err) => {
-        return err.message &&
-            (err.message.includes("CommandFailed") ||
-             err.message.includes("Documents in target range may still be in use") ||
-             // This error can occur when the test updates the shard key value of a document whose
-             // chunk has been moved to another shard. Receiving a chunk only waits for documents
-             // with shard key values in that range to have been cleaned up by the range deleter.
-             // So, if the range deleter has not yet cleaned up that document when the chunk is
-             // moved back to the original shard, the moveChunk may fail as a result of a duplicate
-             // key error on the recipient.
-             err.message.includes("Location51008") || err.message.includes("Location6718402") ||
-             err.message.includes("Location16977"));
+        const errorMsg = stringifyErrorMessageAndAttributes(err);
+        return (errorMsg.includes("CommandFailed") ||
+                errorMsg.includes("Documents in target range may still be in use") ||
+                // This error can occur when the test updates the shard key value of a document
+                // whose chunk has been moved to another shard. Receiving a chunk only waits for
+                // documents with shard key values in that range to have been cleaned up by the
+                // range deleter. So, if the range deleter has not yet cleaned up that document when
+                // the chunk is moved back to the original shard, the moveChunk may fail as a result
+                // of a duplicate key error on the recipient.
+                errorMsg.includes("Location51008") || errorMsg.includes("Location6718402") ||
+                errorMsg.includes("Location16977"));
     };
 
     return $config;

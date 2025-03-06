@@ -297,9 +297,9 @@ tests.push(function invalidResponsesAttemptToProvideInformationToCommandWorks() 
         const error = assert.throws(() => {
             assert.commandWorked(invalidRes);
         });
-
-        assert.gte(error.message.indexOf(invalidRes), 0);
-        assert.gte(error.message.indexOf(typeof invalidRes), 0);
+        const errorMsg = stringifyErrorMessageAndAttributes(error);
+        assert.gte(errorMsg.indexOf(invalidRes), 0);
+        assert.gte(errorMsg.indexOf(typeof invalidRes), 0);
     });
 });
 
@@ -310,9 +310,9 @@ tests.push(function invalidResponsesAttemptToProvideInformationCommandFailed() {
         const error = assert.throws(() => {
             assert.commandFailed(invalidRes);
         });
-
-        assert.gte(error.message.indexOf(invalidRes), 0);
-        assert.gte(error.message.indexOf(typeof invalidRes), 0);
+        const errorMsg = stringifyErrorMessageAndAttributes(error);
+        assert.gte(errorMsg.indexOf(invalidRes), 0);
+        assert.gte(errorMsg.indexOf(typeof invalidRes), 0);
     });
 });
 

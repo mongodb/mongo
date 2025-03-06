@@ -31,7 +31,7 @@ export const workerThread = (function() {
         TestData = (TestData !== undefined) ? TestData : {};
 
         try {
-            // Running a callback passed through testData before running fsm worker theads.
+            // Running a callback passed through testData before running fsm worker threads.
             // Can be added to yml files as the following example:
             // fsmPreOverridesLoadedCallback: '
             //     testingReplication = true;

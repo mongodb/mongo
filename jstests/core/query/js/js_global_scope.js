@@ -108,6 +108,7 @@ const expectedGlobalVars = [
     "isNumber",
     "isObject",
     "isString",
+    "stringifyErrorMessageAndAttributes",
     "parseFloat",
     "parseInt",
     "print",

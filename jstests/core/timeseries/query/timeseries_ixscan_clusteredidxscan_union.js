@@ -99,6 +99,7 @@ TimeseriesTest.run((insert) => {
         const pipeline = testcase.pipeline;
         const expected = testcase.expected;
 
-        assert.eq(coll.aggregate(pipeline).toArray().sort(compareResultEntries), expected);
+        assert.eq(coll.aggregate(pipeline).toArray().sort(compareResultEntries),
+                  expected.sort(compareResultEntries));
     }
 });

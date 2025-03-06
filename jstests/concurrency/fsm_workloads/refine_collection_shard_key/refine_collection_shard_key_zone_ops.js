@@ -210,7 +210,10 @@ export const $config = (function() {
                 // become refined. Retrying swapping the zone range will allow us to target the
                 // shard key in its refined state.
                 const newShardKeyField = this.newShardKeyFields[1];
-                if (e.message.includes(newShardKeyField) && e.message.includes('are not equal')) {
+                const errorMsg = stringifyErrorMessageAndAttributes(e);
+                if ((errorMsg.includes(newShardKeyField) && errorMsg.includes('are not equal')) ||
+                    (errorMsg.includes(newShardKeyField) &&
+                     errorMsg.includes('assert.eq() failed'))) {
                     jsTestLog("Retrying swapZoneRange on collection " + latchCollName +
                               " due to refineCollectionShardKey conflict");
                     for (let zoneRange of Object.values(currentZoneRangeMap)) {

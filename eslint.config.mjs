@@ -92,6 +92,7 @@ export default [
                             isNumber: true,
                             isObject: true,
                             isString: true,
+                            stringifyErrorMessageAndAttributes: true,
                             _createSecurityToken: true,
                             _createTenantToken: true,
                             _isAddressSanitizerActive: true,
