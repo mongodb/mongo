@@ -7,7 +7,6 @@
  *   multiversion_incompatible,
  *   # Cannot compact when using the in-memory storage engine.
  *   requires_persistence,
- *   featureFlagFailOnDirectShardOperations,
  *   requires_fcv_73
  * ]
  */

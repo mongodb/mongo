@@ -1,7 +1,7 @@
 /**
  * Tests that direct shard connections are correctly allowed and disallowed using authentication.
  *
- * @tags: [featureFlagFailOnDirectShardOperations, requires_fcv_73]
+ * @tags: [requires_fcv_73]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

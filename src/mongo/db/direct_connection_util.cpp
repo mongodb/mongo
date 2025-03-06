@@ -63,10 +63,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
     if (OperationShardingState::get(opCtx).shouldSkipDirectConnectionChecks()) {
         return;
     }
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (ShardingState::get(opCtx)->enabled() && fcvSnapshot.isVersionInitialized() &&
-        (feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot) ||
-         feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot))) {
+    if (ShardingState::get(opCtx)->enabled()) {
         bool clusterHasTwoOrMoreShards = [&]() {
             auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
             auto* clusterCardinalityParam =
@@ -91,8 +88,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
                 static constexpr char errorMsg[] =
                     "You are connecting to a sharded cluster improperly by connecting directly to "
                     "a shard. Please connect to the cluster via a router (mongos).";
-                if (feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot) &&
-                    clusterHasTwoOrMoreShards) {
+                if (clusterHasTwoOrMoreShards) {
                     // Atlas log ingestion requires a strict upper bound on the number of logs per
                     // hour. To abide by this, we only log this message once per hour and rely on
                     // the user assertion log (debug 1) otherwise.
@@ -108,9 +104,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
                               str::stream() << errorMsg << " Command: "
                                             << CurOp::get(opCtx)->getCommand()->getName()
                                             << ", Namespace: " << nss.toStringForErrorMsg());
-                } else if (feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot) ||
-                           (!clusterHasTwoOrMoreShards &&
-                            directConnectionChecksWithSingleShard.load())) {
+                } else if (directConnectionChecksWithSingleShard.load()) {
                     // Atlas log ingestion requires a strict upper bound on the number of logs per
                     // hour. To abide by this, we log the lower verbosity messages with a different
                     // log ID to prevent log ingestion from picking them up.

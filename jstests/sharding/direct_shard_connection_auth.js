@@ -1,7 +1,7 @@
 /**
  * Tests that direct shard connections are correctly allowed and disallowed using authentication.
  *
- * @tags: [featureFlagCheckForDirectShardOperations, requires_fcv_70]
+ * @tags: [requires_fcv_70]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -32,9 +32,6 @@ assert(singleShardClusterWarnings);
 assert.commandWorked(shardAdminDB.runCommand(
     {setParameter: 1, logComponentVerbosity: {sharding: {verbosity: 2}, assert: {verbosity: 1}}}));
 
-// TODO: (SERVER-87190) Remove once 8.0 becomes last lts.
-const failOnDirectOps =
-    FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "FailOnDirectShardOperations");
 const resetClusterCardinalityOnRemoveShard =
     FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "ReplicaSetEndpoint");
 
@@ -49,12 +46,13 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
         {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
     assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
 
-    // Direct writes with only read/write privileges should depend on the cluster state and the
-    // failOnDirectShardOperations feature flag.
+    // Test direct writes with only read/write privileges. This should always warn (excluding
+    // RSEndpoint) but the operation should not fail with only one shard in the cluster.
     shardAdminTestDB.createUser({user: "user", pwd: "y", roles: ["readWrite"]});
     assert(userTestDB.auth("user", "y"), "Authentication failed");
+    // Run the command and check warnings. The command should fail in a 2+ shard cluster and succeed
+    // in a 1 shard cluster but we should always emit a warning (excluding RSEndpoint).
     if (!shouldBlockDirectConnections) {
-        // In a single shard cluster, this should be allowed and warn
         assert.commandWorked(userTestDB.getCollection("coll").update(
             {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
         // No warning will be emitted even if the parameter is set if RSEndpoint is enabled.
@@ -64,36 +62,30 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
             assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
         }
     } else {
-        // In a 2 shard cluster, this will fail if the ff is enabled and warn otherwise.
-        if (failOnDirectOps) {
-            assert.commandFailedWithCode(userTestDB.getCollection("coll").update(
-                                             {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
-                                         ErrorCodes.Unauthorized);
-        } else {
-            assert.commandWorked(userTestDB.getCollection("coll").update(
-                {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
-        }
-        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
-    }
-
-    // Unsetting the server parameter should prevent warnings from being emitted if the cluster only
-    // has one shard.
-    assert.commandWorked(
-        shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: false}));
-    // In a 2 shard cluster, this will fail if the ff is enabled and warn otherwise.
-    if (failOnDirectOps && shouldBlockDirectConnections) {
         assert.commandFailedWithCode(userTestDB.getCollection("coll").update(
                                          {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
                                      ErrorCodes.Unauthorized);
-    } else {
-        assert.commandWorked(userTestDB.getCollection("coll").update(
-            {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
-    }
-    if (!shouldBlockDirectConnections) {
-        assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
-    } else {
         assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
     }
+
+    // Test direct writes with only read/write privileges where
+    // directConnectionChecksWithSingleShard is set to false. This should not emit a warning if
+    // there is only one shard in the cluster.
+    assert.commandWorked(
+        shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: false}));
+    // Run the command and check warnings. The command should fail in a 2+ shard cluster and succeed
+    // in a 1 shard cluster and we should only emit a warning in the 2+ shard scenario.
+    if (!shouldBlockDirectConnections) {
+        assert.commandWorked(userTestDB.getCollection("coll").update(
+            {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
+        assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
+    } else {
+        assert.commandFailedWithCode(userTestDB.getCollection("coll").update(
+                                         {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
+                                     ErrorCodes.Unauthorized);
+        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+    }
+    // Reset the parameter for future tests.
     assert.commandWorked(
         shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: true}));
     userTestDB.logout();

@@ -2,8 +2,7 @@
  * Tests that direct shard connections with addShard and moveCollection does not cause data loss.
  *
  * @tags: [
- *   featureFlagFailOnDirectShardOperations,
- *   requires_fcv_80,
+ *   requires_fcv_80
  * ]
  */
 

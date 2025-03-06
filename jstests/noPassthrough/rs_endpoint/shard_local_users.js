@@ -8,7 +8,6 @@
  *   requires_fcv_80,
  *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
- *   featureFlagFailOnDirectShardOperations,
  *   requires_persistence,
  * ]
  */
