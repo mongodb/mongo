@@ -891,20 +891,6 @@ public:
      */
     virtual void notifyInterruptionAcknowledged() {}
 
-    /**
-     * When true, cache eviction should be skipped when the operation is interrupted.
-     * This may be called by a non-owning thread provided that the lifetime of the RecoveryUnit is
-     * guaranteed
-     */
-    virtual void setCancelCacheEvictionOnInterrupt(bool cancelCacheEvictionOnInterrupt) {}
-
-    /**
-     * Whether or not cache eviction should occur when the operation is interrupted.
-     */
-    virtual bool shouldCancelCacheEvictionOnInterrupt() const {
-        return false;
-    }
-
 protected:
     RecoveryUnit() = default;
 

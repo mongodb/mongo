@@ -57,6 +57,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit_test_harness.h"
 #include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -1010,32 +1011,42 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotAbortMode) {
 }
 
 // Validate the return of mdb_handle_general when killing an opCtx with the RU configured to cancel
-// cache eviction.
+// cache eviction. While there is gating in place, ensure that the gating fully disables the
+// feature
 TEST_F(WiredTigerRecoveryUnitTestFixture, OptionalEvictionCanBeInterrupted) {
-    harnessHelper->getClockSourceMock()->advance(Milliseconds(100));
+    for (bool enableFeature : {false, true}) {
+        harnessHelper->getClockSourceMock()->advance(Milliseconds(100));
+        RAIIServerParameterControllerForTest featureFlag{"featureFlagStorageEngineInterruptibility",
+                                                         enableFeature};
+        auto clientAndCtx =
+            makeClientAndOpCtx(harnessHelper.get(), "test" + std::to_string(enableFeature));
+        OperationContext* opCtx = clientAndCtx.second.get();
+        auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
 
-    OperationContext* opCtx = clientAndCtx1.second.get();
-    WiredTigerEventHandler eventHandler;
-    WT_SESSION* session = ru1->getSessionNoTxn()->with([](WT_SESSION* arg) { return arg; });
-    ASSERT_EQ(0,
-              eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
-                                                               ru1->getConnection()->conn(),
-                                                               session,
-                                                               WT_EVENT_EVICTION,
-                                                               nullptr));
+        WiredTigerEventHandler eventHandler;
+        WT_SESSION* session = ru->getSessionNoTxn()->with([](WT_SESSION* arg) { return arg; });
+        ASSERT_EQ(0,
+                  eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
+                                                                   ru->getConnection()->conn(),
+                                                                   session,
+                                                                   WT_EVENT_EVICTION,
+                                                                   nullptr));
 
-    ru1->setCancelCacheEvictionOnInterrupt(true);
-    opCtx->markKilled(ErrorCodes::Interrupted);
-    harnessHelper->getClockSourceMock()->advance(Milliseconds(23));
-    ASSERT_NE(0,
-              eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
-                                                               ru1->getConnection()->conn(),
-                                                               session,
-                                                               WT_EVENT_EVICTION,
-                                                               nullptr));
+        opCtx->markKilled(ErrorCodes::Interrupted);
+        harnessHelper->getClockSourceMock()->advance(Milliseconds(23));
+        ASSERT_EQ(
+            enableFeature,
+            (bool)eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
+                                                                   ru->getConnection()->conn(),
+                                                                   session,
+                                                                   WT_EVENT_EVICTION,
+                                                                   nullptr));
 
-    auto stats = shard_role_details::getRecoveryUnit(opCtx)->getStorageMetrics();
-    ASSERT_EQ(23, stats.interruptDelayMs.load());
+        if (enableFeature) {
+            auto stats = shard_role_details::getRecoveryUnit(opCtx)->getStorageMetrics();
+            ASSERT_EQ(23, stats.interruptDelayMs.load());
+        }
+    }
 }
 
 class SnapshotTestDecoration {

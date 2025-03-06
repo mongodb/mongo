@@ -38,6 +38,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/util/pcre.h"
@@ -1404,7 +1405,7 @@ int WiredTigerUtil::handleWtEvictionEvent(WT_SESSION* session) {
     }
     auto ru = reinterpret_cast<RecoveryUnit*>(session->app_private);
 
-    if (ru->shouldCancelCacheEvictionOnInterrupt() && ru->isInterrupted()) {
+    if (feature_flags::gStorageEngineInterruptibility.isEnabled() && ru->isInterrupted()) {
         ru->notifyInterruptionAcknowledged();
         return -1;
     }
