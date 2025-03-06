@@ -152,7 +152,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: orphanCleanupDelaySecs
-        default: 900
+        default: 3600
         redact: false
 
     disableResumableRangeDeleter:
