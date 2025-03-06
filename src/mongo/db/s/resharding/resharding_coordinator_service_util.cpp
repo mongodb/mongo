@@ -133,14 +133,6 @@ namespace mongo {
 namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting UNSET here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by mongod and
-                                                // writeConcernMajorityJournalDefault is set to true
-                                                // in the ReplSetConfig.
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 void assertNumDocsMatchedEqualsExpected(const BatchedCommandRequest& request,
                                         const BSONObj& response,
@@ -636,7 +628,7 @@ void setupZonesForTempNss(OperationContext* opCtx,
         ConfigsvrUpdateZoneKeyRange cmd(
             nss, zone.getMin(), zone.getMax(), zone.getZone().toString());
         cmd.serialize(&cmdBuilder);
-        cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
+        cmdBuilder.append("writeConcern", resharding::kMajorityWriteConcern.toBSON());
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto cmdResponseStatus = uassertStatusOK(
