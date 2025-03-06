@@ -84,7 +84,7 @@ buildvariants:
     tags: ["experimental", "bazel_check"]
     run_on:
       - ubuntu2204-arm64-large
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       scons_cache_scope: shared
@@ -102,7 +102,7 @@ buildvariants:
     tags: ["experimental", "bazel_check"]
     run_on:
       - ubuntu2204-arm64-large
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       scons_cache_scope: shared
@@ -120,7 +120,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - ubuntu2004-arm64
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       additional_package_targets: >-
@@ -153,18 +153,15 @@ buildvariants:
       compile_variant: enterprise-ubuntu2004-arm64-toolchain-v5
       large_distro_name: ubuntu2004-arm64-large
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - ubuntu2004-arm64-large
-      - name: test_packages
-        distros:
-          - ubuntu1804-arm64-build
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
           - ubuntu2004-arm64-large
-      - name: .release_critical !.requires_large_host
-      - name: .release_critical .requires_large_host
+      - name: .release_critical !.requires_large_host !.publish
+      - name: .release_critical .requires_large_host !.publish
         distros:
           - ubuntu2004-arm64-large
 
@@ -173,7 +170,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - ubuntu2204-arm64-small
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -199,21 +196,15 @@ buildvariants:
       compile_variant: enterprise-ubuntu2204-arm64-toolchain-v5
       large_distro_name: ubuntu2204-arm64-large
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
-        distros:
-          - ubuntu2204-arm64-large
-      - name: compile_test_parallel_unittest_stream_TG
-        distros:
-          - ubuntu2204-arm64-large
-      - name: test_packages
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - ubuntu2204-arm64-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
           - ubuntu2204-arm64-large
-      - name: .release_critical !.requires_large_host
-      - name: .release_critical .requires_large_host
+      - name: .release_critical !.requires_large_host !.publish
+      - name: .release_critical .requires_large_host !.publish
         distros:
           - ubuntu2204-arm64-large
 
@@ -248,10 +239,7 @@ buildvariants:
       compile_variant: enterprise-ubuntu2404-arm64-toolchain-v5
       large_distro_name: ubuntu2404-arm64-large
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
-        distros:
-          - ubuntu2404-arm64-large
-      - name: test_packages
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - ubuntu2404-arm64-large
       - name: test_packages_release
@@ -261,8 +249,8 @@ buildvariants:
       - name: .development_critical .requires_large_host !.incompatible_oscrypto
         distros:
           - ubuntu2404-arm64-large
-      - name: .release_critical !.requires_large_host !.incompatible_oscrypto
-      - name: .release_critical .requires_large_host !.incompatible_oscrypto
+      - name: .release_critical !.requires_large_host !.incompatible_oscrypto !.publish
+      - name: .release_critical .requires_large_host !.incompatible_oscrypto !.publish
         distros:
           - ubuntu2404-arm64-large
 
@@ -272,7 +260,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - ubuntu2004-small
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       additional_package_targets: >-
@@ -303,18 +291,15 @@ buildvariants:
       large_distro_name: ubuntu2004-large
       compile_variant: enterprise-ubuntu2004-64-toolchain-v5
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - ubuntu2004-large
-      - name: test_packages
-        distros:
-          - ubuntu2204-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
           - ubuntu2004-large
-      - name: .release_critical !.requires_large_host
-      - name: .release_critical .requires_large_host
+      - name: .release_critical !.requires_large_host !.publish
+      - name: .release_critical .requires_large_host !.publish
         distros:
           - ubuntu2004-large
 
@@ -338,7 +323,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - ubuntu2204-small
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       additional_package_targets: >-
@@ -370,21 +355,15 @@ buildvariants:
       large_distro_name: ubuntu2204-large
       compile_variant: enterprise-ubuntu2204-64-toolchain-v5
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
-        distros:
-          - ubuntu2204-large
-      - name: compile_test_parallel_unittest_stream_TG
-        distros:
-          - ubuntu2204-large
-      - name: test_packages
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - ubuntu2204-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
           - ubuntu2204-large
-      - name: .release_critical !.requires_large_host
-      - name: .release_critical .requires_large_host
+      - name: .release_critical !.requires_large_host !.publish
+      - name: .release_critical .requires_large_host !.publish
         distros:
           - ubuntu2204-large
 
@@ -393,7 +372,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - ubuntu2404-small
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       additional_package_targets: >-
@@ -425,10 +404,7 @@ buildvariants:
       large_distro_name: ubuntu2404-large
       compile_variant: enterprise-ubuntu2404-toolchain-v5
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
-        distros:
-          - ubuntu2404-large
-      - name: test_packages
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - ubuntu2404-large
       - name: test_packages_release
@@ -438,7 +414,7 @@ buildvariants:
       - name: .development_critical .requires_large_host !.incompatible_oscrypto
         distros:
           - ubuntu2404-large
-      - name: .release_critical !.requires_large_host !.incompatible_oscrypto
-      - name: .release_critical .requires_large_host !.incompatible_oscrypto
+      - name: .release_critical !.requires_large_host !.incompatible_oscrypto !.publish
+      - name: .release_critical .requires_large_host !.incompatible_oscrypto !.publish
         distros:
           - ubuntu2404-large

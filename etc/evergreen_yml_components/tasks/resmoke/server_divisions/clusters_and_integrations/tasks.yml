@@ -3144,7 +3144,30 @@ task_groups:
   # SERVER-76006
   # This is a compile stream meant for non-cached and/or underpowered systems.
   # It joins most of the compile tasks together under a single host spread out
-  # across different tasks.
+  # across different tasks. Excludes 'package'.
+  - <<: *compile_task_group_template
+    name: small_compile_test_serial_no_unittests_TG
+    tasks:
+      - compile_dist_test_half
+      - compile_dist_test
+      - archive_dist_test
+      - archive_dist_test_debug
+      - compile_integration_test
+      - integration_tests_standalone
+      - integration_tests_standalone_audit
+      - integration_tests_standalone_grpc
+      - integration_tests_replset
+      - integration_tests_replset_ssl_auth
+      - integration_tests_sharded
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+      - compile_all_but_not_unittests
+
+  # SERVER-76006
+  # This is a compile stream meant for non-cached and/or underpowered systems.
+  # It joins most of the compile tasks together under a single host spread out
+  # across different tasks. Includes 'package.
   - <<: *compile_task_group_template
     name: small_compile_test_and_package_serial_no_unittests_TG
     tasks:

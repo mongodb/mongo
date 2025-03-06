@@ -476,7 +476,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - amazon2023.3-arm64-small
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -502,18 +502,15 @@ buildvariants:
       scons_cache_scope: shared
       compile_variant: enterprise-amazon2023-arm64-toolchain-v5
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - amazon2023.3-arm64-large
-      - name: test_packages
-        distros:
-          - ubuntu2204-arm64-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
           - amazon2023.3-arm64-large
-      - name: .release_critical !.requires_large_host
-      - name: .release_critical .requires_large_host
+      - name: .release_critical !.requires_large_host !.publish
+      - name: .release_critical .requires_large_host !.publish
         distros:
           - amazon2023.3-arm64-large
 
@@ -522,7 +519,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - amazon2023.3-small
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -548,18 +545,15 @@ buildvariants:
       scons_cache_scope: shared
       compile_variant: enterprise-amazon2023-toolchain-v5
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - amazon2023.3-large
-      - name: test_packages
-        distros:
-          - ubuntu2204-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
           - amazon2023.3-large
-      - name: .release_critical !.requires_large_host
-      - name: .release_critical .requires_large_host
+      - name: .release_critical !.requires_large_host !.publish
+      - name: .release_critical .requires_large_host !.publish
         distros:
           - amazon2023.3-large
 
@@ -568,7 +562,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - amazon2-latest-small
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       test_flags: >-
@@ -594,15 +588,15 @@ buildvariants:
       compile_variant: enterprise-amazon2-streams-toolchain-v5
       large_distro_name: amazon2-latest-large
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - amazon2-latest-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
           - amazon2-latest-large
-      - name: .release_critical !.requires_large_host !crypt_push
-      - name: .release_critical .requires_large_host !crypt_push
+      - name: .release_critical !.requires_large_host !crypt_push !.publish
+      - name: .release_critical .requires_large_host !crypt_push !.publish
         distros:
           - amazon2-latest-large
       - name: streams
@@ -631,7 +625,7 @@ buildvariants:
     display_name: "Enterprise Amazon Linux 2 (v5 toolchain)"
     run_on:
       - amazon2-latest-small
-    activate: false
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       additional_package_targets: >-
@@ -663,18 +657,15 @@ buildvariants:
       core_analyzer_distro_name: amazon2-latest-large
       large_distro_name: amazon2-latest-large
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_serial_no_unittests_TG
         distros:
           - amazon2-latest-large
-      - name: test_packages
-        distros:
-          - ubuntu2204-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
           - amazon2-latest-large
-      - name: .release_critical !.requires_large_host
-      - name: .release_critical .requires_large_host
+      - name: .release_critical !.requires_large_host !.publish
+      - name: .release_critical .requires_large_host !.publish
         distros:
           - amazon2-latest-large
 
