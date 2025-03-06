@@ -100,6 +100,8 @@ buildvariants:
     expansions:
       <<: *linux-x86-dynamic-enterprise-compile-expansions
       compile_variant: *linux-x86-dynamic-compile
+      build_mongot: true
+      download_mongot_release: true
     tasks:
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_core_stream_TG

@@ -84,8 +84,8 @@ buildvariants:
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
         distros:
           - windows-2022-xxlarge
-      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant .requires_execution_on_windows_patch_build
-      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant .requires_execution_on_windows_patch_build
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows .requires_execution_on_windows_patch_build
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows .requires_execution_on_windows_patch_build
         distros:
           - windows-2022-xxlarge
 
@@ -105,8 +105,8 @@ buildvariants:
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
         distros:
           - windows-2022-xxlarge
-      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.requires_execution_on_windows_patch_build
-      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.requires_execution_on_windows_patch_build
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.requires_execution_on_windows_patch_build
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.requires_execution_on_windows_patch_build
         distros:
           - windows-2022-xxlarge
       # server_selection_json_test & server_discovery_and_monitoring_json_test depend on this

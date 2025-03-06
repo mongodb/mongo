@@ -1225,8 +1225,11 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
-        "experimental",
+        "default",
         "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
         "search_e2e_tests",
       ]
     commands:
@@ -1239,8 +1242,11 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
-        "experimental",
+        "default",
         "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
         "search_e2e_tests",
       ]
     commands:
@@ -1255,8 +1261,11 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
-        "experimental",
+        "default",
         "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
         "search_e2e_tests",
       ]
     commands:
@@ -1269,8 +1278,11 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
-        "experimental",
+        "default",
         "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
         "search_e2e_tests",
       ]
     commands:

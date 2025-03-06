@@ -306,6 +306,8 @@ buildvariants:
       # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
       test_flags: >-
         --runAllFeatureFlagTests
+      build_mongot: true
+      download_mongot_release: true
     depends_on:
       - name: archive_dist_test
         variant: *linux_x86_dynamic_compile_variant_name

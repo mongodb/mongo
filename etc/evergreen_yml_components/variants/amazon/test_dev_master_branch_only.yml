@@ -177,10 +177,6 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment
     tasks:
-      - name: search_end_to_end_sharded_cluster
-      - name: search_end_to_end_single_node
-      - name: search_community_end_to_end_sharded_cluster
-      - name: search_community_end_to_end_single_node
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
@@ -216,10 +212,6 @@ buildvariants:
         --additionalFeatureFlags "featureFlagShardAuthoritativeDbMetadata"
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,multiversion_incompatible,incompatible_with_authoritative_shards
     tasks:
-      - name: search_end_to_end_sharded_cluster !.multiversion
-      - name: search_end_to_end_single_node !.multiversion
-      - name: search_community_end_to_end_sharded_cluster !.multiversion
-      - name: search_community_end_to_end_single_node !.multiversion
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
