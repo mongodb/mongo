@@ -206,10 +206,17 @@ public:
             const auto nss = ns();
             const auto shardId = ShardingState::get(opCtx)->shardId();
             const auto& primaryShardId = request().getPrimaryShardId();
+            const auto commandLevel = metadata_consistency_util::getCommandLevel(nss);
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName
+                                  << " can only be run over a specific collection or database",
+                    commandLevel == MetadataConsistencyCommandLevelEnum::kCollectionLevel ||
+                        commandLevel == MetadataConsistencyCommandLevelEnum::kDatabaseLevel);
 
             // Get the list of collections from configsvr sorted by namespace
             const auto catalogClientCollections = [&] {
-                switch (metadata_consistency_util::getCommandLevel(nss)) {
+                switch (commandLevel) {
                     case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
                         return Grid::get(opCtx)->catalogClient()->getCollections(
                             opCtx,
@@ -244,7 +251,7 @@ public:
                 }();
 
                 std::vector<CollectionPtr> localCollections;
-                switch (metadata_consistency_util::getCommandLevel(nss)) {
+                switch (commandLevel) {
                     case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
                         for (auto&& coll : collCatalogSnapshot->range(nss.dbName())) {
                             if (!coll) {
