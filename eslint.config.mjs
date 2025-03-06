@@ -18,227 +18,300 @@ export default [
     ...compat
         .extends("eslint:recommended"),
                 {
-                    ignores: ["src/mongo/gotools/*", "**/*.tpl.js", "jstests/third_party/**/*.js"],
+                    ignores: [
+                        "src/mongo/gotools/*",
+                        "**/*.tpl.js",
+                        "jstests/third_party/**/*.js",
+                    ],
                 },
                 {
                     languageOptions: {
                         globals: {
                             ...globals.mongo,
+
+                            // jstests/global.d.ts
                             TestData: true,
-                            WriteError: true,
-                            WriteCommandError: true,
-                            BulkWriteError: true,
-                            DB: true,
-                            DBCollection: true,
-                            DBQuery: true,
-                            DBExplainQuery: true,
-                            DBCommandCursor: true,
-                            MongoBridge: true,
-                            MongoURI: true,
-                            WriteConcern: true,
-                            SessionOptions: true,
-                            CollInfos: true,
+
+                            // jstests/libs/parallelTester.d.ts
                             CountDownLatch: true,
-                            BSONAwareMap: true,
-                            latestFCV: true,
-                            lastLTSFCV: true,
-                            lastContinuousFCV: true,
-                            checkFCV: true,
-                            isFCVEqual: true,
-                            binVersionToFCV: true,
-                            numVersionsSinceLastLTS: true,
-                            getFCVConstants: true,
-                            removeFCVDocument: true,
-                            targetFCV: true,
+
+                            // src/mongo/shell/assert.d.ts
                             assert: true,
                             doassert: true,
-                            authutil: true,
-                            tojson: true,
-                            tojsononeline: true,
-                            tostrictjson: true,
-                            tojsonObject: true,
-                            toJsonForLog: true,
-                            print: true,
-                            printjson: true,
-                            printjsononeline: true,
-                            jsTest: true,
-                            jsTestLog: true,
-                            jsonTestLog: true,
-                            ErrorCodes: true,
-                            ErrorCodeStrings: true,
-                            checkProgram: true,
-                            Random: true,
+                            sortDoc: true,
+
+                            // src/mongo/shell/bridge.d.ts
+                            MongoBridge: true,
+
+                            // src/mongo/shell/bulk_api.d.ts
+                            BulkWriteError: true,
+                            WriteCommandError: true,
+                            WriteConcern: true,
+                            WriteError: true,
+
+                            // src/mongo/shell/check_log.d.ts
                             checkLog: true,
-                            sleep: true,
-                            resetDbpath: true,
-                            copyDbpath: true,
-                            jsTestName: true,
-                            startParallelShell: true,
-                            buildInfo: true,
-                            getBuildInfo: true,
-                            jsTestOptions: true,
-                            printShardingStatus: true,
-                            _getErrorWithCode: true,
-                            isNetworkError: true,
-                            __magicNoPrint: true,
-                            computeSHA256Block: true,
-                            emit: true,
-                            _awaitRSHostViaRSMonitor: true,
-                            convertShardKeyToHashed: true,
-                            benchRun: true,
-                            benchRunSync: true,
-                            gc: true,
+
+                            // src/mongo/shell/collection.d.ts
+                            DBCollection: true,
+
+                            // src/mongo/shell/data_consistency_checker.d.ts
+                            CollInfos: true,
                             DataConsistencyChecker: true,
-                            isNumber: true,
-                            isObject: true,
-                            isString: true,
-                            stringifyErrorMessageAndAttributes: true,
-                            _createSecurityToken: true,
-                            _createTenantToken: true,
-                            _isAddressSanitizerActive: true,
-                            _isLeakSanitizerActive: true,
-                            _isThreadSanitizerActive: true,
-                            _isUndefinedBehaviorSanitizerActive: true,
-                            _isSpiderMonkeyDebugEnabled: true,
-                            _optimizationsEnabled: true,
+
+                            // src/mongo/shell/db.d.ts
+                            DB: true,
+
+                            // src/mongo/shell/error_codes.d.ts
+                            ErrorCodeStrings: true,
+                            ErrorCodes: true,
+
+                            // src/mongo/shell/explain_query.d.ts
+                            DBExplainQuery: true,
+
+                            // src/mongo/shell/explainable.d.ts
+                            Explainable: true,
+
+                            // src/mongo/shell/feature_compatibility_version.d.ts
+                            binVersionToFCV: true,
+                            checkFCV: true,
+                            isFCVEqual: true,
+                            lastContinuousFCV: true,
+                            lastLTSFCV: true,
+                            latestFCV: true,
+                            numVersionsSinceLastLTS: true,
+                            removeFCVDocument: true,
+                            runFeatureFlagMultiversionTest: true,
+                            targetFCV: true,
+
+                            // src/mongo/shell/query.d.ts
+                            DBQuery: true,
+                            DBCommandCursor: true,
+                            QueryHelpers: true,
+                            ___it___: true,
+
+                            // src/mongo/shell/servers.d.ts
+                            MongoRunner: true,
+                            myPort: true,
+                            runMongoProgram: true,
+                            startMongoProgram: true,
+                            startMongoProgramNoConnect: true,
+
+                            // src/mongo/shell/servers_misc.d.ts
+                            ToolTest: true,
                             allocatePort: true,
                             allocatePorts: true,
                             resetAllocatedPorts: true,
-                            bsonObjToArray: true,
-                            _writeTestPipeObjects: true,
-                            _writeTestPipe: true,
-                            _writeTestPipeBsonFile: true,
-                            _readTestPipes: true,
-                            runFeatureFlagMultiversionTest: true,
-                            isRetryableError: true,
-                            numberDecimalsAlmostEqual: true,
-                            numberDecimalsEqual: true,
-                            debug: true,
-                            bsonsize: true,
+                            startParallelShell: true,
+                            testingReplication: true,
+                            uncheckedParallelShellPidsString: true,
+
+                            // src/mongo/shell/session.d.ts
+                            DriverSession: true,
+                            SessionOptions: true,
                             _DelegatingDriverSession: true,
                             _DummyDriverSession: true,
                             _ServerSession: true,
-                            sortDoc: true,
-                            executeNoThrowNetworkError: true,
-                            _readDumpFile: true,
-                            _openGoldenData: true,
-                            _writeGoldenData: true,
-                            _threadInject: true,
-                            port: true,
+
+                            // src/mongo/shell/shell_utils.d.ts
                             _buildBsonObj: true,
-                            convertTrafficRecordingToBSON: true,
-                            _setShellFailPoint: true,
-                            shellHelper: true,
-                            _srand: true,
-                            _shouldUseImplicitSessions: true,
-                            testingReplication: true,
-                            myPort: true,
-                            retryOnNetworkError: true,
-                            getJSHeapLimitMB: true,
-                            _getEnv: true,
-                            indentStr: true,
-                            _forgetReplSet: true,
-                            _fnvHashToHexString: true,
-                            _resultSetsEqualUnordered: true,
-                            getStringWidth: true,
+                            _closeGoldenData: true,
                             _compareStringsWithCollation: true,
+                            _createSecurityToken: true,
+                            _createTenantToken: true,
+                            _fnvHashToHexString: true,
+                            _isWindows: true,
+                            _openGoldenData: true,
+                            _rand: true,
+                            _replMonitorStats: true,
+                            _resultSetsEqualUnordered: true,
+                            _setShellFailPoint: true,
+                            _srand: true,
+                            _writeGoldenData: true,
+                            benchRun: true,
+                            benchRunSync: true,
+                            computeSHA256Block: true,
+                            convertShardKeyToHashed: true,
+                            fileExists: true,
+                            getBuildInfo: true,
+                            interpreterVersion: true,
+                            isInteractive: true,
+                            numberDecimalsAlmostEqual: true,
+                            numberDecimalsEqual: true,
+
+                            // src/mongo/shell/shell_utils_extended.d.ts
+                            _copyFileRange: true,
+                            _getEnv: true,
+                            _readDumpFile: true,
+                            appendFile: true,
+                            copyDir: true,
+                            copyFile: true,
+                            decompressBSONColumn: true,
+                            getFileMode: true,
+                            getStringWidth: true,
+                            passwordPrompt: true,
+                            umask: true,
+                            writeFile: true,
+
+                            // src/mongo/shell/shell_utils_launcher.d.ts
+                            _readTestPipes: true,
+                            _runMongoProgram: true,
+                            _runningMongoChildProcessIds: true,
+                            _startMongoProgram: true,
+                            _stopMongoProgram: true,
+                            _writeTestPipe: true,
+                            _writeTestPipeBsonFile: true,
+                            _writeTestPipeBsonFileSync: true,
+                            _writeTestPipeObjects: true,
+                            checkProgram: true,
+                            clearRawMongoProgramOutput: true,
+                            convertTrafficRecordingToBSON: true,
+                            copyDbpath: true,
+                            getFCVConstants: true,
+                            pathExists: true,
+                            rawMongoProgramOutput: true,
+                            resetDbpath: true,
+                            run: true,
+                            runNonMongoProgram: true,
+                            runNonMongoProgramQuietly: true,
+                            runProgram: true,
+                            stopMongoProgramByPid: true,
+                            waitMongoProgram: true,
+                            waitProgram: true,
+
+                            // src/mongo/shell/types.d.ts
+                            BSONAwareMap: true,
+                            isNumber: true,
+                            isObject: true,
+                            isString: true,
+                            printjson: true,
+                            printjsononeline: true,
+                            stringifyErrorMessageAndAttributes: true,
+                            toJsonForLog: true,
+                            tojson: true,
+                            tojsonObject: true,
+                            tojsononeline: true,
+
+                            // src/mongo/shell/utils.d.ts
+                            Geo: true,
+                            Random: true,
+                            __autocomplete__: true,
+                            __magicNoPrint: true,
+                            __promptWrapper__: true,
+                            __prompt__: true,
+                            __quiet: true,
+                            _awaitRSHostViaRSMonitor: true,
+                            _barFormat: true,
+                            _getErrorWithCode: true,
+                            _isSpiderMonkeyDebugEnabled: true,
+                            _originalPrint: true,
+                            _shouldRetryWrites: true,
+                            _shouldUseImplicitSessions: true,
+                            _validateMemberIndex: true,
+                            _verboseShell: true,
+                            chatty: true,
+                            compare: true,
+                            compareOn: true,
+                            defaultPrompt: true,
+                            disablePrint: true,
+                            enablePrint: true,
+                            executeNoThrowNetworkError: true,
+                            friendlyEqual: true,
+                            hasErrorCode: true,
+                            helloStatePrompt: true,
+                            help: true,
+                            indentStr: true,
+                            isNetworkError: true,
+                            isRetryableError: true,
+                            jsTest: true,
+                            jsTestOptions: true,
+                            jsTestLog: true,
+                            jsonTestLog: true,
+                            jsTestName: true,
+                            printStackTrace: true,
+                            replSetMemberStatePrompt: true,
+                            retryOnNetworkError: true,
+                            retryOnRetryableError: true,
+                            shellAutocomplete: true,
+                            shellHelper: true,
+                            shellPrint: true,
+                            shellPrintHelper: true,
+                            setVerboseShell: true,
+                            timestampCmp: true,
+
+                            // src/mongo/shell/utils_auth.d.ts
+                            authutil: true,
+
+                            // src/mongo/shell/utils_sh.d.ts
+                            printShardingStatus: true,
+
+                            // src/mongo/scripting/mozjs/bindata.d.ts
+                            BinData: true,
+                            HexData: true,
+                            MD5: true,
+
+                            // src/mongo/scripting/mozjs/bson.d.ts
+                            bsonBinaryEqual: true,
+                            bsonObjToArray: true,
+                            bsonUnorderedFieldsCompare: true,
+                            bsonWoCompare: true,
+
+                            // src/mongo/scripting/mozjs/code.d.ts
+                            Code: true,
+
+                            // src/mongo/scripting/mozjs/dbpointer.d.ts
+                            DBPointer: true,
+
+                            // src/mongo/scripting/mozjs/dbref.d.ts
+                            DBRef: true,
+
+                            // src/mongo/scripting/mozjs/global.d.ts
+                            buildInfo: true,
+                            gc: true,
+                            getJSHeapLimitMB: true,
+                            print: true,
+                            sleep: true,
+
+                            // src/mongo/scripting/mozjs/jsthread.d.ts
+                            _threadInject: true,
+
+                            // src/mongo/scripting/mozjs/maxkey.d.ts
+                            MaxKey: true,
+
+                            // src/mongo/scripting/mozjs/minkey.d.ts
+                            MinKey: true,
+
+                            // src/mongo/scripting/mozjs/mongo.d.ts
+                            _forgetReplSet: true,
+
+                            // src/mongo/scripting/mozjs/numberdecimal.d.ts
+                            NumberDecimal: true,
+
+                            // src/mongo/scripting/mozjs/numberlong.d.ts
+                            NumberLong: true,
+
+                            // src/mongo/scripting/mozjs/object.d.ts
+                            bsonsize: true,
+
+                            // src/mongo/scripting/mozjs/resumetoken.d.ts
+                            decodeResumeToken: true,
                             eventResumeTokenType: true,
                             highWaterMarkResumeTokenType: true,
 
-                            // likely could be replaced with `path`
-                            _copyFileRange: true,
-                            appendFile: true,
-                            copyFile: true,
-                            writeFile: true,
-                            fileExists: true,
-                            pathExists: true,
-                            umask: true,
-                            getFileMode: true,
-                            copyDir: true,
-
-                            // likely could be replaced with `child_process`
-                            MongoRunner: true,
-                            run: true,
-                            runProgram: true,
-                            runMongoProgram: true,
-                            runNonMongoProgram: true,
-                            runNonMongoProgramQuietly: true,
-                            _runMongoProgram: true,
-                            _startMongoProgram: true,
-                            startMongoProgram: true,
-                            _stopMongoProgram: true,
-                            stopMongoProgramByPid: true,
-                            clearRawMongoProgramOutput: true,
-                            rawMongoProgramOutput: true,
-                            waitProgram: true,
-                            waitMongoProgram: true,
-                            _runningMongoChildProcessIds: true,
-                            startMongoProgramNoConnect: true,
-
-                            // shell-specific
-                            shellPrintHelper: true,
-                            shellAutocomplete: true,
-                            __autocomplete__: true,
-                            defaultPrompt: true,
-                            ___it___: true,
-                            __promptWrapper__: true,
-                            passwordPrompt: true,
-                            isInteractive: true,
-
-                            // built-in BSON types and helpers
-                            Code: true,
-                            MaxKey: true,
-                            MinKey: true,
-                            HexData: true,
-                            DBPointer: true,
-                            DBRef: true,
-                            BinData: true,
-                            NumberLong: true,
-                            NumberDecimal: true,
+                            // src/mongo/scripting/mozjs/timestamp.d.ts
                             Timestamp: true,
-                            MD5: true,
-                            Geo: true,
-                            decodeResumeToken: true,
-                            bsonWoCompare: true,
-                            bsonUnorderedFieldsCompare: true,
-                            bsonBinaryEqual: true,
-                            friendlyEqual: true,
-                            timestampCmp: true,
-                            decompressBSONColumn: true,
 
+                            // src/mongo/scripting/mozjs/uri.d.ts
+                            MongoURI: true,
+
+                            // src/mongo/scripting/utils.d.ts
                             hex_md5: true,
-                            QueryHelpers: true,
-                            chatty: true,
-                            DriverSession: true,
-                            ToolTest: true,
-                            uncheckedParallelShellPidsString: true,
-                            _shouldRetryWrites: true,
+                            tostrictjson: true,
 
-                            // from_cpp:
-                            __prompt__: true,
-                            _replMonitorStats: true,
-
-                            // explainable.js
-                            Explainable: true,
-
-                            // utils.js
-                            _verboseShell: true,
-                            __quiet: true,
-                            printStackTrace: true,
-                            setVerboseShell: true,
-                            _barFormat: true,
-                            compare: true,
-                            compareOn: true,
-                            shellPrint: true,
-                            _originalPrint: true,
-                            disablePrint: true,
-                            enablePrint: true,
-                            replSetMemberStatePrompt: true,
-                            hasErrorCode: true,
-                            helloStatePrompt: true,
-                            _validateMemberIndex: true,
-                            help: true,
-                            retryOnRetryableError: true,
+                            // TODO: where are these defined?
+                            debug: true,
+                            emit: true,
+                            port: true,
                         },
 
                         ecmaVersion: 2022,

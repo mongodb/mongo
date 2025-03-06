@@ -6,6 +6,8 @@
     },
     "include": [
         "jstests/**/*.js",
+        "jstests/**/*.d.ts",
+        "src/mongo/scripting/**/*.d.ts",
         "src/mongo/shell/*.js",
         "src/mongo/shell/*.d.ts",
         "src/third_party/fast_check/**/*"

@@ -31,6 +31,8 @@ declare function doassert(
     })
     : never
 
+declare function sortDoc()
+
 declare module assert {
 
     /**
