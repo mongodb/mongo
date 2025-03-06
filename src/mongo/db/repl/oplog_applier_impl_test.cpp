@@ -2460,7 +2460,7 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
     auto collModOp = makeCommandOplogEntry(nextOpTime(), nss, collModCmd, kUuid);
     auto dropCollOp = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()), kUuid);
@@ -2477,7 +2477,7 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
     auto collModOp = makeCommandOplogEntry(nextOpTime(), nss, collModCmd, kUuid);
     auto dropIndexOp = dropIndex("createdAt_index", kUuid);

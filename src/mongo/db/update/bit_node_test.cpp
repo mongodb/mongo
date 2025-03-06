@@ -69,7 +69,7 @@ TEST(BitNodeTest, InitWithArrayFails) {
 
 TEST(BitNodeTest, InitWithEmptyDocumentFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto update = fromjson("{$bit: {a: {}}}}");
+    auto update = fromjson("{$bit: {a: {}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }

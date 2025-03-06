@@ -95,6 +95,14 @@ static const char *LBRACE = "{", *RBRACE = "}", *LBRACKET = "[", *RBRACKET = "]"
                   *RPAREN = ")", *COLON = ":", *COMMA = ",", *FORWARDSLASH = "/",
                   *SINGLEQUOTE = "'", *DOUBLEQUOTE = "\"";
 
+namespace {
+
+bool isAllSpace(StringData str) {
+    return std::all_of(str.begin(), str.end(), [](char c) { return ctype::isSpace(c); });
+}
+
+}  // namespace
+
 JParse::JParse(StringData str)
     : _buf(str.rawData()), _input(_buf), _input_end(_input + str.size()) {}
 
@@ -1448,14 +1456,14 @@ StatusWith<Date_t> JParse::parseDate() {
     return date;
 }
 
-BSONObj fromjson(const char* jsonString, int* len) {
+namespace fromjson_detail {
+
+BSONObj fromJsonImpl(const char* jsonString, size_t len) {
     MONGO_JSON_DEBUG("jsonString: " << jsonString);
-    if (jsonString[0] == '\0') {
-        if (len)
-            *len = 0;
+    if (len == 0) {
         return BSONObj();
     }
-    JParse jparse(jsonString);
+    JParse jparse(StringData{jsonString, len});
     BSONObjBuilder builder;
     Status ret = Status::OK();
     try {
@@ -1469,14 +1477,13 @@ BSONObj fromjson(const char* jsonString, int* len) {
     if (ret != Status::OK()) {
         uasserted(16619, "code {}: {}: {}"_format(ret.code(), ret.codeString(), ret.reason()));
     }
-    if (len)
-        *len = jparse.offset();
+    uassert(ErrorCodes::FailedToParse,
+            "Garbage at end of json string",
+            isAllSpace(jsonString + jparse.offset()));
     return builder.obj();
 }
 
-BSONObj fromjson(const std::string& str) {
-    return fromjson(str.c_str());
-}
+}  // namespace fromjson_detail
 
 std::string tojson(const BSONObj& obj, JsonStringFormat format, bool pretty) {
     return obj.jsonString(format, pretty);

@@ -176,7 +176,7 @@ TEST(DeltaExecutorTest, Insert) {
     }
     {
         // When a path in the diff is same as index path.
-        auto doc = mutablebson::Document(fromjson("{f1: {a: {c: true}}}}"));
+        auto doc = mutablebson::Document(fromjson("{f1: {a: {c: true}}}"));
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {i: {p: false, c: false, b: false}}}}"),

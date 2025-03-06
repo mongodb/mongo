@@ -149,9 +149,9 @@ TEST(PlanCacheKeyInfoTest, ComputeKeySparseIndex) {
                       true,                          // sparse
                       IndexEntry::Identifier{""})};  // name
 
-    unique_ptr<CanonicalQuery> cqEqNumber(canonicalize("{a: 0}}"));
-    unique_ptr<CanonicalQuery> cqEqString(canonicalize("{a: 'x'}}"));
-    unique_ptr<CanonicalQuery> cqEqNull(canonicalize("{a: null}}"));
+    unique_ptr<CanonicalQuery> cqEqNumber(canonicalize("{a: 0}"));
+    unique_ptr<CanonicalQuery> cqEqString(canonicalize("{a: 'x'}"));
+    unique_ptr<CanonicalQuery> cqEqNull(canonicalize("{a: null}"));
 
     // 'cqEqNumber' and 'cqEqString' get the same key, since both are compatible with this
     // index.
@@ -624,7 +624,7 @@ TEST(PlanCacheKeyInfoTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFi
 }
 
 TEST(PlanCacheKeyInfoTest, StableKeyDoesNotChangeAcrossIndexCreation) {
-    unique_ptr<CanonicalQuery> cq(canonicalize("{a: 0}}"));
+    unique_ptr<CanonicalQuery> cq(canonicalize("{a: 0}"));
     const auto preIndexKey = makeKey(*cq);
     const auto preIndexStableKey = preIndexKey.getQueryShape();
     ASSERT_EQ(preIndexKey.getIndexabilityDiscriminators(), "");

@@ -62,7 +62,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
             expCtx->ns.isAdminDB() && expCtx->ns.isCollectionlessAggregateNS());
 
     static const BSONObj kAllCollStatsObj =
-        fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}}");
+        fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}");
     static const BSONObj kGroupObj = fromjson(R"({
         $group: {
             _id: "$ns",

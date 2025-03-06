@@ -814,8 +814,8 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                             "i: {$meta: 'recordId'}, "
                                                             "j: {$meta: 'indexKey'}, "
                                                             "k: {$meta: 'sortKey'}, "
-                                                            "l: {$meta: 'searchScoreDetails'}}, "
-                                                            "m: {$meta: 'vectorSearchScore'}"));
+                                                            "l: {$meta: 'searchScoreDetails'}, "
+                                                            "m: {$meta: 'vectorSearchScore'}}"));
 
     DepsTracker deps;
     inclusion->addDependencies(&deps);
@@ -827,7 +827,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
 
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);

@@ -184,7 +184,7 @@ TEST_F(ChunkManagerTargeterTest, TargetInsertsWithConstantHashedPrefixAndVarying
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}"));
     ASSERT_EQUALS(res.shardName, "1");
 
-    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}, c: 5}"));
+    res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: 5}"));
     ASSERT_EQUALS(res.shardName, "1");
 }
 
@@ -207,7 +207,7 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
 
     // When update targets using query.
     auto requestAndSet = buildUpdate(kNss,
-                                     fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}}"),
+                                     fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}"),
                                      fromjson("{$set: {p : 1}}"),
                                      false);
     res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestAndSet, 0));
@@ -229,7 +229,7 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
     // For replacement style updates, query on _id uses replacement doc to target. If the
     // replacement doc doesn't have shard key fields, then update should be routed to the shard
     // holding 'null' shard key documents.
-    auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}}"), false);
+    auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}"), false);
     res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestReplUpdate, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
@@ -237,7 +237,7 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
 
     // Upsert requires full shard key in query, even if the query can target a single shard.
     auto requestFullKey = buildUpdate(kNss,
-                                      fromjson("{'a.b':  100, 'c.d' : {$exists: false}}}"),
+                                      fromjson("{'a.b':  100, 'c.d' : {$exists: false}}"),
                                       fromjson("{a: {b: -111}}"),
                                       true);
     ASSERT_THROWS_CODE(

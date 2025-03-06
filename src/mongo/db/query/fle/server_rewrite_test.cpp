@@ -94,7 +94,7 @@ protected:
 
 TEST_F(FLEServerRewriteTest, NoFFP_Equality) {
     auto match = fromjson("{ssn: '5'}");
-    auto expected = fromjson("{ssn: '5'}}");
+    auto expected = fromjson("{ssn: '5'}");
 
     auto actual = _mock.rewriteMatchExpressionForTest(match);
     ASSERT_BSONOBJ_EQ(actual, expected);

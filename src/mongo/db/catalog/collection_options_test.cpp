@@ -569,8 +569,7 @@ TEST(FLECollectionOptions, AllowedTypes) {
                     "queries": {"queryType": "equality"}
                 }
             ]
-        }
-    }})"))
+        }})"))
                       .getStatus());
     }
 
@@ -625,7 +624,6 @@ TEST(FLECollectionOptions, DisAllowedTypes) {
                     "queries": {"queryType": "equality"}
                 }
             ]
-        }
     }})"))
                           .getStatus());
     }
