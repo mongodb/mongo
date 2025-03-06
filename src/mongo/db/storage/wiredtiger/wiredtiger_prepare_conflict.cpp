@@ -32,6 +32,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/prepare_conflict_tracker.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_metrics.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
@@ -65,7 +66,7 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx,
                                        RecoveryUnit& ru,
                                        std::function<int()> func) {
     int attempts = 1;
-    ru.getStorageMetrics().incrementPrepareReadConflicts(1);
+    StorageExecutionContext::get(opCtx)->getStorageMetrics().incrementPrepareReadConflicts(1);
     wiredTigerPrepareConflictLog(attempts);
 
     if (!ru.getBlockingAllowed()) {

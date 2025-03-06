@@ -68,7 +68,6 @@ class CappedDeleteSideTxn {
 public:
     CappedDeleteSideTxn(OperationContext* opCtx, const CollectionPtr& collection) : _opCtx(opCtx) {
         ClientLock lk(opCtx->getClient());
-        CurOp::get(opCtx)->updateStorageMetricsOnRecoveryUnitStash(lk);
         _originalRecoveryUnit = shard_role_details::releaseRecoveryUnit(_opCtx, lk).release();
         invariant(_originalRecoveryUnit);
         _originalRecoveryUnitState = shard_role_details::setRecoveryUnit(
@@ -91,12 +90,10 @@ public:
 
     ~CappedDeleteSideTxn() {
         ClientLock lk(_opCtx->getClient());
-        CurOp::get(_opCtx)->updateStorageMetricsOnRecoveryUnitStash(lk);
         shard_role_details::setRecoveryUnit(_opCtx,
                                             std::unique_ptr<RecoveryUnit>(_originalRecoveryUnit),
                                             _originalRecoveryUnitState,
                                             lk);
-        CurOp::get(_opCtx)->updateStorageMetricsOnRecoveryUnitUnstash(lk);
     }
 
 private:

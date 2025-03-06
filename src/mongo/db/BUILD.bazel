@@ -1036,6 +1036,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/stats:timer_stats",
+        "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc",
         "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.

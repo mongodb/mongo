@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -1043,7 +1044,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, OptionalEvictionCanBeInterrupted) {
                                                                    nullptr));
 
         if (enableFeature) {
-            auto stats = shard_role_details::getRecoveryUnit(opCtx)->getStorageMetrics();
+            auto stats = StorageExecutionContext::get(opCtx)->getStorageMetrics();
             ASSERT_EQ(23, stats.interruptDelayMs.load());
         }
     }

@@ -32,7 +32,16 @@
 #include "mongo/util/decorable.h"
 
 namespace mongo {
-const OperationContext::Decoration<StorageExecutionContext> StorageExecutionContext::get =
+
+namespace {
+
+const OperationContext::Decoration<StorageExecutionContext> storageExecutionContextDecoration =
     OperationContext::declareDecoration<StorageExecutionContext>();
+
+}  // namespace
+
+StorageExecutionContext* StorageExecutionContext::get(OperationContext* opCtx) {
+    return &storageExecutionContextDecoration(opCtx);
+}
 
 }  // namespace mongo

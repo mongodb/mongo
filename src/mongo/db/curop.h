@@ -588,18 +588,6 @@ public:
     void updateStatsOnTransactionStash(ClientLock&);
 
     /**
-     * Captures metrics from the recovery unit when it is unstashed to the operation context to
-     * correctly ignore stats from outside this CurOp instance. Requires holding the client lock.
-     */
-    void updateStorageMetricsOnRecoveryUnitUnstash(ClientLock&);
-
-    /**
-     * Captures metrics from the recovery unit that happened during this CurOp instance before a new
-     * recovery unit is set to the operation. Requires holding the client lock.
-     */
-    void updateStorageMetricsOnRecoveryUnitStash(ClientLock&);
-
-    /**
      * Sets the current and max used memory for this CurOp instance.
      *
      * Callers do not need to hold the client lock because CurOp's memory tracking metrics are
@@ -733,11 +721,6 @@ private:
          * Snapshot of locker lock stats.
          */
         SingleThreadedLockStats lockStats;
-
-        /**
-         * Snapshot of storage metrics.
-         */
-        SingleThreadedStorageMetrics storageMetrics;
 
         /**
          * Total time spent waiting on locks.

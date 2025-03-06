@@ -128,6 +128,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/storage:backup_block",
         "//src/mongo/db/storage:capped_snapshots",
+        "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:recovery_unit_base",

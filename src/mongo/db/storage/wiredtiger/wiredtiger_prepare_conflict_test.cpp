@@ -34,6 +34,7 @@
 
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_metrics.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
@@ -93,7 +94,9 @@ TEST_F(WiredTigerPrepareConflictTest, SuccessWithNoConflict) {
 
     ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), *recoveryUnit.get(), successOnFirstTry),
               0);
-    ASSERT_EQ(recoveryUnit.get()->getStorageMetrics().prepareReadConflicts.load(), 0);
+    ASSERT_EQ(
+        StorageExecutionContext::get(opCtx.get())->getStorageMetrics().prepareReadConflicts.load(),
+        0);
     ASSERT_EQ(PrepareConflictTracker::get(opCtx.get()).getThisOpPrepareConflictCount(), 0);
 }
 
@@ -106,7 +109,9 @@ TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictOnce) {
     ASSERT_EQ(wiredTigerPrepareConflictRetry(
                   opCtx.get(), *recoveryUnit.get(), throwWTPrepareConflictOnce),
               0);
-    ASSERT_EQ(recoveryUnit.get()->getStorageMetrics().prepareReadConflicts.load(), 1);
+    ASSERT_EQ(
+        StorageExecutionContext::get(opCtx.get())->getStorageMetrics().prepareReadConflicts.load(),
+        1);
     ASSERT_EQ(PrepareConflictTracker::get(opCtx.get()).getThisOpPrepareConflictCount(), 1);
 }
 
@@ -125,7 +130,9 @@ TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictMultipleTimes) {
     ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), *ru, throwWTPrepareConflictMultipleTimes),
               0);
     // Multiple retries are still considered to be one prepare conflict.
-    ASSERT_EQ(recoveryUnit.get()->getStorageMetrics().prepareReadConflicts.load(), 1);
+    ASSERT_EQ(
+        StorageExecutionContext::get(opCtx.get())->getStorageMetrics().prepareReadConflicts.load(),
+        1);
     ASSERT_EQ(PrepareConflictTracker::get(opCtx.get()).getThisOpPrepareConflictCount(), 1);
 }
 
@@ -139,7 +146,9 @@ TEST_F(WiredTigerPrepareConflictTest, ThrowNonBlocking) {
     ASSERT_THROWS_CODE(wiredTigerPrepareConflictRetry(opCtx.get(), *ru, alwaysFail),
                        StorageUnavailableException,
                        ErrorCodes::WriteConflict);
-    ASSERT_EQ(recoveryUnit.get()->getStorageMetrics().prepareReadConflicts.load(), 1);
+    ASSERT_EQ(
+        StorageExecutionContext::get(opCtx.get())->getStorageMetrics().prepareReadConflicts.load(),
+        1);
 }
 
 }  // namespace

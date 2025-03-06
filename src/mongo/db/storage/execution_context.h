@@ -37,7 +37,20 @@ namespace mongo {
  */
 class StorageExecutionContext {
 public:
-    static const OperationContext::Decoration<StorageExecutionContext> get;
+    /**
+     * Retrieves a reference to the StorageExecutionContext decorating the OperationContext.
+     */
+    static StorageExecutionContext* get(OperationContext* opCtx);
+
+    /**
+     * Retrieve metrics from the storage layer.
+     */
+    AtomicStorageMetrics& getStorageMetrics() {
+        return _storageMetrics;
+    }
+
+private:
+    AtomicStorageMetrics _storageMetrics;
 };
 
 }  // namespace mongo

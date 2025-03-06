@@ -444,13 +444,6 @@ public:
     }
 
     /**
-     * Retrieve metrics from the storage layer.
-     */
-    AtomicStorageMetrics& getStorageMetrics() {
-        return _storageMetrics;
-    }
-
-    /**
      * The ReadSource indicates which external or provided timestamp to read from for future
      * transactions.
      */
@@ -977,7 +970,6 @@ private:
     // Is constructed lazily when accessed or when an underlying storage snapshot is opened.
     boost::optional<Snapshot> _snapshot;
     State _state = State::kInactive;
-    AtomicStorageMetrics _storageMetrics;
     bool _readOnly = false;
     bool _blockingAllowed = true;
 };

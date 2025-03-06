@@ -93,6 +93,7 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/durable_history_pin.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_stats.h"
@@ -3651,12 +3652,11 @@ TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponSt
     txnParticipant.getSingleTransactionStatsForTest()
         .getTransactionStorageMetrics()
         .incrementPrepareReadConflicts(1);
-    shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(
-        2);
+    StorageExecutionContext::get(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(2);
 
     auto storageMetricsToCompare =
         txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
+    storageMetricsToCompare += StorageExecutionContext::get(opCtx())->getStorageMetrics();
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -3677,12 +3677,11 @@ TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponCo
     txnParticipant.getSingleTransactionStatsForTest()
         .getTransactionStorageMetrics()
         .incrementPrepareReadConflicts(1);
-    shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(
-        2);
+    StorageExecutionContext::get(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(2);
 
     auto storageMetricsToCompare =
         txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
+    storageMetricsToCompare += StorageExecutionContext::get(opCtx())->getStorageMetrics();
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -3703,12 +3702,11 @@ TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponAb
     txnParticipant.getSingleTransactionStatsForTest()
         .getTransactionStorageMetrics()
         .incrementPrepareReadConflicts(1);
-    shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(
-        2);
+    StorageExecutionContext::get(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(2);
 
     auto storageMetricsToCompare =
         txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
+    storageMetricsToCompare += StorageExecutionContext::get(opCtx())->getStorageMetrics();
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -4183,13 +4181,14 @@ void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
 /*
  * Sets up the storage metrics for Transactions Metrics test.
  */
-void setupStorageMetrics(const int metricValue, RecoveryUnit* ru) {
-    ru->getStorageMetrics().prepareReadConflicts.store(metricValue);
+void setupStorageMetrics(const int metricValue, OperationContext* opCtx) {
+    StorageExecutionContext::get(opCtx)->getStorageMetrics().prepareReadConflicts.store(
+        metricValue);
 }
 
 void setupMetrics(const int metricValue, OperationContext* opCtx) {
     setupAdditiveMetrics(metricValue, opCtx);
-    setupStorageMetrics(metricValue, shard_role_details::getRecoveryUnit(opCtx));
+    setupStorageMetrics(metricValue, opCtx);
 }
 
 /*
