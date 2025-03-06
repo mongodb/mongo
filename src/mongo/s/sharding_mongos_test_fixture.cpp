@@ -277,7 +277,7 @@ void ShardingTestFixture::setupShards(const std::vector<ShardType>& shards) {
 }
 
 void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) {
-    onFindWithMetadataCommand([this, &shards](const RemoteCommandRequest& request) {
+    onFindCommand([this, &shards](const RemoteCommandRequest& request) {
         const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
             request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
@@ -297,19 +297,12 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
 
         std::vector<BSONObj> shardsToReturn;
 
-        Timestamp maxTopologyTime;
         std::transform(shards.begin(),
                        shards.end(),
                        std::back_inserter(shardsToReturn),
-                       [&maxTopologyTime](const ShardType& shard) {
-                           maxTopologyTime = std::max(shard.getTopologyTime(), maxTopologyTime);
-                           return shard.toBSON();
-                       });
+                       [](const ShardType& shard) { return shard.toBSON(); });
 
-        BSONObjBuilder bob;
-        bob.append(VectorClock::kTopologyTimeFieldName, maxTopologyTime);
-
-        return std::make_tuple(shardsToReturn, bob.obj());
+        return shardsToReturn;
     });
 }
 
