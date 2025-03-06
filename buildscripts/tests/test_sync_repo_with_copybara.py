@@ -66,6 +66,17 @@ class TestBranchFunctions(unittest.TestCase):
         return commit_hashes
 
     @staticmethod
+    def create_repo_branch(repo_directory, branch_name):
+        """
+        Create a branch in a Git repository
+
+        :param repo_directory: The directory path of the Git repository where the branch will be created.
+        :param branch_name: The name of the new branch
+        """
+        os.chdir(repo_directory)
+        sync_repo_with_copybara.run_command(f"git branch {branch_name}")
+
+    @staticmethod
     def mock_search(test_name, num_commits, matched_public_commits):
         """
         Mock search function to simulate finding matching commits.
@@ -134,28 +145,43 @@ class TestBranchFunctions(unittest.TestCase):
     def test_branch_exists(self):
         """Perform a test to check that the branch exists in a repository."""
         test_name = "branch_exists_test"
-        copybara_config = sync_repo_with_copybara.CopybaraConfig(
-            source=None,
-            destination=sync_repo_with_copybara.CopybaraRepoConfig(
-                git_url="https://github.com/mongodb/mongo.git",
-                branch="v7.3",
-            ),
-        )
-        result = sync_repo_with_copybara.check_destination_branch_exists(copybara_config)
-        self.assertTrue(result, f"{test_name}: SUCCESS!")
+        branch = "v0.0"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote_repo_dir = os.path.join(tmpdir, "remote_repo")
+            os.mkdir(remote_repo_dir)
+            self.create_mock_repo_commits(remote_repo_dir, 1)
+            self.create_repo_branch(remote_repo_dir, branch)
+
+            copybara_config = sync_repo_with_copybara.CopybaraConfig(
+                source=None,
+                destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url=remote_repo_dir,
+                    branch=branch,
+                ),
+            )
+            result = sync_repo_with_copybara.check_destination_branch_exists(copybara_config)
+            self.assertTrue(result, f"{test_name}: SUCCESS!")
 
     def test_branch_not_exists(self):
         """Perform a test to check that the branch does not exist in a repository."""
         test_name = "branch_not_exists_test"
-        copybara_config = sync_repo_with_copybara.CopybaraConfig(
-            source=None,
-            destination=sync_repo_with_copybara.CopybaraRepoConfig(
-                git_url="https://github.com/mongodb/mongo.git",
-                branch="..invalid-therefore-impossible-to-create-branch-name",
-            ),
-        )
-        result = sync_repo_with_copybara.check_destination_branch_exists(copybara_config)
-        self.assertFalse(result, f"{test_name}: SUCCESS!")
+        branch = "..invalid-therefore-impossible-to-create-branch-name"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            remote_repo_dir = os.path.join(tmpdir, "remote_repo")
+            os.mkdir(remote_repo_dir)
+            self.create_mock_repo_commits(remote_repo_dir, 1)
+
+            copybara_config = sync_repo_with_copybara.CopybaraConfig(
+                source=None,
+                destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url=remote_repo_dir,
+                    branch=branch,
+                ),
+            )
+            result = sync_repo_with_copybara.check_destination_branch_exists(copybara_config)
+            self.assertFalse(result, f"{test_name}: SUCCESS!")
 
     def test_only_mongodb_mongo_repo(self):
         """Perform a test that the repository is only the MongoDB official repository."""
