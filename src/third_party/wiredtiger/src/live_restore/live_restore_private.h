@@ -21,13 +21,23 @@
 #define WTI_LIVE_RESTORE_STOP_FILE_SUFFIX ".stop"
 #define WTI_LIVE_RESTORE_TEMP_FILE_SUFFIX ".lr_tmp"
 /*
- * WTI_OFFSET_END returns the last byte used by a range (inclusive). i.e. if we have an offset=0 and
- * length=1024 WTI_OFFSET_END returns 1023
+ * WTI_OFFSET_END returns the last byte used by a range (exclusive). i.e. if we have an offset=0 and
+ * length=1024 WTI_OFFSET_END returns 1024
  */
 #define WTI_OFFSET_END(offset, len) (offset + (wt_off_t)len)
 #define WTI_OFFSET_TO_BIT(offset) (uint64_t)((offset) / (wt_off_t)lr_fh->allocsize)
 #define WTI_BIT_TO_OFFSET(bit) (wt_off_t)((bit)*lr_fh->allocsize)
+/*
+ * The end of the bitmap is the portion of the file represented by the bitmap. i.e. a file with
+ * 2*4096 blocks will have a size of 8192 bytes represented.
+ */
+#define WTI_BITMAP_END(lr_fh) ((wt_off_t)(lr_fh)->allocsize * (wt_off_t)(lr_fh)->nbits)
 
+/*
+ * We close the backing source file when migration completes. If we've closed it, or the source file
+ * doesn't exist, there is no more migration work to do.
+ */
+#define WTI_DEST_COMPLETE(lr_fh) ((lr_fh)->source == NULL)
 /*
  * The most aggressive sweep server configuration runs every second. Allow 4 seconds to make sure
  * the server has time to find and close any open file handles.
@@ -40,33 +50,32 @@
  */
 struct __wti_live_restore_file_handle {
     WT_FILE_HANDLE iface;
+    WT_FILE_HANDLE *destination;
+    /* We need to get back to the file system when checking state. */
+    WTI_LIVE_RESTORE_FS *back_pointer;
     uint32_t allocsize;
     WT_FS_OPEN_FILE_TYPE file_type;
 
-    WT_FILE_HANDLE *source;
-    size_t source_size;
-
-    WT_FILE_HANDLE *destination;
-    bool complete;
-
+    /*
+     * This lock protects all of the below fields and should be held for all accesses to them. There
+     * are a few rare exceptions which are listed when they occur.
+     */
+    WT_RWLOCK lock;
     /* Number of bits in the bitmap, should be equivalent to source file size / alloc_size. */
-    WT_RWLOCK bitmap_lock;
     uint64_t nbits;
     uint8_t *bitmap;
-
-    /* We need to get back to the file system when checking state. */
-    WTI_LIVE_RESTORE_FS *back_pointer;
+    WT_FILE_HANDLE *source;
 };
 
 /*
- * WTI_WITH_LIVE_RESTORE_BITMAP_WRITE_LOCK --
+ * WTI_WITH_LIVE_RESTORE_FH_WRITE_LOCK --
  *     Acquire the bitmap list write lock and perform an operation.
  */
-#define WTI_WITH_LIVE_RESTORE_BITMAP_WRITE_LOCK(session, lr_fh, op) \
-    do {                                                            \
-        __wt_writelock((session), &(lr_fh)->bitmap_lock);           \
-        op;                                                         \
-        __wt_writeunlock((session), &(lr_fh)->bitmap_lock);         \
+#define WTI_WITH_LIVE_RESTORE_FH_WRITE_LOCK(session, lr_fh, op) \
+    do {                                                        \
+        __wt_writelock((session), &(lr_fh)->lock);              \
+        op;                                                     \
+        __wt_writeunlock((session), &(lr_fh)->lock);            \
     } while (0)
 
 typedef enum {

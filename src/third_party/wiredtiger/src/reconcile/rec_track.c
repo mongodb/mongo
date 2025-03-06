@@ -483,7 +483,7 @@ __wti_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page, const uint8_t *add
     memcpy(p, value, value_size);
     F_SET(reuse, WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
 
-    __wt_cache_page_inmem_incr(session, page, WT_OVFL_SIZE(reuse, WT_OVFL_REUSE));
+    __wt_cache_page_inmem_incr(session, page, WT_OVFL_SIZE(reuse, WT_OVFL_REUSE), false);
 
     /* Insert the new entry into the skiplist. */
     __ovfl_reuse_skip_search_stack(head, stack, value, value_size);

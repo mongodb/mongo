@@ -178,7 +178,7 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *
      * we added cannot be discarded while visible to any running transaction, and we're a running
      * transaction, which means there can be no corresponding delete until we complete.
      */
-    __wt_cache_page_inmem_incr(session, page, new_ins_size);
+    __wt_cache_page_inmem_incr(session, page, new_ins_size, true);
 
     /* Mark the page dirty after updating the footprint. */
     __wt_page_modify_set(session, page);
@@ -230,7 +230,7 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *ins_
      * we added cannot be discarded while visible to any running transaction, and we're a running
      * transaction, which means there can be no corresponding delete until we complete.
      */
-    __wt_cache_page_inmem_incr(session, page, new_ins_size);
+    __wt_cache_page_inmem_incr(session, page, new_ins_size, true);
 
     /* Mark the page dirty after updating the footprint. */
     __wt_page_modify_set(session, page);
@@ -281,7 +281,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
      * structures we added cannot be discarded while visible to any running transaction, and we're a
      * running transaction, which means there can be no corresponding delete until we complete.
      */
-    __wt_cache_page_inmem_incr(session, page, upd_size);
+    __wt_cache_page_inmem_incr(session, page, upd_size, true);
 
     /* Mark the page dirty after updating the footprint. */
     __wt_page_modify_set(session, page);

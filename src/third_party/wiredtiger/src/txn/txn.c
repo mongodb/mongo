@@ -145,6 +145,8 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 
     /* Leave the generation after releasing the snapshot. */
     __wt_session_gen_leave(session, WT_GEN_HAS_SNAPSHOT);
+
+    __txn_clear_bytes_dirty(session);
 }
 
 /*
@@ -928,7 +930,7 @@ __txn_prepare_rollback_restore_hs_update(
     /* Append the update to the end of the chain. */
     WT_RELEASE_WRITE_WITH_BARRIER(upd_chain->next, upd);
 
-    __wt_cache_page_inmem_incr(session, page, total_size);
+    __wt_cache_page_inmem_incr(session, page, total_size, false);
 
     if (0) {
 err:

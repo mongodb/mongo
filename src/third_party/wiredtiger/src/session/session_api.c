@@ -1776,7 +1776,6 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
     SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(session, ret, begin_transaction);
     SESSION_API_CONF(session, begin_transaction, config, conf);
     WT_STAT_CONN_INCR(session, txn_begin);
-    WT_STAT_SESSION_SET(session, txn_bytes_dirty, 0);
 
     WT_ERR(__wt_txn_context_check(session, false));
 

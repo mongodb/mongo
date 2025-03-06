@@ -110,7 +110,7 @@ err:
     }
 
     /* Increment the cache statistics. */
-    __wt_cache_page_inmem_incr(session, page, size);
+    __wt_cache_page_inmem_incr(session, page, size, false);
     (void)__wt_atomic_add64(&S2C(session)->cache->pages_inmem, 1);
     page->cache_create_gen = __wt_atomic_load64(&S2C(session)->evict->evict_pass_gen);
 
@@ -317,7 +317,7 @@ __wti_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
      * updates to avoid reconciling the page every time.
      */
     __wt_page_modify_clear(session, page);
-    __wt_cache_page_inmem_incr(session, page, total_size);
+    __wt_cache_page_inmem_incr(session, page, total_size, false);
 
     if (0) {
 err:
@@ -444,7 +444,7 @@ __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint3
     }
 
     /* Update the page's cache statistics. */
-    __wt_cache_page_inmem_incr(session, page, size);
+    __wt_cache_page_inmem_incr(session, page, size, false);
 
     if (LF_ISSET(WT_PAGE_DISK_ALLOC))
         __wt_cache_page_image_incr(session, page);

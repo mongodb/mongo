@@ -1590,7 +1590,7 @@ __wti_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t 
      * location in the buffer. If we are crossing the split boundary at the same time, possible when
      * the next record is large enough, just split at this point.
      */
-    if (WT_CROSSING_MIN_BND(r, next_len) && !WT_CROSSING_SPLIT_BND(r, next_len) &&
+    if (WTI_CROSSING_MIN_BND(r, next_len) && !WTI_CROSSING_SPLIT_BND(r, next_len) &&
       !__wti_rec_need_split(r, 0)) {
         /*
          * If the first record doesn't fit into the minimum split size, we end up here. Write the

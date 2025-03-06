@@ -52,14 +52,16 @@ TEST_CASE("Encode various bitmaps", "[live_restore_bitmap]")
     WT_ITEM buf;
     WT_CLEAR(buf);
 
-    REQUIRE(__wt_rwlock_init(session, &lr_fh.bitmap_lock) == 0);
+    REQUIRE(__wt_rwlock_init(session, &lr_fh.lock) == 0);
 
     for (const auto &test : test_bitmaps) {
         lr_fh.bitmap = test.bitmap;
         lr_fh.nbits = test.nbits;
-        __wt_readlock(session, &lr_fh.bitmap_lock);
+        // We need to have a non NULL pointer here for the encoding to take place.
+        lr_fh.source = reinterpret_cast<WT_FILE_HANDLE *>(0xab);
+        __wt_readlock(session, &lr_fh.lock);
         REQUIRE(__ut_live_restore_encode_bitmap(session, &lr_fh, &buf) == 0);
-        __wt_readunlock(session, &lr_fh.bitmap_lock);
+        __wt_readunlock(session, &lr_fh.lock);
         // In the live restore code we only call decode if nbits is not zero.
         if (test.nbits != 0) {
             REQUIRE(
@@ -74,5 +76,5 @@ TEST_CASE("Encode various bitmaps", "[live_restore_bitmap]")
         __wt_buf_free(session, &buf);
         WT_CLEAR(buf);
     }
-    __wt_rwlock_destroy(session, &lr_fh.bitmap_lock);
+    __wt_rwlock_destroy(session, &lr_fh.lock);
 }

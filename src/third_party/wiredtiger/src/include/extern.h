@@ -2078,7 +2078,7 @@ static WT_INLINE void __wt_cache_page_image_incr(WT_SESSION_IMPL *session, WT_PA
 static WT_INLINE void __wt_cache_page_inmem_decr(
   WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
 static WT_INLINE void __wt_cache_page_inmem_incr(
-  WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
+  WT_SESSION_IMPL *session, WT_PAGE *page, size_t size, bool new_update);
 static WT_INLINE void __wt_cell_get_ta(WT_CELL_UNPACK_ADDR *unpack_addr, WT_TIME_AGGREGATE **tap);
 static WT_INLINE void __wt_cell_get_tw(WT_CELL_UNPACK_KV *unpack_value, WT_TIME_WINDOW **twp);
 static WT_INLINE void __wt_cell_type_reset(

@@ -493,7 +493,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
         for (child_refp = child_pindex->index, j = 0; j < slots; ++child_refp, ++root_refp, ++j)
             WT_ERR(__split_ref_move(session, root, root_refp, &root_decr, child_refp, &child_incr));
 
-        __wt_cache_page_inmem_incr(session, child, child_incr);
+        __wt_cache_page_inmem_incr(session, child, child_incr, false);
     }
     WT_ASSERT(session, alloc_refp - alloc_index->index == (ptrdiff_t)alloc_index->entries);
     WT_ASSERT(session, root_refp - pindex->index == (ptrdiff_t)pindex->entries);
@@ -558,7 +558,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     root_decr += size;
 
     /* Adjust the root's memory footprint. */
-    __wt_cache_page_inmem_incr(session, root, root_incr);
+    __wt_cache_page_inmem_incr(session, root, root_incr, false);
     __wt_cache_page_inmem_decr(session, root, root_decr);
 
     WT_STAT_CONN_DSRC_INCR(session, cache_eviction_deepen);
@@ -856,7 +856,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     parent_decr += size;
 
     /* Adjust the parent's memory footprint. */
-    __wt_cache_page_inmem_incr(session, parent, parent_incr);
+    __wt_cache_page_inmem_incr(session, parent, parent_incr, false);
     __wt_cache_page_inmem_decr(session, parent, parent_decr);
 
     /*
@@ -1040,7 +1040,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
         for (child_refp = child_pindex->index, j = 0; j < slots; ++child_refp, ++page_refp, ++j)
             WT_ERR(__split_ref_move(session, page, page_refp, &page_decr, child_refp, &child_incr));
 
-        __wt_cache_page_inmem_incr(session, child, child_incr);
+        __wt_cache_page_inmem_incr(session, child, child_incr, false);
     }
     WT_ASSERT(session, alloc_refp - alloc_index->index == (ptrdiff_t)alloc_index->entries);
     WT_ASSERT(session, page_refp - pindex->index == (ptrdiff_t)pindex->entries);
@@ -1113,7 +1113,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     page_decr += size;
 
     /* Adjust the page's memory footprint. */
-    __wt_cache_page_inmem_incr(session, page, page_incr);
+    __wt_cache_page_inmem_incr(session, page, page_incr, false);
     __wt_cache_page_inmem_decr(session, page, page_decr);
 
     WT_STAT_CONN_DSRC_INCR(session, cache_eviction_split_internal);
@@ -1987,7 +1987,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
      * Update the page accounting.
      */
     __wt_cache_page_inmem_decr(session, page, page_decr);
-    __wt_cache_page_inmem_incr(session, right, right_incr);
+    __wt_cache_page_inmem_incr(session, right, right_incr, false);
 
     /*
      * The act of splitting into the parent releases the pages for eviction; ensure the page
@@ -2031,7 +2031,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     ins_head->tail[0] = moved_ins;
 
     /* Fix up accounting for the page size. */
-    __wt_cache_page_inmem_incr(session, page, page_decr);
+    __wt_cache_page_inmem_incr(session, page, page_decr, false);
 
 err:
     if (split_ref[0] != NULL) {

@@ -1653,15 +1653,15 @@ struct __wt_insert {
 /*
  * Atomically allocate and swap a structure or array into place.
  */
-#define WT_PAGE_ALLOC_AND_SWAP(s, page, dest, v, count)                      \
-    do {                                                                     \
-        if (((v) = (dest)) == NULL) {                                        \
-            WT_ERR(__wt_calloc_def(s, count, &(v)));                         \
-            if (__wt_atomic_cas_ptr(&(dest), NULL, v))                       \
-                __wt_cache_page_inmem_incr(s, page, (count) * sizeof(*(v))); \
-            else                                                             \
-                __wt_free(s, v);                                             \
-        }                                                                    \
+#define WT_PAGE_ALLOC_AND_SWAP(s, page, dest, v, count)                             \
+    do {                                                                            \
+        if (((v) = (dest)) == NULL) {                                               \
+            WT_ERR(__wt_calloc_def(s, count, &(v)));                                \
+            if (__wt_atomic_cas_ptr(&(dest), NULL, v))                              \
+                __wt_cache_page_inmem_incr(s, page, (count) * sizeof(*(v)), false); \
+            else                                                                    \
+                __wt_free(s, v);                                                    \
+        }                                                                           \
     } while (0)
 
 /*

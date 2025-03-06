@@ -137,7 +137,7 @@ __rec_cell_build_leaf_key(
             if (pfx < btree->prefix_compression_min)
                 pfx = 0;
             else if (r->key_pfx_last != 0 && pfx > r->key_pfx_last &&
-              pfx < r->key_pfx_last + WT_KEY_PREFIX_PREVIOUS_MINIMUM)
+              pfx < r->key_pfx_last + WTI_KEY_PREFIX_PREVIOUS_MINIMUM)
                 pfx = r->key_pfx_last;
 
             if (pfx != 0)
@@ -200,7 +200,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
           cursor->value.size, &tw, 0));
 
     /* Boundary: split or write the page. */
-    if (WT_CROSSING_SPLIT_BND(r, key->len + val->len)) {
+    if (WTI_CROSSING_SPLIT_BND(r, key->len + val->len)) {
         /*
          * Turn off prefix compression until a full key written to the new page, and (unless already
          * working with an overflow key), rebuild the key without compression.

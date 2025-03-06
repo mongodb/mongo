@@ -185,6 +185,7 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
     __wt_stats_aggregate_conn(stats, WT_STATS_FIELD_TO_OFFSET(stats, fld))
 #define WT_STAT_DSRC_READ(stats, fld) \
     __wt_stats_aggregate_dsrc(stats, WT_STATS_FIELD_TO_OFFSET(stats, fld))
+#define WT_STAT_SESSION_READ(stats, fld) ((stats)->fld)
 #define WT_STAT_WRITE(session, stats, fld, v) \
     do {                                      \
         if (WT_STAT_ENABLED(session))         \
@@ -229,12 +230,16 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
     WT_STAT_DECRV_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
 #define WT_STAT_CONN_DECR_ATOMIC(session, fld) \
     WT_STAT_DECRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, 1)
+#define WT_STAT_CONN_DECRV_ATOMIC(session, fld, value) \
+    WT_STAT_DECRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
 #define WT_STAT_CONN_DECR(session, fld) WT_STAT_CONN_DECRV(session, fld, 1)
 
 #define WT_STAT_CONN_INCRV(session, fld, value) \
     WT_STAT_INCRV_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
 #define WT_STAT_CONN_INCR_ATOMIC(session, fld) \
     WT_STAT_INCRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, 1)
+#define WT_STAT_CONN_INCRV_ATOMIC(session, fld, value) \
+    WT_STAT_INCRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
 #define WT_STAT_CONN_INCR(session, fld) WT_STAT_CONN_INCRV(session, fld, 1)
 
 #define WT_STATP_CONN_SET(session, stats, fld, value)                           \
@@ -653,6 +658,8 @@ struct __wt_connection_stats {
     int64_t cache_pages_dirty;
     int64_t cache_eviction_blocked_uncommitted_truncate;
     int64_t cache_eviction_clean;
+    int64_t cache_updates_txn_uncommitted_bytes;
+    int64_t cache_updates_txn_uncommitted_count;
     int64_t fsync_all_fh_total;
     int64_t fsync_all_fh;
     int64_t fsync_all_time;
@@ -1433,6 +1440,7 @@ struct __wt_session_stats {
     int64_t bytes_write;
     int64_t lock_dhandle_wait;
     int64_t txn_bytes_dirty;
+    int64_t txn_updates;
     int64_t read_time;
     int64_t write_time;
     int64_t lock_schema_wait;

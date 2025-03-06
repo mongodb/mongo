@@ -8,6 +8,35 @@
 
 #pragma once
 
+#define WTI_CROSSING_MIN_BND(r, next_len) \
+    ((r)->cur_ptr->min_offset == 0 && (next_len) > (r)->min_space_avail)
+#define WTI_CROSSING_SPLIT_BND(r, next_len) ((next_len) > (r)->space_avail)
+#define WTI_CHECK_CROSSING_BND(r, next_len) \
+    (WTI_CROSSING_MIN_BND(r, next_len) || WTI_CROSSING_SPLIT_BND(r, next_len))
+
+/*
+ * WTI_REC_SPLIT_MIN_ITEMS_USE_MEM
+ *     The minimum number of page items (entries on the disk image or saved updates) associated with
+ *     a page required to consider in-memory updates in the split calculation.
+ */
+#define WTI_REC_SPLIT_MIN_ITEMS_USE_MEM 10
+
+/*
+ * WTI_REC_TW_START_VISIBLE_ALL
+ *     Check if the provided time window's start is globally visible as per the saved state on the
+ *     reconciliation structure.
+ *
+ *     An update is considered to be globally visible when its transaction id is less than the
+ *     pinned id, and when its start timestamp is less than or equal to the pinned timestamp.
+ *     Due to a difference in transaction id based visibility and timestamp visibility the timestamp
+ *     comparison is inclusive whereas the transaction id comparison isn't.
+ */
+#define WTI_REC_TW_START_VISIBLE_ALL(r, tw)                    \
+    (WT_TXNID_LT((tw)->start_txn, (r)->rec_start_oldest_id) && \
+      ((tw)->durable_start_ts == WT_TS_NONE ||                 \
+        ((r)->rec_start_pinned_ts != WT_TS_NONE &&             \
+          (tw)->durable_start_ts <= (r)->rec_start_pinned_ts)))
+
 /*
  * WTI_CHILD_MODIFY_STATE --
  *	We review child pages (while holding the child page's WT_REF lock), during internal-page
@@ -268,13 +297,13 @@ struct __wti_reconcile {
     uint32_t count_prepare;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_REC_TIME_NEWEST_START_DURABLE_TS 0x01u
-#define WT_REC_TIME_NEWEST_STOP_DURABLE_TS 0x02u
-#define WT_REC_TIME_NEWEST_STOP_TS 0x04u
-#define WT_REC_TIME_NEWEST_STOP_TXN 0x08u
-#define WT_REC_TIME_NEWEST_TXN 0x10u
-#define WT_REC_TIME_OLDEST_START_TS 0x20u
-#define WT_REC_TIME_PREPARE 0x40u
+#define WTI_REC_TIME_NEWEST_START_DURABLE_TS 0x01u
+#define WTI_REC_TIME_NEWEST_STOP_DURABLE_TS 0x02u
+#define WTI_REC_TIME_NEWEST_STOP_TS 0x04u
+#define WTI_REC_TIME_NEWEST_STOP_TXN 0x08u
+#define WTI_REC_TIME_NEWEST_TXN 0x10u
+#define WTI_REC_TIME_OLDEST_START_TS 0x20u
+#define WTI_REC_TIME_PREPARE 0x40u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t ts_usage_flags;
 
@@ -327,7 +356,7 @@ struct __wti_reconcile {
     WT_ITEM *last, _last; /* Last key/value built */
 
 /* Don't increase key prefix-compression unless there's a significant gain. */
-#define WT_KEY_PREFIX_PREVIOUS_MINIMUM 10
+#define WTI_KEY_PREFIX_PREVIOUS_MINIMUM 10
     uint8_t key_pfx_last; /* Last prefix compression */
 
     bool key_pfx_compress;      /* If can prefix-compress next key */

@@ -148,7 +148,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
           session, r, cbulk->last->data, cbulk->last->size, &tw, cbulk->rle));
 
     /* Boundary: split or write the page. */
-    if (WT_CROSSING_SPLIT_BND(r, val->len))
+    if (WTI_CROSSING_SPLIT_BND(r, val->len))
         WT_RET(__wti_rec_split_crossing_bnd(session, r, val->len));
 
     /* Copy the value onto the page. */

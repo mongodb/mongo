@@ -29,7 +29,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
      * another thread did the work.
      */
     if (__wt_atomic_cas_ptr(&page->modify, NULL, modify))
-        __wt_cache_page_inmem_incr(session, page, sizeof(*modify));
+        __wt_cache_page_inmem_incr(session, page, sizeof(*modify), false);
     else
 err:
         __wt_free(session, modify);

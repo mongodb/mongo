@@ -284,6 +284,8 @@ conn_stats = [
     CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
     CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
+    CacheStat('cache_updates_txn_uncommitted_bytes', 'updates in uncommitted txn - bytes', 'no_clear,no_scale,size'),
+    CacheStat('cache_updates_txn_uncommitted_count', 'updates in uncommitted txn - count', 'no_clear,no_scale,size'),
     CacheStat('cache_write_app_count', 'application threads page write from cache to disk count'),
     CacheStat('cache_write_app_time', 'application threads page write from cache to disk time (usecs)'),
     CacheStat('npos_evict_walk_max', 'eviction walk restored - had to walk this many pages', 'max_aggregate,no_scale'),
@@ -1181,6 +1183,7 @@ session_stats = [
     SessionStat('lock_dhandle_wait', 'dhandle lock wait time (usecs)'),
     SessionStat('lock_schema_wait', 'schema lock wait time (usecs)'),
     SessionStat('read_time', 'page read from disk to cache time (usecs)'),
-    SessionStat('txn_bytes_dirty', 'dirty bytes in this txn'),
+    SessionStat('txn_bytes_dirty', 'dirty bytes in this txn', 'no_clear,no_scale,size'),
+    SessionStat('txn_updates', 'number of updates in this txn', 'no_clear,no_scale,size'),
     SessionStat('write_time', 'page write from cache to disk time (usecs)'),
 ]

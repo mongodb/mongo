@@ -616,7 +616,7 @@ __instantiate_row(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_DELETED *page_d
         WT_ASSERT(session, WT_ROW_INSERT(page, rip) == NULL);
     }
 
-    __wt_cache_page_inmem_incr(session, page, total_size);
+    __wt_cache_page_inmem_incr(session, page, total_size, false);
 
     /*
      * Note that the label is required by the alloc-and-swap macro. There isn't anything we need to

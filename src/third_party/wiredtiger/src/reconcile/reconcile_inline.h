@@ -8,35 +8,6 @@
 
 #pragma once
 
-#define WT_CROSSING_MIN_BND(r, next_len) \
-    ((r)->cur_ptr->min_offset == 0 && (next_len) > (r)->min_space_avail)
-#define WT_CROSSING_SPLIT_BND(r, next_len) ((next_len) > (r)->space_avail)
-#define WT_CHECK_CROSSING_BND(r, next_len) \
-    (WT_CROSSING_MIN_BND(r, next_len) || WT_CROSSING_SPLIT_BND(r, next_len))
-
-/*
- * WT_REC_SPLIT_MIN_ITEMS_USE_MEM
- *     The minimum number of page items (entries on the disk image or saved updates) associated with
- *     a page required to consider in-memory updates in the split calculation.
- */
-#define WT_REC_SPLIT_MIN_ITEMS_USE_MEM 10
-
-/*
- * WT_REC_TW_START_VISIBLE_ALL
- *     Check if the provided time window's start is globally visible as per the saved state on the
- *     reconciliation structure.
- *
- *     An update is considered to be globally visible when its transaction id is less than the
- *     pinned id, and when its start timestamp is less than or equal to the pinned timestamp.
- *     Due to a difference in transaction id based visibility and timestamp visibility the timestamp
- *     comparison is inclusive whereas the transaction id comparison isn't.
- */
-#define WT_REC_TW_START_VISIBLE_ALL(r, tw)                     \
-    (WT_TXNID_LT((tw)->start_txn, (r)->rec_start_oldest_id) && \
-      ((tw)->durable_start_ts == WT_TS_NONE ||                 \
-        ((r)->rec_start_pinned_ts != WT_TS_NONE &&             \
-          (tw)->durable_start_ts <= (r)->rec_start_pinned_ts)))
-
 /*
  * __rec_cell_addr_stats --
  *     Track statistics for time values associated with an address.
@@ -45,19 +16,19 @@ static WT_INLINE void
 __rec_cell_addr_stats(WTI_RECONCILE *r, WT_TIME_AGGREGATE *ta)
 {
     if (ta->newest_start_durable_ts != WT_TS_NONE)
-        FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_START_DURABLE_TS);
+        FLD_SET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_START_DURABLE_TS);
     if (ta->newest_stop_durable_ts != WT_TS_NONE)
-        FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_DURABLE_TS);
+        FLD_SET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_DURABLE_TS);
     if (ta->oldest_start_ts != WT_TS_NONE)
-        FLD_SET(r->ts_usage_flags, WT_REC_TIME_OLDEST_START_TS);
+        FLD_SET(r->ts_usage_flags, WTI_REC_TIME_OLDEST_START_TS);
     if (ta->newest_txn != WT_TXN_NONE)
-        FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_TXN);
+        FLD_SET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_TXN);
     if (ta->newest_stop_ts != WT_TS_MAX)
-        FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_TS);
+        FLD_SET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TS);
     if (ta->newest_stop_txn != WT_TXN_MAX)
-        FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_TXN);
+        FLD_SET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TXN);
     if (ta->prepare != 0)
-        FLD_SET(r->ts_usage_flags, WT_REC_TIME_PREPARE);
+        FLD_SET(r->ts_usage_flags, WTI_REC_TIME_PREPARE);
 }
 
 /*
@@ -160,19 +131,19 @@ __rec_page_time_stats(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     }
 
     /* Time aggregate statistics */
-    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_NEWEST_START_DURABLE_TS))
+    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_START_DURABLE_TS))
         WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_start_durable_ts);
-    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_DURABLE_TS))
+    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_DURABLE_TS))
         WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_durable_ts);
-    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_OLDEST_START_TS))
+    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_OLDEST_START_TS))
         WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_oldest_start_ts);
-    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_NEWEST_TXN))
+    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_TXN))
         WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_txn);
-    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_TS))
+    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TS))
         WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_ts);
-    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_TXN))
+    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TXN))
         WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_txn);
-    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_PREPARE))
+    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_PREPARE))
         WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_prepared);
 }
 
@@ -200,11 +171,11 @@ __wti_rec_need_split(WTI_RECONCILE *r, size_t len)
      * the update structure could skew the calculation, so we subtract the overhead before
      * considering the cache usage by the updates.
      */
-    if (r->page->type == WT_PAGE_ROW_LEAF && page_items > WT_REC_SPLIT_MIN_ITEMS_USE_MEM)
+    if (r->page->type == WT_PAGE_ROW_LEAF && page_items > WTI_REC_SPLIT_MIN_ITEMS_USE_MEM)
         len += (r->supd_memsize - ((size_t)r->supd_next * WT_UPDATE_SIZE)) / 10;
 
     /* Check for the disk image crossing a boundary. */
-    return (WT_CHECK_CROSSING_BND(r, len));
+    return (WTI_CHECK_CROSSING_BND(r, len));
 }
 
 /*
@@ -511,7 +482,7 @@ __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WTI_UPDATE_SELECT
          * Check if the start of the time window is globally visible, and if so remove unnecessary
          * values.
          */
-        if (WT_REC_TW_START_VISIBLE_ALL(r, tw)) {
+        if (WTI_REC_TW_START_VISIBLE_ALL(r, tw)) {
             /* The durable timestamp should never be less than the start timestamp. */
             WT_ASSERT(session, tw->start_ts <= tw->durable_start_ts);
 
