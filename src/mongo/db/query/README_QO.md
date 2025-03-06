@@ -13,9 +13,9 @@ _Disclaimer_: This guide (SPM-2301) is a work in progress.
     - [`MatchExpression` Rewrites](../matcher/README.md)
     - [Pipeline Rewrites](../pipeline/README.md)
   - [Views](../views/README.md)
-- [III. Index Selection](#)
+- III. Index Selection
   - [QueryPlanner and Plan Enumeration](#)
-  - [Classic Runtime Planners](#)
+  - [Classic Runtime Planning](classic_runtime_planner/README.md)
   - [Cost Based Ranker](#)
     - [Cost Model](#)
     - [Cardinality Estimation](#)
