@@ -10,6 +10,11 @@
 #include <thread>
 #include <vector>
 
+// Deliberately using old-style casts for C and C++ compatibility.
+#if defined(__clang__)
+_Pragma("clang diagnostic ignored \"-Wold-style-cast\"");
+#endif
+
 #if (defined(__GNUC__) && __GNUC__ < 7 && !defined(__clang__)) || (defined(_MSC_VER) && _MSC_VER < 1920)
 // Old GCC and old MSVC have partially-broken constexpr that prevents us from
 // properly using static_assert with from_string()

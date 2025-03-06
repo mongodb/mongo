@@ -17,6 +17,7 @@
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt-private.h"
 
+#include "mc-dec128.h"
 #include "mc-fle-blob-subtype-private.h"
 #include "mc-fle2-payload-iev-private-v2.h"
 #include "mc-fle2-tag-and-encrypted-metadata-block-private.h"
@@ -27,7 +28,6 @@
 #include <stdint.h>
 
 #define kMinServerEncryptedValueLen 17U // IV(16) + EncryptCTR(1byte)
-#define kMinSEVAndMetadataLen (kMinServerEncryptedValueLen + kMetadataLen)
 
 #define CHECK_AND_RETURN(x)                                                                                            \
     if (!(x)) {                                                                                                        \
@@ -539,7 +539,7 @@ bool mc_FLE2IndexedEncryptedValueV2_parse(mc_FLE2IndexedEncryptedValueV2_t *iev,
     }
 
     mc_reader_t reader;
-    mc_reader_init_from_buffer(&reader, buf, __FUNCTION__);
+    mc_reader_init_from_buffer(&reader, buf, __func__);
 
     CHECK_AND_RETURN(mc_reader_read_u8(&reader, &iev->fle_blob_subtype, status));
 
@@ -655,7 +655,7 @@ bool mc_FLE2IndexedEncryptedValueV2_serialize(const mc_FLE2IndexedEncryptedValue
     uint32_t expected_len = mc_FLE2IndexedEncryptedValueV2_serialized_length(iev);
     mc_writer_t writer;
     _mongocrypt_buffer_resize(buf, expected_len);
-    mc_writer_init_from_buffer(&writer, buf, __FUNCTION__);
+    mc_writer_init_from_buffer(&writer, buf, __func__);
 
     // Serialize fle_blob_subtype
     CHECK_AND_RETURN(mc_writer_write_u8(&writer, iev->fle_blob_subtype, status));
@@ -721,7 +721,7 @@ static bool is_fle2_range_indexed_supported_type(int bson_type) {
     case BSON_TYPE_INT64:
     case BSON_TYPE_DATE_TIME:
     case BSON_TYPE_DOUBLE:
-#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
     case BSON_TYPE_DECIMAL128:
 #endif
         return true;

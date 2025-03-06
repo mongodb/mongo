@@ -2617,3 +2617,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/zstandard @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/SConscript @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/*.bazel @10gen/devprod-build @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/third_party/libmongocrypt/OWNERS.yml
+/src/third_party/libmongocrypt/**/* @10gen/server-security @svc-auto-approve-bot

@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include "mongocrypt-cache-collinfo-private.h"
+
+//
+
 #include "mongocrypt-cache-private.h"
 
 /* The collinfo cache.

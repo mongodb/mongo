@@ -36,6 +36,8 @@ mcr_dll mcr_dll_open(const char *filepath_) {
     return (mcr_dll){.error_string = NULL, ._native_handle = lib};
 }
 
+void mcr_dll_close_handle(mcr_dll); // -Wmissing-prototypes: not for external use despite external linkage.
+
 void mcr_dll_close_handle(mcr_dll dll) {
     if (dll._native_handle) {
         FreeLibrary(dll._native_handle);
@@ -50,7 +52,7 @@ mcr_dll_path_result mcr_dll_path(mcr_dll dll) {
     mstr ret_str = MSTR_NULL;
     int ret_error = 0;
     DWORD acc_size = 512;
-    while (!ret_str.data && !ret_error) {
+    while (!ret_str.raw.data && !ret_error) {
         // Loop until we allocate a large enough buffer or get an error
         wchar_t *path = calloc((size_t)acc_size + 1u, sizeof(wchar_t));
         SetLastError(0);

@@ -5,16 +5,16 @@
 
 #define test_predicate(Bool, Left, Pred, Right) MSTR_ASSERT(Bool, mstrv_lit(Left), Pred, mstrv_lit(Right))
 
-int main() {
+int main(void) {
     // Test the null-initializers:
     mstr str = MSTR_NULL;
     mstr_view null_view = MSTRV_NULL;
     (void)null_view;
 
     str = mstr_copy_cstr("foo");
-    CHECK(str.len == 3);
+    CHECK(str.raw.len == 3);
     MSTR_ASSERT_EQ(str.view, mstrv_lit("foo"));
-    CHECK(strncmp(str.data, "foo", 3) == 0);
+    CHECK(strncmp(str.raw.data, "foo", 3) == 0);
 
     mstr_inplace_append(&str, mstrv_lit("bar"));
     MSTR_ASSERT_EQ(str.view, mstrv_lit("foobar"));

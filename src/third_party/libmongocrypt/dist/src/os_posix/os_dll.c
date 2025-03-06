@@ -2,13 +2,15 @@
 #if defined(__has_include) && !(defined(_GNU_SOURCE) || defined(_DARWIN_C_SOURCE))
 #if __has_include(<features.h>)
 // We're using a glibc-compatible library
+#if !defined(_GNU_SOURCE)
 #define _GNU_SOURCE
+#endif
 #elif __has_include(<Availability.h>)
 // We're on Apple/Darwin
 #define _DARWIN_C_SOURCE
 #endif
 #else // No __has_include
-#if __GNUC__ < 5
+#if __GNUC__ < 5 && !defined(_GNU_SOURCE)
 // Best guess on older GCC is that we are using glibc
 #define _GNU_SOURCE
 #endif
@@ -40,6 +42,8 @@ mcr_dll mcr_dll_open(const char *filepath) {
         };
     }
 }
+
+void mcr_dll_close_handle(mcr_dll); // -Wmissing-prototypes: not for external use despite external linkage.
 
 void mcr_dll_close_handle(mcr_dll dll) {
     if (dll._native_handle) {

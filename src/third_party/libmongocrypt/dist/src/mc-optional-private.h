@@ -89,7 +89,7 @@ typedef struct {
 #define OPT_DOUBLE_C(val)                                                                                              \
     { .set = true, .value = val }
 
-#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 typedef struct {
     bool set;
     mc_dec128 value;

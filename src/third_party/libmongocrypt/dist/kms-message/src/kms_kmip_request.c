@@ -83,7 +83,7 @@ kms_kmip_request_register_secretdata_new (void *reserved,
 
    if (len != KMS_KMIP_REQUEST_SECRETDATA_LENGTH) {
       KMS_ERROR (req,
-                 "expected SecretData length of %d, got %" PRIu32,
+                 "expected SecretData length of %d, got %zu",
                  KMS_KMIP_REQUEST_SECRETDATA_LENGTH,
                  len);
       return req;
@@ -463,4 +463,3 @@ kms_kmip_request_decrypt_new (void *reserved, const char* unique_identifer, cons
    */
    return kmip_encrypt_decrypt(unique_identifer, ciphertext, len, iv_data, iv_len, false);
 }
-

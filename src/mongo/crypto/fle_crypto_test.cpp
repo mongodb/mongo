@@ -397,52 +397,94 @@ TEST_F(ServiceContextTest, FLETokens_TestVectors) {
                       "52387ea6942d9299a89f70a2a4d8a4209ea1dfe56e29f6c0e3182ca7818b5c9c"_sd)),
                   serverTextPrefixToken);
 
+    auto edcTextExactDerivedFromDataToken =
+        EDCTextExactDerivedFromDataToken::deriveFrom(edcTextExactToken, sampleValue);
+    ASSERT_EQUALS(EDCTextExactDerivedFromDataToken(decodePrf(
+                      "6006D61E9E985EE8F6490AEBF0BFD120BF7A94317646165584894DA6ECBF0E97"_sd)),
+                  edcTextExactDerivedFromDataToken);
+    auto edcTextSubstringDerivedFromDataToken =
+        EDCTextSubstringDerivedFromDataToken::deriveFrom(edcTextSubstringToken, sampleValue);
+    ASSERT_EQUALS(EDCTextSubstringDerivedFromDataToken(decodePrf(
+                      "4DAB3B274AA5D5E99ECBD7F139CD420F25305C9F082B25AA96F1C9FE6E2122E3"_sd)),
+                  edcTextSubstringDerivedFromDataToken);
+    auto edcTextSuffixDerivedFromDataToken =
+        EDCTextSuffixDerivedFromDataToken::deriveFrom(edcTextSuffixToken, sampleValue);
+    ASSERT_EQUALS(EDCTextSuffixDerivedFromDataToken(decodePrf(
+                      "997F4A0B518F6C872951B65DCF26676D3886C98502FE0A7CC4F9C5EA4F30E94B"_sd)),
+                  edcTextSuffixDerivedFromDataToken);
+    auto edcTextPrefixDerivedFromDataToken =
+        EDCTextPrefixDerivedFromDataToken::deriveFrom(edcTextPrefixToken, sampleValue);
+    ASSERT_EQUALS(EDCTextPrefixDerivedFromDataToken(decodePrf(
+                      "D3EBDD34BCACD11C5929A09D2A897EB7938ABD4756CAB805F46FF0F4AFFA7583"_sd)),
+                  edcTextPrefixDerivedFromDataToken);
+
     auto edcTextExactDerivedFromDataTokenAndContentionFactorToken =
         EDCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            edcTextExactToken, sampleValue, counter);
+            edcTextExactDerivedFromDataToken, counter);
     ASSERT_EQUALS(EDCTextExactDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "3551507189d32cc7768390cdd83071deeb3055ca86c4756b16bb740024b23610"_sd)),
                   edcTextExactDerivedFromDataTokenAndContentionFactorToken);
     auto edcTextSubstringDerivedFromDataTokenAndContentionFactorToken =
         EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            edcTextSubstringToken, sampleValue, counter);
+            edcTextSubstringDerivedFromDataToken, counter);
     ASSERT_EQUALS(EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "4b52f6daf3b688971eb5819820c3468b3c79ba45fd3e86134351f9baf203e0d1"_sd)),
                   edcTextSubstringDerivedFromDataTokenAndContentionFactorToken);
     auto edcTextSuffixDerivedFromDataTokenAndContentionFactorToken =
         EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            edcTextSuffixToken, sampleValue, counter);
+            edcTextSuffixDerivedFromDataToken, counter);
     ASSERT_EQUALS(EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "c1f273913631a9a1b36fea884b3c8a3a141c9e21556981094ba15f262e540ac7"_sd)),
                   edcTextSuffixDerivedFromDataTokenAndContentionFactorToken);
     auto edcTextPrefixDerivedFromDataTokenAndContentionFactorToken =
         EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            edcTextPrefixToken, sampleValue, counter);
+            edcTextPrefixDerivedFromDataToken, counter);
     ASSERT_EQUALS(EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "a8d68ebdb0e2d31754f693c56071b0b1d225e6ec5568aff875bd4f7c48c24f66"_sd)),
                   edcTextPrefixDerivedFromDataTokenAndContentionFactorToken);
 
+    auto escTextExactDerivedFromDataToken =
+        ESCTextExactDerivedFromDataToken::deriveFrom(escTextExactToken, sampleValue);
+    ASSERT_EQUALS(ESCTextExactDerivedFromDataToken(decodePrf(
+                      "6D3311B3DE0E32DBFE55A565327AD4B99D670474DDEF52AA200FC79D76B8C7C4"_sd)),
+                  escTextExactDerivedFromDataToken);
+    auto escTextSubstringDerivedFromDataToken =
+        ESCTextSubstringDerivedFromDataToken::deriveFrom(escTextSubstringToken, sampleValue);
+    ASSERT_EQUALS(ESCTextSubstringDerivedFromDataToken(decodePrf(
+                      "0E9D0F7C42658DD6894D3CBE34FFA0D39BE00BA72A21AC79BC3712B25783D247"_sd)),
+                  escTextSubstringDerivedFromDataToken);
+    auto escTextSuffixDerivedFromDataToken =
+        ESCTextSuffixDerivedFromDataToken::deriveFrom(escTextSuffixToken, sampleValue);
+    ASSERT_EQUALS(ESCTextSuffixDerivedFromDataToken(decodePrf(
+                      "A95860B4A08B39B002E5AEE557268786BE4E6D5A8552090DC397FBDB34374313"_sd)),
+                  escTextSuffixDerivedFromDataToken);
+    auto escTextPrefixDerivedFromDataToken =
+        ESCTextPrefixDerivedFromDataToken::deriveFrom(escTextPrefixToken, sampleValue);
+    ASSERT_EQUALS(ESCTextPrefixDerivedFromDataToken(decodePrf(
+                      "8DF7341DD42C1CEE8411657AFAEA424BFA818A539BF0668E1C355FC2A555E11A"_sd)),
+                  escTextPrefixDerivedFromDataToken);
+
     auto escTextExactDerivedFromDataTokenAndContentionFactorToken =
         ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            escTextExactToken, sampleValue, counter);
+            escTextExactDerivedFromDataToken, counter);
     ASSERT_EQUALS(ESCTextExactDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "4cd82a4883ab0a6224a24937066f94827f5107e8bb2f0fa841e10aff8d49e8e4"_sd)),
                   escTextExactDerivedFromDataTokenAndContentionFactorToken);
     auto escTextSubstringDerivedFromDataTokenAndContentionFactorToken =
         ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            escTextSubstringToken, sampleValue, counter);
+            escTextSubstringDerivedFromDataToken, counter);
     ASSERT_EQUALS(ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "94f116183f14442e335902756e5b730683cd998c683b90d04dc9e8f48684bdb2"_sd)),
                   escTextSubstringDerivedFromDataTokenAndContentionFactorToken);
     auto escTextSuffixDerivedFromDataTokenAndContentionFactorToken =
         ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            escTextSuffixToken, sampleValue, counter);
+            escTextSuffixDerivedFromDataToken, counter);
     ASSERT_EQUALS(ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "13390024c674c2d131771cf95af9787c8c7ef76b5d63078b3dc482cb4075a634"_sd)),
                   escTextSuffixDerivedFromDataTokenAndContentionFactorToken);
     auto escTextPrefixDerivedFromDataTokenAndContentionFactorToken =
         ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            escTextPrefixToken, sampleValue, counter);
+            escTextPrefixDerivedFromDataToken, counter);
     ASSERT_EQUALS(ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "9d0d5f84de779360c43be8e61710deb4b2705b6bf1e11ee41fba09fd4486b7c6"_sd)),
                   escTextPrefixDerivedFromDataTokenAndContentionFactorToken);
@@ -2060,12 +2102,16 @@ static FLE2InsertUpdatePayloadV2 generateTestIUPV2ForTextSearch(BSONElement elem
     auto& tsts = iupayload.getTextSearchTokenSets().value();
     {
         auto& exact = tsts.getExactTokenSet();
+        auto edcDataDerivedToken = EDCTextExactDerivedFromDataToken::deriveFrom(
+            EDCTextExactToken::deriveFrom(edcToken), value);
+        auto escDataDerivedToken = ESCTextExactDerivedFromDataToken::deriveFrom(
+            ESCTextExactToken::deriveFrom(escToken), value);
         exact.setEdcDerivedToken(
             EDCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                EDCTextExactToken::deriveFrom(edcToken), value, contention));
+                edcDataDerivedToken, contention));
         exact.setEscDerivedToken(
             ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                ESCTextExactToken::deriveFrom(escToken), value, contention));
+                escDataDerivedToken, contention));
         exact.setServerDerivedFromDataToken(ServerTextExactDerivedFromDataToken::deriveFrom(
             ServerTextExactToken::deriveFrom(serverDerivationToken), value));
         exact.setEncryptedTokens(
@@ -2101,12 +2147,17 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
         if (type == QueryTypeEnum::SubstringPreview) {
             tsts.getSubstringTokenSets().push_back({});
             auto& ts = tsts.getSubstringTokenSets().back();
+            auto edcDataDerivedToken = EDCTextSubstringDerivedFromDataToken::deriveFrom(
+                EDCTextSubstringToken::deriveFrom(edcToken), value);
+            auto escDataDerivedToken = ESCTextSubstringDerivedFromDataToken::deriveFrom(
+                ESCTextSubstringToken::deriveFrom(escToken), value);
+
             ts.setEdcDerivedToken(
                 EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                    EDCTextSubstringToken::deriveFrom(edcToken), value, contention));
+                    edcDataDerivedToken, contention));
             ts.setEscDerivedToken(
                 ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                    ESCTextSubstringToken::deriveFrom(escToken), value, contention));
+                    escDataDerivedToken, contention));
             ts.setServerDerivedFromDataToken(ServerTextSubstringDerivedFromDataToken::deriveFrom(
                 ServerTextSubstringToken::deriveFrom(serverDerivationToken), value));
             ts.setEncryptedTokens(
@@ -2117,12 +2168,17 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
         } else if (type == QueryTypeEnum::SuffixPreview) {
             tsts.getSuffixTokenSets().push_back({});
             auto& ts = tsts.getSuffixTokenSets().back();
+            auto edcDataDerivedToken = EDCTextSuffixDerivedFromDataToken::deriveFrom(
+                EDCTextSuffixToken::deriveFrom(edcToken), value);
+            auto escDataDerivedToken = ESCTextSuffixDerivedFromDataToken::deriveFrom(
+                ESCTextSuffixToken::deriveFrom(escToken), value);
+
             ts.setEdcDerivedToken(
                 EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                    EDCTextSuffixToken::deriveFrom(edcToken), value, contention));
+                    edcDataDerivedToken, contention));
             ts.setEscDerivedToken(
                 ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                    ESCTextSuffixToken::deriveFrom(escToken), value, contention));
+                    escDataDerivedToken, contention));
             ts.setServerDerivedFromDataToken(ServerTextSuffixDerivedFromDataToken::deriveFrom(
                 ServerTextSuffixToken::deriveFrom(serverDerivationToken), value));
             ts.setEncryptedTokens(
@@ -2133,12 +2189,17 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
         } else if (type == QueryTypeEnum::PrefixPreview) {
             tsts.getPrefixTokenSets().push_back({});
             auto& ts = tsts.getPrefixTokenSets().back();
+            auto edcDataDerivedToken = EDCTextPrefixDerivedFromDataToken::deriveFrom(
+                EDCTextPrefixToken::deriveFrom(edcToken), value);
+            auto escDataDerivedToken = ESCTextPrefixDerivedFromDataToken::deriveFrom(
+                ESCTextPrefixToken::deriveFrom(escToken), value);
+
             ts.setEdcDerivedToken(
                 EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                    EDCTextPrefixToken::deriveFrom(edcToken), value, contention));
+                    edcDataDerivedToken, contention));
             ts.setEscDerivedToken(
                 ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                    ESCTextPrefixToken::deriveFrom(escToken), value, contention));
+                    escDataDerivedToken, contention));
             ts.setServerDerivedFromDataToken(ServerTextPrefixDerivedFromDataToken::deriveFrom(
                 ServerTextPrefixToken::deriveFrom(serverDerivationToken), value));
             ts.setEncryptedTokens(

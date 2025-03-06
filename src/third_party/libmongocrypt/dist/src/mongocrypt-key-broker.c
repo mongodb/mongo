@@ -24,11 +24,11 @@ typedef struct _auth_request_t {
     char *kmsid;
 } auth_request_t;
 
-auth_request_t *auth_request_new() {
+static auth_request_t *auth_request_new(void) {
     return bson_malloc0(sizeof(auth_request_t));
 }
 
-void auth_request_destroy(auth_request_t *ar) {
+static void auth_request_destroy(auth_request_t *ar) {
     if (!ar) {
         return;
     }
@@ -41,13 +41,13 @@ struct _mc_mapof_kmsid_to_authrequest_t {
     mc_array_t entries;
 };
 
-mc_mapof_kmsid_to_authrequest_t *mc_mapof_kmsid_to_authrequest_new(void) {
+static mc_mapof_kmsid_to_authrequest_t *mc_mapof_kmsid_to_authrequest_new(void) {
     mc_mapof_kmsid_to_authrequest_t *k2a = bson_malloc0(sizeof(mc_mapof_kmsid_to_authrequest_t));
     _mc_array_init(&k2a->entries, sizeof(auth_request_t *));
     return k2a;
 }
 
-void mc_mapof_kmsid_to_authrequest_destroy(mc_mapof_kmsid_to_authrequest_t *k2a) {
+static void mc_mapof_kmsid_to_authrequest_destroy(mc_mapof_kmsid_to_authrequest_t *k2a) {
     if (!k2a) {
         return;
     }
@@ -59,7 +59,7 @@ void mc_mapof_kmsid_to_authrequest_destroy(mc_mapof_kmsid_to_authrequest_t *k2a)
     bson_free(k2a);
 }
 
-bool mc_mapof_kmsid_to_authrequest_has(const mc_mapof_kmsid_to_authrequest_t *k2a, const char *kmsid) {
+static bool mc_mapof_kmsid_to_authrequest_has(const mc_mapof_kmsid_to_authrequest_t *k2a, const char *kmsid) {
     BSON_ASSERT_PARAM(k2a);
     BSON_ASSERT_PARAM(kmsid);
     for (size_t i = 0; i < k2a->entries.len; i++) {
@@ -71,25 +71,25 @@ bool mc_mapof_kmsid_to_authrequest_has(const mc_mapof_kmsid_to_authrequest_t *k2
     return false;
 }
 
-size_t mc_mapof_kmsid_to_authrequest_len(const mc_mapof_kmsid_to_authrequest_t *k2a) {
+static size_t mc_mapof_kmsid_to_authrequest_len(const mc_mapof_kmsid_to_authrequest_t *k2a) {
     BSON_ASSERT_PARAM(k2a);
     return k2a->entries.len;
 }
 
-bool mc_mapof_kmsid_to_authrequest_empty(const mc_mapof_kmsid_to_authrequest_t *k2a) {
+static bool mc_mapof_kmsid_to_authrequest_empty(const mc_mapof_kmsid_to_authrequest_t *k2a) {
     BSON_ASSERT_PARAM(k2a);
     return k2a->entries.len == 0;
 }
 
 // `mc_mapof_kmsid_to_authrequest_put` moves `to_put` into the map and takes ownership of `to_put`.
 // No checking is done to prohibit duplicate entries.
-void mc_mapof_kmsid_to_authrequest_put(mc_mapof_kmsid_to_authrequest_t *k2a, auth_request_t *to_put) {
+static void mc_mapof_kmsid_to_authrequest_put(mc_mapof_kmsid_to_authrequest_t *k2a, auth_request_t *to_put) {
     BSON_ASSERT_PARAM(k2a);
 
     _mc_array_append_val(&k2a->entries, to_put);
 }
 
-auth_request_t *mc_mapof_kmsid_to_authrequest_at(mc_mapof_kmsid_to_authrequest_t *k2a, size_t i) {
+static auth_request_t *mc_mapof_kmsid_to_authrequest_at(mc_mapof_kmsid_to_authrequest_t *k2a, size_t i) {
     BSON_ASSERT_PARAM(k2a);
 
     return _mc_array_index(&k2a->entries, auth_request_t *, i);

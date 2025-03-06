@@ -173,6 +173,8 @@ bool _native_crypto_aes_256_cbc_decrypt(aes_256_args_t args) {
     return _decrypt_with_cipher(EVP_aes_256_cbc(), args);
 }
 
+bool _native_crypto_aes_256_ecb_encrypt(aes_256_args_t args); // -Wmissing-prototypes: for testing only.
+
 bool _native_crypto_aes_256_ecb_encrypt(aes_256_args_t args) {
     return _encrypt_with_cipher(EVP_aes_256_ecb(), args);
 }

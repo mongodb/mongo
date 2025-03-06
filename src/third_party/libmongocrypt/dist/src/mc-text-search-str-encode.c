@@ -181,7 +181,7 @@ mc_str_encode_sets_t *mc_text_search_str_encode(const mc_FLE2TextSearchInsertSpe
                                                 mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(spec);
     if (spec->len > MAX_ENCODE_BYTE_LEN) {
-        CLIENT_ERR("StrEncode: String passed in was too long: String was %u bytes, but max is %u bytes",
+        CLIENT_ERR("StrEncode: String passed in was too long: String was %" PRIu32 " bytes, but max is %d bytes",
                    spec->len,
                    MAX_ENCODE_BYTE_LEN);
         return NULL;

@@ -25,7 +25,7 @@
  * A non-owning forward-only cursor api to write to a buffer.
  *
  * Tracks length of buffer and current position of buffer. parser_name is
- * typically __FUNCTION__ to provide useful error messages automatically.
+ * typically __func__ to provide useful error messages automatically.
  *
  * All numbers are written as little endian.
  */

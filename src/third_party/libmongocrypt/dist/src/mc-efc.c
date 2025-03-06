@@ -51,7 +51,7 @@ _parse_supported_query_types(bson_iter_t *iter, supported_query_type_flags *out,
     BSON_ASSERT_PARAM(iter);
     BSON_ASSERT_PARAM(out);
     if (!BSON_ITER_HOLDS_DOCUMENT(iter)) {
-        CLIENT_ERR("When parsing supported query types: Expected type document, got: %d", bson_iter_type(iter));
+        CLIENT_ERR("When parsing supported query types: Expected type document, got: %d", (int)bson_iter_type(iter));
         return false;
     }
 
@@ -66,7 +66,7 @@ _parse_supported_query_types(bson_iter_t *iter, supported_query_type_flags *out,
     }
     if (!BSON_ITER_HOLDS_UTF8(&query_type_iter)) {
         CLIENT_ERR("When parsing supported query types: Expected 'queryType' to be type UTF-8, got: %d",
-                   bson_iter_type(&query_type_iter));
+                   (int)bson_iter_type(&query_type_iter));
         return false;
     }
     const char *queryType = bson_iter_utf8(&query_type_iter, NULL /* length */);
@@ -91,7 +91,7 @@ _parse_field(mc_EncryptedFieldConfig_t *efc, bson_t *field, mongocrypt_status_t 
         return false;
     }
     if (!BSON_ITER_HOLDS_BINARY(&field_iter)) {
-        CLIENT_ERR("expected 'fields.keyId' to be type binary, got: %d", bson_iter_type(&field_iter));
+        CLIENT_ERR("expected 'fields.keyId' to be type binary, got: %d", (int)bson_iter_type(&field_iter));
         return false;
     }
     _mongocrypt_buffer_t field_keyid;
@@ -106,7 +106,7 @@ _parse_field(mc_EncryptedFieldConfig_t *efc, bson_t *field, mongocrypt_status_t 
         return false;
     }
     if (!BSON_ITER_HOLDS_UTF8(&field_iter)) {
-        CLIENT_ERR("expected 'fields.path' to be type UTF-8, got: %d", bson_iter_type(&field_iter));
+        CLIENT_ERR("expected 'fields.path' to be type UTF-8, got: %d", (int)bson_iter_type(&field_iter));
         return false;
     }
     field_path = bson_iter_utf8(&field_iter, NULL /* length */);

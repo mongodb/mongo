@@ -474,8 +474,6 @@ bool mc_schema_broker_satisfy_from_cache(mc_schema_broker_t *sb,
         }
 
         if (!mc_schema_entry_satisfy_from_collinfo(it, collinfo, sb->db, it->coll, sb->use_range_v2, status)) {
-            bson_destroy(collinfo);
-            bson_free(ns);
             goto loop_fail;
         }
 

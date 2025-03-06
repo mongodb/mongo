@@ -17,6 +17,12 @@
 #include <strings.h> /* For strncasecmp. */
 #endif
 
+// Deliberately using old-style casts for C and C++ compatibility.
+#if defined(__cplusplus) && defined(__clang__)
+_Pragma("clang diagnostic push");
+_Pragma("clang diagnostic ignored \"-Wold-style-cast\"");
+#endif
+
 MLIB_C_LINKAGE_BEGIN
 
 /**
@@ -70,28 +76,26 @@ typedef struct mstr_view {
  * relinquish ownership of that `mstr` to the callee/caller, respectively.
  * Passing or returning an `mstr_view` is non-owning.
  */
-typedef struct mstr {
-    union {
-        struct {
-            /**
-             * @brief Pointer to the beginning of the code unit array.
-             *
-             * @note DO NOT MODIFY
-             */
-            const char *data;
-            /**
-             * @brief Length of the pointed-to code unit array
-             *
-             * @note DO NOT MODIFY
-             */
-            size_t len;
-        };
-
+typedef union mstr {
+    struct {
         /**
-         * @brief A non-owning `mstr_view` of the string
+         * @brief Pointer to the beginning of the code unit array.
+         *
+         * @note DO NOT MODIFY
          */
-        mstr_view view;
-    };
+        const char *data;
+        /**
+         * @brief Length of the pointed-to code unit array
+         *
+         * @note DO NOT MODIFY
+         */
+        size_t len;
+    } raw;
+
+    /**
+     * @brief A non-owning `mstr_view` of the string
+     */
+    mstr_view view;
 } mstr;
 
 /**
@@ -100,34 +104,32 @@ typedef struct mstr {
  * Returned by @ref mstr_new(). Once initialization is complete, the result can
  * be used as an @ref mstr by accessing the @ref mstr_mut::mstr member.
  */
-typedef struct mstr_mut {
-    union {
-        struct {
-            /**
-             * @brief Pointer to the beginning of the mutable code unit array.
-             *
-             * @note DO NOT MODIFY THE POINTER VALUE. Only modify the pointed-to
-             * characters.
-             */
-            char *data;
-            /**
-             * @brief Length of the pointed-to code unit array.
-             *
-             * @note DO NOT MODIFY
-             */
-            size_t len;
-        };
-        /// Convert the mutable string to an immutable string
-        struct mstr mstr;
-        /// Convert the mutable string to an immutable string view
-        mstr_view view;
-    };
+typedef union mstr_mut {
+    struct {
+        /**
+         * @brief Pointer to the beginning of the mutable code unit array.
+         *
+         * @note DO NOT MODIFY THE POINTER VALUE. Only modify the pointed-to
+         * characters.
+         */
+        char *data;
+        /**
+         * @brief Length of the pointed-to code unit array.
+         *
+         * @note DO NOT MODIFY
+         */
+        size_t len;
+    } raw;
+    /// Convert the mutable string to an immutable string
+    union mstr mstr;
+    /// Convert the mutable string to an immutable string view
+    mstr_view view;
 } mstr_mut;
 
 /**
  * @brief A null @ref mstr
  */
-#define MSTR_NULL (MLIB_INIT(mstr){{{NULL, 0}}})
+#define MSTR_NULL (MLIB_INIT(mstr){{NULL, 0}})
 /**
  * @brief A null @ref mstr_view
  */
@@ -153,7 +155,7 @@ typedef struct mstr_mut {
 static inline mstr_mut mstr_new(size_t len) {
 #ifndef __clang_analyzer__
     assert(len < SIZE_MAX);
-    return MLIB_INIT(mstr_mut){{{(char *)calloc(1, len + 1), len}}};
+    return MLIB_INIT(mstr_mut){{(char *)calloc(1, len + 1), len}};
 #else
     // Clang-analyzer is smart enough to see the calloc(), but not smart enough
     // to link it to the free() in mstr_free()
@@ -195,7 +197,7 @@ static inline mstr_view mstrv_view_cstr(const char *s) {
  */
 static inline mstr mstr_copy_data(const char *s, size_t len) {
     mstr_mut r = mstr_new(len);
-    memcpy(r.data, s, len);
+    memcpy(r.raw.data, s, len);
     return r.mstr;
 }
 
@@ -225,7 +227,7 @@ static inline mstr mstr_copy(mstr_view s) {
  * @param s The string to free
  */
 static inline void mstr_free(mstr s) {
-    free((char *)s.data);
+    free((char *)s.raw.data);
 }
 
 /**
@@ -236,21 +238,21 @@ static inline void mstr_free(mstr s) {
  * @param new_len The new length of the string
  */
 static inline void mstrm_resize(mstr_mut *s, size_t new_len) {
-    if (new_len <= s->len) {
-        s->len = new_len;
+    if (new_len <= s->raw.len) {
+        s->raw.len = new_len;
     } else {
-        const size_t old_len = s->len;
+        const size_t old_len = s->raw.len;
 #ifndef __clang_analyzer__
         // Clang-analyzer is smart enough to see the calloc(), but not smart
         // enough to link it to the free() in mstr_free()
         assert(new_len < SIZE_MAX);
-        s->data = (char *)realloc((char *)s->data, new_len + 1);
+        s->raw.data = (char *)realloc((char *)s->raw.data, new_len + 1);
 #endif
-        s->len = new_len;
+        s->raw.len = new_len;
         assert(new_len >= old_len);
-        memset(s->data + old_len, 0, new_len - old_len);
+        memset(s->raw.data + old_len, 0, new_len - old_len);
     }
-    s->data[new_len] = (char)0;
+    s->raw.data[new_len] = (char)0;
 }
 
 /**
@@ -369,7 +371,7 @@ static inline mstr mstr_splice(mstr_view s, size_t at, size_t del_count, mstr_vi
     assert(s.len - del_count <= SIZE_MAX - insert.len);
     const size_t new_size = s.len - del_count + insert.len;
     mstr_mut ret = mstr_new(new_size);
-    char *p = ret.data;
+    char *p = ret.raw.data;
     memcpy(p, s.data, at);
     p += at;
     if (insert.data) {
@@ -451,7 +453,7 @@ static inline mstr mstr_substr(mstr_view s, size_t at, size_t len) {
         len = remain;
     }
     mstr_mut r = mstr_new(len);
-    memcpy(r.data, s.data + at, len);
+    memcpy(r.raw.data, s.data + at, len);
     return r.mstr;
 }
 
@@ -607,7 +609,7 @@ static inline void _mstr_assert_(mstr_view left,
         if (!B) {
             mstr_assign(&pstr, mstr_prepend(pstr.view, mstrv_lit("not ")));
         }
-        _mstr_assert_fail_(left, pstr.data, right, file, line);
+        _mstr_assert_fail_(left, pstr.raw.data, right, file, line);
     }
 }
 
@@ -767,9 +769,9 @@ static inline mstr_narrow_result mstr_win32_narrow(const wchar_t *wstring) {
                                       wcflags,
                                       wstring,
                                       -1,
-                                      ret.data,
+                                      ret.raw.data,
                                       // Plus one byte for the NUL
-                                      (int)(ret.len + 1),
+                                      (int)(ret.raw.len + 1),
                                       NULL,
                                       NULL);
     assert(length == got_len);
@@ -905,5 +907,10 @@ static mlib_constexpr_fn size_t mlib_strnmcopy(char *dst, size_t dst_bufsize, co
 }
 
 MLIB_C_LINKAGE_END
+
+// Deliberately using old-style casts for C and C++ compatibility.
+#if defined(__cplusplus) && defined(__clang__)
+_Pragma("clang diagnostic pop");
+#endif
 
 #endif // MONGOCRYPT_STR_PRIVATE_H

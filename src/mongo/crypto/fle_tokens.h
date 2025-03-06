@@ -91,16 +91,30 @@
  * ServerTextSubstringToken = HMAC(ServerTokenDerivationLevel1Token, 2)
  * ServerTextSuffixToken = HMAC(ServerTokenDerivationLevel1Token, 3)
  * ServerTextPrefixToken = HMAC(ServerTokenDerivationLevel1Token, 4)
- * EDCTextExactDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(EDCTextExactToken, v), u)
+ * EDCTextExactDerivedFromDataToken = HMAC(EDCTextExactToken, v)
+ * EDCTextSubstringDerivedFromDataToken = HMAC(EDCTextSubstringToken, v)
+ * EDCTextSuffixDerivedFromDataToken = HMAC(EDCTextSuffixToken, v)
+ * EDCTextPrefixDerivedFromDataToken = HMAC(EDCTextPrefixToken, v)
+ * ESCTextExactDerivedFromDataToken = HMAC(ESCTextExactToken, v)
+ * ESCTextSubstringDerivedFromDataToken = HMAC(ESCTextSubstringToken, v)
+ * ESCTextSuffixDerivedFromDataToken = HMAC(ESCTextSuffixToken, v)
+ * ESCTextPrefixDerivedFromDataToken = HMAC(ESCTextPrefixToken, v)
+ * EDCTextExactDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(EDCTextExactDerivedFromDataToken, u)
  * EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken =
- *     HMAC(HMAC(EDCTextSubstringToken, v), u)
- * EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(EDCTextSuffixToken, v), u)
- * EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(EDCTextPrefixToken, v), u)
- * ESCTextExactDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(ESCTextExactToken, v), u)
+ *     HMAC(EDCTextSubstringDerivedFromDataToken, u)
+ * EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(EDCTextSuffixDerivedFromDataToken, u)
+ * EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(EDCTextPrefixDerivedFromDataToken, u)
+ * ESCTextExactDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(ESCTextExactDerivedFromDataToken, u)
  * ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken =
- *     HMAC(HMAC(ESCTextSubstringToken, v), u)
- * ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(ESCTextSuffixToken, v), u)
- * ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(ESCTextPrefixToken, v), u)
+ *     HMAC(ESCTextSubstringDerivedFromDataToken, u)
+ * ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(ESCTextSuffixDerivedFromDataToken, u)
+ * ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(ESCTextPrefixDerivedFromDataToken, u)
  * ServerTextExactDerivedFromDataToken = HMAC(ServerTextExactToken, v)
  * ServerTextSubstringDerivedFromDataToken = HMAC(ServerTextSubstringToken, v)
  * ServerTextSuffixDerivedFromDataToken = HMAC(ServerTextSuffixToken, v)
@@ -245,38 +259,56 @@ FLE_TOKEN_DECL_CLASS(ServerTextSubstringToken, const ServerTokenDerivationLevel1
 FLE_TOKEN_DECL_CLASS(ServerTextSuffixToken, const ServerTokenDerivationLevel1Token& parent)
 FLE_TOKEN_DECL_CLASS(ServerTextPrefixToken, const ServerTokenDerivationLevel1Token& parent)
 
-FLE_TOKEN_DECL_CLASS(EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
+FLE_TOKEN_DECL_CLASS(EDCTextExactDerivedFromDataToken,
                      const EDCTextExactToken& parent,
-                     ConstDataRange cdr,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(EDCTextSubstringDerivedFromDataToken,
+                     const EDCTextSubstringToken& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(EDCTextSuffixDerivedFromDataToken,
+                     const EDCTextSuffixToken& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(EDCTextPrefixDerivedFromDataToken,
+                     const EDCTextPrefixToken& parent,
+                     ConstDataRange cdr)
+
+FLE_TOKEN_DECL_CLASS(ESCTextExactDerivedFromDataToken,
+                     const ESCTextExactToken& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(ESCTextSubstringDerivedFromDataToken,
+                     const ESCTextSubstringToken& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(ESCTextSuffixDerivedFromDataToken,
+                     const ESCTextSuffixToken& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(ESCTextPrefixDerivedFromDataToken,
+                     const ESCTextPrefixToken& parent,
+                     ConstDataRange cdr)
+
+FLE_TOKEN_DECL_CLASS(EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                     const EDCTextExactDerivedFromDataToken& parent,
                      std::uint64_t arg)
 FLE_TOKEN_DECL_CLASS(EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
-                     const EDCTextSubstringToken& parent,
-                     ConstDataRange cdr,
+                     const EDCTextSubstringDerivedFromDataToken& parent,
                      std::uint64_t arg)
 FLE_TOKEN_DECL_CLASS(EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
-                     const EDCTextSuffixToken& parent,
-                     ConstDataRange cdr,
+                     const EDCTextSuffixDerivedFromDataToken& parent,
                      std::uint64_t arg)
 FLE_TOKEN_DECL_CLASS(EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
-                     const EDCTextPrefixToken& parent,
-                     ConstDataRange cdr,
+                     const EDCTextPrefixDerivedFromDataToken& parent,
                      std::uint64_t arg)
 
 FLE_TOKEN_DECL_CLASS(ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
-                     const ESCTextExactToken& parent,
-                     ConstDataRange cdr,
+                     const ESCTextExactDerivedFromDataToken& parent,
                      std::uint64_t arg)
 FLE_TOKEN_DECL_CLASS(ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
-                     const ESCTextSubstringToken& parent,
-                     ConstDataRange cdr,
+                     const ESCTextSubstringDerivedFromDataToken& parent,
                      std::uint64_t arg)
 FLE_TOKEN_DECL_CLASS(ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
-                     const ESCTextSuffixToken& parent,
-                     ConstDataRange cdr,
+                     const ESCTextSuffixDerivedFromDataToken& parent,
                      std::uint64_t arg)
 FLE_TOKEN_DECL_CLASS(ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
-                     const ESCTextPrefixToken& parent,
-                     ConstDataRange cdr,
+                     const ESCTextPrefixDerivedFromDataToken& parent,
                      std::uint64_t arg)
 
 FLE_TOKEN_DECL_CLASS(ServerTextExactDerivedFromDataToken,

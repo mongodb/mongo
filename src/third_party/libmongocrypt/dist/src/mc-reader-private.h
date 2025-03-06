@@ -25,7 +25,7 @@
  * A non-owning forward-only cursor api to read a buffer.
  *
  * Tracks length of buffer and current position of buffer. parser_name is
- * typically __FUNCTION__ to provide useful error messages automatically.
+ * typically __func__ to provide useful error messages automatically.
  *
  * All numbers are read as little endian.
  *
@@ -37,7 +37,7 @@
  *  mongocrypt_status_t *status
  *
  *  mc_reader_t reader;
- *  mc_reader_init_from_buffer (&reader, buf, __FUNCTION__);
+ *  mc_reader_init_from_buffer (&reader, buf, __func__);
  *
  *  _mongocrypt_buffer_t in;
  *  if (!mc_reader_read_uuid_buffer (&reader, &in, status)) {

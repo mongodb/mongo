@@ -22,7 +22,7 @@
 #include "mongocrypt.h"
 
 /**
- * Produced by mongocrypt-marking.c from _mongocrypt_marking_t
+ * Produced by mongocrypt-marking.u.fle1.c from _mongocrypt_marking_t
  * as encrypted payloads for blob_subtypes:
  *   FLE1DeterministicEncryptedValue(1)
  *   FLE1RandomEncryptedValue(2)

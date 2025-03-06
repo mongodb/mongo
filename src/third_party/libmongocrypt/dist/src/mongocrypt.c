@@ -28,6 +28,7 @@
 #include "mongocrypt-cache-private.h"
 #include "mongocrypt-config.h"
 #include "mongocrypt-crypto-private.h"
+#include "mongocrypt-dll-private.h"
 #include "mongocrypt-log-private.h"
 #include "mongocrypt-mutex-private.h"
 #include "mongocrypt-opts-private.h"
@@ -391,14 +392,16 @@ static _loaded_csfle _try_load_csfle(const char *filepath, mongocrypt_status_t *
     // Try to open the dynamic lib
     mcr_dll lib = mcr_dll_open(filepath);
     // Check for errors, which are represented by strings
-    if (lib.error_string.data) {
+    if (lib.error_string.raw.data) {
         // Error opening candidate
         _mongocrypt_log(log,
                         MONGOCRYPT_LOG_LEVEL_WARNING,
                         "Error while opening candidate for CSFLE dynamic library [%s]: %s",
                         filepath,
-                        lib.error_string.data);
-        CLIENT_ERR("Error while opening candidate for CSFLE dynamic library [%s]: %s", filepath, lib.error_string.data);
+                        lib.error_string.raw.data);
+        CLIENT_ERR("Error while opening candidate for CSFLE dynamic library [%s]: %s",
+                   filepath,
+                   lib.error_string.raw.data);
         // Free resources, which will include the error string
         mcr_dll_close(lib);
         // Bad:
@@ -414,7 +417,9 @@ static _loaded_csfle _try_load_csfle(const char *filepath, mongocrypt_status_t *
     {                                                                                                                  \
         /* Symbol names are qualified by the lib name and version: */                                                  \
         const char *symname = "mongo_crypt_v1_" #Name;                                                                 \
-        vtable.Name = mcr_dll_sym(lib, symname);                                                                       \
+        MC_BEGIN_CAST_FUNCTION_TYPE_STRICT_IGNORE                                                                      \
+        vtable.Name = (RetType(*)(__VA_ARGS__))mcr_dll_sym(lib, symname);                                              \
+        MC_END_CAST_FUNCTION_TYPE_STRICT_IGNORE                                                                        \
         if (vtable.Name == NULL) {                                                                                     \
             /* The requested symbol is not present */                                                                  \
             _mongocrypt_log(log,                                                                                       \
@@ -462,7 +467,7 @@ static bool _try_replace_dollar_origin(mstr *filepath, _mongocrypt_log_t *log) {
         return true;
     }
     // Check that the next char is a path separator or end-of-string:
-    char peek = filepath->data[dollar_origin.len];
+    char peek = filepath->raw.data[dollar_origin.len];
     if (peek != 0 && !mpath_is_sep(peek, MPATH_NATIVE)) {
         // Not a single path element
         return true;
@@ -476,8 +481,8 @@ static bool _try_replace_dollar_origin(mstr *filepath, _mongocrypt_log_t *log) {
                         MONGOCRYPT_LOG_LEVEL_WARNING,
                         "Error while loading the executable module path for "
                         "substitution of $ORIGIN in CSFLE search path [%s]: %s",
-                        filepath->data,
-                        error.data);
+                        filepath->raw.data,
+                        error.raw.data);
         mstr_free(error);
         return false;
     }
@@ -493,7 +498,7 @@ static _loaded_csfle _try_find_csfle(mongocrypt_t *crypt) {
 
     BSON_ASSERT_PARAM(crypt);
 
-    if (crypt->opts.crypt_shared_lib_override_path.data) {
+    if (crypt->opts.crypt_shared_lib_override_path.raw.data) {
         // If an override path was specified, skip the library searching behavior
         csfle_cand_filepath = mstr_copy(crypt->opts.crypt_shared_lib_override_path.view);
         if (_try_replace_dollar_origin(&csfle_cand_filepath, &crypt->log)) {
@@ -501,7 +506,7 @@ static _loaded_csfle _try_find_csfle(mongocrypt_t *crypt) {
             // Do not allow a plain filename to go through, as that will cause the
             // DLL load to search the system.
             mstr_assign(&csfle_cand_filepath, mpath_absolute(csfle_cand_filepath.view, MPATH_NATIVE));
-            candidate_csfle = _try_load_csfle(csfle_cand_filepath.data, crypt->status, &crypt->log);
+            candidate_csfle = _try_load_csfle(csfle_cand_filepath.raw.data, crypt->status, &crypt->log);
         }
     } else {
         // No override path was specified, so try to find it on the provided
@@ -523,7 +528,7 @@ static _loaded_csfle _try_find_csfle(mongocrypt_t *crypt) {
                 }
             }
             // Try to load the file:
-            candidate_csfle = _try_load_csfle(csfle_cand_filepath.data, NULL /* status */, &crypt->log);
+            candidate_csfle = _try_load_csfle(csfle_cand_filepath.raw.data, NULL /* status */, &crypt->log);
             if (candidate_csfle.okay) {
                 // Stop searching:
                 break;
@@ -548,13 +553,13 @@ typedef struct csfle_global_lib_state {
     mongo_crypt_v1_lib *csfle_lib;
 } csfle_global_lib_state;
 
-csfle_global_lib_state g_csfle_state;
+static csfle_global_lib_state g_csfle_state;
 
 static void init_csfle_state(void) {
     _mongocrypt_mutex_init(&g_csfle_state.mtx);
 }
 
-mlib_once_flag g_csfle_init_flag = MLIB_ONCE_INITIALIZER;
+static mlib_once_flag g_csfle_init_flag = MLIB_ONCE_INITIALIZER;
 
 /**
  * @brief Verify that `found` refers to the same library that is globally loaded
@@ -586,7 +591,7 @@ static bool _validate_csfle_singleton(mongocrypt_t *crypt, _loaded_csfle found) 
 
     // Path to the existing loaded csfle:
     mcr_dll_path_result existing_path_ = mcr_dll_path(g_csfle_state.dll);
-    assert(existing_path_.path.data && "Failed to get path to already-loaded csfle library");
+    assert(existing_path_.path.raw.data && "Failed to get path to already-loaded csfle library");
     mstr_view existing_path = existing_path_.path.view;
     bool okay = true;
     if (!found.okay) {
@@ -599,7 +604,7 @@ static bool _validate_csfle_singleton(mongocrypt_t *crypt, _loaded_csfle found) 
     } else {
         // Get the path to what we found:
         mcr_dll_path_result found_path = mcr_dll_path(found.lib);
-        assert(found_path.path.data
+        assert(found_path.path.raw.data
                && "Failed to get the dynamic library filepath of the library that "
                   "was loaded for csfle");
         if (!mstr_eq(found_path.path.view, existing_path)) {
@@ -609,7 +614,7 @@ static bool _validate_csfle_singleton(mongocrypt_t *crypt, _loaded_csfle found) 
                        "but the current call to mongocrypt_init() attempted to load a "
                        "second CSFLE library from [%s]. This is not allowed.",
                        existing_path.data,
-                       found_path.path.data);
+                       found_path.path.raw.data);
             okay = false;
         }
         mstr_free(found_path.path);
@@ -784,7 +789,7 @@ static bool _csfle_replace_or_take_validate_singleton(mongocrypt_t *crypt, _load
         have_csfle = true;
         break;
     case LIB_CREATE_FAILED:
-        if (!message.data) {
+        if (!message.raw.data) {
             // We failed to obtain a message about the failure
             _mongocrypt_set_error(crypt->status,
                                   MONGOCRYPT_STATUS_ERROR_CRYPT_SHARED,
@@ -796,7 +801,7 @@ static bool _csfle_replace_or_take_validate_singleton(mongocrypt_t *crypt, _load
                                   MONGOCRYPT_STATUS_ERROR_CRYPT_SHARED,
                                   MONGOCRYPT_GENERIC_ERROR_CODE,
                                   "csfle lib_create() failed: %s [Error %d, code %d]",
-                                  message.data,
+                                  message.raw.data,
                                   err,
                                   code);
         }
@@ -823,7 +828,7 @@ static bool _wants_csfle(mongocrypt_t *c) {
     if (c->opts.bypass_query_analysis) {
         return false;
     }
-    return c->opts.n_crypt_shared_lib_search_paths != 0 || c->opts.crypt_shared_lib_override_path.data != NULL;
+    return c->opts.n_crypt_shared_lib_search_paths != 0 || c->opts.crypt_shared_lib_override_path.raw.data != NULL;
 }
 
 /**
@@ -849,11 +854,11 @@ static bool _try_enable_csfle(mongocrypt_t *crypt) {
 
     // If a crypt_shared override path was specified, but we did not succeed in
     // loading crypt_shared, that is a hard-error.
-    if (crypt->opts.crypt_shared_lib_override_path.data && !found.okay) {
+    if (crypt->opts.crypt_shared_lib_override_path.raw.data && !found.okay) {
         // Wrap error with additional information.
         CLIENT_ERR("A crypt_shared override path was specified [%s], but we failed to open a dynamic "
                    "library at that location. Load error: [%s]",
-                   crypt->opts.crypt_shared_lib_override_path.data,
+                   crypt->opts.crypt_shared_lib_override_path.raw.data,
                    mongocrypt_status_message(crypt->status, NULL /* len */));
         return false;
     }

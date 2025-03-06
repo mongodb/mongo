@@ -51,7 +51,7 @@ static mc_edges_t *mc_edges_new(const char *leaf,
     if (trimFactor != 0 && mc_cmp_greater_equal_su(trimFactor, leaf_len)) {
         // We append a total of leaf_len + 1 (for the root) - trimFactor edges. When this number is equal to 1, we
         // degenerate into equality, which is not desired, so trimFactor must be less than leaf_len.
-        CLIENT_ERR("trimFactor must be less than the number of bits (%ld) used to represent an element of the domain, "
+        CLIENT_ERR("trimFactor must be less than the number of bits (%zu) used to represent an element of the domain, "
                    "but got %" PRId32,
                    leaf_len,
                    trimFactor);
@@ -227,7 +227,7 @@ mc_edges_t *mc_getEdgesDouble(mc_getEdgesDouble_args_t args, mongocrypt_status_t
     return ret;
 }
 
-#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
     mc_OSTType_Decimal128 got;
     if (!mc_getTypeInfoDecimal128(

@@ -744,7 +744,7 @@ done:
    return kms_request_str_detach (sig);
 }
 
-void
+static void
 kms_request_validate (kms_request_t *request)
 {
    if (!check_and_prohibit_kmip (request)) {

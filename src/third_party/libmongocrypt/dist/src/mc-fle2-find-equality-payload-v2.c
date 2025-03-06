@@ -50,12 +50,14 @@ void mc_FLE2FindEqualityPayloadV2_cleanup(mc_FLE2FindEqualityPayloadV2_t *payloa
         uint32_t len;                                                                                                  \
         const uint8_t *data;                                                                                           \
         if (bson_iter_type(&iter) != BSON_TYPE_BINARY) {                                                               \
-            CLIENT_ERR("Field '" #Name "' expected to be bindata, got: %d", bson_iter_type(&iter));                    \
+            CLIENT_ERR("Field '" #Name "' expected to be bindata, got: %d", (int)bson_iter_type(&iter));               \
             goto fail;                                                                                                 \
         }                                                                                                              \
         bson_iter_binary(&iter, &subtype, &len, &data);                                                                \
         if (subtype != BSON_SUBTYPE_BINARY) {                                                                          \
-            CLIENT_ERR("Field '" #Name "' expected to be bindata subtype %d, got: %d", BSON_SUBTYPE_BINARY, subtype);  \
+            CLIENT_ERR("Field '" #Name "' expected to be bindata subtype %d, got: %d",                                 \
+                       BSON_SUBTYPE_BINARY,                                                                            \
+                       (int)subtype);                                                                                  \
             goto fail;                                                                                                 \
         }                                                                                                              \
         if (!_mongocrypt_buffer_copy_from_binary_iter(&out->Dest, &iter)) {                                            \

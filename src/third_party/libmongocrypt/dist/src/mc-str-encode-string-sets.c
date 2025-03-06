@@ -166,8 +166,8 @@ static void mc_substring_set_node_destroy(mc_substring_set_node_t *node) {
 }
 
 // FNV-1a hash function
-const uint32_t FNV1APRIME = 16777619;
-const uint32_t FNV1ABASIS = 2166136261;
+static const uint32_t FNV1APRIME = 16777619;
+static const uint32_t FNV1ABASIS = 2166136261;
 
 static uint32_t fnv1a(const uint8_t *data, uint32_t len) {
     BSON_ASSERT_PARAM(data);

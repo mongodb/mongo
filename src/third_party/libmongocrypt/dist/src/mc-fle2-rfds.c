@@ -302,10 +302,7 @@ bool mc_FLE2RangeFindDriverSpec_parse(mc_FLE2RangeFindDriverSpec_t *spec,
             spec->upper.included = op.op_type == FLE2RangeOperator_kLte;
             break;
         case FLE2RangeOperator_kNone:
-        default:
-            ERR_WITH_BSON(in, "unsupported operator type %s", op.op_type_str);
-            goto fail;
-            break;
+        default: ERR_WITH_BSON(in, "unsupported operator type %s", op.op_type_str); goto fail;
         }
 
         if (spec->field && 0 != strcmp(spec->field, op.field)) {
@@ -578,6 +575,8 @@ static int32_t payloadId = 0;
 static void payloadId_init_mutex(void) {
     _mongocrypt_mutex_init(&payloadId_mutex);
 }
+
+void mc_reset_payloadId_for_testing(void); // -Wmissing-prototypes: for testing only.
 
 void mc_reset_payloadId_for_testing(void) {
     mlib_call_once(&payloadId_init_flag, payloadId_init_mutex);

@@ -60,7 +60,7 @@ static inline char mpath_preferred_sep(mpath_format f) {
  * @return mstr A new string which must be freed with mstr_free()
  */
 static inline mstr mpath_current_path(void) {
-#if _WIN32
+#if defined(_WIN32)
     while (1) {
         DWORD len = GetCurrentDirectoryW(0, NULL);
         wchar_t *wstr = calloc(sizeof(wchar_t), len);
@@ -76,12 +76,12 @@ static inline mstr mpath_current_path(void) {
     }
 #else
     mstr_mut mut = mstr_new(8096);
-    char *p = getcwd(mut.data, mut.len);
+    char *p = getcwd(mut.raw.data, mut.raw.len);
     if (p == NULL) {
         mstr_free(mut.mstr);
         return MSTR_NULL;
     }
-    mstr ret = mstr_copy_cstr(mut.data);
+    mstr ret = mstr_copy_cstr(mut.raw.data);
     mstr_free(mut.mstr);
     return ret;
 #endif
@@ -167,7 +167,7 @@ static inline mstr mpath_join(mstr_view base, mstr_view suffix, mpath_format f) 
     // We must insert a path separator between the two strings
     assert(base.len <= SIZE_MAX - suffix.len - 1u);
     mstr_mut r = mstr_new(base.len + suffix.len + 1);
-    char *p = r.data;
+    char *p = r.raw.data;
     memcpy(p, base.data, base.len);
     p += base.len;
     *p++ = mpath_preferred_sep(f);
@@ -255,7 +255,7 @@ static inline mstr_view mpath_relative_path(mstr_view path, mpath_format f) {
 static inline mstr mpath_to_format(mpath_format from, mstr_view path, mpath_format to) {
     mstr_mut ret = mstr_new(path.len);
     const char *p = path.data;
-    char *out = ret.data;
+    char *out = ret.raw.data;
     const char *stop = path.data + path.len;
     for (; p != stop; ++p, ++out) {
         if (mpath_is_sep(*p, from)) {

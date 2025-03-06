@@ -81,7 +81,6 @@ kms_response_parser_wants_bytes (kms_response_parser_t *parser, int32_t max)
    default:
       KMS_ASSERT (false && "Invalid kms_response_parser HTTP state");
    }
-   return -1;
 }
 
 static bool

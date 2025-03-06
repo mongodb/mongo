@@ -37,6 +37,10 @@
  * https://github.com/freebsd/freebsd/blob/e7c6cef9514d3bb1f14a30a5ee871231523e43db/lib/libc/stdlib/merge.c
  */
 
+#include "sort.h"
+
+//
+
 #include <stddef.h>
 
 /*
@@ -44,7 +48,6 @@
  * last 4 elements.
  */
 
-typedef int (*cmp_t) (const void *, const void *);
 #define CMP(x, y) cmp (x, y)
 #define swap(a, b)   \
    {                 \

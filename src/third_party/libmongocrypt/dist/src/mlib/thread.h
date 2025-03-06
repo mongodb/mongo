@@ -40,7 +40,7 @@ typedef struct mlib_once_flag {
  */
 typedef void (*mlib_init_once_fn_t)(void);
 
-#if _WIN32
+#if defined(_WIN32)
 /**
  * An indirection layer for mlib_once on Windows platforms. Do not use directly.
  */

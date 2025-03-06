@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 
 #include <stdlib.h>
 

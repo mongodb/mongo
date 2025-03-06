@@ -39,10 +39,10 @@ typedef struct {
 
             _mongocrypt_buffer_t key_id;
             bson_value_t key_alt_name;
-        };
+        } fle1;
 
         mc_FLE2EncryptionPlaceholder_t fle2;
-    };
+    } u;
 } _mongocrypt_marking_t;
 
 // `_mongocrypt_marking_t` inherits extended alignment from libbson. To dynamically allocate, use aligned allocation

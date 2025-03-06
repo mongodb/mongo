@@ -205,6 +205,42 @@ types:
         deserializer: '::mongo::AnchorPaddingValueToken::parse'
         is_view: false
 
+    EDCTextExactDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EDCTextExactDerivedFromDataToken'
+        cpp_type: "EDCTextExactDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::EDCTextExactDerivedFromDataToken::parse'
+        is_view: false
+
+    EDCTextSubstringDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EDCTextSubstringDerivedFromDataToken'
+        cpp_type: "EDCTextSubstringDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::EDCTextSubstringDerivedFromDataToken::parse'
+        is_view: false
+
+    EDCTextSuffixDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EDCTextSuffixDerivedFromDataToken'
+        cpp_type: "EDCTextSuffixDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::EDCTextSuffixDerivedFromDataToken::parse'
+        is_view: false
+
+    EDCTextPrefixDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EDCTextPrefixDerivedFromDataToken'
+        cpp_type: "EDCTextPrefixDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::EDCTextPrefixDerivedFromDataToken::parse'
+        is_view: false
+
     EDCTextExactDerivedFromDataTokenAndContentionFactorToken:
         bson_serialization_type: bindata
         bindata_subtype: generic
@@ -239,6 +275,42 @@ types:
         cpp_type: "EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken"
         serializer: 'toCDR'
         deserializer: '::mongo::EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken::parse'
+        is_view: false
+
+    ESCTextExactDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCTextExactDerivedFromDataToken'
+        cpp_type: "ESCTextExactDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCTextExactDerivedFromDataToken::parse'
+        is_view: false
+
+    ESCTextSubstringDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCTextSubstringDerivedFromDataToken'
+        cpp_type: "ESCTextSubstringDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCTextSubstringDerivedFromDataToken::parse'
+        is_view: false
+
+    ESCTextSuffixDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCTextSuffixDerivedFromDataToken'
+        cpp_type: "ESCTextSuffixDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCTextSuffixDerivedFromDataToken::parse'
+        is_view: false
+
+    ESCTextPrefixDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCTextPrefixDerivedFromDataToken'
+        cpp_type: "ESCTextPrefixDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCTextPrefixDerivedFromDataToken::parse'
         is_view: false
 
     ESCTextExactDerivedFromDataTokenAndContentionFactorToken:

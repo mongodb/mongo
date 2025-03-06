@@ -80,7 +80,7 @@ void mc_mincover_destroy(mc_mincover_t *mincover) {
 
 // The 128-bit version is only required for Decimal128, otherwise generates
 // unused-fn warnings
-#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 #define UINT_T mlib_int128
 #define UINT_C MLIB_INT128
 #define UINT_FMT_S "s"
@@ -243,7 +243,7 @@ mc_mincover_t *mc_getMincoverDouble(mc_getMincoverDouble_args_t args, mongocrypt
     return mc;
 }
 
-#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 mc_mincover_t *
 mc_getMincoverDecimal128(mc_getMincoverDecimal128_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
     BSON_ASSERT_PARAM(status);

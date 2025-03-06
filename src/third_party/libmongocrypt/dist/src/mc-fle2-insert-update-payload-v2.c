@@ -137,12 +137,12 @@ void mc_FLE2InsertUpdatePayloadV2_cleanup(mc_FLE2InsertUpdatePayloadV2_t *payloa
         uint32_t len;                                                                                                  \
         const uint8_t *data;                                                                                           \
         if (bson_iter_type(&iter) != BSON_TYPE_BINARY) {                                                               \
-            CLIENT_ERR("Field '" #Name "' expected to be bindata, got: %d", bson_iter_type(&iter));                    \
+            CLIENT_ERR("Field '" #Name "' expected to be bindata, got: %d", (int)bson_iter_type(&iter));               \
             goto fail;                                                                                                 \
         }                                                                                                              \
         bson_iter_binary(&iter, &subtype, &len, &data);                                                                \
         if (subtype != Type) {                                                                                         \
-            CLIENT_ERR("Field '" #Name "' expected to be bindata subtype %d, got: %d", Type, subtype);                 \
+            CLIENT_ERR("Field '" #Name "' expected to be bindata subtype %d, got: %d", Type, (int)subtype);            \
             goto fail;                                                                                                 \
         }                                                                                                              \
         if (!_mongocrypt_buffer_copy_from_binary_iter(&out->Dest, &iter)) {                                            \

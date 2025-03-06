@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#include <stddef.h>
+
 typedef int (*cmp_t) (const void *, const void *);
 
 void

@@ -77,18 +77,18 @@ typedef struct {
 // FLE1 algorithm: AES-256-CBC HMAC/SHA-512-256 (SHA-512 truncated to 256 bits)
 // Algorithm is documented in [FLE and
 // AEAD](https://docs.google.com/document/d/1D8xTXWo1B1dunO0bDZhPdolKTMbbD5fUIgsERubWRmY)
-const _mongocrypt_value_encryption_algorithm_t *_mcFLE1Algorithm();
+const _mongocrypt_value_encryption_algorithm_t *_mcFLE1Algorithm(void);
 
 // FLE2 general algorithm: AES-256-CTR HMAC/SHA-256
 // Algorithm is documented in [AEAD with
 // CTR](https://docs.google.com/document/d/1eCU7R8Kjr-mdyz6eKvhNIDVmhyYQcAaLtTfHeK7a_vE/).
-const _mongocrypt_value_encryption_algorithm_t *_mcFLE2AEADAlgorithm();
+const _mongocrypt_value_encryption_algorithm_t *_mcFLE2AEADAlgorithm(void);
 
 // FLE2 used with FLE2IndexedEncryptedValue: AES-256-CTR no HMAC
-const _mongocrypt_value_encryption_algorithm_t *_mcFLE2Algorithm();
+const _mongocrypt_value_encryption_algorithm_t *_mcFLE2Algorithm(void);
 
 // FLE2AEAD general algorithm: AES-256-CBC HMAC/SHA-256
-const _mongocrypt_value_encryption_algorithm_t *_mcFLE2v2AEADAlgorithm();
+const _mongocrypt_value_encryption_algorithm_t *_mcFLE2v2AEADAlgorithm(void);
 
 bool _mongocrypt_random(_mongocrypt_crypto_t *crypto,
                         _mongocrypt_buffer_t *out,

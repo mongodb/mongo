@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
+#include "hexlify.h"
+
+//
+
 #include "kms_message_private.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

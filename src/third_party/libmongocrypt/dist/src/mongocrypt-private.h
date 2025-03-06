@@ -39,7 +39,7 @@
 
 #define CLIENT_ERR_W_CODE(code, ...) _mongocrypt_set_error(status, MONGOCRYPT_STATUS_ERROR_CLIENT, code, __VA_ARGS__)
 
-#define CLIENT_ERR(fmt, ...) CLIENT_ERR_W_CODE(MONGOCRYPT_GENERIC_ERROR_CODE, fmt, ##__VA_ARGS__)
+#define CLIENT_ERR(...) CLIENT_ERR_W_CODE(MONGOCRYPT_GENERIC_ERROR_CODE, __VA_ARGS__)
 
 #define KMS_ERR_W_CODE(code, ...) _mongocrypt_set_error(status, MONGOCRYPT_STATUS_ERROR_KMS, code, __VA_ARGS__)
 

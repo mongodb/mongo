@@ -102,13 +102,15 @@ int do_main(int argc, const char *const *argv) {
 
     mcr_dll csfle = mcr_dll_open(argv[1]);
     auto close_csfle = DEFER({ mcr_dll_close(csfle); });
-    if (csfle.error_string.data) {
-        std::cerr << "Failed to open [" << argv[1] << "] as a dynamic library: " << csfle.error_string.data << '\n';
+    if (csfle.error_string.raw.data) {
+        std::cerr << "Failed to open [" << argv[1] << "] as a dynamic library: " << csfle.error_string.raw.data << '\n';
         return 3;
     }
 
 #define LOAD_SYM(Name)                                                                                                 \
+    MC_BEGIN_CAST_FUNCTION_TYPE_STRICT_IGNORE                                                                          \
     auto Name = reinterpret_cast<decltype(&(::Name))>(mcr_dll_sym(csfle, #Name));                                      \
+    MC_END_CAST_FUNCTION_TYPE_STRICT_IGNORE                                                                            \
     if (!Name) {                                                                                                       \
         fprintf(stderr, "Failed to load required symbol [%s] from the given csfle library", #Name);                    \
         return 4;                                                                                                      \

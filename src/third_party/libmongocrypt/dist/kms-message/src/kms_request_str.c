@@ -27,8 +27,8 @@
 #include <stdlib.h>
 #include <limits.h> /* CHAR_BIT */
 
-bool rfc_3986_tab[256] = {0};
-bool kms_initialized = false;
+static bool rfc_3986_tab[256] = {0};
+static bool kms_initialized = false;
 
 static void
 tables_init (void)
@@ -124,12 +124,6 @@ kms_request_str_detach (kms_request_str_t *str)
    char *r = str->str;
    free (str);
    return r;
-}
-
-const char *
-kms_request_str_get (kms_request_str_t *str)
-{
-   return str->str;
 }
 
 bool

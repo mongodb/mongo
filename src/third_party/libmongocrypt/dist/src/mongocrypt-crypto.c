@@ -305,9 +305,7 @@ bool _mongocrypt_hmac_sha_256(_mongocrypt_crypto_t *crypto,
     BSON_ASSERT_PARAM(out);
 
     if (key->len != MONGOCRYPT_MAC_KEY_LEN) {
-        CLIENT_ERR("invalid hmac_sha_256 key length. Got %" PRIu32 ", expected: %" PRIu32,
-                   key->len,
-                   MONGOCRYPT_MAC_KEY_LEN);
+        CLIENT_ERR("invalid hmac_sha_256 key length. Got %" PRIu32 ", expected: %d", key->len, MONGOCRYPT_MAC_KEY_LEN);
         return false;
     }
 
@@ -501,12 +499,14 @@ static bool _encrypt_step(_mongocrypt_crypto_t *crypto,
     *bytes_written = 0;
 
     if (MONGOCRYPT_IV_LEN != iv->len) {
-        CLIENT_ERR("IV should have length %d, but has length %d", MONGOCRYPT_IV_LEN, iv->len);
+        CLIENT_ERR("IV should have length %d, but has length %" PRIu32, MONGOCRYPT_IV_LEN, iv->len);
         return false;
     }
 
     if (MONGOCRYPT_ENC_KEY_LEN != enc_key->len) {
-        CLIENT_ERR("Encryption key should have length %d, but has length %d", MONGOCRYPT_ENC_KEY_LEN, enc_key->len);
+        CLIENT_ERR("Encryption key should have length %d, but has length %" PRIu32,
+                   MONGOCRYPT_ENC_KEY_LEN,
+                   enc_key->len);
         return false;
     }
 
@@ -575,7 +575,9 @@ static bool _encrypt_step(_mongocrypt_crypto_t *crypto,
     }
 
     if (*bytes_written % MONGOCRYPT_BLOCK_SIZE != 0) {
-        CLIENT_ERR("encryption failure, wrote %d bytes, not a multiple of %d", *bytes_written, MONGOCRYPT_BLOCK_SIZE);
+        CLIENT_ERR("encryption failure, wrote %" PRIu32 " bytes, not a multiple of %d",
+                   *bytes_written,
+                   MONGOCRYPT_BLOCK_SIZE);
         return false;
     }
 
@@ -628,12 +630,12 @@ static bool _hmac_step(_mongocrypt_crypto_t *crypto,
     _mongocrypt_buffer_init(&to_hmac);
 
     if (MONGOCRYPT_MAC_KEY_LEN != Km->len) {
-        CLIENT_ERR("HMAC key wrong length: %d", Km->len);
+        CLIENT_ERR("HMAC key wrong length: %" PRIu32, Km->len);
         goto done;
     }
 
     if (out->len != MONGOCRYPT_HMAC_LEN) {
-        CLIENT_ERR("out wrong length: %d", out->len);
+        CLIENT_ERR("out wrong length: %" PRIu32, out->len);
         goto done;
     }
 
@@ -761,18 +763,18 @@ static bool _mongocrypt_do_encryption(_mongocrypt_crypto_t *crypto,
         return false;
     }
     if (expect_ciphertext_len != ciphertext->len) {
-        CLIENT_ERR("output ciphertext should have been allocated with %d bytes", expect_ciphertext_len);
+        CLIENT_ERR("output ciphertext should have been allocated with %" PRIu32 " bytes", expect_ciphertext_len);
         return false;
     }
 
     if (MONGOCRYPT_IV_LEN != iv->len) {
-        CLIENT_ERR("IV should have length %d, but has length %d", MONGOCRYPT_IV_LEN, iv->len);
+        CLIENT_ERR("IV should have length %d, but has length %" PRIu32, MONGOCRYPT_IV_LEN, iv->len);
         return false;
     }
 
     const uint32_t expected_key_len = (key_format == KEY_FORMAT_FLE2) ? MONGOCRYPT_ENC_KEY_LEN : MONGOCRYPT_KEY_LEN;
     if (key->len != expected_key_len) {
-        CLIENT_ERR("key should have length %d, but has length %d", expected_key_len, key->len);
+        CLIENT_ERR("key should have length %" PRIu32 ", but has length %" PRIu32, expected_key_len, key->len);
         return false;
     }
 
@@ -886,11 +888,13 @@ static bool _decrypt_step(_mongocrypt_crypto_t *crypto,
     *bytes_written = 0;
 
     if (MONGOCRYPT_IV_LEN != iv->len) {
-        CLIENT_ERR("IV should have length %d, but has length %d", MONGOCRYPT_IV_LEN, iv->len);
+        CLIENT_ERR("IV should have length %d, but has length %" PRIu32, MONGOCRYPT_IV_LEN, iv->len);
         return false;
     }
     if (MONGOCRYPT_ENC_KEY_LEN != enc_key->len) {
-        CLIENT_ERR("encryption key should have length %d, but has length %d", MONGOCRYPT_ENC_KEY_LEN, enc_key->len);
+        CLIENT_ERR("encryption key should have length %d, but has length %" PRIu32,
+                   MONGOCRYPT_ENC_KEY_LEN,
+                   enc_key->len);
         return false;
     }
 
@@ -986,8 +990,8 @@ static bool _mongocrypt_do_decryption(_mongocrypt_crypto_t *crypto,
         return false;
     }
     if (plaintext->len != expect_plaintext_len) {
-        CLIENT_ERR("output plaintext should have been allocated with %d bytes, "
-                   "but has: %d",
+        CLIENT_ERR("output plaintext should have been allocated with %" PRIu32 " bytes, "
+                   "but has: %" PRIu32,
                    expect_plaintext_len,
                    plaintext->len);
         return false;
@@ -1004,13 +1008,13 @@ static bool _mongocrypt_do_decryption(_mongocrypt_crypto_t *crypto,
 
     const uint32_t expected_key_len = (key_format == KEY_FORMAT_FLE2) ? MONGOCRYPT_ENC_KEY_LEN : MONGOCRYPT_KEY_LEN;
     if (expected_key_len != key->len) {
-        CLIENT_ERR("key should have length %d, but has length %d", expected_key_len, key->len);
+        CLIENT_ERR("key should have length %" PRIu32 ", but has length %" PRIu32, expected_key_len, key->len);
         return false;
     }
 
     const uint32_t min_cipherlen = _mongocrypt_calculate_ciphertext_len(0, mode, hmac, NULL);
     if (ciphertext->len < min_cipherlen) {
-        CLIENT_ERR("corrupt ciphertext - must be >= %d bytes", min_cipherlen);
+        CLIENT_ERR("corrupt ciphertext - must be >= %" PRIu32 " bytes", min_cipherlen);
         return false;
     }
 
@@ -1138,7 +1142,9 @@ static bool _mongocrypt_do_decryption(_mongocrypt_crypto_t *crypto,
         _mc_##name##_do_encryption,                                                                                    \
         _mc_##name##_do_decryption,                                                                                    \
     };                                                                                                                 \
-    const _mongocrypt_value_encryption_algorithm_t *_mc##name##Algorithm() { return &_mc##name##Algorithm_definition; }
+    const _mongocrypt_value_encryption_algorithm_t *_mc##name##Algorithm(void) {                                       \
+        return &_mc##name##Algorithm_definition;                                                                       \
+    }
 
 // FLE1 algorithm: AES-256-CBC HMAC/SHA-512-256 (SHA-512 truncated to 256 bits)
 DECLARE_ALGORITHM(FLE1, CBC, SHA_512_256)
@@ -1181,7 +1187,7 @@ bool _mongocrypt_random(_mongocrypt_crypto_t *crypto,
     BSON_ASSERT_PARAM(out);
 
     if (count != out->len) {
-        CLIENT_ERR("out should have length %d, but has length %d", count, out->len);
+        CLIENT_ERR("out should have length %" PRIu32 ", but has length %" PRIu32, count, out->len);
         return false;
     }
 
@@ -1233,11 +1239,11 @@ bool _mongocrypt_calculate_deterministic_iv(_mongocrypt_crypto_t *crypto,
     BSON_ASSERT_PARAM(out);
 
     if (MONGOCRYPT_KEY_LEN != key->len) {
-        CLIENT_ERR("key should have length %d, but has length %d\n", MONGOCRYPT_KEY_LEN, key->len);
+        CLIENT_ERR("key should have length %d, but has length %" PRIu32 "\n", MONGOCRYPT_KEY_LEN, key->len);
         goto done;
     }
     if (MONGOCRYPT_IV_LEN != out->len) {
-        CLIENT_ERR("out should have length %d, but has length %d\n", MONGOCRYPT_IV_LEN, out->len);
+        CLIENT_ERR("out should have length %d, but has length %" PRIu32 "\n", MONGOCRYPT_IV_LEN, out->len);
         goto done;
     }
 
@@ -1300,7 +1306,7 @@ bool _mongocrypt_wrap_key(_mongocrypt_crypto_t *crypto,
     _mongocrypt_buffer_init(encrypted_dek);
 
     if (dek->len != MONGOCRYPT_KEY_LEN) {
-        CLIENT_ERR("data encryption key is incorrect length, expected: %" PRIu32 ", got: %" PRIu32,
+        CLIENT_ERR("data encryption key is incorrect length, expected: %d, got: %" PRIu32,
                    MONGOCRYPT_KEY_LEN,
                    dek->len);
         goto done;
@@ -1348,9 +1354,7 @@ bool _mongocrypt_unwrap_key(_mongocrypt_crypto_t *crypto,
     dek->len = bytes_written;
 
     if (dek->len != MONGOCRYPT_KEY_LEN) {
-        CLIENT_ERR("decrypted key is incorrect length, expected: %" PRIu32 ", got: %" PRIu32,
-                   MONGOCRYPT_KEY_LEN,
-                   dek->len);
+        CLIENT_ERR("decrypted key is incorrect length, expected: %d, got: %" PRIu32, MONGOCRYPT_KEY_LEN, dek->len);
         return false;
     }
     return true;

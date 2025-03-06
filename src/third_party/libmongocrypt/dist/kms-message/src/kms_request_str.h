@@ -64,10 +64,19 @@ kms_request_str_append_newline (kms_request_str_t *str);
 KMS_MSG_EXPORT (void)
 kms_request_str_append_lowercase (kms_request_str_t *str,
                                   kms_request_str_t *appended);
+
+#ifdef __GNUC__
+__attribute__((format(__printf__, 2, 3)))
+#endif
 KMS_MSG_EXPORT (void)
 kms_request_str_appendf (kms_request_str_t *str, const char *format, ...);
+
+#ifdef __GNUC__
+__attribute__((format(__printf__, 2, 3)))
+#endif
 KMS_MSG_EXPORT (void)
 kms_request_strdupf (kms_request_str_t *str, const char *format, ...);
+
 KMS_MSG_EXPORT (void)
 kms_request_str_append_escaped (kms_request_str_t *str,
                                 kms_request_str_t *appended,

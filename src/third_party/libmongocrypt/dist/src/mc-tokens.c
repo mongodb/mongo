@@ -168,7 +168,7 @@ IMPL_TOKEN_NEW_CONST(mc_ServerZerosEncryptionToken, mc_ServerDerivedFromDataToke
 
 // d = 17 bytes of 0, AnchorPaddingTokenRoot = HMAC(ESCToken, d)
 #define ANCHOR_PADDING_TOKEN_D_LENGTH 17
-const uint8_t mc_AnchorPaddingTokenDValue[ANCHOR_PADDING_TOKEN_D_LENGTH] =
+static const uint8_t mc_AnchorPaddingTokenDValue[ANCHOR_PADDING_TOKEN_D_LENGTH] =
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 DEF_TOKEN_TYPE(mc_AnchorPaddingTokenRoot, const mc_ESCToken_t *ESCToken) {
@@ -233,97 +233,89 @@ IMPL_TOKEN_NEW_CONST(mc_ServerTextPrefixToken,
                      mc_ServerTokenDerivationLevel1Token_get(serverTokenDerivationLevel1Token),
                      TEXT_PREFIX_ID)
 
-#define IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(Name, Key, BufferArg, UintArg)                                         \
-    {                                                                                                                  \
-        BSON_CONCAT(Name, _t) *t = bson_malloc(sizeof(BSON_CONCAT(Name, _t)));                                         \
-        _mongocrypt_buffer_t tmp;                                                                                      \
-        _mongocrypt_buffer_init(&tmp);                                                                                 \
-        _mongocrypt_buffer_resize(&tmp, MONGOCRYPT_HMAC_SHA256_LEN);                                                   \
-        _mongocrypt_buffer_init(&t->data);                                                                             \
-        _mongocrypt_buffer_resize(&t->data, MONGOCRYPT_HMAC_SHA256_LEN);                                               \
-        if (!_mongocrypt_hmac_sha_256(crypto, Key, BufferArg, &tmp, status)) {                                         \
-            BSON_CONCAT(Name, _destroy)(t);                                                                            \
-            _mongocrypt_buffer_cleanup(&tmp);                                                                          \
-            return NULL;                                                                                               \
-        }                                                                                                              \
-        _mongocrypt_buffer_t uint_arg;                                                                                 \
-        _mongocrypt_buffer_copy_from_uint64_le(&uint_arg, UintArg);                                                    \
-        if (!_mongocrypt_hmac_sha_256(crypto, &tmp, &uint_arg, &t->data, status)) {                                    \
-            BSON_CONCAT(Name, _destroy)(t);                                                                            \
-            _mongocrypt_buffer_cleanup(&tmp);                                                                          \
-            _mongocrypt_buffer_cleanup(&uint_arg);                                                                     \
-            return NULL;                                                                                               \
-        }                                                                                                              \
-        _mongocrypt_buffer_cleanup(&tmp);                                                                              \
-        _mongocrypt_buffer_cleanup(&uint_arg);                                                                         \
-        return t;                                                                                                      \
-    }
+DEF_TOKEN_TYPE(mc_EDCTextExactDerivedFromDataToken,
+               const mc_EDCTextExactToken_t *edcTextExactToken,
+               const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW(mc_EDCTextExactDerivedFromDataToken, mc_EDCTextExactToken_get(edcTextExactToken), v)
+DEF_TOKEN_TYPE(mc_EDCTextSubstringDerivedFromDataToken,
+               const mc_EDCTextSubstringToken_t *edcTextSubstringToken,
+               const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW(mc_EDCTextSubstringDerivedFromDataToken, mc_EDCTextSubstringToken_get(edcTextSubstringToken), v)
+DEF_TOKEN_TYPE(mc_EDCTextSuffixDerivedFromDataToken,
+               const mc_EDCTextSuffixToken_t *edcTextSuffixToken,
+               const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW(mc_EDCTextSuffixDerivedFromDataToken, mc_EDCTextSuffixToken_get(edcTextSuffixToken), v)
+DEF_TOKEN_TYPE(mc_EDCTextPrefixDerivedFromDataToken,
+               const mc_EDCTextPrefixToken_t *edcTextPrefixToken,
+               const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW(mc_EDCTextPrefixDerivedFromDataToken, mc_EDCTextPrefixToken_get(edcTextPrefixToken), v)
 
 DEF_TOKEN_TYPE(mc_EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
-               const mc_EDCTextExactToken_t *edcTextExactToken,
-               const _mongocrypt_buffer_t *v,
+               const mc_EDCTextExactDerivedFromDataToken_t *edcTextExactToken,
                uint64_t u)
-IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(mc_EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
-                                        mc_EDCTextExactToken_get(edcTextExactToken),
-                                        v,
-                                        u)
+IMPL_TOKEN_NEW_CONST(mc_EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                     mc_EDCTextExactDerivedFromDataToken_get(edcTextExactToken),
+                     u)
 DEF_TOKEN_TYPE(mc_EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
-               const mc_EDCTextSubstringToken_t *edcTextSubstringToken,
-               const _mongocrypt_buffer_t *v,
+               const mc_EDCTextSubstringDerivedFromDataToken_t *edcTextSubstringToken,
                uint64_t u)
-IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(mc_EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
-                                        mc_EDCTextSubstringToken_get(edcTextSubstringToken),
-                                        v,
-                                        u)
+IMPL_TOKEN_NEW_CONST(mc_EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
+                     mc_EDCTextSubstringDerivedFromDataToken_get(edcTextSubstringToken),
+                     u)
 DEF_TOKEN_TYPE(mc_EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
-               const mc_EDCTextSuffixToken_t *edcTextSuffixToken,
-               const _mongocrypt_buffer_t *v,
+               const mc_EDCTextSuffixDerivedFromDataToken_t *edcTextSuffixToken,
                uint64_t u)
-IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(mc_EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
-                                        mc_EDCTextSuffixToken_get(edcTextSuffixToken),
-                                        v,
-                                        u)
+IMPL_TOKEN_NEW_CONST(mc_EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
+                     mc_EDCTextSuffixDerivedFromDataToken_get(edcTextSuffixToken),
+                     u)
 DEF_TOKEN_TYPE(mc_EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
-               const mc_EDCTextPrefixToken_t *edcTextPrefixToken,
-               const _mongocrypt_buffer_t *v,
+               const mc_EDCTextPrefixDerivedFromDataToken_t *edcTextPrefixToken,
                uint64_t u)
-IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(mc_EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
-                                        mc_EDCTextPrefixToken_get(edcTextPrefixToken),
-                                        v,
-                                        u)
+IMPL_TOKEN_NEW_CONST(mc_EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
+                     mc_EDCTextPrefixDerivedFromDataToken_get(edcTextPrefixToken),
+                     u)
+
+DEF_TOKEN_TYPE(mc_ESCTextExactDerivedFromDataToken,
+               const mc_ESCTextExactToken_t *escTextExactToken,
+               const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW(mc_ESCTextExactDerivedFromDataToken, mc_ESCTextExactToken_get(escTextExactToken), v)
+DEF_TOKEN_TYPE(mc_ESCTextSubstringDerivedFromDataToken,
+               const mc_ESCTextSubstringToken_t *escTextSubstringToken,
+               const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW(mc_ESCTextSubstringDerivedFromDataToken, mc_ESCTextSubstringToken_get(escTextSubstringToken), v)
+DEF_TOKEN_TYPE(mc_ESCTextSuffixDerivedFromDataToken,
+               const mc_ESCTextSuffixToken_t *escTextSuffixToken,
+               const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW(mc_ESCTextSuffixDerivedFromDataToken, mc_ESCTextSuffixToken_get(escTextSuffixToken), v)
+DEF_TOKEN_TYPE(mc_ESCTextPrefixDerivedFromDataToken,
+               const mc_ESCTextPrefixToken_t *escTextPrefixToken,
+               const _mongocrypt_buffer_t *v)
+IMPL_TOKEN_NEW(mc_ESCTextPrefixDerivedFromDataToken, mc_ESCTextPrefixToken_get(escTextPrefixToken), v)
 
 DEF_TOKEN_TYPE(mc_ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
-               const mc_ESCTextExactToken_t *escTextExactToken,
-               const _mongocrypt_buffer_t *v,
+               const mc_ESCTextExactDerivedFromDataToken_t *escTextExactToken,
                uint64_t u)
-IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(mc_ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
-                                        mc_ESCTextExactToken_get(escTextExactToken),
-                                        v,
-                                        u)
+IMPL_TOKEN_NEW_CONST(mc_ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                     mc_ESCTextExactDerivedFromDataToken_get(escTextExactToken),
+                     u)
 DEF_TOKEN_TYPE(mc_ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
-               const mc_ESCTextSubstringToken_t *escTextSubstringToken,
-               const _mongocrypt_buffer_t *v,
+               const mc_ESCTextSubstringDerivedFromDataToken_t *escTextSubstringToken,
                uint64_t u)
-IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(mc_ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
-                                        mc_ESCTextSubstringToken_get(escTextSubstringToken),
-                                        v,
-                                        u)
+IMPL_TOKEN_NEW_CONST(mc_ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
+                     mc_ESCTextSubstringDerivedFromDataToken_get(escTextSubstringToken),
+                     u)
 DEF_TOKEN_TYPE(mc_ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
-               const mc_ESCTextSuffixToken_t *escTextSuffixToken,
-               const _mongocrypt_buffer_t *v,
+               const mc_ESCTextSuffixDerivedFromDataToken_t *escTextSuffixToken,
                uint64_t u)
-IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(mc_ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
-                                        mc_ESCTextSuffixToken_get(escTextSuffixToken),
-                                        v,
-                                        u)
+IMPL_TOKEN_NEW_CONST(mc_ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
+                     mc_ESCTextSuffixDerivedFromDataToken_get(escTextSuffixToken),
+                     u)
 DEF_TOKEN_TYPE(mc_ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
-               const mc_ESCTextPrefixToken_t *escTextPrefixToken,
-               const _mongocrypt_buffer_t *v,
+               const mc_ESCTextPrefixDerivedFromDataToken_t *escTextPrefixToken,
                uint64_t u)
-IMPL_TOKEN_NEW_FROM_DATA_AND_CONTENTION(mc_ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
-                                        mc_ESCTextPrefixToken_get(escTextPrefixToken),
-                                        v,
-                                        u)
+IMPL_TOKEN_NEW_CONST(mc_ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
+                     mc_ESCTextPrefixDerivedFromDataToken_get(escTextPrefixToken),
+                     u)
 
 DEF_TOKEN_TYPE(mc_ServerTextExactDerivedFromDataToken,
                const mc_ServerTextExactToken_t *serverTextExactToken,

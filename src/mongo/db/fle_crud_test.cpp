@@ -1903,32 +1903,40 @@ ESCTwiceDerivedTagToken QETextSearchCrudTest::getTestESCToken(BSONElement elemen
     PrfBlock escDataTokenBlk;
     if (!type.has_value()) {
         auto escTextToken = ESCTextExactToken::deriveFrom(escToken);
-        escDataTokenBlk = ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                              escTextToken, toCDR(element), 0)
-                              .asPrfBlock();
+        auto escDataToken =
+            ESCTextExactDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element));
+        escDataTokenBlk =
+            ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, 0)
+                .asPrfBlock();
     } else {
         switch (*type) {
             case QueryTypeEnum::SubstringPreview: {
                 auto escTextToken = ESCTextSubstringToken::deriveFrom(escToken);
+                auto escDataToken =
+                    ESCTextSubstringDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element));
                 escDataTokenBlk =
                     ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                        escTextToken, toCDR(element), 0)
+                        escDataToken, 0)
                         .asPrfBlock();
                 break;
             }
             case QueryTypeEnum::SuffixPreview: {
                 auto escTextToken = ESCTextSuffixToken::deriveFrom(escToken);
+                auto escDataToken =
+                    ESCTextSuffixDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element));
                 escDataTokenBlk =
                     ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                        escTextToken, toCDR(element), 0)
+                        escDataToken, 0)
                         .asPrfBlock();
                 break;
             }
             case QueryTypeEnum::PrefixPreview: {
                 auto escTextToken = ESCTextPrefixToken::deriveFrom(escToken);
+                auto escDataToken =
+                    ESCTextPrefixDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element));
                 escDataTokenBlk =
                     ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                        escTextToken, toCDR(element), 0)
+                        escDataToken, 0)
                         .asPrfBlock();
                 break;
             }

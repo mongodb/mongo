@@ -124,6 +124,9 @@ struct _kms_response_parser_t {
       }                      \
    } while (0)
 
+#ifdef __GNUC__
+__attribute__((format(__printf__, 3, 4)))
+#endif
 void
 kms_set_error (char *error, size_t size, const char *fmt, ...);
 

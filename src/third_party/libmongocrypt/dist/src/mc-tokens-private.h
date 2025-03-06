@@ -197,38 +197,56 @@ DECL_TOKEN_TYPE(mc_ServerTextSuffixToken,
 DECL_TOKEN_TYPE(mc_ServerTextPrefixToken,
                 const mc_ServerTokenDerivationLevel1Token_t *serverTokenDerivationLevel1Token);
 
-DECL_TOKEN_TYPE(mc_EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
+DECL_TOKEN_TYPE(mc_EDCTextExactDerivedFromDataToken,
                 const mc_EDCTextExactToken_t *edcTextExactToken,
-                const _mongocrypt_buffer_t *v,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_EDCTextSubstringDerivedFromDataToken,
+                const mc_EDCTextSubstringToken_t *edcTextSubstringToken,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_EDCTextSuffixDerivedFromDataToken,
+                const mc_EDCTextSuffixToken_t *edcTextSuffixToken,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_EDCTextPrefixDerivedFromDataToken,
+                const mc_EDCTextPrefixToken_t *edcTextPrefixToken,
+                const _mongocrypt_buffer_t *v);
+
+DECL_TOKEN_TYPE(mc_EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                const mc_EDCTextExactDerivedFromDataToken_t *edcTextExactToken,
                 uint64_t u);
 DECL_TOKEN_TYPE(mc_EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
-                const mc_EDCTextSubstringToken_t *edcTextSubstringToken,
-                const _mongocrypt_buffer_t *v,
+                const mc_EDCTextSubstringDerivedFromDataToken_t *edcTextSubstringToken,
                 uint64_t u);
 DECL_TOKEN_TYPE(mc_EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
-                const mc_EDCTextSuffixToken_t *edcTextSuffixToken,
-                const _mongocrypt_buffer_t *v,
+                const mc_EDCTextSuffixDerivedFromDataToken_t *edcTextSuffixToken,
                 uint64_t u);
 DECL_TOKEN_TYPE(mc_EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
-                const mc_EDCTextPrefixToken_t *edcTextPrefixToken,
-                const _mongocrypt_buffer_t *v,
+                const mc_EDCTextPrefixDerivedFromDataToken_t *edcTextPrefixToken,
                 uint64_t u);
 
-DECL_TOKEN_TYPE(mc_ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
+DECL_TOKEN_TYPE(mc_ESCTextExactDerivedFromDataToken,
                 const mc_ESCTextExactToken_t *escTextExactToken,
-                const _mongocrypt_buffer_t *v,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_ESCTextSubstringDerivedFromDataToken,
+                const mc_ESCTextSubstringToken_t *escTextSubstringToken,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_ESCTextSuffixDerivedFromDataToken,
+                const mc_ESCTextSuffixToken_t *escTextSuffixToken,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_ESCTextPrefixDerivedFromDataToken,
+                const mc_ESCTextPrefixToken_t *escTextPrefixToken,
+                const _mongocrypt_buffer_t *v);
+
+DECL_TOKEN_TYPE(mc_ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                const mc_ESCTextExactDerivedFromDataToken_t *escTextExactToken,
                 uint64_t u);
 DECL_TOKEN_TYPE(mc_ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
-                const mc_ESCTextSubstringToken_t *escTextSubstringToken,
-                const _mongocrypt_buffer_t *v,
+                const mc_ESCTextSubstringDerivedFromDataToken_t *escTextSubstringToken,
                 uint64_t u);
 DECL_TOKEN_TYPE(mc_ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
-                const mc_ESCTextSuffixToken_t *escTextSuffixToken,
-                const _mongocrypt_buffer_t *v,
+                const mc_ESCTextSuffixDerivedFromDataToken_t *escTextSuffixToken,
                 uint64_t u);
 DECL_TOKEN_TYPE(mc_ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
-                const mc_ESCTextPrefixToken_t *escTextPrefixToken,
-                const _mongocrypt_buffer_t *v,
+                const mc_ESCTextPrefixDerivedFromDataToken_t *escTextPrefixToken,
                 uint64_t u);
 
 DECL_TOKEN_TYPE(mc_ServerTextExactDerivedFromDataToken,

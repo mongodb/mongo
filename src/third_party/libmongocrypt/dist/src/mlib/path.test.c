@@ -1,8 +1,5 @@
 #include "./path.h"
 
-#define CHECK(Expr)                                                                                                    \
-    ((Expr) ? 0 : ((fprintf(stderr, "%s:%d: Check '%s' failed\n", __FILE__, __LINE__, #Expr), abort()), 0))
-
 #define TEST_DECOMP(Part, Given, Expect)                                                                               \
     MSTR_ASSERT_EQ(mpath_##Part(mstrv_view_cstr(Given), MPATH_NATIVE), mstrv_view_cstr(Expect))
 
@@ -12,7 +9,7 @@ static void test_make_absolute(mpath_format f, const char *part, const char *bas
     mstr_free(result);
 }
 
-int main() {
+int main(void) {
     mstr s = mstr_copy_cstr("/foo/bar/baz.txt");
     MSTR_ASSERT_EQ(mpath_parent(s.view, MPATH_NATIVE), mstrv_lit("/foo/bar"));
     MSTR_ASSERT_EQ(mpath_parent(mpath_parent(s.view, MPATH_NATIVE), MPATH_NATIVE), mstrv_lit("/foo"));

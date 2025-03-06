@@ -100,7 +100,7 @@ bool mc_getTypeInfoDouble(mc_getTypeInfoDouble_args_t args,
                           mongocrypt_status_t *status,
                           bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
 
-#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
+#if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 /**
  * @brief OST-encoding of a Decimal128
  */

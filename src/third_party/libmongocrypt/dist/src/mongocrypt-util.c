@@ -18,19 +18,22 @@
 #if defined(__has_include) && !(defined(_GNU_SOURCE) || defined(_DARWIN_C_SOURCE))
 #if __has_include(<features.h>)
 // We're using a glibc-compatible library
+#if !defined(_GNU_SOURCE)
 #define _GNU_SOURCE
+#endif
 #elif __has_include(<Availability.h>)
 // We're on Apple/Darwin
 #define _DARWIN_C_SOURCE
 #endif
 #else // No __has_include
-#if __GNUC__ < 5
+#if __GNUC__ < 5 && !defined(_GNU_SOURCE)
 // Best guess on older GCC is that we are using glibc
 #define _GNU_SOURCE
 #endif
 #endif
 
 #include "mc-check-conversions-private.h"
+#include "mongocrypt-dll-private.h"
 #include "mongocrypt-private.h" // CLIENT_ERR
 #include "mongocrypt-util-private.h"
 
@@ -60,7 +63,7 @@ current_module_result current_module_path(void) {
     int ret_error = 0;
 #ifdef _WIN32
     DWORD acc_size = 512;
-    while (!ret_str.data && !ret_error) {
+    while (!ret_str.raw.data && !ret_error) {
         // Loop until we allocate a large enough buffer or get an error
         wchar_t *path = calloc(acc_size + 1, sizeof(wchar_t));
         SetLastError(0);
@@ -82,7 +85,9 @@ current_module_result current_module_path(void) {
     // Darwin/BSD/glibc define extensions for finding dynamic library info from
     // the address of a symbol.
     Dl_info info = {0};
+    MC_BEGIN_CAST_FUNCTION_TYPE_STRICT_IGNORE
     int rc = dladdr((const void *)current_module_path, &info);
+    MC_END_CAST_FUNCTION_TYPE_STRICT_IGNORE
     if (rc == 0) {
         // Failed to resolve the symbol
         ret_error = ENOENT;

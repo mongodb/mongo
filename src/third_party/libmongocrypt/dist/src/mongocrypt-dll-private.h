@@ -6,9 +6,9 @@
 
 #include <stdlib.h>
 
-#if _WIN32
+#if defined(_WIN32)
 #define MCR_DLL_SUFFIX ".dll"
-#elif __APPLE__
+#elif defined(__APPLE__)
 #define MCR_DLL_SUFFIX ".dylib"
 #else
 #define MCR_DLL_SUFFIX ".so"
@@ -53,6 +53,23 @@ static inline void mcr_dll_close(mcr_dll dll) {
     mcr_dll_close_handle(dll);
     mstr_free(dll.error_string);
 }
+
+// All currently supported platforms require casting to/from `void*` for dynamically loaded function symbols by
+// necessity despite being undefined behavior according to the C standard specification.
+#if defined(__GNUC__) && ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6))
+// GCC requires silencing `-Wpedantic` for this cast.
+#define MC_BEGIN_CAST_FUNCTION_TYPE_STRICT_IGNORE                                                                      \
+    _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wpedantic\"")
+#define MC_END_CAST_FUNCTION_TYPE_STRICT_IGNORE _Pragma("GCC diagnostic pop")
+#elif defined(__clang__)
+#define MC_BEGIN_CAST_FUNCTION_TYPE_STRICT_IGNORE                                                                      \
+    _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wunknown-warning-option\"")                  \
+        _Pragma("clang diagnostic ignored \"-Wcast-function-type-strict\"")
+#define MC_END_CAST_FUNCTION_TYPE_STRICT_IGNORE _Pragma("clang diagnostic pop")
+#else
+#define MC_BEGIN_CAST_FUNCTION_TYPE_STRICT_IGNORE
+#define MC_END_CAST_FUNCTION_TYPE_STRICT_IGNORE
+#endif
 
 /**
  * @brief Obtain a pointer to an exported entity from the given dynamic library.
