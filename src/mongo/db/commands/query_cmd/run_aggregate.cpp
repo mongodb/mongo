@@ -103,6 +103,7 @@
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -1084,7 +1085,7 @@ void rewritePipelineIfTimeseries(const AggExState& aggExState,
     // Conditions for enabling the viewless code path: feature flag is on, request does not use
     // the rawData flag, and we're querying against a viewless timeseries collection.
     if (auto& request = aggExState.getRequest();
-        aggCatalogState.lockAcquired() && !request.getRawData()) {
+        aggCatalogState.lockAcquired() && !isRawDataOperation(aggExState.getOpCtx())) {
         if (const auto& coll = aggCatalogState.getPrimaryCollection();
             coll && coll->isTimeseriesCollection() && coll->isNewTimeseriesWithoutView()) {
             const auto timeseriesOptions = coll->getTimeseriesOptions();

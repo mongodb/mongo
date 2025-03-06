@@ -83,6 +83,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
@@ -154,7 +155,7 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     aggregation_request_helper::addQuerySettingsToRequest(req, expCtx);
 
     auto reqObj = req.toBSON();
-    if (request.getRawData() && req.getNamespace() != executionNs) {
+    if (isRawDataOperation(expCtx->getOperationContext()) && req.getNamespace() != executionNs) {
         // Rewrite the command object to use the execution namespace.
         BSONObjBuilder builder{reqObj.objsize()};
         for (auto&& [fieldName, elem] : reqObj) {
@@ -468,11 +469,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     return pipeline;
 }
 
-void rewritePipelineIfTimeseries(AggregateCommandRequest& request,
+void rewritePipelineIfTimeseries(OperationContext* opCtx,
+                                 AggregateCommandRequest& request,
                                  const CollectionRoutingInfo& cri) {
     // Conditions for enabling the viewless code path: feature flag is on, request does not use
     // the rawData flag, and we're querying against a sharded viewless timeseries collection.
-    if (!request.getRawData() && cri.cm.isTimeseriesCollection() &&
+    if (!isRawDataOperation(opCtx) && cri.cm.isTimeseriesCollection() &&
         cri.cm.isNewTimeseriesWithoutView()) {
         // TypeCollectionTimeseriesFields encapsulates TimeseriesOptions.
         const auto timeseriesFields = cri.cm.getTimeseriesFields();
@@ -485,7 +487,7 @@ void rewritePipelineIfTimeseries(AggregateCommandRequest& request,
             // The query has been rewritten to something that should run directly against the bucket
             // collection. Set this flag to indicate to the shard that the query's target has
             // changed to avoid incorrect rewrites in the shard role.
-            request.setRawData(true);
+            isRawDataOperation(opCtx) = true;
         }
     }
 }
@@ -628,7 +630,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // none or the routing table is absent, and the rewrite will either be performed in the shard
     // role or the database is nonexistent or the cluster has no shards to execute the query anyway.
     if (routingTableIsAvailable) {
-        rewritePipelineIfTimeseries(request, *cri);
+        rewritePipelineIfTimeseries(opCtx, request, *cri);
     }
 
     // pipelineBuilder will be invoked within AggregationTargeter::make() if and only if it chooses
