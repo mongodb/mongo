@@ -4,8 +4,9 @@
  * @tags: [
  *     requires_fcv_81,
  *     requires_getmore,
- *     # This test runs too long for Evergreen's 30 min timeout in TSAN builds.
+ *     # This test runs too long for TSAN and code coverage builds.
  *     tsan_incompatible,
+ *     incompatible_with_gcov,
  *  ]
  */
 

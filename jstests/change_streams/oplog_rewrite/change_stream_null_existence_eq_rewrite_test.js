@@ -4,7 +4,9 @@
  * @tags: [
  *   requires_fcv_51,
  *   requires_pipeline_optimization,
- *   uses_change_streams
+ *   uses_change_streams,
+ *   # This test runs too long to be included in code coverage:
+ *   incompatible_with_gcov,
  * ]
  */
 import {
