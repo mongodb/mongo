@@ -678,6 +678,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:database_holder",
         "//src/mongo/db/catalog:local_oplog_info",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/catalog:snapshot_helper",
+        "//src/mongo/db/s:sharding_runtime_d_params_idl",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:capped_snapshots",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.

@@ -108,9 +108,9 @@ mongo_cc_library(
         "range_deleter_service.h",
         "sharding_runtime_d_params.h",
         ":range_deletion_task_gen",
-        ":sharding_runtime_d_params_gen",
     ],
     deps = [
+        ":sharding_runtime_d_params_idl",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/repl:replica_set_aware_service",
@@ -830,7 +830,6 @@ mongo_cc_library(
         "type_shard_database.cpp",
         ":collection_critical_section_document_gen",
         ":commit_chunk_migration_gen",
-        ":sharding_runtime_d_params_gen",
         ":type_shard_collection_gen",
         ":type_shard_database_gen",
         "//src/mongo/db/s/metrics:phase_duration.cpp",
@@ -1024,6 +1023,7 @@ mongo_cc_library(
         ":sharding_catalog",
         ":sharding_catalog_manager",
         ":sharding_logging",
+        ":sharding_runtime_d_params_idl",
         ":transaction_coordinator",
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/client:remote_command_targeter",
@@ -1717,5 +1717,21 @@ mongo_cc_benchmark(
         ":sharding_runtime_d",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/auth:authorization_manager_global",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharding_runtime_d_params_idl",
+    srcs = [
+        "sharding_runtime_d_params_gen",
+    ],
+    hdrs = [
+        "sharding_runtime_d_params.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s:common_s",
+        "//src/mongo/util:processinfo",
     ],
 )

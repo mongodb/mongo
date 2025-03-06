@@ -63,6 +63,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_util.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -72,6 +73,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -1569,7 +1571,30 @@ void restoreTransactionResourcesToOperationContext(
                                         << " is now a view after restore from yield");
             };
 
+            auto checkOrphanRangePreserverIsStillValid = [&] {
+                // The query will get killed, throwing a QueryPlanKilled error, when all these
+                // conditions are met:
+                // * The Range Preserver associated with this query has been invalidated.
+                // * The Read Concern of the operation is other than ‘snapshot’ or ‘available’.
+                // * The parameter terminateSecondaryReadsOnOrphanCleanup is enabled.
+                // * The feature flag featureFlagTerminateSecondaryReadsUponRangeDeletion is
+                // enabled.
+                if (acquiredCollection.ownershipFilter &&
+                    feature_flags::gTerminateSecondaryReadsUponRangeDeletion.isEnabled() &&
+                    terminateSecondaryReadsOnOrphanCleanup.load() &&
+                    (prerequisites.readConcern.getLevel() !=
+                         repl::ReadConcernLevel::kSnapshotReadConcern &&
+                     prerequisites.readConcern.getLevel() !=
+                         repl::ReadConcernLevel::kAvailableReadConcern)) {
+                    uassert(ErrorCodes::QueryPlanKilled,
+                            "Read has been terminated due to orphan range cleanup.",
+                            acquiredCollection.ownershipFilter->isRangePreserverStillValid());
+                }
+            };
+
             if (prerequisites.operationType == AcquisitionPrerequisites::OperationType::kRead) {
+                checkOrphanRangePreserverIsStillValid();
+
                 // Just reacquire the CollectionPtr. Reads don't care about placement changes
                 // because they have already established a ScopedCollectionFilter that acts as
                 // RangePreserver.

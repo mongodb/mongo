@@ -64,6 +64,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
@@ -72,6 +73,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
@@ -170,6 +172,10 @@ protected:
         auto catalogState = catalog::closeCatalog(newOpCtx.get());
         catalog::openCatalog(newOpCtx.get(), catalogState, stableTimestamp);
     }
+
+    void testRestoreFailsWhenMetadataInvalidated(bool terminateSecondaryReadsUponRangeDeletion,
+                                                 bool terminateSecondaryReadsOnOrphan,
+                                                 bool mustFail);
 };
 
 void ShardRoleTest::setUp() {
@@ -2706,6 +2712,57 @@ TEST_F(ShardRoleTest, restoreKillsTransactionOnCatalogEpochChange) {
                                opCtx, std::move(yieldedTransactionResources2)),
                            DBException,
                            ErrorCodes::QueryPlanKilled);
+    }
+}
+
+TEST_F(ShardRoleTest, RestoreFailsWhenMetadataInvalidated) {
+    testRestoreFailsWhenMetadataInvalidated(true, true, true);
+    testRestoreFailsWhenMetadataInvalidated(false, true, false);
+    testRestoreFailsWhenMetadataInvalidated(true, false, false);
+}
+
+void ShardRoleTest::testRestoreFailsWhenMetadataInvalidated(
+    bool terminateSecondaryReadsUponRangeDeletion,
+    bool terminateSecondaryReadsOnOrphan,
+    bool mustFail) {
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTerminateSecondaryReadsUponRangeDeletion",
+        terminateSecondaryReadsUponRangeDeletion};
+
+    terminateSecondaryReadsOnOrphanCleanup.store(terminateSecondaryReadsOnOrphan);
+
+    const auto nss = nssShardedCollection1;
+
+    PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
+
+    const auto acquisition = acquireCollection(
+        operationContext(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead},
+        MODE_IX);
+
+    ASSERT_TRUE(acquisition.getShardingFilter().has_value());
+    ASSERT_TRUE(acquisition.getShardingFilter()->keyBelongsToMe(BSON("skey" << 0)));
+
+    // Yield the resources
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    {
+        const auto& csr = CollectionShardingRuntime::acquireExclusive(operationContext(), nss);
+        csr->invalidateRangePreserversOlderThanShardVersion(
+            operationContext(), shardVersionShardedCollection1.placementVersion());
+    }
+
+    if (mustFail) {
+        // Attempt to restore. It must fail as collection metadata trackers are invalidated.
+        ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                               operationContext(), std::move(yieldedTransactionResources)),
+                           DBException,
+                           ErrorCodes::QueryPlanKilled);
+    } else {
+        restoreTransactionResourcesToOperationContext(operationContext(),
+                                                      std::move(yieldedTransactionResources));
     }
 }
 

@@ -107,6 +107,16 @@ void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
     });
 }
 
+void invalidateRangePreservers(OperationContext* opCtx, const RangeDeletionTask& rdt) {
+    auto preMigrationShardVersion = rdt.getPreMigrationShardVersion();
+
+    if (preMigrationShardVersion && preMigrationShardVersion.get() != ChunkVersion::IGNORED()) {
+        auto scopedScr = CollectionShardingRuntime::acquireExclusive(opCtx, rdt.getNss());
+        scopedScr->invalidateRangePreserversOlderThanShardVersion(opCtx,
+                                                                  preMigrationShardVersion.get());
+    }
+}
+
 }  // namespace
 
 RangeDeleterServiceOpObserver::RangeDeleterServiceOpObserver() = default;
@@ -135,6 +145,12 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
                                              const OplogUpdateEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() == NamespaceString::kRangeDeletionNamespace) {
+        const bool processingFieldUpdatedToTrue = [&] {
+            const auto newValueProcessingForField = update_oplog_entry::extractNewValueForField(
+                args.updateArgs->update, RangeDeletionTask::kProcessingFieldName);
+            return (!newValueProcessingForField.eoo() && newValueProcessingForField.Bool());
+        }();
+
         const bool pendingFieldIsRemoved = [&] {
             return update_oplog_entry::isFieldRemovedByUpdate(
                        args.updateArgs->update, RangeDeletionTask::kPendingFieldName) ==
@@ -147,10 +163,18 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
             return (!newValueForPendingField.eoo() && newValueForPendingField.Bool() == false);
         }();
 
-        if (pendingFieldIsRemoved || pendingFieldUpdatedToFalse) {
+        if (processingFieldUpdatedToTrue || pendingFieldIsRemoved || pendingFieldUpdatedToFalse) {
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserContext("RangeDeleterServiceOpObserver"), args.updateArgs->updatedDoc);
-            registerTaskWithOngoingQueriesOnOpLogEntryCommit(opCtx, deletionTask);
+            if (processingFieldUpdatedToTrue) {
+                // Invalidates all RangePreservers when shardPlacementVersion is lower than or
+                // equal to the preMigrationShardVersion. This ensures that reads on secondaries are
+                // terminated, preventing them from potentially targeting orphaned documents.
+                invalidateRangePreservers(opCtx, deletionTask);
+            }
+            if (pendingFieldIsRemoved || pendingFieldUpdatedToFalse) {
+                registerTaskWithOngoingQueriesOnOpLogEntryCommit(opCtx, deletionTask);
+            }
         }
     }
 }
