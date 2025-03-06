@@ -91,6 +91,7 @@
 #include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -309,17 +310,8 @@ BSONObj translateCmdObjForRawData(OperationContext* opCtx,
         if (isTimeseriesViewRequest) {
             ns = translatedNs;
             collectionOrView = acquire();
-
-            // Rewrite the command object to use the buckets namespace.
-            BSONObjBuilder builder{cmdObj.objsize()};
-            for (auto&& [fieldName, elem] : cmdObj) {
-                if (fieldName == DistinctCommandRequest::kCommandName) {
-                    builder.append(fieldName, translatedNs.coll());
-                } else {
-                    builder.append(elem);
-                }
-            }
-            return builder.obj();
+            return rewriteCommandForRawDataOperation<DistinctCommandRequest>(cmdObj,
+                                                                             translatedNs.coll());
         }
     }
 

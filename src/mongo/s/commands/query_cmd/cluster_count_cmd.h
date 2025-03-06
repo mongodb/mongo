@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -426,18 +427,7 @@ private:
         }
 
         ns = ns.makeTimeseriesBucketsNamespace();
-
-        // Rewrite the command object to use the buckets namespace.
-        BSONObjBuilder builder{cmdObj.objsize()};
-        for (auto&& [fieldName, elem] : cmdObj) {
-            if (fieldName == CountCommandRequest::kCommandName) {
-                builder.append(fieldName, ns.coll());
-            } else {
-                builder.append(elem);
-            }
-        }
-
-        return builder.obj();
+        return rewriteCommandForRawDataOperation<CountCommandRequest>(cmdObj, ns.coll());
     }
 };
 

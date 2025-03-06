@@ -154,21 +154,13 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     req.setWriteConcern(std::move(writeConcern));
     aggregation_request_helper::addQuerySettingsToRequest(req, expCtx);
 
-    auto reqObj = req.toBSON();
-    if (isRawDataOperation(expCtx->getOperationContext()) && req.getNamespace() != executionNs) {
-        // Rewrite the command object to use the execution namespace.
-        BSONObjBuilder builder{reqObj.objsize()};
-        for (auto&& [fieldName, elem] : reqObj) {
-            if (fieldName == AggregateCommandRequest::kCommandName) {
-                builder.append(fieldName, executionNs.coll());
-            } else {
-                builder.append(elem);
-            }
-        }
-        reqObj = builder.obj();
-    }
+    auto cmdObj =
+        isRawDataOperation(expCtx->getOperationContext()) && req.getNamespace() != executionNs
+        ? rewriteCommandForRawDataOperation<AggregateCommandRequest>(req.toBSON(),
+                                                                     executionNs.coll())
+        : req.toBSON();
 
-    return Document(reqObj);
+    return Document(cmdObj);
 }
 
 // Build an appropriate ExpressionContext for the pipeline. This helper instantiates an appropriate

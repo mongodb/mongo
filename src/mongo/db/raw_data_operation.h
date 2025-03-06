@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -43,5 +45,21 @@ constexpr inline auto kRawDataFieldName = "rawData"_sd;
  * format in which it is stored.
  */
 bool& isRawDataOperation(OperationContext*);
+
+/**
+ * Returns the rewritten command object, replacing the collection name with the one provided.
+ */
+template <class CommandRequest>
+BSONObj rewriteCommandForRawDataOperation(const BSONObj& cmd, StringData coll) {
+    BSONObjBuilder builder{cmd.objsize()};
+    for (auto&& [fieldName, elem] : cmd) {
+        if (fieldName == CommandRequest::kCommandName) {
+            builder.append(fieldName, coll);
+        } else {
+            builder.append(elem);
+        }
+    }
+    return builder.obj();
+}
 
 }  // namespace mongo
