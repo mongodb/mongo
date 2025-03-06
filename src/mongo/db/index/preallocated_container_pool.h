@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,15 +29,35 @@
 
 #pragma once
 
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/auto_clear_ptr.h"
+
 namespace mongo {
 
 /**
- * This class encompasses the storage state needed for an operation.
+ * A pool of preallocated objects that could be reused within the lifetime of a database operation.
+ * Users of any members should never leave any state behind.
  */
-class StorageExecutionContext {
+class PreallocatedContainerPool {
 public:
-    static const OperationContext::Decoration<StorageExecutionContext> get;
+    static const OperationContext::Decoration<PreallocatedContainerPool> get;
+
+    AutoClearPtr<KeyStringSet> keys() {
+        return makeAutoClearPtr(&_keys);
+    }
+    AutoClearPtr<KeyStringSet> multikeyMetadataKeys() {
+        return makeAutoClearPtr(&_multikeyMetadataKeys);
+    }
+    AutoClearPtr<MultikeyPaths> multikeyPaths() {
+        return makeAutoClearPtr(&_multikeyPaths);
+    }
+
+private:
+    KeyStringSet _keys;
+    KeyStringSet _multikeyMetadataKeys;
+    MultikeyPaths _multikeyPaths;
 };
 
-}  // namespace mongo
+};  // namespace mongo

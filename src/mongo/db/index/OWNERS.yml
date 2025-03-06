@@ -15,6 +15,9 @@ filters:
   - "hash_key_generator*":
     approvers:
       - 10gen/query-execution-indexing
+  - "preallocated_container_pool*":
+    approvers:
+      - 10gen/server-index-builds
   - "sort_key_generator*":
     approvers:
       - 10gen/query-execution-indexing

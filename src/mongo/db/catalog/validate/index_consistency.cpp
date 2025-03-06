@@ -58,11 +58,11 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -832,11 +832,11 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
 
     const auto descriptor = index->descriptor();
     SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
-    auto& executionCtx = StorageExecutionContext::get(opCtx);
+    auto& containerPool = PreallocatedContainerPool::get(opCtx);
 
-    const auto documentKeySet = executionCtx.keys();
-    const auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
-    const auto documentMultikeyPaths = executionCtx.multikeyPaths();
+    const auto documentKeySet = containerPool.keys();
+    const auto multikeyMetadataKeys = containerPool.multikeyMetadataKeys();
+    const auto documentMultikeyPaths = containerPool.multikeyPaths();
 
     try {
         iam->getKeys(opCtx,

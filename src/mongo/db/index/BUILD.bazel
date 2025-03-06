@@ -92,6 +92,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:working_set",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/geo:geoparser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/index_builds:index_build_interceptor",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
         "//src/mongo/db/pipeline:document_path_support",
@@ -104,7 +105,6 @@ mongo_cc_library(
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:encryption_hooks",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
@@ -115,6 +115,21 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
         "//src/third_party/s2",  # TODO(SERVER-93876): Remove.
         "//src/third_party/snappy",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "preallocated_container_pool",
+    srcs = [
+        "preallocated_container_pool.cpp",
+    ],
+    hdrs = [
+        "preallocated_container_pool.h",
+        "//src/mongo/util:auto_clear_ptr.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 

@@ -56,9 +56,9 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_data.h"
@@ -195,7 +195,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
     // TODO provide a way for the query planner to opt out of this checking if it is unneeded due to
     // the structure of the plan.
     if (member->getState() == WorkingSetMember::RID_AND_IDX) {
-        auto& executionCtx = StorageExecutionContext::get(opCtx);
+        auto& containerPool = PreallocatedContainerPool::get(opCtx);
         for (size_t i = 0; i < member->keyData.size(); i++) {
             auto&& memberKey = member->keyData[i];
             // If this key was obtained in the current snapshot, then move on to the next key. There
@@ -204,7 +204,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                 continue;
             }
 
-            auto keys = executionCtx.keys();
+            auto keys = containerPool.keys();
             SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when ensuring the keyData is still valid.

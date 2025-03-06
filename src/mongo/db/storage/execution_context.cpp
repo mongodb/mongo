@@ -35,6 +35,4 @@ namespace mongo {
 const OperationContext::Decoration<StorageExecutionContext> StorageExecutionContext::get =
     OperationContext::declareDecoration<StorageExecutionContext>();
 
-StorageExecutionContext::StorageExecutionContext() {}
-
 }  // namespace mongo

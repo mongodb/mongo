@@ -47,11 +47,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_builds/skipped_record_tracker.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_data.h"
@@ -172,7 +172,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     };
 
     SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
-    auto& executionCtx = StorageExecutionContext::get(opCtx);
+    auto& containerPool = PreallocatedContainerPool::get(opCtx);
 
     auto recordStore = _skippedRecordsTable->rs();
     auto cursor = recordStore->getCursor(opCtx);
@@ -199,9 +199,9 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                         "skippedRecordId"_attr = skippedRecordId,
                         "skippedDoc"_attr = skippedDoc);
 
-            auto keys = executionCtx.keys();
-            auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
-            auto multikeyPaths = executionCtx.multikeyPaths();
+            auto keys = containerPool.keys();
+            auto multikeyMetadataKeys = containerPool.multikeyMetadataKeys();
+            auto multikeyPaths = containerPool.multikeyPaths();
             auto iam = indexCatalogEntry->accessMethod()->asSortedData();
 
             try {

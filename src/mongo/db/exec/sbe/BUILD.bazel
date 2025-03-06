@@ -277,8 +277,8 @@ mongo_cc_library(
         "//src/mongo/db:shard_role",
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/query:query_index_bounds",
-        "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/storage:index_entry_comparison",
     ],
 )

@@ -54,6 +54,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
@@ -69,7 +70,6 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -291,8 +291,8 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                                   << indexIdent,
                     iam);
 
-            auto& executionCtx = StorageExecutionContext::get(opCtx);
-            auto keys = executionCtx.keys();
+            auto& containerPool = PreallocatedContainerPool::get(opCtx);
+            auto keys = containerPool.keys();
             SharedBufferFragmentBuilder pooledBuilder(
                 key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 

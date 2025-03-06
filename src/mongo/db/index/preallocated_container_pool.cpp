@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,17 +27,12 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/index/preallocated_container_pool.h"
+#include "mongo/util/decorable.h"
 
-#include "mongo/db/operation_context.h"
 namespace mongo {
 
-/**
- * This class encompasses the storage state needed for an operation.
- */
-class StorageExecutionContext {
-public:
-    static const OperationContext::Decoration<StorageExecutionContext> get;
-};
+const OperationContext::Decoration<PreallocatedContainerPool> PreallocatedContainerPool::get =
+    OperationContext::declareDecoration<PreallocatedContainerPool>();
 
 }  // namespace mongo

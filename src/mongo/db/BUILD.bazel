@@ -1523,7 +1523,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:health_log_interface",
         "//src/mongo/db/exec:working_set",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/index:index_access_method",
-        "//src/mongo/db/storage:execution_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/index:preallocated_container_pool",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
     ],
 )
