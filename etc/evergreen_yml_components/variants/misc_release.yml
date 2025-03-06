@@ -2216,7 +2216,7 @@ buildvariants:
   display_name: Enterprise Ubuntu 20.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-arm64-build
+  - ubuntu2004-arm64-large
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -2277,7 +2277,7 @@ buildvariants:
   display_name: Ubuntu 20.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-arm64-build
+  - ubuntu2004-arm64-large
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
