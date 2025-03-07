@@ -273,6 +273,13 @@ public:
         const ShardId& shardId);
 
     /**
+     * Notifies the cache that there is a (possibly) newer version on the backing store for all the
+     * entries that reference the passed shard. This will trigger an incremental refresh on the next
+     * cache access.
+     */
+    void advanceTimeInStoreForEntriesThatReferenceShard(const ShardId& shardId);
+
+    /**
      * Non-blocking method, which invalidates all namespaces which contain data on the specified
      * shard and all databases which have the shard listed as their primary shard.
      */

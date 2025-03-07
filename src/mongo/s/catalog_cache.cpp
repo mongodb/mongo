@@ -704,6 +704,56 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     }
 }
 
+void CatalogCache::advanceTimeInStoreForEntriesThatReferenceShard(const ShardId& shardId) {
+    LOGV2_DEBUG(
+        9927700,
+        1,
+        "Advancing the cached version for databases and collections referencing a specific shard",
+        "shardId"_attr = shardId);
+
+    const auto dbEntries = _databaseCache.peekLatestCachedIf(
+        [&](const std::string&, const DatabaseType& dbt) { return dbt.getPrimary() == shardId; });
+    for (const auto& dbEntry : dbEntries) {
+        LOGV2_DEBUG(9927701,
+                    1,
+                    "Advancing the cached version for a database",
+                    "db"_attr = dbEntry->getName());
+
+        _databaseCache.advanceTimeInStore(
+            dbEntry->getName(),
+            ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh());
+    }
+
+    const auto collEntries = _collectionCache.peekLatestCachedIf(
+        [&](const NamespaceString&, const OptionalRoutingTableHistory& ort) {
+            if (!ort.optRt) {
+                return false;
+            }
+            const auto& rt = *ort.optRt;
+
+            std::set<ShardId> shardIds;
+            rt.getAllShardIds(&shardIds);
+
+            return shardIds.find(shardId) != shardIds.end();
+        });
+    for (const auto& collEntry : collEntries) {
+        invariant(collEntry->optRt);
+        const auto& rt = *collEntry->optRt;
+
+        LOGV2_DEBUG(9927702,
+                    1,
+                    "Advancing the cached version for a collection",
+                    "namespace"_attr = rt.nss());
+
+        _collectionCache.advanceTimeInStore(
+            rt.nss(), ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh());
+    }
+
+    LOGV2(9927703,
+          "Advanced the cached version for databases and collections referencing a specific shard",
+          "shardId"_attr = shardId);
+}
+
 void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
     LOGV2_DEBUG(4997600,
                 1,

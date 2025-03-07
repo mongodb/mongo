@@ -79,3 +79,13 @@ server_parameters:
     default: 500
     validator:
       gte: 0
+
+  noCatalogCachePurgeOnShardRemoval:
+    description: >-
+        Advances the catalog cache's time in store when a shard is removed, instead of purging the
+        cache content. This triggers an incremental refresh of the metadata on the next cache access
+        rather than a full (and more expensive) refresh.
+    set_at: [ startup ]
+    cpp_vartype: bool
+    cpp_varname: "gNoCatalogCachePurgeOnShardRemoval"
+    default: false

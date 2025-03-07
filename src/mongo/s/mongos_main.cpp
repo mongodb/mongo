@@ -81,6 +81,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/load_balancer_support.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/s/mongos_topology_coordinator.h"
@@ -431,11 +432,14 @@ Status initializeSharding(OperationContext* opCtx) {
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.
     std::vector<ShardRegistry::ShardRemovalHook> shardRemovalHooks = {
-        // Invalidate appropriate entries in the catalog cache when a shard is removed. It's safe to
-        // capture the catalog cache pointer since the Grid (and therefore CatalogCache and
-        // ShardRegistry) are never destroyed.
+        // It's safe to capture the CatalogCache pointer since the Grid (and therefore CatalogCache
+        // and ShardRegistry) are never destroyed.
         [catCache = catalogCache.get()](const ShardId& removedShard) {
-            catCache->invalidateEntriesThatReferenceShard(removedShard);
+            if (gNoCatalogCachePurgeOnShardRemoval) {
+                catCache->advanceTimeInStoreForEntriesThatReferenceShard(removedShard);
+            } else {
+                catCache->invalidateEntriesThatReferenceShard(removedShard);
+            }
         }};
 
     if (!mongosGlobalParams.configdbs) {

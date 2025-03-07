@@ -67,6 +67,7 @@
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -641,11 +642,14 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.
     std::vector<ShardRegistry::ShardRemovalHook> shardRemovalHooks = {
-        // Invalidate appropriate entries in the CatalogCache when a shard is removed. It's safe to
-        // capture the CatalogCache pointer since the Grid (and therefore CatalogCache and
-        // ShardRegistry) are never destroyed.
+        // It's safe to capture the CatalogCache pointer since the Grid (and therefore CatalogCache
+        // and ShardRegistry) are never destroyed.
         [catCache = catalogCache.get()](const ShardId& removedShard) {
-            catCache->invalidateEntriesThatReferenceShard(removedShard);
+            if (gNoCatalogCachePurgeOnShardRemoval) {
+                catCache->advanceTimeInStoreForEntriesThatReferenceShard(removedShard);
+            } else {
+                catCache->invalidateEntriesThatReferenceShard(removedShard);
+            }
         }};
 
     auto shardRegistry = std::make_unique<ShardRegistry>(
