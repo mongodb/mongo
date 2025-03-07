@@ -306,6 +306,15 @@ LINUX_DEFINES = select({
     "//conditions:default": [],
 })
 
+MACOS_DEFINES = select({
+    "@platforms//os:macos": [
+        # TODO SERVER-54659 - ASIO depends on std::result_of which was removed in C++ 20
+        # xcode15 does not have backwards compatibility
+        "ASIO_HAS_STD_INVOKE_RESULT",
+    ],
+    "//conditions:default": [],
+})
+
 ABSEIL_DEFINES = [
     "ABSL_FORCE_ALIGNED_ACCESS",
 ]
@@ -481,6 +490,7 @@ MACOS_WARNINGS_COPTS = select({
         # by -Wall), in order to enforce that -mXXX-version-min=YYY
         # will enforce that you don't use APIs from ZZZ.
         "-Wunguarded-availability",
+        "-Wno-enum-constexpr-conversion",
     ],
     "//conditions:default": [],
 })
@@ -539,10 +549,10 @@ DWARF_VERSION_FEATURES = select({
 # SERVER-9761: Ensure early detection of missing symbols in dependent
 # libraries at program startup. For non-release dynamic builds we disable
 # this behavior in the interest of improved mongod startup times.
+# Xcode15 removed bind_at_load functionality so we cannot have a selection for macosx here
+# ld: warning: -bind_at_load is deprecated on macOS
+# TODO: SERVER-90596 reenable loading at startup
 BIND_AT_LOAD_LINKFLAGS = select({
-    "//bazel/config:linkstatic_enabled_macos": [
-        "-Wl,-bind_at_load",
-    ],
     "//bazel/config:linkstatic_enabled_linux": [
         "-Wl,-z,now",
     ],
@@ -944,8 +954,8 @@ DEDUPE_SYMBOL_LINKFLAGS = select({
 
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES + \
                        THREAD_SANITIZER_DEFINES + UNDEFINED_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES + \
-                       WINDOWS_DEFINES + TCMALLOC_DEFINES + LINUX_DEFINES + GCC_OPT_DEFINES + BOOST_DEFINES + \
-                       ABSEIL_DEFINES + PCRE2_DEFINES + SAFEINT_DEFINES
+                       WINDOWS_DEFINES + MACOS_DEFINES + TCMALLOC_DEFINES + LINUX_DEFINES + GCC_OPT_DEFINES + \
+                       BOOST_DEFINES + ABSEIL_DEFINES + PCRE2_DEFINES + SAFEINT_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc", "-Isrc/third_party/boost"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS + \
                      MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + UNDEFINED_SANITIZER_COPTS + \

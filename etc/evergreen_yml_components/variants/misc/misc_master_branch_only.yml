@@ -22,20 +22,20 @@ buildvariants:
   - name: build_metrics_tasks_gen
 
 - name: &macos-enterprise-build-metrics macos-enterprise-build-metrics
-  display_name: "~ Build Metrics Enterprise MacOS"
+  display_name: "~ Build Metrics Enterprise MacOS arm64"
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   stepback: false
   run_on:
-  - macos-1100
+  - macos-14-arm64
   expansions:
     num_scons_link_jobs_available: 0.1
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
     compile_flags: >-
       --ssl
       -j$(sysctl -n hw.logicalcpu)
       --libc++
-      --variables-files=etc/scons/xcode_macosx.vars
+      --variables-files=etc/scons/xcode_macosx_arm.vars
   tasks:
   - name: build_metrics_tasks_gen
 

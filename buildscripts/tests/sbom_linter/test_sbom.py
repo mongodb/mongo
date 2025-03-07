@@ -3,12 +3,17 @@
 import os
 import shutil
 import unittest
+import sys
 
 from buildscripts import sbom_linter
 
 TEST_DIR = os.path.join("buildscripts", "tests", "sbom_linter")
 
 
+@unittest.skipIf(
+    sys.platform == "darwin",
+    reason="No need to run this unittest on macos since this is only needed for linux",
+)
 class TestSbom(unittest.TestCase):
     def setUp(self):
         sbom_linter.SKIP_FILE_CHECKING = True

@@ -35,6 +35,20 @@
 namespace mongo::query_shape {
 namespace {
 
+// Compare the raw size of each class, ignoring any padding added from differences in size when
+// compared with alignment.
+static constexpr auto kExpectedAlignment =
+    std::max(alignof(CmdWithLetShape), alignof(FindCmdShapeComponents));
+static constexpr auto kExpectedPadding =
+    (kExpectedAlignment -
+     (sizeof(CmdWithLetShape) + sizeof(FindCmdShapeComponents)) % kExpectedAlignment) %
+    kExpectedAlignment;
+static_assert(
+    sizeof(FindCmdShape) ==
+        sizeof(CmdWithLetShape) + sizeof(FindCmdShapeComponents) + kExpectedPadding,
+    "If the class's members have changed, this assert and the extraSize() calculation may "
+    "need to be updated with a new value.");
+
 BSONObj projectionShape(const boost::optional<projection_ast::Projection>& proj,
                         const SerializationOptions& opts =
                             SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
