@@ -8,8 +8,10 @@ This document describes branching task regarding file updates in `10gen/mongo` r
 - [2. Update files](#2-update-files)
   - [Copybara configuration](#copybara-configuration)
   - [YAML configurations](#yaml-configurations)
-    - [Nightly YAML](#nightly-yaml)
-    - [Sys-perf YAML](#sys-perf-yaml)
+    - [Nightly YAML](#1-nightly-yaml)
+    - [Misc YAML](#2-misc-yaml)
+    - [Test Dev YAML](#3-test-dev-yaml)
+    - [Sys-perf YAML](#4-sys-perf-yaml)
   - [Other files](#other-files)
 - [3. Test changes](#3-test-changes)
 - [4. Merge changes](#4-merge-changes)
@@ -32,6 +34,8 @@ git checkout -b vX.Y-branching-task
 
 The reason they should be pushed as separate commits is in the case of needing to revert one aspect of this entire task.
 
+- [8.1 Branching commit](https://github.com/10gen/mongo/commit/359cbe95216ffaf1a6173884f6519b3d408f1fb5) for reference.
+
 ### Copybara configuration
 
 `copy.bara.sky` and `copy.bara.staging.sky`
@@ -40,46 +44,53 @@ The reason they should be pushed as separate commits is in the case of needing t
 
 ### Evergreen YAML configurations
 
-#### Nightly YAML
+#### 1. Nightly YAML
 
 - `etc/evergreen_nightly.yml` will be used as YAML configuration for a new `mongodb-mongo-vX.Y` evergreen project
 
-  - Copy over commit-queue aliases and patch aliases from `etc/evergreen.yml`
-  - Update "include" section - comment out or uncomment file includes as instructions in the comments suggest.
+- Copy over commit-queue aliases and patch aliases from `etc/evergreen.yml`
+- Update "include" section - comment out or uncomment file includes as instructions in the comments suggest.
 
-    This will move some build variants from `etc/evergreen.yml` to continue running on a new branch project.
-    More information about build variants after branching is [here](../evergreen-testing/yaml_configuration/buildvariants.md#build-variants-after-branching).
+  This will move some build variants from `etc/evergreen.yml` to continue running on a new branch project.
+  More information about build variants after branching is [here](../evergreen-testing/yaml_configuration/buildvariants.md#build-variants-after-branching).
 
-- `burn_in_tags` configuration
+#### 2. Misc YAML
 
-  - Remove build variant names from ["burn_in_tag_include_build_variants" expansion](https://github.com/10gen/mongo/blob/41ebdd14567ee35bdda0942958a5dc193f97dd5f/etc/evergreen_yml_components/variants/misc/misc.yml#L21) that are not included in `etc/evergreen_nightly.yml`
+- `etc/evergreen_yml_components/variants/misc/misc.yml`
 
-- Remove all-feature-flags configuration from build variants
+- `burn_in_tags` configuration:
+  - Remove build variant names from ["burn_in_tag_include_build_variants" expansion](https://github.com/mongodb/mongo/blob/0a68308f0d39a928ed551f285ba72ca560c38576/etc/evergreen_yml_components/variants/misc/misc.yml#L21) that are not included in `etc/evergreen_nightly.yml`
 
-  - Build variant names:
+#### 3. Test Dev YAML
 
-    - `enterprise-windows-all-feature-flags-required`
-    - `enterprise-windows-all-feature-flags-non-essential`
-    - `rhel8-debug-aubsan-lite-all-feature-flags-required`
+1. Promote build variants from "suggested" to "required"
 
-  - Actions:
+   - Build variant names:
+     - in `etc/evergreen_yml_components/variants/amazon/test_dev.yml`:
+       - `enterprise-amazon-linux2-arm64`
 
-    - Remove `all-feature-flags` from their names and display names
-    - Remove `--runAllFeatureFlagTests` from `test_flags` expansion
-    - Replace `!.incompatible_all_feature_flags` tag selectors with `!.requires_all_feature_flags`
+- Actions:
 
-- Promote build variants from "suggested" to "required"
+  - Replace "\*" with "!" in their display names
+  - Replace "suggested" variant tag with "required"
 
-  - Build variant names:
+2.  Remove all-feature-flags configuration from build variants
 
-    - `enterprise-amazon-linux2-arm64`
+    - Build variant names:
 
-  - Actions:
+      - in `etc/evergreen_yml_components/variants/windows/test_dev.yml`:
+        - `enterprise-windows-all-feature-flags-required`
+        - `enterprise-windows-all-feature-flags-non-essential`
+      - in `etc/evergreen_yml_components/variants/sanitizer/test_dev.yml`:
+        - `rhel8-debug-aubsan-lite-all-feature-flags-required`
 
-    - Replace "\*" with "!" in their display names
-    - Replace "suggested" variant tag with "required"
+    - Actions:
 
-#### Sys-perf YAML
+      - Remove `all-feature-flags` from their names and display names
+      - Remove `--runAllFeatureFlagTests` from `test_flags` expansion
+      - Replace `!.incompatible_all_feature_flags` tag selectors with `!.requires_all_feature_flags`
+
+#### 4. Sys-perf YAML
 
 - `etc/system_perf.yml` will be used as YAML configuration for a new `sys-perf-X.Y` evergreen project
 
@@ -109,8 +120,4 @@ If patch results reveal that some steps are missing or outdated in this file, ma
 
 ## 4. Merge changes
 
-All the commits should be pushed together in the same commit-queue task:
-
-```sh
-evergreen commit-queue merge -p mongodb-mongo-vX.Y
-```
+Open a Github PR to merge to branch `vX.Y`.
