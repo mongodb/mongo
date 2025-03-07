@@ -637,6 +637,11 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
                             << base64::encode(diff.data(), diff.size()));
 
     // Verify binary reopen gives identical state as intermediate
+    // TODO SERVER-100659: Remove this limitation when reopen is more robust to large number of
+    // measurements
+    if (generatedElements.size() > 20000) {
+        return 0;
+    }
     BSONColumnBuilder reopen(diff.data(), diff.size());
     invariant(builder.isInternalStateIdentical(reopen),
               str::stream() << "Binary reopen does not yield equivalent state. Column: "

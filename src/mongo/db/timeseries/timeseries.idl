@@ -59,7 +59,8 @@ server_parameters:
         cpp_vartype: "std::int32_t"
         cpp_varname: "gTimeseriesBucketMaxCount"
         default: 1000
-        validator: { gte: 1 }
+        # TODO SERVER-100659: Remove this upper bound limitation when reopen is more robust to large number of measurements
+        validator: { gte: 1, lte: 20000 }
         redact: false
 
     "timeseriesBucketMaxSize":
