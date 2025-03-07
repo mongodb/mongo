@@ -2068,9 +2068,9 @@ buildvariants:
   - name: replica_sets_gen
 
 - name: enterprise-rhel-72-s390x-compile
-  display_name: Enterprise RHEL 7.2 s390x Compile
+  display_name: Enterprise RHEL 7.9 s390x Compile
   run_on:
-  - rhel72-zseries-test
+  - rhel7-zseries-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
@@ -2095,10 +2095,10 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel72-zseries-build
+    - rhel7-zseries-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - rhel72-zseries-build
+    - rhel7-zseries-large
   - name: generate_buildid_to_debug_symbols_mapping
 
 

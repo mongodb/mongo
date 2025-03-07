@@ -2,9 +2,9 @@
 
 buildvariants:
 - name: enterprise-rhel-81-ppc64le
-  display_name: Enterprise RHEL 8.1 PPC64LE
+  display_name: Enterprise RHEL 8.9 PPC64LE
   run_on:
-  - rhel81-power8-small
+  - rhel8-power-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
@@ -32,13 +32,13 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel81-power8-large
+    - rhel8-power-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - rhel81-power8-large
+    - rhel8-power-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
-    - rhel81-power8-large
+    - rhel8-power-large
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -58,9 +58,9 @@ buildvariants:
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-71-ppc64le
-  display_name: Enterprise RHEL 7.1 PPC64LE
+  display_name: Enterprise RHEL 7.9 PPC64LE
   run_on:
-  - rhel71-power8-small
+  - rhel7-power-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
@@ -88,13 +88,13 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel71-power8-large
+    - rhel7-power-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - rhel71-power8-large
+    - rhel7-power-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
-    - rhel71-power8-large
+    - rhel7-power-large
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -114,9 +114,9 @@ buildvariants:
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-72-s390x
-  display_name: Enterprise RHEL 7.2 s390x
+  display_name: Enterprise RHEL 7.9 s390x
   run_on:
-  - rhel72-zseries-test
+  - rhel7-zseries-small
   cron: "0 4 * * 0"
   stepback: false
   expansions:
@@ -142,13 +142,13 @@ buildvariants:
   tasks:
   - name: small_compile_test_and_package_serial_TG
     distros:
-    - rhel72-zseries-build
+    - rhel7-zseries-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - rhel72-zseries-build
+    - rhel7-zseries-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
-    - rhel72-zseries-build
+    - rhel7-zseries-large
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -170,7 +170,7 @@ buildvariants:
 - name: enterprise-rhel-83-s390x
   display_name: Enterprise RHEL 8.3 s390x
   run_on:
-  - rhel83-zseries-small
+  - rhel8-zseries-large-legacy
   cron: "0 4 * * 0"
   stepback: false
   expansions:
@@ -195,11 +195,7 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_s390x,requires_increased_memlock_limits,requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
-    distros:
-    - rhel83-zseries-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
-    distros:
-    - rhel83-zseries-large
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
