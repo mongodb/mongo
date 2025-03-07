@@ -1546,7 +1546,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     return {RolloverAction::kNone, RolloverReason::kNone};
 }
 
-void updateRolloverStats(ExecutionStatsController stats, RolloverReason reason) {
+void updateRolloverStats(ExecutionStatsController& stats, const RolloverReason reason) {
     switch (reason) {
         case RolloverReason::kTimeForward:
             stats.incNumBucketsClosedDueToTimeForward();

@@ -468,7 +468,7 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
 /**
  * Updates the stats based on the RolloverReason.
  */
-void updateRolloverStats(ExecutionStatsController stats, RolloverReason reason);
+void updateRolloverStats(ExecutionStatsController& stats, RolloverReason reason);
 
 /**
  * Retrieves or initializes the execution stats for the given namespace, for writing.

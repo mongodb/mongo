@@ -43,19 +43,16 @@ class BucketCatalogInternalTest : public CatalogTestFixture {
 protected:
     using CatalogTestFixture::setUp;
 
-    bucket_catalog::ExecutionStatsController getExecutionStatsController() {
-        auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
-        bucket_catalog::ExecutionStatsController stats(collectionStats, _globalStats);
-        return stats;
-    }
-
 protected:
-    bucket_catalog::TrackingContexts _trackingContexts;
-    bucket_catalog::ExecutionStats _globalStats;
+    TrackingContexts _trackingContexts;
+    ExecutionStats _globalStats;
 };
 
 TEST_F(BucketCatalogInternalTest, UpdateRolloverStats) {
-    bucket_catalog::ExecutionStatsController stats = getExecutionStatsController();
+    auto _collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
+    ExecutionStatsController stats(_collectionStats, _globalStats);
+
+    // Ensure that both the globalStats and collectionStats are initially all set to 0.
     ASSERT_EQ(_globalStats.numBucketsClosedDueToTimeForward.load(), 0);
     ASSERT_EQ(_globalStats.numBucketsArchivedDueToTimeBackward.load(), 0);
     ASSERT_EQ(_globalStats.numBucketsClosedDueToCount.load(), 0);
@@ -63,23 +60,36 @@ TEST_F(BucketCatalogInternalTest, UpdateRolloverStats) {
     ASSERT_EQ(_globalStats.numBucketsClosedDueToSize.load(), 0);
     ASSERT_EQ(_globalStats.numBucketsClosedDueToSchemaChange.load(), 0);
 
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToTimeForward.load(), 0);
+    ASSERT_EQ(_collectionStats->numBucketsArchivedDueToTimeBackward.load(), 0);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToCount.load(), 0);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToCachePressure.load(), 0);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToSize.load(), 0);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToSchemaChange.load(), 0);
+
     internal::updateRolloverStats(stats, RolloverReason::kTimeForward);
     ASSERT_EQ(_globalStats.numBucketsClosedDueToTimeForward.load(), 1);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToTimeForward.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kTimeBackward);
     ASSERT_EQ(_globalStats.numBucketsArchivedDueToTimeBackward.load(), 1);
+    ASSERT_EQ(_collectionStats->numBucketsArchivedDueToTimeBackward.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kCount);
     ASSERT_EQ(_globalStats.numBucketsClosedDueToCount.load(), 1);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToCount.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kCachePressure);
     ASSERT_EQ(_globalStats.numBucketsClosedDueToCachePressure.load(), 1);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToCachePressure.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kSize);
     ASSERT_EQ(_globalStats.numBucketsClosedDueToSize.load(), 1);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToSize.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kSchemaChange);
     ASSERT_EQ(_globalStats.numBucketsClosedDueToSchemaChange.load(), 1);
+    ASSERT_EQ(_collectionStats->numBucketsClosedDueToSchemaChange.load(), 1);
 }
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
