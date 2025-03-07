@@ -11,15 +11,6 @@ import {
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
-// In variants with config shard and `FeatureFlagDualCatalogCache` enabled, RoutingInformationCache
-// and the "regular" CatalogCache are the same cache, and that interaction makes this test sometimes
-// hit tassert 7032311.
-// TODO SERVER-98223: investigate and remove this fail point.
-if ((TestData.configShard || TestData.embeddedRouter) &&
-    TestData.setParameters.featureFlagDualCatalogCache) {
-    quit();
-}
-
 const st = new ShardingTest({
     mongos: 1,
     shards: 2,
@@ -51,6 +42,9 @@ function simulateResharding() {
     assert.commandWorked(
         mongos.adminCommand({moveChunk: tempReshardingNss, find: {y: 5}, to: st.shard1.shardName}));
 
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {x: 5}, to: st.shard1.shardName}));
+
     jsTestLog("Updating resharding fields");
     let donorReshardingFields = {
         "uuid": uuid,
@@ -64,9 +58,6 @@ function simulateResharding() {
     };
     assert.commandWorked(st.configRS.getPrimary().getDB("config").collections.update(
         {_id: ns}, {"$set": {"reshardingFields": donorReshardingFields}}));
-
-    assert.commandWorked(
-        mongos.adminCommand({moveChunk: ns, find: {x: 5}, to: st.shard1.shardName}));
 
     jsTestLog("Flushing routing table updates");
     assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName}));
