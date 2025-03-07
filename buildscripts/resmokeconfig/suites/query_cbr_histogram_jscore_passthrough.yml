@@ -34,6 +34,13 @@ selector:
     - jstests/core/catalog/agg_internal_list_collections_stage.js
     - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
 
+    # These tests run many queries. This passthrough runs analyze for each indexed field on every query,
+    # causing a > 1 hour runtime. Exclude the tests below to keep the suite runtime reasonable.
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
+    - jstests/core/index/express_pbt.js
+    - jstests/core/query/explain/is_cached_is_true_for_one_plan_pbt.js
+
     # TODO SERVER-100451: $elemMatch estimation using histograms
     - jstests/core/query/boolean_expression_simplification.js
     # TODO SERVER-100665: Inversion of non exact index bounds
@@ -61,9 +68,6 @@ selector:
 
     # TODO SERVER-100739: Empty array breaks histogramCE
     - jstests/core/query/nan.js
-
-    - jstests/core/query/index_correctness_pbt.js
-    - jstests/core/query/run_all_plans_pbt.js
 
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR

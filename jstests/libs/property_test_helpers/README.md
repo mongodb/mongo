@@ -75,6 +75,8 @@ For now, this is also a valid model for a document in a time-series collection (
 
 [queries_create_one_cache_entry_pbt.js](../../core/query/plan_cache/queries_create_one_cache_entry_pbt.js)
 
+[agg_stages_basic_behavior_pbt.js](../../aggregation/sources/agg_stages_basic_behavior_pbt.js)
+
 Details are provided at the top of each file.
 
 # Appendix
