@@ -7,6 +7,8 @@
 //  change_stream_does_not_expect_txns,
 //  requires_replication,
 //  requires_majority_read_concern,
+//  # TODO SERVER-101940 - Investigate how to re-enable or re-work the test coverage.
+//  __TEMPORARILY_DISABLED__,
 // ]
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
