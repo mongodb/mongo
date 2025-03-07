@@ -837,7 +837,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
             // between records, the truncate marker check is not sufficient.
             CursorKey truncateUpToKey = makeCursorKey(truncateMarker->lastRecord, _keyFormat);
             setKey(cursor, &truncateUpToKey);
-            int cmp;
+            int cmp = 0;
             ret = wiredTigerPrepareConflictRetry(opCtx,
                                                  [&] { return cursor->search_near(cursor, &cmp); });
             invariantWTOK(ret, cursor->session);
