@@ -1518,11 +1518,12 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
             // commitTransaction and abortTransaction commands can skip ticketing mechanism as they
             // don't acquire any new storage resources (except writing to oplog) but they release
             // any claimed storage resources.
-            // Prepared transactions should not acquire ticket. Else, it can deadlock with other
-            // non-transactional operations that have exhausted the write tickets and are blocked on
-            // them due to prepare or lock conflict.
-            if (o().txnState.isPrepared() || cmdName == "commitTransaction" ||
-                cmdName == "abortTransaction") {
+            // Prepared transactions or attempts to prepare a transaction should not acquire ticket.
+            // Else, it can deadlock with other non-transactional operations that have exhausted the
+            // write tickets and are blocked on them due to prepare or lock conflict.
+            // SERVER-41980 and SERVER-92292
+            if (o().txnState.isPrepared() || cmdName == "prepareTransaction" ||
+                cmdName == "commitTransaction" || cmdName == "abortTransaction") {
                 acquireTicket = AcquireTicket::kSkip;
             }
         } else {
