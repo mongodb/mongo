@@ -376,7 +376,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
         install-mongocryptd
     run_on:
-      - "amazon2-xlarge"
+      - "amazon2-latest-xlarge"
     tasks:
       - name: compile
 
@@ -389,7 +389,7 @@ buildvariants:
       <<: *compile-expansions
       compile_variant: -arm64
     run_on:
-      - "amazon2-arm64-large"
+      - "amazon2-arm64-latest-large"
     tasks:
       - name: compile
 
