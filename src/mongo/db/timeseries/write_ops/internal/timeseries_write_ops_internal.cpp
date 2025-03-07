@@ -137,6 +137,28 @@ TimeseriesSingleWriteResult performTimeseriesInsert(
 }
 
 /**
+ * Same as above, but expects StmtId's in WriteBatch.
+ */
+TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
+    OperationContext* opCtx,
+    const BSONObj& metadata,
+    const mongo::write_ops::InsertCommandRequest& request,
+    std::shared_ptr<bucket_catalog::WriteBatch> batch) {
+    if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
+        return {status->first, status->second};
+    }
+    return getTimeseriesSingleWriteResult(
+        write_ops_exec::performInserts(
+            opCtx,
+            write_ops_utils::makeTimeseriesInsertOpFromBatch(
+                batch,
+                write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request)),
+                metadata),
+            OperationSource::kTimeseriesInsert),
+        request);
+}
+
+/**
  * Returns the status and whether the request can continue.
  */
 TimeseriesSingleWriteResult performTimeseriesUpdate(

@@ -126,6 +126,14 @@ mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     std::vector<StmtId>&& stmtIds = {});
 
 /**
+ * Builds insert command request, as above, but expects StmtId's in WriteBatch.
+ */
+mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
+    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
+    const NamespaceString& bucketsNs,
+    const BSONObj& metadata);
+
+/**
  * Builds the update command request from a time-series insert write batch.
  */
 mongo::write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
@@ -134,6 +142,14 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds = {});
+
+/**
+ * Builds update command request, as above, but expects StmtId's in WriteBatch.
+ */
+mongo::write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOpFromBatch(
+    OperationContext* opCtx,
+    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
+    const NamespaceString& bucketsNs);
 
 /**
  * Builds the delta update oplog entry from a time-series insert write batch.
@@ -202,6 +218,16 @@ void makeWriteRequest(OperationContext* opCtx,
                       const NamespaceString& bucketsNs,
                       std::vector<mongo::write_ops::InsertCommandRequest>* insertOps,
                       std::vector<mongo::write_ops::UpdateCommandRequest>* updateOps);
+
+/**
+ * Builds the insert and update requests, as above, but expects StmtId's in WriteBatch.
+ */
+void makeWriteRequestFromBatch(OperationContext* opCtx,
+                               std::shared_ptr<bucket_catalog::WriteBatch> batch,
+                               const BSONObj& metadata,
+                               const NamespaceString& bucketsNs,
+                               std::vector<mongo::write_ops::InsertCommandRequest>* insertOps,
+                               std::vector<mongo::write_ops::UpdateCommandRequest>* updateOps);
 
 /**
  * Returns collection of measurements sorted on time field.
