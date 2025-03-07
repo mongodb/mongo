@@ -125,6 +125,8 @@ TEST(GeoParser, parseGeoJSONLine) {
         fromjson("{'type':'LineString', 'coordinates':[[1,2, 3], [3,4, 5], [5,6]]}"),
         false,
         &polyline));
+    ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(
+        fromjson("{'type':'LineString', 'coordinates':[[1,2], [1,2]]}"), false, &polyline));
 }
 
 TEST(GeoParser, parseGeoJSONPolygon) {
@@ -220,6 +222,34 @@ TEST(GeoParser, parseGeoJSONPolygon) {
         &polygonBad));
 }
 
+TEST(GeoParser, parseGeoJSONPolygonStrictSphere) {
+    string crs = "crs:{ type: 'name', properties:{name:'" + CRS_STRICT_WINDING + "'}}";
+    PolygonWithCRS polygon;
+    BSONObj bigSimplePolygon = fromjson(
+        "{'type':'Polygon', 'coordinates':[ "
+        "[[0,0],[5,0],[5,5],[0,5],[0,0]]], " +
+        crs + "}");
+    ASSERT_OK(GeoParser::parseGeoJSONPolygon(bigSimplePolygon, false, &polygon));
+
+    BSONObj bigSimplePolygonWithValidDuplicates = fromjson(
+        "{'type':'Polygon', 'coordinates':[ "
+        "[[0,0],[5,0],[5,5],[5,5],[0,5],[0,0]]], " +
+        crs + "}");
+    ASSERT_OK(GeoParser::parseGeoJSONPolygon(bigSimplePolygonWithValidDuplicates, false, &polygon));
+
+    BSONObj bigSimplePolygonWithInvalidDuplicates = fromjson(
+        "{'type':'Polygon', 'coordinates':[ "
+        "[[0,0],[5,0],[5,0],[0,0],[0,0]]], " +
+        crs + "}");
+    ASSERT_NOT_OK(
+        GeoParser::parseGeoJSONPolygon(bigSimplePolygonWithInvalidDuplicates, false, &polygon));
+
+    BSONObj bigSimplePolygonWithFewPoints = fromjson(
+        "{'type':'Polygon', 'coordinates':[ "
+        "[[0,0]]], " +
+        crs + "}");
+    ASSERT_NOT_OK(GeoParser::parseGeoJSONPolygon(bigSimplePolygonWithFewPoints, false, &polygon));
+}
 
 TEST(GeoParser, parseGeoJSONCRS) {
     string goodCRS1 = "crs:{ type: 'name', properties:{name:'EPSG:4326'}}";
