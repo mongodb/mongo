@@ -1100,6 +1100,12 @@ StatusWith<Bucket*> potentiallyReopenBucket(
         // Reacquire the stripe lock to load the bucket back into the catalog.
     }
 
+    // It's possible to re-open an opened bucket. This behavior isn't limited to rollover.
+    auto existingIt = stripe.openBucketsById.find(reopenedBucket->bucketId);
+    if (existingIt != stripe.openBucketsById.end()) {
+        stats.incNumDuplicateBucketsReopened();
+        return nullptr;
+    }
     auto swBucket = internal::loadBucketIntoCatalog(
         catalog, stripe, stripeLock, stats, bucketKey, std::move(reopenedBucket), catalogEra);
     if (!swBucket.isOK()) {
