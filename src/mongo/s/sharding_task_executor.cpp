@@ -154,8 +154,11 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
             auto lsidObj = lsidElem.Obj();
             if (auto lsidUIDElem = lsidObj.getField(LogicalSessionFromClient::kUidFieldName)) {
-                invariant(SHA256Block::fromBinData(lsidUIDElem._binDataVector()) ==
-                          request.opCtx->getLogicalSessionId()->getUid());
+                tassert(100901,
+                        "User digest in the logical session ID from opCtx does not match with the "
+                        "command request",
+                        SHA256Block::fromBinData(lsidUIDElem._binDataVector()) ==
+                            request.opCtx->getLogicalSessionId()->getUid());
                 return newRequest;
             }
 
