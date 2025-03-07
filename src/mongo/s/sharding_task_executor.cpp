@@ -140,7 +140,10 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
                                                               request.cmdObj["lsid"].Obj());
 
             if (cmdObjLsid.getUid()) {
-                invariant(*cmdObjLsid.getUid() == request.opCtx->getLogicalSessionId()->getUid());
+                tassert(100901,
+                        "User digest in the logical session ID from opCtx does not match with the "
+                        "command request",
+                        *cmdObjLsid.getUid() == request.opCtx->getLogicalSessionId()->getUid());
                 return newRequest;
             }
 
