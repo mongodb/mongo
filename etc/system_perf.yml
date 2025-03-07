@@ -368,7 +368,7 @@ buildvariants:
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     run_on:
-      - amazon2-xlarge
+      - amazon2-latest-xlarge
     tasks:
       - name: compile_and_archive_dist_test_TG
       - name: package_supplementary_data
@@ -385,7 +385,7 @@ buildvariants:
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     run_on:
-      - amazon2-arm64-xlarge
+      - amazon2-arm64-latest-xlarge
     tasks:
       - name: compile_and_archive_dist_test_TG
       - name: package_supplementary_data
@@ -413,7 +413,7 @@ buildvariants:
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
     run_on:
-      - "amazon2-arm64-large"
+      - "amazon2-arm64-latest-large"
     tasks:
       - name: .crypt
 
