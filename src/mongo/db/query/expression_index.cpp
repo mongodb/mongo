@@ -180,7 +180,7 @@ void ExpressionMapping::S2CellIdsToIntervals(const std::vector<S2CellId>& interv
     if (!oilOut->isValidFor(1)) {
         LOGV2(6029801,
               "invalid OrderedIntervalList",
-              "orderedIntervalList"_attr = oilOut->toString(false));
+              "orderedIntervalList"_attr = redact(oilOut->toString(false)));
         MONGO_UNREACHABLE;
     }
 }
@@ -229,7 +229,7 @@ void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2Cell
     if (!oilOut->isValidFor(1)) {
         LOGV2(6029802,
               "invalid OrderedIntervalList",
-              "orderedIntervalList"_attr = oilOut->toString(false));
+              "orderedIntervalList"_attr = redact(oilOut->toString(false)));
         MONGO_UNREACHABLE;
     }
 }
