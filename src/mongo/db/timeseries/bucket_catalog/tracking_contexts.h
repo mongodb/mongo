@@ -47,6 +47,7 @@ enum class TrackingScope {
     kReopeningRequests,
     kStats,
     kSummaries,
+    kMeasurementBatching,
 };
 
 /**
@@ -68,6 +69,7 @@ struct TrackingContexts {
     tracking::Context reopeningRequests;
     tracking::Context stats;
     tracking::Context summaries;
+    tracking::Context measurementBatching;
 #endif
 };
 
@@ -99,6 +101,8 @@ constexpr tracking::Context& getTrackingContext(TrackingContexts& contexts, Trac
             return contexts.stats;
         case TrackingScope::kSummaries:
             return contexts.summaries;
+        case TrackingScope::kMeasurementBatching:
+            return contexts.measurementBatching;
     }
     MONGO_UNREACHABLE;
 #endif

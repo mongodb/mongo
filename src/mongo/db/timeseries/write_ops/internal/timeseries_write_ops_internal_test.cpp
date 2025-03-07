@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/namespace_string.h"
@@ -42,10 +44,20 @@ namespace mongo::timeseries::write_ops::internal {
 namespace {
 class TimeseriesWriteOpsInternalTest : public TimeseriesTestFixture {
 protected:
+    boost::optional<bucket_catalog::BucketMetadata> getBucketMetadata(BSONObj measurement) const;
+
     void _testBuildBatchedInsertContextWithMetaField(
         std::vector<BSONObj>& userMeasurementsBatch,
-        stdx::unordered_map<std::string, std::vector<size_t>>& metaFieldValueToCorrectIndexOrderMap,
+        stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>&
+            metaFieldMetadataToCorrectIndexOrderMap,
         stdx::unordered_set<size_t>& expectedIndicesWithErrors) const;
+
+    void _testBuildBatchedInsertContextOneBatchWithSameMetaFieldType(BSONType type) const;
+
+    template <typename T>
+    void _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+        BSONType type = String,
+        std::vector<T> metaValues = {_metaValue, _metaValue2, _metaValue3}) const;
 
     void _testBuildBatchedInsertContextWithoutMetaField(
         std::vector<BSONObj>& userMeasurementsBatch,
@@ -64,41 +76,57 @@ protected:
     CompressAndWriteBucketFunc _compressBucket = nullptr;
 };
 
+boost::optional<bucket_catalog::BucketMetadata> TimeseriesWriteOpsInternalTest::getBucketMetadata(
+    BSONObj measurement) const {
+    auto tsOptions = _getTimeseriesOptions(_ns1);
+    auto metaValue = measurement.getField(_metaField);
+    if (metaValue.eoo())
+        return boost::none;
+    return bucket_catalog::BucketMetadata{
+        getTrackingContext(_bucketCatalog->trackingContexts,
+                           bucket_catalog::TrackingScope::kMeasurementBatching),
+        metaValue,
+        tsOptions.getMetaField().get()};
+}
+
 void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithMetaField(
     std::vector<BSONObj>& userMeasurementsBatch,
-    stdx::unordered_map<std::string, std::vector<size_t>>& metaFieldValueToCorrectIndexOrderMap,
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>&
+        metaFieldMetadataToCorrectIndexOrderMap,
     stdx::unordered_set<size_t>& expectedIndicesWithErrors) const {
     AutoGetCollection bucketsColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     tracking::Context trackingContext;
     timeseries::bucket_catalog::ExecutionStatsController stats;
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    auto tsOptions = _getTimeseriesOptions(_ns1);
 
-    auto batchedInsertContextVector =
-        buildBatchedInsertContextsWithMetaField(*_bucketCatalog,
-                                                bucketsColl->uuid(),
-                                                bucketsColl->getTimeseriesOptions().get(),
-                                                userMeasurementsBatch,
-                                                stats,
-                                                trackingContext,
-                                                errorsAndIndices);
+    auto batchedInsertContextVector = buildBatchedInsertContextsWithMetaField(*_bucketCatalog,
+                                                                              bucketsColl->uuid(),
+                                                                              tsOptions,
+                                                                              userMeasurementsBatch,
+                                                                              stats,
+                                                                              trackingContext,
+                                                                              errorsAndIndices);
 
-    ASSERT_EQ(batchedInsertContextVector.size(), metaFieldValueToCorrectIndexOrderMap.size());
+    ASSERT_EQ(batchedInsertContextVector.size(), metaFieldMetadataToCorrectIndexOrderMap.size());
 
     // Check that all of the tuples in each BatchedInsertContext have the correct order and
     // measurement.
     for (size_t i = 0; i < batchedInsertContextVector.size(); i++) {
         auto insertBatchContext = batchedInsertContextVector[i];
         ASSERT_EQ(insertBatchContext.key.metadata.getMetaField().get(), _metaField);
-        auto metaFieldValue = insertBatchContext.key.metadata.element().String();
+        auto metaFieldMetadata = insertBatchContext.key.metadata;
         ASSERT_EQ(insertBatchContext.measurementsTimesAndIndices.size(),
-                  metaFieldValueToCorrectIndexOrderMap[metaFieldValue].size());
+                  metaFieldMetadataToCorrectIndexOrderMap[metaFieldMetadata].size());
 
         for (size_t j = 0; j < insertBatchContext.measurementsTimesAndIndices.size(); j++) {
             auto tuple = insertBatchContext.measurementsTimesAndIndices[j];
             auto measurement = std::get<BSONObj>(tuple);
-            ASSERT_EQ(measurement[_metaField].String(), metaFieldValue);
+            bucket_catalog::BucketMetadata metadata = bucket_catalog::BucketMetadata{
+                trackingContext, measurement[_metaField], tsOptions.getMetaField().get()};
+            ASSERT(metadata == metaFieldMetadata);
             auto index = std::get<size_t>(tuple);
-            ASSERT_EQ(index, metaFieldValueToCorrectIndexOrderMap[metaFieldValue][j]);
+            ASSERT_EQ(index, metaFieldMetadataToCorrectIndexOrderMap[metaFieldMetadata][j]);
             ASSERT_EQ(userMeasurementsBatch[index].woCompare(measurement), 0);
         }
     }
@@ -117,6 +145,62 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithMetaField
     }
     ASSERT(expectedIndicesWithErrors.empty());
 };
+
+void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextOneBatchWithSameMetaFieldType(
+    BSONType type) const {
+    std::vector<BSONObj> userMeasurementsBatch{
+        _generateMeasurementWithMetaFieldType(type, Date_t::fromMillisSinceEpoch(200)),
+        _generateMeasurementWithMetaFieldType(type, Date_t::fromMillisSinceEpoch(100)),
+        _generateMeasurementWithMetaFieldType(type, Date_t::fromMillisSinceEpoch(101)),
+        _generateMeasurementWithMetaFieldType(type, Date_t::fromMillisSinceEpoch(202)),
+        _generateMeasurementWithMetaFieldType(type, Date_t::fromMillisSinceEpoch(201)),
+    };
+
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
+        metaFieldMetadataToCorrectIndexOrderMap;
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[0])),
+        std::initializer_list<size_t>{1, 2, 0, 4, 3});
+    stdx::unordered_set<size_t> expectedIndicesWithErrors;
+    _testBuildBatchedInsertContextWithMetaField(
+        userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
+}
+
+template <typename T>
+void TimeseriesWriteOpsInternalTest::
+    _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+        BSONType type, std::vector<T> metaValues) const {
+    std::vector<BSONObj> userMeasurementsBatch{
+        _generateMeasurementWithMetaFieldType(
+            type, Date_t::fromMillisSinceEpoch(101), metaValues[1]),
+        _generateMeasurementWithMetaFieldType(
+            type, Date_t::fromMillisSinceEpoch(104), metaValues[2]),
+        _generateMeasurementWithMetaFieldType(
+            type, Date_t::fromMillisSinceEpoch(105), metaValues[0]),
+        _generateMeasurementWithMetaFieldType(
+            type, Date_t::fromMillisSinceEpoch(107), metaValues[0]),
+        _generateMeasurementWithMetaFieldType(
+            type, Date_t::fromMillisSinceEpoch(103), metaValues[1]),
+        _generateMeasurementWithMetaFieldType(
+            type, Date_t::fromMillisSinceEpoch(102), metaValues[2]),
+        _generateMeasurementWithMetaFieldType(
+            type, Date_t::fromMillisSinceEpoch(106), metaValues[0]),
+    };
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
+        metaFieldMetadataToCorrectIndexOrderMap;
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[2])), /* for _metaValues[0] */
+        std::initializer_list<size_t>{2, 6, 3});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[0])), /* for _metaValue[1] */
+        std::initializer_list<size_t>{0, 4});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[1])), /* for _metaValue[2] */
+        std::initializer_list<size_t>{5, 1});
+    stdx::unordered_set<size_t> expectedIndicesWithErrors;
+    _testBuildBatchedInsertContextWithMetaField(
+        userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
+}
 
 void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaField(
     std::vector<BSONObj>& userMeasurementsBatch,
@@ -272,39 +356,251 @@ TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsOneBatchNoMetaf
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsOneBatchWithMetafield) {
-    std::vector<BSONObj> userMeasurementsBatch{
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "tag":"a", "x":1})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:04:00.000Z"}, "tag":"a", "x":2})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "tag":"a", "x":3})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "tag":"a", "x":4})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "tag":"a", "x":5})"),
-    };
-
-    stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
-    metaFieldValueToCorrectIndexOrderMap.try_emplace("a",
-                                                     std::initializer_list<size_t>{4, 2, 3, 1, 0});
-    stdx::unordered_set<size_t> expectedIndicesWithErrors;
-    _testBuildBatchedInsertContextWithMetaField(
-        userMeasurementsBatch, metaFieldValueToCorrectIndexOrderMap, expectedIndicesWithErrors);
+    // Test with all possible BSONTypes.
+    std::vector<BSONType> allBSONTypes = _getFlattenedVector(std::vector<std::vector<BSONType>>{
+        _stringComponentBSONTypes, _nonStringComponentVariableBSONTypes, _constantBSONTypes});
+    for (BSONType type : allBSONTypes) {
+        _testBuildBatchedInsertContextOneBatchWithSameMetaFieldType(type);
+    }
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsMultipleBatchesWithMetafield) {
+    // Test with BSONTypes that aren't constant (so we create distinct batches).
+    // BSONTypes that have a StringData component.
+    for (BSONType type : _stringComponentBSONTypes) {
+        _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+            type, std::vector<StringData>{_metaValue, _metaValue2, _metaValue3});
+    }
+
+    // Test with BSONTypes that don't have a StringData type metaValue.
+    _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+        bsonTimestamp, std::vector<Timestamp>{Timestamp(1, 2), Timestamp(2, 3), Timestamp(3, 4)});
+    _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+        NumberInt, std::vector<int>{365, 10, 4});
+    _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+        NumberLong,
+        std::vector<long long>{0x0123456789aacdeff, 0x0fedcba987654321, 0x0123456789abcdefll});
+    _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+        NumberDecimal,
+        std::vector<Decimal128>{Decimal128("0.490"), Decimal128("0.30"), Decimal128("1.50")});
+    _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+        NumberDouble, std::vector<double>{1.5, 1.4, 1.3});
+    _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
+        jstOID,
+        std::vector<OID>{OID("00000000ff00000000000002"),
+                         OID("000000000000000000000002"),
+                         OID("0000000000fff00000000002")});
+    // We don't include bool because it only has two distinct meta values when this test requires 3.
+    // We don't include BinDataType because we don't have a constructor for
+    // std::vector<BinDataType>.
+    // We make up for this missing coverage for both BinDataType and Bool in the
+    // BuildBatchedInsertContextsMultipleBatchesWithDifferentMetafieldTypes1/2 unit tests.
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       BuildBatchedInsertContextsMultipleBatchesWithDifferentMetafieldTypes1) {
     std::vector<BSONObj> userMeasurementsBatch{
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "tag":"b", "x":1})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:04:00.000Z"}, "tag":"c", "x":2})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "tag":"a", "x":3})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:07:00.000Z"}, "tag":"a", "x":4})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "tag":"b", "x":5})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "tag":"c", "x":7})"),
-        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:06:00.000Z"}, "tag":"a", "x":6})"),
+        _generateMeasurementWithMetaFieldType(jstOID, Date_t::fromMillisSinceEpoch(113)),
+        _generateMeasurementWithMetaFieldType(Code, Date_t::fromMillisSinceEpoch(105), _metaValue),
+        _generateMeasurementWithMetaFieldType(Code, Date_t::fromMillisSinceEpoch(107), _metaValue),
+        _generateMeasurementWithMetaFieldType(
+            DBRef, Date_t::fromMillisSinceEpoch(103), _metaValue2),
+        _generateMeasurementWithMetaFieldType(jstOID, Date_t::fromMillisSinceEpoch(104)),
+        _generateMeasurementWithMetaFieldType(
+            String, Date_t::fromMillisSinceEpoch(102), _metaValue3),
+        _generateMeasurementWithMetaFieldType(EOO, Date_t::fromMillisSinceEpoch(109)),
+        _generateMeasurementWithMetaFieldType(
+            String, Date_t::fromMillisSinceEpoch(108), _metaValue),
+        _generateMeasurementWithMetaFieldType(
+            String, Date_t::fromMillisSinceEpoch(111), _metaValue),
+        _generateMeasurementWithMetaFieldType(BinData, Date_t::fromMillisSinceEpoch(204)),
+        _generateMeasurementWithMetaFieldType(Code, Date_t::fromMillisSinceEpoch(200), _metaValue2),
+        _generateMeasurementWithMetaFieldType(
+            String, Date_t::fromMillisSinceEpoch(101), _metaValue3),
+        _generateMeasurementWithMetaFieldType(
+            String, Date_t::fromMillisSinceEpoch(121), _metaValue3),
+        _generateMeasurementWithMetaFieldType(String, Date_t::fromMillisSinceEpoch(65), _metaValue),
+        _generateMeasurementWithMetaFieldType(
+            DBRef, Date_t::fromMillisSinceEpoch(400), _metaValue2),
+        _generateMeasurementWithMetaFieldType(MinKey, Date_t::fromMillisSinceEpoch(250)),
+        _generateMeasurementWithMetaFieldType(EOO, Date_t::fromMillisSinceEpoch(108)),
+        _generateMeasurementWithMetaFieldType(MaxKey, Date_t::fromMillisSinceEpoch(231)),
+        _generateMeasurementWithMetaFieldType(EOO, Date_t::fromMillisSinceEpoch(107)),
+        _generateMeasurementWithMetaFieldType(
+            BinData, Date_t::fromMillisSinceEpoch(204), BSONBinData("", 1, BinDataGeneral)),
     };
-    stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
-    metaFieldValueToCorrectIndexOrderMap.try_emplace("a", std::initializer_list<size_t>{2, 6, 3});
-    metaFieldValueToCorrectIndexOrderMap.try_emplace("b", std::initializer_list<size_t>{0, 4});
-    metaFieldValueToCorrectIndexOrderMap.try_emplace("c", std::initializer_list<size_t>{5, 1});
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
+        metaFieldMetadataToCorrectIndexOrderMap;
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[0])), /* for jstOID */
+        std::initializer_list<size_t>{4, 0});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[1])), /* for Code (_metaValue) */
+        std::initializer_list<size_t>{1, 2});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[10])), /* for Code (_metaValue2) */
+        std::initializer_list<size_t>{10});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[6])), /* for EOO */
+        std::initializer_list<size_t>{18, 16, 6});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[3])), /* for DBRef (_metaValue2) */
+        std::initializer_list<size_t>{3, 14});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[7])), /* for String (_metaValue) */
+        std::initializer_list<size_t>{13, 7, 8});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[5])), /* for String (_metaValue3) */
+        std::initializer_list<size_t>{11, 5, 12});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[9])), /* for BinData (0) */
+        std::initializer_list<size_t>{9});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[19])), /* for BinData (1) */
+        std::initializer_list<size_t>{19});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[15])), /* for MinKey */
+        std::initializer_list<size_t>{15});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[17])), /* for MaxKey */
+        std::initializer_list<size_t>{17});
     stdx::unordered_set<size_t> expectedIndicesWithErrors;
     _testBuildBatchedInsertContextWithMetaField(
-        userMeasurementsBatch, metaFieldValueToCorrectIndexOrderMap, expectedIndicesWithErrors);
+        userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       BuildBatchedInsertContextsMultipleBatchesWithDifferentMetafieldTypes2) {
+    std::vector<BSONObj> userMeasurementsBatch{
+        _generateMeasurementWithMetaFieldType(
+            Symbol, Date_t::fromMillisSinceEpoch(382), _metaValue2),
+        _generateMeasurementWithMetaFieldType(
+            CodeWScope, Date_t::fromMillisSinceEpoch(493), _metaValue2),
+        _generateMeasurementWithMetaFieldType(Object, Date_t::fromMillisSinceEpoch(212)),
+        _generateMeasurementWithMetaFieldType(
+            Symbol, Date_t::fromMillisSinceEpoch(284), _metaValue2),
+        _generateMeasurementWithMetaFieldType(
+            CodeWScope, Date_t::fromMillisSinceEpoch(958), _metaValue2),
+        _generateMeasurementWithMetaFieldType(Object, Date_t::fromMillisSinceEpoch(103)),
+        _generateMeasurementWithMetaFieldType(
+            Object, Date_t::fromMillisSinceEpoch(492), _metaValue2),
+        _generateMeasurementWithMetaFieldType(Object, Date_t::fromMillisSinceEpoch(365)),
+        _generateMeasurementWithMetaFieldType(jstNULL, Date_t::fromMillisSinceEpoch(590)),
+        _generateMeasurementWithMetaFieldType(Array, Date_t::fromMillisSinceEpoch(204)),
+        _generateMeasurementWithMetaFieldType(jstNULL, Date_t::fromMillisSinceEpoch(58)),
+        _generateMeasurementWithMetaFieldType(
+            CodeWScope, Date_t::fromMillisSinceEpoch(93), _metaValue3),
+        _generateMeasurementWithMetaFieldType(
+            CodeWScope, Date_t::fromMillisSinceEpoch(304), _metaValue3),
+        _generateMeasurementWithMetaFieldType(jstNULL, Date_t::fromMillisSinceEpoch(384)),
+        _generateMeasurementWithMetaFieldType(CodeWScope, Date_t::fromMillisSinceEpoch(888)),
+        _generateMeasurementWithMetaFieldType(Array, Date_t::fromMillisSinceEpoch(764)),
+        _generateMeasurementWithMetaFieldType(Array, Date_t::fromMillisSinceEpoch(593)),
+    };
+
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
+        metaFieldMetadataToCorrectIndexOrderMap;
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[0])), /* for Symbol */
+        std::initializer_list<size_t>{3, 0});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[1])), /* for CodeWScope (_metaValue2) */
+        std::initializer_list<size_t>{1, 4});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[14])), /* for CodeWScope (_metaValue) */
+        std::initializer_list<size_t>{14});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[11])), /* for CodeWScope (_metaValue3) */
+        std::initializer_list<size_t>{11, 12});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[2])), /* for Object (_metaValue) */
+        std::initializer_list<size_t>{5, 2, 7});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[6])), /* for Object (_metaValue2) */
+        std::initializer_list<size_t>{6});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[8])), /* for jstNULL */
+        std::initializer_list<size_t>{10, 13, 8});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[9])), /* for Array */
+        std::initializer_list<size_t>{9, 16, 15});
+    stdx::unordered_set<size_t> expectedIndicesWithErrors;
+    _testBuildBatchedInsertContextWithMetaField(
+        userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       BuildBatchedInsertContextsMultipleBatchesWithDifferentMetafieldTypes3) {
+    std::vector<BSONObj> userMeasurementsBatch{
+        _generateMeasurementWithMetaFieldType(Date, Date_t::fromMillisSinceEpoch(113)),
+        _generateMeasurementWithMetaFieldType(RegEx, Date_t::fromMillisSinceEpoch(105)),
+        _generateMeasurementWithMetaFieldType(RegEx, Date_t::fromMillisSinceEpoch(107)),
+        _generateMeasurementWithMetaFieldType(Undefined, Date_t::fromMillisSinceEpoch(103)),
+        _generateMeasurementWithMetaFieldType(Bool, Date_t::fromMillisSinceEpoch(104), true),
+        _generateMeasurementWithMetaFieldType(Bool, Date_t::fromMillisSinceEpoch(102), true),
+        _generateMeasurementWithMetaFieldType(Bool, Date_t::fromMillisSinceEpoch(104), false),
+        _generateMeasurementWithMetaFieldType(Bool, Date_t::fromMillisSinceEpoch(102), false),
+        _generateMeasurementWithMetaFieldType(Undefined, Date_t::fromMillisSinceEpoch(102)),
+        _generateMeasurementWithMetaFieldType(EOO, Date_t::fromMillisSinceEpoch(109)),
+        _generateMeasurementWithMetaFieldType(NumberInt, Date_t::fromMillisSinceEpoch(108)),
+        _generateMeasurementWithMetaFieldType(NumberInt, Date_t::fromMillisSinceEpoch(111)),
+        _generateMeasurementWithMetaFieldType(NumberDouble, Date_t::fromMillisSinceEpoch(204), 2.3),
+        _generateMeasurementWithMetaFieldType(NumberLong, Date_t::fromMillisSinceEpoch(200)),
+        _generateMeasurementWithMetaFieldType(NumberDouble, Date_t::fromMillisSinceEpoch(101), 2.1),
+        _generateMeasurementWithMetaFieldType(NumberDouble, Date_t::fromMillisSinceEpoch(121), 2.3),
+        _generateMeasurementWithMetaFieldType(Date, Date_t::fromMillisSinceEpoch(65)),
+        _generateMeasurementWithMetaFieldType(
+            NumberDecimal, Date_t::fromMillisSinceEpoch(400), Decimal128("0.4")),
+        _generateMeasurementWithMetaFieldType(
+            NumberDecimal, Date_t::fromMillisSinceEpoch(400), Decimal128("0.3")),
+        _generateMeasurementWithMetaFieldType(RegEx, Date_t::fromMillisSinceEpoch(108)),
+        _generateMeasurementWithMetaFieldType(bsonTimestamp, Date_t::fromMillisSinceEpoch(231)),
+        _generateMeasurementWithMetaFieldType(EOO, Date_t::fromMillisSinceEpoch(107)),
+    };
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
+        metaFieldMetadataToCorrectIndexOrderMap;
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[0])), /* for Date */
+        std::initializer_list<size_t>{16, 0});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[1])), /* for RegEx */
+        std::initializer_list<size_t>{1, 2, 19});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[3])), /* for Undefined  */
+        std::initializer_list<size_t>{8, 3});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[4])), /* for Bool (true) */
+        std::initializer_list<size_t>{5, 4});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[6])), /* for Bool (false) */
+        std::initializer_list<size_t>{7, 6});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[9])), /* for EOO  */
+        std::initializer_list<size_t>{21, 9});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[10])), /* for NumberInt */
+        std::initializer_list<size_t>{10, 11});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[12])), /* for NumberDouble (2.3) */
+        std::initializer_list<size_t>{15, 12});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[13])), /* for NumberLong */
+        std::initializer_list<size_t>{13});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[14])), /* for NumberDouble (2.1) */
+        std::initializer_list<size_t>{14});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[17])), /* for NumberDecimal (0.4) */
+        std::initializer_list<size_t>{17});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[18])), /* for NumberDecimal (0.3) */
+        std::initializer_list<size_t>{18});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[20])), /* for bsonTimestamp */
+        std::initializer_list<size_t>{20});
+    stdx::unordered_set<size_t> expectedIndicesWithErrors;
+    _testBuildBatchedInsertContextWithMetaField(
+        userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest,
@@ -331,14 +627,17 @@ TEST_F(TimeseriesWriteOpsInternalTest,
         mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "tag":"b", "x":4})"),
         mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "tag":"a", "x":5})"),
     };
-    stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
-    metaFieldValueToCorrectIndexOrderMap.try_emplace(_metaValue.toString(),
-                                                     std::initializer_list<size_t>{4, 0});
-    metaFieldValueToCorrectIndexOrderMap.try_emplace(_metaValue2.toString(),
-                                                     std::initializer_list<size_t>{3});
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
+        metaFieldMetadataToCorrectIndexOrderMap;
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[0])), /* for metaValue: "a" */
+        std::initializer_list<size_t>{4, 0});
+    metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+        *(getBucketMetadata(userMeasurementsBatch[3])), /* for metaValue: "b" */
+        std::initializer_list<size_t>{3});
     stdx::unordered_set<size_t> expectedIndicesWithErrors{1, 2};
     _testBuildBatchedInsertContextWithMetaField(
-        userMeasurementsBatch, metaFieldValueToCorrectIndexOrderMap, expectedIndicesWithErrors);
+        userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsAllMeasurementsErrorNoMeta) {
@@ -357,10 +656,11 @@ TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsAllMeasurements
         mongo::fromjson(R"({"tag":"a", "x":2})"),  // Malformed measurement, missing time field
         mongo::fromjson(R"({"tag":"a", "x":3})"),  // Malformed measurement, missing time field
     };
-    stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
+        metaFieldMetadataToCorrectIndexOrderMap;
     stdx::unordered_set<size_t> expectedIndicesWithErrors{0, 1};
     _testBuildBatchedInsertContextWithMetaField(
-        userMeasurementsBatch, metaFieldValueToCorrectIndexOrderMap, expectedIndicesWithErrors);
+        userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
 };
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchFillsUpSingleBucket) {

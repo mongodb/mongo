@@ -35,6 +35,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::timeseries {
@@ -68,11 +70,53 @@ protected:
 
     const CollatorInterface* _getCollator(const NamespaceString& ns) const;
 
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue = Date_t::now()) const;
+
+    // We don't supply defaults for these type-specific function declarations because we provide the
+    // defaults in the generic _generateMeasurementWithMetaFieldType above.
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  Timestamp metaValue) const;
+
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  int metaValue) const;
+
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  long long metaValue) const;
+
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  Decimal128 metaValue) const;
+
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  double metaValue) const;
+
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  OID metaValue) const;
+
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  bool metaValue) const;
+
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  BSONBinData metaValue) const;
+
+    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
+                                                  Date_t timeValue,
+                                                  StringData metaValue) const;
+
     struct MeasurementsWithRolloverReasonOptions {
         const bucket_catalog::RolloverReason reason;
         size_t numMeasurements = static_cast<size_t>(gTimeseriesBucketMaxCount);
         size_t idxWithDiffMeasurement = static_cast<size_t>(numMeasurements - 1);
         boost::optional<StringData> metaValue = _metaValue;
+        BSONType metaValueType = String;
         Date_t timeValue = Date_t::now();
     };
 
@@ -81,7 +125,20 @@ protected:
 
     uint64_t _getStorageCacheSizeBytes() const;
 
-    std::vector<BSONObj> _getFlattenedVector(const std::vector<std::vector<BSONObj>>& vectors);
+    template <typename T>
+    inline std::vector<T> _getFlattenedVector(const std::vector<std::vector<T>>& vectors) {
+        size_t totalSize = std::accumulate(
+            vectors.begin(), vectors.end(), size_t(0), [](size_t sum, const std::vector<T>& vec) {
+                return sum + vec.size();
+            });
+        std::vector<T> result;
+        result.reserve(totalSize);  // Reserve the total size to avoid multiple allocations
+        // Use a range-based for loop to insert elements
+        for (const auto& vec : vectors) {
+            result.insert(result.end(), vec.begin(), vec.end());
+        }
+        return result;
+    }
 
     OperationContext* _opCtx;
     bucket_catalog::BucketCatalog* _bucketCatalog;
@@ -92,6 +149,17 @@ protected:
     static constexpr StringData _metaValue2 = "b";
     static constexpr StringData _metaValue3 = "c";
     uint64_t _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
+
+    const std::vector<BSONType> _nonStringComponentVariableBSONTypes = {
+        bsonTimestamp, NumberInt, NumberLong, NumberDecimal, NumberDouble, jstOID, Bool, BinData};
+
+    const std::vector<BSONType> _stringComponentBSONTypes = {
+        Object, Array, RegEx, DBRef, Code, Symbol, CodeWScope, String};
+
+    // These BSONTypes will always return the same meta value when passed in as the BSONType in
+    // _generateMeasurementWithMetaFieldType.
+    const std::vector<BSONType> _constantBSONTypes = {
+        Undefined, Date, MinKey, MaxKey, jstNULL, EOO};
 
     // Strings used to simulate kSize/kCachePressure rollover reason.
     std::string _bigStr = std::string(1000, 'a');
