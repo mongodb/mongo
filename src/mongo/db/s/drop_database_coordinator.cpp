@@ -496,10 +496,10 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     }
 
                     // Perform the database drop on the local catalog of any other shard;
-                    // the dbVersion is attached to each request to ensure idempotency.
                     {
                         dropDatabaseParticipantCmd.setFromMigrate(true);
 
+                        // Remove primary shard from participants
                         const auto primaryShardId = ShardingState::get(opCtx)->shardId();
                         auto participants = allShardIds;
                         participants.erase(
@@ -507,18 +507,40 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                             participants.end());
 
                         generic_argument_util::setMajorityWriteConcern(dropDatabaseParticipantCmd);
-                        generic_argument_util::setDbVersionIfPresent(
-                            dropDatabaseParticipantCmd, *metadata().getDatabaseVersion());
 
-                        auto opts = std::make_shared<
-                            async_rpc::AsyncRPCOptions<ShardsvrDropDatabaseParticipant>>(
-                            **executor, token, dropDatabaseParticipantCmd);
-                        try {
+                        // Send participant commands with replay protection to ensure idempotency
+                        // and resilience against network partitioning. The model used to achieve
+                        // replay protection depends on whether the shards are database metadata
+                        // authoritative.
+                        // - If the shards are not database metadata authoritative, we attach the
+                        //   dbVersion to the request and ignore StaleDbVersion exceptions.
+                        // - If the shards are database metadata authoritative, we use the OSI
+                        // protocol.
+                        if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
+                            const auto session = getNewSession(opCtx);
+                            generic_argument_util::setOperationSessionInfo(
+                                dropDatabaseParticipantCmd, session);
+
+                            auto opts = std::make_shared<
+                                async_rpc::AsyncRPCOptions<ShardsvrDropDatabaseParticipant>>(
+                                **executor, token, dropDatabaseParticipantCmd);
+
                             sharding_ddl_util::sendAuthenticatedCommandToShards(
                                 opCtx, opts, participants);
-                        } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
-                            // The DB metadata could have been removed by a network-partitioned
-                            // former primary
+                        } else {
+                            generic_argument_util::setDbVersionIfPresent(
+                                dropDatabaseParticipantCmd, *metadata().getDatabaseVersion());
+
+                            auto opts = std::make_shared<
+                                async_rpc::AsyncRPCOptions<ShardsvrDropDatabaseParticipant>>(
+                                **executor, token, dropDatabaseParticipantCmd);
+                            try {
+                                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                                    opCtx, opts, participants);
+                            } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
+                                // The DB metadata could have been removed by a network-partitioned
+                                // former primary
+                            }
                         }
                     }
                     // Clear the database sharding state info before exiting the critical section so
