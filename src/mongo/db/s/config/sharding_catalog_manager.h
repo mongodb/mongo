@@ -536,6 +536,23 @@ public:
     void installConfigShardIdentityDocument(OperationContext* opCtx);
 
     /**
+     * Checks if the shard has already been removed from the cluster. If not, checks that
+     * preconditions for shard removal are met, starts draining for that shard, and returns progress
+     * to reflect this. If the shard is already in draining, returns boost::none to indicate the
+     * removal process should proceed.
+     */
+    boost::optional<RemoveShardProgress> checkPreconditionsAndStartDrain(OperationContext* opCtx,
+                                                                         const ShardId& shardId);
+
+    /**
+     * Checks if the shard is still draining and returns the draining status if so. If not, returns
+     * boost::none indicating that the commit of the shard removal can proceed.
+     */
+    boost::optional<RemoveShardProgress> checkDrainingProgress(OperationContext* opCtx,
+                                                               const ShardId& shardId);
+
+
+    /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,
      * the data residing in that shard must be moved to the remaining shards in the
      * cluster by "draining" chunks from that shard.
@@ -746,7 +763,6 @@ private:
      * the config server in the newly added shard.
      */
     void _standardizeClusterParameters(OperationContext* opCtx, RemoteCommandTargeter& targeter);
-
 
     /**
      * Execute the migration chunk updates using the internal transaction API.

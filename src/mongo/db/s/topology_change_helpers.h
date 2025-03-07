@@ -302,11 +302,18 @@ boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
  * and then commit the removal of the shard from config.shards and update of the topology time in a
  * transaction.
  */
-void removeShard(const Lock::ExclusiveLock&,
-                 OperationContext* opCtx,
-                 std::shared_ptr<Shard> localConfigShard,
-                 const std::string& shardName,
-                 std::shared_ptr<executor::TaskExecutor> executor);
+void commitRemoveShard(const Lock::ExclusiveLock&,
+                       OperationContext* opCtx,
+                       std::shared_ptr<Shard> localConfigShard,
+                       const std::string& shardName,
+                       std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Runs the different stages of the remove shard command - checkPreconditionsAndStartDrain,
+ * checkDrainingStatus, and commit of the removal. Will retry the entire procedure after receiving
+ * a ConflictingOperationOnProgress error.
+ */
+RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId);
 
 /**
  * Inserts new entries into the config catalog to describe the shard being added (and the
@@ -330,6 +337,13 @@ void updateClusterCardinalityParameter(const Lock::ExclusiveLock& clusterCardina
  * multiple places
  */
 void hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(OperationContext* opCtx);
+
+/**
+ * Checks if the shard exists and returns it if so.
+ */
+boost::optional<ShardType> getShardIfExists(OperationContext* opCtx,
+                                            std::shared_ptr<Shard> localConfigShard,
+                                            const ShardId& shardId);
 
 /**
  * Collects user write blocking state locally (cluster parameter) and propagates it to the given

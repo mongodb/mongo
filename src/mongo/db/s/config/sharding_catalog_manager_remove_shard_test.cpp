@@ -129,6 +129,19 @@ protected:
         ConfigServerTestFixture::tearDown();
     }
 
+    RemoveShardProgress removeShardCommandFlow(OperationContext* opCtx, const ShardId& shardId) {
+        if (auto drainingProgress =
+                ShardingCatalogManager::get(opCtx)->checkPreconditionsAndStartDrain(opCtx,
+                                                                                    shardId)) {
+            return *drainingProgress;
+        }
+        if (auto drainingProgress =
+                ShardingCatalogManager::get(opCtx)->checkDrainingProgress(opCtx, shardId)) {
+            return *drainingProgress;
+        }
+        return ShardingCatalogManager::get(opCtx)->removeShard(opCtx, shardId);
+    }
+
     /**
      * Checks whether a particular shard's "draining" field is set to true.
      */
@@ -183,14 +196,12 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
 
     setupShards(std::vector<ShardType>{shard1, shard2, shard3});
 
-    auto result = ShardingCatalogManager::get(operationContext())
-                      ->removeShard(operationContext(), shard1.getName());
+    auto result = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, result.getState());
     ASSERT_EQUALS(false, result.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
-    auto result2 = ShardingCatalogManager::get(operationContext())
-                       ->removeShard(operationContext(), shard2.getName());
+    auto result2 = removeShardCommandFlow(operationContext(), shard2.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, result2.getState());
     ASSERT_EQUALS(false, result2.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard2.getName()));
@@ -205,8 +216,7 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
 
     setupShards(std::vector<ShardType>{shard1});
 
-    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->removeShard(operationContext(), shard1.getName()),
+    ASSERT_THROWS_CODE(removeShardCommandFlow(operationContext(), shard1.getName()),
                        DBException,
                        ErrorCodes::IllegalOperation);
     ASSERT_FALSE(isDraining(shard1.getName()));
@@ -225,8 +235,7 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
 
     setupShards(std::vector<ShardType>{shard1, shard2});
 
-    auto result = ShardingCatalogManager::get(operationContext())
-                      ->removeShard(operationContext(), shard1.getName());
+    auto result = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, result.getState());
     ASSERT_EQUALS(false, result.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
@@ -269,14 +278,12 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
                     kKeyPattern,
                     std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
-    auto startedResult = ShardingCatalogManager::get(operationContext())
-                             ->removeShard(operationContext(), shard1.getName());
+    auto startedResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, startedResult.getState());
     ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
-    auto ongoingResult = ShardingCatalogManager::get(operationContext())
-                             ->removeShard(operationContext(), shard1.getName());
+    auto ongoingResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
     ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
     ASSERT_EQUALS(3, ongoingResult.getRemaining()->getChunks());
@@ -302,14 +309,12 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
     setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
                   shard1.getName());
 
-    auto startedResult = ShardingCatalogManager::get(operationContext())
-                             ->removeShard(operationContext(), shard1.getName());
+    auto startedResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, startedResult.getState());
     ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
-    auto ongoingResult = ShardingCatalogManager::get(operationContext())
-                             ->removeShard(operationContext(), shard1.getName());
+    auto ongoingResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
     ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
     ASSERT_EQUALS(0, ongoingResult.getRemaining()->getChunks());
@@ -356,14 +361,12 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
                     kKeyPattern,
                     std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
-    auto startedResult = ShardingCatalogManager::get(operationContext())
-                             ->removeShard(operationContext(), shard1.getName());
+    auto startedResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, startedResult.getState());
     ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
-    auto ongoingResult = ShardingCatalogManager::get(operationContext())
-                             ->removeShard(operationContext(), shard1.getName());
+    auto ongoingResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
     ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
     ASSERT_EQUALS(3, ongoingResult.getRemaining()->getChunks());
@@ -381,8 +384,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
             operationContext(), chunkNS, chunk.toConfigBSON(), updatedChunk.toConfigBSON(), false));
     }
 
-    auto completedResult = ShardingCatalogManager::get(operationContext())
-                               ->removeShard(operationContext(), shard1.getName());
+    auto completedResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kCompleted, completedResult.getState());
     ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
 
@@ -396,6 +398,35 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         BSONObj(),
         1));
     ASSERT_TRUE(response.docs.empty());
+}
+
+TEST_F(RemoveShardTest, RemoveShardCommitFailsIfPreconditionsNotMet) {
+    ShardType shard1;
+    shard1.setName("shard1");
+    shard1.setHost("host1:12345");
+    shard1.setState(ShardType::ShardState::kShardAware);
+
+    ShardType shard2;
+    shard2.setName("shard2");
+    shard2.setHost("host2:12345");
+    shard2.setState(ShardType::ShardState::kShardAware);
+
+    setupShards(std::vector<ShardType>{shard1, shard2});
+
+    // Removing a shard that was already removed or does not exist should throw ShardNotFound.
+    ShardId nonExistingShard{"fakeShardId"};
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->removeShard(operationContext(), nonExistingShard),
+                       DBException,
+                       ErrorCodes::ShardNotFound);
+    // Calling the final function in the shard removal procedure on a shard which is not draining
+    // should throw ConflictingOperationInProgress as this should only happen if a sequence of
+    // parallel add/remove shard operations or a manual update of the draining flag occurred. This
+    // error should be handled by the caller.
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->removeShard(operationContext(), shard1.getName()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
 }
 
 TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
@@ -442,14 +473,12 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
                     kKeyPattern,
                     std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
-    auto startedResult = ShardingCatalogManager::get(operationContext())
-                             ->removeShard(operationContext(), shard1.getName());
+    auto startedResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, startedResult.getState());
     ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
-    auto ongoingResult = ShardingCatalogManager::get(operationContext())
-                             ->removeShard(operationContext(), shard1.getName());
+    auto ongoingResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
     ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
     ASSERT_EQUALS(3, ongoingResult.getRemaining()->getChunks());
@@ -471,8 +500,7 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
     // dbsToMove array must contain only a subset of the databases and "truncated" field is enabled.
     setupManyDatabases(101, 200, shard1.getName());
 
-    ongoingResult = ShardingCatalogManager::get(operationContext())
-                        ->removeShard(operationContext(), shard1.getName());
+    ongoingResult = removeShardCommandFlow(operationContext(), shard1.getName());
     ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
     ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
     ASSERT_EQUALS(3, ongoingResult.getRemaining()->getChunks());

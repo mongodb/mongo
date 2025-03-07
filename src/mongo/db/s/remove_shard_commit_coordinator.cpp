@@ -179,11 +179,12 @@ void RemoveShardCommitCoordinator::_commitRemoveShard(
     Lock::ExclusiveLock shardMembershipLock =
         ShardingCatalogManager::get(opCtx)->acquireShardMembershipLockForTopologyChange(opCtx);
 
-    topology_change_helpers::removeShard(shardMembershipLock,
-                                         opCtx,
-                                         ShardingCatalogManager::get(opCtx)->localConfigShard(),
-                                         _doc.getShardId().toString(),
-                                         **executor);
+    topology_change_helpers::commitRemoveShard(
+        shardMembershipLock,
+        opCtx,
+        ShardingCatalogManager::get(opCtx)->localConfigShard(),
+        _doc.getShardId().toString(),
+        **executor);
 
     // The shard which was just removed must be reflected in the shard registry, before the
     // replica set monitor is removed, otherwise the shard would be referencing a dropped RSM.

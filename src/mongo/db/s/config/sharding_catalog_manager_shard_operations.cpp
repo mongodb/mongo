@@ -874,9 +874,9 @@ void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
     uassertStatusOK(addShard(opCtx, &shardName, configConnString, true));
 }
 
+boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsAndStartDrain(
+    OperationContext* opCtx, const ShardId& shardId) {
 
-RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
-                                                        const ShardId& shardId) {
     Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
 
     // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
@@ -896,16 +896,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     Lock::ExclusiveLock shardMembershipLock =
         ShardingCatalogManager::acquireShardMembershipLockForTopologyChange(opCtx);
 
-    auto findShardResponse = uassertStatusOK(
-        _localConfigShard->exhaustiveFindOnConfig(opCtx,
-                                                  kConfigReadSelector,
-                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                  NamespaceString::kConfigsvrShardsNamespace,
-                                                  BSON(ShardType::name() << shardName),
-                                                  BSONObj(),
-                                                  1));
-
-    if (findShardResponse.docs.empty()) {
+    auto optShard = topology_change_helpers::getShardIfExists(opCtx, _localConfigShard, shardId);
+    if (!optShard) {
         // Release the shard membership lock since the set cluster parameter operation below
         // requires taking this lock.
         shardMembershipLock.unlock();
@@ -917,9 +909,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                   str::stream() << "Shard " << shardId << " does not exist");
     }
 
-    const auto shard = uassertStatusOK(ShardType::fromBSON(findShardResponse.docs[0]));
-    const auto replicaSetName =
-        uassertStatusOK(ConnectionString::parse(shard.getHost())).getReplicaSetName();
+    const auto shard = *optShard;
 
     // Find how many *other* shards exist, which are *not* currently draining
     const auto countOtherNotDrainingShards = topology_change_helpers::runCountCommandOnConfig(
@@ -972,18 +962,19 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                        ShardingCatalogClient::kLocalWriteConcern),
                                    "error starting removeShard");
 
-        return {ShardDrainingStateEnum::kStarted};
+        return RemoveShardProgress{ShardDrainingStateEnum::kStarted};
     }
+    return boost::none;
+}
 
-    shardMembershipLock.unlock();
-    clusterCardinalityParameterLock.unlock();
-
+boost::optional<RemoveShardProgress> ShardingCatalogManager::checkDrainingProgress(
+    OperationContext* opCtx, const ShardId& shardId) {
     hangRemoveShardAfterSettingDrainingFlag.pauseWhileSet(opCtx);
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
     auto drainingProgress =
-        topology_change_helpers::getDrainingProgress(opCtx, _localConfigShard, shardName);
+        topology_change_helpers::getDrainingProgress(opCtx, _localConfigShard, shardId.toString());
     // The counters: `shardedChunks`, `totalCollections`, and `databases` are used to present the
     // ongoing status to the user. Additionally, `totalChunks` on the shard is checked for safety,
     // as it is a critical point in the removeShard process, to ensure that a non-empty shard is not
@@ -1004,6 +995,31 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         progress.setRemaining(drainingProgress.removeShardCounts);
         return progress;
     }
+    return boost::none;
+}
+
+RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
+                                                        const ShardId& shardId) {
+    Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
+
+    // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
+    // failed addShard/removeShard operation.
+    resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+
+    // Since we released the addRemoveShardLock between checking the preconditions and here, it is
+    // possible that the shard has already been removed.
+    auto optShard = topology_change_helpers::getShardIfExists(opCtx, _localConfigShard, shardId);
+    uassert(ErrorCodes::ShardNotFound,
+            str::stream() << "Shard " << shardId << " does not exist",
+            optShard.is_initialized());
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Shard " << shardId << " is not currently draining",
+            optShard->getDraining());
+
+    const auto shard = *optShard;
+    const auto replicaSetName =
+        uassertStatusOK(ConnectionString::parse(shard.getHost())).getReplicaSetName();
+    const auto shardName = shardId.toString();
 
     if (shardId == ShardId::kConfigServerId) {
         topology_change_helpers::joinMigrations(opCtx);
@@ -1030,7 +1046,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     // Now that DDL operations are not executing, recheck that this shard truly does not own any
     // chunks nor database.
-    drainingProgress =
+    auto drainingProgress =
         topology_change_helpers::getDrainingProgress(opCtx, _localConfigShard, shardName);
     // The counters: `shardedChunks`, `totalCollections`, and `databases` are used to present the
     // ongoing status to the user. Additionally, `totalChunks` on the shard is checked for safety,
@@ -1052,6 +1068,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         progress.setRemaining(drainingProgress.removeShardCounts);
         return progress;
     }
+
+    // Declare locks that we will need below then unlock them for now.
+    Lock::ExclusiveLock clusterCardinalityParameterLock =
+        acquireClusterCardinalityParameterLockForTopologyChange(opCtx);
+    Lock::ExclusiveLock shardMembershipLock =
+        ShardingCatalogManager::acquireShardMembershipLockForTopologyChange(opCtx);
+    shardMembershipLock.unlock();
+    clusterCardinalityParameterLock.unlock();
 
     {
         // Keep the FCV stable across the commit of the shard removal. This allows us to only drop
@@ -1098,7 +1122,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         clusterCardinalityParameterLock.lock();
         shardMembershipLock.lock();
 
-        topology_change_helpers::removeShard(
+        topology_change_helpers::commitRemoveShard(
             shardMembershipLock,
             opCtx,
             _localConfigShard,

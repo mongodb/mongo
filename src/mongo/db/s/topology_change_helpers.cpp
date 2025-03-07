@@ -1505,11 +1505,11 @@ boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
     return boost::none;
 }
 
-void removeShard(const Lock::ExclusiveLock&,
-                 OperationContext* opCtx,
-                 const std::shared_ptr<Shard> localConfigShard,
-                 const std::string& shardName,
-                 std::shared_ptr<executor::TaskExecutor> executor) {
+void commitRemoveShard(const Lock::ExclusiveLock&,
+                       OperationContext* opCtx,
+                       const std::shared_ptr<Shard> localConfigShard,
+                       const std::string& shardName,
+                       std::shared_ptr<executor::TaskExecutor> executor) {
     // Find a controlShard to be updated.
     auto controlShardQueryStatus =
         localConfigShard->exhaustiveFindOnConfig(opCtx,
@@ -1534,6 +1534,28 @@ void removeShard(const Lock::ExclusiveLock&,
     // Remove the shard's document and update topologyTime within a transaction.
     removeShardInTransaction(
         opCtx, shardName, controlShardName, newTopologyTime.asTimestamp(), executor);
+}
+
+RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId) {
+    const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
+    while (true) {
+        try {
+            if (auto drainingStatus =
+                    shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId)) {
+                return *drainingStatus;
+            }
+            if (auto drainingStatus =
+                    shardingCatalogManager->checkDrainingProgress(opCtx, shardId)) {
+                return *drainingStatus;
+            }
+            return shardingCatalogManager->removeShard(opCtx, shardId);
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
+            LOGV2(10154101,
+                  "Remove shard received retriable error and will be retried",
+                  "shardId"_attr = shardId,
+                  "error"_attr = redact(ex));
+        }
+    }
 }
 
 void addShardInTransaction(OperationContext* opCtx,
@@ -1729,6 +1751,24 @@ void updateClusterCardinalityParameter(const Lock::ExclusiveLock&, OperationCont
 
 void hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(OperationContext* opCtx) {
     hangAddShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
+}
+
+boost::optional<ShardType> getShardIfExists(OperationContext* opCtx,
+                                            std::shared_ptr<Shard> localConfigShard,
+                                            const ShardId& shardId) {
+    auto findShardResponse = uassertStatusOK(
+        localConfigShard->exhaustiveFindOnConfig(opCtx,
+                                                 kConfigReadSelector,
+                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 NamespaceString::kConfigsvrShardsNamespace,
+                                                 BSON(ShardType::name() << shardId.toString()),
+                                                 BSONObj(),
+                                                 1));
+
+    if (!findShardResponse.docs.empty()) {
+        return uassertStatusOK(ShardType::fromBSON(findShardResponse.docs[0]));
+    }
+    return boost::none;
 }
 
 void propagateClusterUserWriteBlockToReplicaSet(OperationContext* opCtx,
