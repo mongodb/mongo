@@ -231,7 +231,7 @@ bool handleCursorCommand(OperationContext* opCtx,
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
                           "stats"_attr = redact(stats),
-                          "cmd"_attr = cmdObj);
+                          "cmd"_attr = redact(cmdObj));
 
             exception.addContext("PlanExecutor error during aggregation");
             throw;

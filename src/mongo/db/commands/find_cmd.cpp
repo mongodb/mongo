@@ -666,7 +666,7 @@ public:
                               "Plan executor error during find command",
                               "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(stats),
-                              "cmd"_attr = cmdObj);
+                              "cmd"_attr = redact(cmdObj));
 
                 exception.addContext("Executor error during find command");
                 throw;
