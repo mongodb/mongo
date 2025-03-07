@@ -27,24 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#ifdef __linux__
+
+#include "mongo/db/startup_warnings_mongod.h"
 
 #include <fstream>
 #include <ostream>
 
-#include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+
 namespace {
 
-using mongo::unittest::TempDir;
-
-using namespace mongo;
+using swm = StartupWarningsMongodLinux;
+using unittest::TempDir;
+using unittest::match::Eq;
 
 TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidDirectory) {
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("no_such_directory", "param");
+        swm::readTransparentHugePagesParameter("no_such_directory", "param");
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
 }
@@ -52,7 +55,7 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidDirector
 TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidFile) {
     TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterInvalidFile");
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        swm::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
 }
@@ -64,7 +67,7 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterEmptyFile) {
         std::ofstream(filename.c_str());
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        swm::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::FileStreamFailed, result.getStatus().code());
 }
@@ -77,7 +80,7 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterBlankLine) {
         ofs << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        swm::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
 }
@@ -90,7 +93,7 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidFormat) 
         ofs << "always madvise never" << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        swm::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
 }
@@ -103,7 +106,7 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterEmptyOpMode) {
         ofs << "always madvise [] never" << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        swm::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
@@ -117,7 +120,7 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterUnrecognizedOpM
         ofs << "always madvise never [unknown]" << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        swm::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
@@ -134,8 +137,7 @@ void readTransparentHugePagesParameter(const std::string& parameter, const std::
     std::string::size_type posEnd = valueStr.find(']');
     std::string mode = valueStr.substr(posBegin + 1, posEnd - posBegin - 1);
 
-    auto result =
-        StartupWarningsMongod::readTransparentHugePagesParameter(parameter, tempDir.path());
+    auto result = swm::readTransparentHugePagesParameter(parameter, tempDir.path());
 
     if (parameter == kTHPEnabledParameter && (mode == "defer" || mode == "defer+madvise")) {
         ASSERT_NOT_OK(result.getStatus());
@@ -151,18 +153,8 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledAlways) {
                                       "[always] defer defer+madvise madvise never");
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragAlways) {
-    readTransparentHugePagesParameter(kTHPDefragParameter,
-                                      "[always] defer defer+madvise madvise never");
-}
-
 TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledDefer) {
     readTransparentHugePagesParameter(kTHPEnabledParameter,
-                                      "always [defer] defer+madvise madvise never");
-}
-
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragDefer) {
-    readTransparentHugePagesParameter(kTHPDefragParameter,
                                       "always [defer] defer+madvise madvise never");
 }
 
@@ -171,18 +163,8 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledDeferMadvise) {
                                       "always defer [defer+madvise] madvise never");
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragDeferMadvise) {
-    readTransparentHugePagesParameter(kTHPDefragParameter,
-                                      "always defer [defer+madvise] madvise never");
-}
-
 TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledMadvise) {
     readTransparentHugePagesParameter(kTHPEnabledParameter,
-                                      "always defer defer+madvise [madvise] never");
-}
-
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragMadvise) {
-    readTransparentHugePagesParameter(kTHPDefragParameter,
                                       "always defer defer+madvise [madvise] never");
 }
 
@@ -191,9 +173,35 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledNever) {
                                       "always defer defer+madvise madvise [never]");
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragNever) {
-    readTransparentHugePagesParameter(kTHPDefragParameter,
-                                      "always defer defer+madvise madvise [never]");
+TEST(StartupWarningsMongodTest, EnablementStates) {
+    using E = swm::THPEnablementWarningLogCase;
+
+    ASSERT_THAT(swm::getTHPEnablementWarningCase("never", false), Eq(E::kNone)) << "good case";
+
+    ASSERT_THAT(swm::getTHPEnablementWarningCase("always", true), Eq(E::kNone))
+        << "good opt-out case";
+
+    ASSERT_THAT(swm::getTHPEnablementWarningCase(Status(ErrorCodes::BadValue, ""),
+                                                 std::make_error_code(std::errc::invalid_argument)),
+                Eq(E::kSystemValueErrorWithOptOutError))
+        << "double error case";
+
+    ASSERT_THAT(swm::getTHPEnablementWarningCase("always", false), Eq(E::kWronglyEnabled))
+        << "wrongly enabled case";
+
+    ASSERT_THAT(swm::getTHPEnablementWarningCase("always",
+                                                 std::make_error_code(std::errc::invalid_argument)),
+                Eq(E::kOptOutError))
+        << "error retrieving out opt value case";
+
+    ASSERT_THAT(swm::getTHPEnablementWarningCase("never",
+                                                 std::make_error_code(std::errc::invalid_argument)),
+                Eq(E::kNone))
+        << "good value opt-out error case";
 }
 
 }  // namespace
+
+}  // namespace mongo
+
+#endif  // __linux__

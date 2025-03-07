@@ -27,23 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 
+#ifdef __linux__
+
 constexpr inline auto kTHPEnabledParameter = "enabled";
-constexpr inline auto kTHPDefragParameter = "defrag";
 
-struct StorageGlobalParams;
-struct ServerGlobalParams;
-
-class StartupWarningsMongod {
+class StartupWarningsMongodLinux {
 private:
-    StartupWarningsMongod();
+    StartupWarningsMongodLinux();
 
 public:
+    enum class THPEnablementWarningLogCase {
+        kWronglyEnabled,
+        kSystemValueError,
+        kSystemValueErrorWithOptOutError,
+        kOptOutError,
+        kNone
+    };
+
     /**
      * Reads Transparent HugePages kernel parameter in sysfs directory.
      * Linux only.
@@ -56,11 +62,44 @@ public:
      */
     static StatusWith<std::string> readTransparentHugePagesParameter(const std::string& parameter,
                                                                      const std::string& directory);
+
+    /**
+     * Return the right THP enablement warning based on system conditions.
+     */
+    static THPEnablementWarningLogCase getTHPEnablementWarningCase(
+        const StatusWith<std::string>& thpEnabled,
+        const std::variant<std::error_code, bool>& optingOutOfTHPForProcess);
+
+    /**
+     * Emit the correct log message corresponding to the inputted warning case.
+     */
+    static void warnForTHPEnablementCases(
+        THPEnablementWarningLogCase warningCase,
+        const StatusWith<std::string>& thpEnabled,
+        const std::variant<std::error_code, bool>& optingOutOfTHPForProcess);
+
+    /**
+     * Take the values of THP on the system and process, verify their correctness in
+     * isolation and combination, and emit a warning to the logs.
+     */
+    static void verifyCorrectTHPSettings(
+        const StatusWith<std::string>& thpEnabled,
+        const std::variant<std::error_code, bool>& optingOutOfTHPForProcess);
+
+    /**
+     * Log startup warnings that only apply to Linux.
+     */
+    static void logLinuxMongodWarnings(const StorageGlobalParams& storageParams,
+                                       const ServerGlobalParams& serverParams,
+                                       ServiceContext* svcCtx);
 };
+
+#endif  // __linux__
 
 // Checks various startup conditions and logs any necessary warnings that
 // are specific to the mongod process.
 void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                               const ServerGlobalParams& serverParams,
                               ServiceContext* svcCtx);
+
 }  // namespace mongo
