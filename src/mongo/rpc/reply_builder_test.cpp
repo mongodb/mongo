@@ -180,6 +180,36 @@ TEST(OpMsgReplyBuilder, CommandError) {
     ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), body);
 }
 
+TEST(OpMsgReplyBuilder, CommandErrorWithWriteConcernError) {
+    const Status realStatus(ErrorCodes::ImmutableField, "tried to modify immutable _id field");
+    WriteConcernErrorDetail wceDetail;
+    wceDetail.setStatus(Status{ErrorCodes::WriteConcernTimeout, "timed out waiting for wc"});
+    const Status status(ErrorWithWriteConcernErrorInfo(realStatus, wceDetail), "wrapped status");
+
+    BSONObj metadata = buildMetadata();
+    BSONObjBuilder extra;
+    extra.append("a", "b");
+    extra.append("c", "d");
+    const BSONObj extraObj = extra.obj();
+    rpc::OpMsgReplyBuilder replyBuilder;
+    replyBuilder.setCommandReply(status, extraObj);
+    replyBuilder.getBodyBuilder().appendElements(metadata);
+    auto msg = replyBuilder.done();
+    msg.header().setId(124);
+    msg.header().setResponseToMsgId(123);
+    OpMsg::appendChecksum(&msg);
+
+    rpc::OpMsgReply parsed(&msg);
+
+    const auto body = ([&] {
+        BSONObjBuilder unifiedBuilder(buildErrReply(realStatus, extraObj));
+        unifiedBuilder.append("writeConcernError", wceDetail.toBSON());
+        unifiedBuilder.appendElements(metadata);
+        return unifiedBuilder.obj();
+    }());
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), body);
+}
+
 TEST(OpMsgReplyBuilder, MessageOverBSONSizeLimit) {
     rpc::OpMsgReplyBuilder r;
     std::string bigStr(1024 * 1024 * 16, 'a');

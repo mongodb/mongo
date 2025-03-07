@@ -1093,8 +1093,18 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
         return swResult.getStatus();
     } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
         auto& commitResult = swResult.getValue();
-        addWriteConcernErrorInfoToReply(commitResult.wcError, reply.get());
-        if (!commitResult.cmdStatus.isOK()) {
+
+        if (commitResult.cmdStatus.isOK()) {
+            // commit encountered a write concern error, but succeeded with the write
+            addWriteConcernErrorInfoToReply(commitResult.wcError, reply.get());
+        } else {
+            // commit encountered an error, and maybe a write concern error as well
+            if (commitResult.wcError.isValid(nullptr) &&
+                commitResult.cmdStatus.code() != ErrorCodes::ErrorWithWriteConcernError) {
+                return Status{
+                    ErrorWithWriteConcernErrorInfo(commitResult.cmdStatus, commitResult.wcError),
+                    "FLE2 findAndModify commit failure includes a write concern error"};
+            }
             return commitResult.cmdStatus;
         }
     }
