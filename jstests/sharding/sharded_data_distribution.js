@@ -83,11 +83,20 @@ const testDb = mongos.getDB("test");
 const barDb = mongos.getDB("bar");
 const fooColl = testDb.getCollection("foo");
 const bazColl = barDb.getCollection("baz");
+const timeseriesColl = testDb.getCollection("timeseriesColl");
 
 st.adminCommand({enablesharding: testDb.getName(), primaryShard: st.shard1.shardName});
 st.adminCommand({shardcollection: ns1, key: {skey: 1}});
+st.adminCommand(
+    {shardcollection: timeseriesColl.getFullName(), timeseries: {timeField: "ts"}, key: {ts: 1}});
 st.adminCommand({enablesharding: barDb.getName(), primaryShard: st.shard1.shardName});
 st.adminCommand({shardcollection: ns2, key: {skey: 1}});
+
+assert.commandWorked(timeseriesColl.insertOne({
+    "metadata": {"sensorId": 5578, "type": "temperature"},
+    "ts": ISODate("2021-05-18T00:00:00.000Z"),
+    "temp": 12
+}));
 
 // Insert data to validate the aggregation stage
 for (let i = 0; i < 6; i++) {
@@ -168,6 +177,23 @@ assert.neq(
     0,
     adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {shards: {$size: 2}}}]).itcount());
 
+// Test that verifies that the fields returned for timeseries collections are correct.
+assert.eq(1,
+          adminDb
+              .aggregate([
+                  {$shardedDataDistribution: {}},
+                  {$match: {ns: "test.system.buckets.timeseriesColl"}},
+                  {
+                      $match: {
+                          $and: [
+                              {"shards.numOwnedDocuments": {$eq: 1}},
+                              {"shards.ownedSizeBytes": {$gt: 0}},
+                              {"shards.orphanedSizeBytes": {$eq: 0}}
+                          ]
+                      }
+                  }
+              ])
+              .itcount());
 st.stop();
 
 // Test that verifies the behavior in unsharded deployments
