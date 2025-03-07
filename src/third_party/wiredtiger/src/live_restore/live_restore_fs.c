@@ -1088,8 +1088,8 @@ __live_restore_fs_open_in_source(WTI_LIVE_RESTORE_FS *lr_fs, WT_SESSION_IMPL *se
     /* Open the file in the layer. */
     WT_ERR(__live_restore_fs_backing_filename(
       &lr_fs->source, session, lr_fs->destination.home, lr_fh->iface.name, &path));
-    WT_ERR(lr_fs->os_file_system->fs_open_file(
-      lr_fs->os_file_system, (WT_SESSION *)session, path, lr_fh->file_type, flags, &fh));
+    WT_ERR(lr_fs->os_file_system->fs_open_file(lr_fs->os_file_system, (WT_SESSION *)session, path,
+      lr_fh->file_type, flags | WT_FS_OPEN_READONLY, &fh));
 
     lr_fh->source = fh;
 
@@ -1350,40 +1350,24 @@ err:
 
 /*
  * __live_restore_setup_lr_fh_directory --
- *     Populate a live restore file handle for a directory. Directories have special handling. If
- *     they don't exist in the destination they'll be created immediately (but not their contents)
- *     and immediately marked as complete. WiredTiger will never create or destroy a directory so we
- *     don't need to think about stop files for directories.
+ *     Populate a live restore file handle for a directory. Directories are created by the user and
+ *     therefore must always exist in the destination.
  */
 static int
 __live_restore_setup_lr_fh_directory(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_fs,
   const char *name, uint32_t flags, WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh)
 {
-    WT_DECL_RET;
-    bool dest_exist = false, source_exist = false;
+    bool dest_exist = false;
 
     WT_RET_NOTFOUND_OK(
       __live_restore_fs_has_file(lr_fs, &lr_fs->destination, session, name, &dest_exist));
-    WT_RET_NOTFOUND_OK(
-      __live_restore_fs_has_file(lr_fs, &lr_fs->source, session, name, &source_exist));
 
-    if (!dest_exist && !source_exist && !LF_ISSET(WT_FS_OPEN_CREATE))
-        WT_RET_MSG(session, ENOENT, "Directory %s does not exist in source or destination", name);
-
-    if (!dest_exist) {
-        /*
-         * The directory doesn't exist in the destination yet. We need to create it in all cases.
-         * Our underlying posix file system doesn't support creating folders via WT_FS_OPEN_CREATE
-         * so we create it manually.
-         *
-         * FIXME-WT-13971 Defaulting to permissions 0755. If the folder exists in the source should
-         * we copy the permissions from the source?
-         */
-        mkdir(name, 0755);
-    }
+    /* WiredTiger never creates directories. The user must do this themselves. */
+    if (!dest_exist)
+        WT_RET_MSG(session, ENOENT, "Directory %s does not exist in the destination", name);
 
     WT_FILE_HANDLE *fh;
-    WT_ERR(lr_fs->os_file_system->fs_open_file(
+    WT_RET(lr_fs->os_file_system->fs_open_file(
       lr_fs->os_file_system, (WT_SESSION *)session, name, lr_fh->file_type, flags, &fh));
 
     lr_fh->destination = fh;
@@ -1391,8 +1375,8 @@ __live_restore_setup_lr_fh_directory(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_
     /* There's no need for a hole list. The directory has already been fully copied */
     lr_fh->bitmap = NULL;
     lr_fh->back_pointer = lr_fs;
-err:
-    return (ret);
+
+    return (0);
 }
 
 /*
@@ -1456,7 +1440,7 @@ __live_restore_fs_atomic_copy_file(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS
 
     /* Open both files and create the temporary destination file. */
     WT_ERR(lr_fs->os_file_system->fs_open_file(
-      lr_fs->os_file_system, wt_session, source_path, type, WT_FS_OPEN_EXCLUSIVE, &source_fh));
+      lr_fs->os_file_system, wt_session, source_path, type, WT_FS_OPEN_READONLY, &source_fh));
     WT_ERR(lr_fs->os_file_system->fs_open_file(lr_fs->os_file_system, wt_session, tmp_dest_path,
       type, WT_FS_OPEN_CREATE | WT_FS_OPEN_EXCLUSIVE, &dest_fh));
 
@@ -1518,7 +1502,6 @@ __live_restore_setup_lr_fh_file_data(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_
         wt_off_t source_size;
         WT_RET(lr_fh->source->fh_size(lr_fh->source, wt_session, &source_size));
         WT_ASSERT(session, source_size != 0);
-        /* FIXME-WT-13971 - Determine if we should copy file permissions from the source. */
         __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
           "%s: Creating destination file backed by source file", lr_fh->iface.name);
         /*
@@ -1662,8 +1645,6 @@ __live_restore_fs_open_file(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, const ch
     lr_fh->iface.fh_extend_nolock = NULL;
 
     WT_ERR(__wt_rwlock_init(session, &lr_fh->lock));
-
-    /* FIXME-WT-13823 Handle the exclusive flag and other flags */
 
     if (file_type == WT_FS_OPEN_FILE_TYPE_DIRECTORY)
         WT_ERR(__live_restore_setup_lr_fh_directory(session, lr_fs, name, flags, lr_fh));

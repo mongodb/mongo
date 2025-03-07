@@ -59,7 +59,7 @@ check(const char *fmt, ...)
 
     printf("%s ", fmt);
     for (p = buf, end = p + len; p < end; p++)
-        printf("%02x", (u_char)*p & 0xff);
+        printf("%02x", (u_char)*p & 0xffu);
     printf("\n");
 
     return (ret);

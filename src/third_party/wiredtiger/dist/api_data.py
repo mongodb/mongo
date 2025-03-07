@@ -593,6 +593,10 @@ connection_runtime_config = [
                 be preferable to set to "true" if there are many collections. It can improve or
                 degrade performance depending on the workload.''',
                 type='boolean', undoc=True),
+            Config('legacy_page_visit_strategy', 'false', r'''
+                Use legacy page visit strategy for eviction. Using this option is highly discouraged
+                as it will re-introduce the bug described in WT-9121.''',
+                type='boolean'),
             ]),
     Config('eviction_checkpoint_target', '1', r'''
         perform eviction at the beginning of checkpoints to bring the dirty content in cache
@@ -1396,7 +1400,7 @@ methods = {
 'WT_SESSION.create' : Method(file_config + tiered_config +
         source_meta + index_only_config + table_only_config + [
     Config('exclusive', 'false', r'''
-        explicitly fail with EEXIST if the object exists. When false (the default), if the object 
+        explicitly fail with EEXIST if the object exists. When false (the default), if the object
         exists, silently fail without creating a new object.''',
         type='boolean'),
     Config('import', '', r'''
