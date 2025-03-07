@@ -322,5 +322,7 @@ std::vector<std::shared_ptr<Instance>> getReshardingStateMachines(OperationConte
     return result;
 }
 
+boost::optional<Status> coordinatorAbortedError();
+
 }  // namespace resharding
 }  // namespace mongo

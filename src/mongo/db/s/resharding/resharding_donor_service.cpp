@@ -75,6 +75,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorBeforeCatalogCacheRefresh);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorAfterBlockingReads);
 MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsAfterTransitionToDonatingOplogEntries);
 MONGO_FAIL_POINT_DEFINE(removeDonorDocFailpoint);
+MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsBeforeObtainingTimestamp);
 
 using namespace fmt::literals;
 
@@ -120,18 +121,6 @@ Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceStri
 }
 
 /**
- * Returns whether it is possible for the donor to be in 'state' when resharding will indefinitely
- * abort.
- */
-bool inPotentialAbortScenario(const DonorStateEnum& state) {
-    // Regardless of whether resharding will abort or commit, the donor will eventually reach state
-    // kDone.
-    // Additionally, if the donor is in state kError, it is guaranteed that the coordinator will
-    // eventually begin the abort process.
-    return state == DonorStateEnum::kError || state == DonorStateEnum::kDone;
-}
-
-/**
  * Fulfills the promise if it is not already. Otherwise, does nothing.
  */
 void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
@@ -144,6 +133,17 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp, Status error) 
     if (!sp.getFuture().isReady()) {
         sp.setError(error);
     }
+}
+
+/**
+ * Returns whether it is possible for the donor to be in 'state' when resharding will indefinitely
+ * abort.
+ */
+bool inPotentialAbortScenario(const DonorStateEnum& state) {
+    // Regardless of whether resharding will abort or commit, the donor will eventually reach state
+    // kDone. Additionally, if the donor is in state kError, it is guaranteed that the coordinator
+    // will eventually begin the abort process.
+    return state == DonorStateEnum::kError || state == DonorStateEnum::kDone;
 }
 
 class ExternalStateImpl : public ReshardingDonorService::DonorStateMachineExternalState {
@@ -378,7 +378,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                    }
 
                    // If aborted, the donor must be allowed to transition to done from any state.
-                   _transitionState(DonorStateEnum::kDone);
+                   _transitionToDone(aborted);
                }
 
                {
@@ -610,6 +610,12 @@ void ReshardingDonorService::DonorStateMachine::
         _externalState->refreshCatalogCache(opCtx.get(), _metadata.getTempReshardingNss());
         _externalState->waitForCollectionFlush(opCtx.get(), _metadata.getTempReshardingNss());
     }
+
+    reshardingDonorFailsBeforeObtainingTimestamp.execute([&](const BSONObj& data) {
+        auto errmsgElem = data["errmsg"];
+        StringData errmsg = errmsgElem ? errmsgElem.checkAndGetStringData() : "Failing for test"_sd;
+        uasserted(ErrorCodes::InternalError, errmsg);
+    });
 
     Timestamp minFetchTimestamp = [this] {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -847,12 +853,12 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }
 
-    _transitionState(DonorStateEnum::kDone);
+    _transitionToDone(false /* aborted */);
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(DonorStateEnum newState) {
     invariant(newState != DonorStateEnum::kDonatingInitialData &&
-              newState != DonorStateEnum::kError);
+              newState != DonorStateEnum::kError && newState != DonorStateEnum::kDone);
 
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(newState);
@@ -863,6 +869,10 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
     // For logging purposes.
     auto oldState = _donorCtx.getState();
     auto newState = newDonorCtx.getState();
+
+    // The donor state machine enters the kError state on unrecoverable errors and so we don't
+    // expect it to ever transition from kError except to kDone.
+    invariant(oldState != DonorStateEnum::kError || newState == DonorStateEnum::kDone);
 
     _updateDonorDocument(std::move(newDonorCtx));
 
@@ -891,6 +901,16 @@ void ReshardingDonorService::DonorStateMachine::_transitionToError(Status abortR
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(DonorStateEnum::kError);
     resharding::emplaceTruncatedAbortReasonIfExists(newDonorCtx, abortReason);
+    _transitionState(std::move(newDonorCtx));
+}
+
+void ReshardingDonorService::DonorStateMachine::_transitionToDone(bool aborted) {
+    auto newDonorCtx = _donorCtx;
+    newDonorCtx.setState(DonorStateEnum::kDone);
+    if (aborted) {
+        resharding::emplaceTruncatedAbortReasonIfExists(newDonorCtx,
+                                                        resharding::coordinatorAbortedError());
+    }
     _transitionState(std::move(newDonorCtx));
 }
 
@@ -1067,6 +1087,13 @@ CancellationToken ReshardingDonorService::DonorStateMachine::_initAbortSource(
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _abortSource = CancellationSource(stepdownToken);
+    }
+
+    if (_donorCtx.getState() == DonorStateEnum::kDone && _donorCtx.getAbortReason()) {
+        // A donor in state kDone with an abortReason is indication that the coordinator
+        // has persisted the decision and called abort on all participants. Canceling the
+        // _abortSource to avoid repeating the future chain.
+        _abortSource->cancel();
     }
 
     if (auto future = _coordinatorHasDecisionPersisted.getFuture(); future.isReady()) {

@@ -323,6 +323,23 @@ public:
         return ReshardingRecipientDocument::parse(errCtx, doc);
     }
 
+    ReshardingRecipientDocument getPersistedRecipientDocument(OperationContext* opCtx,
+                                                              UUID reshardingUUID) {
+        boost::optional<ReshardingRecipientDocument> persistedRecipientDocument;
+        PersistentTaskStore<ReshardingRecipientDocument> store(
+            NamespaceString::kRecipientReshardingOperationsNamespace);
+        store.forEach(opCtx,
+                      BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << reshardingUUID),
+                      [&](const auto& recipientDocument) {
+                          persistedRecipientDocument.emplace(recipientDocument);
+                          return false;
+                      });
+
+        ASSERT(persistedRecipientDocument);
+
+        return persistedRecipientDocument.get();
+    }
+
 private:
     TypeCollectionRecipientFields _makeRecipientFields(
         const ReshardingRecipientDocument& recipientDoc) {
@@ -848,20 +865,10 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
         // errored locally. It is therefore safe to check its local state document until
         // RecipientStateMachine::abort() is called.
         {
-            boost::optional<ReshardingRecipientDocument> persistedRecipientDocument;
-            PersistentTaskStore<ReshardingRecipientDocument> store(
-                NamespaceString::kRecipientReshardingOperationsNamespace);
-            store.forEach(opCtx.get(),
-                          BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
-                               << doc.getReshardingUUID()),
-                          [&](const auto& recipientDocument) {
-                              persistedRecipientDocument.emplace(recipientDocument);
-                              return false;
-                          });
-
-            ASSERT(persistedRecipientDocument);
+            auto persistedRecipientDocument =
+                getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
             auto persistedAbortReasonBSON =
-                persistedRecipientDocument->getMutableState().getAbortReason();
+                persistedRecipientDocument.getMutableState().getAbortReason();
             ASSERT(persistedAbortReasonBSON);
             // The actual abortReason will be slightly larger than kReshardErrorMaxBytes bytes due
             // to the primitive truncation algorithm - Check that the total size is less than
@@ -1078,6 +1085,116 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
     auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     notifyReshardingCommitting(opCtx.get(), *recipient, doc);
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinator) {
+    repl::primaryOnlyServiceTestStepUpWaitForRebuildComplete.setMode(FailPoint::alwaysOn);
+    const auto abortErrMsg = "Recieved abort from the resharding coordinator";
+
+    for (bool isAlsoDonor : {false, true}) {
+        LOGV2(8743301,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoDonor"_attr = isAlsoDonor);
+
+        auto removeRecipientDocFailpoint =
+            globalFailPointRegistry().find("removeRecipientDocFailpoint");
+        auto timesEnteredFailPoint = removeRecipientDocFailpoint->setMode(FailPoint::alwaysOn);
+
+        auto doc = makeStateDocument(isAlsoDonor);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        if (isAlsoDonor) {
+            createSourceCollection(opCtx.get(), doc);
+        }
+
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        recipient->abort(false);
+        removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+        // Ensure the node is aborting with abortReason from coordinator.
+        {
+            auto persistedRecipientDocument =
+                getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
+            auto state = persistedRecipientDocument.getMutableState().getState();
+            ASSERT_EQ(state, RecipientStateEnum::kDone);
+
+            auto abortReason = persistedRecipientDocument.getMutableState().getAbortReason();
+            ASSERT(abortReason);
+            ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::ReshardCollectionAborted);
+            ASSERT_EQ(abortReason->getStringField("errmsg").toString(), abortErrMsg);
+        }
+
+        stepDown();
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        recipient.reset();
+
+        stepUp(opCtx.get());
+        removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 2);
+
+        auto [maybeRecipient, isPausedOrShutdown] =
+            RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeRecipient);
+        ASSERT_FALSE(isPausedOrShutdown);
+        recipient = *maybeRecipient;
+
+        removeRecipientDocFailpoint->setMode(FailPoint::off);
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        checkStateDocumentRemoved(opCtx.get());
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
+    for (bool isAlsoDonor : {false, true}) {
+        LOGV2(8916100,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoDonor"_attr = isAlsoDonor);
+
+        std::string errMsg("Simulating an unrecoverable error for testing");
+        FailPointEnableBlock failpoint("reshardingRecipientFailsAfterTransitionToCloning",
+                                       BSON("errmsg" << errMsg));
+
+        auto doc = makeStateDocument(isAlsoDonor);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+        auto localTransitionToErrorFuture = recipient->awaitInStrictConsistencyOrError();
+        ASSERT_OK(localTransitionToErrorFuture.getNoThrow());
+
+        stepDown();
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        recipient.reset();
+
+        stepUp(opCtx.get());
+
+        auto [maybeRecipient, isPausedOrShutdown] =
+            RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeRecipient);
+        ASSERT_FALSE(isPausedOrShutdown);
+        recipient = *maybeRecipient;
+
+        {
+            auto persistedRecipientDocument =
+                getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
+            auto state = persistedRecipientDocument.getMutableState().getState();
+            ASSERT_EQ(state, RecipientStateEnum::kError);
+            ASSERT(persistedRecipientDocument.getMutableState().getAbortReason());
+        }
+
+        recipient->abort(false);
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    }
 }
 
 }  // namespace

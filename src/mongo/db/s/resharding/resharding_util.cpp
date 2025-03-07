@@ -402,5 +402,10 @@ boost::optional<Milliseconds> estimateRemainingRecipientTime(bool applyingBegan,
     return {};
 }
 
+boost::optional<Status> coordinatorAbortedError() {
+    return Status{ErrorCodes::ReshardCollectionAborted,
+                  "Recieved abort from the resharding coordinator"};
+}
+
 }  // namespace resharding
 }  // namespace mongo
