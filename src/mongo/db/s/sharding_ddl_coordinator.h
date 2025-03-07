@@ -343,7 +343,19 @@ protected:
 
     std::function<void()> _buildPhaseHandler(const Phase& newPhase,
                                              std::function<void()>&& handlerFn) {
+        return _buildPhaseHandler(
+            newPhase, []() { return true; }, std::move(handlerFn));
+    }
+
+    std::function<void()> _buildPhaseHandler(const Phase& newPhase,
+                                             std::function<bool()>&& shouldExecute,
+                                             std::function<void()>&& handlerFn) {
         return [=, this] {
+            // Do not execute the phase if the passed in condition is not met.
+            if (!shouldExecute()) {
+                return;
+            }
+
             const auto& currPhase = _doc.getPhase();
 
             if (currPhase > newPhase) {
@@ -356,18 +368,6 @@ protected:
             }
             return handlerFn();
         };
-    }
-
-    std::function<void()> _buildPhaseHandler(const Phase& newPhase,
-                                             std::function<bool()>&& shouldExecute,
-                                             std::function<void()>&& handlerFn) {
-        if (!shouldExecute()) {
-            // Do not execute the phase if the passed in condition is not met.
-            return [] {
-            };
-        }
-
-        return _buildPhaseHandler(newPhase, std::move(handlerFn));
     }
 
     auto _getDoc() const {
