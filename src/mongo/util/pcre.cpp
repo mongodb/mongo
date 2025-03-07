@@ -403,9 +403,20 @@ public:
                                   static_cast<uint32_t>(options),
                                   _data.get(),
                                   nullptr);
+        // From pcre2_match.c:
+        //   Returns:          > 0 => success; value is the number of ovector pairs filled
+        //                     = 0 => success, but ovector is not big enough
+        //                     = -1 => failed to match (PCRE2_ERROR_NOMATCH)
+        //                     = -2 => partial match (PCRE2_ERROR_PARTIAL)
+        //                     < -2 => some kind of unexpected problem
+        // Specifically, a return value of 0 is not necessarily an error. It only means that the
+        // output vector was not large enough to capture all matches. Whenever 'pcre2_match()'
+        // returns 0, it is ensured that all entries in the ovector have been initialized to
+        // 'PCRE2_UNSET' before. When accessing the ovector entries later via
+        // 'MatchDataImpl::operator[](size_t)', the accessed ovector entry is compared against
+        // PCRE2_UNSET, and an empty 'StringData' value is returned.
         if (matched < 0)
             _error = toErrc(matched);
-        _highestCaptureIndex = matched;
     }
 
 private:
@@ -417,7 +428,6 @@ private:
 
     const RegexImpl* _regex;
     std::error_code _error;
-    size_t _highestCaptureIndex = size_t(-1);
     std::string _inputStorage;
     StringData _input;
     size_t _startPos = 0;
