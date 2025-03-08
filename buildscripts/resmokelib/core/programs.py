@@ -164,12 +164,19 @@ def mongod_program(
     return make_process(logger, args, **process_kwargs), final_mongod_options
 
 
-def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos_options=None):
+def mongos_program(
+    logger: logging.Logger,
+    job_num: int,
+    executable: Optional[str] = None,
+    process_kwargs: Optional[dict] = None,
+    mongos_options: dict = None,
+) -> Tuple[process.Process, dict]:
     """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
     bin_version = get_binary_version(executable)
     args = [executable]
 
     mongos_options = mongos_options.copy()
+    mongos_options.setdefault("set_parameters", {})
 
     if config.NOOP_MONGO_D_S_PROCESSES:
         args[0] = os.path.basename(args[0])
