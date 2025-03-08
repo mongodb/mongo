@@ -103,8 +103,10 @@ public:
     }
 
     ~SymbolHandler() {
-        SymSetOptions(_origOptions);
-        SymCleanup(getHandle());
+        if (_processHandle.has_value()) {
+            SymSetOptions(_origOptions);
+            SymCleanup(getHandle());
+        }
     }
 
     HANDLE getHandle() const {
