@@ -48,10 +48,8 @@ public:
                                                      testCase.tempUnavailable,
                                                      session,
                                                      cacheThreshold,
-                                                     reason,
                                                      prefix,
-                                                     retCode,
-                                                     testCase.sub_level_err),
+                                                     retCode),
                            StorageUnavailableException,
                            err)
             << "Expected " << ErrorCodes::errorString(err)

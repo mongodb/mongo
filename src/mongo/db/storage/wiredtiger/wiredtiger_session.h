@@ -52,6 +52,12 @@ class RecoveryUnit;
  */
 class WiredTigerSession {
 public:
+    struct GetLastError {
+        int err = 0;
+        int sub_level_err = WT_NONE;
+        const char* err_msg = "";
+    };
+
     /**
      * Creates a new WT session on the specified connection. This session will not be cached.
      *
@@ -229,6 +235,11 @@ public:
      * Remove the recovery unit.
      */
     void detachRecoveryUnit();
+
+    /**
+     * Helper for WT_SESSION::get_last_error.
+     */
+    GetLastError getLastError();
 
 private:
     class CachedCursor {

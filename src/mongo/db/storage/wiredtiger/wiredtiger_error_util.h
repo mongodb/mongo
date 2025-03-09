@@ -50,10 +50,8 @@ void throwAppropriateException(bool txnTooLargeEnabled,
                                bool temporarilyUnavailableEnabled,
                                WT_SESSION* session,
                                double cacheThreshold,
-                               const char* reason,
                                StringData prefix,
-                               int retCode,
-                               int sub_level_err);
+                               int retCode);
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix);
 Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix);
 

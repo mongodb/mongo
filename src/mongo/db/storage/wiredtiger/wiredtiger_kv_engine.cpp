@@ -2945,20 +2945,25 @@ Status WiredTigerKVEngine::autoCompact(RecoveryUnit& ru, const AutoCompactOption
 
     WiredTigerSession* s = WiredTigerRecoveryUnit::get(&ru)->getSessionNoTxn();
     int ret = s->compact(nullptr, config.str().c_str());
-    status = wtRCToStatus(
-        ret,
-        *s,
-        "Failed to configure auto compact, please double check it is not already enabled.");
 
-    // We may get ErrorCodes::AlreadyInitialized when we try to reconfigure background compaction
-    // while it is already running.
-    uassert(status.code(), status.reason(), status != ErrorCodes::AlreadyInitialized);
+    if (ret == 0) {
+        return Status::OK();
+    }
 
-    if (!status.isOK())
-        LOGV2_ERROR(8704101,
-                    "WiredTigerKVEngine::autoCompact() failed",
-                    "config"_attr = config.str(),
-                    "error"_attr = status);
+    WiredTigerSession::GetLastError err = s->getLastError();
+
+    // We may get WT_BACKGROUND_COMPACT_ALREADY_RUNNING when we try to reconfigure background
+    // compaction while it is already running.
+    uassert(ErrorCodes::AlreadyInitialized,
+            err.err_msg,
+            err.sub_level_err != WT_BACKGROUND_COMPACT_ALREADY_RUNNING);
+
+    status = wtRCToStatus(ret, *s, "Failed to configure auto compact");
+
+    LOGV2_ERROR(8704101,
+                "WiredTigerKVEngine::autoCompact() failed",
+                "config"_attr = config.str(),
+                "error"_attr = status);
     return status;
 }
 

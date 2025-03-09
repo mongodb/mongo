@@ -118,10 +118,19 @@ void throwAppropriateException(bool txnTooLargeEnabled,
                                bool temporarilyUnavailableEnabled,
                                WT_SESSION* session,
                                double cacheThreshold,
-                               const char* reason,
                                StringData prefix,
-                               int retCode,
-                               int sub_level_err) {
+                               int retCode) {
+
+    // These values are initialized by WT_SESSION::get_last_error and should only be accessed if the
+    // session is not null.
+    int err = 0;
+    int sub_level_err = WT_NONE;
+    const char* reason = "";
+
+    if (session) {
+        session->get_last_error(session, &err, &sub_level_err, &reason);
+    }
+
     if ((txnTooLargeEnabled || temporarilyUnavailableEnabled) &&
         rollbackReasonWasCachePressure(sub_level_err)) {
         throwCachePressureExceptionIfAppropriate(
@@ -140,45 +149,6 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     if (retCode == 0)
         return Status::OK();
 
-    // These values are initialized by WT_SESSION::get_last_error and should only be accessed if the
-    // session is not null.
-    int err = 0;
-    int sub_level_err = WT_NONE;
-    const char* err_msg = "";
-
-
-    // Sub-level error codes are defined at the session level only. Since connection level calls use
-    // wtRCToStatus as well, these connection level calls may pass in a nullptr for the session.
-    if (session) {
-        session->get_last_error(session, &err, &sub_level_err, &err_msg);
-    }
-
-    // Convert sub-level error codes to more granular statuses if applicable.
-    auto subLevelStatus = [&]() -> Status {
-        if (sub_level_err == WT_NONE) {
-            return Status::OK();
-        }
-
-        // We do not convert WT_ROLLBACK error codes into statuses, so we return Status::OK here
-        // and instead handle them differently below.
-        if (retCode == WT_ROLLBACK) {
-            return Status::OK();
-        }
-
-        auto s = generateContextStrStream(prefix, err_msg, err);
-
-        if (sub_level_err == WT_BACKGROUND_COMPACT_ALREADY_RUNNING) {
-            return Status(ErrorCodes::AlreadyInitialized, s);
-        }
-
-        // Return OK when we have an unhandled sublevel error code.
-        return Status::OK();
-    }();
-
-    if (!subLevelStatus.isOK()) {
-        return subLevelStatus;
-    }
-
     if (retCode == WT_ROLLBACK) {
         double cacheThreshold = gTransactionTooLargeForCacheThreshold.load();
         bool txnTooLargeEnabled = cacheThreshold < 1.0;
@@ -188,10 +158,8 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
                                   temporarilyUnavailableEnabled,
                                   session,
                                   cacheThreshold,
-                                  err_msg,
                                   prefix,
-                                  retCode,
-                                  sub_level_err);
+                                  retCode);
     }
 
     // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.

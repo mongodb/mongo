@@ -233,4 +233,10 @@ void WiredTigerSession::detachRecoveryUnit() {
     }
 }
 
+WiredTigerSession::GetLastError WiredTigerSession::getLastError() {
+    GetLastError getLastError;
+    this->get_last_error(&getLastError.err, &getLastError.sub_level_err, &getLastError.err_msg);
+    return getLastError;
+}
+
 }  // namespace mongo
