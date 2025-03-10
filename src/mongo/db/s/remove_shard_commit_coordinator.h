@@ -70,11 +70,8 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
-    // Checks that the shard still exists in the cluster and that the draining flag is still set.
-    void _checkShardExistsAndIsDraining(OperationContext* opCtx);
-
-    // Joins migrations on the config server if we are transitioning from dedicated and checks
-    // if there are range deletions to wait for.
+    // Joins migrations on the config server if we are transitioning from dedicated and checks if
+    // there are range deletions to wait for.
     void _joinMigrationsAndCheckRangeDeletions();
 
     // Stops ongoing ddl operations (excluding topology changes) and waits for any ongoing

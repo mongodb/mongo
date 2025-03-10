@@ -40,7 +40,6 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kCheckPreconditions: "checkPreconditions"
             kJoinMigrationsAndCheckRangeDeletions: "joinMigrationsAndCheckRangeDeletions"
             kStopDDLsAndCleanupData: "stopDDLsAndCleanupData"
             kCommit: "commit"
