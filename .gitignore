@@ -185,6 +185,9 @@ CMakeLists.txt
 .vscode/**
 !.vscode/linux-virtual-workstation.code-workspace
 
+# Zed project
+.zed
+
 # Visual Studio projects
 .vs/
 /x64/
