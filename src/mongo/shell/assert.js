@@ -13,7 +13,7 @@ doassert = function(msg, obj) {
             print(new Date().toISOString() + " assert: " + msg);
     }
 
-    var ex;
+    let ex;
     if (obj) {
         ex = _getErrorWithCode(obj, msg);
     } else {
@@ -28,11 +28,11 @@ doassert = function(msg, obj) {
 // Sort doc/obj fields and return new sorted obj
 sortDoc = function(doc) {
     // Helper to sort the elements of the array
-    var sortElementsOfArray = function(arr) {
-        var newArr = [];
+    const sortElementsOfArray = function(arr) {
+        let newArr = [];
         if (!arr || arr.constructor != Array)
             return arr;
-        for (var i = 0; i < arr.length; i++) {
+        for (let i = 0; i < arr.length; i++) {
             newArr.push(sortDoc(arr[i]));
         }
         return newArr;
@@ -46,27 +46,27 @@ sortDoc = function(doc) {
     if (doc.constructor == Array)
         return sortElementsOfArray(doc);
 
-    var newDoc = {};
-    var fields = Object.keys(doc);
-    if (fields.length > 0) {
-        fields.sort();
-        for (var i = 0; i < fields.length; i++) {
-            var field = fields[i];
-            if (doc.hasOwnProperty(field)) {
-                var tmp = doc[field];
+    let fields = Object.keys(doc);
+    if (fields.length === 0) {
+        return doc;
+    }
 
-                if (tmp) {
-                    // Sort recursively for Arrays and Objects (including bson ones)
-                    if (tmp.constructor == Array)
-                        tmp = sortElementsOfArray(tmp);
-                    else if (tmp._bson || tmp.constructor == Object)
-                        tmp = sortDoc(tmp);
-                }
-                newDoc[field] = tmp;
+    let newDoc = {};
+    fields.sort();
+    for (let i = 0; i < fields.length; i++) {
+        const field = fields[i];
+        if (doc.hasOwnProperty(field)) {
+            let tmp = doc[field];
+
+            if (tmp) {
+                // Sort recursively for Arrays and Objects (including bson ones)
+                if (tmp.constructor == Array)
+                    tmp = sortElementsOfArray(tmp);
+                else if (tmp._bson || tmp.constructor == Object)
+                    tmp = sortDoc(tmp);
             }
+            newDoc[field] = tmp;
         }
-    } else {
-        newDoc = doc;
     }
 
     return newDoc;
@@ -79,7 +79,7 @@ sortDoc = function(doc) {
  * message 'excMsg' upon catching such a thrown exception.
  */
 function _convertExceptionToReturnStatus(func, excMsg) {
-    var safeFunc = () => {
+    const safeFunc = () => {
         try {
             return func();
         } catch (e) {
@@ -115,7 +115,7 @@ assert = (function() {
                     ...(attr.res._mongo && {connection: attr.res._mongo})
                 };
             }
-            doassert(_buildAssertionMessage(msg, prefixOverride || prefix), attr);
+            doassert(_buildAssertionMessage(msg, prefixOverride ?? prefix), attr);
         }
         doassert(_buildAssertionMessage(msg, prefix), attr?.res);
     }
@@ -139,7 +139,7 @@ assert = (function() {
     }
 
     function _buildAssertionMessage(msg, prefix) {
-        var fullMessage = '';
+        let fullMessage = '';
 
         if (prefix) {
             fullMessage += prefix;
@@ -156,14 +156,14 @@ assert = (function() {
         return fullMessage;
     }
 
-    var assert = function(b, msg, attr) {
+    var assert = function(value, msg, attr) {
         if (arguments.length > 3) {
             _doassert("Too many parameters to assert().");
         }
 
         _validateAssertionMessage(msg, attr);
 
-        if (b) {
+        if (value) {
             return;
         }
 
@@ -306,12 +306,12 @@ assert = (function() {
     };
 
     assert.hasFields = function(result, arr, msg, attr) {
-        var count = 0;
         if (!Array.isArray(arr)) {
             _doassert("The second argument to assert.hasFields must be an array.");
         }
 
-        for (var field in result) {
+        let count = 0;
+        for (let field in result) {
             if (arr.includes(field)) {
                 count += 1;
             }
@@ -325,45 +325,45 @@ assert = (function() {
         }
     };
 
-    assert.contains = function(o, arr, msg, attr) {
-        var wasIn = false;
+    assert.contains = function(element, arr, msg, attr) {
         if (!Array.isArray(arr)) {
             _doassert("The second argument to assert.contains() must be an array.");
         }
 
-        for (var i = 0; i < arr.length; i++) {
-            wasIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
-            if (wasIn) {
-                break;
+        for (let i = 0; i < arr.length; i++) {
+            const comp = arr[i];
+            const satisfied = comp == element ||
+                ((comp != null && element != null) && friendlyEqual(comp, element));
+            if (satisfied) {
+                return;
             }
         }
 
-        if (!wasIn) {
-            _doassert(msg,
-                      tojson(o) + " was not in " + tojson(arr),
-                      {o, arr, ...attr},
-                      "assert.contains() failed");
-        }
+        _doassert(msg,
+                  tojson(element) + " was not in " + tojson(arr),
+                  {element, arr, ...attr},
+                  "assert.contains() failed");
     };
 
-    assert.doesNotContain = function(o, arr, msg, attr) {
+    assert.doesNotContain = function(element, arr, msg, attr) {
         if (!Array.isArray(arr)) {
             _doassert("The second argument to assert.doesNotContain must be an array.");
         }
 
-        for (var i = 0; i < arr.length; i++) {
-            const isIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
-            if (isIn) {
+        for (let i = 0; i < arr.length; i++) {
+            const comp = arr[i];
+            const match = comp == element ||
+                ((comp != null && element != null) && friendlyEqual(comp, element));
+            if (match) {
                 _doassert(msg,
-                          tojson(o) + " is in " + tojson(arr),
-                          {o, arr, ...attr},
+                          tojson(element) + " is in " + tojson(arr),
+                          {element, arr, ...attr},
                           "assert.doesNotContain() failed");
             }
         }
     };
 
     assert.containsPrefix = function(prefix, arr, msg, attr) {
-        var wasIn = false;
         if (typeof (prefix) !== "string") {
             _doassert("The first argument to containsPrefix must be a string.");
         }
@@ -376,18 +376,16 @@ assert = (function() {
                 continue;
             }
 
-            wasIn = arr[i].startsWith(prefix);
-            if (wasIn) {
-                break;
+            const satisfied = arr[i].startsWith(prefix);
+            if (satisfied) {
+                return;
             }
         }
 
-        if (!wasIn) {
-            _doassert(msg,
-                      tojson(prefix) + " was not a prefix in " + tojson(arr),
-                      {prefix, arr, ...attr},
-                      "assert.containsPrefix() failed");
-        }
+        _doassert(msg,
+                  tojson(prefix) + " was not a prefix in " + tojson(arr),
+                  {prefix, arr, ...attr},
+                  "assert.containsPrefix() failed");
     };
 
     /*
@@ -395,25 +393,21 @@ assert = (function() {
      * or more than 'timeout' milliseconds have elapsed. Throws an exception with
      * message 'msg' after timing out.
      */
-    assert.soon = function(func, msg, timeout, interval, {runHangAnalyzer = true} = {}, attr) {
+    assert.soon = function(
+        func, msg, timeout, interval = 200, {runHangAnalyzer = true} = {}, attr) {
         _validateAssertionMessage(msg, attr);
 
-        var start = new Date();
+        const start = new Date();
 
-        if (TestData && TestData.inEvergreen) {
-            timeout = timeout || 10 * 60 * 1000;
+        if (TestData?.inEvergreen) {
+            timeout ??= 10 * 60 * 1_000;  // 10 min
         } else {
-            timeout = timeout || 90 * 1000;
+            timeout ??= 90 * 1_000;  // 90 sec
         }
 
-        interval = interval || 200;
-
-        var msgPrefix = "assert.soon failed (timeout " + timeout + "ms): " + func;
-
-        if (msg) {
-            if (typeof (msg) != "function") {
-                msgPrefix = "assert.soon failed (timeout " + timeout + "ms), msg";
-            }
+        let msgPrefix = `assert.soon failed (timeout ${timeout}ms): ${func}`;
+        if (msg && typeof (msg) != "function") {
+            msgPrefix = `assert.soon failed (timeout ${timeout}ms), msg`;
         }
 
         while (1) {
@@ -451,9 +445,9 @@ assert = (function() {
      */
     assert.soonNoExcept = function(
         func, msg, timeout, interval, {runHangAnalyzer = true} = {}, attr) {
-        var safeFunc =
+        const safeFunc =
             _convertExceptionToReturnStatus(func, "assert.soonNoExcept caught exception");
-        var getFunc = () => {
+        const getFunc = () => {
             // No TestData means not running from resmoke. Non-resmoke tests usually don't trace
             // exceptions.
             if (typeof TestData === "undefined") {
@@ -485,9 +479,8 @@ assert = (function() {
      * it defaults to 0.
      */
     assert.retry = function(
-        func, msg, num_attempts, intervalMS, {runHangAnalyzer = true} = {}, attr) {
-        var intervalMS = intervalMS || 0;
-        var attempts_made = 0;
+        func, msg, num_attempts, intervalMS = 0, {runHangAnalyzer = true} = {}, attr) {
+        let attempts_made = 0;
         while (attempts_made < num_attempts) {
             if (func()) {
                 return;
@@ -519,7 +512,7 @@ assert = (function() {
      */
     assert.retryNoExcept = function(
         func, msg, num_attempts, intervalMS, {runHangAnalyzer = true} = {}, attr) {
-        var safeFunc =
+        const safeFunc =
             _convertExceptionToReturnStatus(func, "assert.retryNoExcept caught exception");
         assert.retry(safeFunc, msg, num_attempts, intervalMS, {runHangAnalyzer}, attr);
     };
@@ -546,11 +539,10 @@ assert = (function() {
         return res;
     };
 
-    assert.time = function(f, msg, timeout /*ms*/, {runHangAnalyzer = true} = {}, attr) {
+    assert.time = function(f, msg, timeout = 30_000 /*ms*/, {runHangAnalyzer = true} = {}, attr) {
         _validateAssertionMessage(msg, attr);
 
-        var start = new Date();
-        timeout = timeout || 30000;
+        const start = new Date();
 
         let res;
         if (typeof (f) == "string") {
@@ -560,25 +552,23 @@ assert = (function() {
         }
 
         const diff = (new Date()).getTime() - start.getTime();
-        if (diff > timeout) {
-            const msgPrefix =
-                "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg";
-            msg = _buildAssertionMessage(msg);
-            if (runHangAnalyzer) {
-                msg = msg +
-                    " The hang analyzer is automatically called in assert.time functions. " +
-                    "If you are *expecting* assert.soon to possibly fail, call assert.time " +
-                    "with {runHangAnalyzer: false} as the fourth argument " +
-                    "(you can fill unused arguments with `undefined`).";
-                print(msg + " Running hang analyzer from assert.time.");
-                MongoRunner.runHangAnalyzer();
-            }
-            _doassert(msg,
-                      msgPrefix,
-                      {timeMS: diff, timeoutMS: timeout, ...attr},
-                      "assert.time() failed");
+        if (diff <= timeout) {
+            return res;
         }
-        return res;
+
+        const msgPrefix =
+            "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg";
+        msg = _buildAssertionMessage(msg);
+        if (runHangAnalyzer) {
+            msg = msg + " The hang analyzer is automatically called in assert.time functions. " +
+                "If you are *expecting* assert.soon to possibly fail, call assert.time " +
+                "with {runHangAnalyzer: false} as the fourth argument " +
+                "(you can fill unused arguments with `undefined`).";
+            print(msg + " Running hang analyzer from assert.time.");
+            MongoRunner.runHangAnalyzer();
+        }
+        _doassert(
+            msg, msgPrefix, {timeMS: diff, timeoutMS: timeout, ...attr}, "assert.time() failed");
     };
 
     function assertThrowsHelper(func, params) {
@@ -712,7 +702,7 @@ assert = (function() {
         }
 
         // A write command response may have ok:1 but write errors.
-        if (!ignoreWriteErrors && raw.hasOwnProperty("writeErrors") && raw.writeErrors.length > 0) {
+        if (!ignoreWriteErrors && raw.writeErrors?.length > 0) {
             return false;
         }
 
@@ -745,9 +735,7 @@ assert = (function() {
             if (res.hasWriteConcernError() && res.getWriteConcernError().errmsg === timeoutMsg) {
                 isWriteConcernTimeout = true;
             }
-        } else if ((res.hasOwnProperty("errmsg") && res.errmsg === timeoutMsg) ||
-                   (res.hasOwnProperty("writeConcernError") &&
-                    res.writeConcernError.errmsg === timeoutMsg)) {
+        } else if (res?.errmsg === timeoutMsg || res.writeConcernError?.errmsg === timeoutMsg) {
             isWriteConcernTimeout = true;
         }
         if (isWriteConcernTimeout) {
@@ -763,9 +751,8 @@ assert = (function() {
         // However, they will also abort transactions and continue running rather than fail the
         // test, so we don't want to run the hang analyzer when the error has a
         // TransientTransactionError error label.
-        const isTransientTxnError = res.hasOwnProperty("errorLabels") &&
-            res.errorLabels.includes("TransientTransactionError");
-        const isLockTimeout = res.hasOwnProperty("code") && ErrorCodes.LockTimeout === res.code;
+        const isTransientTxnError = res.errorLabels?.includes("TransientTransactionError");
+        const isLockTimeout = res?.code === ErrorCodes.LockTimeout;
         if (isLockTimeout && !isTransientTxnError) {
             print("Running hang analyzer for lock timeout " + tojson(res));
             MongoRunner.runHangAnalyzer();
@@ -983,7 +970,7 @@ assert = (function() {
     };
 
     assert.writeOK = function(res, msg, {ignoreWriteConcernErrors} = {}) {
-        var errMsg = null;
+        let errMsg = null;
 
         if (res instanceof WriteResult) {
             if (res.hasWriteError()) {
@@ -1026,8 +1013,8 @@ assert = (function() {
             _doassert("assert.writeErrorWithCode called with undefined error code");
         }
 
-        var errMsg = null;
-        var writeErrorCodes = new Set();
+        let errMsg = null;
+        const writeErrorCodes = new Set();
 
         if (res instanceof WriteResult) {
             if (res.hasWriteError()) {
@@ -1083,16 +1070,16 @@ assert = (function() {
         return res;
     };
 
-    assert.isnull = function(what, msg, attr) {
+    assert.isnull = function(value, msg, attr) {
         _validateAssertionMessage(msg, attr);
 
-        if (what == null) {
+        if (value == null) {
             return;
         }
 
         _doassert(msg,
-                  "supposed to be null  was: " + tojson(what),
-                  {what, ...attr},
+                  "supposed to be null, was: " + tojson(value),
+                  {value, ...attr},
                   "assert.isnull() failed");
     };
 
@@ -1188,12 +1175,12 @@ assert = (function() {
     // 'a' and 'b' are sufficiently close, and, if they're not, 'msg' is set to a descriptive error
     // string.
     function _isClose(a, b, places = 4) {
-        var absoluteError = Math.abs(a - b);
+        const absoluteError = Math.abs(a - b);
         if (Math.round(absoluteError * Math.pow(10, places)) === 0) {
             return [true, null];
         }
         // This treats 'places' as significant figures.
-        var relativeError = Math.abs(absoluteError / b);
+        const relativeError = Math.abs(absoluteError / b);
         if (Math.round(relativeError * Math.pow(10, places)) === 0) {
             return [true, null];
         }
@@ -1240,15 +1227,10 @@ assert = (function() {
      * Asserts if the times in millis are not withing delta milliseconds, in either direction.
      * Default Delta: 1 second
      */
-    assert.closeWithinMS = function(a, b, msg, deltaMS, attr) {
-        "use strict";
-
-        if (deltaMS === undefined) {
-            deltaMS = 1000;
-        }
-        var aMS = a instanceof Date ? a.getTime() : a;
-        var bMS = b instanceof Date ? b.getTime() : b;
-        var actualDelta = Math.abs(Math.abs(aMS) - Math.abs(bMS));
+    assert.closeWithinMS = function(a, b, msg, deltaMS = 1_000, attr) {
+        const aMS = a instanceof Date ? a.getTime() : a;
+        const bMS = b instanceof Date ? b.getTime() : b;
+        const actualDelta = Math.abs(Math.abs(aMS) - Math.abs(bMS));
 
         if (actualDelta <= deltaMS) {
             return;
@@ -1265,11 +1247,12 @@ assert = (function() {
     };
 
     assert.includes = function(haystack, needle, msg, attr) {
-        if (!haystack.includes(needle)) {
-            var prefix = `string [${haystack}] does not include [${needle}]`;
-
-            _doassert(msg, prefix, {haystack, needle, ...attr}, "assert.includes() failed");
+        if (haystack.includes(needle)) {
+            return;
         }
+
+        const prefix = `string [${haystack}] does not include [${needle}]`;
+        _doassert(msg, prefix, {haystack, needle, ...attr}, "assert.includes() failed");
     };
 
     assert.noAPIParams = function(cmdOptions) {

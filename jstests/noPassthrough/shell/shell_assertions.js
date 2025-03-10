@@ -853,13 +853,13 @@ tests.push(function assertHasFieldsJsonFormat() {
 tests.push(function assertContainsJsonFormat() {
     assertThrowsErrorWithJson(() => {
         assert.contains(3, [14, 15, 926], "Oops!", kAttr);
-    }, {msg: "assert.contains() failed : Oops!", attr: {o: 3, arr: [14, 15, 926], ...kAttr}});
+    }, {msg: "assert.contains() failed : Oops!", attr: {element: 3, arr: [14, 15, 926], ...kAttr}});
 });
 
 tests.push(function assertDoesNotContainJsonFormat() {
     assertThrowsErrorWithJson(() => {
         assert.doesNotContain(3, [3, 23], "Oops!", kAttr);
-    }, {msg: "assert.doesNotContain() failed : Oops!", attr: {o: 3, arr: [3, 23], ...kAttr}});
+    }, {msg: "assert.doesNotContain() failed : Oops!", attr: {element: 3, arr: [3, 23], ...kAttr}});
 });
 
 tests.push(function assertContainsPrefixJsonFormat() {
@@ -1102,7 +1102,7 @@ tests.push(function assertWriteErrorWithCodeJsonFormat() {
 tests.push(function assertIsNullJsonFormat() {
     assertThrowsErrorWithJson(() => {
         assert.isnull({ok: 1}, "Oops!", kAttr);
-    }, {msg: "assert.isnull() failed : Oops!", attr: {what: {ok: 1}, ...kAttr}});
+    }, {msg: "assert.isnull() failed : Oops!", attr: {value: {ok: 1}, ...kAttr}});
 });
 
 tests.push(function assertLTJsonFormat() {
