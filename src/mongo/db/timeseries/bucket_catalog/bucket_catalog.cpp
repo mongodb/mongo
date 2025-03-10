@@ -139,6 +139,53 @@ void updateBucketFetchAndQueryStats(const ReopeningContext& context,
 }
 
 /**
+ * Determines if 'measurement' will cause rollover to 'bucket'.
+ * Returns the rollover reason and marks the bucket with rollover action if it needs to be rolled
+ * over.
+ */
+RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
+                                                     Stripe& stripe,
+                                                     WithLock stripeLock,
+                                                     Bucket& bucket,
+                                                     const BSONObj& measurement,
+                                                     const Date_t& measurementTimestamp,
+                                                     const TimeseriesOptions& options,
+                                                     const StringDataComparator* comparator,
+                                                     uint64_t storageCacheSizeBytes,
+                                                     ExecutionStatsController& stats) {
+    Bucket::NewFieldNames newFieldNamesToBeInserted;
+    Sizes sizesToBeAdded;
+    calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
+                                       bucket,
+                                       measurement,
+                                       options.getMetaField(),
+                                       newFieldNamesToBeInserted,
+                                       sizesToBeAdded);
+    auto rolloverReason = internal::determineRolloverReason(
+        measurement,
+        options,
+        bucket,
+        catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
+        sizesToBeAdded,
+        measurementTimestamp,
+        storageCacheSizeBytes,
+        comparator,
+        stats);
+    auto rolloverAction = getRolloverAction(rolloverReason);
+
+    if (rolloverAction == RolloverAction::kNone) {
+        // The measurement can be inserted into the open bucket.
+        internal::markBucketNotIdle(stripe, stripeLock, bucket);
+    } else {
+        // Update the bucket's 'rolloverAction'.
+        bucket.rolloverAction = rolloverAction;
+        internal::updateRolloverStats(stats, rolloverReason);
+    }
+
+    return rolloverReason;
+}
+
+/**
  * Returns an open bucket from stripe that can fit 'measurement'. If none available, returns
  * nullptr.
  * Makes the decision to skip query-based reopening if 'measurementTimestamp' is later than
@@ -169,35 +216,22 @@ Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
 
     for (const auto& potentialBucket : potentialBuckets) {
         // Check if the measurement can fit in the potential bucket.
-        Bucket::NewFieldNames newFieldNamesToBeInserted;
-        Sizes sizesToBeAdded;
-        calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
-                                           *potentialBucket,
-                                           measurement,
-                                           options.getMetaField(),
-                                           newFieldNamesToBeInserted,
-                                           sizesToBeAdded);
-        auto rolloverReason = internal::determineRolloverReason(
-            measurement,
-            options,
-            *potentialBucket,
-            catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
-            sizesToBeAdded,
-            measurementTimestamp,
-            storageCacheSizeBytes,
-            comparator,
-            stats);
-        auto rolloverAction = getRolloverAction(rolloverReason);
+        auto rolloverReason = determineBucketRolloverForMeasurement(catalog,
+                                                                    stripe,
+                                                                    stripeLock,
+                                                                    *potentialBucket,
+                                                                    measurement,
+                                                                    measurementTimestamp,
+                                                                    options,
+                                                                    comparator,
+                                                                    storageCacheSizeBytes,
+                                                                    stats);
 
-        if (rolloverAction == RolloverAction::kNone) {
+        if (rolloverReason == RolloverReason::kNone) {
             // The measurement can be inserted into the open bucket.
             internal::markBucketNotIdle(stripe, stripeLock, *potentialBucket);
             return potentialBucket;
         }
-
-        // Update the bucket's 'rolloverAction'.
-        potentialBucket->rolloverAction = rolloverAction;
-        internal::updateRolloverStats(stats, rolloverReason);
 
         // Skip query based reopening when 'measurementTimestamp' is later than the
         // current open bucket's time range.
@@ -994,7 +1028,21 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
             compressAndWriteBucketFunc,
             stats);
         if (swReopenedBucket.isOK() && swReopenedBucket.getValue()) {
-            return *swReopenedBucket.getValue();
+            auto& reopenedBucket = *swReopenedBucket.getValue();
+            auto rolloverReason = determineBucketRolloverForMeasurement(catalog,
+                                                                        stripe,
+                                                                        stripeLock,
+                                                                        reopenedBucket,
+                                                                        measurement,
+                                                                        measurementTimestamp,
+                                                                        options,
+                                                                        comparator,
+                                                                        storageCacheSizeBytes,
+                                                                        stats);
+            if (rolloverReason == RolloverReason::kNone) {
+                // Use the reopened bucket if the measurement can fit there.
+                return reopenedBucket;
+            }
         }
 
         reopeningStatus = swReopenedBucket.getStatus();
