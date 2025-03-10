@@ -161,8 +161,22 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 }
 
 CreateCollectionResponse createCollection(OperationContext* opCtx,
-                                          ShardsvrCreateCollection request,
+                                          const ShardsvrCreateCollection& request,
                                           bool againstFirstShard) {
+
+    const auto& cmdResponse = createCollectionNoThrowOnError(opCtx, request, againstFirstShard);
+    const auto& remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+
+    uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+    uassertStatusOK(getWriteConcernStatusFromCommandResult(remoteResponse.data));
+
+    return CreateCollectionResponse::parse(IDLParserContext("createCollection"),
+                                           remoteResponse.data);
+}
+
+AsyncRequestsSender::Response createCollectionNoThrowOnError(OperationContext* opCtx,
+                                                             ShardsvrCreateCollection request,
+                                                             bool againstFirstShard) {
     const auto& nss = request.getNamespace();
 
     if (MONGO_unlikely(hangCreateUnshardedCollection.shouldFail()) && request.getUnsplittable() &&
@@ -216,17 +230,28 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
                     "nss"_attr = nss,
                     "dataShard"_attr = *requestWithRandomDataShard.getDataShard());
 
-        try {
-            return createCollection(opCtx, std::move(requestWithRandomDataShard));
-        } catch (const ExceptionFor<ErrorCodes::AlreadyInitialized>&) {
-            // If the collection already exists but we randomly selected a dataShard that turns out
+        const auto& cmdResponse =
+            createCollectionNoThrowOnError(opCtx, std::move(requestWithRandomDataShard));
+        const auto status =
+            getStatusFromCommandResult(uassertStatusOK(cmdResponse.swResponse).data);
+
+        static const std::unordered_set<ErrorCodes::Error> errorsToRetryWithoutDataShard = {
+            // If the collection already exists but we randomly selected a dataShard that turns
+            // out
             // to be different than the current one, then createCollection will fail with
-            // AlreadyInitialized error. However, this error can also occur for other reasons. So
+            // AlreadyInitialized error. However, this error can also occur for other reasons.
+            // So
             // let's run createCollection again without selecting a random dataShard.
-        } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
+            ErrorCodes::AlreadyInitialized,
             // It's possible that the dataShard no longer exists. For example, the config shard
             // may have been migrated to a dedicated config server during the test.
             // In this case, the original request will be used to create the collection.
+            ErrorCodes::ShardNotFound};
+
+        if (errorsToRetryWithoutDataShard.find(status.code()) ==
+            errorsToRetryWithoutDataShard.end()) {
+            // Don't retry the operation, return the response we got from the shard.
+            return cmdResponse;
         }
     }
     // Note that this check must run separately to manage the case a request already comes with
@@ -286,16 +311,18 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
         }
     }();
 
-    const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-    uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+    const auto remoteResponseData = uassertStatusOK(cmdResponse.swResponse).data;
 
-    auto createCollResp =
-        CreateCollectionResponse::parse(IDLParserContext("createCollection"), remoteResponse.data);
+    const auto status = getStatusFromCommandResult(remoteResponseData);
+    if (status.isOK()) {
+        auto createCollResp = CreateCollectionResponse::parse(IDLParserContext("createCollection"),
+                                                              remoteResponseData);
 
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    catalogCache->onStaleCollectionVersion(nss, createCollResp.getCollectionVersion());
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        catalogCache->onStaleCollectionVersion(nss, createCollResp.getCollectionVersion());
+    }
 
-    return createCollResp;
+    return cmdResponse;
 }
 
 void createCollectionWithRouterLoop(OperationContext* opCtx,

@@ -37,7 +37,6 @@ imports:
 structs:
     CreateIndexesReply:
         description: "Reply to 'createIndexes' command"
-        strict: true
         is_command_reply: true
         fields:
             numIndexesBefore:

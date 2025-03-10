@@ -3827,14 +3827,13 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
         // TODO SERVER-100935 updateRole does not return WCE
         // TODO SERVER-100935 updateUser does not return WCE
 
-        // TODO SERVER-100936 create does not return WCE
         // TODO SERVER-100937 dropIndexes does not return WCE
 
         // TODO SERVER-100939 setFeatureCompatibilityVersion does not return WCE
 
         // TODO SERVER-100940 enableSharding does not return WCE
         if (clusterType == "sharded" &&
-            (shardedDDLCommandsRequiringMajorityCommit.includes(command) || command == "create" ||
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
              command == "dropIndexes" || command == "dropAllUsersFromDatabase" ||
              command == "grantPrivilegesToRole" || command == "grantRolesToRole" ||
              command == "grantRolesToUser" || command == "revokePrivilegesFromRole" ||
@@ -3847,9 +3846,8 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
     }
 
     if (testCase == "success") {
-        // TODO SERVER-100936 create does not return WCE
         if (clusterType == "sharded" &&
-            (shardedDDLCommandsRequiringMajorityCommit.includes(command) || command == "create")) {
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command))) {
             jsTestLog("Skipping " + command + " test for success case.");
             return true;
         }
