@@ -830,6 +830,16 @@ if (isTrackUnshardedUponCreationEnabled) {
     quit();
 }
 
+// TODO (SERVER-101777): This test makes a lot of assumptions about database versions stored in
+// shards that are not the primary shard. This test shuld be re-written thinking about that shards
+// are database authoritative and don't need to refresh anymore.
+const isAuthoritativeShardEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "ShardAuthoritativeDbMetadata");
+if (isAuthoritativeShardEnabled) {
+    st.stop();
+    quit();
+}
+
 const listCommandsRes = st.s0.adminCommand({listCommands: 1});
 assert.commandWorked(listCommandsRes);
 print("--------------------------------------------");

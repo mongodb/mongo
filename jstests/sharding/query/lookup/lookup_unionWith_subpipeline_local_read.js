@@ -469,9 +469,13 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_view_of_un
 // This leads the pipeline targeter to run a remote request and refresh. Now that collections are
 // tracked, the aggregation is sent using ShardVersion, which is never stale due to an
 // AutoGetCollection in the pipeline execution path that causes always to refresh if not installed.
+// Also, for the authoritative shards, the secondaries will wait internally when they are yet to
+// catch up. This causes them to be always up to date.
 const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-if (!isTrackUnshardedUponCreationEnabled) {
+const isAuthoritativeShardEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "ShardAuthoritativeDbMetadata");
+if (!isTrackUnshardedUponCreationEnabled && !isAuthoritativeShardEnabled) {
     // Test $lookup when it is routed to a secondary which is not yet aware of the foreign
     // collection.
     st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});

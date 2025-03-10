@@ -29,6 +29,16 @@ if (isTrackUnshardedUponCreationEnabled) {
     quit();
 }
 
+// TODO (SERVER-101777): This test makes a lot of assumptions about database versions stored in
+// shards that are not the primary shard. This test shuld be re-written thinking about that shards
+// are database authoritative and don't need to refresh anymore.
+const isAuthoritativeShardEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "ShardAuthoritativeDbMetadata");
+if (isAuthoritativeShardEnabled) {
+    st.stop();
+    quit();
+}
+
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 // Set up two unsharded collections in different databases with shard0 as their primary.

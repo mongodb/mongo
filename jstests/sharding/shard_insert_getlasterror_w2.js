@@ -1,5 +1,10 @@
 // replica set as solo shard
 // TODO: Add assertion code that catches hang
+//
+// @tags: [
+//     # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard-local catalog
+//     incompatible_with_authoritative_shards,
+// ]
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
