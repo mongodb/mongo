@@ -2,14 +2,11 @@
  * Tests the interaction of the refineCollectionShardKey command with the range deleter.
  */
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 

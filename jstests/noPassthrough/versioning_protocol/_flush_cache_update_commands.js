@@ -11,9 +11,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 function checkTimestampConsistencyInPersistentMetadata(
     dbName, nss, dbTimestampInConfig, collTimestampInConfig) {
     // Checking consistency on local shard collection: config.cache.database

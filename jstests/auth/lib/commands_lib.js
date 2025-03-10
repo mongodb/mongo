@@ -91,14 +91,8 @@ one argument, the connection object.
 
 */
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
-import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine_utils.js";
 
 // constants
 

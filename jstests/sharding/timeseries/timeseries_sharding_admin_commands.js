@@ -6,11 +6,8 @@
  * ]
  */
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-
-TestData.skipCheckShardFilteringMetadata = true;
 
 // Connections.
 const mongo = new ShardingTest({shards: 2, rs: {nodes: 3}});

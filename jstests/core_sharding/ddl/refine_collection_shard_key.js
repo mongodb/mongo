@@ -17,9 +17,6 @@ import {
 } from "jstests/sharding/libs/refine_collection_shard_key_common.js";
 import {getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 const kDbName = db.getName();
 const kCollName = jsTestName();
 const kNsName = kDbName + "." + kCollName;

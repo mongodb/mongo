@@ -9,13 +9,10 @@
  * ]
  */
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
-import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-import {defragmentationUtil} from "jstests/sharding/libs/defragmentation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {defragmentationUtil} from "jstests/sharding/libs/defragmentation_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 Random.setRandomSeed();
 

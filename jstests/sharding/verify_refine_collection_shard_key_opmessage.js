@@ -6,9 +6,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 2}});
 
 const mongos = st.s0;

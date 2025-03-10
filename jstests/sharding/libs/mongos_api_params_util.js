@@ -22,9 +22,6 @@ import {
 // therefore preventing orphans from being cleaned up.
 TestData.skipCheckOrphans = true;
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 export let MongosAPIParametersUtil = (function() {
     function validateTestCase(testCase) {
         assert(testCase.skip || testCase.run,

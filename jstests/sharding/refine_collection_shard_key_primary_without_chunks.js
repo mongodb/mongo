@@ -3,9 +3,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 const st = new ShardingTest({shards: 2});
 
 // The orphan hook assumes every shard has the shard key index, which is not true for test_primary

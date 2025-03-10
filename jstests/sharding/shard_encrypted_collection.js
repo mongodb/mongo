@@ -14,9 +14,6 @@ if (!isEnterpriseShell()) {
     quit();
 }
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 const st = new ShardingTest({shards: 1, mongos: 1});
 const mongos = st.s0;
 const kDbName = 'db';

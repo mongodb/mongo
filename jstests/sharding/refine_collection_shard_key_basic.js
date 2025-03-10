@@ -2,23 +2,20 @@
 // Basic tests for refineCollectionShardKey.
 //
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    dropAndReshardColl,
+    integrationTests,
+    shardKeyValidationTests,
+    simpleValidationTests,
+    uniquePropertyTests
+} from "jstests/sharding/libs/refine_collection_shard_key_common.js";
 import {
     flushRoutersAndRefreshShardMetadata
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    simpleValidationTests,
-    shardKeyValidationTests,
-    uniquePropertyTests,
-    integrationTests,
-    dropAndReshardColl
-} from "jstests/sharding/libs/refine_collection_shard_key_common.js";
 
 const st = new ShardingTest({
     mongos: 2,

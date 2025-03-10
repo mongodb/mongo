@@ -8,8 +8,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
 
 const adminDbName = "admin";
 const shard0name = "shard0000";

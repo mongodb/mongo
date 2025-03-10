@@ -2,11 +2,8 @@
 // Jumbo tests for refineCollectionShardKey.
 //
 
-// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
-TestData.skipCheckShardFilteringMetadata = true;
-
-import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2, other: {chunkSize: 1}});
 const primaryShard = st.shard0.shardName;
