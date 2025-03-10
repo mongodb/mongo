@@ -80,6 +80,7 @@ std::once_flag initializeServerStatusSectionFlag;
 class WiredTigerFactory : public StorageEngine::Factory {
 public:
     ~WiredTigerFactory() override {}
+
     std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
                                           const StorageGlobalParams& params,
                                           const StorageEngineLockFile* lockFile) const override {
@@ -147,7 +148,7 @@ public:
         // stateless.
         std::call_once(initializeServerStatusSectionFlag, [] {
             *ServerStatusSectionBuilder<WiredTigerServerStatusSection>(
-                 std::string{kWiredTigerEngineName})
+                 std::string{WiredTigerServerStatusSection::kServerStatusSectionName})
                  .forShard();
         });
 
