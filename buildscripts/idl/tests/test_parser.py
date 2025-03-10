@@ -1817,18 +1817,6 @@ class TestParser(testcase.IDLTestcase):
         # type: () -> None
         """Test feature flag."""
 
-        # Missing default
-        self.assert_parse_fail(
-            textwrap.dedent("""
-            feature_flags:
-                featureFlagToaster:
-                    description: "Make toast"
-                    cpp_varname: gToaster
-                    shouldBeFCVGated: true
-            """),
-            idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD,
-        )
-
         # Missing shouldBeFCVGated
         self.assert_parse_fail(
             textwrap.dedent("""

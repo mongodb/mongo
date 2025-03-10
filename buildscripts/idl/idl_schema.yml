@@ -902,9 +902,22 @@ properties:
           shouldBeFCVGated:
             type: boolean
             description: Whether or not the feature flag should be FCV gated
+          incremental_rollout_phase:
+            type: string
+            description: >
+              Set to a value other than the default ('not_for_incremental_rollout') to make an
+              Incremental Feature Rollout (IFR) feature flag, which can be toggled at runtime. IFR
+              feature flags are disabled by default when in the 'in_development' phase and enabled
+              by default in the 'rollout' and 'released' phases. Client software can query a feature
+              flag's phase using the getParameter command with 'showDetails' enabled. Non-IFR
+              feature flags must specify an explicit 'default' value.
+            enum:
+              - not_for_incremental_rollout
+              - in_development
+              - rollout
+              - released
         required:
           - description
-          - default
           - shouldBeFCVGated
   global:
     description: Global settings that affect code generation

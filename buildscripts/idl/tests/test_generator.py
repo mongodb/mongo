@@ -1385,6 +1385,32 @@ class TestGenerator(testcase.IDLTestcase):
             ],
         )
 
+    def test_incremental_feature_rollout_flag(self) -> None:
+        """Test generation of an Incremental Feature Rollout (IFR) feature flag"""
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    incremental_rollout_phase: in_development
+                    shouldBeFCVGated: false
+            """
+            )
+        )
+        self.assertStringsInFile(
+            header,
+            ["mongo::IncrementalRolloutFeatureFlag gToaster;"],
+        )
+        self.assertStringsInFile(
+            source,
+            [
+                "mongo::IncrementalRolloutFeatureFlag gToaster{false};",
+                '<IncrementalRolloutFeatureFlagServerParameter>("featureFlagToaster", gToaster);',
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
