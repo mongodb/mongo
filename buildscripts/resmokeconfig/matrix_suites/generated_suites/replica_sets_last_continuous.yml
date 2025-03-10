@@ -21,6 +21,9 @@ selector:
     - jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
     - jstests/replsets/invalidate_sessions_on_stepdown.js
     - jstests/replsets/initial_sync_fails_unclean_restart.js
+    - jstests/replsets/test_only_repl_commands.js
+    - jstests/replsets/transactions_only_allowed_on_primaries.js
+    - jstests/replsets/prepare_conflict_read_concern_behavior.js
   exclude_with_any_tags:
     - multiversion_incompatible
     - backport_required_multiversion
