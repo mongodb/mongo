@@ -65,6 +65,22 @@ def test_string_map():
     search(r"absl::flat_hash_set.*0 elems", gdb.execute("print checkNonEmptyAlloc", to_string=True))
 
 
+def test_boost_optional():
+    optional = get_boost_optional(gdb.parse_and_eval("optTypeNone"))
+    assert optional is None, f"optTypeNone was {optional}"
+
+    optional = get_boost_optional(gdb.parse_and_eval("optTypeValue"))
+    assert optional is not None, f"optTypeValue was {optional}"
+    assert optional == 1, f"optTypeValue was {optional}"
+
+    optional = get_boost_optional(gdb.parse_and_eval("wrappedOptTypeNone"))
+    assert optional is None, f"wrappedOptTypeNone was {optional}"
+
+    optional = get_boost_optional(gdb.parse_and_eval("wrappedOptTypeValue"))
+    assert optional is not None, f"wrappedOptTypeValue was {optional}"
+    assert optional["_i"] == 1, f"wrappedOptTypeValue was {optional}"
+
+
 if __name__ == "__main__":
     try:
         gdb.execute("run")
@@ -72,6 +88,7 @@ if __name__ == "__main__":
         test_decorable()
         test_dbname_nss()
         test_string_map()
+        test_boost_optional()
         gdb.write("TEST PASSED\n")
     except Exception as err:
         gdb.write("TEST FAILED -- {!s}\n".format(err))

@@ -105,6 +105,14 @@ public:
     int x = 0;
 };
 
+class IntWrapper {
+public:
+    IntWrapper(int i) : _i(i) {}
+
+private:
+    int _i;
+};
+
 auto intVec = MyDecorable::declareDecoration<std::vector<int>>();
 auto str1 = MyDecorable::declareDecoration<std::string>();
 auto str2 = MyDecorable::declareDecoration<std::string>();
@@ -153,6 +161,12 @@ int clang_optnone main(int argc, char** argv) {
                         mongo::StringMapEq,
                         NonEmptyAlloc<std::string>>
         checkNonEmptyAlloc;
+
+    boost::optional<int> optTypeNone;
+    boost::optional<int> optTypeValue{1};
+
+    boost::optional<IntWrapper> wrappedOptTypeNone;
+    boost::optional<IntWrapper> wrappedOptTypeValue{IntWrapper{1}};
 
     mongo::breakpoint();
 

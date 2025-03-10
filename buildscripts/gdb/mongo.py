@@ -341,6 +341,14 @@ def get_boost_optional(optional):
     if not optional["m_initialized"]:
         return None
     value_ref_type = optional.type.template_argument(0).pointer()
+
+    # boost::optional<T> is either stored using boost::optional_detail::aligned_storage<T> or
+    # using direct storage of `T`. Scalar types are able to take advantage of direct storage.
+    #
+    # https://www.boost.org/doc/libs/1_79_0/libs/optional/doc/html/boost_optional/tutorial/performance_considerations.html
+    if optional["m_storage"].type.strip_typedefs().pointer() == value_ref_type:
+        return optional["m_storage"]
+
     storage = optional["m_storage"]["dummy_"]["data"]
     return storage.cast(value_ref_type).dereference()
 
