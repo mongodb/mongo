@@ -823,17 +823,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
 
     if (opts.attachCursorSource) {
-        // Creating AggregateCommandRequest in order to pass all necessary 'opts' to the
-        // attachCursorSource().
-        AggregateCommandRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
         pipeline = expCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            expCtx,
-            aggRequest,
-            pipeline.release(),
-            boost::none /* shardCursorsSortSpec */,
-            opts.shardTargetingPolicy,
-            std::move(opts.readConcern),
-            opts.useCollectionDefaultCollator);
+            pipeline.release(), opts.shardTargetingPolicy, std::move(opts.readConcern));
     }
 
     // After parsing the pipeline to detect if $$USER_ROLES is referenced, set the value of
@@ -870,14 +861,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
     aggRequest.setPipeline(pipeline->serializeToBson());
 
-    return expCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-        expCtx,
-        aggRequest,
-        pipeline.release(),
-        shardCursorsSortSpec,
-        opts.shardTargetingPolicy,
-        std::move(readConcern),
-        opts.useCollectionDefaultCollator);
+    return expCtx->mongoProcessInterface->attachCursorSourceToPipeline(aggRequest,
+                                                                       pipeline.release(),
+                                                                       expCtx,
+                                                                       shardCursorsSortSpec,
+                                                                       opts.shardTargetingPolicy,
+                                                                       std::move(readConcern));
 }
 
 Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(

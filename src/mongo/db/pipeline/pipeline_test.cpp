@@ -133,11 +133,8 @@ class StubExplainInterface : public StubMongoProcessInterface {
         }
         return BSON("pipeline" << bab.arr());
     }
-
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* ownedPipeline,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
-        bool shouldUseCollectionDefaultCollator = false) override {
+        Pipeline* ownedPipeline, boost::optional<const AggregateCommandRequest&> aggRequest) {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
         return pipeline;

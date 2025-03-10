@@ -185,13 +185,6 @@ structs:
                              "updateDescription" field in update events will be omitted.
                 query_shape: literal
 
-            matchCollectionUUIDForUpdateLookup:
-                type: optionalBool
-                description: An internal flag that ensures that updateLookup is performed on the 
-                             collection where UUID matches the one from the corresponding change 
-                             event. In case of a mismatch, null document will be returned.
-                query_shape: literal
-
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamOplogMatch stage of an
