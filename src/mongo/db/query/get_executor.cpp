@@ -907,8 +907,9 @@ private:
         planCacheCounters.incrementSbeHitsCounter();
 
         auto result = releaseResult();
-        result->runtimePlanner =
-            crp_sbe::makePlannerForSbeCacheEntry(makePlannerData(), std::move(cacheEntry));
+        const auto cachedSolutionHash = cacheEntry->cachedPlan->solutionHash;
+        result->runtimePlanner = crp_sbe::makePlannerForSbeCacheEntry(
+            makePlannerData(), std::move(cacheEntry), cachedSolutionHash);
         return result;
     }
 
@@ -991,8 +992,12 @@ private:
                     *_cq, std::move(querySolution), _plannerParams->secondaryCollectionsInfo);
 
                 auto result = releaseResult();
-                result->runtimePlanner = crp_sbe::makePlannerForClassicCacheEntry(
-                    makePlannerData(), std::move(querySolution), cs->decisionReads());
+
+                result->runtimePlanner =
+                    crp_sbe::makePlannerForClassicCacheEntry(makePlannerData(),
+                                                             std::move(querySolution),
+                                                             cs->cachedPlan->solutionHash,
+                                                             cs->decisionReads());
 
                 planCacheCounters.incrementClassicHitsCounter();
                 return result;

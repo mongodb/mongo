@@ -448,7 +448,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
             ASSERT_TRUE(cacheEntry);
             ASSERT_TRUE(cacheEntry->isPinned()) << "Expects single solution to be pinned in cache.";
             auto cachedPlanner =
-                makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry));
+                makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry), {});
             auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
             PlanSummaryStats stats;
             cachedExec->getPlanExplainer().getSummaryStats(&stats);
@@ -497,7 +497,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
                 ASSERT_TRUE(cacheEntry);
 
                 cachedPlanner =
-                    makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry));
+                    makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry), {});
             } else {
                 auto [classicCacheKey, plannerGenerator] = makePlannerGeneratorFromClassicCache(
                     cq.get(), std::move(plannerData), NumReads{10000});
@@ -577,7 +577,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbePlanCacheIsUpdatedDuringEofOptimizati
         auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
         ASSERT_TRUE(cacheEntry);
         auto cachedPlanner =
-            makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry));
+            makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry), {});
         auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
         ASSERT_EQ(cachedExec->getPlanExplainer().getVersion(), "2");
         auto cachedResult = getResultDocumentsAndAssertExecState(kDocCount, cachedExec.get());
@@ -625,7 +625,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest,
 
     auto cacheEntry = sbePlanCache.getCacheEntryIfActive(planCacheKey);
     ASSERT_TRUE(cacheEntry);
-    auto cachedPlanner = makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry));
+    auto cachedPlanner =
+        makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry), {});
     auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
     assertPlanExecutorReturnsCorrectSums({20, 180}, cachedExec.get());
 }
@@ -742,7 +743,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbeCachedPlannerReplansOnFailureMemoryLi
     cacheEntry->cachedPlan->planStageData.staticData =
         std::make_shared<stage_builder::PlanStageStaticData>();
 
-    cachedPlanner = makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry));
+    cachedPlanner = makePlannerForSbeCacheEntry(std::move(plannerData), std::move(cacheEntry), {});
 
     auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
     PlanSummaryStats stats;
@@ -867,7 +868,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbeCachedPlannerReplansOnHittingMaxNumRe
         mockPlanCacheHolder->cachedPlan->planStageData.staticData = staticData;
 
         auto cachedPlanner =
-            makePlannerForSbeCacheEntry(std::move(plannerData), std::move(mockPlanCacheHolder));
+            makePlannerForSbeCacheEntry(std::move(plannerData), std::move(mockPlanCacheHolder), {});
         auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
         PlanSummaryStats stats;
         cachedExec->getPlanExplainer().getSummaryStats(&stats);
