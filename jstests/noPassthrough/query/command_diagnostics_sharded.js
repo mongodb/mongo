@@ -7,7 +7,7 @@
 import {
     assertOnDiagnosticLogContents,
     getDiagnosticLogs,
-    queryPlannerAlwaysFails,
+    getQueryPlannerAlwaysFailsWithNamespace,
     runWithFailpoint
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -19,7 +19,13 @@ const collName = jsTestName();
 const ns = dbName + "." + collName;
 
 let resetFn;
-let conn;
+
+// We should always be running the comands below against mongos, but depending on which node we are
+// asserting has the right ScopedDebugInfo (mongos or mongod) we need to keep track of a
+// separate connection to set the failpoint on and read logs from.
+let mongosConn;
+let connToCheckLogs;
+
 /**
  * Runs 'command' with the queryPlannerAlwaysFails failpoint enabled, finds the resulting
  * ScopedDebugInfo diagnostic log line, and asserts that it contains 'expectedDiagnosticInfo'.
@@ -35,9 +41,11 @@ function runTest({
         return;
     }
 
-    const db = conn.getDB(dbName);
+    const mongosDb = mongosConn.getDB(dbName);
+    const checkLogsDb = connToCheckLogs.getDB(dbName);
     if (hasEnterpriseModule) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: redact}));
+        assert.commandWorked(
+            connToCheckLogs.adminCommand({setParameter: 1, redactClientLogData: redact}));
     }
 
     // In addition to the particular diagnostic info expected per test case, all commands should
@@ -47,45 +55,45 @@ function runTest({
         "locks: {}",
         "flowControl: {}",
     ]);
-    const {failpointName, failpointOpts, errorCode} = queryPlannerAlwaysFails;
+    const {failpointName, failpointOpts, errorCode} = getQueryPlannerAlwaysFailsWithNamespace(ns);
 
     // If the knob for diagnostic logging is disabled, ensure that we do not see any diagnostic
     // logging.
-    setParameter(conn, "enableDiagnosticLogging", false);
-    jsTestLog("Running test case with knob disabled: ",
+    setParameter(checkLogsDb, "enableDiagnosticLogging", false);
+    jsTestLog("Running test case with knob disabled: " +
               tojson({description, command, expectedDiagnosticInfo, redact}));
-    runWithFailpoint(db, failpointName, failpointOpts, () => {
+    runWithFailpoint(checkLogsDb, failpointName, failpointOpts, () => {
         // BulkWrites don't fail if sub-operations fail, but they would still generate the
         // diagnostic log if the knob was enabled.
         if (!command.bulkWrite) {
-            assert.commandFailedWithCode(db.runCommand(command), errorCode, description);
+            assert.commandFailedWithCode(mongosDb.runCommand(command), errorCode, description);
         } else {
-            assert.commandWorked(db.adminCommand(command), description);
+            assert.commandWorked(mongosDb.adminCommand(command), description);
         }
     });
 
     const commandDiagnostics =
-        getDiagnosticLogs({description: description, logFile: conn.fullOptions.logFile});
+        getDiagnosticLogs({description: description, logFile: connToCheckLogs.fullOptions.logFile});
     assert.eq(commandDiagnostics.length,
               0,
               `${description}: found an unexpected log line containing command diagnostics`);
 
     // Now enable the knob and ensure that we do see the expected logs.
-    setParameter(conn, "enableDiagnosticLogging", true);
-    jsTestLog("Running test case with knob enabled:",
+    setParameter(checkLogsDb, "enableDiagnosticLogging", true);
+    jsTestLog("Running test case with knob enabled:" +
               tojson({description, command, expectedDiagnosticInfo, redact}));
-    runWithFailpoint(db, failpointName, failpointOpts, () => {
+    runWithFailpoint(checkLogsDb, failpointName, failpointOpts, () => {
         // BulkWrites don't fail if sub-operations fail, but they still generate the diagnostic log.
         if (!command.bulkWrite) {
-            assert.commandFailedWithCode(db.runCommand(command), errorCode, description);
+            assert.commandFailedWithCode(mongosDb.runCommand(command), errorCode, description);
         } else {
-            assert.commandWorked(db.adminCommand(command), description);
+            assert.commandWorked(mongosDb.adminCommand(command), description);
         }
     });
 
     assertOnDiagnosticLogContents({
         description: description,
-        logFile: conn.fullOptions.logFile,
+        logFile: connToCheckLogs.fullOptions.logFile,
         expectedDiagnosticInfo: expectedDiagnosticInfo
     });
 
@@ -129,7 +137,7 @@ function runTests() {
         expectedDiagnosticInfo: [
             "{\'currentOp\': { ",
             `ns: \\"${ns}\\"`,
-            `\'opDescription\': { find: \\"${collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0`,
+            `\'opDescription\': { find: \\"${collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1`,
             ...defaultExpCtxLog
         ],
     });
@@ -185,9 +193,8 @@ function runTests() {
         command: {mapReduce: collName, map: () => emit(0, 0), reduce: () => 1, out: {inline: 1}},
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
-            `\'opDescription\': { mapReduce: \\"${
-                collName}\\", map: () => emit(0, 0), reduce: () => 1, out: { inline: 1.0 }`,
-            ...defaultExpCtxLog
+            'isMapReduceCommand: true',
+            ...defaultExpCtxLog,
         ]
     });
 
@@ -258,7 +265,7 @@ function runTests() {
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { find: \\"${
-                collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0`,
+                collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1`,
             ...defaultExpCtxLog
         ],
     });
@@ -271,7 +278,7 @@ function runTests() {
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { aggregate: \\"${
-                collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: \\"$arr\\" } ]`,
+                collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: `,
             ...defaultExpCtxLog
         ]
     });
@@ -301,9 +308,11 @@ jsTestLog("Testing tassert log diagnostics on mongos");
     // log files that we grep in assertOnDiagnosticLogContents for the next test case.
     resetFn = () => {
         st.restartMongos(0, st.s0.opts, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
-        conn = st.s;
+        mongosConn = st.s;
+        connToCheckLogs = st.s;
     };
-    conn = st.s;
+    mongosConn = st.s;
+    connToCheckLogs = st.s;
     runTests();
 
     st.stop();
@@ -322,9 +331,10 @@ jsTestLog("Testing tassert log diagnostics on shards");
     // log files that we grep in assertOnDiagnosticLogContents for the next test case.
     resetFn = () => {
         st.rs0.restart(st.rs0.getPrimary(), {allowedExitCode: MongoRunner.EXIT_ABRUPT});
-        conn = st.rs0.getPrimary();
+        connToCheckLogs = st.rs0.getPrimary();
     };
-    conn = st.rs0.getPrimary();
+    mongosConn = st.s;
+    connToCheckLogs = st.rs0.getPrimary();
     runTests();
 
     st.stop();
