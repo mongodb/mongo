@@ -119,6 +119,24 @@ TEST_F(SBEMathBuiltinTest, Abs) {
         ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
         ASSERT(Decimal128{"6e300"} == value::bitcastTo<Decimal128>(resultVal));
     }
+
+    {
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(NAN));
+        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(resultTag, resultVal);
+
+        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
+        ASSERT_EQ(value::bitcastFrom<double>(NAN), resultVal);
+    }
+
+    {
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-NAN));
+        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(resultTag, resultVal);
+
+        ASSERT_EQ(value::TypeTags::NumberDouble, resultTag);
+        ASSERT_EQ(value::bitcastFrom<double>(NAN), resultVal);
+    }
 }
 
 TEST_F(SBEMathBuiltinTest, Ceil) {
