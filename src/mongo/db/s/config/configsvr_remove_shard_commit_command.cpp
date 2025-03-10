@@ -39,6 +39,24 @@
 namespace mongo {
 namespace {
 
+// Helper to create the correct response from a RemoveShardProgress object
+BSONObj buildResponse(OperationContext* opCtx,
+                      const RemoveShardProgress& progress,
+                      const ShardId& shardId) {
+    RemoveShardResponse response(
+        topology_change_helpers::getRemoveShardMessage(progress.getState()));
+    response.setRemoveShardDrainingProgress(progress);
+    response.setShard(StringData(shardId));
+
+    // We need to manually create the bson for the dbs and collections to move because we
+    // may need to truncate the list for it to serialize as a bson.
+    BSONObj responseObj = response.toBSON();
+    BSONObjBuilder result(responseObj);
+
+    ShardingCatalogManager::get(opCtx)->appendDBAndCollDrainingInfo(opCtx, result, shardId);
+    return result.obj();
+}
+
 /**
  * Internal sharding command run on config servers to remove a shard from the cluster.
  *
@@ -73,12 +91,19 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const auto [shardId, replicaSetName] = [&] {
-                const auto shardIdOrUrl = request().getCommandParameter();
-                const auto shard = uassertStatusOK(
-                    Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl));
-                return std::make_pair(shard->getId(), shard->getConnString().getReplicaSetName());
-            }();
+            const auto swShard =
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, request().getCommandParameter());
+            if (!swShard.isOK() && swShard.getStatus() == ErrorCodes::ShardNotFound) {
+                const auto result =
+                    buildResponse(opCtx,
+                                  RemoveShardProgress(ShardDrainingStateEnum::kCompleted),
+                                  ShardId(request().getCommandParameter()));
+                return Response::parse(IDLParserContext("ConfigsvrRemoveShardCommitCommand"),
+                                       result);
+            }
+            const auto shard = uassertStatusOK(swShard);
+            const auto shardId = shard->getId();
+            const auto replicaSetName = shard->getConnString().getReplicaSetName();
 
             const auto removeShardCommitCoordinator =
                 [&, shardId = shardId, replicaSetName = replicaSetName] {
@@ -112,21 +137,9 @@ public:
                     return removeShardProgress->getProgress();
                 }
             }();
+            const auto result = buildResponse(opCtx, drainingStatus, shardId);
 
-            RemoveShardResponse response(
-                topology_change_helpers::getRemoveShardMessage(drainingStatus.getState()));
-            response.setRemoveShardDrainingProgress(drainingStatus);
-            response.setShard(StringData(shardId));
-
-            // We need to manually create the bson for the dbs and collections to move because we
-            // may need to truncate the list for it to serialize as a bson.
-            BSONObj responseObj = response.toBSON();
-            BSONObjBuilder result(responseObj);
-
-            ShardingCatalogManager::get(opCtx)->appendDBAndCollDrainingInfo(opCtx, result, shardId);
-
-            return Response::parse(IDLParserContext("ConfigsvrRemoveShardCommitCommand"),
-                                   result.obj());
+            return Response::parse(IDLParserContext("ConfigsvrRemoveShardCommitCommand"), result);
         }
 
     private:
