@@ -2,6 +2,7 @@
 // This test was adjusted as we start to allow sorting by "searchScore".
 // @tags: [featureFlagRankFusionFull, requires_fcv_81]
 
+const kUnavailableMetadataErrCode = 40218;
 var coll = db.sort_with_metadata;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, text: "apple", words: 1}));
@@ -11,16 +12,35 @@ assert.commandWorked(coll.insert({_id: 4, text: "cantaloupe", words: 1}));
 
 assert.commandWorked(coll.createIndex({text: "text"}));
 
-// TODO SERVER-93521 This should fail.
-assert.doesNotThrow(() => coll.aggregate([
+assert.throwsWithCode(() => coll.aggregate([
     {$match: {$text: {$search: 'apple banana'}}},
     {$sort: {textScore: {$meta: 'searchScore'}}}
-]));
+]),
+                      kUnavailableMetadataErrCode);
 
-assert.throws(() => coll.aggregate([
+assert.throwsWithCode(() => coll.aggregate([
+    {$match: {$text: {$search: 'apple banana'}}},
+    {$set: {textScore: {$meta: 'searchScore'}}}
+]),
+                      kUnavailableMetadataErrCode);
+
+assert.throwsWithCode(() => coll.aggregate([
+    {$match: {$text: {$search: 'apple banana'}}},
+    {$sort: {textScore: {$meta: 'vectorSearchScore'}}}
+]),
+                      kUnavailableMetadataErrCode);
+
+assert.throwsWithCode(() => coll.aggregate([
+    {$match: {$text: {$search: 'apple banana'}}},
+    {$set: {textScore: {$meta: 'vectorSearchScore'}}}
+]),
+                      kUnavailableMetadataErrCode);
+
+assert.throwsWithCode(() => coll.aggregate([
     {$match: {$text: {$search: 'apple banana'}}},
     {$sort: {textScore: {$meta: 'searchHighlights'}}}
-]));
+]),
+                      31138);
 
 assert.throws(
     () => coll.aggregate(

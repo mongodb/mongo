@@ -99,7 +99,6 @@ const FirstStageOptions = Object.freeze({
 
 // The set of metadata fields that can be referenced inside $meta, alongside information used to
 // dictate if the queries should succeed or not.
-// TODO SERVER-93521: Change "searchScore" and "vectorSearchScore" to be validated.
 const MetaFields = Object.freeze({
     TEXT_SCORE: {
         name: "textScore",
@@ -126,9 +125,10 @@ const MetaFields = Object.freeze({
         {name: "randVal", shouldBeValidated: false, debugName: "rand val", validSortKey: true},
     SEARCH_SCORE: {
         name: "searchScore",
-        shouldBeValidated: false,
+        shouldBeValidated: true,
         debugName: "$search score",
-        validSortKey: true
+        validSortKey: true,
+        firstStageRequired: [FirstStageOptions.SEARCH]
     },
     SEARCH_HIGHLIGHTS: {
         name: "searchHighlights",
@@ -182,9 +182,10 @@ const MetaFields = Object.freeze({
     },
     VECTOR_SEARCH_SCORE: {
         name: "vectorSearchScore",
-        shouldBeValidated: false,
+        shouldBeValidated: true,
         debugName: "$vectorSearch distance",
-        validSortKey: true
+        validSortKey: true,
+        firstStageRequired: [FirstStageOptions.VECTOR_SEARCH]
     },
     SCORE: {
         name: "score",

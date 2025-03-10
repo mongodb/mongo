@@ -111,6 +111,8 @@ void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type) {
         DocumentMetadataFields::MetaType::kGeoNearPoint,
         DocumentMetadataFields::MetaType::kScore,
         DocumentMetadataFields::MetaType::kScoreDetails,
+        DocumentMetadataFields::MetaType::kSearchScore,
+        DocumentMetadataFields::MetaType::kVectorSearchScore,
     };
 
     // Perform validation if necessary.
