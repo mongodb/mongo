@@ -41,6 +41,7 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
+#include <absl/strings/str_split.h>
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
@@ -69,7 +70,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"  // IWYU pragma: keep
 
 using namespace mongo;
 
@@ -141,7 +141,7 @@ void testGetFields(const char* query,
 
     // Verify results
     // First, check that results contain a superset of expected fields.
-    vector<string> expectedFields = StringSplitter::split(expectedFieldsStr, ",");
+    vector<string> expectedFields = absl::StrSplit(expectedFieldsStr, ",", absl::SkipEmpty());
     for (vector<string>::const_iterator i = expectedFields.begin(); i != expectedFields.end();
          i++) {
         if (fields[*i].isSparse != sparseSupported) {
@@ -303,7 +303,7 @@ void testRateIndices(const char* query,
 
     // Compare with expected list of paths.
     // First verify number of paths retrieved.
-    vector<string> expectedPaths = StringSplitter::split(expectedPathsStr, ",");
+    vector<string> expectedPaths = absl::StrSplit(expectedPathsStr, ",", absl::SkipEmpty());
     if (paths.size() != expectedPaths.size()) {
         str::stream ss;
         ss << "rateIndices(query=" << query << ", prefix=" << prefix

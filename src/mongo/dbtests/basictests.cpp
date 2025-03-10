@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <absl/strings/str_join.h>
+#include <absl/strings/str_split.h>
 #include <cstddef>
 #include <iostream>
 #include <memory>
@@ -247,8 +249,8 @@ public:
 
 struct StringSplitterTest {
     void test(string s) {
-        vector<string> v = StringSplitter::split(s, ",");
-        ASSERT_EQUALS(s, StringSplitter::join(v, ","));
+        vector<string> v = absl::StrSplit(s, ",");
+        ASSERT_EQUALS(s, absl::StrJoin(v, ","));
     }
 
     void run() {
@@ -256,13 +258,19 @@ struct StringSplitterTest {
         test("a,b");
         test("a,b,c");
 
-        vector<string> x = StringSplitter::split("axbxc", "x");
+        vector<string> x = absl::StrSplit("axbxc", "x", absl::SkipEmpty());
         ASSERT_EQUALS(3, (int)x.size());
         ASSERT_EQUALS("a", x[0]);
         ASSERT_EQUALS("b", x[1]);
         ASSERT_EQUALS("c", x[2]);
 
-        x = StringSplitter::split("axxbxxc", "xx");
+        x = absl::StrSplit("axxbxxc", "xx", absl::SkipEmpty());
+        ASSERT_EQUALS(3, (int)x.size());
+        ASSERT_EQUALS("a", x[0]);
+        ASSERT_EQUALS("b", x[1]);
+        ASSERT_EQUALS("c", x[2]);
+
+        x = absl::StrSplit("xxaxxxxbxxcxx", "xx", absl::SkipEmpty());
         ASSERT_EQUALS(3, (int)x.size());
         ASSERT_EQUALS("a", x[0]);
         ASSERT_EQUALS("b", x[1]);

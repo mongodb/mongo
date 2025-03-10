@@ -32,6 +32,7 @@
 #include <deque>
 #include <memory>
 
+#include <absl/strings/str_split.h>
 #include <boost/iterator/iterator_traits.hpp>
 #include <boost/move/utility_core.hpp>
 
@@ -44,7 +45,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"  // IWYU pragma: keep
 
 namespace mongo {
 
@@ -121,7 +121,8 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
     if (inputData.startsWith("m=")) {
         return Status(ErrorCodes::BadValue, "SCRAM required extensions not supported");
     }
-    const auto input = StringSplitter::split(inputData.toString(), ",");
+    const std::vector<std::string> input =
+        absl::StrSplit(std::string_view(inputData), ",", absl::SkipEmpty());
 
     if (input.size() < 3) {
         return Status(ErrorCodes::BadValue,
@@ -185,7 +186,8 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
  **/
 StatusWith<bool> SaslSCRAMClientConversation::_thirdStep(StringData inputData,
                                                          std::string* outputData) {
-    const auto input = StringSplitter::split(inputData.toString(), ",");
+    const std::vector<std::string> input =
+        absl::StrSplit(std::string_view(inputData), ",", absl::SkipEmpty());
 
     if (input.empty()) {
         return Status(

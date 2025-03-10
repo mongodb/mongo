@@ -36,6 +36,7 @@
 #include <memory>
 #include <set>
 
+#include <absl/strings/str_split.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -66,7 +67,6 @@
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -162,7 +162,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
         return Status(ErrorCodes::BadValue, "SCRAM mandatory extensions are not supported");
     }
 
-    /* StringSplitter::split() will ignore consecutive delimiters.
+    /* absl::SkipEmpty() will ignore consecutive delimiters.
      * e.g. "foo,,bar" => {"foo","bar"}
      * This makes our implementation of SCRAM *slightly* more generous
      * in what it will accept than the standard calls for.
@@ -170,7 +170,9 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
      * This does not impact _authMessage, as it's composed from the raw
      * string input, rather than the output of the split operation.
      */
-    const auto input = StringSplitter::split(client_first_message_bare.toString(), ",");
+    const std::vector<std::string> input =
+        absl::StrSplit(std::string_view(client_first_message_bare), ",", absl::SkipEmpty());
+
 
     if (input.size() < 2) {
         // gs2-header is not included in this count, so add it back in.
@@ -342,7 +344,9 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
     }
     const auto proof = last_field.substr(2);
 
-    const auto input = StringSplitter::split(client_final_message_without_proof.toString(), ",");
+    const std::vector<std::string> input = absl::StrSplit(
+        std::string_view(client_final_message_without_proof), ",", absl::SkipEmpty());
+
     if (input.size() < 2) {
         // Add count for proof back on.
         return badCount(input.size() + 1);

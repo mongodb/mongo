@@ -33,6 +33,7 @@
 
 #include "mongo/util/net/ssl_options.h"
 
+#include <absl/strings/str_split.h>
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/status.h"
@@ -43,7 +44,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/text.h"
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/ssl.h>
@@ -61,7 +61,7 @@ namespace mongo {
 Status storeTLSLogVersion(const std::string& loggedProtocols) {
     // The tlsLogVersion field is composed of a comma separated list of protocols to
     // log. First, tokenize the field.
-    const auto tokens = StringSplitter::split(loggedProtocols, ",");
+    const auto tokens = absl::StrSplit(loggedProtocols, ",", absl::SkipEmpty());
 
     // All universally accepted tokens, and their corresponding enum representation.
     const std::map<std::string, SSLParams::Protocols> validConfigs{
@@ -72,7 +72,8 @@ Status storeTLSLogVersion(const std::string& loggedProtocols) {
     };
 
     // Map the tokens to their enum values, and push them onto the list of logged protocols.
-    for (const std::string& token : tokens) {
+    for (const auto& t : tokens) {
+        std::string token(t);
         auto mappedToken = validConfigs.find(token);
         if (mappedToken != validConfigs.end()) {
             sslGlobalParams.tlsLogVersions.push_back(mappedToken->second);

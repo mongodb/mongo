@@ -47,54 +47,6 @@
 
 namespace mongo {
 
-// --- StringSplitter ----
-
-/** get next split string fragment */
-std::string StringSplitter::next() {
-    const char* foo = strstr(_big, _splitter);
-    if (foo) {
-        std::string s(_big, foo - _big);
-        _big = foo + strlen(_splitter);
-        while (*_big && strstr(_big, _splitter) == _big)
-            _big++;
-        return s;
-    }
-
-    std::string s = _big;
-    _big += strlen(_big);
-    return s;
-}
-
-
-void StringSplitter::split(std::vector<std::string>& l) {
-    while (more()) {
-        l.push_back(next());
-    }
-}
-
-std::vector<std::string> StringSplitter::split() {
-    std::vector<std::string> l;
-    split(l);
-    return l;
-}
-
-std::string StringSplitter::join(const std::vector<std::string>& l, const std::string& split) {
-    std::stringstream ss;
-    for (unsigned i = 0; i < l.size(); i++) {
-        if (i > 0)
-            ss << split;
-        ss << l[i];
-    }
-    return ss.str();
-}
-
-std::vector<std::string> StringSplitter::split(const std::string& big,
-                                               const std::string& splitter) {
-    StringSplitter ss(big.c_str(), splitter.c_str());
-    return ss.split();
-}
-
-
 // --- utf8 utils ------
 
 inline int leadingOnes(unsigned char c) {
