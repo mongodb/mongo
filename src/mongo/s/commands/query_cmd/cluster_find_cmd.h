@@ -46,7 +46,9 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -202,6 +204,19 @@ public:
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
 
+            BSONObj cmdObj = _request.body;
+            NamespaceString expNs = ns();
+            if (_cmdRequest->getRawData() &&
+                _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&
+                CollectionRoutingInfoTargeter{opCtx, _cmdRequest->getNamespaceOrUUID().nss()}
+                    .timeseriesNamespaceNeedsRewrite(_cmdRequest->getNamespaceOrUUID().nss())) {
+                auto expNs =
+                    _cmdRequest->getNamespaceOrUUID().nss().makeTimeseriesBucketsNamespace();
+                _cmdRequest->setNss(expNs);
+                cmdObj =
+                    rewriteCommandForRawDataOperation<FindCommandRequest>(cmdObj, expNs.coll());
+            }
+
             auto expCtx = ExpressionContextBuilder{}
                               .fromRequest(opCtx, *_cmdRequest)
                               .explain(verbosity)
@@ -222,7 +237,7 @@ public:
                 return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
             }};
             auto querySettings = query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
-                expCtx, deferredShape, ns());
+                expCtx, deferredShape, expNs);
             expCtx->setQuerySettingsIfNotPresent(querySettings);
 
             auto cq = CanonicalQuery(CanonicalQueryParams{
@@ -253,8 +268,8 @@ public:
                     _cmdRequest = uassertStatusOK(ClusterFind::transformQueryForShards(cq));
                 }
 
-                const auto explainCmd = ClusterExplain::wrapAsExplain(
-                    _cmdRequest->toBSON(), verbosity, querySettings.toBSON());
+                const auto explainCmd =
+                    ClusterExplain::wrapAsExplain(cmdObj, verbosity, querySettings.toBSON());
 
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,

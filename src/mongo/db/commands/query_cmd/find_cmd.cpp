@@ -111,6 +111,7 @@
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -453,6 +454,22 @@ public:
             boost::optional<CollectionOrViewAcquisition> collectionOrView =
                 acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
 
+            auto ns = [&] {
+                if (_cmdRequest->getRawData()) {
+                    auto [isTimeseriesViewRequest, translatedNs] =
+                        timeseries::isTimeseriesViewRequest(opCtx, *_cmdRequest);
+                    if (isTimeseriesViewRequest) {
+                        _cmdRequest->setNss(translatedNs);
+                        collectionOrView = acquireCollectionOrViewMaybeLockFree(
+                            opCtx,
+                            CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                opCtx, translatedNs, AcquisitionPrerequisites::kRead));
+                        return translatedNs;
+                    }
+                }
+                return _ns;
+            }();
+
             // Going forward this operation must never ignore interrupt signals while waiting for
             // lock acquisition. This InterruptibleLockGuard will ensure that waiting for lock
             // re-acquisition after yielding will not ignore interrupt signals. This is necessary to
@@ -494,7 +511,7 @@ public:
             auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 {.findCommand = std::move(_cmdRequest),
-                 .extensionsCallback = ExtensionsCallbackReal(opCtx, &_ns),
+                 .extensionsCallback = ExtensionsCallbackReal(opCtx, &ns),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
             // Initialize system variables before constructing CanonicalQuery as the constructor
@@ -511,7 +528,7 @@ public:
                 query_settings::lookupQuerySettingsWithRejectionCheckOnShard(
                     expCtx,
                     deferredShape,
-                    _ns,
+                    ns,
                     parsedRequest->findCommandRequest->getQuerySettings()));
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});
