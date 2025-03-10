@@ -36,8 +36,8 @@ from contextlib import contextmanager
 
 class test_config12(wttest.WiredTigerTestCase):
     default_warning_message = ['config eviction_checkpoint_target=.*cannot be less than eviction_dirty_target=.*Setting eviction_checkpoint_target to.*',
-                                                                     'config eviction_updates_target.*cannot be zero.*Setting to.*of eviction_updates_target.*',
-                                                                     'config eviction_updates_trigger.*cannot be zero.*Setting to.*of eviction_updates_trigger.*']
+                                                                     'config eviction_updates_target.*cannot be zero.*Setting to.*of eviction_dirty_target.*',
+                                                                     'config eviction_updates_trigger.*cannot be zero.*Setting to.*of eviction_dirty_trigger.*']
 
     @contextmanager
     def expect_verbose(self, config, patterns, expect_output = True):

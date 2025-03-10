@@ -5056,6 +5056,8 @@ tasks:
           test-name: checkpoint-stress.wtperf
 
   - name: perf-test-live-restore
+    # FIXME-WT-14242 Re-enable once we've fixed an issue with live restore reading a page from a hole.
+    activate: false
     tags: ["long-perf"]
     depends_on:
       - name: perf-test-long-500m-btree-populate
@@ -5096,6 +5098,8 @@ tasks:
       - func: "cleanup"
 
   - name: perf-test-live-restore-no-server
+    # FIXME-WT-14242 Re-enable once we've fixed an issue with live restore reading a page from a hole.
+    activate: false
     tags: ["long-perf"]
     depends_on:
       - name: perf-test-long-500m-btree-populate
