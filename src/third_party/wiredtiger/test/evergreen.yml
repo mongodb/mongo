@@ -5713,7 +5713,6 @@ buildvariants:
     ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_ZSTD=0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
-  activate: false # Launch only manually for now
   tasks:
     - name: compile
     - name: generate-datafile-big-endian
@@ -5751,7 +5750,6 @@ buildvariants:
     ENABLE_TCMALLOC: 0
     # Use half number of vCPU to avoid OOM kill failure
     num_jobs: $(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
-  activate: false # Launch only manually for now
   tasks:
     - name: compile
     - name: unit-test
