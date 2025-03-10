@@ -623,6 +623,7 @@ be invoked as either:
                     "evergreen.task.id": _config.EVERGREEN_TASK_ID,
                     "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
                     "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
+                    "evergreen.version.id": _config.EVERGREEN_VERSION_ID,
                     "evergreen.revision": _config.EVERGREEN_REVISION,
                     "evergreen.patch_build": _config.EVERGREEN_PATCH_BUILD,
                 },
