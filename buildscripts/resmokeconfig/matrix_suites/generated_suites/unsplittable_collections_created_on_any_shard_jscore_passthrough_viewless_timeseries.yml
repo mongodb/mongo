@@ -54,4 +54,5 @@ selector:
     - viewless_timeseries_incompatible
   roots:
     - jstests/core/timeseries/ddl/timeseries_create_collection.js
+    - jstests/core/timeseries/write/basic.js
 test_kind: js_test

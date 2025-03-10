@@ -117,6 +117,7 @@ boost::optional<std::pair<Status, bool>> checkFailUnorderedTimeseriesInsertFailP
  */
 TimeseriesSingleWriteResult performTimeseriesInsert(
     OperationContext* opCtx,
+    const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds,
     const mongo::write_ops::InsertCommandRequest& request,
@@ -127,11 +128,7 @@ TimeseriesSingleWriteResult performTimeseriesInsert(
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performInserts(
             opCtx,
-            write_ops_utils::makeTimeseriesInsertOp(
-                batch,
-                write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request)),
-                metadata,
-                std::move(stmtIds)),
+            write_ops_utils::makeTimeseriesInsertOp(batch, bucketsNs, metadata, std::move(stmtIds)),
             OperationSource::kTimeseriesInsert),
         request);
 }
@@ -171,6 +168,69 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
     }
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performUpdates(opCtx, op, OperationSource::kTimeseriesInsert), request);
+}
+
+// TODO SERVER-101784 remove this helper function once 9.0 becomes last LTS
+// By then we won't have system.buckets collection anymore, only viewless timeseries collection will
+// exists.
+CollectionAcquisition acquireBucketsCollection(OperationContext* opCtx,
+                                               CollectionAcquisitionRequest acquisitionReq,
+                                               LockMode mode) {
+    const auto& originNss = acquisitionReq.nssOrUUID.nss();
+
+    tassert(10168010,
+            "Found unsupported view mode during buckets acquisition",
+            acquisitionReq.viewMode == AcquisitionPrerequisites::ViewMode::kMustBeCollection);
+
+    // Override view mode to allow acquisition on timeseries view
+    acquisitionReq.viewMode = AcquisitionPrerequisites::ViewMode::kCanBeView;
+
+    boost::optional<CollectionOrViewAcquisition> acq =
+        acquireCollectionOrView(opCtx, acquisitionReq, mode);
+    if (acq->isView()) {
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                fmt::format("Namespace {} is a view, not a collection",
+                            acq->nss().toStringForErrorMsg()),
+                acq->getView().getViewDefinition().timeseries());
+
+        // modify acquistion request to target the buckets collection
+        acquisitionReq.viewMode = AcquisitionPrerequisites::ViewMode::kMustBeCollection;
+        acquisitionReq.nssOrUUID = acq->getView().getViewDefinition().viewOn();
+
+        // Release the main acquisition before attempting acquisition on buckets collection.
+        // This is necessary to avoid deadlock with other code that perform acquisition in opposide
+        // order (e.g. dropCollection)
+        acq.reset();
+        auto bucketsAcq = acquireCollection(opCtx, acquisitionReq, mode);
+        uassert(ErrorCodes::NamespaceNotFound,
+                fmt::format("timeseries buckets collection does not exist {}",
+                            acquisitionReq.nssOrUUID.toStringForErrorMsg()),
+                bucketsAcq.exists());
+        return bucketsAcq;
+    }
+
+
+    // Even if the timeseries view does not exist we look directly for the legacy system buckets
+    // collection. This is to support writes when the timeseries view does not exists. For
+    // instance for direct writes on shards other than the DB primary shard.
+    if (!acq->collectionExists() && !originNss.isTimeseriesBucketsCollection()) {
+        acquisitionReq.viewMode = AcquisitionPrerequisites::ViewMode::kMustBeCollection;
+        acquisitionReq.nssOrUUID = originNss.makeTimeseriesBucketsNamespace();
+        auto bucketsAcq = acquireCollection(opCtx, acquisitionReq, mode);
+        if (bucketsAcq.exists()) {
+            return bucketsAcq;
+        }
+    }
+
+    return CollectionAcquisition(std::move(*acq));
+}
+
+CollectionAcquisition acquireAndValidateBucketsCollection(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode) {
+
+    auto bucketsAcq = acquireBucketsCollection(opCtx, acquisitionReq, mode);
+    timeseries::assertTimeseriesBucketsCollection(bucketsAcq.getCollectionPtr().get());
+    return bucketsAcq;
 }
 
 /**
@@ -274,7 +334,6 @@ insertIntoBucketCatalog(OperationContext* opCtx,
     hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-    auto bucketsNs = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
 
     // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
     // Collection instances remain valid, and the collator is not invalidated.
@@ -289,16 +348,19 @@ insertIntoBucketCatalog(OperationContext* opCtx,
         // the timeseriesOptions. However, the associated collection must be acquired before
         // we check for the presence of buckets collection. This ensures that a potential
         // ShardVersion mismatch can be detected, before checking for other errors.
-        const auto coll = acquireCollection(opCtx,
-                                            CollectionAcquisitionRequest::fromOpCtx(
-                                                opCtx, bucketsNs, AcquisitionPrerequisites::kRead),
-                                            MODE_IS);
-        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
+        const auto bucketsAcq = acquireAndValidateBucketsCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsAcq.nss());
         // Check for the presence of the buckets collection
+        // TODO SERVER-101456 remove this check once we stop doing the lookup
+        // in addition to the acquireAndValidateBucketsCollection function.
         timeseries::assertTimeseriesBucketsCollection(bucketsColl);
         // Process timeSeriesOptions
-        timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
-        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsNs, timeSeriesOptions);
+        timeSeriesOptions = bucketsColl->getTimeseriesOptions().get();
+        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsAcq.nss(), timeSeriesOptions);
     } catch (const DBException& ex) {
         if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
             throw;
@@ -335,9 +397,6 @@ insertIntoBucketCatalog(OperationContext* opCtx,
             return true;
         }
 
-        auto viewNs = internal::ns(request).isTimeseriesBucketsCollection()
-            ? internal::ns(request).getTimeseriesViewNamespace()
-            : internal::ns(request);
         auto& measurementDoc = request.getDocuments()[start + index];
 
         // It is a layering violation to have the bucket catalog be privy to the details of writing
@@ -422,11 +481,11 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
     try {
         std::vector<mongo::write_ops::InsertCommandRequest> insertOps;
         std::vector<mongo::write_ops::UpdateCommandRequest> updateOps;
-        auto nss = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
 
         // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
         // Collection instances remain valid, and the collator is not invalidated.
         auto catalog = CollectionCatalog::get(opCtx);
+        NamespaceString nss;
         const CollatorInterface* collator = nullptr;
 
         try {
@@ -435,14 +494,13 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()'
             // might block waiting for other batches to complete, limiting the scope of the
             // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
-            const auto acquisition =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest::fromOpCtx(
-                                      opCtx, nss, AcquisitionPrerequisites::kRead),
-                                  MODE_IS);
-            auto bucketsColl = acquisition.getCollectionPtr().get();
-            assertTimeseriesBucketsCollection(bucketsColl);
-            collator = bucketsColl->getDefaultCollator();
+            const auto bucketsAq = acquireAndValidateBucketsCollection(
+                opCtx,
+                CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
+                MODE_IS);
+            nss = bucketsAq.nss();
+            collator = bucketsAq.getCollectionPtr()->getDefaultCollator();
         } catch (const DBException& ex) {
             if (ex.code() != ErrorCodes::StaleDbVersion &&
                 !ErrorCodes::isStaleShardVersionError(ex)) {
@@ -856,12 +914,12 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
-    auto nss = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
 
     // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
     // Collection instances remain valid, and the collator is not invalidated.
     auto catalog = CollectionCatalog::get(opCtx);
     const CollatorInterface* collator = nullptr;
+    NamespaceString nss;
 
     try {
         // The associated collection must be acquired before we check for the presence of
@@ -869,13 +927,13 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()' might
         // block waiting for other batches to complete, limiting the scope of the
         // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
-        const auto acquisition = acquireCollection(
+        const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
-        auto bucketsColl = acquisition.getCollectionPtr().get();
-        assertTimeseriesBucketsCollection(bucketsColl);
-        collator = bucketsColl->getDefaultCollator();
+        nss = bucketsAcq.nss();
+        collator = bucketsAcq.getCollectionPtr()->getDefaultCollator();
     } catch (const DBException& ex) {
         if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
             throw;
@@ -899,7 +957,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
         const auto output =
-            performTimeseriesInsert(opCtx, metadata, std::move(stmtIds), request, batch);
+            performTimeseriesInsert(opCtx, nss, metadata, std::move(stmtIds), request, batch);
         if (auto error = write_ops_exec::generateError(
                 opCtx, output.result.getStatus(), start + index, errors->size())) {
             bool canContinue = output.canContinue;

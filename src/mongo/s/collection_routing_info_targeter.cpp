@@ -895,7 +895,8 @@ bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesBucketsNamespace() const 
     if (MONGO_unlikely(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {
         return true;
     }
-    return _cri.cm.hasRoutingTable() && _cri.cm.getTimeseriesFields();
+    return _cri.hasRoutingTable() && _cri.cm.isTimeseriesCollection() &&
+        !_cri.cm.isNewTimeseriesWithoutView();
 }
 
 bool CollectionRoutingInfoTargeter::timeseriesNamespaceNeedsRewrite(

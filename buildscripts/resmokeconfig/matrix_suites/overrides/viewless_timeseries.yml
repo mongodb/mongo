@@ -29,6 +29,7 @@
     selector:
       roots:
         - jstests/core/timeseries/ddl/timeseries_create_collection.js
+        - jstests/core/timeseries/write/basic.js
       exclude_files:
 
 - name: exclude_viewless_timeseries_incompabile_tag

@@ -304,8 +304,7 @@ public:
                 }
             }
 
-            if (!request().getRawData() &&
-                timeseries::isTimeseriesViewRequest(opCtx, request()).first) {
+            if (timeseries::isTimeseriesRequest(opCtx, request())) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {

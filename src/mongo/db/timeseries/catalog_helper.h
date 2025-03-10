@@ -45,6 +45,26 @@ class OperationContext;
  */
 namespace timeseries {
 
+struct TimeseriesLookupInfo {
+    // If the namespace refer to a timeseries collection
+    bool isTimeseries;
+    // If the namespace was translated from view to system.buckets collection
+    bool wasNssTranslated;
+    // The namespace of the target buckets collection
+    NamespaceString targetNss;
+};
+
+/**
+ * Returns timeseries information about the given namespace timeseries.
+ *
+ * Throws if this is a time-series collection but the timeseries options are not valid.
+ *
+ * TODO SERVER-101784 simplify this function once 9.0 becomes last LTS, considering that we will not
+ * need to take into account legacy timeseries collection.
+ */
+TimeseriesLookupInfo lookupTimeseriesCollection(OperationContext* opCtx,
+                                                const NamespaceStringOrUUID& nssOrUUID,
+                                                bool skipSystemBucketLookup);
 /**
  * Returns a copy of the time-series options for namespace 'nss', if 'nss' refers to a time-series
  * collection. Otherwise returns boost::none.
