@@ -66,7 +66,7 @@ function runTest({
     // logging.
     setParameter(conn, "enableDiagnosticLogging", false);
     runWithFailpoint(db, failpointName, failpointOpts, () => {
-        jsTestLog("Running test case with knob disabled: ", description);
+        jsTestLog("Running test case with knob disabled: " + description);
         if (errorCode) {
             assert.commandFailedWithCode(db.runCommand(command), errorCode, description);
         } else {
@@ -83,7 +83,7 @@ function runTest({
     // Now enable the knob and ensure that we do see the expected logs.
     setParameter(conn, "enableDiagnosticLogging", true);
     runWithFailpoint(db, failpointName, failpointOpts, () => {
-        jsTestLog("Running test case with knob enabled:", description);
+        jsTestLog("Running test case with knob enabled:" + description);
         if (errorCode) {
             assert.commandFailedWithCode(db.runCommand(command), errorCode, description);
         } else {

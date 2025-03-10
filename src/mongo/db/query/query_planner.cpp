@@ -965,7 +965,11 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 "query"_attr = redact(query.toString()));
 
     if (auto scoped = queryPlannerAlwaysFails.scoped(); MONGO_unlikely(scoped.isActive())) {
-        tasserted(9656400, "Hit queryPlannerAlwaysFails fail point");
+        if (!scoped.getData().hasField("namespace") ||
+            scoped.getData().getStringField("namespace") ==
+                NamespaceStringUtil::serialize(query.nss(), SerializationContext::stateDefault())) {
+            tasserted(9656400, "Hit queryPlannerAlwaysFails fail point");
+        }
     }
 
     for (size_t i = 0; i < params.mainCollectionInfo.indexes.size(); ++i) {

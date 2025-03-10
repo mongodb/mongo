@@ -58,3 +58,13 @@ export const queryPlannerAlwaysFails = {
     failpointOpts: {},
     errorCode: 9656400,
 };
+
+// This is useful in a sharded environment to ensure that we only hit the failpoint for the query we
+// sent via the test, rather than for a background query.
+export function getQueryPlannerAlwaysFailsWithNamespace(namespace) {
+    return {
+        failpointName: queryPlannerAlwaysFails.failpointName,
+        failpointOpts: {'namespace': namespace},
+        errorCode: queryPlannerAlwaysFails.errorCode,
+    };
+}
