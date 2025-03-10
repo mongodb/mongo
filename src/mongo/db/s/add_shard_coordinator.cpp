@@ -119,9 +119,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 std::string shardName = topology_change_helpers::createShardName(
                     opCtx, targeter, _doc.getIsConfigShard(), _doc.getProposedName(), **executor);
 
-                // TODO(SERVER-100897): Find out why this fails if we pass a session info
                 topology_change_helpers::createShardIdentity(
-                    opCtx, targeter, shardName, boost::none, **executor);
+                    opCtx, targeter, shardName, _osiGenerator(), **executor);
 
                 _doc.setChosenName(shardName);
 
@@ -410,7 +409,7 @@ void AddShardCoordinator::_setFCVOnReplicaSet(OperationContext* opCtx,
     setFcvCmd.setDbName(DatabaseName::kAdmin);
     setFcvCmd.setFromConfigServer(true);
     generic_argument_util::setMajorityWriteConcern(setFcvCmd);
-    // TODO(SERVER-100897): Find out why this fails if we pass a session info
+    // TODO(SERVER-101740): Find out why this fails if we pass a session info
     // generic_argument_util::setOperationSessionInfo(setFcvCmd, sessionInfo);
 
     uassertStatusOK(
