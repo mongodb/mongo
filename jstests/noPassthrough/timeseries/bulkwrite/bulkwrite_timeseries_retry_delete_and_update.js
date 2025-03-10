@@ -13,4 +13,5 @@
  * ]
  */
 await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
-await import('jstests/noPassthrough/timeseries/timeseries_retry_delete_and_update.js');
+await import(
+    'jstests/noPassthrough/timeseries/updates_deletes/timeseries_retry_delete_and_update.js');

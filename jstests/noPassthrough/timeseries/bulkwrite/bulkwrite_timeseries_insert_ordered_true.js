@@ -8,4 +8,4 @@
  * ]
  */
 await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
-await import('jstests/noPassthrough/timeseries/timeseries_insert_ordered_true.js');
+await import('jstests/noPassthrough/timeseries/write/timeseries_insert_ordered_true.js');
