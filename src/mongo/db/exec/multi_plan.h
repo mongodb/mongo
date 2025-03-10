@@ -120,6 +120,12 @@ public:
      * Runs all plans added by addPlan(), ranks them, and picks a best plan. All further calls to
      * doWork() will return results from the best plan.
      *
+     * If Multiplan rate limiting is enabled, the function attempts to obtain a token per candidate
+     * plan to proceed with multiplanning. If not enough tokens are available, the function waits
+     * until either a plan is cached or the tokens become available. Once unblocked, the function
+     * returns a RetryMultiPlanning error, which leads to query replanning. Ideally, a cached plan
+     * will be available, avoiding the need for multiplanning.
+     *
      * If 'yieldPolicy' is non-null, then all locks may be yielded in between round-robin works of
      * the candidate plans. By default, 'yieldPolicy' is null and no yielding will take place.
      *

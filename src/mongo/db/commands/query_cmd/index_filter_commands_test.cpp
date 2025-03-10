@@ -308,7 +308,7 @@ private:
             return plan.toString();
         };
         PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
-            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn};
+            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn, _collectionPtr};
         ASSERT_OK(_classicPlanCache->set(
             makeClassicKey(*cq),
             std::move(cacheData),
@@ -353,7 +353,7 @@ private:
         PlanCacheCallbacksImpl<sbe::PlanCacheKey,
                                sbe::CachedSbePlan,
                                plan_cache_debug_info::DebugInfoSBE>
-            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn};
+            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn, _collectionPtr};
 
         ASSERT_OK(_sbePlanCache->set(
             makeSbeKey(*cq),

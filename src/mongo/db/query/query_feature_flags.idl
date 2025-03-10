@@ -221,6 +221,12 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
+    featureFlagMultiPlanLimiter:
+      description: "Feature flag to enable MultiPlan rate limiter."
+      cpp_varname: gfeatureFlagMultiPlanLimiter
+      default: false
+      shouldBeFCVGated: false
+
     featureFlagSbeUpgradeBinaryTrees:
       description: "Feature flag to enable N-ary ABT nodes"
       cpp_varname: gFeatureFlagSbeUpgradeBinaryTrees

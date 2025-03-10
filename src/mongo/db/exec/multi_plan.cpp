@@ -46,6 +46,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/histogram_server_status_metric.h"
+#include "mongo/db/exec/multi_plan_bucket.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -217,8 +218,37 @@ void MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 }
 
 Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
+    static AtomicWord<long> concurrentMultiPlansCounter = 0;
     if (bestPlanChosen()) {
         return Status::OK();
+    }
+
+    boost::optional<MultiPlanTokens> tokens{};
+
+    const size_t candidatesSize = _candidates.size();
+
+    const auto concurrentMultiPlanJobs = concurrentMultiPlansCounter.addAndFetch(candidatesSize);
+    ON_BLOCK_EXIT(
+        [candidatesSize]() { concurrentMultiPlansCounter.subtractAndFetch(candidatesSize); });
+
+    if (feature_flags::gfeatureFlagMultiPlanLimiter.isEnabled() &&
+        concurrentMultiPlanJobs > internalQueryConcurrentMultiPlanningThreshold.load()) {
+        auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(*_query, collectionPtr());
+        auto bucket = MultiPlanBucket::get(planCacheKey, collectionPtr());
+
+        // If no token is available, the thread can wait here for some time.
+        LOGV2_DEBUG(8712801, 5, "Obtaining multiplanning rate limiter tokens");
+        tokens = bucket->getTokens(_candidates.size(), yieldPolicy, opCtx());
+        if (!tokens) {
+            LOGV2_DEBUG(8712802,
+                        1,
+                        "Not enough multiplanning rate limiter tokens were available, retrying");
+            return Status(ErrorCodes::RetryMultiPlanning,
+                          "Too many multi plans running for the same shape");
+        }
+        LOGV2_DEBUG(8712803,
+                    1,
+                    "Multiplanning rate limiter tokens are available, continue multiplanning...");
     }
 
     if (MONGO_unlikely(sleepWhileMultiplanning.shouldFail())) {

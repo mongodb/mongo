@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/multi_plan_bucket.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/plan_cache/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
@@ -46,10 +47,12 @@ class PlanCacheCallbacksImpl : public PlanCacheCallbacks<KeyType, CachedPlanType
 public:
     PlanCacheCallbacksImpl(const CanonicalQuery& cq,
                            std::function<DebugInfoType()> buildDebugInfo,
-                           std::function<std::string(const CachedPlanType&)> printCachedPlan)
+                           std::function<std::string(const CachedPlanType&)> printCachedPlan,
+                           const CollectionPtr& collection)
         : _cq{cq},
           _buildDebugInfoCallback(buildDebugInfo),
-          _printCachedPlanCallback(printCachedPlan) {
+          _printCachedPlanCallback(printCachedPlan),
+          _collection(collection) {
         tassert(6407401, "_buildDebugInfoCallBack should be callable", _buildDebugInfoCallback);
         tassert(8983105, "_printCachedPlanCallback should be callable", _printCachedPlanCallback);
     }
@@ -109,6 +112,11 @@ public:
         tassert(1003136, "Expected oldEntry to not be null", oldEntry);
         tassert(1003137, "oldEntry is expected to have non zero works", oldEntry->readsOrWorks);
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
+
+        if (_collection) {
+            MultiPlanBucket::get(key.toString(), _collection)->unlockAll();
+        }
+
         log_detail::logPromoteCacheEntry(_cq.toStringShort(),
                                          std::move(planCacheShapeHash),
                                          std::move(planCacheKey),
@@ -161,5 +169,6 @@ private:
     const CanonicalQuery& _cq;
     std::function<DebugInfoType()> _buildDebugInfoCallback;
     std::function<std::string(const CachedPlanType&)> _printCachedPlanCallback;
+    const CollectionPtr& _collection;
 };
 }  // namespace mongo

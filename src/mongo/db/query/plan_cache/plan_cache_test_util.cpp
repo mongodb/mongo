@@ -32,6 +32,10 @@
 #include "mongo/db/exec/plan_cache_util.h"
 
 namespace mongo {
+namespace {
+const CollectionPtr emptyCollectionPtr{};
+}
+
 std::unique_ptr<plan_ranker::PlanRankingDecision> createDecision(size_t numPlans, size_t works) {
     auto why = std::make_unique<plan_ranker::PlanRankingDecision>();
     std::vector<std::unique_ptr<PlanStageStats>> stats;
@@ -56,6 +60,6 @@ createCallback(const CanonicalQuery& cq, const plan_ranker::PlanRankingDecision&
     auto printCachedPlanFn = [](const SolutionCacheData& plan) {
         return plan.toString();
     };
-    return {cq, std::move(buildDebugInfoFn), printCachedPlanFn};
+    return {cq, std::move(buildDebugInfoFn), printCachedPlanFn, emptyCollectionPtr};
 }
 }  // namespace mongo

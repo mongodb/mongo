@@ -150,7 +150,7 @@ void updateClassicPlanCacheFromClassicCandidatesImpl(
         return plan.toString();
     };
     PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
-        callbacks{query, buildDebugInfoFn, printCachedPlanFn};
+        callbacks{query, buildDebugInfoFn, printCachedPlanFn, collection};
     winningPlan.solution->cacheData->indexFilterApplied = winningPlan.solution->indexFilterApplied;
     winningPlan.solution->cacheData->solutionHash = winningPlan.solution->hash();
     auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
@@ -185,7 +185,7 @@ void updateSbePlanCache(OperationContext* opCtx,
     PlanCacheCallbacksImpl<sbe::PlanCacheKey,
                            sbe::CachedSbePlan,
                            plan_cache_debug_info::DebugInfoSBE>
-        callbacks{query, buildDebugInfoFn, printCachedPlanFn};
+        callbacks{query, buildDebugInfoFn, printCachedPlanFn, collections.getMainCollection()};
 
     auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
 

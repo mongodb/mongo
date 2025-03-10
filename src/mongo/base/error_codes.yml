@@ -840,6 +840,7 @@ error_codes:
       extra: ErrorWithWriteConcernErrorInfo,
       categories: [InternalOnly],
     }
+  - {code: 442, name: RetryMultiPlanning}
 
   # Error codes 4000-8999 are reserved.
 

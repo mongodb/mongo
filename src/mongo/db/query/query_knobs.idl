@@ -224,6 +224,29 @@ server_parameters:
     default: false
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
+  
+  internalQueryConcurrentMultiPlanningThreshold:
+    description: "The number of concurrent trialing multiplan candidates required to enable the MultiPlan rate limiter."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryConcurrentMultiPlanningThreshold"
+    cpp_vartype: AtomicWord<int>
+    default: 32000
+    validator:
+      gt: 0
+    redact: false
+
+  internalQueryMaxConcurrentMultiPlanJobsPerCacheKey:
+    description: "The maximum number of concurrent trialing multiplan candidates per plan cache key.
+     If the MultiPlan rate limiter is enabled and we reach this number of trailing candidates 
+     we block multiplanning for the plan cache key until some of the previous multiplanning jobs are 
+     finished or an active plan cache entry is added."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxConcurrentMultiPlanJobsPerCacheKey"
+    cpp_vartype: AtomicWord<int>
+    default: 320
+    validator:
+      gt: 0
+    redact: false
 
   #
   # Plan cache
