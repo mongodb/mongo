@@ -42,6 +42,14 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
+        .then(_buildPhaseHandler(Phase::kCheckPreconditions,
+                                 [this, executor = executor, anchor = shared_from_this()] {
+                                     const auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+                                     getForwardableOpMetadata().setOn(opCtx);
+
+                                     _checkShardExistsAndIsDraining(opCtx);
+                                 }))
         .then(_buildPhaseHandler(
             Phase::kJoinMigrationsAndCheckRangeDeletions,
             [this, anchor = shared_from_this()] { return _doc.getIsTransitionToDedicated(); },
@@ -79,6 +87,10 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
                                      _finalizeShardRemoval(opCtx);
                                  }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
+            if (status == ErrorCodes::RequestAlreadyFulfilled) {
+                return Status::OK();
+            }
+
             if (_doc.getPhase() < Phase::kStopDDLsAndCleanupData) {
                 return status;
             }
@@ -107,6 +119,22 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_cleanupOnAbort(
 
             _resumeDDLOperations(opCtx);
         });
+}
+
+void RemoveShardCommitCoordinator::_checkShardExistsAndIsDraining(OperationContext* opCtx) {
+    // Since we released the addRemoveShardLock between checking the preconditions and here, it is
+    // possible that the shard has already been removed.
+    auto optShard = topology_change_helpers::getShardIfExists(
+        opCtx, ShardingCatalogManager::get(opCtx)->localConfigShard(), _doc.getShardId());
+    if (!optShard.is_initialized()) {
+        _finalizeShardRemoval(opCtx);
+        uasserted(ErrorCodes::RequestAlreadyFulfilled,
+                  str::stream() << "Shard " << _doc.getShardId()
+                                << " has already been removed from the cluster");
+    }
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Shard " << _doc.getShardId() << " is not currently draining",
+            optShard->getDraining());
 }
 
 void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions() {
