@@ -1157,10 +1157,13 @@ config_mirrors(void)
     char buf[100];
     bool already_set, explicit_mirror;
 
+    g.mirror_col_store = false;
     /* Check for a CONFIG file that's already set up for mirroring. */
     for (already_set = false, i = 1; i <= ntables; ++i)
         if (NTV(tables[i], RUNS_MIRROR)) {
             already_set = tables[i]->mirror = true;
+            if (tables[i]->type == FIX || tables[i]->type == VAR)
+                g.mirror_col_store = true;
             if (g.base_mirror == NULL && tables[i]->type != FIX)
                 g.base_mirror = tables[i];
         }
@@ -1250,7 +1253,8 @@ config_mirrors(void)
     tables[i]->mirror = true;
     config_single(tables[i], "runs.mirror=1", false);
     g.base_mirror = tables[i];
-
+    if (tables[i]->type == VAR)
+        g.mirror_col_store = true;
     /*
      * Pick some number of tables to mirror, then turn on mirroring the next (n-1) tables, where
      * allowed.
@@ -1261,6 +1265,8 @@ config_mirrors(void)
         if (tables[i] != g.base_mirror) {
             tables[i]->mirror = true;
             config_single(tables[i], "runs.mirror=1", false);
+            if (tables[i]->type == FIX || tables[i]->type == VAR)
+                g.mirror_col_store = true;
             if (--mirrors == 0)
                 break;
         }

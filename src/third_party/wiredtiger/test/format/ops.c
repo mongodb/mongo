@@ -1163,6 +1163,24 @@ rollback_retry:
                     tinfo->last += range;
                     if (tinfo->last > max_rows)
                         tinfo->last = 0;
+                    /*
+                     * Edge case: There is a case where we cannot detect a proper mirror mismatch.
+                     * Say we truncated the tail end key range of all the mirrors from N to
+                     * max_rows. This truncate happened before any thread added another non-mirrored
+                     * append/insert to a column store table and the data in that truncated key
+                     * range was sufficient to delete the pages at the end of the column store
+                     * table. Then when a column store non-mirrored insert happened, it appended the
+                     * new item at key N instead of at max_rows + 1. Then the next mirror check will
+                     * detect a mismatch from the row-store table because the appended value does
+                     * not match the truncated value.
+                     *
+                     * We want to test truncate at the end of the range as much as possible, so
+                     * adjust the end range to max_rows - 1 only in the case where we are mirroring
+                     * and have a column store table.
+                     */
+                    if (g.base_mirror != NULL && g.mirror_col_store &&
+                      (tinfo->last == 0 || tinfo->last == max_rows))
+                        tinfo->last = max_rows - 1;
                 }
             } else {
                 if (TV(BTREE_REVERSE)) {
