@@ -21,6 +21,7 @@ import requests
 from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
+from retry.api import retry_call
 from simple_report import Report, Result
 
 root = logging.getLogger()
@@ -422,15 +423,33 @@ def run_test(test: Test, client: DockerClient) -> Result:
 
 
 logging.info("Attempting to download current mongo releases json")
-r = requests.get("https://downloads.mongodb.org/current.json")
+r = retry_call(
+    requests.get,
+    fargs=["https://downloads.mongodb.org/current.json"],
+    fkwargs={"timeout": 30},
+    tries=5,
+    delay=5,
+)
 current_releases = r.json()
 
 logging.info("Attempting to download current mongo tools releases json")
-r = requests.get("https://downloads.mongodb.org/tools/db/release.json")
+r = retry_call(
+    requests.get,
+    fargs=["https://downloads.mongodb.org/tools/db/release.json"],
+    fkwargs={"timeout": 30},
+    tries=5,
+    delay=5,
+)
 current_tools_releases = r.json()
 
 logging.info("Attempting to download current mongosh releases json")
-r = requests.get("https://s3.amazonaws.com/info-mongodb-com/com-download-center/mongosh.json")
+r = retry_call(
+    requests.get,
+    fargs=["https://s3.amazonaws.com/info-mongodb-com/com-download-center/mongosh.json"],
+    fkwargs={"timeout": 30},
+    tries=5,
+    delay=5,
+)
 mongosh_releases = r.json()
 
 
