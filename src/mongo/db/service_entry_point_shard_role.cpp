@@ -1821,7 +1821,8 @@ void ExecCommandDatabase::_initiateCommand() {
 
     uassert(ErrorCodes::InvalidOptions,
             "Command does not support the rawData option",
-            !genericArgs.getRawData() || _invocation->supportsRawData());
+            !genericArgs.getRawData() || _invocation->supportsRawData() ||
+                client->isInternalClient());
     uassert(ErrorCodes::InvalidOptions,
             "rawData is not enabled",
             !genericArgs.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
