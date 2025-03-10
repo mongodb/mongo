@@ -130,7 +130,7 @@ void MockRemoteDBServer::setCommandReply(const string& cmdName,
 void MockRemoteDBServer::setCommandReply(const string& cmdName,
                                          const vector<StatusWith<BSONObj>>& replySequence) {
     scoped_spinlock sLock(_lock);
-    _cmdMap[cmdName].reset(new CircularBSONIterator(replySequence));
+    _cmdMap[cmdName] = std::make_shared<CircularBSONIterator>(replySequence);
 }
 
 void MockRemoteDBServer::insert(const NamespaceString& nss, BSONObj obj) {

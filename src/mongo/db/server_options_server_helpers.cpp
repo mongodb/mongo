@@ -72,7 +72,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 
-using std::endl;
 using std::string;
 
 namespace mongo {

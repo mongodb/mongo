@@ -116,24 +116,24 @@ private:
 template <bool requiresMultiProducer, bool requiresMultiConsumer, typename Callback>
 std::enable_if_t<!requiresMultiProducer && !requiresMultiConsumer> runCallbackWithPerms(
     Callback&& cb) {
-    std::forward<Callback>(cb)(std::true_type{}, std::true_type{});
-    std::forward<Callback>(cb)(std::true_type{}, std::false_type{});
-    std::forward<Callback>(cb)(std::false_type{}, std::true_type{});
-    std::forward<Callback>(cb)(std::false_type{}, std::false_type{});
+    cb(std::true_type{}, std::true_type{});
+    cb(std::true_type{}, std::false_type{});
+    cb(std::false_type{}, std::true_type{});
+    cb(std::false_type{}, std::false_type{});
 }
 
 template <bool requiresMultiProducer, bool requiresMultiConsumer, typename Callback>
 std::enable_if_t<requiresMultiProducer && !requiresMultiConsumer> runCallbackWithPerms(
     Callback&& cb) {
-    std::forward<Callback>(cb)(std::true_type{}, std::true_type{});
-    std::forward<Callback>(cb)(std::true_type{}, std::false_type{});
+    cb(std::true_type{}, std::true_type{});
+    cb(std::true_type{}, std::false_type{});
 }
 
 template <bool requiresMultiProducer, bool requiresMultiConsumer, typename Callback>
 std::enable_if_t<!requiresMultiProducer && requiresMultiConsumer> runCallbackWithPerms(
     Callback&& cb) {
-    std::forward<Callback>(cb)(std::true_type{}, std::true_type{});
-    std::forward<Callback>(cb)(std::false_type{}, std::true_type{});
+    cb(std::true_type{}, std::true_type{});
+    cb(std::false_type{}, std::true_type{});
 }
 
 template <bool requiresMultiProducer, bool requiresMultiConsumer, typename Callback>

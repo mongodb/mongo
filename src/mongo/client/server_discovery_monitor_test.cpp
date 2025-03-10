@@ -93,7 +93,7 @@ protected:
         _executor->startup();
         _startDate = _net->now();
         _eventsPublisher = std::make_shared<sdam::TopologyEventsPublisher>(_executor);
-        _topologyListener.reset(new sdam::TopologyListenerMock());
+        _topologyListener = std::make_shared<sdam::TopologyListenerMock>();
         _eventsPublisher->registerListener(_topologyListener);
     }
 

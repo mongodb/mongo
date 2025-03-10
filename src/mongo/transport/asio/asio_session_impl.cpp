@@ -261,7 +261,7 @@ void CommonAsioSession::end() {
     std::error_code ec;
     {
         stdx::lock_guard lg(_sslSocketLock);
-        getSocket().shutdown(GenericSocket::shutdown_both, ec);
+        (void)getSocket().shutdown(GenericSocket::shutdown_both, ec);
     }
     if ((ec) && (ec != asio::error::not_connected)) {
         LOGV2_ERROR(23841, "Error shutting down socket", "error"_attr = ec.message());
@@ -285,7 +285,7 @@ Future<Message> CommonAsioSession::asyncSourceMessage(const BatonHandle& baton) 
 Status CommonAsioSession::waitForData() try {
     ensureSync();
     asio::error_code ec;
-    getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
+    (void)getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
     return errorCodeToStatus(ec, "waitForData");
 } catch (const DBException& ex) {
     return ex.toStatus();
@@ -409,7 +409,7 @@ Future<void> CommonAsioSession::handshakeSSLForEgress(const HostAndPort& target,
     auto doHandshake = [&] {
         if (_blockingMode == sync) {
             std::error_code ec;
-            _sslSocket->handshake(asio::ssl::stream_base::client, ec);
+            (void)_sslSocket->handshake(asio::ssl::stream_base::client, ec);
             return futurize(ec);
         } else {
             return _sslSocket->async_handshake(asio::ssl::stream_base::client, UseFuture{});
@@ -433,7 +433,7 @@ void AsyncAsioSession::ensureSync() {
 void SyncAsioSession::ensureSync() {
     asio::error_code ec;
     if (_blockingMode != sync) {
-        getSocket().non_blocking(false, ec);
+        (void)getSocket().non_blocking(false, ec);
         fassert(40490, errorCodeToStatus(ec, "ensureSync non_blocking"));
         _blockingMode = sync;
     }
@@ -469,7 +469,7 @@ void AsyncAsioSession::ensureAsync() {
     invariant(!_configuredTimeout);
 
     asio::error_code ec;
-    getSocket().non_blocking(true, ec);
+    (void)getSocket().non_blocking(true, ec);
     fassert(50706, errorCodeToStatus(ec, "ensureAsync non_blocking"));
     _blockingMode = async;
 }

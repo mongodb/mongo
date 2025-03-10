@@ -49,7 +49,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 
-using std::ios_base;
 using std::ofstream;
 using std::string;
 using std::stringstream;

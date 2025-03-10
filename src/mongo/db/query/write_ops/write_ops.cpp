@@ -72,13 +72,11 @@ namespace mongo {
 
 using write_ops::DeleteCommandReply;
 using write_ops::DeleteCommandRequest;
-using write_ops::DeleteOpEntry;
 using write_ops::FindAndModifyCommandReply;
 using write_ops::InsertCommandReply;
 using write_ops::InsertCommandRequest;
 using write_ops::UpdateCommandReply;
 using write_ops::UpdateCommandRequest;
-using write_ops::UpdateOpEntry;
 using write_ops::WriteCommandRequestBase;
 
 namespace {

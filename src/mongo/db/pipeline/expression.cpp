@@ -82,7 +82,6 @@ namespace mongo {
 using Parser = Expression::Parser;
 
 using boost::intrusive_ptr;
-using std::move;
 using std::pair;
 using std::string;
 using std::vector;

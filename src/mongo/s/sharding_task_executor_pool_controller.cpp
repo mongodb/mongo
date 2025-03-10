@@ -55,8 +55,8 @@ namespace {
 
 template <typename Map, typename Key>
 auto& getOrInvariant(Map&& map, const Key& key) noexcept {
-    auto it = std::forward<Map>(map).find(key);
-    invariant(it != std::forward<Map>(map).end(), "Unable to find key in map");
+    auto it = map.find(key);
+    invariant(it != map.end(), "Unable to find key in map");
 
     return it->second;
 }

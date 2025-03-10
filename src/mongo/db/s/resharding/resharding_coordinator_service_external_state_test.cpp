@@ -113,14 +113,14 @@ public:
     ReshardingCoordinatorDocument makeCoordinatorDocument(const DocumentsToCopyMap& docsToCopy,
                                                           const DocumentsCopiedMap& docsCopied) {
         std::vector<DonorShardEntry> donorShards;
-        for (auto [donorShardId, donorDocsToCopy] : docsToCopy) {
+        for (auto&& [donorShardId, donorDocsToCopy] : docsToCopy) {
             DonorShardEntry donorEntry(donorShardId, {});
             donorEntry.setDocumentsToCopy(donorDocsToCopy);
             donorShards.emplace_back(donorEntry);
         }
 
         std::vector<RecipientShardEntry> recipientShards;
-        for (auto [recipientShardId, _] : docsCopied) {
+        for (auto&& [recipientShardId, _] : docsCopied) {
             RecipientShardEntry recipientEntry(recipientShardId, {});
             recipientShards.emplace_back(recipientEntry);
         }
@@ -139,14 +139,14 @@ public:
         const DocumentsFinalMap& docsFinalOnDonors,
         const DocumentsFinalMap& docsFinalOnRecipients) {
         std::vector<DonorShardEntry> donorShards;
-        for (auto [donorShardId, donorDocsFinal] : docsFinalOnDonors) {
+        for (auto&& [donorShardId, donorDocsFinal] : docsFinalOnDonors) {
             DonorShardEntry donorEntry(donorShardId, {});
             donorEntry.setDocumentsFinal(donorDocsFinal);
             donorShards.emplace_back(donorEntry);
         }
 
         std::vector<RecipientShardEntry> recipientShards;
-        for (auto [recipientShardId, recipientDocsFinal] : docsFinalOnRecipients) {
+        for (auto&& [recipientShardId, recipientDocsFinal] : docsFinalOnRecipients) {
             RecipientShardContext mutableState;
             mutableState.setTotalNumDocuments(recipientDocsFinal);
             RecipientShardEntry recipientEntry(recipientShardId, mutableState);

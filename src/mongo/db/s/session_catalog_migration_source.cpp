@@ -881,7 +881,7 @@ SessionCatalogMigrationSource::SessionOplogIterator::SessionOplogIterator(
           }
           // The SessionCatalogMigrationSource should not try to create a SessionOplogIterator for
           // internal sessions for non-retryable writes.
-          invariant(isParentSessionId(txnRecord.getSessionId()));
+          invariant(isParentSessionId(_record.getSessionId()));
           return _record.getState() ? EntryType::kNonRetryableTransaction
                                     : EntryType::kRetryableWrite;
       }()) {

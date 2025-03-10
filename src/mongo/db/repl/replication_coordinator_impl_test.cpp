@@ -106,7 +106,6 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using rpc::OplogQueryMetadata;
 using rpc::ReplSetMetadata;
-using unittest::assertGet;
 
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 // Helper class to wrap Timestamp as an OpTime with term 1.

@@ -35,6 +35,7 @@
 #include <boost/optional/optional.hpp>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <s2cellid.h>
 #include <utility>
 
@@ -101,7 +102,7 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
             LOGV2_WARNING(23847, "Deprecated $uniqueDocs option", "query"_attr = redact(obj));
         } else {
             // The element must be a geo specifier. "$box", "$center", "$geometry", etc.
-            geoContainer.reset(new GeometryContainer());
+            geoContainer = std::make_shared<GeometryContainer>();
             Status status = geoContainer->parseFromQuery(elt);
             if (!status.isOK())
                 return status;

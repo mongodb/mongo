@@ -54,7 +54,6 @@
 namespace {
 
 using namespace mongo;
-using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::TaskExecutor;
 

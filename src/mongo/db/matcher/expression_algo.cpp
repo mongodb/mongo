@@ -1053,7 +1053,7 @@ bool isIndependentOfImpl(E&& expr,
         // The whole expression is independent of 'pathSet' if and only if every child is.
         for (int i = 0, numChildren = expr.numChildren(); i < numChildren; ++i) {
             if (!isIndependentOfImpl<E, Args...>(
-                    *expr.getChild(i), pathSet, renames, std::forward<Args>(renameables)...)) {
+                    *expr.getChild(i), pathSet, renames, renameables...)) {
                 return false;
             }
         }

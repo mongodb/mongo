@@ -383,7 +383,7 @@ public:
     }
 
     MonoBlock(MonoBlock&& o)
-        : ValueBlock(std::move(o)), _tag(o._tag), _val(o._val), _count(o._count) {
+        : ValueBlock(static_cast<ValueBlock&&>(o)), _tag(o._tag), _val(o._val), _count(o._count) {
         o._tag = TypeTags::Nothing;
         o._val = 0;
     }
@@ -506,7 +506,9 @@ public:
     }
 
     HeterogeneousBlock(HeterogeneousBlock&& o)
-        : ValueBlock(std::move(o)), _vals(std::move(o._vals)), _tags(std::move(o._tags)) {
+        : ValueBlock(static_cast<HeterogeneousBlock&&>(o)),
+          _vals(std::move(o._vals)),
+          _tags(std::move(o._tags)) {
         o._vals = {};
         o._tags = {};
     }

@@ -57,7 +57,6 @@ namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
-using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
 class MockProgressManager {

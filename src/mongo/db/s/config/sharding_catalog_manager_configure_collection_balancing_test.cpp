@@ -63,7 +63,6 @@
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
 class ConfigureCollectionBalancingTest : public ConfigServerTestFixture {

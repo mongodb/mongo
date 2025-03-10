@@ -176,7 +176,7 @@ class SyncClient {
 public:
     explicit SyncClient(int port) {
         std::error_code ec;
-        _sock.connect(asio::ip::tcp::endpoint(testHostAddr(), port), ec);
+        (void)_sock.connect(asio::ip::tcp::endpoint(testHostAddr(), port), ec);
         ASSERT_FALSE(ec) << errorMessage(ec);
         LOGV2(6109504, "sync client connected");
     }
@@ -482,7 +482,8 @@ TEST(AsioTransportLayer, IngressPhysicalNetworkMetricsTest) {
     });
     SyncClient conn(tf.tla().listenerPort());
     auto stats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress);
-    conn.write(req.buf(), req.size());
+    auto ec = conn.write(req.buf(), req.size());
+    ASSERT_FALSE(ec) << errorMessage(ec);
     ASSERT_OK(received.future.getNoThrow());
     ASSERT_OK(responsed.future.getNoThrow());
     auto diff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress)
@@ -590,14 +591,14 @@ public:
         std::error_code ec;
         auto ep = asio::ip::tcp::endpoint(testHostAddr(), port);
 
-        _sock.open(ep.protocol(), ec);
+        (void)_sock.open(ep.protocol(), ec);
         ASSERT_FALSE(ec) << errorMessage(ec);
 
         ec = tfo::initOutgoingSocket(_sock);
         ASSERT_FALSE(ec) << errorMessage(ec);
 
         _sock.non_blocking(true);
-        _sock.connect(ep, ec);
+        (void)_sock.connect(ep, ec);
         ASSERT_FALSE(ec) << errorMessage(ec);
         LOGV2(7097407, "TFO client connected");
         _sock.non_blocking(false);

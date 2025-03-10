@@ -789,7 +789,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                 if (connector->session) {
                     connector->session->end();
                 } else {
-                    connector->socket.cancel(ec);
+                    (void)connector->socket.cancel(ec);
                 }
             });
     }
@@ -1055,12 +1055,12 @@ Status AsioTransportLayer::setup() {
                 acceptor, IPV6OnlyOption(true), "acceptor v6 only", logv2::LogSeverity::Info());
         }
 
-        acceptor.non_blocking(true, ec);
+        (void)acceptor.non_blocking(true, ec);
         if (ec) {
             return errorCodeToStatus(ec, "setup non_blocking");
         }
 
-        acceptor.bind(*addr, ec);
+        (void)acceptor.bind(*addr, ec);
         if (ec) {
             return errorCodeToStatus(ec, "setup bind").withContext(addr.toString());
         }
@@ -1149,7 +1149,7 @@ void AsioTransportLayer::_runListener() {
 
     for (auto& acceptorRecord : _acceptorRecords) {
         asio::error_code ec;
-        acceptorRecord->acceptor.listen(serverGlobalParams.listenBacklog, ec);
+        (void)acceptorRecord->acceptor.listen(serverGlobalParams.listenBacklog, ec);
         if (ec) {
             LOGV2_FATAL(31339,
                         "Error listening for new connections on listen address",

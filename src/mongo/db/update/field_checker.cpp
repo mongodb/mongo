@@ -35,7 +35,6 @@
 
 namespace mongo {
 
-using str::stream;
 
 namespace fieldchecker {
 
