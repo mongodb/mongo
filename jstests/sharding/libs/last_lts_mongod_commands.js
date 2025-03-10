@@ -3,8 +3,6 @@
 // to run on same- and mixed-version suites, we allow these commands to have a test defined without
 // always existing on the servers being used.
 export const commandsRemovedFromMongodSinceLastLTS = [
-    "_configsvrRenameCollectionMetadata",
-    "_shardsvrDropCollectionIfUUIDNotMatching",
     "_getAuditConfigGeneration",  // Removed in 8.1
     "_configsvrRefineCollectionShardKey",
     "stageDebug",
@@ -13,8 +11,4 @@ export const commandsRemovedFromMongodSinceLastLTS = [
 // These commands were added in mongod since the last LTS version, so will not appear in the
 // listCommands output of a last LTS version mongod. We will allow these commands to have a
 // test defined without always existing on the mongod being used.
-export const commandsAddedToMongodSinceLastLTS = [
-    "clusterBulkWrite",
-    "setQuerySettings",
-    "removeQuerySettings",
-];
+export const commandsAddedToMongodSinceLastLTS = [];
