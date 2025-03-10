@@ -78,17 +78,16 @@ namespace {
 
 class WiredTigerRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelper {
 public:
-    WiredTigerRecoveryUnitHarnessHelper()
-        : _dbpath("wt_test"),
-          _engine(std::string{kWiredTigerEngineName},  // .canonicalName
-                  _dbpath.path(),                      // .path
-                  &_cs,                                // .cs
-                  "",                                  // .extraOpenOptions
-                  1,                                   // .cacheSizeMB
-                  0,                                   // .maxCacheOverflowFileSizeMB
-                  false,                               // .ephemeral
-                  false                                // .repair
-          ) {
+    WiredTigerRecoveryUnitHarnessHelper() : _dbpath("wt_test") {
+        WiredTigerKVEngine::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+        wtConfig.cacheSizeMB = 1;
+        _engine = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
+                                                       _dbpath.path(),
+                                                       &_cs,
+                                                       std::move(wtConfig),
+                                                       false,
+                                                       false);
+
         // Use a replica set so that writes to replicated collections are not journaled and thus
         // retain their timestamps.
         repl::ReplSettings replSettings;
@@ -97,13 +96,13 @@ public:
         repl::ReplicationCoordinator::set(getGlobalServiceContext(),
                                           std::make_unique<repl::ReplicationCoordinatorMock>(
                                               getGlobalServiceContext(), replSettings));
-        _engine.notifyStorageStartupRecoveryComplete();
+        _engine->notifyStorageStartupRecoveryComplete();
     }
 
     ~WiredTigerRecoveryUnitHarnessHelper() override {}
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::unique_ptr<RecoveryUnit>(_engine.newRecoveryUnit());
+        return std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit());
     }
 
     std::unique_ptr<RecordStore> createRecordStore(OperationContext* opCtx,
@@ -111,14 +110,16 @@ public:
         std::string ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
+        WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
+            getWiredTigerTableConfigFromStartupOptions();
+        wtTableConfig.keyFormat = KeyFormat::Long;
+        wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(nss);
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
             std::string{kWiredTigerEngineName},
             NamespaceStringUtil::serializeForCatalog(nss),
             ident,
             CollectionOptions(),
-            "",
-            KeyFormat::Long,
-            WiredTigerUtil::useTableLogging(nss),
+            wtTableConfig,
             nss.isOplog());
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
@@ -137,7 +138,7 @@ public:
         params.engineName = std::string{kWiredTigerEngineName};
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;
-        params.isEphemeral = false;
+        params.inMemory = false;
         params.isLogged = WiredTigerUtil::useTableLogging(nss);
         params.isChangeCollection = nss.isChangeCollection();
         params.sizeStorer = nullptr;
@@ -145,14 +146,14 @@ public:
         params.forceUpdateWithFullDocument = false;
 
         auto ret = std::make_unique<WiredTigerRecordStore>(
-            &_engine,
+            _engine.get(),
             WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
             params);
         return std::move(ret);
     }
 
     WiredTigerKVEngine* getEngine() {
-        return &_engine;
+        return _engine.get();
     }
 
     ClockSourceMock* getClockSourceMock() {
@@ -162,7 +163,7 @@ public:
 private:
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
-    WiredTigerKVEngine _engine;
+    std::unique_ptr<WiredTigerKVEngine> _engine;
 };
 
 std::unique_ptr<RecoveryUnitHarnessHelper> makeWTRUHarnessHelper() {

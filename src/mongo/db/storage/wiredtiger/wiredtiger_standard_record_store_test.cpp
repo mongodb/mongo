@@ -116,7 +116,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.engineName = std::string{kWiredTigerEngineName};
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;
-        params.isEphemeral = false;
+        params.inMemory = false;
         params.isLogged = false;
         params.isChangeCollection = false;
         params.sizeStorer = &ss;

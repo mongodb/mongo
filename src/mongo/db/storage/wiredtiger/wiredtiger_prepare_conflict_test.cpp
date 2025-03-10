@@ -56,14 +56,13 @@ namespace {
 std::unique_ptr<WiredTigerKVEngine> makeKVEngine(ServiceContext* serviceContext,
                                                  const std::string& path,
                                                  ClockSource* clockSource) {
+    WiredTigerKVEngine::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+    wtConfig.cacheSizeMB = 1;
     return std::make_unique<WiredTigerKVEngine>(
         /*canonicalName=*/"",
         path,
         clockSource,
-        /*extraOpenOptions=*/"",
-        // Refer to config string in WiredTigerCApiTest::RollbackToStable40.
-        /*cacheSizeMB=*/1,
-        /*maxHistoryFileSizeMB=*/0,
+        std::move(wtConfig),
         /*ephemeral=*/false,
         /*repair=*/false);
 }

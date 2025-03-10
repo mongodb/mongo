@@ -70,7 +70,7 @@ public:
     std::unique_ptr<RecordStore> newOplogRecordStore() override;
 
     KVEngine* getEngine() final {
-        return &_engine;
+        return _engine.get();
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
@@ -81,16 +81,16 @@ public:
     std::unique_ptr<RecordStore> newOplogRecordStoreNoInit();
 
     WiredTigerConnection& connection() {
-        return _engine.getConnection();
+        return _engine->getConnection();
     }
 
     WT_CONNECTION* conn() {
-        return _engine.getConn();
+        return _engine->getConn();
     }
 
 private:
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
-    WiredTigerKVEngine _engine;
+    std::unique_ptr<WiredTigerKVEngine> _engine;
 };
 }  // namespace mongo

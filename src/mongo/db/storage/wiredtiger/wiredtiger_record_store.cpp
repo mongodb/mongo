@@ -294,16 +294,13 @@ private:
     bool _saveStorageCursorOnDetachFromOperationContext = false;
 };
 
-
 // static
 StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     const std::string& engineName,
     StringData tableName,
     StringData ident,
     const CollectionOptions& options,
-    StringData extraStrings,
-    KeyFormat keyFormat,
-    bool loggingEnabled,
+    const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
     bool isOplog) {
 
     // Separate out a prefix and suffix in the default string. User configuration will
@@ -319,9 +316,6 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     ss << "leaf_value_max=64MB,";
 
     ss << "checksum=on,";
-    if (wiredTigerGlobalOptions.useCollectionPrefixCompression) {
-        ss << "prefix_compression,";
-    }
 
     ss << "block_compressor=";
     if (options.timeseries) {
@@ -329,14 +323,14 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
         ss << WiredTigerGlobalOptions::kDefaultTimeseriesCollectionCompressor;
     } else {
         // All other collections use the globally configured default.
-        ss << wiredTigerGlobalOptions.collectionBlockCompressor;
+        ss << wtTableConfig.blockCompressor;
     }
     ss << ",";
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(tableName);
 
-    ss << extraStrings << ",";
+    ss << wtTableConfig.extraCreateOptions << ",";
 
     StatusWith<std::string> customOptions =
         parseOptionsField(options.storageEngine.getObjectField(engineName));
@@ -360,9 +354,9 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
         // collection KeyFormat::String is sufficient.
         uassert(6144101,
                 "RecordStore with CollectionOptions.clusteredIndex requires KeyFormat::String",
-                keyFormat == KeyFormat::String);
+                wtTableConfig.keyFormat == KeyFormat::String);
     }
-    if (keyFormat == KeyFormat::String) {
+    if (wtTableConfig.keyFormat == KeyFormat::String) {
         // If the RecordId format is a String, assume a byte array key format.
         ss << "key_format=u";
     } else {
@@ -378,7 +372,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     }
     ss << ")";
 
-    if (loggingEnabled) {
+    if (wtTableConfig.logEnabled) {
         ss << ",log=(enabled=true)";
     } else {
         ss << ",log=(enabled=false)";
@@ -396,7 +390,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _engineName(params.engineName),
       _keyFormat(params.keyFormat),
       _overwrite(params.overwrite),
-      _isEphemeral(params.isEphemeral),
+      _inMemory(params.inMemory),
       _isLogged(params.isLogged),
       _isChangeCollection(params.isChangeCollection),
       _forceUpdateWithFullDocument(params.forceUpdateWithFullDocument),
@@ -505,7 +499,7 @@ long long WiredTigerRecordStore::numRecords() const {
 int64_t WiredTigerRecordStore::storageSize(RecoveryUnit& ru,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel) const {
-    if (_isEphemeral) {
+    if (_inMemory) {
         return dataSize();
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
@@ -1052,7 +1046,7 @@ StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
 void WiredTigerRecordStore::validate(RecoveryUnit& ru,
                                      const CollectionValidation::ValidationOptions& options,
                                      ValidateResults* results) {
-    if (_isEphemeral) {
+    if (_inMemory) {
         return;
     }
 
@@ -1472,7 +1466,7 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
               .engineName = oplogParams.engineName,
               .keyFormat = KeyFormat::Long,
               .overwrite = true,
-              .isEphemeral = oplogParams.isEphemeral,
+              .inMemory = oplogParams.inMemory,
               .isLogged = true,
               .isChangeCollection = false,
               .sizeStorer = oplogParams.sizeStorer,
@@ -1508,7 +1502,7 @@ std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getCursor(
 void WiredTigerRecordStore::Oplog::validate(RecoveryUnit& ru,
                                             const CollectionValidation::ValidationOptions& options,
                                             ValidateResults* results) {
-    if (_isEphemeral) {
+    if (_inMemory) {
         return;
     }
 

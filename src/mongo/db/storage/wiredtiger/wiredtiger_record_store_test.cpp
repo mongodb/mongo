@@ -762,14 +762,16 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const std::string ns = "testRecordStore";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
     const std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
+        getWiredTigerTableConfigFromStartupOptions();
+    wtTableConfig.keyFormat = KeyFormat::String;
+    wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(nss);
     const StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
                                                     NamespaceStringUtil::serializeForCatalog(nss),
                                                     "",
                                                     CollectionOptions(),
-                                                    "",
-                                                    KeyFormat::String,
-                                                    WiredTigerUtil::useTableLogging(nss));
+                                                    wtTableConfig);
     ASSERT_TRUE(result.isOK());
     const std::string config = result.getValue();
 
@@ -788,7 +790,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.engineName = std::string{kWiredTigerEngineName};
     params.keyFormat = KeyFormat::String;
     params.overwrite = false;
-    params.isEphemeral = false;
+    params.inMemory = false;
     params.isLogged = WiredTigerUtil::useTableLogging(nss);
     params.isChangeCollection = false;
     params.sizeStorer = nullptr;

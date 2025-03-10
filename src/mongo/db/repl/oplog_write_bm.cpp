@@ -165,7 +165,7 @@ public:
 
         _tempDir.emplace("oplog_write_bm_data");
         storageGlobalParams.dbpath = _tempDir->path();
-        storageGlobalParams.ephemeral = false;
+        storageGlobalParams.inMemory = false;
 
         Client::initThread("oplog write main", getGlobalServiceContext()->getService());
         _client = Client::getCurrent();
@@ -261,7 +261,7 @@ public:
         // Restart storage engine.
         _tempDir.emplace("oplog_write_bm_data");
         storageGlobalParams.dbpath = _tempDir->path();
-        storageGlobalParams.ephemeral = false;
+        storageGlobalParams.inMemory = false;
 
         auto uniqueOpCtx = _svcCtx->makeOperationContext(&cc());
         shard_role_details::setRecoveryUnit(uniqueOpCtx.get(),

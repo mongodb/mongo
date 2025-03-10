@@ -50,7 +50,6 @@ public:
           maxCacheOverflowFileSizeGBDeprecated(0),
           liveRestoreThreads(0),
           liveRestoreReadSizeMB(0),
-          useCollectionPrefixCompression(false),
           useIndexPrefixCompression(false){};
 
     Status store(const optionenvironment::Environment& params);
@@ -67,7 +66,6 @@ public:
     double liveRestoreReadSizeMB;
 
     std::string collectionBlockCompressor;
-    bool useCollectionPrefixCompression;
     bool useIndexPrefixCompression;
     std::string collectionConfig;
     std::string indexConfig;

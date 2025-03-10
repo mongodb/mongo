@@ -60,7 +60,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_base.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/platform/atomic_word.h"
@@ -85,14 +84,42 @@ namespace mongo {
 
 class RecoveryUnit;
 class WiredTigerConnection;
-class WiredTigerSizeStorer;
+class WiredTigerKVEngine;
 class WiredTigerOplogData;
 class WiredTigerOplogTruncateMarkers;
+class WiredTigerSizeStorer;
 
 class WiredTigerRecordStore : public RecordStoreBase {
 public:
     class Capped;
     class Oplog;
+
+    // Encapsulates configuration parameters to configure a WiredTiger table.
+    struct WiredTigerTableConfig {
+        // This specifies the value for the key_format configuration parameter.
+        KeyFormat keyFormat;
+        // This specifies the value for the log.enabled configuration parameter.
+        bool logEnabled{true};
+        // This specifies the value for the block_compressor configuration parameter.
+        std::string blockCompressor{"snappy"};
+        // Any additional configuration parameters for WT_SESSION::create() in the configuration
+        // string format.
+        std::string extraCreateOptions;
+    };
+
+    struct Params {
+        boost::optional<UUID> uuid;
+        std::string ident;
+        std::string engineName;
+        KeyFormat keyFormat;
+        bool overwrite;
+        bool inMemory;
+        bool isLogged;
+        bool isChangeCollection;
+        WiredTigerSizeStorer* sizeStorer;
+        bool tracksSizeAdjustments;
+        bool forceUpdateWithFullDocument;
+    };
 
     /**
      * Parses collections options for wired tiger configuration string for table creation.
@@ -113,28 +140,13 @@ public:
      * Note that even if this function returns an OK status, WT_SESSION:create() may still
      * fail with the constructed configuration string.
      */
-    static StatusWith<std::string> generateCreateString(const std::string& engineName,
-                                                        StringData tableName,
-                                                        StringData ident,
-                                                        const CollectionOptions& options,
-                                                        StringData extraStrings,
-                                                        KeyFormat keyFormat,
-                                                        bool loggingEnabled,
-                                                        bool isOplog = false);
-
-    struct Params {
-        boost::optional<UUID> uuid;
-        std::string ident;
-        std::string engineName;
-        KeyFormat keyFormat;
-        bool overwrite;
-        bool isEphemeral;
-        bool isLogged;
-        bool isChangeCollection;
-        WiredTigerSizeStorer* sizeStorer;
-        bool tracksSizeAdjustments;
-        bool forceUpdateWithFullDocument;
-    };
+    static StatusWith<std::string> generateCreateString(
+        const std::string& engineName,
+        StringData tableName,
+        StringData ident,
+        const CollectionOptions& options,
+        const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
+        bool isOplog = false);
 
     WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, WiredTigerRecoveryUnit&, Params params);
 
@@ -165,7 +177,7 @@ public:
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const override;
 
     bool compactSupported() const override {
-        return !_isEphemeral;
+        return !_inMemory;
     }
 
     void validate(RecoveryUnit& ru,
@@ -304,7 +316,7 @@ protected:
     // Whether or not to allow writes to overwrite existing records with the same RecordId.
     const bool _overwrite;
     // True if the storage engine is an in-memory storage engine
-    const bool _isEphemeral;
+    const bool _inMemory;
     // True if WiredTiger is logging updates to this table
     const bool _isLogged;
     // True if the namespace of this record store starts with "config.system.change_collection", and
@@ -358,7 +370,7 @@ public:
         UUID uuid;
         std::string ident;
         std::string engineName;
-        bool isEphemeral;
+        bool inMemory;
         int64_t oplogMaxSize;
         WiredTigerSizeStorer* sizeStorer;
         bool tracksSizeAdjustments;

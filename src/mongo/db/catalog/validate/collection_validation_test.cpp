@@ -97,10 +97,10 @@ private:
     };
 };
 
-// Calling verify() is not possible on an ephemeral instance.
+// Calling verify() is not possible on an in-memory instance.
 class CollectionValidationDiskTest : public CollectionValidationTest {
 protected:
-    CollectionValidationDiskTest() : CollectionValidationTest(Options{}.ephemeral(false)) {}
+    CollectionValidationDiskTest() : CollectionValidationTest(Options{}.inMemory(false)) {}
 };
 
 /**

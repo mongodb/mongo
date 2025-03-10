@@ -227,7 +227,8 @@ public:
     virtual bool supportsCheckpoints() const = 0;
 
     /**
-     * Returns true if the engine does not persist data to disk; false otherwise.
+     * Returns true if the KVEngine is ephemeral -- that is, it is NOT persistent and all data is
+     * lost after shutdown. Otherwise, returns false.
      */
     virtual bool isEphemeral() const = 0;
 

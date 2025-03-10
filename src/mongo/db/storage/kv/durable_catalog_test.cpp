@@ -241,7 +241,7 @@ private:
 
 class ImportCollectionTest : public DurableCatalogTest {
 public:
-    explicit ImportCollectionTest() : DurableCatalogTest(Options{}.ephemeral(false)) {}
+    explicit ImportCollectionTest() : DurableCatalogTest(Options{}.inMemory(false)) {}
 
 protected:
     void setUp() override {

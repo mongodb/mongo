@@ -86,8 +86,8 @@ struct StorageGlobalParams {
     // --magicRestore
     bool magicRestore;
 
-    // Whether the Storage Engine selected should be ephemeral in nature or not.
-    bool ephemeral = false;
+    // Whether the Storage Engine selected should be in-memory in nature or not.
+    bool inMemory = false;
 
     // --journalCommitInterval
     // This parameter is both a server parameter and a configuration parameter, and to resolve

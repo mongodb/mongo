@@ -167,7 +167,7 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
 
     storageGlobalParams.dbpath = _tempDir.path();
 
-    storageGlobalParams.ephemeral = options._ephemeral;
+    storageGlobalParams.inMemory = options._inMemory;
 
     // Since unit tests start in their own directories, by default skip lock file and metadata file
     // for faster startup.

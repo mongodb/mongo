@@ -209,7 +209,7 @@ public:
 
 class StorageEngineRepairTest : public StorageEngineTest {
 public:
-    StorageEngineRepairTest() : StorageEngineTest(Options{}.enableRepair().ephemeral(false)) {
+    StorageEngineRepairTest() : StorageEngineTest(Options{}.enableRepair().inMemory(false)) {
         repl::StorageInterface::set(getServiceContext(),
                                     std::make_unique<repl::StorageInterfaceImpl>());
     }
@@ -232,7 +232,7 @@ public:
 
 class StorageEngineTestNotEphemeral : public StorageEngineTest {
 public:
-    StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.ephemeral(false)){};
+    StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.inMemory(false)){};
 };
 
 }  // namespace mongo
