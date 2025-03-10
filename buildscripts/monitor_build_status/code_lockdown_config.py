@@ -11,14 +11,13 @@ class ThresholdConfig(BaseModel):
     grace_period_days: int
 
 
-class BfThresholds(BaseModel):
-    hot_bf: ThresholdConfig
-    cold_bf: ThresholdConfig
-    perf_bf: ThresholdConfig
+class IssueThresholds(BaseModel):
+    hot: ThresholdConfig
+    cold: ThresholdConfig
 
 
 class Defaults(BaseModel):
-    thresholds: BfThresholds
+    thresholds: IssueThresholds
     slack_tags: List[str]
 
 
@@ -30,14 +29,14 @@ class DefaultsConfig(BaseModel):
 
 class TeamConfig(BaseModel):
     name: str
-    thresholds: Optional[BfThresholds]
+    thresholds: Optional[IssueThresholds]
     slack_tags: Optional[List[str]]
 
 
 class GroupConfig(BaseModel):
     name: str
     teams: List[str]
-    thresholds: Optional[BfThresholds]
+    thresholds: Optional[IssueThresholds]
     slack_tags: Optional[List[str]]
 
 
@@ -74,11 +73,11 @@ class CodeLockdownConfig(BaseModel):
 
         return []
 
-    def get_overall_thresholds(self) -> BfThresholds:
+    def get_overall_thresholds(self) -> IssueThresholds:
         """Get overall thresholds."""
         return self.defaults.overall.thresholds
 
-    def get_group_thresholds(self, group_name: str) -> BfThresholds:
+    def get_group_thresholds(self, group_name: str) -> IssueThresholds:
         """
         Get group or default thresholds.
 
@@ -91,7 +90,7 @@ class CodeLockdownConfig(BaseModel):
 
         return self.defaults.group.thresholds
 
-    def get_team_thresholds(self, team_name: str) -> BfThresholds:
+    def get_team_thresholds(self, team_name: str) -> IssueThresholds:
         """
         Get team or default thresholds.
 

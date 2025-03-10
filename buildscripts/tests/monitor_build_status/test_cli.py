@@ -18,6 +18,7 @@ class TestSummarize(unittest.TestCase):
             f"{under_test.SummaryMsg.PREFIX.value} "
             f"{under_test.SummaryMsg.BELOW_THRESHOLDS.value}\n\n"
             f"{under_test.SummaryMsg.PLAYBOOK_REFERENCE.value}\n"
+            f"{under_test.SummaryMsg.DASHBOARD_REFERENCE.value}"
         )
 
         self.assertEqual(summary, expected_summary)
@@ -36,6 +37,7 @@ class TestSummarize(unittest.TestCase):
             f"{under_test.SummaryMsg.PREFIX.value} "
             f"{under_test.SummaryMsg.BELOW_THRESHOLDS.value}\n\n"
             f"{under_test.SummaryMsg.PLAYBOOK_REFERENCE.value}\n"
+            f"{under_test.SummaryMsg.DASHBOARD_REFERENCE.value}"
         )
 
         self.assertEqual(summary, expected_summary)
@@ -55,6 +57,7 @@ class TestSummarize(unittest.TestCase):
             f"{under_test.SummaryMsg.THRESHOLD_EXCEEDED.value}\n"
             f"\t- Scope 1\n\t- Scope 2\n\t- Scope 3\n\n"
             f"{under_test.SummaryMsg.PLAYBOOK_REFERENCE.value}\n"
+            f"{under_test.SummaryMsg.DASHBOARD_REFERENCE.value}"
         )
 
         self.assertEqual(summary, expected_summary)

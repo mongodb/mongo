@@ -1,39 +1,30 @@
 defaults:
   overall:
     thresholds:
-      hot_bf:
-        count: 30
+      hot:
+        count: 70 # temporary while we get AFs under control, then should reduce to 60
         grace_period_days: 7
-      cold_bf:
+      cold:
         count: 100
-        grace_period_days: 7
-      perf_bf:
-        count: 30
         grace_period_days: 7
     slack_tags:
       - "<!here>"
   group:
     thresholds:
-      hot_bf:
-        count: 8
+      hot:
+        count: 16
         grace_period_days: 7
-      cold_bf:
+      cold:
         count: 32
         grace_period_days: 7
-      perf_bf:
-        count: 8
-        grace_period_days: 14
     slack_tags: []
   team:
     thresholds:
-      hot_bf:
-        count: 3
+      hot:
+        count: 6
         grace_period_days: 2
-      cold_bf:
+      cold:
         count: 10
-        grace_period_days: 2
-      perf_bf:
-        count: 3
         grace_period_days: 2
     slack_tags: []
 
@@ -47,14 +38,11 @@ groups:
   #     - "Team Name 2"
   #     - "Team Name 3"
   #   thresholds:  # Optional, group default thresholds will be used if absent
-  #     hot_bf:
+  #     hot:
   #       count: 15
   #       grace_period_days: 7
-  #     cold_bf:
+  #     cold:
   #       count: 50
-  #       grace_period_days: 7
-  #     perf_bf:
-  #       count: 15
   #       grace_period_days: 7
   #   slack_tags:  # Optional, group default slack_tags will be used if absent
   #     - "<!here>" # This is equivalent to "@here"
@@ -119,14 +107,11 @@ teams:
   #######################################################################
   # - name: "Team Name"  # Should exactly match "Assigned Teams" Jira BF field value
   #   thresholds:  # Optional, team default thresholds will be used if absent
-  #     hot_bf:
+  #     hot:
   #       count: 3
   #       grace_period_days: 2
-  #     cold_bf:
+  #     cold:
   #       count: 10
-  #       grace_period_days: 2
-  #     perf_bf:
-  #       count: 5
   #       grace_period_days: 2
   #   slack_tags:  # Optional, team default slack_tags will be used if absent
   #     - "<!here>" # This is equivalent to "@here"

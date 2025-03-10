@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from statistics import median
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, List, Tuple
 
 import structlog
 import typer
@@ -17,26 +17,23 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from buildscripts.client.jiraclient import JiraAuth, JiraClient
-from buildscripts.monitor_build_status.bfs_report import BfCategory, BFsReport
 from buildscripts.monitor_build_status.code_lockdown_config import (
-    BfThresholds,
     CodeLockdownConfig,
+    IssueThresholds,
 )
 from buildscripts.monitor_build_status.evergreen_service import (
     EvergreenService,
-    EvgProjectsInfo,
     TaskStatusCounts,
 )
-from buildscripts.monitor_build_status.jira_service import (
-    JiraCustomFieldName,
-    JiraService,
-)
+from buildscripts.monitor_build_status.issue_report import IssueCategory, IssueReport
+from buildscripts.monitor_build_status.jira_service import JiraService
 from buildscripts.resmokelib.utils.evergreen_conn import get_evergreen_api
 from buildscripts.util.cmdutils import enable_logging
 
 LOGGER = structlog.get_logger(__name__)
 
 BLOCK_ON_RED_PLAYBOOK_URL = "http://go/blockonred"
+DASHBOARD_URL = "https://jira.mongodb.org/secure/Dashboard.jspa?selectPageId=33310"
 CODE_LOCKDOWN_CONFIG = "etc/code_lockdown.yml"
 
 JIRA_SERVER = "https://jira.mongodb.org"
@@ -46,20 +43,10 @@ SLACK_CHANNEL = "#10gen-mongo-code-lockdown"
 EVERGREEN_LOOKBACK_DAYS = 14
 
 
-def iterable_to_jql(entries: Iterable[str]) -> str:
-    return ", ".join(f'"{entry}"' for entry in entries)
-
-
-JIRA_PROJECTS = {"Build Failures"}
-END_STATUSES = {"Needs Triage", "Open", "In Progress", "Waiting for Bug Fix"}
-PRIORITIES = {"Blocker - P1", "Critical - P2", "Major - P3", "Minor - P4"}
-EXCLUDE_LABELS = {"exclude-from-master-quota"}
-ACTIVE_BFS_QUERY = (
-    f"project in ({iterable_to_jql(JIRA_PROJECTS)})"
-    f" AND status in ({iterable_to_jql(END_STATUSES)})"
-    f" AND priority in ({iterable_to_jql(PRIORITIES)})"
-    f" AND (labels not in ({iterable_to_jql(EXCLUDE_LABELS)}) OR labels is EMPTY)"
-)
+# filter 53085 is all issues in scope
+# filter 53200 identifies those which are hot
+HOT_QUERY = "filter = 53085 AND filter = 53200"
+COLD_QUERY = "filter = 53085 AND filter != 53200"
 
 
 class CodeMergeStatus(Enum):
@@ -83,6 +70,7 @@ class SummaryMsg(Enum):
     )
 
     PLAYBOOK_REFERENCE = f"Refer to our playbook at <{BLOCK_ON_RED_PLAYBOOK_URL}> for details."
+    DASHBOARD_REFERENCE = f"Drill into the data using the <{DASHBOARD_URL}|Jira Dashboard>."
 
 
 class MonitorBuildStatusOrchestrator:
@@ -105,12 +93,12 @@ class MonitorBuildStatusOrchestrator:
         evg_project_names = evg_projects_info.branch_to_projects_map[branch]
         LOGGER.info("Got Evergreen projects data")
 
-        bfs_report = self._make_bfs_report(evg_projects_info)
-        bf_count_status_msg, bf_count_percentages = self._get_bf_counts_status(
-            bfs_report, self.code_lockdown_config
+        issue_report = self._make_report()
+        issue_count_status_msg, issue_count_percentages = self._get_issue_counts_status(
+            issue_report, self.code_lockdown_config
         )
-        status_message = f"{status_message}\n{bf_count_status_msg}\n"
-        scope_percentages.update(bf_count_percentages)
+        status_message = f"{status_message}\n{issue_count_status_msg}\n"
+        scope_percentages.update(issue_count_percentages)
 
         # We are looking for Evergreen versions that started before the beginning of yesterday
         # to give them time to complete
@@ -140,57 +128,51 @@ class MonitorBuildStatusOrchestrator:
                 msg=status_message.strip(),
             )
 
-    def _make_bfs_report(self, evg_projects_info: EvgProjectsInfo) -> BFsReport:
-        query = (
-            f'{ACTIVE_BFS_QUERY} AND "{JiraCustomFieldName.EVERGREEN_PROJECT}" in'
-            f" ({iterable_to_jql(evg_projects_info.active_project_names)})"
-        )
-        LOGGER.info("Getting active BFs from Jira", query=query)
+    def _make_report(self) -> IssueReport:
+        LOGGER.info("Getting hot issues from Jira", query=HOT_QUERY)
+        hot_issues = self.jira_service.fetch_issues(HOT_QUERY)
+        LOGGER.info("Getting cold issues from Jira", query=COLD_QUERY)
+        cold_issues = self.jira_service.fetch_issues(COLD_QUERY)
 
-        active_bfs = self.jira_service.fetch_bfs(query)
-        LOGGER.info("Got active BFs", count=len(active_bfs))
+        LOGGER.info("Got active Issues", count_hot=len(hot_issues), count_cold=len(cold_issues))
 
-        bfs_report = BFsReport.empty()
-        for bf in active_bfs:
-            bfs_report.add_bf_data(bf)
+        report = IssueReport.empty()
+        report.add_issues(hot=hot_issues, cold=cold_issues)
 
-        return bfs_report
+        return report
 
     @staticmethod
-    def _get_bf_counts_status(
-        bfs_report: BFsReport, code_lockdown_config: CodeLockdownConfig
+    def _get_issue_counts_status(
+        bfs_report: IssueReport, code_lockdown_config: CodeLockdownConfig
     ) -> Tuple[str, Dict[str, List[float]]]:
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         percentages: Dict[str, List[float]] = {}
 
-        status_message = "`[STATUS]` The current BF count"
-        headers = ["Scope", "Hot BFs", "Cold BFs", "Perf BFs"]
+        status_message = "`[STATUS]` The current issue count"
+        headers = ["Scope", "Hot Issues", "Cold Issues"]
         table_data = []
 
         def _process_thresholds(
             scope: str,
-            hot_bf_count: int,
-            cold_bf_count: int,
-            perf_bf_count: int,
-            thresholds: BfThresholds,
+            hot_issue_count: int,
+            cold_issue_count: int,
+            thresholds: IssueThresholds,
             slack_tags: List[str],
         ) -> None:
-            if all(count == 0 for count in [hot_bf_count, cold_bf_count, perf_bf_count]):
+            if all(count == 0 for count in [hot_issue_count, cold_issue_count]):
                 return
 
-            hot_bf_percentage = hot_bf_count / thresholds.hot_bf.count * 100
-            cold_bf_percentage = cold_bf_count / thresholds.cold_bf.count * 100
-            perf_bf_percentage = perf_bf_count / thresholds.perf_bf.count * 100
+            hot_bf_percentage = hot_issue_count / thresholds.hot.count * 100
+            cold_bf_percentage = cold_issue_count / thresholds.cold.count * 100
 
             label = f"{scope} {' '.join(slack_tags)}"
-            percentages[label] = [hot_bf_percentage, cold_bf_percentage, perf_bf_percentage]
+            percentages[label] = [hot_bf_percentage, cold_bf_percentage]
 
             table_data.append(
                 [
                     scope,
-                    f"{hot_bf_percentage:.0f}% ({hot_bf_count} / {thresholds.hot_bf.count})",
-                    f"{cold_bf_percentage:.0f}% ({cold_bf_count} / {thresholds.cold_bf.count})",
-                    f"{perf_bf_percentage:.0f}% ({perf_bf_count} / {thresholds.perf_bf.count})",
+                    f"{hot_bf_percentage:.0f}% ({hot_issue_count} / {thresholds.hot.count})",
+                    f"{cold_bf_percentage:.0f}% ({cold_issue_count} / {thresholds.cold.count})",
                 ]
             )
 
@@ -198,17 +180,13 @@ class MonitorBuildStatusOrchestrator:
         overall_slack_tags = code_lockdown_config.get_overall_slack_tags()
         _process_thresholds(
             "[Org] Overall",
-            bfs_report.get_bf_count(
-                BfCategory.HOT,
-                now - timedelta(days=overall_thresholds.hot_bf.grace_period_days),
+            bfs_report.get_issue_count(
+                IssueCategory.HOT,
+                now - timedelta(days=overall_thresholds.hot.grace_period_days),
             ),
-            bfs_report.get_bf_count(
-                BfCategory.COLD,
-                now - timedelta(days=overall_thresholds.cold_bf.grace_period_days),
-            ),
-            bfs_report.get_bf_count(
-                BfCategory.PERF,
-                now - timedelta(days=overall_thresholds.perf_bf.grace_period_days),
+            bfs_report.get_issue_count(
+                IssueCategory.COLD,
+                now - timedelta(days=overall_thresholds.cold.grace_period_days),
             ),
             overall_thresholds,
             overall_slack_tags,
@@ -220,19 +198,14 @@ class MonitorBuildStatusOrchestrator:
             group_slack_tags = code_lockdown_config.get_group_slack_tags(group_name)
             _process_thresholds(
                 f"[Group] {group_name}",
-                bfs_report.get_bf_count(
-                    BfCategory.HOT,
-                    now - timedelta(days=group_thresholds.hot_bf.grace_period_days),
+                bfs_report.get_issue_count(
+                    IssueCategory.HOT,
+                    now - timedelta(days=group_thresholds.hot.grace_period_days),
                     group_teams,
                 ),
-                bfs_report.get_bf_count(
-                    BfCategory.COLD,
-                    now - timedelta(days=group_thresholds.cold_bf.grace_period_days),
-                    group_teams,
-                ),
-                bfs_report.get_bf_count(
-                    BfCategory.PERF,
-                    now - timedelta(days=group_thresholds.perf_bf.grace_period_days),
+                bfs_report.get_issue_count(
+                    IssueCategory.COLD,
+                    now - timedelta(days=group_thresholds.cold.grace_period_days),
                     group_teams,
                 ),
                 group_thresholds,
@@ -244,19 +217,14 @@ class MonitorBuildStatusOrchestrator:
             team_slack_tags = code_lockdown_config.get_team_slack_tags(assigned_team)
             _process_thresholds(
                 f"[Team] {assigned_team}",
-                bfs_report.get_bf_count(
-                    BfCategory.HOT,
-                    now - timedelta(days=team_thresholds.hot_bf.grace_period_days),
+                bfs_report.get_issue_count(
+                    IssueCategory.HOT,
+                    now - timedelta(days=team_thresholds.hot.grace_period_days),
                     [assigned_team],
                 ),
-                bfs_report.get_bf_count(
-                    BfCategory.COLD,
-                    now - timedelta(days=team_thresholds.cold_bf.grace_period_days),
-                    [assigned_team],
-                ),
-                bfs_report.get_bf_count(
-                    BfCategory.PERF,
-                    now - timedelta(days=team_thresholds.perf_bf.grace_period_days),
+                bfs_report.get_issue_count(
+                    IssueCategory.COLD,
+                    now - timedelta(days=team_thresholds.cold.grace_period_days),
                     [assigned_team],
                 ),
                 team_thresholds,
@@ -264,7 +232,7 @@ class MonitorBuildStatusOrchestrator:
             )
 
         table_str = tabulate(
-            table_data, headers, tablefmt="outline", colalign=("left", "right", "right", "right")
+            table_data, headers, tablefmt="outline", colalign=("left", "right", "right")
         )
         status_message = f"{status_message}\n```\n{table_str}\n```"
 
@@ -359,7 +327,7 @@ class MonitorBuildStatusOrchestrator:
             for scope in red_scopes:
                 summary = f"{summary}\n\t- {scope}"
 
-        summary = f"{summary}\n\n{SummaryMsg.PLAYBOOK_REFERENCE.value}\n"
+        summary = f"{summary}\n\n{SummaryMsg.PLAYBOOK_REFERENCE.value}\n{SummaryMsg.DASHBOARD_REFERENCE.value}"
 
         return summary
 
