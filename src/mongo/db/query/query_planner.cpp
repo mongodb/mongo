@@ -103,7 +103,6 @@
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/query/util/set_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"

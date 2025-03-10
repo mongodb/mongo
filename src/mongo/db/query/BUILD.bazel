@@ -433,7 +433,6 @@ mongo_cc_library(
         "//src/mongo/db/query/plan_enumerator:enumerator_memo.cpp",
         "//src/mongo/db/query/plan_enumerator:memo_prune.cpp",
         "//src/mongo/db/query/plan_enumerator:plan_enumerator.cpp",
-        "//src/mongo/db/query/util:set_util.h",
         "//src/mongo/util:map_utils.h",
     ],
     hdrs = [
