@@ -7,10 +7,9 @@ ExpressionConcat
     in 
         if (typeMatch(l4.0, 1088) ?: true) 
         then null 
-        else 
-            if isString(l4.0) 
-            then concat("This is", " a ", move(l4.0)) 
-            else fail(7158201, "$concat supports only strings") 
+        elif isString(l4.0) 
+        then concat("This is", " a ", move(l4.0)) 
+        else fail(7158201, "$concat supports only strings") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionReplaceOne
@@ -23,13 +22,11 @@ ExpressionReplaceOne
             l12.0 = (typeMatch(l11.0, 1088) ?: true) 
         ] 
         in 
-            if (l12.0 || isString(l11.0)) 
-            then 
-                if move(l12.0) 
-                then null 
-                else replaceOne(move(l11.0), "test", "nice place") 
-            
-            else fail(7158302, "$replaceOne requires that 'input' be a string") 
+            if !((l12.0 || isString(l11.0))) 
+            then fail(7158302, "$replaceOne requires that 'input' be a string") 
+            elif move(l12.0) 
+            then null 
+            else replaceOne(move(l11.0), "test", "nice place") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionSplit
@@ -40,14 +37,11 @@ ExpressionSplit
     in 
         if (typeMatch(l15.0, 1088) ?: true) 
         then null 
-        else 
-            if isString(l15.0) 
-            then 
-                if (l15.0 == "") 
-                then [""] 
-                else split(move(l15.0), " ") 
-            
-            else fail(7158202, "$split string expression must be a string") 
+        elif !(isString(l15.0)) 
+        then fail(7158202, "$split string expression must be a string") 
+        elif (l15.0 == "") 
+        then [""] 
+        else split(move(l15.0), " ") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionStrcasecmp
@@ -72,10 +66,9 @@ ExpressionSubstrBytes
     in substrBytes(
         if (typeMatch(l22.0, 1088) ?: true) 
         then "" 
-        else 
-            if (coerceToString(l22.0) ?: true) 
-            then fail(5155608, "$substrBytes: string expression could not be resolved to a string") 
-            else coerceToString(move(l22.0)) 
+        elif (coerceToString(l22.0) ?: true) 
+        then fail(5155608, "$substrBytes: string expression could not be resolved to a string") 
+        else coerceToString(move(l22.0)) 
    , 10ll, 4ll) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
@@ -87,10 +80,9 @@ ExpressionSubstrCP
     in substrCP(
         if (typeMatch(l26.0, 1088) ?: true) 
         then "" 
-        else 
-            if (coerceToString(l26.0) ?: true) 
-            then fail(5155708, "$substrCP: string expression could not be resolved to a string") 
-            else coerceToString(move(l26.0)) 
+        elif (coerceToString(l26.0) ?: true) 
+        then fail(5155708, "$substrCP: string expression could not be resolved to a string") 
+        else coerceToString(move(l26.0)) 
    , 10, 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
@@ -152,10 +144,9 @@ ExpressionTrim
     in 
         if (typeMatch(l37.0, 1088) ?: true) 
         then null 
-        else 
-            if isString(l37.0) 
-            then trim(move(l37.0), ".") 
-            else fail(5156302, "$trim input expression must be a string") 
+        elif isString(l37.0) 
+        then trim(move(l37.0), ".") 
+        else fail(5156302, "$trim input expression must be a string") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionIndexOfBytes
@@ -166,14 +157,13 @@ ExpressionIndexOfBytes
     in 
         if (typeMatch(l41.0, 1088) ?: true) 
         then null 
-        else 
-            if isString(l41.0) 
-            then indexOfBytes(move(l41.0), "is", 
-                if (!(isNaN(0ll)) && false) 
-                then fail(7158004, "$indexOfBytes start index must be positive") 
-                else 0ll 
-           ) 
-            else fail(7158007, "$indexOfBytes string must resolve to a string or null") 
+        elif isString(l41.0) 
+        then indexOfBytes(move(l41.0), "is", 
+            if (!(isNaN(0ll)) && false) 
+            then fail(7158004, "$indexOfBytes start index must be positive") 
+            else 0ll 
+       ) 
+        else fail(7158007, "$indexOfBytes string must resolve to a string or null") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionIndexOfCP
@@ -184,14 +174,13 @@ ExpressionIndexOfCP
     in 
         if (typeMatch(l45.0, 1088) ?: true) 
         then null 
-        else 
-            if isString(l45.0) 
-            then indexOfCP(move(l45.0), "is", 
-                if (!(isNaN(4)) && false) 
-                then fail(7158004, "$indexOfCP start index must be positive") 
-                else 4ll 
-           ) 
-            else fail(7158007, "$indexOfCP string must resolve to a string or null") 
+        elif isString(l45.0) 
+        then indexOfCP(move(l45.0), "is", 
+            if (!(isNaN(4)) && false) 
+            then fail(7158004, "$indexOfCP start index must be positive") 
+            else 4ll 
+       ) 
+        else fail(7158007, "$indexOfCP string must resolve to a string or null") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionIndexOfCP
@@ -202,18 +191,17 @@ ExpressionIndexOfCP
     in 
         if (typeMatch(l50.0, 1088) ?: true) 
         then null 
-        else 
-            if isString(l50.0) 
-            then indexOfCP(move(l50.0), " ", 
-                if (!(isNaN(1)) && false) 
-                then fail(7158004, "$indexOfCP start index must be positive") 
-                else 1ll 
-           , 
-                if (!(isNaN(3)) && false) 
-                then fail(7158006, "$indexOfCP end index must be positive") 
-                else 3ll 
-           ) 
-            else fail(7158007, "$indexOfCP string must resolve to a string or null") 
+        elif isString(l50.0) 
+        then indexOfCP(move(l50.0), " ", 
+            if (!(isNaN(1)) && false) 
+            then fail(7158004, "$indexOfCP start index must be positive") 
+            else 1ll 
+       , 
+            if (!(isNaN(3)) && false) 
+            then fail(7158006, "$indexOfCP end index must be positive") 
+            else 3ll 
+       ) 
+        else fail(7158007, "$indexOfCP string must resolve to a string or null") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionRegexFind

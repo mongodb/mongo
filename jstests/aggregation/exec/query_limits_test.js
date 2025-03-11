@@ -48,6 +48,34 @@ function testLargeIn() {
     runAgg([{$match: {a: {$in: filterValsDoubles}}}]);
 }
 
+// Construct a big $switch statement.
+function testLargeSwitch() {
+    jsTestLog("Testing large $switch");
+    const cases = range(150000)
+                      .map(function(i) {
+                          return {case: {$gt: ["$a", i]}, then: i};
+                      })
+                      .reverse();
+    runAgg([{$project: {b: {$switch: {branches: cases, default: 345678}}}}]);
+}
+
+// Construct a big $bucket statement.
+function testLargeBucket() {
+    jsTestLog("Testing large $bucket");
+    let boundaries = [];
+    for (let i = 0; i < 100000; i++) {
+        boundaries.push(i);
+    }
+    runAgg([{
+        $bucket: {
+            groupBy: "$a",
+            boundaries: boundaries,
+            default: "default",
+            output: {"count": {$sum: 1}}
+        }
+    }]);
+}
+
 // Construct a {$project: {a0: 1, a1: 1, ...}}.
 function testLargeProject() {
     jsTestLog("Testing large $project");
@@ -216,6 +244,8 @@ function testLargeSetFunction() {
 
 const tests = [
     testLargeIn,
+    testLargeSwitch,
+    testLargeBucket,
     testLargeProject,
     testLargeAndOrPredicates,
     testDeeplyNestedPath,

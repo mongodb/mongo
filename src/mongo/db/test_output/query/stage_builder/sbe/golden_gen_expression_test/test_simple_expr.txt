@@ -24,10 +24,9 @@ ExpressionObjectToArray
         else 
             if (typeMatch(s1, 1088) ?: true) 
             then null 
-            else 
-                if isObject(s1) 
-                then Nothing 
-                else fail(5153215, "$objectToArray requires an object input") 
+            elif isObject(s1) 
+            then Nothing 
+            else fail(5153215, "$objectToArray requires an object input") 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionArrayToObject
@@ -37,10 +36,9 @@ ExpressionBsonSize
 
     if (typeMatch(s1, 1088) ?: true) 
     then null 
-    else 
-        if isObject(s1) 
-        then bsonSize(s1) 
-        else fail(7158301, "$bsonSize requires a document input") 
+    elif isObject(s1) 
+    then bsonSize(s1) 
+    else fail(7158301, "$bsonSize requires a document input") 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionIfNull
@@ -86,17 +84,15 @@ ExpressionLet
             in 
                 if (typeMatch(l28.0, 1088) ?: true) 
                 then null 
-                else 
-                    if ((
-                        if isNumber(l28.0) 
-                        then 0 
-                        else 
-                            if isDate(l28.0) 
-                            then 1 
-                            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
-                    + 0) > 1) 
-                    then fail(7157722, "only one date allowed in an $add expression") 
-                    else (move(l28.0) + 1) 
+                elif ((
+                    if isNumber(l28.0) 
+                    then 0 
+                    elif isDate(l28.0) 
+                    then 1 
+                    else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+                + 0) > 1) 
+                then fail(7157722, "only one date allowed in an $add expression") 
+                else (move(l28.0) + 1) 
     ] 
     in 
         let [
@@ -105,10 +101,9 @@ ExpressionLet
         in 
             if ((typeMatch(l27.0, 1088) ?: true) || (typeMatch(l29.0, 1088) ?: true)) 
             then null 
-            else 
-                if (isNumber(l27.0) && isNumber(l29.0)) 
-                then (move(l27.0) * move(l29.0)) 
-                else fail(7157721, "only numbers are allowed in an $multiply expression") 
+            elif (isNumber(l27.0) && isNumber(l29.0)) 
+            then (move(l27.0) * move(l29.0)) 
+            else fail(7157721, "only numbers are allowed in an $multiply expression") 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionNot

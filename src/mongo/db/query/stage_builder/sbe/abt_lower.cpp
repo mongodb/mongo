@@ -33,59 +33,29 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
-#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <cstddef>
 #include <cstdint>
-#include <iterator>
 #include <limits>
-#include <map>
-#include <sstream>
-#include <string_view>
-#include <type_traits>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
-#include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/filter.h"
-#include "mongo/db/exec/sbe/stages/hash_agg.h"
-#include "mongo/db/exec/sbe/stages/hash_join.h"
-#include "mongo/db/exec/sbe/stages/ix_scan.h"
-#include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/exec/sbe/stages/loop_join.h"
-#include "mongo/db/exec/sbe/stages/merge_join.h"
-#include "mongo/db/exec/sbe/stages/project.h"
-#include "mongo/db/exec/sbe/stages/scan.h"
-#include "mongo/db/exec/sbe/stages/sort.h"
-#include "mongo/db/exec/sbe/stages/sorted_merge.h"
-#include "mongo/db/exec/sbe/stages/spool.h"
-#include "mongo/db/exec/sbe/stages/union.h"
-#include "mongo/db/exec/sbe/stages/unique.h"
-#include "mongo/db/exec/sbe/stages/unwind.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/strong_alias.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/stage_types.h"
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo::stage_builder::abt {
 
 static sbe::EExpression::Vector toInlinedVector(
     std::vector<std::unique_ptr<sbe::EExpression>> args) {
     sbe::EExpression::Vector inlined;
+    inlined.reserve(args.size());
     for (auto&& arg : args) {
         inlined.emplace_back(std::move(arg));
     }
@@ -259,15 +229,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     const Switch& fn, std::vector<std::unique_ptr<sbe::EExpression>> args) {
-    size_t lastCond = args.size() - 3;
-    auto expr = sbe::makeE<sbe::EIf>(
-        std::move(args[lastCond]), std::move(args[lastCond + 1]), std::move(args[lastCond + 2]));
-    while (lastCond >= 2) {
-        lastCond -= 2;
-        expr = sbe::makeE<sbe::EIf>(
-            std::move(args[lastCond]), std::move(args[lastCond + 1]), std::move(expr));
-    }
-    return expr;
+    return sbe::makeE<sbe::ESwitch>(std::move(args));
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {

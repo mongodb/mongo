@@ -118,6 +118,8 @@ sbe::EExpression::Vector SbExprBuilder::lower(SbExpr::Vector& sbExprs,
                                               const VariableTypes* varTypes) {
     // Convert the SbExpr vector to an EExpression vector.
     sbe::EExpression::Vector exprs;
+    exprs.reserve(sbExprs.size());
+
     for (auto& e : sbExprs) {
         exprs.emplace_back(lower(e, varTypes));
     }

@@ -320,19 +320,27 @@ void CodeFragment::appendNoStack(CodeFragment&& code) {
     copyCodeAndFixup(std::move(code));
 }
 
-void CodeFragment::append(CodeFragment&& lhs, CodeFragment&& rhs) {
-    invariant(lhs.stackSize() == rhs.stackSize());
+void CodeFragment::append(std::vector<CodeFragment>&& fragments) {
+    if (fragments.empty()) {
+        return;
+    }
+    for (const auto& fragment : fragments) {
+        tassert(10130701,
+                "Exclusive code fragments must have the same stack size",
+                fragment.stackSize() == fragments[0].stackSize());
+    }
 
     // Fixup all stack offsets before copying.
-    lhs.fixupStackOffsets(_stackSize);
-    rhs.fixupStackOffsets(_stackSize);
+    for (auto& fragment : fragments) {
+        fragment.fixupStackOffsets(_stackSize);
+        _maxStackSize = std::max(_maxStackSize, _stackSize + fragment._maxStackSize);
+    }
 
-    _maxStackSize = std::max(_maxStackSize, _stackSize + lhs._maxStackSize);
-    _maxStackSize = std::max(_maxStackSize, _stackSize + rhs._maxStackSize);
-    _stackSize += lhs._stackSize;
+    _stackSize += fragments[0]._stackSize;
 
-    copyCodeAndFixup(std::move(lhs));
-    copyCodeAndFixup(std::move(rhs));
+    for (auto&& fragment : fragments) {
+        copyCodeAndFixup(std::move(fragment));
+    }
 }
 
 void CodeFragment::appendConstVal(value::TypeTags tag, value::Value val) {

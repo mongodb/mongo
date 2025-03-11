@@ -33,10 +33,9 @@ ExpressionSetDifference
         in 
             if ((typeMatch(l11.0, 1088) ?: true) || (typeMatch(l10.0, 1088) ?: true)) 
             then null 
-            else 
-                if (!(isArray(l11.0)) || !(isArray(l10.0))) 
-                then fail(7158101, "All operands of $setDifference must be arrays.") 
-                else setDifference(move(l11.0), move(l10.0)) 
+            elif (!(isArray(l11.0)) || !(isArray(l10.0))) 
+            then fail(7158101, "All operands of $setDifference must be arrays.") 
+            else setDifference(move(l11.0), move(l10.0)) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionSetEquals
@@ -66,10 +65,9 @@ ExpressionSetIntersection
         in 
             if ((typeMatch(l19.0, 1088) ?: true) || (typeMatch(l18.0, 1088) ?: true)) 
             then null 
-            else 
-                if (!(isArray(l19.0)) || !(isArray(l18.0))) 
-                then fail(7158101, "All operands of $setIntersection must be arrays.") 
-                else setIntersection(move(l19.0), move(l18.0)) 
+            elif (!(isArray(l19.0)) || !(isArray(l18.0))) 
+            then fail(7158101, "All operands of $setIntersection must be arrays.") 
+            else setIntersection(move(l19.0), move(l18.0)) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionSetIsSubset
@@ -95,10 +93,9 @@ ExpressionSetUnion
         in 
             if ((typeMatch(l26.0, 1088) ?: true) || (typeMatch(l25.0, 1088) ?: true)) 
             then null 
-            else 
-                if (!(isArray(l26.0)) || !(isArray(l25.0))) 
-                then fail(7158101, "All operands of $setUnion must be arrays.") 
-                else setUnion(move(l26.0), move(l25.0)) 
+            elif (!(isArray(l26.0)) || !(isArray(l25.0))) 
+            then fail(7158101, "All operands of $setUnion must be arrays.") 
+            else setUnion(move(l26.0), move(l25.0)) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionReverseArray
@@ -109,10 +106,9 @@ ExpressionReverseArray
     in 
         if (typeMatch(l28.0, 1088) ?: true) 
         then null 
-        else 
-            if isArray(l28.0) 
-            then reverseArray(move(l28.0)) 
-            else fail(7158002, "$reverseArray argument must be an array") 
+        elif isArray(l28.0) 
+        then reverseArray(move(l28.0)) 
+        else fail(7158002, "$reverseArray argument must be an array") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionSortArray
@@ -123,10 +119,9 @@ ExpressionSortArray
     in 
         if (typeMatch(l30.0, 1088) ?: true) 
         then null 
-        else 
-            if isArray(l30.0) 
-            then sortArray(move(l30.0), {"" : -1L}) 
-            else fail(7158001, "$sortArray input argument must be an array") 
+        elif isArray(l30.0) 
+        then sortArray(move(l30.0), {"" : -1L}) 
+        else fail(7158001, "$sortArray input argument must be an array") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionIsArray

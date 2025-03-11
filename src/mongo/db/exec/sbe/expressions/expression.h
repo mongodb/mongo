@@ -459,6 +459,69 @@ public:
 };
 
 /**
+ * This is a multi-conditional (a.k.a. if-then-elif-...-else) expression.
+ */
+class ESwitch final : public EExpression {
+public:
+    /**
+     * Create a Switch multi-conditional expression by providing a flat list of expressions. These
+     * are taken as pairs of (condition, thenBranch) followed by a final 'default' expression.
+     */
+    ESwitch(std::vector<std::unique_ptr<sbe::EExpression>> nodes) {
+        // Enforce that the list is not empty and contains an odd number of expressions.
+        // When it contains a single expression, it represents a switch where only the 'default'
+        // branch is present.
+        tassert(10130700,
+                "switch created with a wrong number of expressions",
+                nodes.size() > 1 && ((nodes.size() - 1) % 2) == 0);
+        _nodes.reserve(nodes.size());
+        for (auto&& n : nodes) {
+            _nodes.emplace_back(std::move(n));
+        }
+        validateNodes();
+    }
+
+    std::unique_ptr<EExpression> clone() const override;
+
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
+
+    std::vector<DebugPrinter::Block> debugPrint() const override;
+
+    size_t estimateSize() const final;
+
+    /**
+     * Computes the number of pairs (condition, thenBranch) contained in the flat list of
+     * expressions. i.e. exclude the final 'default' expression, then divide by two.
+     */
+    size_t getNumBranches() const {
+        return (_nodes.size() - 1) / 2;
+    }
+
+    /**
+     * Extract from the flat list of expressions the expression representing the idx-th condition.
+     */
+    const EExpression* getCondition(size_t idx) const {
+        return _nodes[idx * 2].get();
+    }
+
+    /**
+     * Extract from the flat list of expressions the expression representing the idx-th branch, i.e.
+     * right after the idx-th condition.
+     */
+    const EExpression* getThenBranch(size_t idx) const {
+        return _nodes[idx * 2 + 1].get();
+    }
+
+    /**
+     * Extract from the flat list of expressions the expression representing the default branch,
+     * i.e. the last item of the list.
+     */
+    const EExpression* getDefault() const {
+        return _nodes.back().get();
+    }
+};
+
+/**
  * This is a let expression that can be used to define local variables.
  */
 class ELocalBind final : public EExpression {

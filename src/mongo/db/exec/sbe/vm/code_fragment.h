@@ -63,10 +63,10 @@ public:
 
     void append(CodeFragment&& code);
     void appendNoStack(CodeFragment&& code);
-    // Used when either `lhs` or `rhs` will run, but not both. This method will adjust the stack
-    // size once in this call, rather than twice (once for each CodeFragment). The CodeFragments
+    // Used when only one of the fragments will run, but not more. This method will adjust the stack
+    // size once in this call, rather than N (once for each CodeFragment). The CodeFragments
     // must have the same stack size for us to know how to adjust the stack at compile time.
-    void append(CodeFragment&& lhs, CodeFragment&& rhs);
+    void append(std::vector<CodeFragment>&& fragments);
     void appendConstVal(value::TypeTags tag, value::Value val);
     void appendAccessVal(value::SlotAccessor* accessor);
     void appendMoveVal(value::SlotAccessor* accessor);
