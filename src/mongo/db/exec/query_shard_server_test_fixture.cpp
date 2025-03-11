@@ -155,9 +155,12 @@ CollectionMetadata QueryShardServerTestFixture::prepareTestData(
 
     {
         AutoGetCollection autoColl(operationContext(), _testNss, MODE_X);
+        // TODO(SERVER-101914): Refactor away from using CollectionShardingRuntime.
+        // NOLINTBEGIN(mongo-collection-sharding-runtime-check)
         auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
             operationContext(), _testNss);
         scopedCsr->setFilteringMetadata(operationContext(), CollectionMetadata(cm, curShard));
+        // NOLINTEND(mongo-collection-sharding-runtime-check)
     }
 
     _manager = std::make_shared<MetadataManager>(

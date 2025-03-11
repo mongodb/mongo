@@ -31,9 +31,9 @@
 
 #include <cstdint>
 #include <cstring>
-#include <third_party/wiredtiger/wiredtiger.h>
 #include <type_traits>
 #include <utility>
+#include <wiredtiger.h>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
