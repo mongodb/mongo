@@ -643,13 +643,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
         return colls;
     };
 
-    try {
-        return clonedCollections(cloneCommand(getNewSession(opCtx)));
-    } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
-        // TODO SERVER-83213: we're dealing with an older binary version, retry without the OSI
-        // protection. Remove once 8.0 is last-lts.
-        return clonedCollections(cloneCommand(boost::none));
-    }
+    return clonedCollections(cloneCommand(getNewSession(opCtx)));
 }
 
 void MovePrimaryCoordinator::assertClonedData(
