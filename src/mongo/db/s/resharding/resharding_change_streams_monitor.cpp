@@ -379,19 +379,19 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
                    batch.add(doc);
                }
 
-               if (!batch.empty()) {
-                   uassert(10178201,
-                           str::stream()
-                               << "Expected '" << ResponseCursorBase::kPostBatchResumeTokenFieldName
-                               << "' to be available",
-                           cursor->getPostBatchResumeToken().has_value());
-                   uassert(10178202,
-                           str::stream()
-                               << "Expected '" << ResponseCursorBase::kPostBatchResumeTokenFieldName
-                               << "' to be non-empty",
-                           !cursor->getPostBatchResumeToken()->isEmpty());
-                   batch.setResumeToken(*cursor->getPostBatchResumeToken());
+               uassert(10178201,
+                       str::stream()
+                           << "Expected '" << ResponseCursorBase::kPostBatchResumeTokenFieldName
+                           << "' to be available",
+                       cursor->getPostBatchResumeToken().has_value());
+               uassert(10178202,
+                       str::stream()
+                           << "Expected '" << ResponseCursorBase::kPostBatchResumeTokenFieldName
+                           << "' to be non-empty",
+                       !cursor->getPostBatchResumeToken()->isEmpty());
+               batch.setResumeToken(*cursor->getPostBatchResumeToken());
 
+               {
                    // Create an alternative client so the callback can create its own opCtx to do
                    // writes without impacting the opCtx used to open the change stream cursor.
                    auto newClient =
