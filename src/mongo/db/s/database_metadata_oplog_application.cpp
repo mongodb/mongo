@@ -38,14 +38,14 @@ namespace mongo {
 namespace {
 
 void applyOplogEntryToInsertDatabaseMetadata(OperationContext* opCtx, const DatabaseType& db) {
-    AutoGetDb autoDb(opCtx, db.getDbName(), MODE_X);
+    AutoGetDb autoDb(opCtx, db.getDbName(), MODE_IX);
     auto scopedDss =
         DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, db.getDbName());
     scopedDss->setDbInfo(opCtx, db, true /* useDssForTesting */);
 }
 
 void applyOplogEntryToRemoveDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
-    AutoGetDb autoDb(opCtx, dbName, MODE_X);
+    AutoGetDb autoDb(opCtx, dbName, MODE_IX);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     scopedDss->clearDbInfo(opCtx, false /* cancelOngoingRefresh */, true /* useDssForTesting */);
 }

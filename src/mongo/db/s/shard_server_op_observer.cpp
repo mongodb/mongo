@@ -227,7 +227,7 @@ void updateDbMetadataInCache(OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const boost::optional<DatabaseType>& dbMetadata,
                              DatabaseMetadataUpdateOpEnum op) {
-    AutoGetDb autoDb(opCtx, dbName, MODE_X);
+    AutoGetDb autoDb(opCtx, dbName, MODE_IX);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     switch (op) {
         case DatabaseMetadataUpdateOpEnum::kCreate:
