@@ -192,7 +192,7 @@ def configure_exception_capture(test_logger):
     return [js_exception, py_exception]
 
 
-def new_test_logger(test_shortname, test_basename, command, parent, job_num, test_id, job_logger):
+def new_test_logger(test_shortname, test_basename, parent, job_num, test_id, job_logger):
     """Create a new test logger that will be a child of the given parent."""
     name = "%s:%s" % (parent.name, test_shortname)
     logger = logging.Logger(name)

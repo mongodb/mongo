@@ -153,7 +153,16 @@ class ProcessTestCase(TestCase):
 
     def as_command(self):
         """Return the command invocation used to run the test."""
-        return self._make_process().as_command()
+        try:
+            proc = self._make_process()
+            return proc.as_command()
+        except:
+            self.logger.exception(
+                "Encountered an error getting command for %s %s", self.test_kind, self.basename()
+            )
+            raise self.failureException(
+                "%s failed when building process command" % (self.short_description(),)
+            )
 
     def _execute(self, process: "process.Process"):
         """Run the specified process."""

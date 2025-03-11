@@ -236,7 +236,15 @@ class Job(object):
         execute_test_span.set_attributes(attributes=common_test_attributes)
         execute_test_span.set_status(StatusCode.ERROR, "fail_early")
 
-        test.configure(self.fixture, config.NUM_CLIENTS_PER_FIXTURE, config.USE_TENANT_CLIENT)
+        try:
+            test.configure(self.fixture, config.NUM_CLIENTS_PER_FIXTURE, config.USE_TENANT_CLIENT)
+        except:
+            self.logger.error(
+                "%s marked as a failure because it could not be configured.",
+                test.short_description(),
+            )
+            self._fail_test(test, sys.exc_info(), return_code=2)
+            raise errors.StopExecution("Could not configure the test %s" % test.short_description())
 
         self._run_hooks_before_tests(test, hook_failure_flag)
 

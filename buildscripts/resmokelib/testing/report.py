@@ -8,6 +8,7 @@ import threading
 import time
 import unittest
 from logging import Logger
+from typing import Any
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import logging
@@ -18,7 +19,7 @@ from buildscripts.resmokelib.testing.testcases.interface import TestCase
 class TestReport(unittest.TestResult):
     """Record test status and timing information."""
 
-    def __init__(self, job_logger, suite_options, job_num=None):
+    def __init__(self, job_logger: logging.Logger, suite_options: Any, job_num=None):
         """
         Initialize the TestReport with the logger configuration.
 
@@ -119,11 +120,15 @@ class TestReport(unittest.TestResult):
         test_info.group_id = f"job{self.job_num}"
 
         basename = test.basename()
-        command = test.as_command()
-        if command:
-            self.job_logger.info("Running %s...\n%s", basename, command)
-        else:
-            self.job_logger.info("Running %s...", basename)
+        try:
+            command = test.as_command()
+            if command:
+                self.job_logger.info("Running %s...\n%s", basename, command)
+            else:
+                self.job_logger.info("Running %s...", basename)
+        except:
+            # This can happen in rare cases like in ProcessTestCase where the process building itself fails
+            self.job_logger.exception("Failed to form command for test %s" % basename)
 
         with self._lock:
             self.test_infos.append(test_info)
@@ -134,7 +139,6 @@ class TestReport(unittest.TestResult):
         test_logger = logging.loggers.new_test_logger(
             test.short_name(),
             test.basename(),
-            command,
             test.logger,
             self.job_num,
             test.id(),
@@ -410,7 +414,6 @@ class TestReport(unittest.TestResult):
         logger = logging.loggers.new_test_logger(
             test.short_name(),
             test.basename(),
-            None,
             test.logger,
             self.job_num,
             test.id(),
