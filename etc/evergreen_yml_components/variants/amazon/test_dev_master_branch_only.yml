@@ -11,7 +11,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-arm64-dynamic-compile-params # Essential set of compile parameters used for Linux dev variants.
     run_on:
-      - amazon2-arm64-latest-large
+      - amazon2023-arm64-latest-large
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     stepback: false
 
@@ -21,7 +21,7 @@ variables:
     has_packages: false
     compile_flags: >-
       --ssl
-      MONGO_DISTMOD=amazon2
+      MONGO_DISTMOD=amazon2023
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
@@ -30,71 +30,71 @@ variables:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &amazon_linux2_arm64_static_compile_variant_dependency
+  - &amazon_linux2023_arm64_static_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
-        variant: &amazon_linux2_arm64_static_compile_variant_name amazon-linux2-arm64-static-compile
+        variant: &amazon_linux2023_arm64_static_compile_variant_name amazon-linux2023-arm64-static-compile
       - name: archive_jstestshell
-        variant: *amazon_linux2_arm64_static_compile_variant_name
+        variant: *amazon_linux2023_arm64_static_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: amazon-linux2-arm64-static-compile
+    #   variant: amazon-linux2023-arm64-static-compile
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_arm64_generic_expansions
-    multiversion_platform: amazon2
+    multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: aarch64
     packager_arch: aarch64
-    packager_distro: amazon2
+    packager_distro: amazon2023
     repo_edition: enterprise
-    large_distro_name: amazon2-arm64-atlas-latest-large
-    core_analyzer_distro_name: amazon2-arm64-latest-xlarge
+    large_distro_name: amazon2023-arm64-latest-large
+    core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
     num_scons_link_jobs_available: 0.99
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &amazon_linux2_arm64_dynamic_expansions
+  - &amazon_linux2023_arm64_dynamic_expansions
     <<: *linux_arm64_generic_expansions
-    compile_variant: *amazon_linux2_arm64_static_compile_variant_name
+    compile_variant: *amazon_linux2023_arm64_static_compile_variant_name
 
 buildvariants:
   - <<: *linux-arm64-dynamic-compile-params
-    name: &amazon-linux2-arm64-stitch-compile amazon-linux2-arm64-stitch-compile
-    display_name: "* Amazon Linux 2 arm64 Enterprise Stitch Compile"
+    name: &amazon-linux2023-arm64-stitch-compile amazon-linux2023-arm64-stitch-compile
+    display_name: "* Amazon Linux 2023 arm64 Enterprise Stitch Compile"
     tags: ["suggested", "bazel_check"]
     expansions:
       <<: *linux-arm64-dynamic-enterprise-compile-expansions
-      compile_variant: *amazon-linux2-arm64-stitch-compile
+      compile_variant: *amazon-linux2023-arm64-stitch-compile
     tasks:
       - name: .stitch
 
   # Caching is purposefully disabled on this variant so we can benchmark consistent build times.
-  - name: &amazon-linux2-arm64-local-compile amazon-linux2-arm64-local-compile
-    display_name: "Amazon Linux 2 arm64 Local Compile"
+  - name: &amazon-linux2023-arm64-local-compile amazon-linux2023-arm64-local-compile
+    display_name: "Amazon Linux 2023 arm64 Local Compile"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2-arm64-latest-large
+      - amazon2023-arm64-latest-large
     expansions:
       scons_cache_scope: none
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=amazon2
+        MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
         BAZEL_FLAGS=--config=local
-      compile_variant: *amazon-linux2-arm64-local-compile
+      compile_variant: *amazon-linux2023-arm64-local-compile
     tasks:
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_core_stream_TG
@@ -153,17 +153,17 @@ buildvariants:
     tasks:
       - name: compile_bazel_TG
 
-  - &enterprise-amazon-linux2-arm64-all-feature-flags-template
-    <<: *amazon_linux2_arm64_static_compile_variant_dependency
-    name: enterprise-amazon-linux2-arm64-all-feature-flags
-    display_name: "! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags)"
+  - &enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    <<: *amazon_linux2023_arm64_static_compile_variant_dependency
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags
+    display_name: "! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags)"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - amazon2-arm64-atlas-latest-small
+      - amazon2023-arm64-latest-small
     stepback: true
     expansions:
-      <<: *amazon_linux2_arm64_dynamic_expansions
+      <<: *amazon_linux2023_arm64_dynamic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
@@ -180,24 +180,24 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .fuzzer_deterministic
 
-  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2-arm64-all-feature-flags-shards-authoritative
-    display_name: "*| Amazon Linux 2 arm64 Atlas Enterprise (all feature flags) shards authoritative"
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-shards-authoritative
+    display_name: "*| Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags) shards authoritative"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
-      <<: *amazon_linux2_arm64_dynamic_expansions
+      <<: *amazon_linux2023_arm64_dynamic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
@@ -215,20 +215,20 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !fcv_upgrade_downgrade_sharding_jscore_passthrough_gen !fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !fcv_upgrade_downgrade_sharding_jscore_passthrough_gen !fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .fuzzer_deterministic !.multiversion
 
-  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
-    display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Fuzzers"
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-fuzzers
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Fuzzers"
     tags: ["suggested"]
     tasks:
       - name: .aggfuzzer
@@ -238,23 +238,23 @@ buildvariants:
       - name: .updatefuzzer
       - name: .jstestfuzz
 
-  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2-arm64-all-feature-flags-cluster-scalability-only
-    display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Cluster Scalability Patch Only"
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-cluster-scalability-only
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Cluster Scalability Patch Only"
     tags: ["cluster_scalability_only", "suggested"]
     tasks:
       - name: .cluster_scalability_only
 
-  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2-arm64-all-feature-flags-embedded-router
-    display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Embedded Router Tasks"
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-embedded-router
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Embedded Router Tasks"
     tags: ["suggested"]
     tasks:
       - name: .embedded_router
 
-  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2-arm64-all-feature-flags-magic-restore
-    display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Magic Restore Tasks"
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-magic-restore
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Magic Restore Tasks"
     tags: ["suggested"]
     tasks:
       - name: .magic_restore
@@ -268,7 +268,7 @@ buildvariants:
     expansions:
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=amazon2
+        MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --debug-symbols=minimal
@@ -281,16 +281,16 @@ buildvariants:
 
   ### Query Patch-Specific Build Variants ###
 
-  - <<: *amazon_linux2_arm64_static_compile_variant_dependency
-    name: amazon_linux2_arm64_static-classic-engine-query-patch-only
-    display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (Classic Engine)"
+  - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
+    name: amazon_linux2023_arm64_static-classic-engine-query-patch-only
+    display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (Classic Engine)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     run_on:
-      - amazon2-arm64-atlas-latest-small
+      - amazon2023-arm64-latest-small
     stepback: false
     expansions:
-      <<: *amazon_linux2_arm64_dynamic_expansions
+      <<: *amazon_linux2023_arm64_dynamic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
@@ -307,22 +307,22 @@ buildvariants:
       - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
       - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_correctness
       - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .assigned_to_jira_team_server_query_integration !.requires_large_host !.benchmarks !.blocked_in_query_alias
       - name: .assigned_to_jira_team_server_query_integration .requires_large_host !.benchmarks !.blocked_in_query_alias
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen
             variant: generate-tasks-for-version
             omit_generated_tasks: true
           - name: archive_dist_test
-            variant: *amazon_linux2_arm64_static_compile_variant_name
+            variant: *amazon_linux2023_arm64_static_compile_variant_name
       - name: check_feature_flag_tags
       - name: check_for_todos
       - name: test_api_version_compatibility
@@ -346,16 +346,16 @@ buildvariants:
       - name: query_cbr_histogram_aggregation_passthrough
         cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
 
-  - <<: *amazon_linux2_arm64_static_compile_variant_dependency
-    name: amazon_linux2_arm64_static-try-sbe-engine-query-patch-only
-    display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (Try SBE Engine)"
+  - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
+    name: amazon_linux2023_arm64_static-try-sbe-engine-query-patch-only
+    display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (Try SBE Engine)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     run_on:
-      - amazon2-arm64-atlas-latest-small
+      - amazon2023-arm64-latest-small
     expansions:
       expansions:
-      <<: *amazon_linux2_arm64_dynamic_expansions
+      <<: *amazon_linux2023_arm64_dynamic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
@@ -374,22 +374,22 @@ buildvariants:
       - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
       - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_correctness
       - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .assigned_to_jira_team_server_query_integration !.requires_large_host !.benchmarks !.blocked_in_query_alias
       - name: .assigned_to_jira_team_server_query_integration .requires_large_host !.benchmarks !.blocked_in_query_alias
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen
             variant: generate-tasks-for-version
             omit_generated_tasks: true
           - name: archive_dist_test
-            variant: *amazon_linux2_arm64_static_compile_variant_name
+            variant: *amazon_linux2023_arm64_static_compile_variant_name
       - name: .query_correctness
         cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
       - name: check_feature_flag_tags
@@ -403,14 +403,14 @@ buildvariants:
       - name: initial_sync_fuzzer_sanity_patch
       - name: rollback_fuzzer_sanity_patch
 
-  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2-arm64-all-feature-flags-required-query-patch-only
-    display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (all feature flags)"
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only
+    display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (all feature flags)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     expansions:
       expansions:
-      <<: *amazon_linux2_arm64_dynamic_expansions
+      <<: *amazon_linux2023_arm64_dynamic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
@@ -427,10 +427,10 @@ buildvariants:
 
   # TODO SERVER-94401: Reenable testing this variant.
   # # Run all-feature-flags along with recordIdsReplicated:true on all collections.
-  # - &enterprise-amazon-linux2-arm64-all-feature-flags-recordIdsReplicated
-  #   <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-  #   name: enterprise-amazon-linux2-arm64-all-feature-flags-recordIdsReplicated
-  #   display_name: "Amazon Linux 2 arm64 Enterprise (all feature flags) recordIdsReplicated"
+  # - &enterprise-amazon-linux2023-arm64-all-feature-flags-recordIdsReplicated
+  #   <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+  #   name: enterprise-amazon-linux2023-arm64-all-feature-flags-recordIdsReplicated
+  #   display_name: "Amazon Linux 2023 arm64 Enterprise (all feature flags) recordIdsReplicated"
   #   tags: []
   #   # Run daily once at 4 AM.
   #   cron: "0 4 * * *"
@@ -438,17 +438,17 @@ buildvariants:
   #     - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #     - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #       distros:
-  #         - amazon2-arm64-atlas-latest-large
+  #         - amazon2023-arm64-latest-large
   #     - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #     - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #       distros:
-  #         - amazon2-arm64-atlas-latest-large
+  #         - amazon2023-arm64-latest-large
   #     - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #     - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #       distros:
-  #         - amazon2-arm64-atlas-latest-large
+  #         - amazon2023-arm64-latest-large
   #   expansions:
-  #     <<: *enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+  #     <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-expansions
   #     # This builder excludes tests tagged with:
   #     # 1) exclude_when_record_ids_replicated: indicates that the test is particular about recordIdsReplicated:false
   #     # 2) disables_test_commands: this builder uses failpoints, and setting disables_test_commands means that the builder can't use failpoints.
@@ -549,54 +549,6 @@ buildvariants:
         distros:
           - amazon2023.3-large
 
-  - name: enterprise-amazon2-streams-toolchain-v5
-    display_name: "Amazon Linux 2 enterprise build with streams (v5 toolchain)"
-    tags: ["forbid_tasks_tagged_with_experimental"]
-    run_on:
-      - amazon2-latest-small
-    cron: "0 0 * * *" # Run once a day
-    stepback: false
-    expansions:
-      test_flags: >-
-        --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
-        --streams-release-build
-      has_packages: true
-      packager_arch: x86_64
-      packager_distro: amazon2
-      packager_script: packager_enterprise.py
-      push_arch: x86_64-enterprise-amazon2-streams
-      push_bucket: downloads.10gen.com
-      push_name: linux
-      push_path: linux
-      multiversion_platform: amazon2
-      multiversion_edition: enterprise-streams
-      repo_edition: enterprise
-      scons_cache_scope: shared
-      compile_variant: enterprise-amazon2-streams-toolchain-v5
-      large_distro_name: amazon2-latest-large
-    tasks:
-      - name: compile_test_serial_no_unittests_TG
-        distros:
-          - amazon2-latest-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
-        distros:
-          - amazon2-latest-large
-      - name: .release_critical !.requires_large_host !crypt_push !.publish
-      - name: .release_critical .requires_large_host !crypt_push !.publish
-        distros:
-          - amazon2-latest-large
-      - name: streams
-      - name: streams_kafka
-      - name: streams_kafka_gwproxy
-      - name: streams_https
-      - name: streams_lambda
-
   - <<: *enterprise-amazon2023-arm64-toolchain-v5-template
     name: enterprise-amazon2023-arm64-fuzzers-toolchain-v5
     display_name: "Enterprise Amazon Linux 2023.3 arm64 Fuzzers (v5 toolchain)"
@@ -613,59 +565,11 @@ buildvariants:
       - name: .query_fuzzer
       - name: .updatefuzzer !.multiversion
 
-  - name: enterprise-amazon2-toolchain-v5
-    display_name: "Enterprise Amazon Linux 2 (v5 toolchain)"
-    run_on:
-      - amazon2-latest-small
-    cron: "0 0 * * *" # Run once a day
-    stepback: false
-    expansions:
-      additional_package_targets: >-
-        archive-mongocryptd
-        archive-mongocryptd-debug
-      test_flags: >-
-        --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
-      push_path: linux
-      push_bucket: downloads.10gen.com
-      push_name: linux
-      push_arch: x86_64-enterprise-amazon2
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
-      multiversion_platform: amazon2
-      multiversion_edition: enterprise
-      has_packages: true
-      packager_script: packager_enterprise.py
-      packager_arch: x86_64
-      packager_distro: amazon2
-      repo_edition: enterprise
-      scons_cache_scope: shared
-      compile_variant: enterprise-amazon2-toolchain-v5
-      core_analyzer_distro_name: amazon2-latest-large
-      large_distro_name: amazon2-latest-large
-    tasks:
-      - name: compile_test_serial_no_unittests_TG
-        distros:
-          - amazon2-latest-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
-        distros:
-          - amazon2-latest-large
-      - name: .release_critical !.requires_large_host !.publish
-      - name: .release_critical .requires_large_host !.publish
-        distros:
-          - amazon2-latest-large
-
-  - name: &amazon-linux2-arm64-static-compile-toolchain-v5 amazon-linux2-arm64-static-compile-toolchain-v5
-    display_name: "! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis (v5 toolchain)"
+  - name: &amazon-linux2023-arm64-static-compile-toolchain-v5 amazon-linux2023-arm64-static-compile-toolchain-v5
+    display_name: "! Amazon Linux 2023 arm64 Enterprise Shared Library Compile & Static Analysis (v5 toolchain)"
     tags: ["required", "bazel_check", "forbid_tasks_tagged_with_experimental"]
     run_on:
-      - amazon2-arm64-latest-large
+      - amazon2023-arm64-latest-large
     stepback: false
     cron: "0 0 * * *" # Run once a day
     expansions:
@@ -674,7 +578,7 @@ buildvariants:
       has_packages: false
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=amazon2
+        MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
         --link-model=static
@@ -685,66 +589,59 @@ buildvariants:
       clang_tidy_toolchain: v4
       build_mongot: true
       download_mongot_release: true
-      compile_variant: *amazon-linux2-arm64-static-compile-toolchain-v5
+      compile_variant: *amazon-linux2023-arm64-static-compile-toolchain-v5
       evergreen_remote_exec: on
     tasks:
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
         distros:
-          - amazon2-arm64-latest-nvme
+          - amazon2023-arm64-latest-large-localstorage
       - name: compile_all_but_not_unittests_TG
         distros:
-          - amazon2-arm64-latest-nvme
+          - amazon2023-arm64-latest-large-localstorage
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
         distros:
-          - amazon2-arm64-latest-nvme
+          - amazon2023-arm64-latest-large-localstorage
       - name: compile_jstestshell_TG
         distros:
-          - amazon2-arm64-latest-nvme
-      # TODO(SERVER-99105): Remove the lint/non-lint branch once this is on AL2023
-      - name: .development_critical_single_variant !.requires_large_host !.lint
-      - name: .development_critical_single_variant .requires_large_host !.lint
+          - amazon2023-arm64-latest-large-localstorage
+      - name: .development_critical_single_variant !.requires_large_host
+      - name: .development_critical_single_variant .requires_large_host
         distros:
-          - amazon2-arm64-latest-xlarge
-      - name: .development_critical_single_variant !.requires_large_host .lint
-        distros:
-          - amazon2023.3-arm64-small
-      - name: .development_critical_single_variant .requires_large_host .lint
-        distros:
-          - amazon2023.3-arm64-large
+          - amazon2023-arm64-latest-xlarge
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
-          - amazon2-arm64-latest-xlarge
+          - amazon2023-arm64-latest-xlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
-          - amazon2-arm64-latest-xlarge
+          - amazon2023-arm64-latest-xlarge
       - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
         distros:
-          - amazon2-arm64-latest-xlarge
+          - amazon2023-arm64-latest-xlarge
 
-  - name: enterprise-amazon-linux2-arm64-all-feature-flags-toolchain-v5
-    display_name: "! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags) (v5 toolchain)"
+  - name: enterprise-amazon-linux2023-arm64-all-feature-flags-toolchain-v5
+    display_name: "! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags) (v5 toolchain)"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     stepback: false
     cron: "0 0 * * *" # Run once a day
     run_on:
-      - amazon2-arm64-atlas-latest-small
+      - amazon2023-arm64-latest-small
     depends_on:
       - name: archive_dist_test
-        variant: *amazon-linux2-arm64-static-compile-toolchain-v5
+        variant: *amazon-linux2023-arm64-static-compile-toolchain-v5
       - name: archive_jstestshell
-        variant: *amazon-linux2-arm64-static-compile-toolchain-v5
+        variant: *amazon-linux2023-arm64-static-compile-toolchain-v5
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     expansions:
-      <<: *amazon_linux2_arm64_dynamic_expansions
+      <<: *amazon_linux2023_arm64_dynamic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
@@ -757,7 +654,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment
-      compile_variant: *amazon-linux2-arm64-static-compile-toolchain-v5
+      compile_variant: *amazon-linux2023-arm64-static-compile-toolchain-v5
     tasks:
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
@@ -766,31 +663,31 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
-          - amazon2-arm64-atlas-latest-large
+          - amazon2023-arm64-latest-large
       - name: .fuzzer_deterministic
 
-  - name: &amazon-linux2-arm64-crypt-compile-toolchain-v5 amazon-linux2-arm64-crypt-compile-toolchain-v5
-    display_name: "! Amazon Linux 2 arm64 Crypt Compile (v5 toolchain)"
+  - name: &amazon-linux2023-arm64-crypt-compile-toolchain-v5 amazon-linux2023-arm64-crypt-compile-toolchain-v5
+    display_name: "! Amazon Linux 2023 arm64 Crypt Compile (v5 toolchain)"
     tags: ["required", "bazel_check"]
     stepback: false
     cron: "0 0 * * *" # Run once a day
     run_on:
-      - amazon2-arm64-latest-large
+      - amazon2023-arm64-latest-large
     expansions:
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
       compile_flags: >-
         --ssl
-        MONGO_DISTMOD=amazon2
+        MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
         --link-model=static
@@ -798,7 +695,7 @@ buildvariants:
         --link-model=dynamic
       unittest_compile_flags: >-
         --link-model=dynamic
-      compile_variant: *amazon-linux2-arm64-crypt-compile-toolchain-v5
+      compile_variant: *amazon-linux2023-arm64-crypt-compile-toolchain-v5
       evergreen_remote_exec: on
     tasks:
       - name: .crypt

@@ -111,19 +111,22 @@ commit_queue_aliases:
     task: "^(bazel_.*|run_.*|compile_.*|lint_.*|jsCore|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
     variant_tags: []
     task_tags: []
-  - variant: "^(amazon-linux2-arm64-static-compile|linux-x86-dynamic-compile-required)$"
+  - variant: "^(amazon-linux2023-arm64-static-compile|linux-x86-dynamic-compile-required)$"
     variant_tags: []
     task_tags: ["clang_tidy"]
   - variant: "^(al2023-arm64-sep-benchmark)$"
     variant_tags: []
     task_tags: ["benchmarks_sep"]
+  # TODO SERVER-101932: Delete this
+  - variant: amazon-linux2-arm64-static-compile
+    task: lint_pylinters
 
 github_pr_aliases:
   - variant: "commit-queue"
     task: "^(bazel_.*|run_.*|compile_.*|lint_.*|jsCore|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
     variant_tags: []
     task_tags: []
-  - variant: "^(amazon-linux2-arm64-static-compile|linux-x86-dynamic-compile-required)$"
+  - variant: "^(amazon-linux2023-arm64-static-compile|linux-x86-dynamic-compile-required)$"
     variant_tags: []
     task_tags: ["clang_tidy"]
   - variant: "^(AL2023-arm64-coverage)$"
@@ -131,13 +134,16 @@ github_pr_aliases:
   - variant: "^(al2023-arm64-sep-benchmark)$"
     variant_tags: []
     task_tags: ["benchmarks_sep"]
+  # TODO SERVER-101932: Delete this
+  - variant: amazon-linux2-arm64-static-compile
+    task: lint_pylinters
 
 patch_aliases:
   - alias: required
     variant_tags: ["required"]
     task: ".*"
   - alias: query
-    variant: "^(.*query-patch-only|amazon-linux2-arm64-static-compile)$"
+    variant: "^(.*query-patch-only|amazon-linux2023-arm64-static-compile)$"
     task: ".*"
   - alias: query-quick
     variant: "^(.*query-quick-patch-only|linux-x86-dynamic-compile)$"

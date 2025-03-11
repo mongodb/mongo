@@ -67,7 +67,7 @@ The reason they should be pushed as separate commits is in the case of needing t
 
    - Build variant names:
      - in `etc/evergreen_yml_components/variants/amazon/test_dev.yml`:
-       - `enterprise-amazon-linux2-arm64`
+       - `enterprise-amazon-linux2023-arm64`
 
 - Actions:
 

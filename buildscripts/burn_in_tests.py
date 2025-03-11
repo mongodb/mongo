@@ -47,7 +47,7 @@ EXTERNAL_LOGGERS = {
     "urllib3",
 }
 
-DEFAULT_VARIANT = "enterprise-amazon-linux2-arm64-all-feature-flags"
+DEFAULT_VARIANT = "enterprise-amazon-linux2023-arm64-all-feature-flags"
 ENTERPRISE_MODULE_PATH = "src/mongo/db/modules/enterprise"
 DEFAULT_REPO_LOCATIONS = ["."]
 REPEAT_SUITES = 2

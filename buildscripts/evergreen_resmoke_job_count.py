@@ -154,7 +154,7 @@ def get_original_task_name(task_name, variant_name):
     /<task name>_[0-9]+-<platform>/ or /burn_in:<task name>_gen-<variant>_[0-9]+/
 
     For example, "sharding_0-linux-debug" -> "sharding" or
-    "burn_in:sharding_gen-enterprise-amazon-linux2-arm64-all-feature-flags-generated-by-burn-in-tags_0" -> "sharding".
+    "burn_in:sharding_gen-enterprise-amazon-linux2023-arm64-all-feature-flags-generated-by-burn-in-tags_0" -> "sharding".
     """
     return (
         re.compile("_[0-9]+")
@@ -168,7 +168,7 @@ def get_original_variant_name(variant_name):
     """
     Return the original variant name.
 
-    For example, "amazon-linux2-generated-by-burn-in-tags" -> "amazon-linux2".
+    For example, "amazon-linux2023-generated-by-burn-in-tags" -> "amazon-linux2023".
     """
     return variant_name.removesuffix(BURN_IN_VARIANT_SUFFIX)
 
@@ -265,8 +265,8 @@ def maybe_override_num_jobs_on_required(task_name, variant, jobs):
     }
 
     if variant in (
-        "enterprise-amazon-linux2-arm64-all-feature-flags",
-        "enterprise-amazon-linux2-arm64-all-feature-flags-toolchain-v5",
+        "enterprise-amazon-linux2023-arm64-all-feature-flags",
+        "enterprise-amazon-linux2023-arm64-all-feature-flags-toolchain-v5",
     ):
         all_factors |= {
             "search_no_pinned_connections_auth": 0.5,

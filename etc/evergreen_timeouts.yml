@@ -10,18 +10,6 @@
 # in alphabetical order.
 
 overrides:
-  amazon2:
-    - task: aggregation_blockprocessing_fuzzer
-      exec_timeout: 600 # 10 hours
-
-  enterprise-amazon2:
-    - task: aggregation_blockprocessing_fuzzer
-      exec_timeout: 600 # 10 hours
-
-  enterprise-amazon2-toolchain-v5:
-    - task: aggregation_blockprocessing_fuzzer
-      exec_timeout: 600 # 10 hours
-
   amazon2023:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
@@ -32,7 +20,7 @@ overrides:
 
   # We increased the timeout since comparison results speed were slowed down due to resolving
   # Object.entries correctly.
-  enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers:
+  enterprise-amazon-linux2023-arm64-all-feature-flags-fuzzers:
     - task: aggregation_timeseries_fuzzer
       exec_timeout: 150 # 2.5 hours
     - task: aggregation_blockprocessing_fuzzer
@@ -44,7 +32,7 @@ overrides:
     - task: change_stream_serverless_no_optimization_fuzzer
       exec_timeout: 600 # 10 hours
 
-  enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers-toolchain-v5:
+  enterprise-amazon-linux2023-arm64-all-feature-flags-fuzzers-toolchain-v5:
     - task: aggregation_timeseries_fuzzer
       exec_timeout: 150 # 2.5 hours
     - task: aggregation_blockprocessing_fuzzer
