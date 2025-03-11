@@ -194,4 +194,25 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
     const std::vector<BSONObj>& userMeasurementsBatch,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
 
+/**
+ * Rewrites the indices for each write batch's userBatchIndices vector to reflect the measurement's
+ * index into the original user batch of measurements relative to the original batch's startIndex,
+ * from the indices into the filtered subset. This also populates each write batch's vector of
+ * statement ids.
+ */
+void rewriteIndicesForSubsetOfBatch(OperationContext* opCtx,
+                                    const mongo::write_ops::InsertCommandRequest& request,
+                                    size_t startIndex,
+                                    TimeseriesWriteBatches& writeBatches,
+                                    std::vector<size_t>& originalIndices);
+/**
+ * Processes the errors in `errorsAndIndices` and populates the `errors` vector with them, tying
+ * each error to the index of the measurement that caused it in the original user batch of
+ * measurements.
+ */
+void processErrorsForSubsetOfBatch(OperationContext* opCtx,
+                                   const std::vector<WriteStageErrorAndIndex>& errorsAndIndices,
+                                   const std::vector<size_t>& originalIndices,
+                                   std::vector<mongo::write_ops::WriteError>* errors);
+
 }  // namespace mongo::timeseries::write_ops::internal

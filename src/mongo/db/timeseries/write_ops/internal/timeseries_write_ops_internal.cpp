@@ -721,6 +721,47 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     return docsToRetry;
 }
 
+/**
+ * Returns true if we are both performing retryable time-series writes and there is at least one
+ * measurement in the request's batch of measurements that has already been executed. Returns false
+ * otherwise.
+ */
+bool batchContainsExecutedStatements(OperationContext* opCtx,
+                                     const mongo::write_ops::InsertCommandRequest& request,
+                                     size_t start,
+                                     size_t numDocs) {
+    if (isTimeseriesWriteRetryable(opCtx)) {
+        for (size_t index = 0; index < numDocs; index++) {
+            auto stmtId = request.getStmtIds() ? request.getStmtIds()->at(start + index)
+                                               : request.getStmtId().value_or(0) + start + index;
+            if (TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, stmtId)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Populates 'filteredBatch' and 'filteredIndices' with only the measurements (and corresponding
+ * indices) in request's batch of measurements that have not been already executed.
+ */
+void filterOutExecutedMeasurements(OperationContext* opCtx,
+                                   const mongo::write_ops::InsertCommandRequest& request,
+                                   size_t start,
+                                   size_t numDocs,
+                                   std::vector<BSONObj>& filteredBatch,
+                                   std::vector<size_t>& filteredIndices) {
+    auto& originalUserMeasurementBatch = request.getDocuments();
+    for (size_t index = 0; index < numDocs; index++) {
+        auto stmtId = request.getStmtIds() ? request.getStmtIds()->at(start + index)
+                                           : request.getStmtId().value_or(0) + start + index;
+        if (!TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, stmtId)) {
+            filteredBatch.emplace_back(originalUserMeasurementBatch.at(start + index));
+            filteredIndices.emplace_back(start + index);
+        }
+    }
+}
 }  // namespace
 
 NamespaceString ns(const mongo::write_ops::InsertCommandRequest& request) {
@@ -1302,5 +1343,42 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
 
     return results;
 }
+
+void rewriteIndicesForSubsetOfBatch(OperationContext* opCtx,
+                                    const mongo::write_ops::InsertCommandRequest& request,
+                                    size_t startIndex,
+                                    TimeseriesWriteBatches& writeBatches,
+                                    std::vector<size_t>& originalIndices) {
+    auto stmtIds = request.getStmtIds();
+    auto retryableWrites = isTimeseriesWriteRetryable(opCtx);
+    for (auto& writeBatch : writeBatches) {
+        for (size_t index = 0; index < writeBatch->userBatchIndices.size(); index++) {
+            auto shiftedIndex = writeBatch->userBatchIndices[index];
+            auto originalIndex = originalIndices[shiftedIndex];
+            writeBatch->userBatchIndices[index] = originalIndex;
+            if (retryableWrites) {
+                auto stmtId = stmtIds
+                    ? stmtIds->at(startIndex + originalIndex)
+                    : request.getStmtId().value_or(0) + startIndex + originalIndex;
+                writeBatch->stmtIds.push_back(stmtId);
+            }
+        }
+    }
+}
+
+void processErrorsForSubsetOfBatch(OperationContext* opCtx,
+                                   const std::vector<WriteStageErrorAndIndex>& errorsAndIndices,
+                                   const std::vector<size_t>& originalIndices,
+                                   std::vector<mongo::write_ops::WriteError>* errors) {
+    if (!errorsAndIndices.empty()) {
+        for (auto& [errorStatus, index] : errorsAndIndices) {
+            auto error = write_ops_exec::generateError(
+                opCtx, errorStatus, originalIndices[index], errors->size());
+            invariant(errorStatus.code() != ErrorCodes::WriteConflict);
+            errors->emplace_back(std::move(*error));
+        }
+    }
+}
+
 
 }  // namespace mongo::timeseries::write_ops::internal
