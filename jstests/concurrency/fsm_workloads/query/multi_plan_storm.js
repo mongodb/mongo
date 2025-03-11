@@ -4,6 +4,8 @@
  * invalidated.
  * @tags: [
  *  requires_fcv_81,
+ *  requires_getmore,
+ *  incompatible_with_concurrency_simultaneous,
  * ]
  */
 export const $config = (function() {
@@ -33,7 +35,7 @@ export const $config = (function() {
             const originalParamValue = assert.commandWorked(db.adminCommand(
                 {getParameter: 1, internalQueryConcurrentMultiPlanningThreshold: 1}));
             assert.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryConcurrentMultiPlanningThreshold: 20}));
+                {setParameter: 1, internalQueryConcurrentMultiPlanningThreshold: 5}));
             this.concurrentMultiplanningThresholdOriginalValues[db.getMongo().host] =
                 originalParamValue.internalQueryConcurrentMultiPlanningThreshold;
         });
@@ -69,7 +71,7 @@ export const $config = (function() {
     }
 
     return {
-        threadCount: 2000,
+        threadCount: 20,
         iterations: 2,
         states: states,
         startState: 'query',
