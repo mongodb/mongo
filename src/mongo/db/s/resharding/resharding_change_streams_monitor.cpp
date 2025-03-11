@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
@@ -300,7 +301,9 @@ std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() co
     BSONObj matchStage = BSON("$match" << BSON(DocumentSourceChangeStream::kOperationTypeField
                                                << BSON("$in" << operationTypesArrayBuilder.arr())));
 
-    return {std::move(changeStreamStage), std::move(matchStage)};
+    BSONObj projectStage = BSON("$project" << BSON("operationType" << 1));
+
+    return {std::move(changeStreamStage), std::move(matchStage), std::move(projectStage)};
 }
 
 AggregateCommandRequest ReshardingChangeStreamsMonitor::makeAggregateCommandRequest() {
@@ -377,6 +380,18 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
                }
 
                if (!batch.empty()) {
+                   uassert(10178201,
+                           str::stream()
+                               << "Expected '" << ResponseCursorBase::kPostBatchResumeTokenFieldName
+                               << "' to be available",
+                           cursor->getPostBatchResumeToken().has_value());
+                   uassert(10178202,
+                           str::stream()
+                               << "Expected '" << ResponseCursorBase::kPostBatchResumeTokenFieldName
+                               << "' to be non-empty",
+                           !cursor->getPostBatchResumeToken()->isEmpty());
+                   batch.setResumeToken(*cursor->getPostBatchResumeToken());
+
                    // Create an alternative client so the callback can create its own opCtx to do
                    // writes without impacting the opCtx used to open the change stream cursor.
                    auto newClient =
@@ -385,7 +400,7 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
                    _batchProcessedCallback(batch);
                }
 
-               _numEventsTotal += batch.numEvents();
+               _numEventsTotal += batch.getNumEvents();
                _numBatches++;
                _receivedFinalEvent = batch.containsFinalEvent();
 
@@ -403,8 +418,6 @@ ReshardingChangeStreamsMonitor::EventBatch::EventBatch(Role role)
     : _role(role), _createdAt(Date_t::now()) {}
 
 void ReshardingChangeStreamsMonitor::EventBatch::add(const BSONObj& event) {
-    _lastEvent = event;
-
     const StringData eventOpType =
         event.getStringField(DocumentSourceChangeStream::kOperationTypeField);
 
@@ -439,6 +452,10 @@ bool ReshardingChangeStreamsMonitor::EventBatch::shouldDispose() {
     return _numEvents >= batchSizeLimit || (Date_t::now() - _createdAt) >= batchTimeLimit;
 }
 
+void ReshardingChangeStreamsMonitor::EventBatch::setResumeToken(BSONObj resumeToken) {
+    _resumeToken = resumeToken;
+}
+
 bool ReshardingChangeStreamsMonitor::EventBatch::containsFinalEvent() const {
     return _containsFinalEvent;
 }
@@ -447,16 +464,16 @@ bool ReshardingChangeStreamsMonitor::EventBatch::empty() const {
     return _numEvents == 0;
 }
 
-int64_t ReshardingChangeStreamsMonitor::EventBatch::numEvents() const {
+int64_t ReshardingChangeStreamsMonitor::EventBatch::getNumEvents() const {
     return _numEvents;
 };
 
-int64_t ReshardingChangeStreamsMonitor::EventBatch::documentsDelta() const {
+int64_t ReshardingChangeStreamsMonitor::EventBatch::getDocumentsDelta() const {
     return _documentsDelta;
 };
 
-BSONObj ReshardingChangeStreamsMonitor::EventBatch::resumeToken() const {
-    return _lastEvent->getObjectField("_id");
+BSONObj ReshardingChangeStreamsMonitor::EventBatch::getResumeToken() const {
+    return _resumeToken;
 };
 
 

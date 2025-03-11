@@ -67,6 +67,12 @@ public:
         bool shouldDispose();
 
         /**
+         * Sets the resume token after this batch. This is the 'postBatchResumeToken' for the
+         * $changeStream aggregate or latest getMore command.
+         */
+        void setResumeToken(BSONObj resumeToken);
+
+        /**
          * Returns true if this batch contains the final event, i.e. it is the final batch.
          */
         bool containsFinalEvent() const;
@@ -79,9 +85,9 @@ public:
         /**
          * Getters.
          */
-        int64_t numEvents() const;
-        int64_t documentsDelta() const;
-        BSONObj resumeToken() const;
+        int64_t getNumEvents() const;
+        int64_t getDocumentsDelta() const;
+        BSONObj getResumeToken() const;
 
     private:
         const Role _role;
@@ -89,8 +95,8 @@ public:
         const Date_t _createdAt;
 
         bool _containsFinalEvent = false;
-        // The last event in this batch,
-        boost::optional<BSONObj> _lastEvent;
+        // The resume token after this batch,
+        BSONObj _resumeToken;
         // The number of events in this batch.
         int64_t _numEvents = 0;
         // The change in documents based on the events in this batch.

@@ -1007,14 +1007,14 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
         LOGV2(9858300,
               "Persisting change streams monitor's progress",
               "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-              "documentsDelta"_attr = batch.documentsDelta(),
+              "documentsDelta"_attr = batch.getDocumentsDelta(),
               "completed"_attr = batch.containsFinalEvent());
 
         invariant(_changeStreamsMonitorCtx);
         auto newChangeStreamsCtx = *_changeStreamsMonitorCtx;
-        newChangeStreamsCtx.setResumeToken(batch.resumeToken().getOwned());
+        newChangeStreamsCtx.setResumeToken(batch.getResumeToken().getOwned());
         newChangeStreamsCtx.setDocumentsDelta(newChangeStreamsCtx.getDocumentsDelta() +
-                                              batch.documentsDelta());
+                                              batch.getDocumentsDelta());
         newChangeStreamsCtx.setCompleted(batch.containsFinalEvent());
         _updateRecipientDocument(newChangeStreamsCtx, factory);
     };

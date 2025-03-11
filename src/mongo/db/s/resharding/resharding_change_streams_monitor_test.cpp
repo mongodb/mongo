@@ -328,8 +328,8 @@ protected:
     BSONObj resumeToken;
     bool completed;
     ReshardingChangeStreamsMonitor::BatchProcessedCallback callback = [&](const auto& batch) {
-        delta += batch.documentsDelta();
-        resumeToken = batch.resumeToken().getOwned();
+        delta += batch.getDocumentsDelta();
+        resumeToken = batch.getResumeToken().getOwned();
         completed = batch.containsFinalEvent();
     };
 };
@@ -473,7 +473,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
 
     int donorDelta = 0;
     auto donorCallback = [&](const auto& batch) {
-        donorDelta += batch.documentsDelta();
+        donorDelta += batch.getDocumentsDelta();
     };
     auto donorMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
         reshardingUUID, sourceNss, startAtTime, donorCallback);
@@ -489,7 +489,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
 
     int recipientDelta = 0;
     auto recipientCallback = [&](const auto& batch) {
-        recipientDelta += batch.documentsDelta();
+        recipientDelta += batch.getDocumentsDelta();
     };
     auto recipientMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
         reshardingUUID, tempNss, startAtTime, recipientCallback);

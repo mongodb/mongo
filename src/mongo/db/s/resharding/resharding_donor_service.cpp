@@ -1044,14 +1044,14 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                 LOGV2(9858404,
                       "Persisting change streams monitor's progress",
                       "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                      "documentsDelta"_attr = batch.documentsDelta(),
+                      "documentsDelta"_attr = batch.getDocumentsDelta(),
                       "completed"_attr = batch.containsFinalEvent());
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
                 auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
-                changeStreamsMonitorCtx.setResumeToken(batch.resumeToken().getOwned());
+                changeStreamsMonitorCtx.setResumeToken(batch.getResumeToken().getOwned());
                 changeStreamsMonitorCtx.setDocumentsDelta(
-                    changeStreamsMonitorCtx.getDocumentsDelta() + batch.documentsDelta());
+                    changeStreamsMonitorCtx.getDocumentsDelta() + batch.getDocumentsDelta());
                 changeStreamsMonitorCtx.setCompleted(batch.containsFinalEvent());
 
                 _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
