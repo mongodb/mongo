@@ -46,7 +46,8 @@ def make_hooks_compatible(suite):
             if name in INCOMPATIBLE_HOOKS:
                 continue
 
-            if name == "ValidateCollections":
+            if name in ["ValidateCollections", "BackgroundInitialSync", "IntermediateInitialSync"]:
+                # Fast count can be incorrect in case of an unclean shutdown, which may occur in Antithesis.
                 set_dict_value(
                     hook,
                     ["shell_options", "global_vars", "TestData", "skipEnforceFastCountOnValidate"],
