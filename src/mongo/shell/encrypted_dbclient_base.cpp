@@ -584,7 +584,13 @@ void EncryptedDBClientBase::decrypt(mozjs::MozJSImplScope* scope,
 
 boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldConfig(
     const NamespaceString& nss) {
-    auto collsList = _conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
+    // There are no guarantees that retrieving collection information with secondary reads enabled
+    // will reflect its own creation in a sharded cluster. To avoid a NamespaceNotFound error when
+    // using a connection from the router, we should fetch the information from the primary node of
+    // the replica set.
+    bool useSecondaryReads = !_conn->isMongos();
+    auto collsList =
+        _conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()), useSecondaryReads);
     uassert(ErrorCodes::BadValue,
             str::stream() << "Namespace not found: " << nss.toStringForErrorMsg(),
             !collsList.empty());

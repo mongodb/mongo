@@ -381,7 +381,8 @@ public:
      * }
      */
     std::list<BSONObj> getCollectionInfos(const DatabaseName& dbName,
-                                          const BSONObj& filter = BSONObj());
+                                          const BSONObj& filter = BSONObj(),
+                                          bool secondaryOk = true);
 
     /**
      * Drops an entire database.
