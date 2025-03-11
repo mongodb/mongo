@@ -27,12 +27,116 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <fmt/format.h>
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
+
+// Verifies that creating a default all-ascending Ordering behaves as expected.
+TEST(IndexKeyOrderingTest, OrderingAllAscending) {
+    Ordering o = Ordering::allAscending();
+    ASSERT_EQ(0, o.getBits());
+    // We are even checking 10 more bits than actually defined. These all default to ascending too.
+    for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys + 10; ++i) {
+        uint32_t mask = i < 32 ? uint32_t{1} << i : 0;
+        ASSERT_EQ(o.get(i), 1);
+        ASSERT_FALSE(o.descending(mask));
+    }
+}
+
+// Verifies that creating an Ordering from BSON behaves as expected.
+TEST(IndexKeyOrderingTest, MakeFromBSON) {
+    BSONObjBuilder bob;
+    for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys / 2; ++i) {
+        bob.append(fmt::format("test{}", i), i % 2 == 0 ? 1 : -1);
+    }
+    BSONObj obj = bob.obj();
+
+    auto o = Ordering::make(obj);
+    ASSERT_EQ(o.getBits(), 0x0000aaaaU);
+    for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys + 10; ++i) {
+        uint32_t mask = i < 32 ? uint32_t{1} << i : 0;
+        if (i < Ordering::kMaxCompoundIndexKeys / 2) {
+            // These are the actually defined keys.
+            if (i % 2 == 0) {
+                ASSERT_EQ(o.get(i), 1);
+                ASSERT_FALSE(o.descending(mask));
+            } else {
+                ASSERT_EQ(o.get(i), -1);
+                ASSERT_TRUE(o.descending(mask));
+            }
+        } else {
+            // These are the undefined keys. They default to ascending.
+            ASSERT_EQ(o.get(i), 1);
+            ASSERT_FALSE(o.descending(mask));
+        }
+    }
+}
+
+// Verifies that creating an Ordering from a BSONObj with too many fields throws an exception.
+TEST(IndexKeyOrderingTest, MakeFromBSONTooManyKeys) {
+    BSONObjBuilder bob;
+    for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys + 1; ++i) {
+        bob.append(fmt::format("test{}", i), 1);
+    }
+    BSONObj obj = bob.obj();
+
+    ASSERT_THROWS_CODE(Ordering::make(obj), DBException, 13103);
+}
+
+// Verifies that comparison results are correct.
+TEST(IndexKeyOrderingTest, AllAscendingCompareResults) {
+    Ordering o = Ordering::allAscending();
+
+    auto compare = [&o](StringData l, StringData r) -> int {
+        return fromjson(l).woCompare(fromjson(r), o);
+    };
+
+    ASSERT_EQ(0, compare("{}", "{}"));
+    ASSERT_EQ(1, compare("{a:1}", "{}"));
+    ASSERT_EQ(-1, compare("{}", "{a:1}"));
+    ASSERT_EQ(0, compare("{a:1}", "{a:1}"));
+    ASSERT_EQ(-1, compare("{a:1}", "{a:2}"));
+    ASSERT_EQ(1, compare("{a:2}", "{a:1}"));
+    ASSERT_EQ(1, compare("{a:1,b:1}", "{a:1}"));
+    ASSERT_EQ(-1, compare("{a:1}", "{a:1,b:1}"));
+    ASSERT_EQ(0, compare("{a:1,b:1}", "{a:1,b:1}"));
+}
+
+// Verifies that comparison results are correct.
+TEST(IndexKeyOrderingTest, AllDescendingCompareResults) {
+    BSONObjBuilder bob;
+    for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys; ++i) {
+        bob.append(fmt::format("test{}", i), -1);
+    }
+    BSONObj obj = bob.obj();
+    auto o = Ordering::make(obj);
+    ASSERT_EQ(o.getBits(), 0xffffffffU);
+
+    auto compare = [&o](StringData l, StringData r) -> int {
+        return fromjson(l).woCompare(fromjson(r), o);
+    };
+
+    ASSERT_EQ(0, compare("{}", "{}"));
+    ASSERT_EQ(1, compare("{a:1}", "{}"));
+    ASSERT_EQ(-1, compare("{}", "{a:1}"));
+    ASSERT_EQ(0, compare("{a:1}", "{a:1}"));
+    ASSERT_EQ(1, compare("{a:1}", "{a:2}"));
+    ASSERT_EQ(-1, compare("{a:2}", "{a:1}"));
+    ASSERT_EQ(1, compare("{a:1,b:1}", "{a:1}"));
+    ASSERT_EQ(-1, compare("{a:1}", "{a:1,b:1}"));
+    ASSERT_EQ(0, compare("{a:1,b:1}", "{a:1,b:1}"));
+}
 
 // Verifies that the server treats legacy index key specs the way that we expect them. Namely,
 // anything that is not a number is treated as ascending, and all negative numbers are descending.
