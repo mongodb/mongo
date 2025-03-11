@@ -841,6 +841,16 @@ error_codes:
       categories: [InternalOnly],
     }
   - {code: 442, name: RetryMultiPlanning}
+  - {
+      code: 443,
+      name: StreamProcessorS3ConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+  - {
+      code: 444,
+      name: StreamProcessorS3Error,
+      categories: [StreamProcessorUserError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
