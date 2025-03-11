@@ -251,7 +251,6 @@ mongo_cc_library(
         "//src/mongo/db/commands:rename_collection_idl",
         "//src/mongo/db/commands:rwc_defaults_commands",
         "//src/mongo/db/commands:servers",
-        "//src/mongo/db/commands:set_cluster_parameter_impl",
         "//src/mongo/db/commands:set_feature_compatibility_version_idl",
         "//src/mongo/db/commands:set_index_commit_quorum_idl",
         "//src/mongo/db/commands:set_user_write_block_mode_idl",
