@@ -318,7 +318,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_knobs",
     srcs = [
-        "explain_version_validator.cpp",
         "framework_control.cpp",
         "plan_ranker_mode.cpp",
         "query_feature_flags_gen",
@@ -329,7 +328,6 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.cpp",
     ],
     hdrs = [
-        "explain_version_validator.h",
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.h",
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.h",
     ],

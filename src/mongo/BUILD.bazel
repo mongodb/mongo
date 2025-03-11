@@ -660,7 +660,6 @@ filegroup(
         "//src/mongo/db/query:bson_typemask.h",
         "//src/mongo/db/query:distinct_command_gen",
         "//src/mongo/db/query:explain_verbosity_gen",
-        "//src/mongo/db/query:explain_version_validator.h",
         "//src/mongo/db/query:find_command.h",
         "//src/mongo/db/query:find_command_gen",
         "//src/mongo/db/query:hint_parser.h",

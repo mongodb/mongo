@@ -32,7 +32,6 @@ imports:
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/query/explain_version_validator.h"
     - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
     - "mongo/db/query/query_knob_expressions.h"
     - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
