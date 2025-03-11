@@ -61,6 +61,7 @@ protected:
 
     void doSaveState(bool relinquishCursor) override;
     void doRestoreState(bool relinquishCursor) override;
+    void doDiscardState() override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {

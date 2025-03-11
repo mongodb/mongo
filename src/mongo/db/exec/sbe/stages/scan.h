@@ -261,6 +261,7 @@ public:
 protected:
     void doSaveState(bool relinquishCursor) override;
     void doRestoreState(bool relinquishCursor) override;
+    void doDiscardState() override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
@@ -441,6 +442,7 @@ public:
 protected:
     void doSaveState(bool fullSave) final;
     void doRestoreState(bool fullSave) final;
+    void doDiscardState() override;
     void doDetachFromOperationContext() final;
     void doAttachToOperationContext(OperationContext* opCtx) final;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;

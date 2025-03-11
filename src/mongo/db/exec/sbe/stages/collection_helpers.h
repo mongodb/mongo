@@ -136,11 +136,11 @@ public:
 private:
     /*
      * Establish a collection instance consistent with the opened storage snapshot by calling
-     * 'establishConsistentCollection' and store it into _collPtr
+     * establishConsistentCollection().
      */
-    void getConsistentCollection(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const UUID& collUuid);
+    CollectionPtr getConsistentCollection(OperationContext* opCtx,
+                                          const DatabaseName& dbName,
+                                          const UUID& collUuid);
     boost::optional<CollectionPtr> _collPtr;
     boost::optional<NamespaceString> _collName;
     boost::optional<CollectionAcquisition> _collAcq;

@@ -93,6 +93,17 @@ void HashAggBaseStage<Derived>::doRestoreState(bool relinquishCursor) {
 }
 
 template <class Derived>
+void HashAggBaseStage<Derived>::doDiscardState() {
+    // If saveState() or restoreState() threw an exception, we need to discard any storage engine
+    // resources eagerly to satisfy invariants in the event that the snapshot is abandoned later.
+    if (_recordStore && _rsCursor && _opCtx) {
+        _recordStore->resetCursor(_opCtx, _rsCursor);
+    }
+    _rsCursor.reset();
+    _recordStore.reset();
+}
+
+template <class Derived>
 void HashAggBaseStage<Derived>::doDetachFromOperationContext() {
     if (_rsCursor) {
         _rsCursor->detachFromOperationContext();
