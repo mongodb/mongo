@@ -52,7 +52,7 @@ class StringData;
  * Utilities for dealing with what used to be called metadata.
  */
 namespace rpc {
-
+class ImpersonatedClientSessionGuard;
 /**
  * Returns an empty metadata object.
  */
@@ -63,7 +63,8 @@ BSONObj makeEmptyMetadata();
  */
 void readRequestMetadata(OperationContext* opCtx,
                          const GenericArguments& requestArgs,
-                         bool cmdRequiresAuth);
+                         bool cmdRequiresAuth,
+                         boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard);
 
 /**
  * A legacy command object and a corresponding query flags bitfield. The legacy command object

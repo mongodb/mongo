@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/rpc/metadata/audit_metadata_gen.h"
+#include "mongo/rpc/metadata/impersonated_client_session.h"
 
 namespace mongo {
 namespace rpc {
@@ -55,10 +56,13 @@ namespace rpc {
 static constexpr auto kImpersonationMetadataSectionName = "$audit"_sd;
 
 /*
- * Sets the provided audit metadata on the AuditClientAtrrs decorator or AuditUserAttrs decorator
- * respectively only if their data is present.
+ * Sets the provided audit metadata on the AuditClientAttrs decorator (via
+ * ImpersonatedClientSessionGuard) or AuditUserAttrs decorator respectively only if their data is
+ * present.
  */
-void setAuditMetadata(OperationContext* opCtx, const boost::optional<AuditMetadata>& data);
+void setAuditMetadata(OperationContext* opCtx,
+                      const boost::optional<AuditMetadata>& data,
+                      boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard);
 
 /*
  * Get impersonation metadata off the opCtx

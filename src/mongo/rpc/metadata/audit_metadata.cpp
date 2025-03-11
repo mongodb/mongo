@@ -53,7 +53,9 @@
 
 namespace mongo {
 namespace rpc {
-void setAuditClientMetadata(OperationContext* opCtx, const boost::optional<AuditMetadata>& data) {
+void setAuditClientMetadata(OperationContext* opCtx,
+                            const boost::optional<AuditMetadata>& data,
+                            boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard) {
     // TODO SERVER-83990: remove
     if (!gFeatureFlagExposeClientIpInAuditLogs.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -64,34 +66,17 @@ void setAuditClientMetadata(OperationContext* opCtx, const boost::optional<Audit
         return;
     }
 
-    auto client = opCtx->getClient();
-    auto session = client->session();
-
     if (!data || !data->getClientMetadata()) {
         return;
     }
 
-    auto local = session->local();
-    const auto& hosts = data->getClientMetadata()->getHosts();
-    auto remote = hosts[0];
-
-    std::vector<HostAndPort> intermediates;
-    for (size_t i = 1; i < hosts.size(); ++i) {
-        // In rare occasions a node will send a request to itself (e.g.
-        // checkCatalogConsistencyAcrossShards), adding itself as an intermediate. We check if the
-        // host is the same to skip it.
-        if (MONGO_unlikely(hosts[i] == local)) {
-            continue;
-        }
-        intermediates.push_back(hosts[i]);
-    }
-
-    AuditClientAttrs::set(
-        client, AuditClientAttrs(std::move(local), std::move(remote), std::move(intermediates)));
+    clientSessionGuard.emplace(opCtx->getClient(), data->getClientMetadata().value());
 }
 
-void setAuditMetadata(OperationContext* opCtx, const boost::optional<AuditMetadata>& data) {
-    setAuditClientMetadata(opCtx, data);
+void setAuditMetadata(OperationContext* opCtx,
+                      const boost::optional<AuditMetadata>& data,
+                      boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard) {
+    setAuditClientMetadata(opCtx, data, clientSessionGuard);
     if (data) {
         if (auto& user = data->getUser()) {
             rpc::AuditUserAttrs::set(opCtx, *user, data->getRoles(), true /* isImpersonating */);
