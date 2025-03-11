@@ -46,6 +46,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
@@ -252,6 +253,12 @@ public:
                          .build();
 
             try {
+                // Handle requests against a viewless timeseries collection.
+                if (convertAndRunAggregateIfViewlessTimeseries(
+                        opCtx, result, cq.getFindCommandRequest(), querySettings, verbosity)) {
+                    return;
+                }
+
                 long long millisElapsed;
                 std::vector<AsyncRequestsSender::Response> shardResponses;
 
@@ -375,6 +382,12 @@ public:
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
 
             try {
+                // Handle requests against a viewless timeseries collection.
+                if (convertAndRunAggregateIfViewlessTimeseries(
+                        opCtx, result, cq->getFindCommandRequest(), querySettings)) {
+                    return;
+                }
+
                 // Do the work to generate the first batch of results. This blocks waiting to
                 // get responses from the shard(s).
                 bool partialResultsReturned = false;
@@ -408,6 +421,37 @@ public:
 
         const GenericArguments& getGenericArguments() const override {
             return _genericArgs;
+        }
+
+        /**
+         * Helper function to detect when we are running find on a viewless timeseries query,
+         * converting the request to an agg request, and calling runAggregate(). Returns true if the
+         * conversion to and execution as an aggregate pipeline took place.
+         */
+        bool convertAndRunAggregateIfViewlessTimeseries(
+            OperationContext* const opCtx,
+            rpc::ReplyBuilderInterface* const result,
+            const FindCommandRequest& request,
+            const query_settings::QuerySettings& querySettings,
+            boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
+            if (timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, ns())) {
+                const auto hasExplain = verbosity.has_value();
+                auto bodyBuilder = result->getBodyBuilder();
+                bodyBuilder.resetToEmpty();
+                auto aggRequest =
+                    query_request_conversion::asAggregateCommandRequest(request, hasExplain);
+                aggRequest.setQuerySettings(querySettings);
+                uassertStatusOK(ClusterAggregate::runAggregate(
+                    opCtx,
+                    ClusterAggregate::Namespaces{ns(), ns()},
+                    aggRequest,
+                    {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::find)},
+                    verbosity,
+                    &bodyBuilder));
+                return true;
+            } else {
+                return false;
+            }
         }
 
         void retryOnViewError(

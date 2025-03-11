@@ -75,9 +75,13 @@ bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
 
 bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
                                              const NamespaceString& nss) {
-    const auto& cri =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    return isEligibleForViewlessTimeseriesRewrites(opCtx, cri);
+    if (const auto& criWithStatus =
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
+        criWithStatus.isOK()) {
+        return isEligibleForViewlessTimeseriesRewrites(opCtx, criWithStatus.getValue());
+    } else {
+        return false;
+    }
 }
 
 bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,

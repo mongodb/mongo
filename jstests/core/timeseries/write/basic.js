@@ -46,15 +46,15 @@ assert.eq(
 // Count documents
 assert.eq(numDocs, coll.countDocuments({}), `Unexpected number of documents with countDocuments`);
 
-// TODO SERVER-101498 re-enable this test case once find path works for viewless timeseries
 // Fetch documents with find
-// docs = coll.find().toArray();
-// assert.eq(numDocs, docs.length, `Unexpected number of documents found with find
-// ${tojson(docs)}`);
+docs = coll.find().toArray();
+assert.eq(numDocs,
+          docs.length,
+          `Unexpected number of documents found with find
+${tojson(docs)}`);
 
 let bucketsDocs = coll.aggregate([{$match: {}}], {rawData: true}).toArray();
 validateBuckets(bucketsDocs, numDocs);
 
-// TODO SERVER-101498 re-enable this test case once find path works for viewless timeseries
-// bucketsDocs = coll.find().rawData().toArray();
-// validateBuckets(bucketsDocs, numDocs);
+bucketsDocs = coll.find().rawData().toArray();
+validateBuckets(bucketsDocs, numDocs);

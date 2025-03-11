@@ -111,6 +111,7 @@
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -533,14 +534,14 @@ public:
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});
 
-            // If we are running a query against a view redirect this query through the aggregation
-            // system.
-            if (collectionOrView->isView()) {
+            // If we are running a query against a view or a timeseries collection, redirect this
+            // query through the aggregation system.
+            if (collectionOrView->isView() ||
+                timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, *collectionOrView)) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
-                auto curOp = CurOp::get(opCtx);
-                curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
-                return runFindOnView(opCtx, *cq, verbosity, replyBuilder);
+                CurOp::get(opCtx)->debug().queryStatsInfo.disableForSubqueryExecution = true;
+                return runFindAsAgg(opCtx, *cq, verbosity, replyBuilder);
             }
 
             // Get the execution plan for the query.
@@ -815,12 +816,13 @@ public:
                     "CanonicalQuery namespace should match catalog namespace",
                     cq->nss() == nss);
 
-            // If we are running a query against a view redirect this query through the aggregation
-            // system.
-            if (collectionOrView->isView()) {
+            // If we are running a query against a view or a timeseries collection, redirect this
+            // query through the aggregation system.
+            if (collectionOrView->isView() ||
+                timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, *collectionOrView)) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
-                return runFindOnView(opCtx, *cq, boost::none /* verbosity */, replyBuilder);
+                return runFindAsAgg(opCtx, *cq, boost::none /* verbosity */, replyBuilder);
             }
 
             const auto& collection = collectionOrView->getCollection();
@@ -1007,11 +1009,11 @@ public:
                                                          respSc);
         }
 
-        void runFindOnView(OperationContext* opCtx,
-                           const CanonicalQuery& cq,
-                           boost::optional<ExplainOptions::Verbosity> verbosity,
-                           rpc::ReplyBuilderInterface* replyBuilder) {
-            bool hasExplain = verbosity.has_value();
+        void runFindAsAgg(OperationContext* opCtx,
+                          const CanonicalQuery& cq,
+                          boost::optional<ExplainOptions::Verbosity> verbosity,
+                          rpc::ReplyBuilderInterface* replyBuilder) {
+            const auto hasExplain = verbosity.has_value();
             auto aggRequest = query_request_conversion::asAggregateCommandRequest(
                 cq.getFindCommandRequest(), hasExplain);
 
@@ -1019,12 +1021,14 @@ public:
 
             // An empty PrivilegeVector for explain is acceptable because these privileges are only
             // checked on getMore and explain will not open a cursor.
-            const auto privileges = verbosity ? PrivilegeVector()
+            const auto privileges = verbosity ? PrivilegeVector{}
                                               : uassertStatusOK(auth::getPrivilegesForAggregate(
                                                     AuthorizationSession::get(opCtx->getClient()),
                                                     aggRequest.getNamespace(),
                                                     aggRequest,
                                                     false));
+            // This will do view definition resolution for views and timeseries things for
+            // timeseries queries.
             const auto status = runAggregate(opCtx,
                                              aggRequest,
                                              {aggRequest},
@@ -1034,7 +1038,8 @@ public:
                                              replyBuilder);
             if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                 uasserted(ErrorCodes::InvalidPipelineOperator,
-                          str::stream() << "Unsupported in view pipeline: " << status.reason());
+                          str::stream{} << "Unsupported operator in converted pipeline: "
+                                        << status.reason());
             }
             uassertStatusOK(status);
         }
