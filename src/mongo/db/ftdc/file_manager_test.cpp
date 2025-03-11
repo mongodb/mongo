@@ -77,7 +77,7 @@ TEST_F(FTDCFileManagerTest, TestFull) {
     boost::filesystem::path dir(tempdir.path());
     createDirectoryClean(dir);
 
-    FTDCCollectorCollection rotate;
+    SyncFTDCCollectorCollection rotate;
     auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
     ASSERT_OK(swMgr.getStatus());
     auto mgr = std::move(swMgr.getValue());
@@ -166,7 +166,7 @@ TEST_F(FTDCFileManagerTest, TestNormalRestart) {
 
     for (int i = 0; i < 3; i++) {
         // Do a few cases of stop and start to ensure it works as expected
-        FTDCCollectorCollection rotate;
+        SyncFTDCCollectorCollection rotate;
         auto swMgr =
             FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
         ASSERT_OK(swMgr.getStatus());
@@ -227,7 +227,7 @@ TEST_F(FTDCFileManagerTest, TestCorruptCrashRestart) {
 
     for (int i = 0; i < 2; i++) {
         // Do a few cases of stop and start to ensure it works as expected
-        FTDCCollectorCollection rotate;
+        SyncFTDCCollectorCollection rotate;
         auto swMgr =
             FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
         ASSERT_OK(swMgr.getStatus());
@@ -306,7 +306,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     boost::filesystem::path fileOut;
 
     {
-        FTDCCollectorCollection rotate;
+        SyncFTDCCollectorCollection rotate;
         auto swMgr =
             FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
         ASSERT_OK(swMgr.getStatus());
@@ -341,7 +341,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
 
     // Let the manager run the recovery over the interim file
     {
-        FTDCCollectorCollection rotate;
+        SyncFTDCCollectorCollection rotate;
         auto swMgr =
             FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
         ASSERT_OK(swMgr.getStatus());
@@ -375,7 +375,7 @@ void FTDCFileManagerTest::testPeriodicCollection(bool multiservice) {
     boost::filesystem::path dir(tempdir.path());
     createDirectoryClean(dir);
 
-    FTDCCollectorCollection rotate;
+    SyncFTDCCollectorCollection rotate;
     auto mgr = uassertStatusOK(
         FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{multiservice}));
 

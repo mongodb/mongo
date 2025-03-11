@@ -135,6 +135,8 @@ public:
      *
      * `role` is used to disambiguate role-specific collectors with colliding names.
      * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
+     *
+     * It is not safe to call this after FTDC startup.
      */
     void addPeriodicMetadataCollector(std::unique_ptr<FTDCCollectorInterface> collector,
                                       ClusterRole role);
@@ -144,6 +146,8 @@ public:
      *
      * `role` is used to disambiguate role-specific collectors with colliding names.
      * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
+     *
+     * It is not safe to call this after FTDC startup.
      */
     void addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
 
@@ -154,6 +158,8 @@ public:
      *
      * `role` is used to disambiguate role-specific collectors with colliding names.
      * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
+     *
+     * It is not safe to call this after FTDC startup.
      */
     void addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
 
@@ -252,17 +258,17 @@ private:
     FTDCConfig _configTemp;
 
     // Set of periodic metadata collectors
-    FTDCCollectorCollection _periodicMetadataCollectors;
+    SyncFTDCCollectorCollection _periodicMetadataCollectors;
 
     // Set of periodic collectors
-    FTDCCollectorCollection _periodicCollectors;
+    SyncFTDCCollectorCollection _periodicCollectors;
 
     // Last seen sample document from periodic collectors
     // Owned
     BSONObj _mostRecentPeriodicDocument;
 
     // Set of file rotation collectors
-    FTDCCollectorCollection _rotateCollectors;
+    SyncFTDCCollectorCollection _rotateCollectors;
 
     // File manager that manages file rotation, and logging
     std::unique_ptr<FTDCFileManager> _mgr;
