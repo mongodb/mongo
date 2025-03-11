@@ -76,7 +76,9 @@ class FCVGatedFeatureFlag {
     friend class FeatureFlagServerParameter;  // For set(...)
 
 public:
-    FCVGatedFeatureFlag(bool enabled, StringData versionString);
+    FCVGatedFeatureFlag(bool enabled,
+                        StringData versionString,
+                        bool enableInTransitionalFCV = false);
 
     // Non-copyable, non-movable
     FCVGatedFeatureFlag(const FCVGatedFeatureFlag&) = delete;
@@ -152,6 +154,7 @@ private:
 
 private:
     bool _enabled;
+    bool _enableInTransitionalFCV;
     multiversion::FeatureCompatibilityVersion _version;
 };
 

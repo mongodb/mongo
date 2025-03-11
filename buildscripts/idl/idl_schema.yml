@@ -902,6 +902,11 @@ properties:
           shouldBeFCVGated:
             type: boolean
             description: Whether or not the feature flag should be FCV gated
+          enableOnTransitionalFCV:
+            type: boolean
+            description: >
+              Also enable this feature flag during the transitional FCV state (kUpgrade,
+              kDowngrade). Can only appear along with shouldBeFCVGated: true.
           incremental_rollout_phase:
             type: string
             description: >

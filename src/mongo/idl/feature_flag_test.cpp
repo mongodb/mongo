@@ -175,9 +175,23 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 // (Generic FCV reference): feature flag test
 static const ServerGlobalParams::FCVSnapshot kLastLTSFCVSnapshot(
     multiversion::GenericFCV::kLastLTS);
+static const ServerGlobalParams::FCVSnapshot kLastContinuousFCVSnapshot(
+    multiversion::GenericFCV::kLastContinuous);
 static const ServerGlobalParams::FCVSnapshot kLatestFCVSnapshot(multiversion::GenericFCV::kLatest);
 static const ServerGlobalParams::FCVSnapshot kUninitializedFCVSnapshot(
     multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+
+// (Generic FCV reference): feature flag test
+static const ServerGlobalParams::FCVSnapshot kUpgradingFromLastLTSToLatestFCVSnapshot(
+    multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+static const ServerGlobalParams::FCVSnapshot kDowngradingFromLatestToLastLTSFCVSnapshot(
+    multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
+static const ServerGlobalParams::FCVSnapshot kUpgradingFromLastContinuousToLatestFCVSnapshot(
+    multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest);
+static const ServerGlobalParams::FCVSnapshot kDowngradingFromLatestToLastContinuousFCVSnapshot(
+    multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous);
+static const ServerGlobalParams::FCVSnapshot kUpgradingFromLastLTSToLastContinuousFCVSnapshot(
+    multiversion::GenericFCV::kUpgradingFromLastLTSToLastContinuous);
 
 // Test feature flags are enabled and not enabled based on fcv
 TEST_F(FeatureFlagTest, IsEnabledTrue) {
@@ -353,6 +367,70 @@ TEST_F(FeatureFlagTest, FCVGatedAsCheckableFeatureFlagRef) {
     });
     ASSERT_FALSE(checkableFeatureFlagRefBlender.isEnabled([](auto&) { return false; }));
     ASSERT_TRUE(checkableFeatureFlagRefBlender.isEnabled([](auto&) { return true; }));
+}
+
+TEST_F(FeatureFlagTest, TestFCVGatedWithTransitionOnTransitionalFCV) {
+    // (Generic FCV reference): feature flag test
+    mongo::FCVGatedFeatureFlag featureFlagLatest{
+        true /* enabled */,
+        multiversion::toString(multiversion::GenericFCV::kLatest),
+        true /* enableOnTransitionalFCV */};
+    mongo::FCVGatedFeatureFlag featureFlagLastContinuous{
+        true /* enabled */,
+        multiversion::toString(multiversion::GenericFCV::kLastContinuous),
+        true /* enableOnTransitionalFCV */};
+
+    // Test newest version
+    ASSERT_TRUE(featureFlagLatest.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
+    ASSERT_TRUE(featureFlagLastContinuous.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
+
+    // Test last continuous
+    ASSERT_FALSE(featureFlagLatest.isEnabled(kNoVersionContext, kLastContinuousFCVSnapshot));
+    ASSERT_TRUE(featureFlagLastContinuous.isEnabled(kNoVersionContext, kLastContinuousFCVSnapshot));
+
+    // The behavior is not exactly the same if there are no lastContinuous versions, and everything
+    // are compile-time constants, hence the `if constexpr` here. If kLastContinuous == kLastLTS,
+    // then the tests below would fail. Those situations are impossible in production.
+    // (Generic FCV reference): feature flag test
+    if constexpr (multiversion::GenericFCV::kLastContinuous != multiversion::GenericFCV::kLastLTS) {
+        // Test oldest version
+        ASSERT_FALSE(featureFlagLatest.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+        ASSERT_FALSE(featureFlagLastContinuous.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+
+        // Test upgrading LastLTS -> LastContinuous
+        ASSERT_FALSE(featureFlagLatest.isEnabled(kNoVersionContext,
+                                                 kUpgradingFromLastLTSToLastContinuousFCVSnapshot));
+        ASSERT_TRUE(featureFlagLastContinuous.isEnabled(
+            kNoVersionContext, kUpgradingFromLastLTSToLastContinuousFCVSnapshot));
+    } else {
+        // Test oldest version
+        ASSERT_FALSE(featureFlagLatest.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+        ASSERT_TRUE(featureFlagLastContinuous.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+    }
+
+    // Test upgrading LastLTS -> Latest
+    ASSERT_TRUE(
+        featureFlagLatest.isEnabled(kNoVersionContext, kUpgradingFromLastLTSToLatestFCVSnapshot));
+    ASSERT_TRUE(featureFlagLastContinuous.isEnabled(kNoVersionContext,
+                                                    kUpgradingFromLastLTSToLatestFCVSnapshot));
+
+    // Test upgrading LastContinuous -> Latest
+    ASSERT_TRUE(featureFlagLatest.isEnabled(kNoVersionContext,
+                                            kUpgradingFromLastContinuousToLatestFCVSnapshot));
+    ASSERT_TRUE(featureFlagLastContinuous.isEnabled(
+        kNoVersionContext, kUpgradingFromLastContinuousToLatestFCVSnapshot));
+
+    // Test downgrading Latest -> LastContinuous
+    ASSERT_TRUE(featureFlagLatest.isEnabled(kNoVersionContext,
+                                            kDowngradingFromLatestToLastContinuousFCVSnapshot));
+    ASSERT_TRUE(featureFlagLastContinuous.isEnabled(
+        kNoVersionContext, kDowngradingFromLatestToLastContinuousFCVSnapshot));
+
+    // Test downgrading Latest -> LastLTS
+    ASSERT_TRUE(
+        featureFlagLatest.isEnabled(kNoVersionContext, kDowngradingFromLatestToLastLTSFCVSnapshot));
+    ASSERT_TRUE(featureFlagLastContinuous.isEnabled(kNoVersionContext,
+                                                    kDowngradingFromLatestToLastLTSFCVSnapshot));
 }
 
 

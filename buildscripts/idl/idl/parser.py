@@ -1001,6 +1001,7 @@ def _parse_feature_flag(ctxt, spec, name, node):
             "shouldBeFCVGated": _RuleDesc(
                 "scalar_or_mapping", _RuleDesc.REQUIRED, mapping_parser_func=_parse_expression
             ),
+            "enableOnTransitionalFCV": _RuleDesc("bool_scalar"),
             "incremental_rollout_phase": _RuleDesc("scalar"),
         },
     )

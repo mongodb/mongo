@@ -3080,7 +3080,35 @@ class TestBinder(testcase.IDLTestcase):
                     version: 123
                     shouldBeFCVGated: false
             """),
-            idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION,
+            idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
+        )
+
+        # if shouldBeFCVGated is false, enableOnTransitionalFCV is not allowed
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    shouldBeFCVGated: false
+                    enableOnTransitionalFCV: true
+            """),
+            idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
+        )
+
+        # if shouldBeFCVGated: true, enableOnTransitionalFCV is allowed
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    version: 123
+                    shouldBeFCVGated: true
+                    enableOnTransitionalFCV: true
+            """)
         )
 
         # incremental_rollout_phase must have a valid value

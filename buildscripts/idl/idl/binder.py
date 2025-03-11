@@ -1672,11 +1672,13 @@ def _bind_non_ifr_feature_flag_default(ctxt, param):
     expr_for_default = syntax.Expression(
         param.default.file_name, param.default.line, param.default.column
     )
-    expr_for_default.expr = (
-        f'{param.default.literal}, "{param.version or ""}"_sd'
-        if param.shouldBeFCVGated.literal == "true"
-        else param.default.literal
-    )
+    if param.shouldBeFCVGated.literal == "true":
+        expr_for_default.expr = f'{param.default.literal}, "{param.version or ""}"_sd'
+        if param.enableOnTransitionalFCV:
+            expr_for_default.expr += ", true"
+    else:
+        expr_for_default.expr = param.default.literal
+
     bound_expr = _bind_expression(expr_for_default)
     bound_expr.export = False
     return bound_expr
@@ -1745,9 +1747,11 @@ def _bind_feature_flags(ctxt, param):
             if param.default.literal == "true" and not param.version:
                 ctxt.add_feature_flag_default_true_missing_version(param)
                 return None
-        elif param.version:
+        elif param.version or param.enableOnTransitionalFCV:
             # Feature flags that should not be FCV gated must not have a version.
-            ctxt.add_feature_flag_fcv_gated_false_has_version(param)
+            ctxt.add_feature_flag_fcv_gated_false_has_unsupported_option(
+                param, "version" if param.version else "enableOnTransitionalFCV"
+            )
             return None
     else:
         # Non-IFR flags must specify a 'default' value.

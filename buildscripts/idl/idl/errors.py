@@ -136,7 +136,7 @@ ERROR_ID_QUERY_SHAPE_PROPERTIES_MUTUALLY_EXCLUSIVE = "ID0097"
 ERROR_ID_QUERY_SHAPE_PROPERTY_CANNOT_BE_FALSE = "ID0098"
 ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0099"
 ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0100"
-ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION = "ID0101"
+ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION = "ID0101"
 ERROR_ID_QUERY_SHAPE_INVALID_VALUE = "ID0102"
 ERROR_ID_BAD_CPP_NAMESPACE = "ID0103"
 ERROR_ID_INCREMENTAL_ROLLOUT_PHASE_INVALID_VALUE = "ID0104"
@@ -1117,14 +1117,15 @@ class ParserContext(object):
             ("The 'version' attribute is not allowed for feature flag that defaults to false"),
         )
 
-    def add_feature_flag_fcv_gated_false_has_version(self, location):
+    def add_feature_flag_fcv_gated_false_has_unsupported_option(self, location, option_name):
         # type: (common.SourceLocation) -> None
-        """Add an error about a feature flag that should not be FCV gated but has a version."""
+        """Add an error about a feature flag that should not be FCV gated but has an option for FCV gated feature flags."""
         self._add_error(
             location,
-            ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION,
+            ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
             (
-                "The 'version' attribute is not allowed for feature flag that should not be FCV gated"
+                "The '%s' attribute is not allowed for feature flag that should not be FCV gated"
+                % (option_name)
             ),
         )
 

@@ -29,7 +29,6 @@
 
 #include "mongo/db/feature_flag.h"
 
-
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -38,8 +37,12 @@
 namespace mongo {
 
 // (Generic FCV reference): feature flag support
-FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled, StringData versionString)
-    : _enabled(enabled), _version(multiversion::GenericFCV::kLatest) {
+FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled,
+                                         StringData versionString,
+                                         bool enableInTransitionalFCV)
+    : _enabled(enabled),
+      _enableInTransitionalFCV(enableInTransitionalFCV),
+      _version(multiversion::GenericFCV::kLatest) {
 
     // Verify the feature flag invariants. IDL binder verifies these hold but we add these checks to
     // prevent incorrect direct instantiation.
@@ -111,7 +114,21 @@ bool FCVGatedFeatureFlag::isEnabledOnVersion(
         return false;
     }
 
-    return targetFCV >= _version;
+    if (targetFCV >= _version) {
+        return true;
+    }
+
+    if (_enableInTransitionalFCV &&
+        ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(targetFCV)) {
+        const auto transitionInfo = multiversion::getTransitionFCVInfo(targetFCV);
+        // During upgrade, enable the feature flag, as if we were already on the target FCV
+        // During downgrade, keep the feature flag enabled as if we were still on the source FCV
+        const auto transitionTarget =
+            transitionInfo.to > transitionInfo.from ? transitionInfo.to : transitionInfo.from;
+        return transitionTarget >= _version;
+    }
+
+    return false;
 }
 
 bool FCVGatedFeatureFlag::isDisabledOnTargetFCVButEnabledOnOriginalFCV(

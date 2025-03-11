@@ -916,6 +916,7 @@ class FeatureFlag(common.SourceLocation):
         self.default = None  # type: Expression
         self.version = None  # type: str
         self.shouldBeFCVGated = None  # type: Expression
+        self.enableOnTransitionalFCV = None  # type: Expression
         self.incremental_rollout_phase = None  # type: Optional[str]
 
         super(FeatureFlag, self).__init__(file_name, line, column)
