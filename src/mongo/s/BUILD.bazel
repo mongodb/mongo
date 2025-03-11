@@ -1045,14 +1045,12 @@ mongo_cc_binary(
 mongo_cc_library(
     name = "sharding_test_fixture_common",
     srcs = [
-        "catalog_cache_loader_mock.cpp",
         "catalog_cache_mock.cpp",
         "config_server_catalog_cache_loader_mock.cpp",
         "sharding_test_fixture_common.cpp",
         "//src/mongo/db/s:shard_server_catalog_cache_loader_mock.cpp",
     ],
     hdrs = [
-        "catalog_cache_loader_mock.h",
         "catalog_cache_mock.h",
         "config_server_catalog_cache_loader_mock.h",
         "sharding_test_fixture_common.h",

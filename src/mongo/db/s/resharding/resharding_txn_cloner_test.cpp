@@ -115,7 +115,6 @@
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
@@ -144,11 +143,11 @@ class ReshardingTxnClonerTest : service_context_test::WithSetupTransportLayer,
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         // The config database's primary shard is always config, and it is always sharded.
-        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(DatabaseType{
+        getRouterRoleCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(DatabaseType{
             DatabaseName::kConfig, ShardId::kConfigServerId, DatabaseVersion::makeFixed()});
 
         // The config.transactions collection is always unsharded.
-        getCatalogCacheLoaderMock()->setCollectionRefreshReturnValue(
+        getRouterRoleCatalogCacheLoaderMock()->setCollectionRefreshReturnValue(
             {ErrorCodes::NamespaceNotFound, "collection not found"});
 
         for (const auto& shardId : kTwoShardIdList) {

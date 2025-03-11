@@ -83,12 +83,14 @@ protected:
                 [&](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
                     const auto& configConnStr = shardIdentity.getConfigsvrConnectionString();
 
-                    auto loader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
+                    auto routerLoader = std::make_shared<ConfigServerCatalogCacheLoaderImpl>();
+                    auto catalogCache = std::make_unique<CatalogCache>(opCtx->getServiceContext(),
+                                                                       std::move(routerLoader));
+
+                    auto shardLoader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
                         std::make_unique<ConfigServerCatalogCacheLoaderImpl>());
-                    auto catalogCache =
-                        std::make_unique<CatalogCache>(opCtx->getServiceContext(), loader);
                     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(
-                        configConnStr, std::move(catalogCache), std::move(loader)));
+                        configConnStr, std::move(catalogCache), std::move(shardLoader)));
 
                     // Set the ConnectionString return value on the mock targeter so that later
                     // calls to the targeter's getConnString() return the appropriate value

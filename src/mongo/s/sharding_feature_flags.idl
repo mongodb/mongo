@@ -136,7 +136,7 @@ feature_flags:
     description: "Feature flag to enable one catalog cache for the shard role and another one for
                   the router role."
     cpp_varname: feature_flags::gDualCatalogCache
-    default: false
+    default: true
     shouldBeFCVGated: false
   featureFlagUseTopologyChangeCoordinators:
     description: "Feature flag for enabling the coordinator based topology changes."
