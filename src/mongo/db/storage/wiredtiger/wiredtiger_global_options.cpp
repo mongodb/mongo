@@ -27,9 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <wiredtiger.h>
+
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -90,5 +100,82 @@ Status WiredTigerGlobalOptions::validateWiredTigerLiveRestoreReadSizeMB(const in
 
     return Status::OK();
 }
+
+void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
+                                                    BSONObjBuilder* b,
+                                                    StringData name,
+                                                    const boost::optional<TenantId>&) {
+    *b << name << StringData{*_data.first};
+}
+
+Status validateExtraDiagnostics(const std::vector<std::string>& value,
+                                const boost::optional<TenantId>& tenantId) {
+    try {
+        std::set<std::string> flagArr = {"all",
+                                         "concurrent_access",
+                                         "data_validation",
+                                         "invalid_op",
+                                         "out_of_order",
+                                         "panic",
+                                         "slow_operation",
+                                         "visibility"};
+        for (const auto& diagFlag : value) {
+            bool exists = std::find(flagArr.begin(), flagArr.end(), diagFlag) != flagArr.end();
+
+            if (!exists) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("'{}' is not a valid flag option", diagFlag));
+            }
+        }
+    } catch (...) {
+        return exceptionToStatus();
+    }
+
+    return Status::OK();
+}
+
+Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
+                                                             const boost::optional<TenantId>&) {
+    size_t pos = str.find('\0');
+    if (pos != std::string::npos) {
+        return Status(ErrorCodes::BadValue,
+                      (str::stream()
+                       << "WiredTiger configuration strings cannot have embedded null characters. "
+                          "Embedded null found at position "
+                       << pos));
+    }
+
+    LOGV2(22376, "Reconfiguring WiredTiger storage engine", "config"_attr = str);
+
+    invariant(_data.second);
+    int ret = _data.second->reconfigure(str.toString().c_str());
+    if (ret != 0) {
+        const char* errorStr = wiredtiger_strerror(ret);
+        std::string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
+                                            << ret << "): " << errorStr);
+        LOGV2_ERROR(22378,
+                    "WiredTiger reconfiguration failed",
+                    "error"_attr = ret,
+                    "message"_attr = errorStr);
+
+        return Status(ErrorCodes::BadValue, result);
+    }
+
+    _data.first = str.toString();
+    return Status::OK();
+}
+
+Status WiredTigerDirectoryForIndexesParameter::setFromString(StringData,
+                                                             const boost::optional<TenantId>&) {
+    return {ErrorCodes::IllegalOperation,
+            str::stream() << name() << " cannot be set via setParameter"};
+};
+void WiredTigerDirectoryForIndexesParameter::append(OperationContext* opCtx,
+                                                    BSONObjBuilder* builder,
+                                                    StringData name,
+                                                    const boost::optional<TenantId>&) {
+    builder->append(name, wiredTigerGlobalOptions.directoryForIndexes);
+}
+
 
 }  // namespace mongo

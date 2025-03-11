@@ -56,6 +56,9 @@ public:
 
     double cacheSizeGB;
     size_t statisticsLogDelaySecs;
+    int32_t sessionMax{0};
+    double evictionDirtyTargetGB{0};
+    double evictionDirtyTriggerGB{0};
     std::string journalCompressor;
     int zstdCompressorLevel;
     bool directoryForIndexes;

@@ -94,11 +94,11 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_truncate_markers.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
@@ -360,12 +360,12 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "eviction=(threads_min=" << _wtConfig.evictionThreadsMin
        << ",threads_max=" << _wtConfig.evictionThreadsMax << "),";
 
-    if (gWiredTigerEvictionDirtyTargetGB)
+    if (_wtConfig.evictionDirtyTargetMB)
         ss << "eviction_dirty_target=" << _wtConfig.evictionDirtyTargetMB << "MB,";
     if (!gWiredTigerExtraDiagnostics.empty())
         ss << "extra_diagnostics=[" << boost::algorithm::join(gWiredTigerExtraDiagnostics, ",")
            << "],";
-    if (gWiredTigerEvictionDirtyMaxGB)
+    if (_wtConfig.evictionDirtyTriggerMB)
         ss << "eviction_dirty_trigger=" << _wtConfig.evictionDirtyTriggerMB << "MB,";
     if (gWiredTigerCheckpointCleanupPeriodSeconds)
         ss << "checkpoint_cleanup=(wait="
@@ -3009,9 +3009,9 @@ Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, co
 
 WiredTigerKVEngine::WiredTigerConfig getWiredTigerConfigFromStartupOptions() {
     WiredTigerKVEngine::WiredTigerConfig wtConfig;
-    wtConfig.sessionMax = gWiredTigerSessionMax;
-    wtConfig.evictionDirtyTargetMB = gWiredTigerEvictionDirtyTargetGB * 1024;
-    wtConfig.evictionDirtyTriggerMB = gWiredTigerEvictionDirtyMaxGB * 1024;
+    wtConfig.sessionMax = wiredTigerGlobalOptions.sessionMax;
+    wtConfig.evictionDirtyTargetMB = wiredTigerGlobalOptions.evictionDirtyTargetGB * 1024;
+    wtConfig.evictionDirtyTriggerMB = wiredTigerGlobalOptions.evictionDirtyTriggerGB * 1024;
     wtConfig.logCompressor = wiredTigerGlobalOptions.journalCompressor;
     wtConfig.liveRestorePath = wiredTigerGlobalOptions.liveRestoreSource;
     wtConfig.liveRestoreThreadsMax = wiredTigerGlobalOptions.liveRestoreThreads;
