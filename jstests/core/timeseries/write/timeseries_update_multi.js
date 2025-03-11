@@ -9,6 +9,9 @@
  *   requires_non_retryable_writes,
  *   featureFlagTimeseriesUpdatesSupport,
  *   requires_fcv_80,
+ *   # TODO SERVER-94428: Reenable this test.
+ *   # This test is currently incompatible with dbcheck.
+ *   viewless_timeseries_incompatible,
  * ]
  */
 

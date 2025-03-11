@@ -5,7 +5,6 @@
         mongod_options:
           set_parameters:
             featureFlagCreateViewlessTimeseriesCollections: 1
-
 - name: enable_viewless_timeseries_feature_flag_mongos
   value:
     executor:
@@ -13,25 +12,38 @@
         mongos_options:
           set_parameters:
             featureFlagCreateViewlessTimeseriesCollections: 1
-
 - name: all_timeseries_tests_selector
   value:
     selector:
+      exclude_files: null
       roots:
         - jstests/core/timeseries/**/*.js
-      exclude_files:
-        # TODO SERVER-94428: Reenable this test.
-        # This test is currently incompatible with dbcheck.
-        - jstests/core/timeseries/write/timeseries_update_multi.js
-
 - name: only_validated_timeseries_tests_selector
   value:
     selector:
+      exclude_files: null
       roots:
         - jstests/core/timeseries/ddl/timeseries_create_collection.js
+        - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
+        - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
+        - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
+        - jstests/core/timeseries/libs/geo.js
+        - jstests/core/timeseries/libs/timeseries.js
+        - jstests/core/timeseries/libs/timeseries_agg_helpers.js
+        - jstests/core/timeseries/libs/timeseries_groupby_reorder_helpers.js
+        - jstests/core/timeseries/libs/timeseries_sort_util.js
+        - jstests/core/timeseries/libs/timeseries_writes_util.js
+        - jstests/core/timeseries/libs/viewless_timeseries_util.js
+        - jstests/core/timeseries/query/timeseries_cursor_batches.js
+        - jstests/core/timeseries/query/timeseries_groupby_reorder.js
+        - jstests/core/timeseries/query/timeseries_groupby_reorder_expr.js
+        - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
+        - jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
+        - jstests/core/timeseries/query/timeseries_project_pushdown.js
+        - jstests/core/timeseries/query/timeseries_shadowing_meta_project_pushdown.js
         - jstests/core/timeseries/write/basic.js
-      exclude_files:
-
+        - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
+        - jstests/core/timeseries/write/timeseries_insert.js
 - name: exclude_viewless_timeseries_incompabile_tag
   value:
     exclude_with_any_tags:
