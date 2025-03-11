@@ -19,22 +19,20 @@ const runTest = function(insertAfterRestart) {
         return conn.getDB(jsTestName()).test;
     };
 
-    const getSizeStorerData = function() {
-        const filePath = dbpath + (_isWindows() ? "\\" : "/") + jsTestName();
-        runWiredTigerTool("-r", "-h", dbpath, "dump", "-j", "-f", filePath, "sizeStorer");
-        return JSON.parse(cat(filePath))["table:sizeStorer"][1].data;
-    };
-
     assert.commandWorked(coll().insert({a: 1}));
     assert.eq(coll().count(), 1);
     const uri = coll().stats().wiredTiger.uri.split("statistics:")[1];
 
-    MongoRunner.stopMongod(conn);
+    const assertSizeStorerEntry = function(expected) {
+        const filePath = dbpath + (_isWindows() ? "\\" : "/") + jsTestName();
+        runWiredTigerTool(
+            "-r", "-h", dbpath, "dump", "-j", "-k", uri, "-f", filePath, "sizeStorer");
+        const data = JSON.parse(cat(filePath))["table:sizeStorer"][1].data;
+        assert.eq(data.length, expected ? 1 : 0, tojson(data));
+    };
 
-    let sizeStorerData = getSizeStorerData();
-    assert(sizeStorerData.find(entry => entry.key0 === uri),
-           "Size storer unexpectedly does not contain entry for " + uri + ": " +
-               tojson(sizeStorerData));
+    MongoRunner.stopMongod(conn);
+    assertSizeStorerEntry(true);
 
     conn = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true, setParameter: {syncdelay: 0}});
 
@@ -47,10 +45,7 @@ const runTest = function(insertAfterRestart) {
     checkLog.containsJson(conn, 6776600, {ident: uri.split("table:")[1]});
 
     MongoRunner.stopMongod(conn);
-
-    sizeStorerData = getSizeStorerData();
-    assert(!sizeStorerData.find(entry => entry.key0 === uri),
-           "Size storer unexpectedly contains entry for " + uri + ": " + tojson(sizeStorerData));
+    assertSizeStorerEntry(false);
 };
 
 runTest(false);
