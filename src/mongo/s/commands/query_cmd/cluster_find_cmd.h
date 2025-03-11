@@ -204,7 +204,7 @@ public:
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
 
-            BSONObj cmdObj = _request.body;
+            BSONObj cmdObj = _cmdRequest->toBSON();
             NamespaceString expNs = ns();
             if (_cmdRequest->getRawData() &&
                 _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&
