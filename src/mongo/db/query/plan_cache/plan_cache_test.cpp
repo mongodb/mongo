@@ -2167,6 +2167,31 @@ TEST_F(PlanCacheTest, PlanCacheMaxSizeParameterCanBeZero) {
     ASSERT_EQ(0U, planCache.size());
 }
 
+//
+// QS hashing.
+//
+
+TEST_F(CachePlanSelectionTest, RecoveredSolutionWithMatchExpressionHasTaggedMatchExpressionHash) {
+    addIndex(BSON("x" << 1), "x_1");
+    addIndex(BSON("y" << 1), "y_1");
+
+    // Pick any match expression query.
+    auto query = BSON("x" << 5 << "y" << 1);
+    runQuery(query);
+
+    auto bestSoln =
+        firstMatchingSolution("{fetch: {filter: {x: 5}, node: {ixscan: {pattern: {y: 1}}}}}");
+    ASSERT_NE(0, bestSoln->taggedMatchExpressionHash);
+
+    auto planSoln = planQueryFromCache(query, {}, {}, {}, *bestSoln);
+
+    // TODO (SERVER-101922): Change this to be an equality check against bestSoln.
+    // Ensure that the taggedMatchExpressionHash is set. Since the index order can change, we cannot
+    // assert that bestSoln->taggedMatchExpressionHash == planSoln->taggedMatchExpressionHash, just
+    // that planSoln->taggedMatchExpressionHash is set to something.
+    ASSERT_NE(0, planSoln->taggedMatchExpressionHash);
+}
+
 /**
  * Tests specifically for SBE plan cache.
  */

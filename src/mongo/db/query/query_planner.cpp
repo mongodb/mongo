@@ -805,6 +805,10 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         return s;
     }
 
+    // Must be performed before nodes are sorted in prepareForAccessPlanning(). See
+    // QueryPlanner::plan() for details.
+    const auto taggedMatchExpressionHash = hashTaggedMatchExpression(clone.get());
+
     // The MatchExpression tree is in canonical order. We must order the nodes for access
     // planning.
     prepareForAccessPlanning(clone.get());
@@ -827,6 +831,8 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
                       str::stream() << "Failed to analyze plan from cache. Query: "
                                     << query.toStringShortForErrorMsg());
     }
+
+    soln->taggedMatchExpressionHash = taggedMatchExpressionHash;
 
     LOGV2_DEBUG(20966,
                 5,
