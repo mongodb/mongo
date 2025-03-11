@@ -128,7 +128,15 @@ const MetaFields = Object.freeze({
         shouldBeValidated: true,
         debugName: "$search score",
         validSortKey: true,
-        firstStageRequired: [FirstStageOptions.SEARCH]
+        firstStageRequired: [
+            FirstStageOptions.SEARCH,
+            FirstStageOptions.SEARCH_W_DETAILS,
+            // TODO SERVER-100443: $rankFusion shouldn't produce
+            // "searchScore" metadata, but it thinks it will if one
+            // of the $rankFusion input pipelines has $search.
+            FirstStageOptions.RANK_FUSION,
+            FirstStageOptions.RANK_FUSION_W_DETAILS
+        ]
     },
     SEARCH_HIGHLIGHTS: {
         name: "searchHighlights",
