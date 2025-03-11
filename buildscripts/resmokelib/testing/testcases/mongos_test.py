@@ -9,15 +9,17 @@ class MongosTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "mongos_test"
 
-    def __init__(self, logger: logging.Logger, mongos_options: dict):
+    def __init__(self, logger: logging.Logger, mongos_options: list[dict]):
         """Initialize the mongos test and saves the options."""
+
+        assert len(mongos_options) == 1
 
         self.mongos_executable = utils.default_if_none(
             config.MONGOS_EXECUTABLE, config.DEFAULT_MONGOS_EXECUTABLE
         )
         # Use the executable as the test name.
         interface.ProcessTestCase.__init__(self, logger, "mongos test", self.mongos_executable)
-        self.options = mongos_options.copy()
+        self.options = mongos_options[0].copy()
 
     def configure(self, fixture, *args, **kwargs):
         """Ensure the --test option is present in the mongos options."""
