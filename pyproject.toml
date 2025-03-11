@@ -48,10 +48,10 @@ boto3 = "^1.20.26"
 botocore = "^1.23.26"
 
 [tool.poetry.group.build-metrics.dependencies]
-jsonschema = "^4.17.3"
-psutil = "^5.8.0"
+jsonschema = "^4.23.0"
+psutil = "^6.0.0"
 memory-profiler = "^0.61.0"
-puremagic = "^1.15"
+puremagic = "^1.26"
 tabulate = "^0.9.0"
 
 [tool.poetry.group.compile.dependencies]
@@ -62,12 +62,12 @@ setuptools = "^58.1.0"
 wheel = "0.37.0"
 
 [tool.poetry.group.core.dependencies]
-psutil = "5.8.0"
+psutil = "^6.0.0"
 pymongo = "4.3.3"
-PyYAML = "5.3.1"
-types-PyYAML = "~6.0.12.10"
-requests = "^2.26.0"
-typing-extensions = "^4.7.1"
+PyYAML = "^6.0.2"
+types-PyYAML = "^6.0.12.20240808"
+requests = "^2.32.3"
+typing-extensions = "^4.12.2"
 
 [tool.poetry.group.export.dependencies]
 pipx = "1.4.3"
@@ -110,7 +110,6 @@ PyJWT = "^2.4.0"
 GitPython = "~3.1.7"
 mypy = "~1.3.0"
 pydocstyle = "6.3.0"
-pylint = "2.17.4"
 structlog = "~23.1.0"
 yamllint = "1.32.0"
 yapf = "0.26.0"              # latest is 0.40.1, but that causes CI failures

@@ -21,7 +21,6 @@ from buildscripts.linter import git
 from buildscripts.linter import mypy
 from buildscripts.linter import parallel
 from buildscripts.linter import pydocstyle
-from buildscripts.linter import pylint
 from buildscripts.linter import runner
 from buildscripts.linter import yapf
 # pylint: enable=wrong-import-position
@@ -29,7 +28,6 @@ from buildscripts.linter import yapf
 # List of supported linters
 _LINTERS = [
     yapf.YapfLinter(),
-    pylint.PyLintLinter(),
     pydocstyle.PyDocstyleLinter(),
     mypy.MypyLinter(),
 ]
