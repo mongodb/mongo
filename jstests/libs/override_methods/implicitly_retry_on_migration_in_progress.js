@@ -44,7 +44,7 @@ function runCommandWithMigrationRetries(conn, dbName, commandName, commandObj, f
         throw new Error(`Cowardly refusing to run command ${
             (inTransaction
                  ? "inside"
-                 : "outside")} of transaction with random moveCollection in the backgorund ${
+                 : "outside")} of transaction with random moveCollection in the background ${
             tojson(commandObj)}`);
     }
 

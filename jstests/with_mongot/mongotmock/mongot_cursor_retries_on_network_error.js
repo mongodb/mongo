@@ -50,13 +50,14 @@ function runStandaloneTest(stageRegex, pipeline, expectedCommand) {
     // Simulate a case where mongot closes the connection after getting a command,
     // and closes the connection again after receiving the retry.
     // Mongod should only retry once, and the network error from the closed connection should
-    // be propogated to the client on retry.
+    // be propagated to the client on retry.
     {
         mongotmock.closeConnectionInResponseToNextNRequests(2);
 
         const result = assert.throws(() => coll.aggregate(pipeline, {cursor: {batchSize: 2}}));
         assert(isNetworkError(result));
-        assert(stageRegex.test(result), `Error wasn't due to stage failing: ${result}`);
+        assert(stageRegex.test(stringifyErrorMessageAndAttributes(result)),
+               `Error wasn't due to stage failing: ${result}`);
     }
 }
 

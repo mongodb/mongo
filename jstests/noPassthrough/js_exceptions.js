@@ -7,14 +7,14 @@ let tests = [
         callback: function() {
             UUID("asdf");
         },
-        match: "Error: Invalid UUID string: asdf :",
+        match: "Error: Invalid UUID string: asdf",
         stack: true,
     },
     {
         callback: function() {
             throw {};
         },
-        match: "uncaught exception: \\\[object Object\\\] :",
+        match: "uncaught exception: \\\[object Object\\\]",
         stack: undefined,
     },
     {
@@ -36,14 +36,14 @@ let tests = [
             // eslint-disable-next-line
             foo.bar();
         },
-        match: "uncaught exception: ReferenceError: foo is not defined :",
+        match: "uncaught exception: ReferenceError: foo is not defined",
         stack: true,
     },
     {
         callback: function() {
             throw function() {};
         },
-        match: "function\\\(\\\) {} :",
+        match: "function\\\(\\\) {}",
         stack: undefined,
     },
     {
@@ -54,7 +54,7 @@ let tests = [
                 throw (e.constructor());
             }
         },
-        match: "uncaught exception: Error :",
+        match: "uncaught exception: Error",
         stack: true,
     },
     {
@@ -86,35 +86,19 @@ tests.forEach(function(t) {
         assert.throws(startParallelShell(
             code + ";\nrecurser(0," + depth + "," + tojson(t.callback) + ");", false, true));
         let output = rawMongoProgramOutput(".*");
-        let lines = output.split(/\s*\n|\\n/);
-        let matchShellExp = false;
-        while (lines.length > 0 & matchShellExp !== true) {
-            let line = lines.shift();
-            if (line.match(/MongoDB shell version/)) {
-                matchShellExp = true;
-            }
-        }
-        assert(matchShellExp);
-        assertMatch(/\s*/, lines.pop());
-        assertMatch(/exiting with code/, lines.pop());
-        assertMatch(new RegExp(t.match), lines.shift());
+        assert.includes(output, "MongoDB shell version");
+        assert.includes(output, "exiting with code");
+        assertMatch(new RegExp(t.match), output);
 
         if (t.stack == true) {
-            assert.eq(lines.length,
+            assert.eq(output.match(/\@\(shell eval\):\d+:\d+/g).length,
                       depth + 2);  // plus one for the shell and one for the callback
-            lines.forEach(function(l) {
-                assertMatch(/\@\(shell eval\):\d+:\d+/, l);
-            });
-            lines.pop();
-            lines.shift();
-            lines.forEach(function(l) {
-                assertMatch(/recurser\@/, l);
-            });
+            assert.eq(output.match(/recurser\@/g).length, depth);
         } else if (t.stack == false) {
-            assert.eq(lines.length, 0);
+            assert(!output.includes("shell eval"));
+            assert(!output.includes("recurser"));
         } else if (t.stack == undefined) {
-            assert.eq(lines.length, 1);
-            assertMatch(/undefined/, lines.pop());
+            assert.includes(output, "undefined");
         }
     });
 });

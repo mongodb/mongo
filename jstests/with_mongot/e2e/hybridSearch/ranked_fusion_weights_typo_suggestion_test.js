@@ -66,9 +66,7 @@ function assertWeightsSuggestionErrorMessage(weights, suggestions) {
         coll.aggregate(query);
     } catch (e) {
         didError = true;
-        // Extract rank fusion error message from Error object
-        const re = new RegExp('\"errmsg\" : \"(.*)\"');
-        let rankFusionErrMsg = e.message.match(re)[1];
+        let rankFusionErrMsg = e.message;
 
         // 'i' is index into the 'suggestions' array.
         function convertSingleSuggestionToString(i) {
@@ -98,9 +96,9 @@ function assertWeightsSuggestionErrorMessage(weights, suggestions) {
             expectedErrMsg += convertSingleSuggestionToString(i);
         }
 
-        assert.eq(expectedErrMsg,
-                  rankFusionErrMsg,
-                  "$rankFusion error message for misspelled weights did not match");
+        assert.includes(rankFusionErrMsg,
+                        expectedErrMsg,
+                        "$rankFusion error message for misspelled weights did not match");
     }
     assert(didError, "expected $rankFusion query with provided weights to error, but did not.");
 }
