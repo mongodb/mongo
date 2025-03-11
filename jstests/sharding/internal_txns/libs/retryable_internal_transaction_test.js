@@ -5,6 +5,7 @@
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {
     getImageEntriesForTxn,
     getImageEntriesForTxnOnNode,
@@ -127,6 +128,9 @@ export function RetryableInternalTransactionTest(collectionOptions = {},
             assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
             st.rs0.waitForPrimary();
         }
+
+        // This is needed to avoid network errors when the SDAM replica set monitor is used.
+        awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
     }
 
     function commitTransaction(lsid, txnNumber, isPreparedTxn, isRetry) {
