@@ -5267,7 +5267,7 @@ class PipelineOptimizationsShardMerger : public PipelineOptimizations {
 public:
     void setUp() override {
         PipelineOptimizations::setUp();
-        getRouterRoleCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
             DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, "a"),
                          kMyShardName,
                          DatabaseVersion{}});

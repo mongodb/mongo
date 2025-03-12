@@ -70,40 +70,27 @@ void ShardServerTestFixture::setUp() {
                                 ConnectionString(kConfigHostAndPort),
                                 kMyShardName});
 
-    if (!_routerRoleCatalogCacheLoader) {
-        _routerRoleCatalogCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderImpl>();
-    }
-
-    if (!_catalogCache) {
-        _catalogCache =
-            std::make_unique<CatalogCache>(getServiceContext(), _routerRoleCatalogCacheLoader);
-    }
-
-    if (!_shardRoleCatalogCacheLoader) {
-        _shardRoleCatalogCacheLoader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
+    if (!_catalogCacheLoader) {
+        _catalogCacheLoader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
             std::make_unique<ConfigServerCatalogCacheLoaderImpl>());
     }
 
-    uassertStatusOK(
-        initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort),
-                                                      std::move(_catalogCache),
-                                                      _shardRoleCatalogCacheLoader));
+    if (!_catalogCache) {
+        _catalogCache = std::make_unique<CatalogCache>(getServiceContext(), _catalogCacheLoader);
+    }
+
+    uassertStatusOK(initializeGlobalShardingStateForMongodForTest(
+        ConnectionString(kConfigHostAndPort), std::move(_catalogCache), _catalogCacheLoader));
 
     // Set the findHost() return value on the mock targeter so that later calls to the
     // config targeter's findHost() return the appropriate value.
     configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
 }
 
-void ShardServerTestFixture::setRouterRoleCatalogCacheLoader(
-    std::shared_ptr<ConfigServerCatalogCacheLoader> loader) {
-    invariant(loader && !_catalogCache && !_routerRoleCatalogCacheLoader);
-    _routerRoleCatalogCacheLoader = loader;
-}
-
-void ShardServerTestFixture::setShardRoleCatalogCacheLoader(
+void ShardServerTestFixture::setCatalogCacheLoader(
     std::shared_ptr<ShardServerCatalogCacheLoader> loader) {
-    invariant(loader && !_shardRoleCatalogCacheLoader);
-    _shardRoleCatalogCacheLoader = loader;
+    invariant(loader && !_catalogCache && !_catalogCacheLoader);
+    _catalogCacheLoader = loader;
 }
 
 void ShardServerTestFixture::setCatalogCache(std::unique_ptr<CatalogCache> cache) {
@@ -116,9 +103,10 @@ std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatal
 }
 
 void ShardServerTestFixtureWithCatalogCacheMock::setUp() {
-    auto loader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
-    setRouterRoleCatalogCacheLoader(loader);
-    setCatalogCache(std::make_unique<CatalogCacheMock>(getServiceContext(), std::move(loader)));
+    auto loader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
+    _cacheLoaderMock = loader;
+    setCatalogCacheLoader(loader);
+    setCatalogCache(std::make_unique<CatalogCacheMock>(getServiceContext(), loader));
     ShardServerTestFixture::setUp();
 }
 
@@ -126,20 +114,15 @@ CatalogCacheMock* ShardServerTestFixtureWithCatalogCacheMock::getCatalogCacheMoc
     return static_cast<CatalogCacheMock*>(catalogCache());
 }
 
-std::shared_ptr<ConfigServerCatalogCacheLoaderMock>
-ShardServerTestFixtureWithCatalogCacheMock::getRouterRoleCatalogCacheLoaderMock() {
-    auto mockLoader = std::dynamic_pointer_cast<ConfigServerCatalogCacheLoaderMock>(
-        _routerRoleCatalogCacheLoader);
-    invariant(mockLoader);
-    return mockLoader;
+std::shared_ptr<ShardServerCatalogCacheLoaderMock>
+ShardServerTestFixtureWithCatalogCacheMock::getCatalogCacheLoaderMock() {
+    return _cacheLoaderMock;
 }
 
 void ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp() {
-    auto routerLoader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
-    setRouterRoleCatalogCacheLoader(std::move(routerLoader));
-
-    auto shardLoader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
-    setShardRoleCatalogCacheLoader(std::move(shardLoader));
+    auto loader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
+    _cacheLoaderMock = loader;
+    setCatalogCacheLoader(loader);
 
     ShardServerTestFixture::setUp();
 }
@@ -148,20 +131,9 @@ CatalogCacheMock* ShardServerTestFixtureWithCatalogCacheLoaderMock::getCatalogCa
     return static_cast<CatalogCacheMock*>(catalogCache());
 }
 
-std::shared_ptr<ConfigServerCatalogCacheLoaderMock>
-ShardServerTestFixtureWithCatalogCacheLoaderMock::getRouterRoleCatalogCacheLoaderMock() {
-    auto mockLoader = std::dynamic_pointer_cast<ConfigServerCatalogCacheLoaderMock>(
-        _routerRoleCatalogCacheLoader);
-    invariant(mockLoader);
-    return mockLoader;
-}
-
 std::shared_ptr<ShardServerCatalogCacheLoaderMock>
-ShardServerTestFixtureWithCatalogCacheLoaderMock::getShardRoleCatalogCacheLoaderMock() {
-    auto mockLoader =
-        std::dynamic_pointer_cast<ShardServerCatalogCacheLoaderMock>(_shardRoleCatalogCacheLoader);
-    invariant(mockLoader);
-    return mockLoader;
+ShardServerTestFixtureWithCatalogCacheLoaderMock::getCatalogCacheLoaderMock() {
+    return _cacheLoaderMock;
 }
 
 }  // namespace mongo

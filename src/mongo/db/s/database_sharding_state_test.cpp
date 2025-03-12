@@ -62,6 +62,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -156,7 +157,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
             return scopedDss->getDbVersion(opCtx);
         };
 
-        getShardRoleCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
         ASSERT_OK(
             FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(opCtx, kDbName, newDbVersion));
 
@@ -182,7 +183,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
 
-        getShardRoleCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
         ASSERT_OK(
             FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(opCtx, kDbName, boost::none));
 

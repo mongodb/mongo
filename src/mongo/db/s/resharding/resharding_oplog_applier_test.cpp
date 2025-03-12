@@ -94,8 +94,8 @@
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/config_server_catalog_cache_loader_mock.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -175,13 +175,13 @@ public:
                                     ConnectionString(kConfigHostAndPort),
                                     _sourceId.getShardId()});
 
-        _mockCatalogCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
+        _mockCatalogCacheLoader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
         auto catalogCache =
             std::make_unique<CatalogCache>(getServiceContext(), _mockCatalogCacheLoader);
-        uassertStatusOK(initializeGlobalShardingStateForMongodForTest(
-            ConnectionString(kConfigHostAndPort),
-            std::move(catalogCache),
-            std::make_shared<ShardServerCatalogCacheLoaderMock>()));
+        uassertStatusOK(
+            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort),
+                                                          std::move(catalogCache),
+                                                          _mockCatalogCacheLoader));
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
@@ -481,7 +481,7 @@ protected:
     service_context_test::ShardRoleOverride _shardRole;
 
     boost::optional<ChunkManager> _cm;
-    std::shared_ptr<ConfigServerCatalogCacheLoaderMock> _mockCatalogCacheLoader;
+    std::shared_ptr<ShardServerCatalogCacheLoaderMock> _mockCatalogCacheLoader;
 
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;

@@ -276,11 +276,6 @@ void FilteringMetadataCache::initForTesting(ServiceContext* serviceCtx,
     auto decoration = FilteringMetadataCache::get(serviceCtx);
     invariant(decoration->_loader == nullptr);
     decoration->_loader = loader;
-
-    if (feature_flags::gDualCatalogCache.isEnabled()) {
-        decoration->_cache =
-            std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"_sd);
-    }
 }
 
 FilteringMetadataCache* FilteringMetadataCache::get(ServiceContext* serviceCtx) {

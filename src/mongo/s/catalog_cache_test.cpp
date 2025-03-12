@@ -56,6 +56,7 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
@@ -83,7 +84,7 @@ protected:
         configTargeter()->setFindHostReturnValue(kConfigHostAndPort);
 
         // Setup catalogCache with mock loader
-        _catalogCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
+        _catalogCacheLoader = std::make_shared<CatalogCacheLoaderMock>();
         _catalogCache = std::make_unique<CatalogCache>(getServiceContext(), _catalogCacheLoader);
 
         // Populate the shardRegistry with the shards from kShards vector
@@ -97,9 +98,8 @@ protected:
 
     class ScopedCollectionProvider {
     public:
-        ScopedCollectionProvider(
-            std::shared_ptr<ConfigServerCatalogCacheLoaderMock> catalogCacheLoader,
-            const StatusWith<CollectionType>& swCollection)
+        ScopedCollectionProvider(std::shared_ptr<CatalogCacheLoaderMock> catalogCacheLoader,
+                                 const StatusWith<CollectionType>& swCollection)
             : _catalogCacheLoader(catalogCacheLoader) {
             _catalogCacheLoader->setCollectionRefreshReturnValue(swCollection);
         }
@@ -108,7 +108,7 @@ protected:
         }
 
     private:
-        std::shared_ptr<ConfigServerCatalogCacheLoaderMock> _catalogCacheLoader;
+        std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
     };
 
     ScopedCollectionProvider scopedCollectionProvider(
@@ -118,7 +118,7 @@ protected:
 
     class ScopedChunksProvider {
     public:
-        ScopedChunksProvider(std::shared_ptr<ConfigServerCatalogCacheLoaderMock> catalogCacheLoader,
+        ScopedChunksProvider(std::shared_ptr<CatalogCacheLoaderMock> catalogCacheLoader,
                              const StatusWith<std::vector<ChunkType>>& swChunks)
             : _catalogCacheLoader(catalogCacheLoader) {
             _catalogCacheLoader->setChunkRefreshReturnValue(swChunks);
@@ -128,7 +128,7 @@ protected:
         }
 
     private:
-        std::shared_ptr<ConfigServerCatalogCacheLoaderMock> _catalogCacheLoader;
+        std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
     };
 
     ScopedChunksProvider scopedChunksProvider(const StatusWith<std::vector<ChunkType>>& swChunks) {
@@ -137,9 +137,8 @@ protected:
 
     class ScopedDatabaseProvider {
     public:
-        ScopedDatabaseProvider(
-            std::shared_ptr<ConfigServerCatalogCacheLoaderMock> catalogCacheLoader,
-            const StatusWith<DatabaseType>& swDatabase)
+        ScopedDatabaseProvider(std::shared_ptr<CatalogCacheLoaderMock> catalogCacheLoader,
+                               const StatusWith<DatabaseType>& swDatabase)
             : _catalogCacheLoader(catalogCacheLoader) {
             _catalogCacheLoader->setDatabaseRefreshReturnValue(swDatabase);
         }
@@ -148,7 +147,7 @@ protected:
         }
 
     private:
-        std::shared_ptr<ConfigServerCatalogCacheLoaderMock> _catalogCacheLoader;
+        std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
     };
 
     ScopedDatabaseProvider scopedDatabaseProvider(const StatusWith<DatabaseType>& swDatabase) {
@@ -232,7 +231,7 @@ protected:
     RAIIServerParameterControllerForTest featureFlagController{
         "featureFlagGlobalIndexesShardingCatalog", true};
 
-    std::shared_ptr<ConfigServerCatalogCacheLoaderMock> _catalogCacheLoader;
+    std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
     std::unique_ptr<CatalogCache> _catalogCache;
 };
 

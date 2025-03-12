@@ -2,7 +2,7 @@
  * Tests that the replica set endpoint skips readPreference re-targeting.
  *
  * @tags: [
- *   requires_fcv_81,
+ *   requires_fcv_80,
  *   featureFlagDualCatalogCache,
  *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
