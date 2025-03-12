@@ -65,6 +65,7 @@ MONGO_FAIL_POINT_DEFINE(hangInsertIntoBucketCatalogBeforeCheckingTimeseriesColle
 MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection);
 MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimeseriesCollection);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 
 
 using TimeseriesBatches =
@@ -532,6 +533,8 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                 opCtx, batch, metadata, stmtIds, nss, &insertOps, &updateOps);
         }
 
+        hangTimeseriesInsertBeforeWrite.pauseWhileSet();
+
         auto result = internal::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
 
         if (!result.isOK()) {
@@ -961,7 +964,6 @@ Status performAtomicTimeseriesWrites(
     if (!coll.exists()) {
         write_ops::assertTimeseriesBucketsCollectionNotFound(ns);
     }
-
     auto curOp = CurOp::get(opCtx);
     curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                    .getDatabaseProfileLevel(ns.dbName()));
@@ -1102,6 +1104,11 @@ Status performAtomicTimeseriesWrites(
     // If we encounter a TimeseriesBucketCompressionFailure, we should throw to
     // a higher level (write_ops_exec::performUpdates) so that we can freeze the corrupt bucket.
     throw;
+} catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
+    // This particular CollectionUUIDMismatch is re-thrown differently because there is already a
+    // check for this error higher up, which means this error must come from the guards installed to
+    // enforce that time-series operations are prepared and committed on the same collection.
+    uasserted(9748800, "Collection was changed during insert");
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
@@ -1159,6 +1166,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         docsToRetry->push_back(index);
         return true;
     }
+
+    hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
     const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;

@@ -628,6 +628,14 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         if (ex.code() == ErrorCodes::Unauthorized) {
             throw;
         }
+        // In a time-series context, this particular CollectionUUIDMismatch is re-thrown differently
+        // because there is already a check for this error higher up, which means this error must
+        // come from the guards installed to enforce that time-series operations are prepared
+        // and committed on the same collection.
+        if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
+            source == OperationSource::kTimeseriesInsert) {
+            uasserted(9748801, "Collection was changed during insert");
+        }
     }
 
     if (shouldProceedWithBatchInsert) {
@@ -1556,6 +1564,16 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                           retryAttempts,
                           "Caught DuplicateKey exception during upsert",
                           logAttrs(ns));
+        } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
+            // In a time-series context, this particular CollectionUUIDMismatch is re-thrown
+            // differently because there is already a check for this error higher up, which means
+            // this error must come from the guards installed to enforce that time-series operations
+            // are prepared and committed on the same collection.
+            if (source == OperationSource::kTimeseriesInsert) {
+                uasserted(9748802, "Collection was changed during insert");
+            }
+
+            throw;
         }
     }
 
