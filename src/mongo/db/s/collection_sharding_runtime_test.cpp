@@ -91,7 +91,6 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-namespace {
 
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
@@ -132,6 +131,14 @@ public:
 
         return CollectionMetadata(std::move(cm), ShardId("0"));
     }
+
+    uint64_t getNumMetadataManagerChanges(CollectionShardingRuntime& csr) {
+        return csr._numMetadataManagerChanges;
+    }
+
+    MetadataManager* getMetadataManager(CollectionShardingRuntime& csr) {
+        return csr._metadataManager.get();
+    }
 };
 
 TEST_F(CollectionShardingRuntimeTest,
@@ -152,7 +159,7 @@ TEST_F(
     CollectionShardingRuntimeTest,
     GetCollectionDescriptionReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUnshardedMetadata) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    csr.setFilteringMetadata(operationContext(), CollectionMetadata());
+    csr.setFilteringMetadata(operationContext(), CollectionMetadata::UNTRACKED());
     ASSERT_FALSE(csr.getCollectionDescription(operationContext()).isSharded());
 }
 
@@ -178,9 +185,9 @@ TEST_F(CollectionShardingRuntimeTest,
 
 TEST_F(
     CollectionShardingRuntimeTest,
-    GetCurrentMetadataIfKnownReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUnshardedMetadata) {
+    GetCurrentMetadataIfKnownReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUntrackedMetadata) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    csr.setFilteringMetadata(operationContext(), CollectionMetadata());
+    csr.setFilteringMetadata(operationContext(), CollectionMetadata::UNTRACKED());
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
     ASSERT_TRUE(optCurrMetadata);
     ASSERT_FALSE(optCurrMetadata->isSharded());
@@ -211,16 +218,16 @@ TEST_F(CollectionShardingRuntimeTest,
 
 TEST_F(CollectionShardingRuntimeTest, SetFilteringMetadataWithSameUUIDKeepsSameMetadataManager) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 0);
+    ASSERT_EQ(getNumMetadataManagerChanges(csr), 0);
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
     csr.setFilteringMetadata(opCtx, metadata);
     // Should create a new MetadataManager object, bumping the count to 1.
-    ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 1);
+    ASSERT_EQ(getNumMetadataManagerChanges(csr), 1);
     // Set it again.
     csr.setFilteringMetadata(opCtx, metadata);
     // Should not have reset metadata, so the counter should still be 1.
-    ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 1);
+    ASSERT_EQ(getNumMetadataManagerChanges(csr), 1);
 }
 
 TEST_F(CollectionShardingRuntimeTest,
@@ -234,17 +241,175 @@ TEST_F(CollectionShardingRuntimeTest,
         kTestNss,
         ShardVersionFactory::make(metadata, boost::optional<CollectionIndexes>(boost::none)),
         boost::none /* databaseVersion */};
-    ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 1);
+    ASSERT_EQ(getNumMetadataManagerChanges(csr), 1);
 
     // Set it again with a different metadata object (UUID is generated randomly in
     // makeShardedMetadata()).
     auto newMetadata = makeShardedMetadata(opCtx);
     csr.setFilteringMetadata(opCtx, newMetadata);
 
-    ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 2);
+    ASSERT_EQ(getNumMetadataManagerChanges(csr), 2);
     ASSERT(
         csr.getCollectionDescription(opCtx).uuidMatches(newMetadata.getChunkManager()->getUUID()));
 }
+
+TEST_F(CollectionShardingRuntimeTest,
+       TransitioningFromUntrackedToTrackedMetadataKeepsSameMetadataManager) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    ASSERT_EQ(0, getNumMetadataManagerChanges(csr));
+
+    // Set an UNTRACKED metadata
+    csr.setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
+
+    // Should create a new MetadataManager object, bumping the count to 1.
+    ASSERT_EQ(1, getNumMetadataManagerChanges(csr));
+    ASSERT_EQ(0, getMetadataManager(csr)->numberOfMetadataSnapshots());
+    ASSERT_EQ(boost::none, getMetadataManager(csr)->getCollectionUuid());
+    ASSERT_EQ(false, getMetadataManager(csr)->hasRoutingTable());
+
+    // Retain the added metadata when a newer metadata is installed
+    auto rangePreserver = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+
+    // Set a TRACKED METADATA
+    auto metadata = makeShardedMetadata(opCtx);
+    csr.setFilteringMetadata(opCtx, metadata);
+
+    // Should not have reset metadata, so the counter should still be 1.
+    ASSERT_EQ(1, getNumMetadataManagerChanges(csr));
+    ASSERT_EQ(1, getMetadataManager(csr)->numberOfMetadataSnapshots());
+    ASSERT_EQ(metadata.getUUID(), getMetadataManager(csr)->getCollectionUuid().get());
+    ASSERT_EQ(true, getMetadataManager(csr)->hasRoutingTable());
+}
+
+TEST_F(CollectionShardingRuntimeTest,
+       TransitioningFromUntrackedToUntrackedMetadataKeepsMetadataManager) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    ASSERT_EQ(0, getNumMetadataManagerChanges(csr));
+
+    // Set an UNTRACKED metadata
+    csr.setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
+
+    // When a range preserver isn't bound to a metadata tracker, it gets automatically removed once
+    // another filtering metadata is added. Hence, we should install a range preserver to avoid
+    // getting a false positive result on this test.
+    auto rangePreserver = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+
+    // Should create a new MetadataManager object, bumping the count to 1.
+    ASSERT_EQ(1, getNumMetadataManagerChanges(csr));
+    ASSERT_EQ(0, getMetadataManager(csr)->numberOfMetadataSnapshots());
+    ASSERT_EQ(boost::none, getMetadataManager(csr)->getCollectionUuid());
+    ASSERT_EQ(false, getMetadataManager(csr)->hasRoutingTable());
+
+    // Set UNTRACKED METADATA again
+    csr.setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
+
+    // Should not have reset metadata, so the counter should still be 1.
+    // Should not have added any snapshot to the metadata manager.
+    ASSERT_EQ(1, getNumMetadataManagerChanges(csr));
+    ASSERT_EQ(0, getMetadataManager(csr)->numberOfMetadataSnapshots());
+    ASSERT_EQ(boost::none, getMetadataManager(csr)->getCollectionUuid());
+    ASSERT_EQ(false, getMetadataManager(csr)->hasRoutingTable());
+}
+
+TEST_F(CollectionShardingRuntimeTest,
+       TransitioningFromTrackedToUntrackedMetadataRestoresMetadataManager) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    ASSERT_EQ(0, getNumMetadataManagerChanges(csr));
+
+    // Set a TRACKED METADATA
+    auto metadata = makeShardedMetadata(opCtx);
+    csr.setFilteringMetadata(opCtx, metadata);
+
+    // Should create a new MetadataManager object, bumping the count to 1.
+    ASSERT_EQ(1, getNumMetadataManagerChanges(csr));
+    ASSERT_EQ(0, getMetadataManager(csr)->numberOfMetadataSnapshots());
+    ASSERT_EQ(metadata.getUUID(), getMetadataManager(csr)->getCollectionUuid().get());
+    ASSERT_EQ(true, getMetadataManager(csr)->hasRoutingTable());
+
+    // Set UNTRACKED METADATA
+    csr.setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
+
+    // Should have reset metadata, so the counter should have bumped to 1.
+    ASSERT_EQ(2, getNumMetadataManagerChanges(csr));
+    ASSERT_EQ(0, getMetadataManager(csr)->numberOfMetadataSnapshots());
+    ASSERT_EQ(boost::none, getMetadataManager(csr)->getCollectionUuid());
+    ASSERT_EQ(false, getMetadataManager(csr)->hasRoutingTable());
+}
+
+TEST_F(CollectionShardingRuntimeTest,
+       TransitioningFromTrackedToTrackedMetadataWithSameUUIDKeepsMetadataManager) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    ASSERT_EQ(0, getNumMetadataManagerChanges(csr));
+
+    auto metadata1 = makeShardedMetadata(opCtx);
+    auto metadata2 = makeShardedMetadata(opCtx, metadata1.getUUID());
+
+    // Set a TRACKED METADATA
+    {
+        csr.setFilteringMetadata(opCtx, metadata1);
+
+        // Should create a new MetadataManager object, bumping the count to 1.
+        ASSERT_EQ(1, getNumMetadataManagerChanges(csr));
+        ASSERT_EQ(0, getMetadataManager(csr)->numberOfMetadataSnapshots());
+        ASSERT_EQ(metadata1.getUUID(), getMetadataManager(csr)->getCollectionUuid().get());
+        ASSERT_EQ(true, getMetadataManager(csr)->hasRoutingTable());
+    }
+
+    // Retain the added metadata when a newer metadata is installed
+    auto rangePreserver = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+
+    // Set a TRACKED METADATA again with the same UUID
+    {
+        csr.setFilteringMetadata(opCtx, metadata2);
+
+        // Should keep the same MetadataManager object and increase the number of snapshots
+        ASSERT_EQ(1, getNumMetadataManagerChanges(csr));
+        ASSERT_EQ(1, getMetadataManager(csr)->numberOfMetadataSnapshots());
+        ASSERT_EQ(metadata1.getUUID(), getMetadataManager(csr)->getCollectionUuid().get());
+        ASSERT_EQ(true, getMetadataManager(csr)->hasRoutingTable());
+    }
+}
+
+TEST_F(CollectionShardingRuntimeTest,
+       TransitioningFromTrackedToTrackedMetadataWithDifferentUUIDRestoresMetadataManager) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    ASSERT_EQ(0, getNumMetadataManagerChanges(csr));
+
+    const auto metadata1 = makeShardedMetadata(opCtx);
+    const auto metadata2 = makeShardedMetadata(opCtx);
+    ASSERT_NE(metadata1.getUUID(), metadata2.getUUID());
+
+    // Set a TRACKED METADATA
+    {
+        csr.setFilteringMetadata(opCtx, metadata1);
+
+        // Should create a new MetadataManager object, bumping the count to 1.
+        ASSERT_EQ(1, getNumMetadataManagerChanges(csr));
+        ASSERT_EQ(0, getMetadataManager(csr)->numberOfMetadataSnapshots());
+        ASSERT_EQ(metadata1.getUUID(), getMetadataManager(csr)->getCollectionUuid().get());
+        ASSERT_EQ(true, getMetadataManager(csr)->hasRoutingTable());
+    }
+
+    // Set a TRACKED METADATA again with a different UUID
+    {
+        csr.setFilteringMetadata(opCtx, metadata2);
+
+        // Should restore the MetadataManager object.
+        ASSERT_EQ(2, getNumMetadataManagerChanges(csr));
+        ASSERT_EQ(0, getMetadataManager(csr)->numberOfMetadataSnapshots());
+        ASSERT_EQ(metadata2.getUUID(), getMetadataManager(csr)->getCollectionUuid().get());
+        ASSERT_EQ(true, getMetadataManager(csr)->hasRoutingTable());
+    }
+}
+
 
 TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflicts) {
     OperationContext* opCtx = operationContext();
@@ -334,7 +499,7 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVer
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
-TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUnshardedVersion) {
+TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanUnshardedVersion) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
@@ -353,6 +518,28 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUnshardedVersion)
     csr.invalidateRangePreserversOlderThanShardVersion(opCtx, ChunkVersion::UNSHARDED());
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
+
+TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUntrackedCollection) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    csr.setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
+
+    auto ownershipFilter = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+
+    ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
+
+    // Promote the collection to a sharded collection since it only make sense to invalidat range
+    // preservers on sharded collections.
+    const auto metadata = makeShardedMetadata(opCtx);
+    csr.setFilteringMetadata(opCtx, metadata);
+
+    ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
+
+    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, metadata.getShardPlacementVersion());
+    ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
+}
+
 
 class CollectionShardingRuntimeTestWithMockedLoader
     : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
@@ -720,5 +907,4 @@ TEST_F(ShardingMongoDTestFixture, ShardingStateEnabledReturnsTrackedVersion) {
     ASSERT_THROWS_CODE(csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::StaleConfig);
 }
 
-}  // namespace
 }  // namespace mongo

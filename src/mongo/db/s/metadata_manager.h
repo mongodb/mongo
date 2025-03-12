@@ -58,7 +58,7 @@ namespace mongo {
 class RangePreserver;
 
 /**
- * Contains filtering metadata for a sharded collection.
+ * Contains filtering metadata for a collection.
  */
 class MetadataManager : public std::enable_shared_from_this<MetadataManager> {
 public:
@@ -92,11 +92,10 @@ public:
     }
 
     /**
-     * Returns the UUID of the collection tracked by this MetadataManager object.
+     * If the collection is tracked, returns its UUID.
+     * Otherwise, it will return boost::none.
      */
-    UUID getCollectionUuid() const {
-        return _collectionUuid;
-    }
+    boost::optional<UUID> getCollectionUuid() const;
 
     /**
      * Returns the number of CollectionMetadata objects being maintained on behalf of running
@@ -121,6 +120,10 @@ public:
 
     void invalidateRangePreserversOlderThanShardVersion(OperationContext* opCtx,
                                                         const ChunkVersion& shardVersion);
+    /**
+     * Returns whether the active metadata has routing table.
+     */
+    bool hasRoutingTable();
 
 private:
     // Management of the _metadata list is implemented in RangePreserver
@@ -181,14 +184,18 @@ private:
      */
     CollectionMetadataTracker* _findNewestOverlappingMetadata(WithLock, ChunkRange const& range);
 
+    /**
+     * Internal method to fetch the collection UUID when the `_managerLock` is already acquired.
+     * If the collection is tracked, returns its UUID.
+     * Otherwise, it will return boost::none.
+     */
+    boost::optional<UUID> _getCollectionUuidWithLock(WithLock wl) const;
+
     // ServiceContext from which to obtain instances of global support objects
     ServiceContext* const _serviceContext;
 
     // Namespace for which this manager object applies
     const NamespaceString _nss;
-
-    // The UUID for the collection tracked by this manager object.
-    const UUID _collectionUuid;
 
     // Mutex to protect the state below
     mutable stdx::mutex _managerLock;

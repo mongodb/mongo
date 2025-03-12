@@ -978,7 +978,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
     // Temp collections are always UNSHARDED
     if (options.temp) {
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, collectionName)
-            ->setFilteringMetadata(opCtx, CollectionMetadata());
+            ->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
         return;
     }
 
@@ -995,7 +995,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
     if (oss._forceCSRAsUnknownAfterCollectionCreation) {
         scopedCsr->clearFilteringMetadata(opCtx);
     } else if (!scopedCsr->getCurrentMetadataIfKnown()) {
-        scopedCsr->setFilteringMetadata(opCtx, CollectionMetadata());
+        scopedCsr->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
     }
 }
 

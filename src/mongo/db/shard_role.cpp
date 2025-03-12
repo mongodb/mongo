@@ -364,7 +364,7 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
         scopedCSS->getCollectionDescription(opCtx, placementConcern.shardVersion.has_value());
 
     invariant(!collectionDescription.isSharded() || placementConcern.shardVersion);
-    auto optOwnershipFilter = collectionDescription.isSharded()
+    auto optOwnershipFilter = placementConcern.shardVersion.has_value()
         ? boost::optional<ScopedCollectionFilter>(scopedCSS->getOwnershipFilter(
               opCtx,
               prerequisites.operationType == AcquisitionPrerequisites::OperationType::kRead

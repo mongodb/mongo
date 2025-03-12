@@ -77,7 +77,7 @@ protected:
             MODE_IX,
             AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-            ->setFilteringMetadata(opCtx, CollectionMetadata());
+            ->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
         auto cm = ChunkManager(kMyShardName,
                                _dbVersion,
                                RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},

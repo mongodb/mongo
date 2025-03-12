@@ -223,7 +223,7 @@ void ShardRoleTest::installUnshardedCollectionMetadata(OperationContext* opCtx,
         MODE_IX,
         AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-        ->setFilteringMetadata(opCtx, CollectionMetadata());
+        ->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
 }
 
 void ShardRoleTest::installShardedCollectionMetadata(OperationContext* opCtx,

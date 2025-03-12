@@ -257,10 +257,6 @@ public:
     SharedSemiFuture<void> getOngoingQueriesCompletionFuture(const UUID& collectionUuid,
                                                              ChunkRange const& range) const;
 
-    std::uint64_t getNumMetadataManagerChanges_forTest() {
-        return _numMetadataManagerChanges;
-    }
-
     /**
      * Initializes the placement version recover/refresh shared semifuture for other threads to wait
      * on it.
@@ -318,6 +314,8 @@ public:
                                                         const ChunkVersion& shardVersion);
 
 private:
+    friend class CollectionShardingRuntimeTest;
+
     struct PlacementVersionRecoverOrRefresh {
     public:
         PlacementVersionRecoverOrRefresh(SharedSemiFuture<void> future,

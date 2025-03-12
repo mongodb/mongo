@@ -64,7 +64,7 @@ void setUnshardedFilteringMetadata(OperationContext* opCtx, const NamespaceStrin
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-        ->setFilteringMetadata(opCtx, CollectionMetadata());
+        ->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
 }
 
 class SplitVectorTest : public ShardServerTestFixture {

@@ -164,7 +164,7 @@ protected:
 };
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
-    const auto metadata{CollectionMetadata()};
+    const auto metadata{CollectionMetadata::UNTRACKED()};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
     ScopedSetShardRole scopedSetShardRole{

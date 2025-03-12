@@ -156,7 +156,12 @@ CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* service, Na
     : _serviceContext(service),
       _nss(std::move(nss)),
       _metadataType(_nss.isNamespaceAlwaysUntracked() ? MetadataType::kUntracked
-                                                      : MetadataType::kUnknown) {}
+                                                      : MetadataType::kUnknown) {
+    if (_metadataType == MetadataType::kUntracked) {
+        _metadataManager =
+            std::make_shared<MetadataManager>(service, _nss, CollectionMetadata::UNTRACKED());
+    }
+}
 
 CollectionShardingRuntime::~CollectionShardingRuntime() = default;
 
@@ -326,7 +331,7 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
 
     stdx::lock_guard lk(_metadataManagerLock);
 
-    // If the collection was sharded and the new metadata represents a new collection we might need
+    // If the collection was tracked and the new metadata represents a new collection we might need
     // to clean up some sharding-related state
     if (_metadataManager) {
         const auto oldShardPlacementVersion = _metadataManager->getActivePlacementVersion();
@@ -338,19 +343,24 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
     if (!newMetadata.hasRoutingTable()) {
         LOGV2(7917801, "Marking collection as untracked", logAttrs(_nss));
         _metadataType = MetadataType::kUntracked;
-        _metadataManager.reset();
-        ++_numMetadataManagerChanges;
-        return;
+    } else {
+        _metadataType = MetadataType::kTracked;
     }
 
-    // At this point we know that the new metadata is associated to a tracked collection.
-    _metadataType = MetadataType::kTracked;
+    // Recreate the _metadataManager if any of these conditions are met:
+    //     - It wasn't been set yet.
+    //     - We're transitioning from Tracked to Untracked.
+    //     - Uuid mismatch (Uuid's are only set when the metadata is tracked).
+    const bool shouldRecreateMetadataManager = !_metadataManager ||
+        (!newMetadata.hasRoutingTable() && _metadataManager->hasRoutingTable()) ||
+        (_metadataManager->hasRoutingTable() && newMetadata.hasRoutingTable() &&
+         _metadataManager->getCollectionUuid() != newMetadata.getUUID());
 
-    if (!_metadataManager || !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
+    if (shouldRecreateMetadataManager) {
         _metadataManager =
             std::make_shared<MetadataManager>(opCtx->getServiceContext(), _nss, newMetadata);
         ++_numMetadataManagerChanges;
-    } else {
+    } else if (newMetadata.hasRoutingTable()) {
         _metadataManager->setFilteringMetadata(std::move(newMetadata));
     }
 }
@@ -407,7 +417,8 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
             // If the metadata was reset, or the collection was dropped and recreated since the
             // metadata manager was created, return an error.
             if (self->_metadataType != MetadataType::kTracked ||
-                (collectionUuid != self->_metadataManager->getCollectionUuid())) {
+                !self->_metadataManager->getCollectionUuid().has_value() ||
+                collectionUuid != self->_metadataManager->getCollectionUuid().get()) {
                 return {ErrorCodes::ConflictingOperationInProgress,
                         "Collection being migrated was dropped and created or otherwise had its "
                         "metadata reset"};
@@ -417,7 +428,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
             rangeDeleterService->getRangeDeleterServiceInitializationFuture().get(opCtx);
 
             return rangeDeleterService->getOverlappingRangeDeletionsFuture(
-                self->_metadataManager->getCollectionUuid(), orphanRange);
+                self->_metadataManager->getCollectionUuid().get(), orphanRange);
         }();
 
         if (!swOrphanCleanupFuture.isOK()) {
@@ -462,7 +473,8 @@ SharedSemiFuture<void> CollectionShardingRuntime::getOngoingQueriesCompletionFut
     const UUID& collectionUuid, ChunkRange const& range) const {
     stdx::lock_guard lk(_metadataManagerLock);
 
-    if (!_metadataManager || _metadataManager->getCollectionUuid() != collectionUuid) {
+    if (!_metadataManager || !_metadataManager->getCollectionUuid().has_value() ||
+        _metadataManager->getCollectionUuid().get() != collectionUuid) {
         return SemiFuture<void>::makeReady().share();
     }
     return _metadataManager->getOngoingQueriesCompletionFuture(range);
@@ -476,8 +488,8 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
         case MetadataType::kUnknown:
             return nullptr;
         case MetadataType::kUntracked:
-            return kUntrackedCollection;
         case MetadataType::kTracked:
+            tassert(10016213, "MetadataManager must be initialized", _metadataManager);
             return _metadataManager->getActiveMetadata(atClusterTime, preserveRange);
     };
     MONGO_UNREACHABLE;
@@ -760,7 +772,7 @@ void CollectionCriticalSection::enterCommitPhase() {
 void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
     WithLock, OperationContext* opCtx) {
     if (!_metadataManager) {
-        // The old collection metadata was unsharded, nothing to cleanup so far.
+        // The old collection metadata was unknown, nothing to cleanup so far.
         return;
     }
 
@@ -778,7 +790,7 @@ void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
                     [&](const sbe::PlanCacheKey& key, const sbe::PlanCacheEntry& entry) -> bool {
                         const auto matchingCollState =
                             [&](const sbe::PlanCacheKeyCollectionState& entryCollState) {
-                                return entryCollState.uuid == oldUUID &&
+                                return oldUUID && entryCollState.uuid == *oldUUID &&
                                     entryCollState.collectionGeneration &&
                                     entryCollState.collectionGeneration->epoch ==
                                     oldShardVersion.epoch() &&

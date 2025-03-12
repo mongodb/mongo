@@ -100,7 +100,7 @@ class PersistentTaskQueueTest : public ShardServerTestFixture {
         Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(operationContext(),
                                                                              kNss)
-            ->setFilteringMetadata(operationContext(), CollectionMetadata());
+            ->setFilteringMetadata(operationContext(), CollectionMetadata::UNTRACKED());
     }
 };
 

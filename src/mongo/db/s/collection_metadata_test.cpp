@@ -57,7 +57,7 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("tes
 const ShardId kThisShard("thisShard");
 const ShardId kOtherShard("otherShard");
 
-CollectionMetadata makeCollectionMetadataImpl(
+CollectionMetadata makeTrackedCollectionMetadataImpl(
     const KeyPattern& shardKeyPattern,
     const std::vector<std::pair<BSONObj, BSONObj>>& thisShardsChunks,
     bool staleChunkManager,
@@ -122,6 +122,7 @@ CollectionMetadata makeCollectionMetadataImpl(
         kThisShard);
 }
 
+
 struct ConstructedRangeMap : public RangeMap {
     ConstructedRangeMap()
         : RangeMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
@@ -129,7 +130,7 @@ struct ConstructedRangeMap : public RangeMap {
 
 class NoChunkFixture : public unittest::Test {
 protected:
-    CollectionMetadata makeCollectionMetadata(
+    CollectionMetadata makeTrackedCollectionMetadata(
         UUID existingUuid = UUID::gen(),
         UUID reshardingUuid = UUID::gen(),
         CoordinatorStateEnum state = CoordinatorStateEnum::kInitializing) const {
@@ -152,43 +153,43 @@ protected:
         auto metadataUuid =
             (state >= CoordinatorStateEnum::kCommitting) ? reshardingUuid : existingUuid;
 
-        return makeCollectionMetadataImpl(
+        return makeTrackedCollectionMetadataImpl(
             KeyPattern(BSON("a" << 1)), {}, false, metadataUuid, Timestamp(1, 1), reshardingFields);
     }
 };
 
 TEST_F(NoChunkFixture, KeyBelongsToMe) {
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 10)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 10)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY)));
 
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSONObj()));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSONObj()));
 }
 
 TEST_F(NoChunkFixture, IsValidKey) {
-    ASSERT(makeCollectionMetadata().isValidKey(BSON("a"
-                                                    << "abcde")));
-    ASSERT(makeCollectionMetadata().isValidKey(BSON("a" << 3)));
-    ASSERT(!makeCollectionMetadata().isValidKey(BSON("a"
-                                                     << "abcde"
-                                                     << "b" << 1)));
-    ASSERT(!makeCollectionMetadata().isValidKey(BSON("c"
-                                                     << "abcde")));
+    ASSERT(makeTrackedCollectionMetadata().isValidKey(BSON("a"
+                                                           << "abcde")));
+    ASSERT(makeTrackedCollectionMetadata().isValidKey(BSON("a" << 3)));
+    ASSERT(!makeTrackedCollectionMetadata().isValidKey(BSON("a"
+                                                            << "abcde"
+                                                            << "b" << 1)));
+    ASSERT(!makeTrackedCollectionMetadata().isValidKey(BSON("c"
+                                                            << "abcde")));
 }
 
 TEST_F(NoChunkFixture, GetNextChunk) {
     ChunkType nextChunk;
-    ASSERT(
-        !makeCollectionMetadata().getNextChunk(makeCollectionMetadata().getMinKey(), &nextChunk));
+    ASSERT(!makeTrackedCollectionMetadata().getNextChunk(
+        makeTrackedCollectionMetadata().getMinKey(), &nextChunk));
 }
 
 TEST_F(NoChunkFixture, RangeOverlapsChunk) {
-    ASSERT(!makeCollectionMetadata().rangeOverlapsChunk(
+    ASSERT(!makeTrackedCollectionMetadata().rangeOverlapsChunk(
         ChunkRange{BSON("a" << 100), BSON("a" << 200)}));
 }
 
 TEST_F(NoChunkFixture, OrphanedDataRangeBegin) {
-    auto metadata(makeCollectionMetadata());
+    auto metadata(makeTrackedCollectionMetadata());
 
     ConstructedRangeMap pending;
     BSONObj lookupKey = metadata.getMinKey();
@@ -203,7 +204,7 @@ TEST_F(NoChunkFixture, OrphanedDataRangeBegin) {
 }
 
 TEST_F(NoChunkFixture, OrphanedDataRangeMiddle) {
-    auto metadata(makeCollectionMetadata());
+    auto metadata(makeTrackedCollectionMetadata());
 
     ConstructedRangeMap pending;
     BSONObj lookupKey = BSON("a" << 20);
@@ -218,7 +219,7 @@ TEST_F(NoChunkFixture, OrphanedDataRangeMiddle) {
 }
 
 TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
-    auto metadata(makeCollectionMetadata());
+    auto metadata(makeTrackedCollectionMetadata());
 
     ConstructedRangeMap pending;
     ASSERT(!metadata.getNextOrphanRange(pending, metadata.getMaxKey()));
@@ -230,68 +231,69 @@ TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
  */
 class SingleChunkFixture : public unittest::Test {
 protected:
-    CollectionMetadata makeCollectionMetadata() const {
-        return makeCollectionMetadataImpl(
+    CollectionMetadata makeTrackedCollectionMetadata() const {
+        return makeTrackedCollectionMetadataImpl(
             KeyPattern(BSON("a" << 1)), {std::make_pair(BSON("a" << 10), BSON("a" << 20))}, false);
     }
 };
 
 TEST_F(SingleChunkFixture, KeyBelongsToMe) {
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 10)));
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 15)));
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 19)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 10)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 15)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 19)));
 
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 0)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 9)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 20)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 1234)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 0)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 9)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 20)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 1234)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY)));
 
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSONObj()));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSONObj()));
 }
 
 TEST_F(SingleChunkFixture, GetNextChunk) {
     ChunkType nextChunk;
-    ASSERT(makeCollectionMetadata().getNextChunk(makeCollectionMetadata().getMinKey(), &nextChunk));
+    ASSERT(makeTrackedCollectionMetadata().getNextChunk(makeTrackedCollectionMetadata().getMinKey(),
+                                                        &nextChunk));
     ASSERT_EQUALS(0, nextChunk.getMin().woCompare(BSON("a" << 10)));
     ASSERT_EQUALS(0, nextChunk.getMax().woCompare(BSON("a" << 20)));
 }
 
 TEST_F(SingleChunkFixture, GetNextChunkShouldFindNothing) {
     ChunkType nextChunk;
-    ASSERT(
-        !makeCollectionMetadata().getNextChunk(makeCollectionMetadata().getMaxKey(), &nextChunk));
+    ASSERT(!makeTrackedCollectionMetadata().getNextChunk(
+        makeTrackedCollectionMetadata().getMaxKey(), &nextChunk));
 }
 
 TEST_F(SingleChunkFixture, RangeOverlapsChunk) {
-    ASSERT(
-        !makeCollectionMetadata().rangeOverlapsChunk(ChunkRange{BSON("a" << 20), BSON("a" << 30)}));
-    ASSERT(!makeCollectionMetadata().rangeOverlapsChunk(
+    ASSERT(!makeTrackedCollectionMetadata().rangeOverlapsChunk(
+        ChunkRange{BSON("a" << 20), BSON("a" << 30)}));
+    ASSERT(!makeTrackedCollectionMetadata().rangeOverlapsChunk(
         ChunkRange{BSON("a" << 100), BSON("a" << 200)}));
-    ASSERT(
-        !makeCollectionMetadata().rangeOverlapsChunk(ChunkRange{BSON("a" << 0), BSON("a" << 10)}));
-    ASSERT(
-        makeCollectionMetadata().rangeOverlapsChunk(ChunkRange{BSON("a" << 11), BSON("a" << 19)}));
-    ASSERT(
-        makeCollectionMetadata().rangeOverlapsChunk(ChunkRange{BSON("a" << 19), BSON("a" << 20)}));
+    ASSERT(!makeTrackedCollectionMetadata().rangeOverlapsChunk(
+        ChunkRange{BSON("a" << 0), BSON("a" << 10)}));
+    ASSERT(makeTrackedCollectionMetadata().rangeOverlapsChunk(
+        ChunkRange{BSON("a" << 11), BSON("a" << 19)}));
+    ASSERT(makeTrackedCollectionMetadata().rangeOverlapsChunk(
+        ChunkRange{BSON("a" << 19), BSON("a" << 20)}));
 }
 
 TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
     ConstructedRangeMap pending;
-    auto keyRange =
-        makeCollectionMetadata().getNextOrphanRange(pending, makeCollectionMetadata().getMinKey());
+    auto keyRange = makeTrackedCollectionMetadata().getNextOrphanRange(
+        pending, makeTrackedCollectionMetadata().getMinKey());
     ASSERT(keyRange);
 
-    ASSERT(keyRange->getMin().woCompare(makeCollectionMetadata().getMinKey()) == 0);
+    ASSERT(keyRange->getMin().woCompare(makeTrackedCollectionMetadata().getMinKey()) == 0);
     ASSERT(keyRange->getMax().woCompare(BSON("a" << 10)) == 0);
 
-    keyRange = makeCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax());
+    keyRange = makeTrackedCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax());
     ASSERT(keyRange);
     ASSERT(keyRange->getMin().woCompare(BSON("a" << 20)) == 0);
-    ASSERT(keyRange->getMax().woCompare(makeCollectionMetadata().getMaxKey()) == 0);
+    ASSERT(keyRange->getMax().woCompare(makeTrackedCollectionMetadata().getMaxKey()) == 0);
 
-    ASSERT(!makeCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax()));
+    ASSERT(!makeTrackedCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax()));
 }
 
 /**
@@ -300,9 +302,9 @@ TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
  */
 class SingleChunkMinMaxCompoundKeyFixture : public unittest::Test {
 protected:
-    CollectionMetadata makeCollectionMetadata() const {
+    CollectionMetadata makeTrackedCollectionMetadata() const {
         const KeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
-        return makeCollectionMetadataImpl(
+        return makeTrackedCollectionMetadataImpl(
             shardKeyPattern,
             {std::make_pair(shardKeyPattern.globalMin(), shardKeyPattern.globalMax())},
             false);
@@ -310,13 +312,13 @@ protected:
 };
 
 TEST_F(SingleChunkMinMaxCompoundKeyFixture, KeyBelongsToMe) {
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY << "b" << MINKEY)));
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY << "b" << 10)));
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 10 << "b" << 20)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY << "b" << MINKEY)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY << "b" << 10)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 10 << "b" << 20)));
 
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY << "b" << MAXKEY)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY << "b" << MAXKEY)));
 
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSONObj()));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSONObj()));
 }
 
 /**
@@ -325,8 +327,8 @@ TEST_F(SingleChunkMinMaxCompoundKeyFixture, KeyBelongsToMe) {
  */
 class TwoChunksWithGapCompoundKeyFixture : public unittest::Test {
 protected:
-    CollectionMetadata makeCollectionMetadata() const {
-        return makeCollectionMetadataImpl(
+    CollectionMetadata makeTrackedCollectionMetadata() const {
+        return makeTrackedCollectionMetadataImpl(
             KeyPattern(BSON("a" << 1 << "b" << 1)),
             {std::make_pair(BSON("a" << 10 << "b" << 0), BSON("a" << 20 << "b" << 0)),
              std::make_pair(BSON("a" << 30 << "b" << 0), BSON("a" << 40 << "b" << 0))},
@@ -337,23 +339,23 @@ protected:
 TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapOrphanedDataRanges) {
     ConstructedRangeMap pending;
 
-    auto keyRange =
-        makeCollectionMetadata().getNextOrphanRange(pending, makeCollectionMetadata().getMinKey());
+    auto keyRange = makeTrackedCollectionMetadata().getNextOrphanRange(
+        pending, makeTrackedCollectionMetadata().getMinKey());
     ASSERT(keyRange);
-    ASSERT(keyRange->getMin().woCompare(makeCollectionMetadata().getMinKey()) == 0);
+    ASSERT(keyRange->getMin().woCompare(makeTrackedCollectionMetadata().getMinKey()) == 0);
     ASSERT(keyRange->getMax().woCompare(BSON("a" << 10 << "b" << 0)) == 0);
 
-    keyRange = makeCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax());
+    keyRange = makeTrackedCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax());
     ASSERT(keyRange);
     ASSERT(keyRange->getMin().woCompare(BSON("a" << 20 << "b" << 0)) == 0);
     ASSERT(keyRange->getMax().woCompare(BSON("a" << 30 << "b" << 0)) == 0);
 
-    keyRange = makeCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax());
+    keyRange = makeTrackedCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax());
     ASSERT(keyRange);
     ASSERT(keyRange->getMin().woCompare(BSON("a" << 40 << "b" << 0)) == 0);
-    ASSERT(keyRange->getMax().woCompare(makeCollectionMetadata().getMaxKey()) == 0);
+    ASSERT(keyRange->getMax().woCompare(makeTrackedCollectionMetadata().getMaxKey()) == 0);
 
-    ASSERT(!makeCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax()));
+    ASSERT(!makeTrackedCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax()));
 }
 
 /**
@@ -362,17 +364,18 @@ TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapOrphanedDataRanges) {
  */
 class ThreeChunkWithRangeGapFixture : public unittest::Test {
 protected:
-    CollectionMetadata makeCollectionMetadata() const {
-        return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)),
-                                          {std::make_pair(BSON("a" << MINKEY), BSON("a" << 10)),
-                                           std::make_pair(BSON("a" << 10), BSON("a" << 20)),
-                                           std::make_pair(BSON("a" << 30), BSON("a" << MAXKEY))},
-                                          false);
+    CollectionMetadata makeTrackedCollectionMetadata() const {
+        return makeTrackedCollectionMetadataImpl(
+            KeyPattern(BSON("a" << 1)),
+            {std::make_pair(BSON("a" << MINKEY), BSON("a" << 10)),
+             std::make_pair(BSON("a" << 10), BSON("a" << 20)),
+             std::make_pair(BSON("a" << 30), BSON("a" << MAXKEY))},
+            false);
     }
 };
 
 TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkMatch) {
-    auto metadata(makeCollectionMetadata());
+    auto metadata(makeTrackedCollectionMetadata());
 
     ChunkType chunk;
 
@@ -392,35 +395,36 @@ TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkMatch) {
 }
 
 TEST_F(ThreeChunkWithRangeGapFixture, KeyBelongsToMe) {
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 5)));
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 10)));
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 30)));
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 40)));
-    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 5)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 10)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 30)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 40)));
+    ASSERT(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY)));
 
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 20)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 25)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 20)));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 25)));
 
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSONObj()));
+    ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSONObj()));
 }
 
 TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkFromBeginning) {
     ChunkType nextChunk;
-    ASSERT(makeCollectionMetadata().getNextChunk(makeCollectionMetadata().getMinKey(), &nextChunk));
+    ASSERT(makeTrackedCollectionMetadata().getNextChunk(makeTrackedCollectionMetadata().getMinKey(),
+                                                        &nextChunk));
     ASSERT_EQUALS(0, nextChunk.getMin().woCompare(BSON("a" << MINKEY)));
     ASSERT_EQUALS(0, nextChunk.getMax().woCompare(BSON("a" << 10)));
 }
 
 TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkFromMiddle) {
     ChunkType nextChunk;
-    ASSERT(makeCollectionMetadata().getNextChunk(BSON("a" << 20), &nextChunk));
+    ASSERT(makeTrackedCollectionMetadata().getNextChunk(BSON("a" << 20), &nextChunk));
     ASSERT_EQUALS(0, nextChunk.getMin().woCompare(BSON("a" << 30)));
     ASSERT_EQUALS(0, nextChunk.getMax().woCompare(BSON("a" << MAXKEY)));
 }
 
 TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkFromLast) {
     ChunkType nextChunk;
-    ASSERT(makeCollectionMetadata().getNextChunk(BSON("a" << 30), &nextChunk));
+    ASSERT(makeTrackedCollectionMetadata().getNextChunk(BSON("a" << 30), &nextChunk));
     ASSERT_EQUALS(0, nextChunk.getMin().woCompare(BSON("a" << 30)));
     ASSERT_EQUALS(0, nextChunk.getMax().woCompare(BSON("a" << MAXKEY)));
 }
@@ -431,18 +435,18 @@ TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkFromLast) {
  */
 class StaleChunkFixture : public unittest::Test {
 protected:
-    CollectionMetadata makeCollectionMetadata() const {
-        return makeCollectionMetadataImpl(
+    CollectionMetadata makeTrackedCollectionMetadata() const {
+        return makeTrackedCollectionMetadataImpl(
             KeyPattern(BSON("a" << 1)), {std::make_pair(BSON("a" << 10), BSON("a" << 20))}, true);
     }
 };
 
 TEST_F(StaleChunkFixture, KeyBelongsToMe) {
-    ASSERT_THROWS_CODE(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 10)),
+    ASSERT_THROWS_CODE(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 10)),
                        AssertionException,
                        ErrorCodes::StaleChunkHistory);
 
-    ASSERT_THROWS_CODE(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 0)),
+    ASSERT_THROWS_CODE(makeTrackedCollectionMetadata().keyBelongsToMe(BSON("a" << 0)),
                        AssertionException,
                        ErrorCodes::StaleChunkHistory);
 }

@@ -383,7 +383,7 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
-        scopedCsr->setFilteringMetadata(opCtx, CollectionMetadata());
+        scopedCsr->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
         return;
     }
 
@@ -455,7 +455,7 @@ CollectionMetadata FilteringMetadataCache::_forceGetCurrentMetadata(OperationCon
             uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
         if (!cm.hasRoutingTable()) {
-            return CollectionMetadata();
+            return CollectionMetadata::UNTRACKED();
         }
 
         return CollectionMetadata(cm, ShardingState::get(opCtx)->shardId());
@@ -464,7 +464,7 @@ CollectionMetadata FilteringMetadataCache::_forceGetCurrentMetadata(OperationCon
               "Namespace not found, collection may have been dropped",
               logAttrs(nss),
               "error"_attr = redact(ex));
-        return CollectionMetadata();
+        return CollectionMetadata::UNTRACKED();
     }
 }
 

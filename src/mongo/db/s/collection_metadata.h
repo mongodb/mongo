@@ -82,6 +82,13 @@ public:
     CollectionMetadata(ChunkManager cm, const ShardId& thisShardId);
 
     /**
+     * Returns a CollectionMetadata object for an untracked collection.
+     */
+    static CollectionMetadata UNTRACKED() {
+        return CollectionMetadata();
+    }
+
+    /**
      * Returns whether this metadata object represents a sharded or unsharded collection.
      */
     bool isSharded() const {
@@ -155,12 +162,12 @@ public:
      * Obtains the shard id with which this collection metadata is configured.
      */
     const ShardId& shardId() const {
-        invariant(hasRoutingTable());
+        tassert(10016205, "Expected a routing table to be initialized", hasRoutingTable());
         return _thisShardId;
     }
 
     const ShardKeyPattern& getShardKeyPattern() const {
-        invariant(hasRoutingTable());
+        tassert(10016206, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm->getShardKeyPattern();
     }
 
@@ -188,11 +195,12 @@ public:
     }
 
     bool uuidMatches(UUID uuid) const {
-        invariant(hasRoutingTable());
+        tassert(10016215, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm->uuidMatches(uuid);
     }
 
     const UUID& getUUID() const {
+        tassert(10016216, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm->getUUID();
     }
 
@@ -218,7 +226,7 @@ public:
     //
 
     const ChunkManager* getChunkManager() const {
-        invariant(hasRoutingTable());
+        tassert(10016207, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm.get_ptr();
     }
 
@@ -227,7 +235,7 @@ public:
      * returns false. If key is not a valid shard key, the behaviour is undefined.
      */
     bool keyBelongsToMe(const BSONObj& key) const {
-        invariant(hasRoutingTable());
+        tassert(10016208, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm->keyBelongsToShard(key, _thisShardId);
     }
 
@@ -254,7 +262,7 @@ public:
      * Returns true if the argument range overlaps any chunk.
      */
     bool rangeOverlapsChunk(const ChunkRange& range) const {
-        invariant(hasRoutingTable());
+        tassert(10016209, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm->rangeOverlapsShard(range, _thisShardId);
     }
 
@@ -295,17 +303,17 @@ public:
     void toBSONChunks(BSONArrayBuilder* builder) const;
 
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
-        invariant(hasRoutingTable());
+        tassert(10016210, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm->getReshardingFields();
     }
 
     const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
-        invariant(hasRoutingTable());
+        tassert(10016211, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm->getTimeseriesFields();
     }
 
     bool isUniqueShardKey() const {
-        invariant(hasRoutingTable());
+        tassert(10016212, "Expected a routing table to be initialized", hasRoutingTable());
         return _cm->isUnique();
     }
 

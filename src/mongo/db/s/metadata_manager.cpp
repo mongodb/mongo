@@ -50,6 +50,9 @@ namespace {
  * input range.
  */
 bool metadataOverlapsRange(const CollectionMetadata& metadata, const ChunkRange& range) {
+    if (!metadata.hasRoutingTable()) {
+        return true;
+    }
     auto chunkRangeToCompareToMetadata =
         migrationutil::extendOrTruncateBoundsForMetadata(metadata, range);
     return metadata.rangeOverlapsChunk(chunkRangeToCompareToMetadata);
@@ -114,9 +117,7 @@ private:
 MetadataManager::MetadataManager(ServiceContext* serviceContext,
                                  NamespaceString nss,
                                  CollectionMetadata initialMetadata)
-    : _serviceContext(serviceContext),
-      _nss(std::move(nss)),
-      _collectionUuid(initialMetadata.getChunkManager()->getUUID()) {
+    : _serviceContext(serviceContext), _nss(std::move(nss)) {
     _metadata.emplace_back(std::make_shared<CollectionMetadataTracker>(std::move(initialMetadata)));
 }
 
@@ -153,6 +154,24 @@ std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMet
     return std::make_shared<MetadataAtTimestamp>(CollectionMetadata(
         ChunkManager::makeAtTime(*activeMetadata->getChunkManager(), atClusterTime->asTimestamp()),
         activeMetadata->shardId()));
+}
+
+boost::optional<UUID> MetadataManager::getCollectionUuid() const {
+    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    return _getCollectionUuidWithLock(lg);
+}
+
+boost::optional<UUID> MetadataManager::_getCollectionUuidWithLock(WithLock wl) const {
+    invariant(!_metadata.empty());
+    invariant(_metadata.back()->metadata.has_value());
+
+    const auto& activeMetadata = _metadata.back()->metadata.value();
+
+    // The UUID is only present on a CollectionMetadataTracker if the collection is tracked.
+    if (activeMetadata.hasRoutingTable()) {
+        return activeMetadata.getUUID();
+    }
+    return boost::none;
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {
@@ -205,6 +224,11 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
 }
 
 void MetadataManager::_setActiveMetadata(WithLock wl, CollectionMetadata newMetadata) {
+    tassert(10016218,
+            "Attempted to update MetadataManager with incompatible new metadata",
+            !this->hasRoutingTable() ||
+                (newMetadata.hasRoutingTable() &&
+                 this->_getCollectionUuidWithLock(wl) == newMetadata.getUUID()));
     _metadata.emplace_back(std::make_shared<CollectionMetadataTracker>(std::move(newMetadata)));
     _retireExpiredMetadata(wl);
 }
@@ -280,6 +304,11 @@ auto MetadataManager::_findNewestOverlappingMetadata(WithLock, ChunkRange const&
     }
 
     return nullptr;
+}
+
+bool MetadataManager::hasRoutingTable() {
+    invariant(!_metadata.empty());
+    return _metadata.back()->metadata->hasRoutingTable();
 }
 
 }  // namespace mongo
