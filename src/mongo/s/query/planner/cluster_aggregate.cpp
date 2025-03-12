@@ -259,8 +259,8 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
             if (nss == executionNss)
                 continue;
 
-            const auto [resolvedNsCM, _] =
-                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            const auto resolvedNsCM =
+                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss)).cm;
             if (resolvedNsCM.isSharded()) {
                 std::set<ShardId> shardIdsForNs;
                 // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
@@ -533,8 +533,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         if (criSW.getStatus().code() == ErrorCodes::NamespaceNotFound) {
             return false;
         }
-        const auto [resolvedNsCM, _] = uassertStatusOK(criSW);
-        return resolvedNsCM.isSharded();
+        const auto& cri = uassertStatusOK(criSW);
+        return cri.cm.isSharded();
     };
     bool isExplain = request.getExplain().get_value_or(false);
     liteParsedPipeline.verifyIsSupported(opCtx, isSharded, isExplain);

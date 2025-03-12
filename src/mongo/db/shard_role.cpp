@@ -1926,6 +1926,10 @@ void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
     const ShardVersion& requestedShardVersion,
     const ScopedCollectionDescription& shardingCollectionDescription,
     const CollectionPtr& collectionPtr) {
+    if (MONGO_unlikely(requestedShardVersion.getIgnoreShardingCatalogUuidMismatch())) {
+        return;
+    }
+
     // Skip the check if the requested shard version corresponds to an untracked collection or
     // corresponds to this shard not own any chunk. Also skip the check if the router attached
     // ShardVersion::IGNORED, since in this case the router broadcasts request to shards that may

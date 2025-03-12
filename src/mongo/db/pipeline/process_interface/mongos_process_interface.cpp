@@ -384,9 +384,9 @@ std::vector<GenericCursor> MongosProcessInterface::getIdleCursors(
 }
 
 bool MongosProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    auto [cm, _] =
+    const auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    return cm.isSharded();
+    return cri.cm.isSharded();
 }
 
 MongoProcessInterface::SupportingUniqueIndex

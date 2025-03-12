@@ -290,7 +290,8 @@ boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContex
     if (swCRI.getStatus().code() == ErrorCodes::NamespaceNotFound) {
         return boost::none;
     }
-    auto [cm, _] = uassertStatusOK(swCRI);
+    const auto cri = uassertStatusOK(swCRI);
+    const auto& cm = cri.cm;
 
     if (cm.hasRoutingTable()) {
         if (cm.isUnsplittable()) {

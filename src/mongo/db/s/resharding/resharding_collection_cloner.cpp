@@ -257,6 +257,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
     if (!_relaxed) {
         request.setCollectionUUID(_sourceUUID);
     }
+    // If running in "relaxed" mode, also instruct the receiving shards to ignore collection uuid
+    // mismatches between the local and sharding catalogs.
+    boost::optional<RouterRelaxCollectionUUIDConsistencyCheckBlock>
+        routerRelaxCollectionUUIDConsistencyCheckBlock(boost::in_place_init_if, _relaxed, opCtx);
+
     auto hint = collectionHasSimpleCollation(opCtx, _sourceNss)
         ? boost::optional<BSONObj>{BSON("_id" << 1)}
         : boost::none;
@@ -604,6 +609,10 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
     if (!_relaxed) {
         request.setCollectionUUID(_sourceUUID);
     }
+    // If running in "relaxed" mode, also instruct the receiving shards to ignore collection uuid
+    // mismatches between the local and sharding catalogs.
+    boost::optional<RouterRelaxCollectionUUIDConsistencyCheckBlock>
+        routerRelaxCollectionUUIDConsistencyCheckBlock(boost::in_place_init_if, _relaxed, opCtx);
 
     // In the case of a single-shard command, dispatchShardPipeline uses the passed-in batch
     // size instead of 0.  The ReshardingCloneFetcher does not handle cursors with a populated
@@ -841,11 +850,11 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
         // writes to the temporary resharding collection. We attach shard version IGNORED to the
         // insert operations and retry once on a StaleConfig error to allow the collection metadata
         // information to be recovered.
-        auto [_, sii] = uassertStatusOK(
+        const auto cri = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
         return resharding::data_copy::insertBatchTransactionally(opCtx,
                                                                  _outputNss,
-                                                                 sii,
+                                                                 cri.sii,
                                                                  txnNum,
                                                                  batch,
                                                                  _reshardingUUID,

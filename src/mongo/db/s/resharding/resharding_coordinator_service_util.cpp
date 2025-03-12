@@ -535,9 +535,10 @@ void writeToConfigIndexesForTempNss(OperationContext* opCtx,
 
     switch (nextState) {
         case CoordinatorStateEnum::kPreparingToDonate: {
-            auto [_, optSii] =
+            const auto optSii =
                 uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(
-                    opCtx, coordinatorDoc.getSourceNss()));
+                                    opCtx, coordinatorDoc.getSourceNss()))
+                    .sii;
             if (optSii) {
                 std::vector<BSONObj> indexes;
                 optSii->forEachIndex([&](const auto index) {

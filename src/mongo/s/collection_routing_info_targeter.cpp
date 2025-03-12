@@ -275,7 +275,10 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         }
     };
 
-    auto [cm, sii] = createDatabaseAndGetRoutingInfo(_nss);
+    auto [cm, sii] = [&]() {
+        auto cri = createDatabaseAndGetRoutingInfo(_nss);
+        return std::make_tuple(std::move(cri.cm), std::move(cri.sii));
+    }();
 
     // For a tracked time-series collection, only the underlying buckets collection is stored on the
     // config servers. If the user operation is on the time-series view namespace, we should check
@@ -292,11 +295,11 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
     //    back to the view namespace and reset '_isRequestOnTimeseriesViewNamespace'.
     if (!cm.hasRoutingTable() && !_nss.isTimeseriesBucketsCollection()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
-        auto [bucketsPlacementInfo, bucketsIndexInfo] = createDatabaseAndGetRoutingInfo(bucketsNs);
-        if (bucketsPlacementInfo.hasRoutingTable()) {
+        auto bucketsCri = createDatabaseAndGetRoutingInfo(bucketsNs);
+        if (bucketsCri.cm.hasRoutingTable()) {
             _nss = bucketsNs;
-            cm = std::move(bucketsPlacementInfo);
-            sii = std::move(bucketsIndexInfo);
+            cm = std::move(bucketsCri.cm);
+            sii = std::move(bucketsCri.sii);
             if (!isRawDataOperation(opCtx)) {
                 _isRequestOnTimeseriesViewNamespace = true;
             }
@@ -305,9 +308,9 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         // This can happen if a tracked time-series collection is dropped and re-created. Then we
         // need to reset the namespace to the original namespace.
         _nss = _nss.getTimeseriesViewNamespace();
-        auto [newCm, newSii] = createDatabaseAndGetRoutingInfo(_nss);
-        cm = std::move(newCm);
-        sii = std::move(newSii);
+        auto newCri = createDatabaseAndGetRoutingInfo(_nss);
+        cm = std::move(newCri.cm);
+        sii = std::move(newCri.sii);
         _isRequestOnTimeseriesViewNamespace = false;
     }
 

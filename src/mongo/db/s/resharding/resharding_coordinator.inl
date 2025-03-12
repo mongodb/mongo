@@ -1110,6 +1110,12 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
                    .then([this, anchor = shared_from_this(), executor] {
                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
+                       // If running in "relaxed" mode, instruct the receiving shards to ignore
+                       // collection uuid mismatches between the local and sharding catalogs.
+                       boost::optional<RouterRelaxCollectionUUIDConsistencyCheckBlock>
+                           routerRelaxCollectionUUIDConsistencyCheckBlock(
+                               boost::in_place_init_if, _coordinatorDoc.getRelaxed(), opCtx.get());
+
                        std::map<ShardId, ShardVersion> donorShardVersions;
                        {
                            auto cri =

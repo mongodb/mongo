@@ -82,18 +82,18 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 
 std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwningShard(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
-    const auto [cm, _] = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+    const auto cri = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
         opCtx, NamespaceString::kLogicalSessionsNamespace));
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Collection "
                           << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " is not sharded",
-            cm.isSharded());
+            cri.cm.isSharded());
 
     std::multimap<ShardId, LogicalSessionId> sessionIdsByOwningShard;
     for (const auto& session : sessions) {
         sessionIdsByOwningShard.emplace(
-            cm.findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
+            cri.cm.findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
             session);
     }
 
@@ -108,18 +108,18 @@ std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwnin
 
 std::vector<LogicalSessionRecord> SessionsCollectionSharded::_groupSessionRecordsByOwningShard(
     OperationContext* opCtx, const LogicalSessionRecordSet& sessions) {
-    const auto [cm, _] = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+    const auto cri = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
         opCtx, NamespaceString::kLogicalSessionsNamespace));
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Collection "
                           << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " is not sharded",
-            cm.isSharded());
+            cri.cm.isSharded());
 
     std::multimap<ShardId, LogicalSessionRecord> sessionsByOwningShard;
     for (const auto& session : sessions) {
         sessionsByOwningShard.emplace(
-            cm.findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
+            cri.cm.findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
             session);
     }
 

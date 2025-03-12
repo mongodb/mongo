@@ -126,8 +126,9 @@ public:
             result.append("version", cachedDbInfo->getVersion().toBSON());
         } else {
             // Return the collection's information.
-            const auto [cm, sii] =
-                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            const auto& cm = cri.cm;
+            const auto& sii = cri.sii;
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Collection " << nss.toStringForErrorMsg()
                                   << " does not have a routing table.",

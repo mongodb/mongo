@@ -500,12 +500,12 @@ void MigrationSourceManager::enterCriticalSection() {
 
     hangBeforeEnteringCriticalSection.pauseWhileSet();
 
-    const auto [cm, _] =
+    const auto cri =
         uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(_opCtx, nss()));
 
     // Check that there are no chunks on the recepient shard. Write an oplog event for change
     // streams if this is the first migration to the recipient.
-    if (!cm.getVersion(_args.getToShard()).isSet()) {
+    if (!cri.cm.getVersion(_args.getToShard()).isSet()) {
         migrationutil::notifyChangeStreamsOnRecipientFirstChunk(
             _opCtx, nss(), _args.getFromShard(), _args.getToShard(), _collectionUUID);
 

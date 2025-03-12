@@ -173,6 +173,9 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
     return std::make_shared<RoutingTableHistory>(std::move(newRoutingHistory));
 }
 
+const OperationContext::Decoration<bool> routerShouldRelaxCollectionUUIDConsistencyCheck =
+    OperationContext::declareDecoration<bool>();
+
 }  // namespace
 
 bool CollectionRoutingInfo::hasRoutingTable() const {
@@ -180,13 +183,21 @@ bool CollectionRoutingInfo::hasRoutingTable() const {
 }
 
 ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
-    return ShardVersionFactory::make(
+    ShardVersion sv = ShardVersionFactory::make(
         cm, sii ? boost::make_optional(sii->getCollectionIndexes()) : boost::none);
+    if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
+        sv.setIgnoreShardingCatalogUuidMismatch();
+    }
+    return sv;
 }
 
 ShardVersion CollectionRoutingInfo::getShardVersion(const ShardId& shardId) const {
-    return ShardVersionFactory::make(
+    auto sv = ShardVersionFactory::make(
         cm, shardId, sii ? boost::make_optional(sii->getCollectionIndexes()) : boost::none);
+    if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
+        sv.setIgnoreShardingCatalogUuidMismatch();
+    }
+    return sv;
 }
 
 AtomicWord<uint64_t> ComparableDatabaseVersion::_disambiguatingSequenceNumSource{1ULL};
@@ -471,15 +482,21 @@ StatusWith<CollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoAt(
     boost::optional<Timestamp> optAtClusterTime,
     bool allowLocks) {
     try {
-        auto cm = uassertStatusOK(
-            _getCollectionPlacementInfoAt(opCtx, nss, optAtClusterTime, allowLocks));
-        if (!cm.isSharded()) {
-            // If the collection is unsharded, it cannot have global indexes so there is no need to
-            // fetch the index information.
-            return CollectionRoutingInfo{std::move(cm), boost::none};
+        auto cri = [&]() -> StatusWith<CollectionRoutingInfo> {
+            auto cm = uassertStatusOK(
+                _getCollectionPlacementInfoAt(opCtx, nss, optAtClusterTime, allowLocks));
+            if (!cm.isSharded()) {
+                // If the collection is unsharded, it cannot have global indexes so there is no need
+                // to fetch the index information.
+                return CollectionRoutingInfo{std::move(cm), boost::none};
+            }
+            auto sii = _getCollectionIndexInfo(opCtx, nss, allowLocks);
+            return _retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
+        }();
+        if (MONGO_unlikely(routerShouldRelaxCollectionUUIDConsistencyCheck(opCtx) && cri.isOK())) {
+            cri.getValue().shouldIgnoreUuidMismatch = true;
         }
-        auto sii = _getCollectionIndexInfo(opCtx, nss, allowLocks);
-        return _retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
+        return cri;
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -1046,4 +1063,15 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
         throw;
     }
 }
+
+RouterRelaxCollectionUUIDConsistencyCheckBlock::RouterRelaxCollectionUUIDConsistencyCheckBlock(
+    OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    routerShouldRelaxCollectionUUIDConsistencyCheck(opCtx) = true;
+}
+
+RouterRelaxCollectionUUIDConsistencyCheckBlock::~RouterRelaxCollectionUUIDConsistencyCheckBlock() {
+    routerShouldRelaxCollectionUUIDConsistencyCheck(_opCtx) = false;
+}
+
 }  // namespace mongo

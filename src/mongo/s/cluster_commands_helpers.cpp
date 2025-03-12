@@ -1033,7 +1033,7 @@ BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
     OperationContext* opCtx, const NamespaceString& nss, const CollectionRoutingInfo& cri) {
     auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
-        const auto& [cm, sii] = cri;
+        const auto& cm = cri.cm;
         ListIndexes listIndexesCmd(nss);
         setReadWriteConcern(opCtx, listIndexesCmd, true, false);
         auto cmdNoVersion = listIndexesCmd.toBSON();

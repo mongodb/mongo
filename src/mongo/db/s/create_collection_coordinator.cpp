@@ -1824,9 +1824,9 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
         // TODO (SERVER-100309): Remove once 9.0 becomes last LTS
         if (_doc.getCreateSessionsCollectionRemotelyOnFirstShard() &&
             nss() == NamespaceString::kLogicalSessionsNamespace) {
-            const auto& [cm, _] = uassertStatusOK(
+            const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss()));
-            return cm.hasRoutingTable();
+            return cri.cm.hasRoutingTable();
         } else {
             return sharding_ddl_util::getCollectionUUID(opCtx, nss()).is_initialized();
         }
@@ -1847,9 +1847,9 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
                   _doc.getCreateSessionsCollectionRemotelyOnFirstShard());
         // If we are in the state described above, we cannot get the uuid locally and so we need to
         // take the existing one from config.collections.
-        const auto& [cm, _] = uassertStatusOK(
+        const auto& cri = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss()));
-        _uuid = cm.getUUID();
+        _uuid = cri.cm.getUUID();
     } else {
         _uuid = *optUuid;
     }

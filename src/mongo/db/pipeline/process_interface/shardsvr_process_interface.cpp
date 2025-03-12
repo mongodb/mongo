@@ -122,9 +122,9 @@ void writeToLocalShard(OperationContext* opCtx,
 }  // namespace
 
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    const auto [cm, _] =
+    const auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    return cm.isSharded();
+    return cri.cm.isSharded();
 }
 
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(

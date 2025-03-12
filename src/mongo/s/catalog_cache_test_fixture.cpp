@@ -117,9 +117,9 @@ CoreCatalogCacheTestFixture::scheduleRoutingInfoUnforcedRefresh(const NamespaceS
 executor::NetworkTestEnv::FutureHandle<boost::optional<CollectionRoutingInfo>>
 CoreCatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const NamespaceString& nss) {
     auto catalogCache = Grid::get(getServiceContext())->catalogCache();
-    const auto [cm, _] =
+    const auto cri =
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
-    ASSERT(cm.isSharded());
+    ASSERT(cri.cm.isSharded());
 
     // Simulates the shard wanting a higher version than the one sent by the router.
     catalogCache->onStaleCollectionVersion(nss, boost::none);

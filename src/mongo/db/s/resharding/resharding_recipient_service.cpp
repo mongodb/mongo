@@ -929,8 +929,8 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
 
     auto myShardId = _externalState->myShardId(opCtx->getServiceContext());
 
-    auto [sourceChunkMgr, _] =
-        _externalState->getTrackedCollectionRoutingInfo(opCtx, _metadata.getSourceNss());
+    auto sourceChunkMgr =
+        _externalState->getTrackedCollectionRoutingInfo(opCtx, _metadata.getSourceNss()).cm;
 
     // The metrics map can already be pre-populated if it was recovered from disk.
     if (_applierMetricsMap.empty()) {

@@ -79,6 +79,11 @@ struct CollectionRoutingInfo {
     bool hasRoutingTable() const;
     ShardVersion getCollectionVersion() const;
     ShardVersion getShardVersion(const ShardId& shardId) const;
+
+    // When set to true, the ShardVersions returned by this object will have the
+    // 'ignoreCollectionUuidMismatch' flag set, thus instructing the receiving shards to ignore
+    // collection UUID mismatches between the sharding catalog and their local catalog.
+    bool shouldIgnoreUuidMismatch = false;
 };
 
 /**
@@ -440,6 +445,25 @@ private:
         void report(BSONObjBuilder* builder) const;
 
     } _stats;
+};
+
+/**
+ * RAII type that instructs the CatalogCache to set the 'shouldIgnoreUuidMismatch' flag to
+ * CollectionRoutingInfo objects returned withing the scope, indicating that routing done used that
+ * object will instruct the receiving shards to ignore collection UUID mismatches between the
+ * sharding catalog and the local catalog.
+ *
+ * This is only meant to be used for inconsistency-recovery situations.
+ */
+class RouterRelaxCollectionUUIDConsistencyCheckBlock {
+public:
+    RouterRelaxCollectionUUIDConsistencyCheckBlock(OperationContext* opCtx);
+    RouterRelaxCollectionUUIDConsistencyCheckBlock(
+        const RouterRelaxCollectionUUIDConsistencyCheckBlock&) = delete;
+    ~RouterRelaxCollectionUUIDConsistencyCheckBlock();
+
+private:
+    OperationContext* const _opCtx;
 };
 
 }  // namespace mongo

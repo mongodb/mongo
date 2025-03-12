@@ -41,10 +41,12 @@ namespace mongo {
 ShardVersion ShardVersion::parse(const BSONElement& element) {
     auto parsedVersion = ShardVersionBase::parse(IDLParserContext("ShardVersion"), element.Obj());
     auto version = parsedVersion.getVersion();
-    return ShardVersion(ChunkVersion({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
-                                     {version.getSecs(), version.getInc()}),
-                        parsedVersion.getIndexVersion(),
-                        parsedVersion.getPlacementConflictTime());
+    ShardVersion sv(ChunkVersion({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
+                                 {version.getSecs(), version.getInc()}),
+                    parsedVersion.getIndexVersion(),
+                    parsedVersion.getPlacementConflictTime());
+    sv._ignoreShardingCatalogUuidMismatch = parsedVersion.getIgnoreCollectionUuidMismatch();
+    return sv;
 }
 
 void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
@@ -53,6 +55,9 @@ void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
     version.setPlacement(
         Timestamp(placementVersion().majorVersion(), placementVersion().minorVersion()));
     version.setPlacementConflictTime(_placementConflictTime);
+    if (MONGO_unlikely(_ignoreShardingCatalogUuidMismatch)) {
+        version.setIgnoreCollectionUuidMismatch(_ignoreShardingCatalogUuidMismatch);
+    }
 
     CollectionIndexesBase indexVersion;
     indexVersion.setIndexVersion(_indexVersion);

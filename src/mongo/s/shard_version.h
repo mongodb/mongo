@@ -96,6 +96,14 @@ public:
         _placementConflictTime.emplace(std::move(conflictTime));
     }
 
+    bool getIgnoreShardingCatalogUuidMismatch() const {
+        return _ignoreShardingCatalogUuidMismatch;
+    }
+
+    void setIgnoreShardingCatalogUuidMismatch() {
+        _ignoreShardingCatalogUuidMismatch = true;
+    }
+
     bool operator==(const ShardVersion& otherVersion) const {
         return _chunkVersion == otherVersion._chunkVersion &&
             _indexVersion == otherVersion._indexVersion;
@@ -131,6 +139,10 @@ private:
     ChunkVersion _chunkVersion;
     boost::optional<Timestamp> _indexVersion;
     boost::optional<LogicalTime> _placementConflictTime;
+
+    // When set to true, shards will ignore collection UUID mismatches between the sharding catalog
+    // and their local catalog.
+    bool _ignoreShardingCatalogUuidMismatch = false;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ShardVersion& v) {

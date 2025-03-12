@@ -112,9 +112,9 @@ ChunkVersion ReshardingCoordinatorExternalState::calculateChunkVersionForInitial
 
 boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalogIndexVersion(
     OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
-    auto [_, optSii] =
+    const auto cri =
         uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
-    if (optSii) {
+    if (cri.sii) {
         VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
         auto time = vt.clusterTime().asTimestamp();
         return CollectionIndexes{uuid, time};
@@ -124,16 +124,17 @@ boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalo
 
 bool ReshardingCoordinatorExternalState::getIsUnsplittable(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
-    auto [cm, _] =
+    const auto cri =
         uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
-    return cm.isUnsplittable();
+    return cri.cm.isUnsplittable();
 }
 
 boost::optional<CollectionIndexes>
 ReshardingCoordinatorExternalState::getCatalogIndexVersionForCommit(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
-    auto [_, optSii] =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
+    const auto optSii =
+        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss))
+            .sii;
     if (optSii) {
         return optSii->getCollectionIndexes();
     }

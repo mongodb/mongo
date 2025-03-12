@@ -105,11 +105,12 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                // collection. We attach placement version IGNORED to the write
                                // operations and retry once on a StaleConfig error to allow the
                                // collection metadata information to be recovered.
-                               auto [_, sii] = uassertStatusOK(
+                               const auto cri = uassertStatusOK(
                                    Grid::get(opCtx.get())
                                        ->catalogCache()
                                        ->getCollectionRoutingInfo(opCtx.get(),
                                                                   _crudApplication.getOutputNss()));
+                               const auto& sii = cri.sii;
                                ScopedSetShardRole scopedSetShardRole(
                                    opCtx.get(),
                                    _crudApplication.getOutputNss(),
