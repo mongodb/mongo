@@ -85,6 +85,10 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
 
     liteParsedPipeline.validate(opCtx, performApiVersionChecks);
 
+    uassert(ErrorCodes::OptionNotSupportedOnView,
+            "$rankFusion is currently unsupported in a view definition",
+            !liteParsedPipeline.startsWithRankFusionStage());
+
     // Verify that this is a legitimate pipeline specification by making sure it parses
     // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a
     // collection and a pipeline, but in this case we don't need this map to be accurate since

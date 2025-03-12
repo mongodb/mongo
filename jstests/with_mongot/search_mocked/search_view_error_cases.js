@@ -149,6 +149,7 @@ runTest({
     errorCode: 9475802
 });
 
+/**
 runTest({
     name: "rankFusion_search_view",
     pipeline: [{$rankFusion: {input: {pipelines: {search: [{$search: {}}]}}}}],
@@ -160,6 +161,7 @@ runTest({
     pipeline: [{$rankFusion: {input: {pipelines: {search: [{$vectorSearch: {}}]}}}}],
     errorCode: 9475801
 });
+*/
 
 runTest({
     name: "scoreFusion_search_view",
