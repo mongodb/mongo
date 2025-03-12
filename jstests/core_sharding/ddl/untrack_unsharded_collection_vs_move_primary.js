@@ -2,7 +2,7 @@
  * Tests that the untrackUnshardedCollection command is consistent with the execution of movePrimary
  * commands
  * @tags: [
- *   requires_fcv_81,
+ *   requires_fcv_80,
  *   # Requires a deterministic placement for the collection.
  *   assumes_balancer_off,
  *   # Test cases involve the execution of movePrimary

@@ -120,10 +120,6 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
                 jsTestLog(`Untrack collection result for ${namespace}: ${tojson(res)}`);
                 return;
             }
-            //  TODO (SERVER-96072) remove this error once the command is backported.
-            if (res.code === ErrorCodes.CommandNotFound) {
-                return;
-            }
         }
         assert.commandWorked(res);
         jsTestLog(`Untrack collection worked`);

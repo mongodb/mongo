@@ -195,8 +195,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     ErrorCodes.InvalidNamespace,
                     // Handles the case where the collection/db does not exist
                     ErrorCodes.NamespaceNotFound,
-                    //  TODO (SERVER-96072) remove this error once the command is backported.
-                    ErrorCodes.CommandNotFound,
                 ]);
         }
     };

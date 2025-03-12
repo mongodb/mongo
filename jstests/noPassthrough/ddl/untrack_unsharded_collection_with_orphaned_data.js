@@ -2,7 +2,7 @@
  * Test covering the expected behavior of untrackCollection against the existence an orphaned
  * collection in the local catalog of one or more shards.
  * @tags: [
- *   requires_fcv_81,
+ *   requires_fcv_80,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
