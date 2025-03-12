@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/window_function/window_function_min_max_scalar.h"
+#include "mongo/db/pipeline/window_function/window_function_min_max_scaler.h"
 
 #include "mongo/db/exec/expression/evaluate.h"
 
 namespace mongo {
 
-Value WindowFunctionMinMaxScalar::computeValue(const Value& currentValue,
+Value WindowFunctionMinMaxScaler::computeValue(const Value& currentValue,
                                                const Value& windowMin,
                                                const Value& windowMax,
                                                const Value& sMin,

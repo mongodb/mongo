@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class WindowFunctionMinMaxScalar : public WindowFunctionMinMaxCommon {
+class WindowFunctionMinMaxScaler : public WindowFunctionMinMaxCommon {
 public:
     using WindowFunctionMinMaxCommon::_memUsageTracker;
     using WindowFunctionMinMaxCommon::_values;
@@ -44,16 +44,16 @@ public:
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
                                                        std::pair<Value, Value> sMinAndsMax = {
                                                            Value(0), Value(1)}) {
-        return std::make_unique<WindowFunctionMinMaxScalar>(expCtx, sMinAndsMax);
+        return std::make_unique<WindowFunctionMinMaxScaler>(expCtx, sMinAndsMax);
     }
 
-    explicit WindowFunctionMinMaxScalar(ExpressionContext* const expCtx,
+    explicit WindowFunctionMinMaxScaler(ExpressionContext* const expCtx,
                                         std::pair<Value, Value> sMinAndsMax = {Value(0), Value(1)})
         : WindowFunctionMinMaxCommon(expCtx), _sMinAndsMax(sMinAndsMax) {
         _memUsageTracker.set(sizeof(*this));
     }
 
-    // Stateless computation of the output value of $minMaxScalar, provided all needed inputs
+    // Stateless computation of the output value of $minMaxScaler, provided all needed inputs
     // Output = (((currentValue - windowMin) / (windowMax - windowMin)) * (sMax - sMin)) + sMin
     static Value computeValue(const Value& currentValue,
                               const Value& windowMin,
@@ -62,13 +62,13 @@ public:
                               const Value& sMax);
 
     Value getValue(boost::optional<Value> current) const final {
-        // Value of the current document is needed to compute the $minMaxScalar.
+        // Value of the current document is needed to compute the $minMaxScaler.
         tassert(9459901,
-                "$minMaxScalar window function must be provided with the value of the current "
+                "$minMaxScaler window function must be provided with the value of the current "
                 "document",
                 current.has_value());
         tassert(9459902,
-                "There must always be documents in the current window for $minMaxScalar",
+                "There must always be documents in the current window for $minMaxScaler",
                 !_values.empty());
 
         return computeValue(*current,

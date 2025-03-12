@@ -34,15 +34,15 @@
 namespace mongo {
 
 /**
- * Custom WindowFunctionExec class specifically for the implementation of $minMaxScalar
+ * Custom WindowFunctionExec class specifically for the implementation of $minMaxScaler
  * for WindowBounds that do not remove documents from the window.
- * $minMaxScalar cannot use the generic WindowFunctionExec classes that handle non-removable
+ * $minMaxScaler cannot use the generic WindowFunctionExec classes that handle non-removable
  * implementations because it cannot implement a generic accumulator, that does not allow
  * for reading the value of the "current" document.
  */
-class WindowFunctionExecMinMaxScalarNonRemovable final : public WindowFunctionExec {
+class WindowFunctionExecMinMaxScalerNonRemovable final : public WindowFunctionExec {
 public:
-    WindowFunctionExecMinMaxScalarNonRemovable(PartitionIterator* iter,
+    WindowFunctionExecMinMaxScalerNonRemovable(PartitionIterator* iter,
                                                boost::intrusive_ptr<Expression> input,
                                                std::pair<Value, Value> sMinAndsMax,
                                                SimpleMemoryUsageTracker* memTracker)
@@ -54,9 +54,9 @@ public:
     // TODO: SERVER-95229 fill in implemenation to support non-removable windows
     Value getNext(boost::optional<Document> current) override {
         uasserted(ErrorCodes::NotImplemented,
-                  "non-removable $minMaxScalar window functions are not yet supported");
+                  "non-removable $minMaxScaler window functions are not yet supported");
         tassert(9459905,
-                "WindowFunctionExecMinMaxScalarNonRemovable must be provided with the value of the "
+                "WindowFunctionExecMinMaxScalerNonRemovable must be provided with the value of the "
                 "current document",
                 current.has_value());
         return Value{BSONNULL};

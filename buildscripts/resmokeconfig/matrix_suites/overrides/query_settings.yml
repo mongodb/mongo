@@ -93,7 +93,7 @@
       # cluster aggregations.
       - jstests/aggregation/sources/unwind/unwind_preserve_null_and_empty_arrays.js
       - jstests/aggregation/sources/sample/sample_optimization.js
-      - jstests/aggregation/sources/setWindowFields/min_max_scalar_parsing.js
+      - jstests/aggregation/sources/setWindowFields/min_max_scaler_parsing.js
       - jstests/aggregation/parsing/max_subpipeline_depth.js
       - jstests/aggregation/sources/densify/parse.js
       - jstests/aggregation/sources/graphLookup/basic.js

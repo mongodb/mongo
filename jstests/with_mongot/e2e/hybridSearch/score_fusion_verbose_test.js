@@ -3,7 +3,7 @@
  * aggregation stage is introduced.
  *
  * This file runs the same hybrid search with two different score normalization methods:
- * Sigmoid and MinMaxScalar.
+ * Sigmoid and MinMaxScaler.
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
@@ -147,7 +147,7 @@ runQueryTest(
     buildExpectedResults(
         /*expectedResultIds*/[6, 1, 2, 3, 4, 5, 8, 9, 10, 12, 13, 14, 11, 7, 15], datasets.MOVIES));
 
-// Test 2: MinMaxScalar score normalization
+// Test 2: MinMaxScaler score normalization
 runQueryTest(
     vectorSearchPipeline
         .concat([

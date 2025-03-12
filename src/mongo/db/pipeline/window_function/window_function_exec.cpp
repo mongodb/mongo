@@ -43,7 +43,7 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_first_last.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_linear_fill.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_min_max_scalar.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_min_max_scaler.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable_range.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
@@ -134,19 +134,19 @@ std::unique_ptr<mongo::WindowFunctionExec> translateDerivative(
         iter, expr->input(), sortExpr, expr->bounds(), expr->unit(), memTracker);
 }
 
-// $minMaxScalar uses a custom translation from a ExpressionMinMaxScalar to WindowFunctionExec
+// $minMaxScaler uses a custom translation from a ExpressionMinMaxScaler to WindowFunctionExec
 // because, like other window functions, it differentiates its execution implementation between
 // removable and non-removable windows for execution efficiency; however, unlike other window
 // functions, it does not use the generic implementation of non-removable WindowFunctionExecs
 // becuase it is unable to implement a generic accumulator, due to needing the value of
 // the "current" document being processed.
-std::unique_ptr<mongo::WindowFunctionExec> translateMinMaxScalar(
+std::unique_ptr<mongo::WindowFunctionExec> translateMinMaxScaler(
     ExpressionContext* expCtx,
-    window_function::ExpressionMinMaxScalar* minMaxScalarExpr,
+    window_function::ExpressionMinMaxScaler* minMaxScalerExpr,
     PartitionIterator* iter,
     const boost::optional<SortPattern>& sortBy,
     SimpleMemoryUsageTracker* memTracker) {
-    WindowBounds bounds = minMaxScalarExpr->bounds();
+    WindowBounds bounds = minMaxScalerExpr->bounds();
     return visit(
         OverloadedVisitor{
             [&](const WindowBounds::DocumentBased& docBounds) {
@@ -157,20 +157,20 @@ std::unique_ptr<mongo::WindowFunctionExec> translateMinMaxScalar(
                             // implementations are supported.
                             uasserted(ErrorCodes::NotImplemented,
                                       str::stream() << "left unbounded windows for "
-                                                       "$minMaxScalar are not yet supported");
+                                                       "$minMaxScaler are not yet supported");
                             // A left unbounded window will always be non-removable regardless of
                             // the upper bound.
-                            return std::make_unique<WindowFunctionExecMinMaxScalarNonRemovable>(
+                            return std::make_unique<WindowFunctionExecMinMaxScalerNonRemovable>(
                                 iter,
-                                minMaxScalarExpr->input(),
-                                minMaxScalarExpr->getDomainMinAndMax(),
+                                minMaxScalerExpr->input(),
+                                minMaxScalerExpr->getDomainMinAndMax(),
                                 memTracker);
                         },
                         [&](const auto&) -> std::unique_ptr<WindowFunctionExec> {
                             return std::make_unique<WindowFunctionExecRemovableDocument>(
                                 iter,
-                                minMaxScalarExpr->input(),
-                                minMaxScalarExpr->buildRemovable(),
+                                minMaxScalerExpr->input(),
+                                minMaxScalerExpr->buildRemovable(),
                                 docBounds,
                                 memTracker);
                         }},
@@ -187,20 +187,20 @@ std::unique_ptr<mongo::WindowFunctionExec> translateMinMaxScalar(
                     // supported.
                     uasserted(ErrorCodes::NotImplemented,
                               str::stream() << "left unbounded windows for "
-                                               "$minMaxScalar are not yet supported");
+                                               "$minMaxScaler are not yet supported");
                     // A left unbounded window will always be non-removable regardless of
                     // the upper bound.
-                    return std::make_unique<WindowFunctionExecMinMaxScalarNonRemovable>(
+                    return std::make_unique<WindowFunctionExecMinMaxScalerNonRemovable>(
                         iter,
-                        minMaxScalarExpr->input(),
-                        minMaxScalarExpr->getDomainMinAndMax(),
+                        minMaxScalerExpr->input(),
+                        minMaxScalerExpr->getDomainMinAndMax(),
                         memTracker);
                 } else {
                     return std::make_unique<WindowFunctionExecRemovableRange>(
                         iter,
-                        minMaxScalarExpr->input(),
+                        minMaxScalerExpr->input(),
                         std::move(sortByExpr),
-                        minMaxScalarExpr->buildRemovable(),
+                        minMaxScalerExpr->buildRemovable(),
                         bounds,
                         memTracker);
                 }
@@ -221,9 +221,9 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
     SimpleMemoryUsageTracker& functionMemTracker = (*memTracker)[functionStmt.fieldName];
     if (auto expr = dynamic_cast<window_function::ExpressionDerivative*>(functionStmt.expr.get())) {
         return translateDerivative(expr, iter, sortBy, &functionMemTracker);
-    } else if (auto expr = dynamic_cast<window_function::ExpressionMinMaxScalar*>(
+    } else if (auto expr = dynamic_cast<window_function::ExpressionMinMaxScaler*>(
                    functionStmt.expr.get())) {
-        return translateMinMaxScalar(expCtx, expr, iter, sortBy, &functionMemTracker);
+        return translateMinMaxScaler(expCtx, expr, iter, sortBy, &functionMemTracker);
     } else if (auto expr =
                    dynamic_cast<window_function::ExpressionFirst*>(functionStmt.expr.get())) {
         return std::make_unique<WindowFunctionExecFirst>(

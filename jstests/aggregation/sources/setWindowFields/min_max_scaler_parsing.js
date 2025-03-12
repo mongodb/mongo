@@ -1,5 +1,5 @@
 /**
- * Test that $minMaxScalar window function expression parsing works.
+ * Test that $minMaxScaler window function expression parsing works.
  * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
  */
 
@@ -22,12 +22,12 @@ function expectFailureWithArgs(setWindowFieldsArgs, errorCode) {
 //
 // $setWindowFields args that should fail (with documented reason).
 expectFailureWithArgs(
-    // Unexpected input argument to $minMaxScalar.
+    // Unexpected input argument to $minMaxScaler.
     {
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {input: "$x", hello: "world"},
+                $minMaxScaler: {input: "$x", hello: "world"},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -39,7 +39,7 @@ expectFailureWithArgs(
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {min: 0, max: 10},
+                $minMaxScaler: {min: 0, max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -51,7 +51,7 @@ expectFailureWithArgs(
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {input: "$x", min: "hello", max: 10},
+                $minMaxScaler: {input: "$x", min: "hello", max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -63,7 +63,7 @@ expectFailureWithArgs(
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {input: "$x", min: 0, max: "world"},
+                $minMaxScaler: {input: "$x", min: 0, max: "world"},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -75,7 +75,7 @@ expectFailureWithArgs(
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {input: "$x", min: 0},
+                $minMaxScaler: {input: "$x", min: 0},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -87,7 +87,7 @@ expectFailureWithArgs(
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {input: "$x", max: 10},
+                $minMaxScaler: {input: "$x", max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -99,7 +99,7 @@ expectFailureWithArgs(
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {input: "$x", min: 10, max: 10},
+                $minMaxScaler: {input: "$x", min: 10, max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -111,7 +111,7 @@ expectFailureWithArgs(
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {input: "$x", min: 11, max: 10},
+                $minMaxScaler: {input: "$x", min: 11, max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -122,7 +122,7 @@ expectFailureWithArgs(
     {
         sortBy: {_id: 1},
         output: {
-            "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {documents: [1, "unbounded"]}},
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [1, "unbounded"]}},
         }
     },
     ErrorCodes.FailedToParse);
@@ -131,7 +131,7 @@ expectFailureWithArgs(
     {
         sortBy: {_id: 1},
         output: {
-            "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {documents: [-2, -1]}},
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [-2, -1]}},
         }
     },
     ErrorCodes.FailedToParse);
@@ -140,7 +140,7 @@ expectFailureWithArgs(
     {
         sortBy: {_id: 1},
         output: {
-            "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {range: [1.5, "unbounded"]}},
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [1.5, "unbounded"]}},
         }
     },
     ErrorCodes.FailedToParse);
@@ -149,7 +149,7 @@ expectFailureWithArgs(
     {
         sortBy: {_id: 1},
         output: {
-            "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {range: [-1.5, -0.5]}},
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [-1.5, -0.5]}},
         }
     },
     ErrorCodes.FailedToParse);
@@ -159,7 +159,7 @@ expectFailureWithArgs(
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {
-                $minMaxScalar: {input: "$x", min: 0, max: 10},
+                $minMaxScaler: {input: "$x", min: 0, max: 10},
             },
         }
     },
@@ -170,14 +170,14 @@ expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
         "relativeXValue":
-            {$minMaxScalar: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+            {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
     }
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
         "relativeXValue": {
-            $minMaxScalar: {input: "$x", min: 0, max: 10},
+            $minMaxScaler: {input: "$x", min: 0, max: 10},
             window: {documents: ["current", "unbounded"]}
         },
     }

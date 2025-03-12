@@ -38,18 +38,18 @@
 
 namespace mongo {
 namespace {
-class WindowFunctionMinMaxScalarTest : public AggregationContextFixture {
+class WindowFunctionMinMaxScalerTest : public AggregationContextFixture {
 public:
-    WindowFunctionMinMaxScalarTest()
+    WindowFunctionMinMaxScalerTest()
         : expCtx(getExpCtx()),
-          minMaxScalar(std::make_unique<WindowFunctionMinMaxScalar>(expCtx.get())) {
+          minMaxScaler(std::make_unique<WindowFunctionMinMaxScaler>(expCtx.get())) {
         auto collator = std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kToLowerString);
         expCtx->setCollator(std::move(collator));
     }
 
-    void createWindowFunctionMinMaxScalarWithSMinAndSMax(std::pair<Value, Value> sMinAndsMax) {
-        minMaxScalar = std::make_unique<WindowFunctionMinMaxScalar>(expCtx.get(), sMinAndsMax);
+    void createWindowFunctionMinMaxScalerWithSMinAndSMax(std::pair<Value, Value> sMinAndsMax) {
+        minMaxScaler = std::make_unique<WindowFunctionMinMaxScaler>(expCtx.get(), sMinAndsMax);
     }
 
     // Test case runner that adds values into the window then asserts the value is as expected.
@@ -61,10 +61,10 @@ public:
         }
 
         for (const auto& v : values) {
-            minMaxScalar->add(v);
+            minMaxScaler->add(v);
         }
 
-        ASSERT_VALUE_EQ(minMaxScalar->getValue(*values.begin()), expected);
+        ASSERT_VALUE_EQ(minMaxScaler->getValue(*values.begin()), expected);
     }
 
     int getRandomBetweenBounds(int lower, int upper) {
@@ -73,37 +73,37 @@ public:
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    std::unique_ptr<WindowFunctionMinMaxScalar> minMaxScalar;
+    std::unique_ptr<WindowFunctionMinMaxScaler> minMaxScaler;
 };
 
-TEST_F(WindowFunctionMinMaxScalarTest, SingleValueAddedIntoWindow) {
-    // If a single value is added into the window, $minMaxScalar should always return 0.
+TEST_F(WindowFunctionMinMaxScalerTest, SingleValueAddedIntoWindow) {
+    // If a single value is added into the window, $minMaxScaler should always return 0.
     // This is because the window has no range between the min and the max.
 
     Value randomValue = Value(getRandomBetweenBounds(1, 1000));
-    minMaxScalar->add(randomValue);
-    ASSERT_VALUE_EQ(minMaxScalar->getValue(randomValue), Value(0));
+    minMaxScaler->add(randomValue);
+    ASSERT_VALUE_EQ(minMaxScaler->getValue(randomValue), Value(0));
 
     // Adding in more of the same value should also cause the computed value to remain at 0,
     // because the min and the max will remain 0.
     int nTimes = getRandomBetweenBounds(2, 25);
     for (int i = 0; i < nTimes; i++) {
-        minMaxScalar->add(randomValue);
+        minMaxScaler->add(randomValue);
     }
-    ASSERT_VALUE_EQ(minMaxScalar->getValue(randomValue), Value(0));
+    ASSERT_VALUE_EQ(minMaxScaler->getValue(randomValue), Value(0));
 
     // Change the sMin and sMax bounds also should not affect the return value of the min of the
     // domain.
     int sMin = getRandomBetweenBounds(1, 100);
     int sMax = sMin + getRandomBetweenBounds(1, 100);
-    createWindowFunctionMinMaxScalarWithSMinAndSMax({Value(sMin), Value(sMax)});
+    createWindowFunctionMinMaxScalerWithSMinAndSMax({Value(sMin), Value(sMax)});
     for (int i = 0; i < nTimes; i++) {
-        minMaxScalar->add(randomValue);
+        minMaxScaler->add(randomValue);
     }
-    ASSERT_VALUE_EQ(minMaxScalar->getValue(randomValue), Value(sMin));
+    ASSERT_VALUE_EQ(minMaxScaler->getValue(randomValue), Value(sMin));
 }
 
-TEST_F(WindowFunctionMinMaxScalarTest, GetValueOnWindowMin) {
+TEST_F(WindowFunctionMinMaxScalerTest, GetValueOnWindowMin) {
     // Check that the if the current value is the min of the window, the returned value is zero.
     int windowMin = getRandomBetweenBounds(1, 100);
     std::vector<Value> values = {
@@ -113,11 +113,11 @@ TEST_F(WindowFunctionMinMaxScalarTest, GetValueOnWindowMin) {
     // Scaling the domain by sMin and sMax should always produce the sMin.
     int sMin = getRandomBetweenBounds(1, 100);
     int sMax = sMin + getRandomBetweenBounds(1, 100);
-    createWindowFunctionMinMaxScalarWithSMinAndSMax({Value(sMin), Value(sMax)});
+    createWindowFunctionMinMaxScalerWithSMinAndSMax({Value(sMin), Value(sMax)});
     runTestCase(values, Value(sMin));
 }
 
-TEST_F(WindowFunctionMinMaxScalarTest, GetValueOnWindowMax) {
+TEST_F(WindowFunctionMinMaxScalerTest, GetValueOnWindowMax) {
     // Check that the if the current value is the max of the window, the returned value is one.
     int windowMin = getRandomBetweenBounds(1, 100);
     std::vector<Value> values = {
@@ -127,14 +127,14 @@ TEST_F(WindowFunctionMinMaxScalarTest, GetValueOnWindowMax) {
     // Scaling the domain by sMin and sMax should always produce the sMin.
     int sMin = getRandomBetweenBounds(1, 100);
     int sMax = sMin + getRandomBetweenBounds(1, 100);
-    createWindowFunctionMinMaxScalarWithSMinAndSMax({Value(sMin), Value(sMax)});
+    createWindowFunctionMinMaxScalerWithSMinAndSMax({Value(sMin), Value(sMax)});
     runTestCase(values, Value(sMax));
 }
 
-TEST_F(WindowFunctionMinMaxScalarTest, GetValueOnWindowIntermediate) {
+TEST_F(WindowFunctionMinMaxScalerTest, GetValueOnWindowIntermediate) {
     // Get the value when current value is inbetween the min and max.
     std::vector<Value> values = {Value(35), Value(10) /*min*/, Value(110) /*max*/, Value(23)};
-    // $minMaxScalar = (xi - min(x)) / (max(x) - min(x)) = (35 - 10) / (110 - 10) = 25 / 100 = 0.25
+    // $minMaxScaler = (xi - min(x)) / (max(x) - min(x)) = (35 - 10) / (110 - 10) = 25 / 100 = 0.25
     runTestCase(values, Value(0.25));
 
     // Check that the value works scaled between sMin and sMax
@@ -142,14 +142,14 @@ TEST_F(WindowFunctionMinMaxScalarTest, GetValueOnWindowIntermediate) {
     int sMax = 150;
     // Scaled value = ((unscaled value) * (sMax - sMin)) + sMin = (0.25 * (150 - 50)) + 50
     // = (0.25 * 100) + 50 = 75
-    createWindowFunctionMinMaxScalarWithSMinAndSMax({Value(sMin), Value(sMax)});
+    createWindowFunctionMinMaxScalerWithSMinAndSMax({Value(sMin), Value(sMax)});
     runTestCase(values, Value(75));
 }
 
-TEST_F(WindowFunctionMinMaxScalarTest, GetValueOnWindowIntermediateWithDoubles) {
+TEST_F(WindowFunctionMinMaxScalerTest, GetValueOnWindowIntermediateWithDoubles) {
     // Get the value when current value is inbetween the min and max.
     std::vector<Value> values = {Value(3.5), Value(1.0) /*min*/, Value(11.0) /*max*/, Value(2.3)};
-    // $minMaxScalar = (xi - min(x)) / (max(x) - min(x)) = (3.5 - 1.0) / (11.0 - 1.0) = 2.5 / 10.0 =
+    // $minMaxScaler = (xi - min(x)) / (max(x) - min(x)) = (3.5 - 1.0) / (11.0 - 1.0) = 2.5 / 10.0 =
     // 0.25
     runTestCase(values, Value(0.25));
 
@@ -158,7 +158,7 @@ TEST_F(WindowFunctionMinMaxScalarTest, GetValueOnWindowIntermediateWithDoubles) 
     int sMax = 15.0;
     // Scaled value = ((unscaled value) * (sMax - sMin)) + sMin = (0.25 * (15.0 - 5.0)) + 5.0
     // = (0.25 * 10.0) + 5.0 = 7.5
-    createWindowFunctionMinMaxScalarWithSMinAndSMax({Value(sMin), Value(sMax)});
+    createWindowFunctionMinMaxScalerWithSMinAndSMax({Value(sMin), Value(sMax)});
     runTestCase(values, Value(7.5));
 }
 

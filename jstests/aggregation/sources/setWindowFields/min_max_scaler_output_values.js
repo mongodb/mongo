@@ -1,5 +1,5 @@
 /**
- * Test that $minMaxScalar window function output values are as expected.
+ * Test that $minMaxScaler window function output values are as expected.
  * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
  */
 
@@ -7,7 +7,7 @@ const coll = db[jsTestName()];
 coll.drop();
 
 // Input documents to test against.
-// The value of field "x" is what we will compute the $minMaxScalar of in these tests.
+// The value of field "x" is what we will compute the $minMaxScaler of in these tests.
 // The value of field "y" is used to test sorting docs by a field other than "_id".
 let documents = [
     {_id: 1, "x": -3, "y": 8, "partition": "A"},
@@ -31,7 +31,7 @@ assert.commandWorked(coll.insertMany(documents));
 //          ...
 //        },
 //        docIdToOutputFieldValue: {
-//          <doc_id>: <$minMaxScalar ouput field value>,
+//          <doc_id>: <$minMaxScaler ouput field value>,
 //          ...
 //        }
 //    },
@@ -59,7 +59,7 @@ function testDocumentBasedRemovableQueries() {
                 sortBy: {_id: 1},
                 output: {
                     "relativeXValue":
-                        {$minMaxScalar: {input: "$x"}, window: {documents: ["current", "current"]}},
+                        {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
                 }
             },
             docIdToOutputFieldValue: {
@@ -77,7 +77,7 @@ function testDocumentBasedRemovableQueries() {
             sortBy: {_id: 1},
             output: {
                 "relativeXValue":
-                    {$minMaxScalar: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+                    {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
             }
         },
         docIdToOutputFieldValue: {
@@ -94,7 +94,7 @@ function testDocumentBasedRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {documents: [-2, 2]}},
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [-2, 2]}},
             }
         },
         docIdToOutputFieldValue: {
@@ -114,7 +114,7 @@ function testDocumentBasedRemovableQueries() {
                 sortBy: {y: 1},
                 output: {
                     "relativeXValue": {
-                        $minMaxScalar: {input: "$x"},
+                        $minMaxScaler: {input: "$x"},
                         window: {documents: ["current", "unbounded"]}
                     },
                 }
@@ -136,7 +136,7 @@ function testDocumentBasedRemovableQueries() {
                 sortBy: {y: 1},
                 output: {
                     "relativeXValue": {
-                        $minMaxScalar: {input: "$x", min: 10000, max: 20000},
+                        $minMaxScaler: {input: "$x", min: 10000, max: 20000},
                         window: {documents: ["current", "unbounded"]}
                     },
                 }
@@ -158,7 +158,7 @@ function testDocumentBasedRemovableQueries() {
                 sortBy: {_id: 1},
                 output: {
                     "relativeXValue": {
-                        $minMaxScalar: {input: {$add: [1, "$x"]}},
+                        $minMaxScaler: {input: {$add: [1, "$x"]}},
                         window: {documents: ["current", "unbounded"]}
                     },
                 }
@@ -182,7 +182,7 @@ function testDocumentBasedRemovableQueries() {
                 sortBy: {y: 1},
                 output: {
                     "relativeXValue": {
-                        $minMaxScalar: {input: {$const: 1}},
+                        $minMaxScaler: {input: {$const: 1}},
                         window: {documents: ["current", "unbounded"]}
                     },
                 }
@@ -204,7 +204,7 @@ function testDocumentBasedRemovableQueries() {
                 partitionBy: "$partition",
                 sortBy: {_id: 1},
                 output: {
-                    "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {documents: [-1, 2]}},
+                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [-1, 2]}},
                 }
             },
             docIdToOutputFieldValue: {
@@ -226,7 +226,7 @@ function testRangeBasedRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {range: ["current", 2]}},
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", 2]}},
             }
         },
         docIdToOutputFieldValue: {
@@ -245,7 +245,7 @@ function testRangeBasedRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {y: 1},
                 output: {
-                    "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {range: [-5, 5]}},
+                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [-5, 5]}},
                 }
             },
             docIdToOutputFieldValue: {
@@ -265,7 +265,7 @@ function testRangeBasedRemovableQueries() {
                 partitionBy: "$partition",
                 sortBy: {y: 1},
                 output: {
-                    "relativeXValue": {$minMaxScalar: {input: "$x"}, window: {range: [-3, 4]}},
+                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [-3, 4]}},
                 }
             },
             docIdToOutputFieldValue: {
