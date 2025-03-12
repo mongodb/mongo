@@ -738,6 +738,11 @@ BSONObj createPassthroughCommandForShard(
     if (requestQueryStatsFromRemotes) {
         targetedCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
     }
+
+    if (expCtx->isRankFusion()) {
+        targetedCmd[AggregateCommandRequest::kIsRankFusionFieldName] = Value(true);
+    }
+
     auto shardCommand = genericTransformForShards(
         std::move(targetedCmd), expCtx, explainVerbosity, std::move(readConcern));
 
@@ -785,6 +790,10 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     // send to the shards.
     targetedCmd[AggregateCommandRequest::kPipelineFieldName] =
         Value(splitPipeline.shardsPipeline->serialize());
+
+    if (expCtx->isRankFusion()) {
+        targetedCmd[AggregateCommandRequest::kIsRankFusionFieldName] = Value(true);
+    }
 
     // When running on many shards with the exchange we may not need merging.
     if (needsMerge) {

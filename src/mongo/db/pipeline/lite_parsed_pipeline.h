@@ -161,6 +161,13 @@ public:
     }
 
     /**
+     * Returns true iff the pipeline begins with a $rankFusion stage.
+     */
+    bool startsWithRankFusionStage() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->isRankFusionStage();
+    }
+
+    /**
      * Returns true if the pipeline contains at least one stage that requires the aggregation
      * command to be exempt from ingress admission control.
      */

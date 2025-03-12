@@ -799,6 +799,10 @@ Status runAggregateOnView(AggExState& aggExState,
             "mapReduce on a view is not supported",
             !aggExState.getRequest().getIsMapReduceCommand());
 
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            "$rankFusion is currently unsupported on views",
+            !aggExState.isRankFusionStage());
+
     // Resolve the request's collation and check that the default collation of 'view' is compatible
     // with the operation's collation. The collation resolution and check are both skipped if the
     // request did not specify a collation.
