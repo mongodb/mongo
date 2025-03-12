@@ -837,7 +837,6 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
     auto [measurement, date, index] = batchedInsertTuple;
 
     bool isNewlyOpenedBucket = (bucket.size == 0);
-    bool openedDueToMetadata = true;
     calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
                                        bucket,
                                        measurement,
@@ -875,7 +874,6 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
                                       newFieldNamesToBeInserted,
                                       sizesToBeAdded,
                                       isNewlyOpenedBucket,
-                                      openedDueToMetadata,
                                       bucket,
                                       writeBatch);
     return true;
@@ -1734,12 +1732,6 @@ bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
                                         size_t& currentPosition,
                                         std::shared_ptr<WriteBatch>& writeBatch) {
     invariant(currentPosition < batch.measurementsTimesAndIndices.size());
-
-    // getEligibleBucket guarantees that we will successfully insert at least one measurement
-    // (batch.measurementsTimesAndIndices[currentPosition]) into the provided bucket without rolling
-    // it over, which allows us to unconditionally initialize the writeBatch.
-    writeBatch = activeBatch(
-        catalog.trackingContexts, eligibleBucket, opId, batch.stripeNumber, batch.stats);
     while (currentPosition < batch.measurementsTimesAndIndices.size()) {
         if (!tryToInsertIntoBucketWithoutRollover(
                 catalog,
@@ -1771,7 +1763,6 @@ void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
                                        Bucket::NewFieldNames& newFieldNamesToBeInserted,
                                        const Sizes& sizesToBeAdded,
                                        bool isNewlyOpenedBucket,
-                                       bool openedDueToMetadata,
                                        Bucket& bucket,
                                        std::shared_ptr<WriteBatch>& writeBatch) {
     writeBatch->measurements.push_back(measurement);
@@ -1790,9 +1781,6 @@ void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
     bucket.size +=
         sizesToBeAdded.uncommittedVerifiedSize + sizesToBeAdded.uncommittedMeasurementEstimate;
     if (isNewlyOpenedBucket) {
-        if (openedDueToMetadata) {
-            writeBatch->openedDueToMetadata = true;
-        }
         auto updateStatus =
             bucket.schema.update(measurement, timeseriesOptions.getMetaField(), comparator);
         invariant(updateStatus == Schema::UpdateStatus::Updated);

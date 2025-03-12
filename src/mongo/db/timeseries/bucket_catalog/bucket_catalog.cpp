@@ -152,7 +152,8 @@ RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
                                                      const TimeseriesOptions& options,
                                                      const StringDataComparator* comparator,
                                                      uint64_t storageCacheSizeBytes,
-                                                     ExecutionStatsController& stats) {
+                                                     ExecutionStatsController& stats,
+                                                     bool& bucketOpenedDueToMetadata) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
     calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
@@ -181,7 +182,7 @@ RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
         bucket.rolloverAction = rolloverAction;
         internal::updateRolloverStats(stats, rolloverReason);
     }
-
+    bucketOpenedDueToMetadata = false;
     return rolloverReason;
 }
 
@@ -201,7 +202,8 @@ Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
                                      const StringDataComparator* comparator,
                                      uint64_t storageCacheSizeBytes,
                                      internal::AllowQueryBasedReopening& allowQueryBasedReopening,
-                                     ExecutionStatsController& stats) {
+                                     ExecutionStatsController& stats,
+                                     bool& bucketOpenedDueToMetadata) {
     // Gets a vector of potential buckets, starting with kSoftClose/kArchived buckets, followed by
     // at most one kNone bucket.
     auto potentialBuckets = findAndRolloverOpenBuckets(catalog,
@@ -225,7 +227,8 @@ Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
                                                                     options,
                                                                     comparator,
                                                                     storageCacheSizeBytes,
-                                                                    stats);
+                                                                    stats,
+                                                                    bucketOpenedDueToMetadata);
 
         if (rolloverReason == RolloverReason::kNone) {
             // The measurement can be inserted into the open bucket.
@@ -990,7 +993,8 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                           BucketStateRegistry::Era era,
                           uint64_t storageCacheSizeBytes,
                           const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-                          ExecutionStatsController& stats) {
+                          ExecutionStatsController& stats,
+                          bool& bucketOpenedDueToMetadata) {
     Status reopeningStatus = Status::OK();
     auto numReopeningsAttempted = 0;
     auto reopeningLimit = 3;
@@ -1007,7 +1011,8 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                                                                comparator,
                                                                storageCacheSizeBytes,
                                                                allowQueryBasedReopening,
-                                                               stats)) {
+                                                               stats,
+                                                               bucketOpenedDueToMetadata)) {
             return *eligibleBucket;
         }
 
@@ -1038,7 +1043,8 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                                                                         options,
                                                                         comparator,
                                                                         storageCacheSizeBytes,
-                                                                        stats);
+                                                                        stats,
+                                                                        bucketOpenedDueToMetadata);
             if (rolloverReason == RolloverReason::kNone) {
                 // Use the reopened bucket if the measurement can fit there.
                 return reopenedBucket;
@@ -1063,7 +1069,8 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                                                            comparator,
                                                            storageCacheSizeBytes,
                                                            allowQueryBasedReopening,
-                                                           stats)) {
+                                                           stats,
+                                                           bucketOpenedDueToMetadata)) {
         return *eligibleBucket;
     }
 

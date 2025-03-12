@@ -1428,6 +1428,7 @@ TimeseriesWriteBatches stageInsertBatch(
     bool needsAnotherBucket = true;
 
     while (needsAnotherBucket) {
+        bool bucketOpenedDueToMetadata = true;
         auto [measurement, measurementTimestamp, _] =
             batch.measurementsTimesAndIndices[currentPosition];
         auto& eligibleBucket = bucket_catalog::getEligibleBucket(opCtx,
@@ -1443,11 +1444,15 @@ TimeseriesWriteBatches stageInsertBatch(
                                                                  catalogEra,
                                                                  storageCacheSizeBytes,
                                                                  compressAndWriteBucketFunc,
-                                                                 batch.stats);
+                                                                 batch.stats,
+                                                                 bucketOpenedDueToMetadata);
 
-        // We have a guarantee that eligibleBucket can insert at least one measurement in the batch,
-        // so this will always be assigned a relevant writeBatch.
-        std::shared_ptr<bucket_catalog::WriteBatch> writeBatch;
+        // getEligibleBucket guarantees that we will successfully insert at least one measurement
+        // (batch.measurementsTimesAndIndices[currentPosition]) into the provided bucket without
+        // rolling it over, which allows us to unconditionally initialize the writeBatch.
+        std::shared_ptr<bucket_catalog::WriteBatch> writeBatch = activeBatch(
+            bucketCatalog.trackingContexts, eligibleBucket, opId, batch.stripeNumber, batch.stats);
+        writeBatch->openedDueToMetadata = bucketOpenedDueToMetadata;
         needsAnotherBucket =
             !(bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(bucketCatalog,
                                                                            opId,

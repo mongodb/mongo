@@ -602,7 +602,6 @@ void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
                                        Bucket::NewFieldNames& newFieldNamesToBeInserted,
                                        const Sizes& sizesToBeAdded,
                                        bool isNewlyOpenedBucket,
-                                       bool openedDueToMetadata,
                                        Bucket& bucket,
                                        std::shared_ptr<WriteBatch>& writeBatch);
 }  // namespace mongo::timeseries::bucket_catalog::internal

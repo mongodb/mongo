@@ -480,6 +480,7 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                           BucketStateRegistry::Era era,
                           uint64_t storageCacheSizeBytes,
                           const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-                          ExecutionStatsController& stats);
+                          ExecutionStatsController& stats,
+                          bool& bucketOpenedDueToMetadata);
 
 }  // namespace mongo::timeseries::bucket_catalog

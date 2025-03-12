@@ -614,7 +614,11 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     size_t currentPositionFromNumMeasurementsInBatch = 0;
     auto& stripe = *_bucketCatalog->stripes[currentBatch.stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
-    std::shared_ptr<WriteBatch> writeBatch;
+    auto writeBatch = activeBatch(_bucketCatalog->trackingContexts,
+                                  bucketToInsertInto,
+                                  _opCtx->getOpID(),
+                                  currentBatch.stripeNumber,
+                                  currentBatch.stats);
     auto successfulInsertion =
         internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
                                                      _opCtx->getOpID(),
@@ -657,8 +661,11 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                                                          nullptr,
                                                          boost::none,
                                                          prevBatch.stats);
-
-        std::shared_ptr<WriteBatch> writeBatch;
+        auto newWriteBatch = activeBatch(_bucketCatalog->trackingContexts,
+                                         *newBucketToInsertInto,
+                                         _opCtx->getOpID(),
+                                         currentBatch.stripeNumber,
+                                         currentBatch.stats);
         auto currBatch = batchedInsertContexts[currBatchedInsertContextsIndex[i]];
         successfulInsertion =
             internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
@@ -670,7 +677,7 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                                                          _storageCacheSizeBytes,
                                                          *newBucketToInsertInto,
                                                          currentPosition,
-                                                         writeBatch);
+                                                         newWriteBatch);
         ASSERT_EQ(newBucketToInsertInto->numMeasurements, numMeasurementsInWriteBatch[i]);
         currentPositionFromNumMeasurementsInBatch += numMeasurementsInWriteBatch[i];
         ASSERT_EQ(currentPosition, currentPositionFromNumMeasurementsInBatch);
@@ -2745,6 +2752,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
     {
         stdx::unique_lock<stdx::mutex> stripeLock(
             _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->mutex);
+        bool bucketOpenedDueToMetadata = true;
         auto& bucket = getEligibleBucket(_opCtx,
                                          *_bucketCatalog,
                                          *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
@@ -2758,13 +2766,15 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
                                          era,
                                          _storageCacheSizeBytes,
                                          /*compressAndWriteBucketFunc=*/nullptr,
-                                         batchedInsertCtx.stats);
+                                         batchedInsertCtx.stats,
+                                         bucketOpenedDueToMetadata);
         ASSERT_EQ(0, bucket.size);
         ASSERT_EQ(RolloverAction::kNone, bucket.rolloverAction);
         ASSERT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
         ASSERT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
+        ASSERT(bucketOpenedDueToMetadata);
     }
 }
 
@@ -2798,6 +2808,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
     {
         stdx::unique_lock<stdx::mutex> stripeLock(
             _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->mutex);
+        bool bucketOpenedDueToMetadata = true;
         auto& bucketFound =
             getEligibleBucket(_opCtx,
                               *_bucketCatalog,
@@ -2812,13 +2823,15 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
                               era,
                               _storageCacheSizeBytes,
                               /*compressAndWriteBucketFunc=*/nullptr,
-                              batchedInsertCtx.stats);
+                              batchedInsertCtx.stats,
+                              bucketOpenedDueToMetadata);
         ASSERT_EQ(&bucketAllocated, &bucketFound);
         ASSERT_EQ(RolloverAction::kNone, bucketFound.rolloverAction);
         ASSERT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
         ASSERT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
+        ASSERT(!bucketOpenedDueToMetadata);
     }
 }
 
