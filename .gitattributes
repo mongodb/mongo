@@ -3,3 +3,4 @@
 *.sh text eol=lf
 **/third_party/**/* rules-lint-ignored=true
 external rules-lint-ignored=true
+*.idl linguist-language=yaml
