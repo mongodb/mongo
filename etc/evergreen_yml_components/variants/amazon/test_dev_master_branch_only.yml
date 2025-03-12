@@ -586,7 +586,7 @@ buildvariants:
         --link-model=dynamic
       unittest_compile_flags: >-
         --link-model=dynamic
-      clang_tidy_toolchain: v4
+      clang_tidy_toolchain: v5
       build_mongot: true
       download_mongot_release: true
       compile_variant: *amazon-linux2023-arm64-static-compile-toolchain-v5

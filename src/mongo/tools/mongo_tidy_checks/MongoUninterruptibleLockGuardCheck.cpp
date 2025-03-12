@@ -39,7 +39,7 @@ static constexpr auto kBannedMember = "uninterruptibleLocksRequested_DO_NOT_USE"
 AST_MATCHER(clang::CXXMemberCallExpr, matchesForbiddenCall) {
     if (auto memberDecl = Node.getMethodDecl()) {
         if (auto identifierInfo = memberDecl->getDeclName().getAsIdentifierInfo()) {
-            return identifierInfo->getName().equals(kBannedMember);
+            return identifierInfo->getName() == kBannedMember;
         }
     }
     return false;

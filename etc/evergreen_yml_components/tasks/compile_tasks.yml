@@ -379,7 +379,7 @@ tasks:
         vars:
           # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
           targets: //src/mongo/...
-          args: --config=clang-tidy-${clang_tidy_toolchain|v4} --mongo_toolchain_version=${clang_tidy_toolchain|v4} --keep_going
+          args: --config=clang-tidy-${clang_tidy_toolchain|v5} --mongo_toolchain_version=${clang_tidy_toolchain|v5} --keep_going
           run_for_clang_tidy: "true"
       - func: "generate clang-tidy report"
 

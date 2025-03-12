@@ -259,7 +259,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
       compile_variant: *linux-x86-dynamic-grpc
-      clang_tidy_toolchain: v4
+      clang_tidy_toolchain: v5
       large_distro_name: rhel8.8-xlarge
       test_flags: >-
         --additionalFeatureFlags "featureFlagGRPC"

@@ -46,8 +46,9 @@ class MongoAssertCheck : public clang::tidy::ClangTidyCheck {
 
 public:
     MongoAssertCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
-    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
-    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+    void registerPPCallbacks(const clang::SourceManager& SM,
+                             clang::Preprocessor* PP,
+                             clang::Preprocessor* ModuleExpanderpp) override;
 };
 
 }  // namespace mongo::tidy

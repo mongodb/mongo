@@ -55,8 +55,8 @@ void MongoStdAtomicCheck::check(const ast_matchers::MatchFinder::MatchResult& Re
     const auto* loc_match = Result.Nodes.getNodeAs<TypeLoc>("loc_atomic");
     if (loc_match) {
         diag(loc_match->getBeginLoc(),
-             "Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types from "
-             "\"mongo/platform/atomic_word.h\"");
+             "Illegal use of prohibited std::atomic<T>, use Atomic<T> or other types from "
+             "\"mongo/platform/atomic.h\"");
     }
 }
 

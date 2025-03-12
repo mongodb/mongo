@@ -29,57 +29,41 @@
 
 #include "MongoAssertCheck.h"
 
-#include <clang/Lex/Lexer.h>
+#include <clang/Lex/PPCallbacks.h>
+#include <clang/Lex/Preprocessor.h>
 
 namespace mongo::tidy {
 
 using namespace clang;
 using namespace clang::ast_matchers;
 
+// Callbacks for handling preprocessor events
+class MongoAssertMacroPPCallbacks : public clang::PPCallbacks {
+public:
+    explicit MongoAssertMacroPPCallbacks(MongoAssertCheck& Check) : Check(Check) {}
+
+    void MacroExpands(const clang::Token& MacroNameTok,
+                      const clang::MacroDefinition& MD,
+                      SourceRange Range,
+                      const MacroArgs* Args) override {
+        if (MacroNameTok.getIdentifierInfo()->getName() == "assert") {
+            Check.diag(Range.getBegin(),
+                       "Illegal use of the bare assert macro, use a macro function from "
+                       "assert_util.h instead");
+        }
+    }
+
+private:
+    MongoAssertCheck& Check;
+};
+
 MongoAssertCheck::MongoAssertCheck(StringRef Name, clang::tidy::ClangTidyContext* Context)
     : ClangTidyCheck(Name, Context) {}
 
-// Custom AST Matcher that checks if an expression is an 'assert' macro expansion
-AST_MATCHER(Expr, isAssertMacroExpansion) {
-
-    // Return false if the expression is not a macro expansion
-    if (!Node.getBeginLoc().isMacroID()) {
-        return false;
-    }
-
-    auto& SM = Finder->getASTContext().getSourceManager();
-    auto MacroLoc = SM.getImmediateMacroCallerLoc(Node.getBeginLoc());
-
-    // Get the name of the macro being expanded
-    llvm::StringRef MacroSpellingRef =
-        clang::Lexer::getImmediateMacroName(MacroLoc, SM, Finder->getASTContext().getLangOpts());
-    std::string Spelling = MacroSpellingRef.str();
-
-    if (Spelling == "assert") {
-        // Check if the file name contains "assert.h"
-        // <cassert> will also be caught because it redirects to assert.h
-        auto FileName = SM.getFilename(SM.getSpellingLoc(MacroLoc));
-
-        return llvm::StringRef(FileName).contains("assert.h") &&
-            !llvm::StringRef(FileName).contains("src/mongo/unittest/assert.h");
-    }
-    return false;
-}
-
-void MongoAssertCheck::registerMatchers(ast_matchers::MatchFinder* Finder) {
-
-    // Add the custom matcher 'isAssertMacroExpansion' to the MatchFinder
-    Finder->addMatcher(expr(isAssertMacroExpansion()).bind("assertMacroExpansion"), this);
-}
-
-void MongoAssertCheck::check(const ast_matchers::MatchFinder::MatchResult& Result) {
-
-    // Check assert macro expansion
-    const auto* AssertMacroExpansion = Result.Nodes.getNodeAs<Expr>("assertMacroExpansion");
-    if (AssertMacroExpansion) {
-        diag(AssertMacroExpansion->getBeginLoc(),
-             "Illegal use of the bare assert function, use a function from assert_util.h instead");
-    }
+void MongoAssertCheck::registerPPCallbacks(const clang::SourceManager& SM,
+                                           clang::Preprocessor* PP,
+                                           clang::Preprocessor* ModuleExpanderpp) {
+    PP->addPPCallbacks(std::make_unique<MongoAssertMacroPPCallbacks>(*this));
 }
 
 }  // namespace mongo::tidy

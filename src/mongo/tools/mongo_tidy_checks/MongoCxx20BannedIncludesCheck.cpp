@@ -48,22 +48,22 @@ public:
                             llvm::StringRef FileName,
                             bool IsAngled,
                             clang::CharSourceRange FilenameRange,
-                            const clang::FileEntry* File,
+                            clang::OptionalFileEntryRef File,
                             llvm::StringRef SearchPath,
                             llvm::StringRef RelativePath,
-                            const clang::Module* Imported,
+                            const clang::Module* SuggestedModule,
+                            bool ModuleImported,
                             clang::SrcMgr::CharacteristicKind FileType) override {
 
-        if (FileName.equals("coroutine") || FileName.equals("format")) {
+        if (FileName == "coroutine" || FileName == "format") {
             Check.diag(FilenameRange.getBegin(),
                        "Use of prohibited %0%1%2 header. There are no override waivers issued for "
                        "this header. For questions please reach out to #cxx-discuss.")
                 << (IsAngled ? "<" : "\"") << FileName << (IsAngled ? ">" : "\"");
         }
 
-        if (FileName.equals("syncstream") || FileName.equals("ranges") ||
-            FileName.equals("barrier") || FileName.equals("latch") ||
-            FileName.equals("semaphore")) {
+        if (FileName == "syncstream" || FileName == "ranges" || FileName == "barrier" ||
+            FileName == "latch" || FileName == "semaphore") {
             Check.diag(FilenameRange.getBegin(),
                        "Use of prohibited %0%1%2 header. There are override waivers issued for "
                        "this header. You need to follow the process in PM-3140 to override this "

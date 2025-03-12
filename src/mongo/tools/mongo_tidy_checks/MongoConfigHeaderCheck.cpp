@@ -50,7 +50,7 @@ public:
         if (ConfigHeaderIncluded)
             return;
         llvm::StringRef macroName = MacroNameTok.getIdentifierInfo()->getName();
-        if (macroName.startswith("MONGO_CONFIG_")) {
+        if (macroName.starts_with("MONGO_CONFIG_")) {
             Check.diag(Loc, "MONGO_CONFIG define used without prior inclusion of config.h");
         }
     }
@@ -110,13 +110,14 @@ public:
                             llvm::StringRef FileName,
                             bool IsAngled,
                             clang::CharSourceRange FilenameRange,
-                            const clang::FileEntry* File,
+                            clang::OptionalFileEntryRef File,
                             llvm::StringRef SearchPath,
                             llvm::StringRef RelativePath,
-                            const clang::Module* Imported,
+                            const clang::Module* SuggestedModule,
+                            bool ModuleImported,
                             clang::SrcMgr::CharacteristicKind FileType) override {
 
-        if (FileName.equals("mongo/config.h")) {
+        if (FileName == "mongo/config.h") {
             ConfigHeaderIncluded = true;
         }
     }

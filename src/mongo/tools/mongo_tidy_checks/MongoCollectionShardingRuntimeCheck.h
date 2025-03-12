@@ -53,8 +53,8 @@ public:
                                         clang::tidy::ClangTidyContext* Context);
     void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
     void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
-    std::vector<std::string> exceptionDirs;
-    std::vector<std::string> exceptionFiles;
+    std::vector<llvm::StringRef> exceptionDirs;
+    std::vector<llvm::StringRef> exceptionFiles;
 };
 
 }  // namespace mongo::tidy

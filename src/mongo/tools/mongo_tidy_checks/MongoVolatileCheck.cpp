@@ -52,13 +52,13 @@ void MongoVolatileCheck::check(const MatchFinder::MatchResult& Result) {
 
     if (var_match) {
         diag(var_match->getBeginLoc(),
-             "Illegal use of the volatile storage keyword, use AtomicWord instead from "
-             "\"mongo/platform/atomic_word.h\"");
+             "Illegal use of the volatile storage keyword, use Atomic instead from "
+             "\"mongo/platform/atomic.h\"");
     }
     if (field_match) {
         diag(field_match->getBeginLoc(),
-             "Illegal use of the volatile storage keyword, use AtomicWord instead from "
-             "\"mongo/platform/atomic_word.h\"");
+             "Illegal use of the volatile storage keyword, use Atomic instead from "
+             "\"mongo/platform/atomic.h\"");
     }
 }
 

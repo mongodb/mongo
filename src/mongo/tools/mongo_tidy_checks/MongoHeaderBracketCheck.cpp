@@ -42,9 +42,11 @@ namespace mongo::tidy {
 
 namespace {
 
-bool startsWithAny(llvm::StringRef fullString, std::vector<std::string> const& startings) {
-    return std::any_of(startings.cbegin(), startings.cend(), [&](llvm::StringRef starting) {
-        return fullString.startswith(starting);
+bool containsAny(llvm::StringRef fullString, clang::ArrayRef<clang::StringRef> const& patterns) {
+    return std::any_of(patterns.begin(), patterns.end(), [&](llvm::StringRef pattern) {
+        // Ensure the pattern ends with a directory delimiter to avoid matching partial names.
+        auto patternStr = pattern.str();
+        return fullString.contains(llvm::StringRef(std::filesystem::path(patternStr) / ""));
     });
 }
 
@@ -61,10 +63,11 @@ public:
                             llvm::StringRef FileName,
                             bool IsAngled,
                             clang::CharSourceRange FilenameRange,
-                            const clang::FileEntry* File,
+                            clang::OptionalFileEntryRef File,
                             llvm::StringRef SearchPath,
                             llvm::StringRef RelativePath,
-                            const clang::Module* Imported,
+                            const clang::Module* SuggestedModule,
+                            bool ModuleImported,
                             clang::SrcMgr::CharacteristicKind FileType) override {
 
         // This represents the full path from the project root directory
@@ -82,13 +85,13 @@ public:
         }
 
         // if this is a mongo source file including a real file
-        if (!llvm::StringRef(origin_source_path).startswith("<built-in>:") &&
-            startsWithAny(llvm::StringRef(origin_source_path.lexically_normal()),
-                          Check.mongoSourceDirs)) {
+        if (!llvm::StringRef(origin_source_path).starts_with("<built-in>:") &&
+            containsAny(llvm::StringRef(origin_source_path.lexically_normal()),
+                        Check.mongoSourceDirs)) {
 
             // Check that the a third party header which is included from a mongo source file
             // is used angle brackets.
-            if (!IsAngled && !startsWithAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
+            if (!IsAngled && !containsAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
 
                 std::string Replacement = (llvm::Twine("<") + FileName + ">").str();
                 Check.diag(FilenameRange.getBegin(),
@@ -99,9 +102,9 @@ public:
 
             // Check that the a third party header which is in our vendored tree is not including
             // the third_party in the include path.
-            if (!startsWithAny(llvm::StringRef(header_path), Check.mongoSourceDirs) &&
-                llvm::StringRef(header_path).startswith("src/third_party") &&
-                FileName.startswith("third_party")) {
+            if (!containsAny(llvm::StringRef(header_path), Check.mongoSourceDirs) &&
+                llvm::StringRef(header_path).contains("src/third_party/") &&
+                FileName.contains("third_party/")) {
                 Check.diag(FilenameRange.getBegin(),
                            "third_party include '%0' should not start with 'third_party/'. The "
                            "included file should be useable in either context of system or "
@@ -111,11 +114,10 @@ public:
 
             // Check that the a mongo header which is included from a mongo source file
             // is used double quotes.
-            else if (IsAngled &&
-                     startsWithAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
+            else if (IsAngled && containsAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
                 // TODO(SERVER-95253): Explicitly handle third party headers inside of the
                 // enterprise module directory.
-                if (!FileName.startswith("bsoncxx/") && !FileName.startswith("mongocxx/")) {
+                if (!FileName.contains("bsoncxx/") && !FileName.contains("mongocxx/")) {
                     std::string Replacement = (llvm::Twine("\"") + FileName + "\"").str();
                     Check.diag(FilenameRange.getBegin(),
                                "mongo include '%0' should use double quotes")
@@ -143,7 +145,8 @@ MongoHeaderBracketCheck::MongoHeaderBracketCheck(llvm::StringRef Name,
     // Accept relative paths
     int origLength = static_cast<int>(mongoSourceDirs.size());
     for (int i = 0; i < origLength; i++) {
-        mongoSourceDirs.push_back(std::filesystem::current_path() / mongoSourceDirs[i]);
+        mongoSourceDirs.push_back(
+            llvm::StringRef(std::filesystem::current_path() / mongoSourceDirs[i].str()));
     }
 }
 

@@ -46,7 +46,7 @@ public:
     void registerPPCallbacks(const clang::SourceManager& SM,
                              clang::Preprocessor* PP,
                              clang::Preprocessor* ModuleExpanderPP) override;
-    std::vector<std::string> mongoSourceDirs;
+    std::vector<llvm::StringRef> mongoSourceDirs;
 };
 
 }  // namespace mongo::tidy

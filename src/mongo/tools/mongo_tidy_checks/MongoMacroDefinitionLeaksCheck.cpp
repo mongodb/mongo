@@ -32,6 +32,7 @@
 
 #include <clang/Lex/PPCallbacks.h>
 #include <clang/Lex/Preprocessor.h>
+#include <stack>
 
 namespace mongo::tidy {
 
@@ -80,7 +81,7 @@ public:
 
         if (Reason == EnterFile) {
             // Push the file to the stack
-            fileStack.push(CurrentFile->getName().str());
+            fileStack.push(CurrentFile->tryGetRealPathName().str());
             defineUndefDiff = 0;
         } else if (Reason == ExitFile && !fileStack.empty()) {
             // Get the top file from the stack

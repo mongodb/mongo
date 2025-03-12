@@ -193,14 +193,19 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = "Use of std::optional, use boost::optional instead."
+        opt = "mongo-std-optional-check,-warnings-as-errors"
         self.expected_output = [
-            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nvoid f(std::optional<std::string> parameterDeclTest) {",
-            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\n    std::optional<std::string> variableDeclTest;",
-            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\n    std::optional<int> fieldDeclTest = 5;",
-            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nvoid functionName(const std::optional<int>& referenceDeclTest) {",
-            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nstd::optional<std::string> functionReturnTypeDeclTest(StringData name);",
-            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nstd::optional<T> templateDeclTest;",
-            "Use of std::optional, use boost::optional instead.  [mongo-std-optional-check,-warnings-as-errors]\nusing std::optional;",
+            f"{msg}  [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (36, "void f(std::optional<std::string> parameterDeclTest) {"),
+                (37, "    std::optional<std::string> variableDeclTest;"),
+                (42, "    std::optional<int> fieldDeclTest = 5;"),
+                (46, "void functionName(const std::optional<int>& referenceDeclTest) {"),
+                (52, "std::optional<std::string> functionReturnTypeDeclTest(StringData name);"),
+                (55, "std::optional<T> templateDeclTest;"),
+                (57, "using std::optional;"),
+            ]
         ]
 
         self.run_clang_tidy()
@@ -213,10 +218,15 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = 'Illegal use of the volatile storage keyword, use Atomic instead from "mongo/platform/atomic.h"'
+        opt = "mongo-volatile-check,-warnings-as-errors"
         self.expected_output = [
-            'Illegal use of the volatile storage keyword, use AtomicWord instead from "mongo/platform/atomic_word.h" [mongo-volatile-check,-warnings-as-errors]\nvolatile int varVolatileTest;',
-            'Illegal use of the volatile storage keyword, use AtomicWord instead from "mongo/platform/atomic_word.h" [mongo-volatile-check,-warnings-as-errors]\n    volatile int fieldVolatileTest;',
-            'Illegal use of the volatile storage keyword, use AtomicWord instead from "mongo/platform/atomic_word.h" [mongo-volatile-check,-warnings-as-errors]\nvoid functionName(volatile int varVolatileTest) {}',
+            f"{msg} [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (31, "volatile int varVolatileTest;"),
+                (33, "    volatile int fieldVolatileTest;"),
+                (35, "void functionName(volatile int varVolatileTest) {}"),
+            ]
         ]
 
         self.run_clang_tidy()
@@ -229,9 +239,14 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = "Illegal use of prohibited tracing support, this is only for local development use and should not be committed."
+        opt = "mongo-trace-check,-warnings-as-errors"
         self.expected_output = [
-            "Illegal use of prohibited tracing support, this is only for local development use and should not be committed. [mongo-trace-check,-warnings-as-errors]\n    TracerProvider::initialize();",
-            "Illegal use of prohibited tracing support, this is only for local development use and should not be committed. [mongo-trace-check,-warnings-as-errors]\n    TracerProvider provider = TracerProvider::get();",
+            f"{msg} [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (12, "    TracerProvider::initialize();"),
+                (13, "    TracerProvider provider = TracerProvider::get();"),
+            ]
         ]
 
         self.run_clang_tidy()
@@ -244,9 +259,14 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = 'Illegal use of prohibited std::atomic<T>, use Atomic<T> or other types from "mongo/platform/atomic.h"'
+        opt = "mongo-std-atomic-check,-warnings-as-errors"
         self.expected_output = [
-            'Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types from "mongo/platform/atomic_word.h" [mongo-std-atomic-check,-warnings-as-errors]\nstd::atomic<int> atomic_var;',
-            'Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types from "mongo/platform/atomic_word.h" [mongo-std-atomic-check,-warnings-as-errors]\n    std::atomic<int> field_decl;',
+            f"{msg} [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (6, "std::atomic<int> atomic_var;"),
+                (10, "    std::atomic<int> field_decl;"),
+            ]
         ]
 
         self.run_clang_tidy()
@@ -260,7 +280,7 @@ class MongoTidyTests(unittest.TestCase):
         )
 
         self.expected_output = [
-            "error: Illegal use of the bare assert function, use a function from assert_util.h instead",
+            "error: Illegal use of the bare assert macro, use a macro function from assert_util.h instead",
         ]
 
         self.run_clang_tidy()
@@ -287,9 +307,14 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = "error: Illegal use of unstructured logging, this is only for local development use and should not be committed"
+        opt = "mongo-unstructured-log-check,-warnings-as-errors"
         self.expected_output = [
-            "error: Illegal use of unstructured logging, this is only for local development use and should not be committed [mongo-unstructured-log-check,-warnings-as-errors]\n    logd();",
-            "error: Illegal use of unstructured logging, this is only for local development use and should not be committed [mongo-unstructured-log-check,-warnings-as-errors]\n    doUnstructuredLogImpl();",
+            f"{msg} [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (11, "    logd();"),
+                (12, "    doUnstructuredLogImpl();"),
+            ]
         ]
 
         self.run_clang_tidy()
@@ -303,12 +328,17 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = "error: MONGO_CONFIG define used without prior inclusion of config.h"
+        opt = "mongo-config-header-check,-warnings-as-errors"
         self.expected_output = [
-            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#define MONGO_CONFIG_TEST1 1",
-            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#ifdef MONGO_CONFIG_TEST1",
-            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#if MONGO_CONFIG_TEST1 == 1",
-            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#ifndef MONGO_CONFIG_TEST2",
-            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#if defined(MONGO_CONFIG_TEST1)",
+            f"{msg} [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (4, "#define MONGO_CONFIG_TEST1 1"),
+                (6, "#ifdef MONGO_CONFIG_TEST1"),
+                (9, "#if MONGO_CONFIG_TEST1 == 1"),
+                (12, "#ifndef MONGO_CONFIG_TEST2"),
+                (15, "#if defined(MONGO_CONFIG_TEST1)"),
+            ]
         ]
         self.run_clang_tidy()
 
@@ -323,9 +353,17 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = (
+            "error: Illegal use of CollectionShardingRuntime outside of mongo/db/s/; "
+            "use CollectionShardingState instead; see src/mongo/db/s/collection_sharding_state.h for details."
+        )
+        opt = "mongo-collection-sharding-runtime-check,-warnings-as-errors"
         self.expected_output = [
-            'error: Illegal use of CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState instead; see src/mongo/db/s/collection_sharding_state.h for details. [mongo-collection-sharding-runtime-check,-warnings-as-errors]\n    CollectionShardingRuntime csr(5, "Test");',
-            'error: Illegal use of CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState instead; see src/mongo/db/s/collection_sharding_state.h for details. [mongo-collection-sharding-runtime-check,-warnings-as-errors]\n    int result = CollectionShardingRuntime::functionTest(7, "Test");',
+            f"{msg} [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (21, '    CollectionShardingRuntime csr(5, "Test");'),
+                (24, '    int result = CollectionShardingRuntime::functionTest(7, "Test");'),
+            ]
         ]
 
         self.run_clang_tidy()
@@ -386,9 +424,14 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = "error: Use of rand or srand, use <random> or PseudoRandom instead."
+        opt = "mongo-rand-check,-warnings-as-errors"
         self.expected_output = [
-            "error: Use of rand or srand, use <random> or PseudoRandom instead. [mongo-rand-check,-warnings-as-errors]\n    srand(time(0));",
-            "error: Use of rand or srand, use <random> or PseudoRandom instead. [mongo-rand-check,-warnings-as-errors]\n    int random_number = rand();",
+            f"{msg} [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (5, "    srand(time(0));"),
+                (6, "    int random_number = rand();"),
+            ]
         ]
 
         self.run_clang_tidy()
@@ -401,9 +444,14 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        msg = "error: Prefer using other mutex types over `WriteRarelyRWMutex`."
+        opt = "mongo-rwmutex-check,-warnings-as-errors"
         self.expected_output = [
-            "error: Prefer using other mutex types over `WriteRarelyRWMutex`. [mongo-rwmutex-check,-warnings-as-errors]\nWriteRarelyRWMutex mutex_vardecl;",
-            "error: Prefer using other mutex types over `WriteRarelyRWMutex`. [mongo-rwmutex-check,-warnings-as-errors]\n    WriteRarelyRWMutex mutex_fielddecl;",
+            f"{msg} [{opt}]\n{n:5} | {src}"
+            for n, src in [
+                (5, "WriteRarelyRWMutex mutex_vardecl;"),
+                (8, "    WriteRarelyRWMutex mutex_fielddecl;"),
+            ]
         ]
 
         self.run_clang_tidy()

@@ -98,7 +98,7 @@ buildvariants:
     tags: ["required", "bazel_check", "forbid_tasks_tagged_with_experimental"]
     expansions:
       <<: *linux-arm64-static-enterprise-compile-expansions
-      clang_tidy_toolchain: v4
+      clang_tidy_toolchain: v5
       build_mongot: true
       download_mongot_release: true
       compile_variant: *amazon-linux2023-arm64-static-compile
@@ -207,7 +207,7 @@ buildvariants:
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
         -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
-      clang_tidy_toolchain: v4
+      clang_tidy_toolchain: v5
       num_scons_unit_cc_jobs_available: 0.75
       compile_variant: *commit-queue
     depends_on: []
@@ -257,7 +257,7 @@ buildvariants:
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
         -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
-      clang_tidy_toolchain: v4
+      clang_tidy_toolchain: v5
       num_scons_unit_cc_jobs_available: 0.75
       compile_variant: *commit-queue-toolchain-v5
     depends_on: []

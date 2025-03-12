@@ -330,7 +330,6 @@ common --remote_upload_local_results=False
 
 # Settings specific for clang-tidy
 --config=clang-tidy
-common:clang-tidy --//bazel/config:clang_tidy_toolchain_version=v4
 common:clang-tidy --config=dbg
 common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests
 common:clang-tidy --//bazel/config:compiler_type=clang
@@ -340,17 +339,6 @@ common:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config_s
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=//:clang_tidy
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_additional_deps=//:toolchain_files
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_plugin_deps=//src/mongo/tools/mongo_tidy_checks:mongo_tidy_checks
-
-# clang-tidy config using the v4 toolchain
---config=clang-tidy-v4
-common:clang-tidy-v4 --config=clang-tidy
-common:clang-tidy --//bazel/config:mongo_toolchain_version=v4
-
-# clang-tidy config using the v5 toolchain
---config=clang-tidy-v5
-common:clang-tidy-v5 --config=clang-tidy
-common:clang-tidy-v5 --//bazel/config:mongo_toolchain_version=v5
-common:clang-tidy-v5 --//bazel/config:clang_tidy_toolchain_version=v5
 
 --config=mod-scanner
 common:mod-scanner --config=dbg

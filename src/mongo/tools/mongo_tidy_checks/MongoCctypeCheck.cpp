@@ -47,16 +47,17 @@ public:
                             llvm::StringRef FileName,
                             bool IsAngled,
                             clang::CharSourceRange FilenameRange,
-                            const clang::FileEntry* File,
+                            clang::OptionalFileEntryRef File,
                             llvm::StringRef SearchPath,
                             llvm::StringRef RelativePath,
-                            const clang::Module* Imported,
+                            const clang::Module* SuggestedModule,
+                            bool ModuleImported,
                             clang::SrcMgr::CharacteristicKind FileType) override {
 
         // match following cases
         // #include <cctype>
         // #include <ctype.h>
-        if (FileName.equals("cctype") || FileName.equals("ctype.h")) {
+        if (FileName == "cctype" || FileName == "ctype.h") {
             std::string Replacement = "\"mongo/util/ctype.h\"";
             Check.diag(FilenameRange.getBegin(),
                        "Use of prohibited %0%1%2 header, use \"mongo/util/ctype.h\"")

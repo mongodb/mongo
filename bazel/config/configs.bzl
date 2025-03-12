@@ -682,25 +682,3 @@ server_js = rule(
     implementation = lambda ctx: server_js_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
-
-# ============================
-# clang_tidy_toolchain_version
-# ============================
-
-clang_tidy_toolchain_version_values = ["auto", "v4", "v5"]
-
-clang_tidy_toolchain_version_provider = provider(
-    doc = "Choose which toolchain we use for clang-tidy",
-    fields = {"clang_tidy_toolchain_version": "Choose one of " + ", ".join(clang_tidy_toolchain_version_values)},
-)
-
-def clang_tidy_toolchain_version_impl(ctx):
-    clang_tidy_toolchain_version_value = ctx.build_setting_value
-    if clang_tidy_toolchain_version_value not in clang_tidy_toolchain_version_values:
-        fail(str(ctx.label) + "clang_tidy_toolchain_version allowed to take values {" + ", ".join(clang_tidy_toolchain_version_values) + "} but was set to unallowed value " + clang_tidy_toolchain_version_value)
-    return clang_tidy_toolchain_version_provider(clang_tidy_toolchain_version = clang_tidy_toolchain_version_value)
-
-clang_tidy_toolchain_version = rule(
-    implementation = clang_tidy_toolchain_version_impl,
-    build_setting = config.string(flag = True),
-)

@@ -47,12 +47,14 @@ MongoCollectionShardingRuntimeCheck::MongoCollectionShardingRuntimeCheck(
     // Accept relative paths
     int origLength = static_cast<int>(exceptionDirs.size());
     for (int i = 0; i < origLength; i++) {
-        exceptionDirs.push_back(std::filesystem::current_path() / exceptionDirs[i]);
+        exceptionDirs.push_back(
+            llvm::StringRef(std::filesystem::current_path() / exceptionDirs[i].str()));
     }
 
     origLength = static_cast<int>(exceptionFiles.size());
     for (int i = 0; i < origLength; i++) {
-        exceptionFiles.push_back(std::filesystem::current_path() / exceptionFiles[i]);
+        exceptionFiles.push_back(
+            llvm::StringRef(std::filesystem::current_path() / exceptionFiles[i].str()));
     }
 }
 
@@ -97,14 +99,14 @@ void MongoCollectionShardingRuntimeCheck::check(const MatchFinder::MatchResult& 
 
     // If the file path is in an exception directory, skip the check.
     for (const auto& dir : this->exceptionDirs) {
-        if (FilePath.startswith(dir)) {
+        if (FilePath.contains(dir)) {
             return;
         }
     }
 
     // If the file path is one of the exception files, skip the check.
     for (const auto& file : this->exceptionFiles) {
-        if (FilePath.equals(file)) {
+        if (FilePath == file) {
             return;
         }
     }

@@ -91,7 +91,7 @@ cc_library(
         "-Woverloaded-virtual",
         "-Wwrite-strings",
         "-Wsuggest-override",
-        "-Iexternal/mongo_toolchain_v4/stow/llvm-v4/include/",
+        "-Iexternal/mongo_toolchain_v5/stow/llvm-v5/include",
     ],
     local_defines = [
         "GTEST_HAS_RTTI=0",
@@ -109,7 +109,7 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = select({
-        "@//bazel/platforms:use_mongo_toolchain": ["@mongo_toolchain_v4//:llvm_headers"],
+        "@//bazel/platforms:use_mongo_toolchain": ["@mongo_toolchain_v5//:llvm_headers"],
         "//conditions:default": [],
     }),
 )
@@ -158,6 +158,7 @@ cc_shared_library(
         "-Wl,-O3",
         "-Wl,--gc-sections",
         "-Wl,-rpath,\\$ORIGIN/../lib",  # Ensure that the shared library can find its dependencies.
+        "-Wl,-rpath-link,external/mongo_toolchain_v5/stow/llvm-v5/lib",
     ],
     deps = [
         ":mongo_tidy_checks_static",

@@ -57,7 +57,7 @@ void MongoNoUniqueAddressCheck::check(const ast_matchers::MatchFinder::MatchResu
                 auto charRange =
                     Lexer::getAsCharRange(sm.getExpansionRange(attr->getLocation()), sm, lo);
                 auto originalMacro = Lexer::getSourceText(charRange, sm, lo);
-                if (originalMacro.equals("MONGO_COMPILER_NO_UNIQUE_ADDRESS")) {
+                if (originalMacro == "MONGO_COMPILER_NO_UNIQUE_ADDRESS") {
                     return;
                 }
             }

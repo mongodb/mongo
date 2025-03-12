@@ -99,6 +99,10 @@ if env.GetOption("ninja") == "disabled":
             ),
             "" if mongo_tidy_test_env.Verbose() else "Runnning mongo tidy checks unittests.",
         ),
+        ENV={
+            "MONGO_TOOLCHAIN_VERSION": env["MONGO_TOOLCHAIN_VERSION"],
+            "MONGO_TOOLCHAIN_FROM_BAZEL": "false",
+        },
     )
 
     mongo_tidy_test_env.Alias("+mongo-tidy-tests", test)
