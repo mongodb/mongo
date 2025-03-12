@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
@@ -76,6 +77,12 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
         if (!WiredTigerUtil::historyStoreStatistics(engine, subsection)) {
             LOGV2_DEBUG(10100101, 2, "WiredTiger is not ready to collect statistics.");
         }
+    }
+
+    {
+        BSONObjBuilder subsection(bob.subobjStart("connectionStats"));
+        subsection.appendNumber("cached idle session count",
+                                (long long)engine->getConnection().getIdleSessionsCount());
     }
 
     return bob.obj();
