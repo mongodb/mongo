@@ -44,6 +44,15 @@ namespace shard_local_catalog_operations {
  */
 std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx);
 
+/**
+ * Read database metadata for a specific database in the shard-local catalog.
+ *
+ * This function reads the database metadata from the replicated durable collection
+ * `config.shard.databases`.
+ */
+std::unique_ptr<DBClientCursor> readDatabaseMetadata(OperationContext* opCtx,
+                                                     const DatabaseName& dbName);
+
 }  // namespace shard_local_catalog_operations
 
 }  // namespace mongo

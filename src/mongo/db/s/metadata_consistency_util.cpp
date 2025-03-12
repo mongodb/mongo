@@ -60,6 +60,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/s/shard_local_catalog_operations.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
@@ -411,12 +412,7 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLo
     const ShardId& primaryShard) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
-    DBDirectClient client(opCtx);
-    FindCommandRequest findRequest{NamespaceString::kConfigShardDatabasesNamespace};
-    const auto dbNameStr =
-        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
-    findRequest.setFilter(BSON(DatabaseType::kDbNameFieldName << dbNameStr));
-    auto cursor = client.find(std::move(findRequest));
+    auto cursor = shard_local_catalog_operations::readDatabaseMetadata(opCtx, dbName);
 
     if (!cursor->more()) {
         inconsistencies.emplace_back(makeInconsistency(

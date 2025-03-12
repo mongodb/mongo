@@ -31,6 +31,7 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/find_command_gen.h"
+#include "mongo/s/catalog/type_database_gen.h"
 
 namespace mongo {
 
@@ -41,7 +42,28 @@ std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx)
     DBDirectClient client(opCtx);
 
     auto cursor = client.find(std::move(findOp));
-    tassert(9813600, "Failed to retrieve cursor", cursor);
+    tassert(9813600, "Failed to retrieve cursor while reading database metadata", cursor);
+
+    return cursor;
+}
+
+std::unique_ptr<DBClientCursor> readDatabaseMetadata(OperationContext* opCtx,
+                                                     const DatabaseName& dbName) {
+    DBDirectClient client(opCtx);
+
+    const auto dbNameStr =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+
+    FindCommandRequest findOp{NamespaceString::kConfigShardDatabasesNamespace};
+    findOp.setFilter(BSON(DatabaseType::kDbNameFieldName << dbNameStr));
+
+    auto cursor = client.find(std::move(findOp));
+
+    tassert(
+        10078300,
+        str::stream() << "Failed to retrieve cursor while reading database metadata for database: "
+                      << dbName.toStringForErrorMsg(),
+        cursor);
 
     return cursor;
 }
