@@ -387,7 +387,7 @@ public:
             shardResponses,
             mongosStageName,
             millisElapsed,
-            cmdObj,
+            originalCmdObj,
             &bodyBuilder);
     }
 
