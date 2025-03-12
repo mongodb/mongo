@@ -833,19 +833,22 @@ private:
 
     std::string _planSummary;
 
-    // The resource stats reported from the locker, recovery unit, and admission context that:
-    // 1. accrued outside of this operation (as positive)
-    // 2. accrued on this operation but is no longer reported by the resource (as negative)
+    // Tracks resource statistics from the locker and admission context that accrued outside the
+    // current operation.
     //
-    // This includes:
-    // * the snapshot of lock, recovery unit, and admission stats taken when this CurOp instance is
-    //   pushed to a CurOpStack (as positive)
-    // * the snapshot of lock stats and storage metrics taken when transaction resources are
-    //   unstashed to this operation context (as positive)
-    // * the snapshot of lock stats taken when transactions resources are stashed (as negative).
-    //   This captures the locker activity that happened on this operation before the locker is
-    //   released back to transaction resources.
-    // * the snapshot of storage metrics taken when the recovery unit is swapped off (as negative)
+    // This variable is used to compute the lock stats and storage metrics accrued specifically by
+    // this operation by subtracting its value from the final resource stats. For
+    // instance, if this variable holds a value of 5, and the total for that metric at the end of
+    // the operation is 9, then 4 (9 - 5) was accrued during the operation.
+    //
+    // Note that this variable accurately reflects metrics accrued outside the operation only when
+    // this CurOp is on top of the CurOpStack. When CurOp is stashed, this variable temporarily
+    // stores the value accrued by this operation as a negative number.
+    //
+    // Example:
+    // If the metric value is 5 with CurOp on the stack top, and after stashing at metric value 9,
+    // the accrued value of 4 (9 - 5) is stored as -4. Upon unstashing and seeing a metric value of
+    // 11, we calculate that 7 (11 - (-4)) was accrued outside of this operation.
     boost::optional<AdditiveResourceStats> _resourceStatsBase;
 
     SharedUserAcquisitionStats _userAcquisitionStats{std::make_shared<UserAcquisitionStats>()};
