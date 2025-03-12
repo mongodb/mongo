@@ -423,6 +423,14 @@ repos:
       - yum/redhat/8/mongodb-enterprise
       - yum/redhat/8Server/mongodb-enterprise
 
+  - name: rhel9
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.org
+    repos:
+      - yum/redhat/9/mongodb-org
+      - yum/redhat/9Server/mongodb-org
+
   - name: rhel90
     type: rpm
     edition: enterprise
