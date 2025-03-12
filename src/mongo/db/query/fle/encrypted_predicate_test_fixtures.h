@@ -42,6 +42,7 @@
 
 namespace mongo::fle {
 using TagMap = std::map<std::pair<StringData, int>, std::vector<PrfBlock>>;
+using StrTagMap = std::map<std::pair<StringData, StringData>, std::vector<PrfBlock>>;
 
 /*
  * The MockServerRewrite allows unit testing individual predicate rewrites without going through the

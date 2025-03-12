@@ -2865,6 +2865,7 @@ mongo_cc_library(
         "//src/mongo/db/query/fle:range_predicate.cpp",
         "//src/mongo/db/query/fle:range_validator.cpp",
         "//src/mongo/db/query/fle:server_rewrite.cpp",
+        "//src/mongo/db/query/fle:text_search_predicate.cpp",
         "//src/mongo/s:ns_targeter.h",
         "//src/mongo/s/write_ops:batch_write_exec.h",
     ],
@@ -2878,6 +2879,7 @@ mongo_cc_library(
         "//src/mongo/db/query/fle:range_validator.h",
         "//src/mongo/db/query/fle:server_rewrite.h",
         "//src/mongo/db/query/fle:server_rewrite_helper.h",
+        "//src/mongo/db/query/fle:text_search_predicate.h",
     ],
     deps = [
         ":dbdirectclient",
@@ -2927,6 +2929,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/fle:query_rewriter_test.cpp",
         "//src/mongo/db/query/fle:range_predicate_test.cpp",
         "//src/mongo/db/query/fle:range_validator_test.cpp",
+        "//src/mongo/db/query/fle:text_search_predicate_test.cpp",
     ],
     tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({
