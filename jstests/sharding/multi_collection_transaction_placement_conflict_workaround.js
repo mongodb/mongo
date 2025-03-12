@@ -247,7 +247,6 @@ const st = new ShardingTest({mongos: 1, shards: 2});
             assert.eq(2, coll3.find().itcount());
 
             // Now read coll3 within the transaction and expect to get a conflict.
-            // TODO (SERVER-86920): remove WriteConflict as an accepted error.
             let err = assert.throwsWithCode(() => {
                 if (command === 'find') {
                     sessionColl3.find().itcount();
@@ -256,7 +255,7 @@ const st = new ShardingTest({mongos: 1, shards: 2});
                 } else if (command === 'update') {
                     assert.commandWorked(sessionColl3.update({x: 1}, {$set: {c: 1}}));
                 }
-            }, [ErrorCodes.WriteConflict, ErrorCodes.SnapshotUnavailable]);
+            }, [ErrorCodes.SnapshotUnavailable]);
             assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
 
             // Transaction abort can race 'abort' before 'new transaction' command on participants,
