@@ -629,7 +629,7 @@ buildvariants:
           - rhel8.8-large
 
   - name: &linux-debug-aubsan-compile-grpc linux-debug-aubsan-compile-grpc
-    display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Compile with GRPC"
+    display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Compile with Ingress GRPC"
     tags: ["experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:

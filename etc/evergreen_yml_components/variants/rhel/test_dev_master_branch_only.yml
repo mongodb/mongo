@@ -245,7 +245,7 @@ buildvariants:
       - name: crypt_build_debug_and_test
 
   - name: &linux-x86-dynamic-grpc linux-x86-dynamic-grpc
-    display_name: "~ Linux x86 Shared Library Enterprise with GRPC"
+    display_name: "~ Linux x86 Shared Library Enterprise with Ingress GRPC"
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-xlarge
@@ -868,30 +868,6 @@ buildvariants:
       - name: .release_critical .requires_large_host !.publish
         distros:
           - rhel8.8-arm64-large
-
-  - name: enterprise-rhel-8-arm64-grpc-toolchain-v5
-    display_name: "Enterprise RHEL 8 arm64 GRPC (v5 toolchain)"
-    tags: []
-    run_on:
-      - rhel8.8-arm64-large
-    cron: "0 0 * * *" # Run once a day
-    stepback: false
-    expansions:
-      test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-      compile_flags: >-
-        --ssl
-        --dbg=on
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
-        --link-model=dynamic
-      compile_variant: enterprise-rhel-8-arm64-grpc-toolchain-v5
-      scons_cache_scope: shared
-    tasks:
-      - name: compile_test_parallel_unittest_stream_TG
-      - name: compile_test_parallel_core_stream_TG
-      - name: compile_test_parallel_dbtest_stream_TG
 
   - name: enterprise-rhel-93-64-bit-toolchain-v5
     display_name: "Enterprise RHEL 9.3 (v5 toolchain)"
