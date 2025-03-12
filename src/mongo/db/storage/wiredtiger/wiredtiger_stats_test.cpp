@@ -47,6 +47,7 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
@@ -83,6 +84,7 @@ protected:
             _path.path().c_str(), nullptr, "create,statistics=(fast),", &wtConnection));
         _conn = std::make_unique<WiredTigerConnection>(wtConnection, &_clockSource);
         _session = std::make_unique<WiredTigerSession>(_conn.get());
+        _session->setTickSource_forTest(&tickSourceMock);
         ASSERT_WT_OK(_session->create(_uri.c_str(),
                                       "type=file,key_format=q,value_format=u,log=(enabled=false)"));
     }
@@ -166,6 +168,7 @@ protected:
     unittest::TempDir _path{"wiredtiger_operation_stats_test"};
     std::string _uri{"table:wiredtiger_operation_stats_test"};
     ClockSourceMock _clockSource;
+    TickSourceMock<Microseconds> tickSourceMock;
     std::unique_ptr<WiredTigerConnection> _conn;
     std::unique_ptr<WiredTigerSession> _session;
     /* Number of reads the fixture will prepare in setUp(), consequently max amount of times read()
@@ -305,6 +308,40 @@ TEST_F(WiredTigerStatsTest, Clone) {
 
     stats += *clone;
     ASSERT_BSONOBJ_NE(stats.toBSON(), clone->toBSON());
+}
+
+TEST_F(WiredTigerStatsTest, StorageExecutionTime) {
+    auto getStorageExecutionTime = [&](WiredTigerSession& session) {
+        // querying stats also advances the tick source
+        tickSourceMock.setAdvanceOnRead(Microseconds{0});
+        WiredTigerStats stats{session};
+        BSONObj statsObj = stats.toBSON();
+        auto waitingObj = statsObj["timeWaitingMicros"];
+        if (waitingObj.eoo()) {
+            return 0LL;
+        }
+
+        auto storageExecutionTime = waitingObj["storageExecutionMicros"];
+        if (storageExecutionTime.eoo()) {
+            return 0LL;
+        }
+
+        return storageExecutionTime.Long();
+    };
+
+
+    ASSERT_EQ(getStorageExecutionTime(*_session), 0);
+    tickSourceMock.setAdvanceOnRead(Microseconds{200});
+    _session->checkpoint(nullptr);
+
+    auto storageExecutionTime = getStorageExecutionTime(*_session);
+    ASSERT_EQ(storageExecutionTime, 200);
+
+    tickSourceMock.setAdvanceOnRead(Microseconds{200});
+    _session->checkpoint(nullptr);
+
+    storageExecutionTime = getStorageExecutionTime(*_session);
+    ASSERT_EQ(storageExecutionTime, 400);
 }
 
 }  // namespace

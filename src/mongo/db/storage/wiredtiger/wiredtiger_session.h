@@ -35,9 +35,12 @@
 #include <wiredtiger.h>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/system_tick_source.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -102,10 +105,11 @@ public:
         return functor(_session);
     }
 
-#define WRAPPED_WT_SESSION_METHOD(name)                               \
-    template <typename... Args>                                       \
-    auto name(Args&&... args) {                                       \
-        return _session->name(_session, std::forward<Args>(args)...); \
+#define WRAPPED_WT_SESSION_METHOD(name)                                         \
+    decltype(auto) name(auto&&... args) {                                       \
+        Timer timer(_tickSource);                                               \
+        ON_BLOCK_EXIT([&] { _storageExecutionTime += timer.elapsed(); });       \
+        return _session->name(_session, std::forward<decltype(args)>(args)...); \
     }
 
     WRAPPED_WT_SESSION_METHOD(alter)
@@ -236,10 +240,21 @@ public:
      */
     void detachRecoveryUnit();
 
+    Microseconds getStorageExecutionTime() const {
+        return _storageExecutionTime;
+    }
+
     /**
      * Helper for WT_SESSION::get_last_error.
      */
     GetLastError getLastError();
+
+    /**
+     * Setter used for testing to allow tick source to be mocked.
+     */
+    void setTickSource_forTest(TickSource* tickSource) {
+        _tickSource = tickSource;
+    }
 
 private:
     class CachedCursor {
@@ -275,10 +290,15 @@ private:
 
     Date_t _idleExpireTime;
 
+    // Tracks the duration of the last WT_SESSION API call.
+    Microseconds _storageExecutionTime;
+
     // A set that contains the undo config strings for any reconfigurations we might have performed
     // on a session during the lifetime of this recovery unit. We use these to reset the session to
     // its default configuration before returning it to the session cache.
     stdx::unordered_set<std::string> _undoConfigStrings;
+
+    TickSource* _tickSource = globalSystemTickSource();
 };
 
 }  // namespace mongo

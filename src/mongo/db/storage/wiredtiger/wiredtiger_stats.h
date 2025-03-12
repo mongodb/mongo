@@ -57,7 +57,7 @@ public:
 
     std::unique_ptr<StorageStats> clone() const final;
 
-    WiredTigerStats& operator=(WiredTigerStats&&);
+    WiredTigerStats& operator=(WiredTigerStats&&) noexcept;
 
     StorageStats& operator+=(const StorageStats&) final;
 
@@ -73,14 +73,20 @@ private:
 private:
     // See src/third_party/wiredtiger/src/include/stat.h
     // which is derived from src/third_party/wiredtiger/dist/stat_data.py
-    int64_t bytes_read{0};
-    int64_t bytes_write{0};
-    int64_t lock_dhandle_wait{0};
-    int64_t txn_bytes_dirty{0};
-    int64_t read_time{0};
-    int64_t write_time{0};
-    int64_t lock_schema_wait{0};
-    int64_t cache_time{0};
+    int64_t _bytesRead{0};
+    int64_t _bytesWrite{0};
+    int64_t _lockDhandleWait{0};
+    int64_t _txnBytesDirty{0};
+    Microseconds _readTime{0};
+    Microseconds _writeTime{0};
+    int64_t _lockSchemaWait{0};
+    Microseconds _cacheTime{0};
+    // The latency for WiredTiger to interrupt cache eviction.
+    Microseconds _cacheTimeInterruptible{0};
+    // The time spent performing mandatory cache eviction.
+    Microseconds _cacheTimeMandatory{0};
+    // The duration of the last WT_SESSION API call.
+    Microseconds _storageExecutionTime{0};
 };
 
 inline WiredTigerStats operator-(WiredTigerStats lhs, const WiredTigerStats& rhs) {
