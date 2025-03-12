@@ -815,8 +815,8 @@ void ShardingChecksForUpdate::checkUpdateChangesShardKeyFields(
     const auto& newObj = newObjCopy ? *newObjCopy : newDoc.getObject();
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
-    ShardingWriteRouter shardingWriteRouter(opCtx, _collAcq.getCollectionPtr()->ns());
     checkUpdateChangesExistingShardKey(opCtx, newDoc, newObj, oldObj);
+    ShardingWriteRouter shardingWriteRouter(opCtx, _collAcq.getCollectionPtr()->ns());
     checkUpdateChangesReshardingKey(opCtx, shardingWriteRouter, newObj, oldObj);
 }
 
