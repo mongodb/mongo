@@ -37,6 +37,11 @@
 namespace mongo::timeseries {
 
 template <typename T>
+concept HasGetNs = requires(const T& t) {
+    t.getNs();
+};
+
+template <typename T>
 concept HasGetNamespace = requires(const T& t) {
     t.getNamespace();
 };
@@ -58,7 +63,7 @@ concept HasGetIsTimeseriesNamespace = requires(const T& t) {
 
 template <typename T>
 concept IsRequestableOnTimeseries =
-    HasGetNamespace<T> || HasGetNsString<T> || HasGetNamespaceOrUUID<T>;
+    HasGetNs<T> || HasGetNamespace<T> || HasGetNsString<T> || HasGetNamespaceOrUUID<T>;
 
 /**
  * Returns true if the timeseries namespace for this request has been already translated
@@ -86,6 +91,8 @@ requires IsRequestableOnTimeseries<T> mongo::NamespaceStringOrUUID getNamespaceO
         return request.getNamespace();
     } else if constexpr (HasGetNsString<T>) {
         return request.getNsString();
+    } else if constexpr (HasGetNs<T>) {
+        return request.getNs();
     } else {
         return request.getNamespaceOrUUID();
     }

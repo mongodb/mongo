@@ -646,26 +646,6 @@ bool attemptGroupedFLEInserts(OperationContext* opCtx,
     return false;
 }
 
-// A class that meets the type requirements for timeseries::isTimeseriesViewRequest.
-class TimeseriesBucketNamespace {
-public:
-    TimeseriesBucketNamespace() = delete;
-    TimeseriesBucketNamespace(const NamespaceString& ns, const OptionalBool& isTimeseriesNamespace)
-        : _ns(ns), _isTimeseriesNamespace(isTimeseriesNamespace) {}
-
-    const NamespaceString& getNamespace() const {
-        return _ns;
-    }
-
-    const OptionalBool& getIsTimeseriesNamespace() const {
-        return _isTimeseriesNamespace;
-    }
-
-private:
-    NamespaceString _ns;
-    OptionalBool _isTimeseriesNamespace{OptionalBool()};
-};
-
 /*
  * Helper function to flush timeseries insert ops grouped by the insertGrouper.
  */
@@ -748,8 +728,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
     setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opInsert, nsEntry, insertDocsObj);
 
     // Handle timeseries inserts.
-    TimeseriesBucketNamespace tsNs(nsString, nsEntry.getIsTimeseriesNamespace());
-    if (auto [isTimeseriesViewRequest, _] = timeseries::isTimeseriesViewRequest(opCtx, tsNs);
+    if (auto [isTimeseriesViewRequest, _] = timeseries::isTimeseriesViewRequest(opCtx, nsEntry);
         isTimeseriesViewRequest) {
         try {
             handleGroupedTimeseriesInserts(
@@ -1162,8 +1141,7 @@ void explainUpdateOp(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) {
     invariant(op);
-    TimeseriesBucketNamespace tsNs(nsEntry.getNs(), nsEntry.getIsTimeseriesNamespace());
-    auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, tsNs);
+    auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, nsEntry);
 
     auto updateRequest = UpdateRequest();
 
@@ -1203,8 +1181,7 @@ void explainDeleteOp(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) {
     invariant(op);
-    TimeseriesBucketNamespace tsNs(nsEntry.getNs(), nsEntry.getIsTimeseriesNamespace());
-    auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, tsNs);
+    auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, nsEntry);
 
     auto deleteRequest = DeleteRequest();
 
@@ -1370,9 +1347,7 @@ public:
 
             if (req.getRawData()) {
                 for (auto& nsEntry : req.getNsInfo()) {
-                    TimeseriesBucketNamespace tsNs(nsEntry.getNs(),
-                                                   nsEntry.getIsTimeseriesNamespace());
-                    nsEntry.setNs(timeseries::isTimeseriesViewRequest(opCtx, tsNs).second);
+                    nsEntry.setNs(timeseries::isTimeseriesViewRequest(opCtx, nsEntry).second);
                 }
             }
 
@@ -1619,8 +1594,8 @@ bool handleUpdateOp(OperationContext* opCtx,
             ? bulk_write_common::getStatementId(req, currentOpIdx)
             : kUninitializedStmtId;
 
-        TimeseriesBucketNamespace tsNs(nsEntry.getNs(), nsEntry.getIsTimeseriesNamespace());
-        auto [isTimeseriesViewRequest, bucketNs] = timeseries::isTimeseriesViewRequest(opCtx, tsNs);
+        auto [isTimeseriesViewRequest, bucketNs] =
+            timeseries::isTimeseriesViewRequest(opCtx, nsEntry);
 
         // Handle retryable timeseries updates.
         if (isTimeseriesViewRequest && opCtx->isRetryableWrite() &&
@@ -1803,7 +1778,6 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
     // case there is a mismatch in the mongos request provided versions and the local (shard's)
     // understanding of the version.
     for (const auto& nsInfo : req.getNsInfo()) {
-        auto& ns = nsInfo.getNs();
         auto& shardVersion = nsInfo.getShardVersion();
         auto& databaseVersion = nsInfo.getDatabaseVersion();
 
@@ -1817,11 +1791,11 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             // will be acquired with the bucket namespace. So we must initialize the
             // 'OperationShardingState' with the bucket namespace to trigger the shard version
             // checks.
-            TimeseriesBucketNamespace tsNs(ns, nsInfo.getIsTimeseriesNamespace());
+            //
             // The returned namespaceForSharding will be the timeseries system bucket collection if
             // the request is made on a timeseries collection. Otherwise, it will stay unchanged
             // (i.e. the namespace from the client request).
-            auto [_, namespaceForSharding] = timeseries::isTimeseriesViewRequest(opCtx, tsNs);
+            auto [_, namespaceForSharding] = timeseries::isTimeseriesViewRequest(opCtx, nsInfo);
 
             OperationShardingState::setShardRole(
                 opCtx, namespaceForSharding, shardVersion, databaseVersion);
