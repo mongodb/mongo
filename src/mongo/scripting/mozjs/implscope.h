@@ -107,6 +107,15 @@ namespace mongo {
 namespace mozjs {
 
 /**
+ * Error messages or error message prefixes.
+ */
+namespace ErrorMessage {
+const StringData kUncaughtException = "uncaught exception";
+const StringData kOutOfMemory = "Out of memory";
+const StringData kUnknownError = "Unknown Failure from JSInterpreter";
+}  // namespace ErrorMessage
+
+/**
  * Implementation Scope for MozJS
  *
  * The Implementation scope holds the actual mozjs runtime and context objects,
@@ -442,6 +451,18 @@ public:
     void setStatus(Status status);
 
     ModuleLoader* getModuleLoader() const;
+
+    /**
+     * getJSContextForTest and getGlobalForTest should only be used from implscope_test.cpp, as we
+     * need a way to expose these members for some JS API calls.
+     */
+    JSContext* getJSContextForTest() {
+        return _context;
+    }
+
+    JS::HandleObject getGlobalForTest() {
+        return _global;
+    }
 
 private:
     template <typename ImplScopeFunction>

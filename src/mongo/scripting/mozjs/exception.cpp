@@ -128,6 +128,14 @@ Status jsExceptionToStatus(JSContext* cx,
                            StringData altReason) {
     auto scope = getScope(cx);
 
+    // It's possible that we have an uncaught exception for OOM, which is reported on the
+    // exception status of the JSContext. We must check for this OOM exception first to ensure
+    // we return the correct error code and message (i.e JSInterpreterFailure). This is consistent
+    // with MozJSImplScope::_checkForPendingException().
+    if (JS_IsThrowingOutOfMemoryException(cx, excn)) {
+        return Status(ErrorCodes::JSInterpreterFailure, ErrorMessage::kOutOfMemory);
+    }
+
     if (!excn.isObject()) {
         return Status(altCode, ValueWriter(cx, excn).toString());
     }

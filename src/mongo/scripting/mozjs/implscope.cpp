@@ -129,15 +129,6 @@ const int kStackChunkSize = 8192;
  */
 constexpr size_t kMaxErrorStringSize = logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024;
 
-/**
- * Error messages or error message prefixes.
- */
-namespace ErrorMessage {
-const StringData kUncaughtException = "uncaught exception";
-const StringData kOutOfMemory = "Out of memory";
-const StringData kUnknownError = "Unknown Failure from JSInterpreter";
-}  // namespace ErrorMessage
-
 const StringData kTestDataFieldName = "TestData";
 const StringData kLogFormatFieldName = "logFormat";
 const StringData kExtraAttrFieldName = "extraAttr";
@@ -347,7 +338,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     }();
 
     if (scope->_hasOutOfMemoryException) {
-        status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
+        status = Status(ErrorCodes::JSInterpreterFailure, ErrorMessage::kOutOfMemory);
     }
 
     if (!status.isOK())
