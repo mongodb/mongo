@@ -865,7 +865,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericAbs(value::TypeT
 
             return {false,
                     value::TypeTags::NumberInt32,
-                    value::bitcastFrom<int32_t>(operand >= 0 ? operand : -operand)};
+                    value::bitcastFrom<int32_t>(std::abs(operand))};
         }
         case value::TypeTags::NumberInt64: {
             auto operand = value::bitcastTo<int64_t>(operandValue);
@@ -875,13 +875,13 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericAbs(value::TypeT
             }
             return {false,
                     value::TypeTags::NumberInt64,
-                    value::bitcastFrom<int64_t>(operand >= 0 ? operand : -operand)};
+                    value::bitcastFrom<int64_t>(std::abs(operand))};
         }
         case value::TypeTags::NumberDouble: {
             auto operand = value::bitcastTo<double>(operandValue);
             return {false,
                     value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(operand >= 0 ? operand : -operand)};
+                    value::bitcastFrom<double>(std::abs(operand))};
         }
         case value::TypeTags::NumberDecimal: {
             auto operand = value::bitcastTo<Decimal128>(operandValue);
