@@ -22,7 +22,7 @@ const startPoint = db.getMongo().watch().getResumeToken();
 const numDocs = 8;
 
 // Generate a write workload for the change stream to consume.
-generateChangeStreamWriteWorkload(testDB, collName, numDocs);
+generateChangeStreamWriteWorkload(testDB, collName, numDocs, false /* includeInvalidatingEvents */);
 
 // Function to generate a list of all paths to be tested from those observed in the event stream.
 function traverseEvent(event, outputMap, prefixPath = "") {
