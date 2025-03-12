@@ -56,21 +56,29 @@ export const ThreadManager = function(clusterOptions) {
         }
 
         var requestedNumThreads = computeNumThreads();
+        var perLoadThreads = {};
+        var factor = 1;
         if (requestedNumThreads > maxAllowedThreads) {
             // Scale down the requested '$config.threadCount' values to make
             // them sum to less than 'maxAllowedThreads'
-            var factor = maxAllowedThreads / requestedNumThreads;
+            factor = maxAllowedThreads / requestedNumThreads;
             workloads.forEach(function(workload) {
                 var config = context[workload].config;
                 var threadCount = config.threadCount;
                 threadCount = Math.floor(factor * threadCount);
                 threadCount = Math.max(1, threadCount);  // ensure workload is executed
                 config.threadCount = threadCount;
+                perLoadThreads[workload] = threadCount;
             });
         }
 
         numThreads = computeNumThreads();
-        assert.lte(numThreads, maxAllowedThreads);
+        assert.lte(numThreads, maxAllowedThreads, tojson({
+                       'requestedNumThreads': requestedNumThreads,
+                       'maxAllowedThreads': maxAllowedThreads,
+                       'factor': factor,
+                       'perLoadThreads': perLoadThreads
+                   }));
         latch = new CountDownLatch(numThreads);
         errorLatch = new CountDownLatch(numThreads);
 

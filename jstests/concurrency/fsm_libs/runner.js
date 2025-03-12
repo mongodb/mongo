@@ -492,6 +492,11 @@ export const runner = (function() {
         prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);
 
         try {
+            // Overrides for main thread's execution of fsm_workload setup functions
+            if (typeof TestData.fsmPreOverridesLoadedCallback !== 'undefined') {
+                new Function(`${TestData.fsmPreOverridesLoadedCallback}`)();
+            }
+
             // Set up the thread manager for this set of foreground workloads.
             startTime = Date.now();
             threadMgr.init(workloads, context, maxAllowedThreads);
