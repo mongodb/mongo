@@ -155,6 +155,7 @@ let testCases = {
     _shardsvrBeginMigrationBlockingOperation: {skip: "internal command"},
     _shardsvrChangePrimary: {skip: "internal command"},
     _shardsvrCleanupReshardCollection: {skip: "internal command"},
+    _shardsvrCloneAuthoritativeMetadata: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "internal command"},
     _shardsvrRegisterIndex: {skip: "internal command"},
     _shardsvrCheckMetadataConsistency: {skip: "internal command"},

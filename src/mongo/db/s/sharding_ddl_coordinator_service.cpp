@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/s/add_shard_coordinator.h"
 #include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
+#include "mongo/db/s/clone_authoritative_metadata_coordinator.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/convert_to_capped_coordinator.h"
@@ -132,6 +133,9 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<RemoveShardCommitCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kAddShard:
             return std::make_shared<AddShardCoordinator>(service, std::move(initialState));
+        case DDLCoordinatorTypeEnum::kCloneAuthoritativeMetadata:
+            return std::make_shared<CloneAuthoritativeMetadataCoordinator>(service,
+                                                                           std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()

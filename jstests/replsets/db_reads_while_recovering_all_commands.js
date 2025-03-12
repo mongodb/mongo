@@ -92,6 +92,7 @@ const allCommands = {
     _shardsvrChangePrimary: {skip: isAnInternalCommand},
     _shardsvrCleanupStructuredEncryptionData: {skip: isPrimaryOnly},
     _shardsvrCleanupReshardCollection: {skip: isPrimaryOnly},
+    _shardsvrCloneAuthoritativeMetadata: {skip: isPrimaryOnly},
     _shardsvrCloneCatalogData: {skip: isPrimaryOnly},
     _shardsvrCompactStructuredEncryptionData: {skip: isPrimaryOnly},
     _shardsvrRegisterIndex: {skip: isPrimaryOnly},

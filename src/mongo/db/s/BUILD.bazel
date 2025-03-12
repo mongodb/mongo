@@ -248,6 +248,16 @@ idl_generator(
 )
 
 idl_generator(
+    name = "clone_authoritative_metadata_coordinator_gen",
+    src = "clone_authoritative_metadata_coordinator.idl",
+    deps = [
+        ":sharding_ddl_coordinator_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s/request_types:sharded_ddl_commands_gen",
+    ],
+)
+
+idl_generator(
     name = "collmod_coordinator_document_gen",
     src = "collmod_coordinator_document.idl",
     deps = [
@@ -1146,6 +1156,8 @@ mongo_cc_library(
         "cleanup_orphaned_cmd.cpp",
         "cleanup_structured_encryption_data_coordinator.cpp",
         "cleanup_structured_encryption_data_coordinator_gen",
+        "clone_authoritative_metadata_coordinator.cpp",
+        "clone_authoritative_metadata_coordinator_gen",
         "clone_catalog_data_command.cpp",
         "cluster_abort_transaction_cmd_d.cpp",
         "cluster_commit_transaction_cmd_d.cpp",
@@ -1197,6 +1209,7 @@ mongo_cc_library(
         "shardsvr_check_metadata_consistency_participant_command.cpp",
         "shardsvr_cleanup_reshard_collection_command.cpp",
         "shardsvr_cleanup_structured_encryption_data_command.cpp",
+        "shardsvr_clone_authoritative_metadata_command.cpp",
         "shardsvr_collmod_command.cpp",
         "shardsvr_collmod_participant_command.cpp",
         "shardsvr_commit_index_participant_command.cpp",
@@ -1322,6 +1335,7 @@ mongo_cc_library(
         "add_shard_coordinator.h",
         "analyze_shard_key_cmd_util.h",
         "cleanup_structured_encryption_data_coordinator.h",
+        "clone_authoritative_metadata_coordinator.h",
         "collmod_coordinator.h",
         "compact_structured_encryption_data_coordinator.h",
         "convert_to_capped_coordinator.h",

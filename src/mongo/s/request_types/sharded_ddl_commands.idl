@@ -866,3 +866,12 @@ commands:
                 description: "The database metadata to commit."
                 optional: true
         reply_type: OkReply
+
+    _shardsvrCloneAuthoritativeMetadata:
+        command_name: _shardsvrCloneAuthoritativeMetadata
+        cpp_name: ShardsvrCloneAuthoritativeMetadata
+        description: "Internal command to clone metadata from global catalog to the shard-local catalog"
+        strict: false
+        namespace: ignored
+        api_version: ""
+        reply_type: OkReply

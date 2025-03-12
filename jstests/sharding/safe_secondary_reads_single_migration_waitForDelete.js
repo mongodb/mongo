@@ -97,6 +97,7 @@ let testCases = {
     _shardsvrCheckMetadataConsistency: {skip: "internal command"},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: "internal command"},
     _shardsvrCleanupStructuredEncryptionData: {skip: "primary only"},
+    _shardsvrCloneAuthoritativeMetadata: {skip: "primary only"},
     _shardsvrCoordinateMultiUpdate: {skip: "primary only"},
     _shardsvrCompactStructuredEncryptionData: {skip: "primary only"},
     _shardsvrEndMigrationBlockingOperation: {skip: "primary only"},

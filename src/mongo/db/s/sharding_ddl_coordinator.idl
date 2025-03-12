@@ -62,6 +62,7 @@ enums:
             kCreateDatabase: "createDatabase"
             kRemoveShardCommit: "removeShardCommit"
             kAddShard: "addShard"
+            kCloneAuthoritativeMetadata: "cloneAuthoritativeMetadata"
 
 types:
     ForwardableOperationMetadata:

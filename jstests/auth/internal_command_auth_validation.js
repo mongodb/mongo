@@ -461,6 +461,10 @@ const internalCommandsMap = {
         testname: "_shardsvrCleanupReshardCollection",
         command: {_shardsvrCleanupReshardCollection: "test.x", reshardingUUID: UUID()},
     },
+    _shardsvrCloneAuthoritativeMetadata: {
+        testname: "_shardsvrCloneAuthoritativeMetadata",
+        command: {_shardsvrCloneAuthoritativeMetadata: 1, writeConcern: {w: "majority"}},
+    },
     _shardsvrCloneCatalogData: {
         testname: "_shardsvrCloneCatalogData",
         command: {_shardsvrCloneCatalogData: 'test', from: [], writeConcern: {w: "majority"}},
