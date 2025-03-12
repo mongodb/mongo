@@ -199,13 +199,29 @@ inline void waitForWriteConcern(OperationContext* opCtx,
     // approximation is to use the system’s last op time, which is guaranteed to be >= than the
     // original op time.
 
-    // Ensures that if we tried to do a write, we wait for write concern, even if that write was
-    // a noop. We do not need to update this for multi-document transactions as read-only/noop
-    // transactions will do a noop write at commit time, which should have incremented the
-    // lastOp. And speculative majority semantics dictate that "abortTransaction" should not
-    // wait for write concern on operations the transaction observed.
-    if (shard_role_details::getLocker(opCtx)->wasGlobalLockTakenForWrite() &&
-        !opCtx->inMultiDocumentTransaction()) {
+    // Ensures that we always wait for write concern, even if that write was a noop. We do not need
+    // to update this for multi-document transactions as read-only/noop transactions will do a noop
+    // write at commit time, which should have incremented the lastOp. And speculative majority
+    // semantics dictate that "abortTransaction" should not wait for write concern on operations the
+    // transaction observed.
+
+    // Aggregate and getMore requests can be read ops or write ops. We only want to wait for write
+    // concern if the op could have done a write (i.e. had any write stages in its pipeline).
+    // Aggregate::Invocation::isReadOperation will indicate whether the original agg request had
+    // any write stages in its pipeline, but GetMore::Invocation::isReadOperation will not, so we
+    // fall back to checking whether it took the global write lock for getMore.
+    // Also, aggregate requests with write stages can be processed on secondaries if the read
+    // concern specifies such. The secondariy will forward writes to the primary, and the primary
+    // will wait for write concern. The secondary should not wait for write concern.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    auto skipSettingLastOpToSystemOp = (replCoord && replCoord->getSettings().isReplSet() &&
+                                        !replCoord->getMemberState().primary()) ||
+        (invocation->isReadOperation() &&
+         invocation->definition()->getLogicalOp() != LogicalOp::opGetMore) ||
+        (invocation->definition()->getLogicalOp() == LogicalOp::opGetMore &&
+         !shard_role_details::getLocker(opCtx)->wasGlobalLockTakenForWrite());
+
+    if (!skipSettingLastOpToSystemOp && !opCtx->inMultiDocumentTransaction()) {
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         waitForWriteConcernAndAppendStatus();
