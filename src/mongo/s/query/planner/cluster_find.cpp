@@ -925,7 +925,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     auto cursorManager = Grid::get(opCtx)->getCursorManager();
 
     auto authzSession = AuthorizationSession::get(opCtx->getClient());
-    auto authChecker = [&authzSession](const boost::optional<UserName>& userName) -> Status {
+    AuthzCheckFn authChecker = [&authzSession](AuthzCheckFnInputType userName) -> Status {
         return authzSession->isCoauthorizedWith(userName)
             ? Status::OK()
             : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");

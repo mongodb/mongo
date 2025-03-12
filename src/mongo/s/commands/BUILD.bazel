@@ -201,6 +201,7 @@ mongo_cc_library(
         "//src/mongo/s/commands/query_cmd:cluster_pipeline_cmd_s.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_plan_cache_clear_cmd.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_profile_cmd.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_release_memory_cmd.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_write_cmd_s.cpp",
     ],
     hdrs = [

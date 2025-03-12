@@ -153,6 +153,20 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
     return next;
 }
 
+Status ClusterClientCursorImpl::releaseMemory() {
+    tassert(9745605, "releaseMemory should have a valid OperationContext", _opCtx);
+    auto interruptStatus = _opCtx->checkForInterruptNoAssert();
+    if (!interruptStatus.isOK()) {
+        return interruptStatus;
+    }
+
+    auto res = _root->releaseMemory();
+    if (res.isOK()) {
+        ++_numReturnedSoFar;
+    }
+    return res;
+}
+
 void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
     tassert(7448200,
             "Cannot kill a cluster client cursor that has already been killed",

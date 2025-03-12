@@ -77,6 +77,8 @@ public:
      */
     StatusWith<ClusterQueryResult> next(OperationContext*);
 
+    Status releaseMemory(OperationContext* opCtx);
+
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
         return _arm->setAwaitDataTimeout(awaitDataTimeout);
     }

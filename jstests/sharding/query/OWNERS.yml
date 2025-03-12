@@ -48,3 +48,6 @@ filters:
   - "update_delete_many_metrics.js":
     approvers:
       - 10gen/query-integration-observability
+  - "release_memory*":
+    approvers:
+      - 10gen/query-execution

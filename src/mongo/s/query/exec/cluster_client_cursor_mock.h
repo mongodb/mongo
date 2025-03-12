@@ -72,6 +72,8 @@ public:
 
     void kill(OperationContext* opCtx) final;
 
+    Status releaseMemory() final;
+
     void reattachToOperationContext(OperationContext* opCtx) final {
         _opCtx = opCtx;
     }

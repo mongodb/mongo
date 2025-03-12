@@ -125,7 +125,7 @@ public:
     void checkForFailedRequests();
 
     /**
-     * Take all cursors currently tracked by the CursorEstablsher.
+     * Take all cursors currently tracked by the CursorEstablisher.
      */
     std::vector<RemoteCursor> takeCursors() {
         return std::exchange(_remoteCursors, {});

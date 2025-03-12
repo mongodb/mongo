@@ -25,3 +25,7 @@ filters:
   - "cluster_profile_cmd.cpp":
     approvers:
       - 10gen/query-integration-observability
+  - "cluster_release_memory_cmd.cpp":
+    approvers:
+      - 10gen/query-execution
+      - 10gen/query-execution-client-cursor

@@ -1243,8 +1243,6 @@ const allCommands = {
         skip: isDeprecated,
     },
     releaseMemory: {
-        // TODO SERVER-97456 - remove this
-        skip: "Currently not supported in sharding",
         setUp: function(conn) {
             const db = conn.getDB(dbName);
             for (let i = 0; i < 10; i++) {

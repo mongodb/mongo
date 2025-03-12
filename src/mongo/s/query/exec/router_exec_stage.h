@@ -72,6 +72,13 @@ public:
      */
     virtual StatusWith<ClusterQueryResult> next() = 0;
 
+    virtual Status releaseMemory() {
+        tassert(9745608,
+                "router stage should have a child or provide alternative implementation",
+                _child);
+        return _child->releaseMemory();
+    }
+
     /**
      * Must be called before destruction to abandon a not-yet-exhausted plan. May block waiting for
      * responses from remote hosts.

@@ -1,7 +1,6 @@
 /**
  * Test basic case for releaseMemory command
  * @tags: [
- *   # TODO SERVER-97456 - this test should work with mongos when command is supported
  *   assumes_against_mongod_not_mongos,
  *   assumes_read_preference_unchanged,
  *   assumes_superuser_permissions,

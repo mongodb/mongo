@@ -73,6 +73,8 @@ public:
      */
     virtual StatusWith<ClusterQueryResult> next() = 0;
 
+    virtual Status releaseMemory() = 0;
+
     /**
      * Must be called before destruction to abandon a not-yet-exhausted cursor. If next() has
      * already returned boost::none, then the cursor is exhausted and is safe to destroy.

@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
+#include "mongo/db/query/client_cursor/release_memory_gen.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -387,10 +388,13 @@ AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk
 }
 
 void AsyncResultsMerger::_cancelCallbackForRemote(WithLock lk, const RemoteCursorPtr& remote) {
-    if (!remote->cbHandle.isValid()) {
-        return;
+    if (remote->cbHandle.isValid()) {
+        _executor->cancel(remote->cbHandle);
     }
-    _executor->cancel(remote->cbHandle);
+
+    if (remote->releaseMemoryCbHandle.isValid()) {
+        _executor->cancel(remote->releaseMemoryCbHandle);
+    }
 }
 
 void AsyncResultsMerger::_removeRemoteFromPromisedMinSortKeys(WithLock lk,
@@ -650,6 +654,51 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock,
 Status AsyncResultsMerger::scheduleGetMores() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _scheduleGetMores(lk);
+}
+
+
+stdx::shared_future<void> AsyncResultsMerger::releaseMemory(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (_releaseMemoryCompleteInfo) {
+        // There is already a 'releasMemoryCompleteInfo' future. Do not create another one.
+        return _releaseMemoryCompleteInfo->getFuture();
+    }
+
+    // Create a 'releasMemoryCompleteInfo' future, which will be signaled when all remotes have
+    // responded to the releaseMemory command.
+    _releaseMemoryCompleteInfo.emplace();
+
+    _status = _scheduleReleaseMemory(lk, opCtx);
+    if (!_status.isOK()) {
+        LOGV2_ERROR(
+            9745606, "Scheduling releaseMemory encountered an issue", "status"_attr = _status);
+        _releaseMemoryCompleteInfo->signalFutures();
+    }
+
+    if (!_haveOutstandingReleaseMemoryRequests(lk)) {
+        // Signal the future right now, as there's nothing to wait for.
+        _releaseMemoryCompleteInfo->signalFutures();
+    }
+
+    return _releaseMemoryCompleteInfo->getFuture();
+}
+
+Status AsyncResultsMerger::releaseMemoryResult(OperationContext* opCtx) {
+    if (!_status.isOK()) {
+        return _status;
+    }
+    for (const auto& remote : _remotes) {
+        // If we are done, all remotes should have sent a response.
+        tassert(9745603, "remote should have releaseMemoryResponse", remote->releaseMemoryResponse);
+        auto response = remote->releaseMemoryResponse.get();
+        Status responseStatus = getStatusFromCommandResult(response);
+        if (!responseStatus.isOK()) {
+            return responseStatus;
+        }
+    }
+
+    return Status::OK();
 }
 
 Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
@@ -974,6 +1023,20 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
     _signalCurrentEventIfReady(lk);  // Wake up anyone waiting on '_currentEvent'.
 }
 
+void AsyncResultsMerger::_handleReleaseMemoryResponse(WithLock lk,
+                                                      StatusWith<BSONObj>& parsedResponse,
+                                                      const RemoteCursorPtr& remote) {
+    // Got a response from remote, so indicate we are no longer waiting for one.
+    remote->releaseMemoryCbHandle = executor::TaskExecutor::CallbackHandle();
+    remote->releaseMemoryResponse = std::move(parsedResponse.getValue());
+
+
+    if (!_haveOutstandingReleaseMemoryRequests(lk)) {
+        tassert(9745604, "_releaseMemoryCompleteInfo should exist", _releaseMemoryCompleteInfo);
+        _releaseMemoryCompleteInfo->signalFutures();
+    }
+}
+
 void AsyncResultsMerger::_cleanUpKilledBatch(WithLock lk) {
     invariant(_lifecycleState == kKillStarted);
 
@@ -1082,6 +1145,12 @@ bool AsyncResultsMerger::_haveOutstandingBatchRequests(WithLock) {
     });
 }
 
+bool AsyncResultsMerger::_haveOutstandingReleaseMemoryRequests(WithLock) {
+    return std::any_of(_remotes.begin(), _remotes.end(), [](const auto& remote) {
+        return remote->releaseMemoryCbHandle.isValid();
+    });
+}
+
 void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opCtx) {
     invariant(_killCompleteInfo);
 
@@ -1135,6 +1204,61 @@ void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
                                 })
         .getStatus()
         .ignore();
+}
+
+Status AsyncResultsMerger::_scheduleReleaseMemory(WithLock, OperationContext* opCtx) {
+    std::vector<AsyncRequestsSender::Request> asyncRequests;
+    asyncRequests.reserve(_remotes.size());
+    for (auto& remote : _remotes) {
+        if (!remote->status.isOK()) {
+            return remote->status;
+        }
+
+        const std::vector<mongo::CursorId> params{remote->cursorId};
+        ReleaseMemoryCommandRequest releaseMemoryCmd(params);
+        releaseMemoryCmd.setDbName(remote->cursorNss.dbName());
+        BSONObjBuilder bob;
+        releaseMemoryCmd.serialize(&bob);
+
+        executor::RemoteCommandRequest executorRequest{
+            remote->getTargetHost(), remote->cursorNss.dbName(), bob.obj(), _opCtx};
+
+        LOGV2_DEBUG(99745600,
+                    2,
+                    "scheduling releaseMemory command",
+                    "remoteHost"_attr = remote->getTargetHost(),
+                    "shardId"_attr = remote->shardId.toString());
+
+        // Make a copy of the remote's cursorId here while holding the mutex. The copy is passed
+        // into the lambda so the cursorId can be accessed without holding the mutex.
+        const auto cursorId = remote->cursorId;
+        auto callbackStatus = _executor->scheduleRemoteCommand(
+            executorRequest,
+            [self = shared_from_this(), cursorId, remote /* intrusive_ptr copy! */](
+                auto const& cbData) {
+                // Parse response outside of the mutex.
+                auto parsedResponse = [&](const auto& cbData) -> StatusWith<BSONObj> {
+                    if (!cbData.response.isOK()) {
+                        return cbData.response.status;
+                    }
+
+                    // Not much to do here really.
+                    return std::move(cbData.response.data);
+                }(cbData);
+
+                // Handle the response and update the remote's status under the mutex.
+                stdx::lock_guard<stdx::mutex> lk(self->_mutex);
+                self->_handleReleaseMemoryResponse(lk, parsedResponse, remote);
+            });
+
+        if (!callbackStatus.isOK()) {
+            return callbackStatus.getStatus();
+        }
+
+        remote->releaseMemoryCbHandle = callbackStatus.getValue();
+    }
+
+    return Status::OK();
 }
 
 bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& remote) {

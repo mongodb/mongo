@@ -281,7 +281,7 @@ continuation-chaining member functions in [future.h][future], starting above the
 At some point, we may have no more continuations to add to a future chain, and will want to either
 synchronously extract the value or error held in the last future of the chain, or add a callback to
 asynchronously consume this value. The `.get()` and `.getAsync()` members of future-like types
-provide these facilities for terminating a future chain by extracting or asynchronouslyunsly
+provide these facilities for terminating a future chain by extracting or asynchronously
 consuming the result of the chain. The `.getAsync()` function works much like `.onCompletion()`,
 taking a `Status` or `StatusWith<T>` and running regardless of whether or not the previous link in
 the chain resolved with error or success, and running asynchronously when the previous results are

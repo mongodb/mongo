@@ -231,6 +231,12 @@ public:
      */
     Status scheduleGetMores();
 
+    stdx::shared_future<void> releaseMemory(OperationContext* opCtx);
+
+    // It merges the releaseMemory results from all the remote requests. At the moment it returns
+    // only a status but it can be extended to return more in the future.
+    Status releaseMemoryResult(OperationContext* opCtx);
+
     /**
      * Adds the specified shard cursors to the set of cursors to be merged.  The results from the
      * new cursors will be returned as normal through nextReady().
@@ -410,9 +416,13 @@ private:
 
         // The buffer of results that have been retrieved but not yet returned to the caller.
         std::queue<BSONObj> docBuffer;
+        // Keep outside the docBuffer so not to mess with buffered results from normal execution.
+        boost::optional<BSONObj> releaseMemoryResponse;
 
         // Is valid if there is currently a pending request to this remote.
         executor::TaskExecutor::CallbackHandle cbHandle;
+        // Different handle so that it does not override the handle for getMore.
+        executor::TaskExecutor::CallbackHandle releaseMemoryCbHandle;
 
         // Set to an error status if there is an error retrieving a response from this remote or if
         // the command result contained an error.
@@ -515,6 +525,10 @@ private:
                               StatusWith<CursorResponse>& response,
                               const RemoteCursorPtr& remote);
 
+    void _handleReleaseMemoryResponse(WithLock lk,
+                                      StatusWith<BSONObj>& response,
+                                      const RemoteCursorPtr& remote);
+
     /**
      * Schedule a killCursors request for the remote if the remote still has a cursor open.
      * This is a fire-and-forget attempt to close the remote cursor. We are not blocking until
@@ -562,6 +576,12 @@ private:
      * Returns true if this async cursor is waiting to receive another batch from a remote.
      */
     bool _haveOutstandingBatchRequests(WithLock);
+    /**
+     * Returns true if this async cursor is waiting to receive a response on a releaseMemory command
+     * from a remote.
+     */
+    bool _haveOutstandingReleaseMemoryRequests(WithLock);
+
 
     /**
      * Called internally when attempting to get a new event for the caller to wait on. Throws if
@@ -596,6 +616,11 @@ private:
      * Checks if we need to schedule a killCursor command for this remote
      */
     bool _shouldKillRemote(WithLock, const RemoteCursorData& remote);
+
+    /**
+     * Schedules a releaseMemory command to be run on all remote hosts that have stored cursors.
+     */
+    Status _scheduleReleaseMemory(WithLock, OperationContext* opCtx);
 
     /**
      * Updates the given remote's metadata (e.g. the cursor id) based on information in
@@ -733,11 +758,12 @@ private:
 
     // Handles the promise/future mechanism used to cleanly shut down the ARM. This avoids race
     // conditions in cases where the underlying TaskExecutor is simultaneously being torn down.
-    struct KillCompletePromiseFuture {
-        KillCompletePromiseFuture() : _future(_promise.get_future()) {}
+    struct CompletePromiseFuture {
+        CompletePromiseFuture() : _future(_promise.get_future()) {}
 
-        // Multiple calls to kill() can be made and each must return a future that will be
-        // notified when the ARM has been cleaned up.
+        // Multiple calls to the method that creates the promise (i.e., kill()/releaseMemory()) can
+        // be made and each must return a future that will be notified when the ARM has been cleaned
+        // up.
         stdx::shared_future<void> getFuture() {
             return _future;
         }
@@ -752,7 +778,9 @@ private:
         stdx::promise<void> _promise;
         stdx::shared_future<void> _future;
     };
-    boost::optional<KillCompletePromiseFuture> _killCompleteInfo;
+
+    boost::optional<CompletePromiseFuture> _killCompleteInfo;
+    boost::optional<CompletePromiseFuture> _releaseMemoryCompleteInfo;
 };
 
 }  // namespace mongo

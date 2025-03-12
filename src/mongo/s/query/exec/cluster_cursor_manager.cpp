@@ -78,6 +78,13 @@ Status cursorInUseStatus(CursorId cursorId) {
 
 }  // namespace
 
+/* Explicit instantiation of the templates to have available for linker. */
+template Status ClusterCursorManager::checkAuthCursor<AuthzCheckFnInputType>(
+    OperationContext* opCtx, CursorId cursorId, AuthzCheckFn func);
+
+template Status ClusterCursorManager::checkAuthCursor<ReleaseMemoryAuthzCheckFnInputType>(
+    OperationContext* opCtx, CursorId cursorId, ReleaseMemoryAuthzCheckFn func);
+
 ClusterCursorManager::PinnedCursor::PinnedCursor(ClusterCursorManager* manager,
                                                  ClusterClientCursorGuard&& cursorGuard,
                                                  const NamespaceString& nss,
@@ -226,7 +233,6 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         return cursorNotFoundStatus(cursorId);
     }
 
-    // Check if the user is coauthorized to access this cursor.
     auto authCheckStatus = authChecker(entry->getAuthenticatedUser());
     if (!authCheckStatus.isOK()) {
         return authCheckStatus.withContext(str::stream()
@@ -247,7 +253,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
 
     auto cursorGuard = entry->releaseCursor(opCtx);
 
-    // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
+    // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor. Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).
     if (cursorGuard->getLsid()) {
         auto vivifyCursorStatus =
@@ -264,9 +270,34 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }
 
+StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursorNoAuthCheck(
+    CursorId cursorId, OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (_inShutdown) {
+        return Status(ErrorCodes::ShutdownInProgress,
+                      "Cannot check out cursor as we are in the process of shutting down");
+    }
+
+    CursorEntry* entry = _getEntry(lk, cursorId);
+    if (!entry) {
+        return cursorNotFoundStatus(cursorId);
+    }
+
+    if (entry->getOperationUsingCursor()) {
+        return cursorInUseStatus(cursorId);
+    }
+
+    auto cursorGuard = entry->releaseCursor(opCtx);
+    cursorGuard->reattachToOperationContext(opCtx);
+
+    return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
+}
+
 void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cursor,
                                          CursorId cursorId,
-                                         CursorState cursorState) {
+                                         CursorState cursorState,
+                                         bool isReleaseMemory) {
     invariant(cursor);
     // Read the clock out of the lock.
     const auto now = _clockSource->now();
@@ -275,7 +306,9 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     OperationContext* opCtx = cursor->getCurrentOperationContext();
     invariant(opCtx);
     cursor->detachFromOperationContext();
-    cursor->setLastUseDate(now);
+    if (!isReleaseMemory) {
+        cursor->setLastUseDate(now);
+    }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -285,7 +318,9 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     // killPending will be true if killCursor() was called while the cursor was in use.
     const bool killPending = entry->isKillPending();
 
-    entry->setLastActive(now);
+    if (!isReleaseMemory) {
+        entry->setLastActive(now);
+    }
     entry->returnCursor(std::move(cursor));
 
     if (cursorState == CursorState::NotExhausted && !killPending) {
@@ -298,9 +333,10 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     detachAndKillCursor(std::move(lk), opCtx, cursorId);
 }
 
-Status ClusterCursorManager::checkAuthForKillCursors(OperationContext* opCtx,
-                                                     CursorId cursorId,
-                                                     AuthzCheckFn authChecker) {
+template <typename T>
+Status ClusterCursorManager::checkAuthCursor(OperationContext* opCtx,
+                                             CursorId cursorId,
+                                             std::function<Status(T)> authChecker) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto entry = _getEntry(lk, cursorId);
 
@@ -308,9 +344,7 @@ Status ClusterCursorManager::checkAuthForKillCursors(OperationContext* opCtx,
         return cursorNotFoundStatus(cursorId);
     }
 
-    // Note that getAuthenticatedUser() is thread-safe, so it's okay to call even if there's
-    // an operation using the cursor.
-    return authChecker(entry->getAuthenticatedUser());
+    return AuthzCheckPolicy<T>::authzCheck(entry, authChecker);
 }
 
 void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry) {

@@ -85,6 +85,8 @@ public:
 
     StatusWith<ClusterQueryResult> next() final;
 
+    Status releaseMemory() final;
+
     void kill(OperationContext* opCtx) final;
 
     void reattachToOperationContext(OperationContext* opCtx) final;

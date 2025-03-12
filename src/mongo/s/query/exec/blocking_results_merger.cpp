@@ -154,6 +154,7 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::blockUntilNext(OperationCo
 
     return _arm->nextReady();
 }
+
 StatusWith<ClusterQueryResult> BlockingResultsMerger::next(OperationContext* opCtx) {
     CurOp::get(opCtx)->ensureRecordRemoteOpWait();
 
@@ -161,6 +162,11 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::next(OperationContext* opC
     // cursors wait for ready() only until a specified time limit is exceeded.
     return (_tailableMode == TailableModeEnum::kTailableAndAwaitData ? awaitNextWithTimeout(opCtx)
                                                                      : blockUntilNext(opCtx));
+}
+
+Status BlockingResultsMerger::releaseMemory(OperationContext* opCtx) {
+    _arm->releaseMemory(opCtx).wait();
+    return _arm->releaseMemoryResult(opCtx);
 }
 
 StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEvent() {

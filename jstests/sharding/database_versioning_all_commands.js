@@ -693,6 +693,7 @@ let testCases = {
     refineCollectionShardKey: {skip: "not on a user database"},
     refreshLogicalSessionCacheNow: {skip: "goes through the cluster write path"},
     refreshSessions: {skip: "executes locally on mongos (not sent to any remote node)"},
+    releaseMemory: {skip: "requires a previously established cursor"},
     removeShard: {skip: "not on a user database"},
     removeShardFromZone: {skip: "not on a user database"},
     renameCollection: {

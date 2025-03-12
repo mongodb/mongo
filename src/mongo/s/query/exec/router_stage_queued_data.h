@@ -52,6 +52,12 @@ public:
 
     StatusWith<ClusterQueryResult> next() final;
 
+    Status releaseMemory() final {
+        // It has no children. It cannot do anything to release memory.
+        return Status::OK();
+    }
+
+
     void kill(OperationContext* opCtx) final;
 
     bool remotesExhausted() const final;

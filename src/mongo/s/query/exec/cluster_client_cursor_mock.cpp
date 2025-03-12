@@ -125,6 +125,10 @@ void ClusterClientCursorMock::kill(OperationContext* opCtx) {
     }
 }
 
+Status ClusterClientCursorMock::releaseMemory() {
+    return Status::OK();
+}
+
 bool ClusterClientCursorMock::isTailable() const {
     return false;
 }

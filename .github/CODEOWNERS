@@ -1155,6 +1155,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/query/**/stats.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/sharding/query/**/unowned_doc_filtering.js @10gen/query-execution-router-query-exec @svc-auto-approve-bot
 /jstests/sharding/query/**/update_delete_many_metrics.js @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/sharding/query/**/release_memory* @10gen/query-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/query/agg/OWNERS.yml
 /jstests/sharding/query/agg/**/* @10gen/query @svc-auto-approve-bot
@@ -2373,6 +2374,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_index_filter_cmd.cpp @10gen/query-execution-query-settings @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_plan_cache_clear_cmd.cpp @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_profile_cmd.cpp @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/s/commands/query_cmd/**/cluster_release_memory_cmd.cpp @10gen/query-execution @10gen/query-execution-client-cursor @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/migration_blocking_operation/OWNERS.yml
 /src/mongo/s/migration_blocking_operation/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot

@@ -1090,7 +1090,7 @@ public:
     /**
      * Checks if the client associated with the given OperationContext is authorized to run this
      * command.
-     * Command imlpementations MUST provide a method here, even if no authz checks are required.
+     * Command implementations MUST provide a method here, even if no authz checks are required.
      * Such commands should return Status::OK(), with a comment stating "No auth required".
      */
     virtual Status checkAuthForOperation(OperationContext* opCtx,

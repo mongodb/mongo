@@ -1,6 +1,5 @@
 /*
  * Run release memory auth test on a standalone mongod.
- * TODO SERVER-97456 - add sharded test
  * @tags: [
  *   requires_fcv_81
  * ]

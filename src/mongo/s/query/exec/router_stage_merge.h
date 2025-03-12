@@ -60,6 +60,11 @@ public:
         return _resultsMerger.next(getOpCtx());
     }
 
+    Status releaseMemory() final {
+        auto res = _resultsMerger.releaseMemory(getOpCtx());
+        return res;
+    }
+
     void kill(OperationContext* opCtx) final {
         _resultsMerger.kill(opCtx);
     }

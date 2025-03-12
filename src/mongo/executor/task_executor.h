@@ -228,7 +228,7 @@ public:
 
     /**
      * Same as waitForEvent without an OperationContext, but if the OperationContext gets
-     * interrupted, will return the kill code, or, if the the deadline passes, will return
+     * interrupted, will return the kill code, or, if the deadline passes, will return
      * Status::OK with cv_status::timeout.
      */
     virtual StatusWith<stdx::cv_status> waitForEvent(OperationContext* opCtx,
