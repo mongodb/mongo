@@ -618,7 +618,7 @@ public:
      * ServiceContext. Also, "opCtx" should never be deleted before this method returns. Finally,
      * the thread invoking this method must not hold the client and the service context locks.
      */
-    void delistOperation(OperationContext* opCtx) noexcept;
+    void delistOperation(OperationContext* opCtx);
 
     /**
      * Kills the operation "opCtx" with the code "killCode", if opCtx has not already been killed,
@@ -631,7 +631,7 @@ public:
      */
     void killAndDelistOperation(
         OperationContext* opCtx,
-        ErrorCodes::Error killError = ErrorCodes::OperationIsKilledAndDelisted) noexcept;
+        ErrorCodes::Error killError = ErrorCodes::OperationIsKilledAndDelisted);
 
     /**
      * Registers a listener to be notified each time an op is killed.
@@ -811,7 +811,7 @@ private:
      * operations are shortly deleted, this method should only be called after killing an operation
      * or in its destructor.
      */
-    void _delistOperation(OperationContext* opCtx) noexcept;
+    void _delistOperation(OperationContext* opCtx);
 
     stdx::mutex _mutex;
 

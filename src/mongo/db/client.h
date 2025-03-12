@@ -283,7 +283,7 @@ public:
      * Signal the client's OperationContext that it has been killed.
      * Any future OperationContext on this client will also receive a kill signal.
      */
-    void setKilled() noexcept;
+    void setKilled();
 
     /**
      * Get the state for killing the client's OperationContext.

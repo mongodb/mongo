@@ -40,13 +40,13 @@ namespace mongo {
  * If std::malloc() fails, reports error with stack trace and exit.
  */
 [[nodiscard]] MONGO_COMPILER_RETURNS_NONNULL MONGO_COMPILER_MALLOC
-    MONGO_COMPILER_ALLOC_SIZE(1) void* mongoMalloc(size_t size) noexcept;
+    MONGO_COMPILER_ALLOC_SIZE(1) void* mongoMalloc(size_t size);
 
 /**
  * Wrapper around std::realloc().
  * If std::realloc() fails, reports error with stack trace and exit.
  */
 [[nodiscard]] MONGO_COMPILER_RETURNS_NONNULL MONGO_COMPILER_ALLOC_SIZE(2) void* mongoRealloc(
-    void* ptr, size_t size) noexcept;
+    void* ptr, size_t size);
 
 }  // namespace mongo

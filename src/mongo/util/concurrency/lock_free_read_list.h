@@ -160,7 +160,7 @@ public:
         }
     }
 
-    Entry* add(T data) noexcept {
+    Entry* add(T data) {
         stdx::lock_guard lk(_updateMutex);
         if (!_freeList.empty()) {
             // We are just recycling an entry from the free-list, so all we have to do is checking
@@ -178,7 +178,7 @@ public:
         return entry;
     }
 
-    void remove(Entry* e) noexcept {
+    void remove(Entry* e) {
         auto entry = static_cast<EntryImpl*>(e);
         stdx::unique_lock lk(_updateMutex);
         entry->markDeletedAndAwaitReaders(lk);

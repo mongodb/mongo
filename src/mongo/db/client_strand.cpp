@@ -58,7 +58,7 @@ boost::intrusive_ptr<ClientStrand> ClientStrand::get(Client* client) {
     return getClientStrandData(client).strand;
 }
 
-void ClientStrand::_setCurrent() noexcept {
+void ClientStrand::_setCurrent() {
     invariant(_isBound.load());
     invariant(_client);
 
@@ -75,7 +75,7 @@ void ClientStrand::_setCurrent() noexcept {
     }
 }
 
-void ClientStrand::_releaseCurrent() noexcept {
+void ClientStrand::_releaseCurrent() {
     invariant(_isBound.load());
     invariant(!_client);
 

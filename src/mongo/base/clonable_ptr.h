@@ -172,7 +172,7 @@ private:
 
 public:
     /*! Destroys this pointer.  Functions like `std::unique_ptr`. */
-    inline ~clonable_ptr() noexcept = default;
+    inline ~clonable_ptr() = default;
 
     /*! Moves a value, by pointer.  Functions like `std::unique_ptr`. */
     inline clonable_ptr(clonable_ptr&&) noexcept(noexcept(CloneFactory{

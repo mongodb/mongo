@@ -618,7 +618,7 @@ public:
 
         // None of the code which resets this builder to the not-done state is expected to throw.
         // If it does, that would be a violation of our expectations.
-        ScopeGuard resetObjectState([this]() noexcept {
+        ScopeGuard resetObjectState([this]() {
             // Immediately after the buffer for the ephemeral space created by the call to `_done()`
             // is ready, reset our state to not-done.
             _doneCalled = false;

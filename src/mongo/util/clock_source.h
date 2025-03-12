@@ -73,7 +73,7 @@ public:
         StopWatch(ClockSource* clockSource) : StopWatch(clockSource, clockSource->now()) {}
         StopWatch(/** SystemClockSource::get() */);
 
-        Date_t now() noexcept {
+        Date_t now() {
             return _clockSource->now();
         }
 
@@ -85,7 +85,7 @@ public:
             return _start;
         }
 
-        auto elapsed() noexcept {
+        auto elapsed() {
             return now() - _start;
         }
 

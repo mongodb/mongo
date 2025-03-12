@@ -64,7 +64,7 @@ public:
 ClientOutOfLineExecutor::ClientOutOfLineExecutor() noexcept
     : _impl{std::make_unique<Impl>()}, _taskQueue{std::make_shared<QueueType>()} {}
 
-ClientOutOfLineExecutor::~ClientOutOfLineExecutor() noexcept {
+ClientOutOfLineExecutor::~ClientOutOfLineExecutor() {
     if (!_requireShutdown.load())
         return;
     invariant(_isShutdown);

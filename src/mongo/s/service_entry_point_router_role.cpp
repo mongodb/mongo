@@ -202,7 +202,7 @@ Future<DbResponse> ServiceEntryPointRouterRole::handleRequestImpl(OperationConte
 }
 
 Future<DbResponse> ServiceEntryPointRouterRole::handleRequest(OperationContext* opCtx,
-                                                              const Message& message) noexcept {
+                                                              const Message& message) {
     tassert(9391502,
             "Invalid ClusterRole in ServiceEntryPointRouterRole",
             opCtx->getService()->role().hasExclusively(ClusterRole::RouterServer));

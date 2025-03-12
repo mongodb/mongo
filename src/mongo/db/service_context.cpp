@@ -429,7 +429,7 @@ void ServiceContext::killOperation(ClientLock& clientLock,
     }
 }
 
-void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
+void ServiceContext::_delistOperation(OperationContext* opCtx) {
     auto client = opCtx->getClient();
     {
         stdx::lock_guard clientLock(*client);
@@ -445,7 +445,7 @@ void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
     opCtx->releaseOperationKey();
 }
 
-void ServiceContext::delistOperation(OperationContext* opCtx) noexcept {
+void ServiceContext::delistOperation(OperationContext* opCtx) {
     auto client = opCtx->getClient();
     invariant(client);
 
@@ -455,8 +455,7 @@ void ServiceContext::delistOperation(OperationContext* opCtx) noexcept {
     _delistOperation(opCtx);
 }
 
-void ServiceContext::killAndDelistOperation(OperationContext* opCtx,
-                                            ErrorCodes::Error killCode) noexcept {
+void ServiceContext::killAndDelistOperation(OperationContext* opCtx, ErrorCodes::Error killCode) {
 
     auto client = opCtx->getClient();
     invariant(client);

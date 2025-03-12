@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-void* mongoMalloc(size_t size) noexcept {
+void* mongoMalloc(size_t size) {
     void* x = std::malloc(size);
     if (x == nullptr) {
         reportOutOfMemoryErrorAndExit();
@@ -41,7 +41,7 @@ void* mongoMalloc(size_t size) noexcept {
     return x;
 }
 
-void* mongoRealloc(void* ptr, size_t size) noexcept {
+void* mongoRealloc(void* ptr, size_t size) {
     void* x = std::realloc(ptr, size);
     if (x == nullptr) {
         reportOutOfMemoryErrorAndExit();

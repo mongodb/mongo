@@ -40,8 +40,7 @@ class ServiceEntryPointRouterRole final : public ServiceEntryPoint {
 public:
     static Future<DbResponse> handleRequestImpl(OperationContext* opCtx, const Message& request);
 
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept final;
+    Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) final;
 };
 
 }  // namespace mongo

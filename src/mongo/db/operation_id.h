@@ -62,13 +62,13 @@ public:
 
     OperationIdManager();
 
-    static OperationIdManager& get(ServiceContext*) noexcept;
+    static OperationIdManager& get(ServiceContext*);
 
     /**
      * Issues the next OperationId from the client's lease. May acquire a lock on client's
      * `ServiceContext` if the client has exhausted it's lease.
      */
-    OperationId issueForClient(Client*) noexcept;
+    OperationId issueForClient(Client*);
 
     /**
      * Finds the client that holds the lease containing the OperationId -- the id itself will not

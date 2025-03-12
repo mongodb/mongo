@@ -69,7 +69,7 @@ struct alignas(64) LockEntry {
  */
 class LockEntryRegistry {
 public:
-    LockEntry* checkout() noexcept {
+    LockEntry* checkout() {
         stdx::lock_guard lk(_mutex);
         if (MONGO_unlikely(_freeList.empty())) {
             _refill(lk);
@@ -81,7 +81,7 @@ public:
         return lockEntry;
     }
 
-    void release(LockEntry* lockEntry) noexcept {
+    void release(LockEntry* lockEntry) {
         invariant(lockEntry->entry.load() == nullptr,
                   "Thread destroyed while holding on to a WriteRarelyRWMutex read lock");
         stdx::lock_guard lk(_mutex);
@@ -90,7 +90,7 @@ public:
     }
 
     template <typename CallbackType>
-    inline void visitLocks(CallbackType callback) noexcept {
+    inline void visitLocks(CallbackType callback) {
         for (auto bh = _blockHoldersHead.load(); bh; bh = bh->next) {
             for (auto& lockEntry : bh->block->entries) {
                 callback(lockEntry.entry);
@@ -124,7 +124,7 @@ private:
         std::unique_ptr<MemoryBlock> block;
     };
 
-    MONGO_COMPILER_NOINLINE void _refill(WithLock) noexcept {
+    MONGO_COMPILER_NOINLINE void _refill(WithLock) {
         auto bh = std::make_unique<BlockHolder>();
         // The following assumes each `LockList` is zeroed out by its ctor.
         bh->block = std::make_unique<MemoryBlock>();
@@ -162,7 +162,7 @@ public:
         _reset();
     }
 
-    MONGO_COMPILER_NOINLINE auto initialize() noexcept {
+    MONGO_COMPILER_NOINLINE auto initialize() {
         _lockEntry = globalLockRegistry().checkout();
         return _lockEntry;
     }
@@ -172,7 +172,7 @@ public:
     }
 
 private:
-    void _reset() noexcept {
+    void _reset() {
         if (_lockEntry) {
             globalLockRegistry().release(_lockEntry);
             _lockEntry = nullptr;
@@ -189,7 +189,7 @@ private:
 thread_local LockEntryHandle myLockHandle;
 thread_local constinit LockEntry* myLockEntry = nullptr;
 
-MONGO_COMPILER_NOINLINE MONGO_COMPILER_COLD_FUNCTION LockEntry* setupThreadLockEntry() noexcept {
+MONGO_COMPILER_NOINLINE MONGO_COMPILER_COLD_FUNCTION LockEntry* setupThreadLockEntry() {
     return (myLockEntry = myLockHandle.initialize());
 }
 
@@ -197,7 +197,7 @@ static constexpr int kRaisedWriteFlag = 1;  // Value indicating an active writer
 
 }  // namespace
 
-void WriteRarelyRWMutex::_lock() noexcept {
+void WriteRarelyRWMutex::_lock() {
     _writeMutex.lock();
     invariant(_writeFlag.load() == 0);
     _writeFlag.store(kRaisedWriteFlag);
@@ -210,21 +210,21 @@ void WriteRarelyRWMutex::_lock() noexcept {
     });
 }
 
-void WriteRarelyRWMutex::_unlock() noexcept {
+void WriteRarelyRWMutex::_unlock() {
     invariant(_writeFlag.load() == kRaisedWriteFlag);
     _writeFlag.store(0);
     _writeFlag.notifyAll();
     _writeMutex.unlock();
 }
 
-MONGO_COMPILER_NOINLINE void WriteRarelyRWMutex::_releaseSharedLockAndWaitForWriter() noexcept {
+MONGO_COMPILER_NOINLINE void WriteRarelyRWMutex::_releaseSharedLockAndWaitForWriter() {
     // Readers should await completion of the write, instead of spinning. We may want to change how
     // readers wait to also check for interruptions while waiting, if needed.
     _unlock_shared();
     _writeFlag.wait(kRaisedWriteFlag);
 }
 
-void WriteRarelyRWMutex::_lock_shared() noexcept {
+void WriteRarelyRWMutex::_lock_shared() {
     auto lockEntry = myLockEntry;
     if (MONGO_unlikely(!lockEntry)) {
         lockEntry = setupThreadLockEntry();
@@ -248,7 +248,7 @@ void WriteRarelyRWMutex::_lock_shared() noexcept {
     }
 }
 
-void WriteRarelyRWMutex::_unlock_shared() noexcept {
+void WriteRarelyRWMutex::_unlock_shared() {
     auto& entry = myLockEntry->entry;
     invariant(entry.loadRelaxed() == this,
               "Attempted to unlock a WriteRarelyRWMutex not held by this thread");

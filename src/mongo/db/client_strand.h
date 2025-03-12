@@ -196,7 +196,7 @@ private:
      *
      * This is only valid to call if no other thread has the Client bound.
      */
-    void _setCurrent() noexcept;
+    void _setCurrent();
 
     /**
      * Release the Client from the current thread.
@@ -204,7 +204,7 @@ private:
      * This is valid to call multiple times on the same thread. It is not valid to mix this with
      * Client::releaseCurrent().
      */
-    void _releaseCurrent() noexcept;
+    void _releaseCurrent();
 
     Client* const _clientPtr;
 

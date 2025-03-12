@@ -190,7 +190,7 @@ bool Client::hasAnyActiveCurrentOp() const {
     return false;
 }
 
-void Client::setKilled() noexcept {
+void Client::setKilled() {
     ClientLock lk(this);
     _killed.store(true);
     if (_opCtx) {

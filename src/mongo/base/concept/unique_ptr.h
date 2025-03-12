@@ -39,7 +39,7 @@ namespace concept {
     template <typename T>
     struct UniquePtr {
         /** The `UniquePtr< T >` must retire its pointer to `T` on destruction. */
-        ~UniquePtr() noexcept;
+        ~UniquePtr();
 
         UniquePtr(UniquePtr&& p);
         UniquePtr& operator=(UniquePtr&& p);

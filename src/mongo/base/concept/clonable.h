@@ -39,7 +39,7 @@ namespace concept {
      */
     struct Clonable {
         /*! Clonable objects must be safe to destroy, by pointer. */
-        virtual ~Clonable() noexcept = 0;
+        virtual ~Clonable() = 0;
 
         /*! Clonable objects can be cloned without knowing the actual dynamic type. */
         Constructible<UniquePtr<Clonable>> clone() const;

@@ -140,7 +140,7 @@ public:
     virtual TimeoutState run_until(ClockSource* clkSource, Date_t deadline) noexcept = 0;
 
 protected:
-    ~Waitable() noexcept {}
+    ~Waitable() = default;
 };
 
 }  // namespace mongo

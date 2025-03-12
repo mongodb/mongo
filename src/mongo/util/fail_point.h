@@ -460,7 +460,7 @@ public:
      *
      * @returns the number of times the fail point has been entered so far.
      */
-    EntryCountT waitForTimesEntered(EntryCountT targetTimesEntered) const noexcept {
+    EntryCountT waitForTimesEntered(EntryCountT targetTimesEntered) const {
         return waitForTimesEntered(Interruptible::notInterruptible(), targetTimesEntered);
     }
 

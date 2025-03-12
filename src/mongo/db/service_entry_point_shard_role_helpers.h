@@ -302,18 +302,18 @@ inline void appendReplyMetadata(OperationContext* opCtx,
     }
 }
 
-inline Status refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) noexcept {
+inline Status refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) {
     return FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
         opCtx, se.getDb(), se.getVersionReceived());
 }
 
-inline Status refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) noexcept {
+inline Status refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) {
     return FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
         opCtx, se.getNss(), se.getVersionReceived().placementVersion());
 }
 
-inline Status refreshCatalogCache(
-    OperationContext* opCtx, const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) noexcept {
+inline Status refreshCatalogCache(OperationContext* opCtx,
+                                  const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) {
     return Grid::get(opCtx)
         ->catalogCache()
         ->getCollectionRoutingInfo(opCtx, refreshInfo.getNss())
@@ -321,7 +321,7 @@ inline Status refreshCatalogCache(
 }
 
 inline void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
-                                                   const StaleConfigInfo& se) noexcept {
+                                                   const StaleConfigInfo& se) {
     resharding_metrics::onCriticalSectionError(opCtx, se);
 }
 
@@ -330,7 +330,7 @@ inline void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
 // lock.  This will cause mongod to perhaps erroneously check for write concern when no writes
 // were done, or unnecessarily kill a read operation.  If we re-use the opCtx to retry command
 // execution, we must reset the locker state.
-inline void resetLockerState(OperationContext* opCtx) noexcept {
+inline void resetLockerState(OperationContext* opCtx) {
     // It is necessary to lock the client to change the Locker on the OperationContext.
     ClientLock lk(opCtx->getClient());
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());

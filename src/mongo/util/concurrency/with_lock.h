@@ -70,18 +70,18 @@ namespace mongo {
  */
 struct WithLock {
     template <typename LatchT>
-    WithLock(stdx::lock_guard<LatchT> const&) noexcept {}
+    WithLock(stdx::lock_guard<LatchT> const&) {}
 
     template <typename LatchT>
-    WithLock(stdx::unique_lock<LatchT> const& lock) noexcept {
+    WithLock(stdx::unique_lock<LatchT> const& lock) {
         invariant(lock.owns_lock());
     }
 
     // Add constructors from any other lock types here.
 
     // Pass by value is OK.
-    WithLock(WithLock const&) noexcept {}
-    WithLock(WithLock&&) noexcept {}
+    WithLock(WithLock const&) = default;
+    WithLock(WithLock&&) noexcept = default;
 
     // No assigning WithLocks.
     void operator=(WithLock const&) = delete;
@@ -97,12 +97,12 @@ struct WithLock {
      * Produces a WithLock without benefit of any actual lock, for use in cases where a lock is not
      * really needed, such as in many (but not all!) constructors.
      */
-    static WithLock withoutLock() noexcept {
+    static WithLock withoutLock() {
         return {};
     }
 
 private:
-    WithLock() noexcept = default;
+    WithLock() = default;
 };
 
 }  // namespace mongo

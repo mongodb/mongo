@@ -52,7 +52,7 @@ public:
     static constexpr StateType kReadersCountMask = ~kWriteIntentMask;
     static constexpr StateType kReadersOverflowMask = 1 << 30;
 
-    void lock() noexcept {
+    void lock() {
         _writeMutex.lock();
         auto state = _state.fetchAndBitOr(kWriteIntentMask) | kWriteIntentMask;
         while (state & kReadersCountMask) {
@@ -62,13 +62,13 @@ public:
         }
     }
 
-    void unlock() noexcept {
+    void unlock() {
         _state.fetchAndBitXor(kWriteIntentMask);
         _state.notifyAll();
         _writeMutex.unlock();
     }
 
-    void lock_shared() noexcept {
+    void lock_shared() {
         if (auto state = _state.addAndFetch(1);
             MONGO_unlikely(_hasPendingWriterOrTooManyReaders(state))) {
             // A write is in progress. Clear the read intent and wait until we can lock for reading.
@@ -76,7 +76,7 @@ public:
         }
     }
 
-    void unlock_shared() noexcept {
+    void unlock_shared() {
         if (MONGO_unlikely(_state.subtractAndFetch(1) == kWriteIntentMask)) {
             // A writer is waiting and this is the last reader, so we need to notify the waiters.
             _state.notifyAll();
@@ -176,22 +176,22 @@ public:
 
     WriteRarelyRWMutex() = default;
 
-    auto writeLock() noexcept {
+    auto writeLock() {
         return WriteLock(this);
     }
 
-    auto readLock() noexcept {
+    auto readLock() {
         return ReadLock(this);
     }
 
 private:
-    void _releaseSharedLockAndWaitForWriter() noexcept;
+    void _releaseSharedLockAndWaitForWriter();
 
-    void _lock() noexcept;
-    void _unlock() noexcept;
+    void _lock();
+    void _unlock();
 
-    void _lock_shared() noexcept;
-    void _unlock_shared() noexcept;
+    void _lock_shared();
+    void _unlock_shared();
 
     friend bool isWriteFlagSet_forTest(const WriteRarelyRWMutex& mutex) {
         return mutex._writeFlag.load();

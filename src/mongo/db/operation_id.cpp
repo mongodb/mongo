@@ -44,7 +44,7 @@ namespace {
 const auto getOperationIdManager = ServiceContext::declareDecoration<OperationIdManager>();
 }  // namespace
 
-OperationIdManager& OperationIdManager::get(ServiceContext* svcCtx) noexcept {
+OperationIdManager& OperationIdManager::get(ServiceContext* svcCtx) {
     return (*svcCtx)[getOperationIdManager];
 }
 
@@ -102,7 +102,7 @@ namespace {
 const auto getClientState = Client::declareDecoration<ClientState>();
 }  // namespace
 
-OperationId OperationIdManager::issueForClient(Client* client) noexcept {
+OperationId OperationIdManager::issueForClient(Client* client) {
     auto getLease = [this, client](Lease* oldLease) {
         stdx::lock_guard lk(_mutex);
         auto lease = _pool->lease(lk);

@@ -2434,7 +2434,7 @@ void onHandleRequestException(const HandleRequest::ExecutionContext& context,
 }
 
 Future<DbResponse> ServiceEntryPointShardRole::handleRequest(OperationContext* opCtx,
-                                                             const Message& m) noexcept try {
+                                                             const Message& m) try {
     tassert(9391501,
             "Invalid ClusterRole in ServiceEntryPointShardRole",
             opCtx->getService()->role().hasExclusively(ClusterRole::ShardServer));

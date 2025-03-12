@@ -53,7 +53,7 @@ public:
     /**
      * Factory method.
      */
-    static constexpr DoubleDoubleSummation create(double sum, double addend) noexcept {
+    static constexpr DoubleDoubleSummation create(double sum, double addend) {
         return DoubleDoubleSummation(sum, addend);
     }
 
@@ -161,7 +161,7 @@ private:
     // using compensated addition.
     double _special = 0.0;
 
-    constexpr DoubleDoubleSummation(double sum, double addend) noexcept
+    constexpr DoubleDoubleSummation(double sum, double addend)
         : _sum(sum), _addend(addend), _special(sum) {}
 };
 }  // namespace mongo
