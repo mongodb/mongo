@@ -13,7 +13,6 @@ mongo_cc_library(
     name = "kv_drop_pending_ident_reaper",
     srcs = [
         "kv_drop_pending_ident_reaper.cpp",
-        "//src/mongo/db/catalog:import_options.h",
     ],
     hdrs = [
         "kv_drop_pending_ident_reaper.h",

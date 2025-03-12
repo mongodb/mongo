@@ -635,7 +635,10 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
     const NamespaceString& nss,
     const BSONObj& metadata,
     const BSONObj& storageMetadata,
-    const ImportOptions& importOptions) {
+    bool generateNewUUID,
+    bool panicOnCorruptWtMetadata,
+    bool repair,
+    bool skipIdentCollisionCheck) {
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
     invariant(nss.coll().size() > 0);
 
@@ -649,8 +652,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
             metadata.hasField("ident"));
 
     const auto& catalogEntry = [&] {
-        if (importOptions.importCollectionUUIDOption ==
-            ImportOptions::ImportCollectionUUIDOption::kGenerateNew) {
+        if (generateNewUUID) {
             // Generate a new UUID for the collection.
             md.options.uuid = UUID::gen();
             BSONObjBuilder catalogEntryBuilder;
@@ -689,7 +691,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
         };
 
         stdx::lock_guard<stdx::mutex> lk(_randLock);
-        while (!importOptions.skipIdentCollisionCheck &&
+        while (!skipIdentCollisionCheck &&
                (_hasEntryCollidingWithRand(lk) || identsToImportConflict(lk))) {
             _rand = _newRand();
         }
@@ -711,7 +713,9 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
         });
 
     auto kvEngine = _engine->getEngine();
-    Status status = kvEngine->importRecordStore(entry.ident, storageMetadata, importOptions);
+    Status status =
+        kvEngine->importRecordStore(entry.ident, storageMetadata, panicOnCorruptWtMetadata, repair);
+
     if (!status.isOK())
         return status;
 
@@ -719,7 +723,8 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
         status = kvEngine->importSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
                                                      indexIdent,
                                                      storageMetadata,
-                                                     importOptions);
+                                                     panicOnCorruptWtMetadata,
+                                                     repair);
         if (!status.isOK()) {
             return status;
         }

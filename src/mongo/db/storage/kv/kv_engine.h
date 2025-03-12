@@ -37,7 +37,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/import_options.h"
 #include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -137,7 +136,8 @@ public:
      */
     virtual Status importRecordStore(StringData ident,
                                      const BSONObj& storageMetadata,
-                                     const ImportOptions& importOptions) {
+                                     bool panicOnCorruptWtMetadata,
+                                     bool repair) {
         MONGO_UNREACHABLE;
     }
 
@@ -203,7 +203,8 @@ public:
     virtual Status importSortedDataInterface(RecoveryUnit&,
                                              StringData ident,
                                              const BSONObj& storageMetadata,
-                                             const ImportOptions& importOptions) {
+                                             bool panicOnCorruptWtMetadata,
+                                             bool repair) {
         MONGO_UNREACHABLE;
     }
 

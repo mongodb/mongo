@@ -97,7 +97,6 @@ mongo_cc_library(
         "wiredtiger_stats.h",
         "wiredtiger_util.h",
         "//src/mongo/db/catalog:health_log.h",
-        "//src/mongo/db/catalog:import_options.h",
         "//src/mongo/db/concurrency:deferred_writer.h",
         "//src/mongo/db/storage:journal_listener.h",
         "//src/mongo/db/storage:snapshot_manager.h",

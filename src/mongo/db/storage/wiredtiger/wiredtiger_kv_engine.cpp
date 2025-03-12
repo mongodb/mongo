@@ -1477,11 +1477,12 @@ Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
 
 Status WiredTigerKVEngine::importRecordStore(StringData ident,
                                              const BSONObj& storageMetadata,
-                                             const ImportOptions& importOptions) {
+                                             bool panicOnCorruptWtMetadata,
+                                             bool repair) {
     WiredTigerSession session(_connection.get());
 
-    std::string config = uassertStatusOK(
-        WiredTigerUtil::generateImportString(ident, storageMetadata, importOptions));
+    std::string config = uassertStatusOK(WiredTigerUtil::generateImportString(
+        ident, storageMetadata, panicOnCorruptWtMetadata, repair));
 
     string uri = _uri(ident);
     LOGV2_DEBUG(5095102,
@@ -1688,10 +1689,11 @@ Status WiredTigerKVEngine::createSortedDataInterface(RecoveryUnit& ru,
 Status WiredTigerKVEngine::importSortedDataInterface(RecoveryUnit& ru,
                                                      StringData ident,
                                                      const BSONObj& storageMetadata,
-                                                     const ImportOptions& importOptions) {
+                                                     bool panicOnCorruptWtMetadata,
+                                                     bool repair) {
 
-    std::string config = uassertStatusOK(
-        WiredTigerUtil::generateImportString(ident, storageMetadata, importOptions));
+    std::string config = uassertStatusOK(WiredTigerUtil::generateImportString(
+        ident, storageMetadata, panicOnCorruptWtMetadata, repair));
 
     LOGV2_DEBUG(5095103,
                 2,

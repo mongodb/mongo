@@ -318,7 +318,6 @@ mongo_cc_library(
     name = "durable_catalog",
     srcs = [
         "durable_catalog.cpp",
-        "//src/mongo/db/catalog:import_options.h",
         "//src/mongo/db/storage/kv:kv_engine.h",
     ],
     hdrs = [

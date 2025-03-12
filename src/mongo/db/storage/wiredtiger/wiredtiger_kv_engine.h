@@ -48,7 +48,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/import_options.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -307,14 +306,26 @@ public:
         StringData ident,
         const IndexDescriptor* desc) override;
 
+    /**
+     * panicOnCorruptWtMetadata - determines whether WT should panic or error upon corrupt metadata
+     * for a collection.
+     * true: WT will panic
+     * false: WT will error and the operation can be retried with repair=true
+     *
+     * repair - determines whether WT should try to reconstruct the collection metadata from the
+     * latest checkpoint. This requires reading the entire table and should only be used when
+     * absolutely required to ensure the import succeeds
+     */
     Status importRecordStore(StringData ident,
                              const BSONObj& storageMetadata,
-                             const ImportOptions& importOptions) override;
+                             bool panicOnCorruptWtMetadata,
+                             bool repair) override;
 
     Status importSortedDataInterface(RecoveryUnit&,
                                      StringData ident,
                                      const BSONObj& storageMetadata,
-                                     const ImportOptions& importOptions) override;
+                                     bool panicOnCorruptWtMetadata,
+                                     bool repair) override;
 
     /**
      * Drops the specified ident for resumable index builds.

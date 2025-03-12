@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/import_options.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
@@ -249,7 +248,10 @@ public:
                                               const NamespaceString& nss,
                                               const BSONObj& metadata,
                                               const BSONObj& storageMetadata,
-                                              const ImportOptions& importOptions);
+                                              bool generateNewUUID,
+                                              bool panicOnCorruptWtMetadata = true,
+                                              bool repair = false,
+                                              bool skipIdentCollisionCheck = false);
 
     Status renameCollection(OperationContext* opCtx,
                             const RecordId& catalogId,

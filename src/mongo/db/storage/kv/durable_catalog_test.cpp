@@ -55,7 +55,6 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/import_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
@@ -302,12 +301,11 @@ protected:
                      ->lookupCollectionByNamespace(operationContext(), nss));
 
         WriteUnitOfWork wuow(operationContext());
-        auto res = getCatalog()->importCollection(
-            operationContext(),
-            nss,
-            metadata,
-            storageMetadata,
-            ImportOptions(ImportOptions::ImportCollectionUUIDOption::kGenerateNew));
+        auto res = getCatalog()->importCollection(operationContext(),
+                                                  nss,
+                                                  metadata,
+                                                  storageMetadata,
+                                                  /*generateNewUUID= */ true);
         if (res.isOK()) {
             wuow.commit();
         }

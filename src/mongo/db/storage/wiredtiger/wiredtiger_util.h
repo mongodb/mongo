@@ -31,7 +31,6 @@
 
 #include <span>
 
-#include "mongo/db/catalog/import_options.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -140,7 +139,8 @@ public:
      */
     static StatusWith<std::string> generateImportString(StringData ident,
                                                         const BSONObj& storageMetadata,
-                                                        const ImportOptions& importOptions);
+                                                        bool panicOnCorruptWtMetadata,
+                                                        bool repair);
 
     /**
      * Creates the configuration string for the 'backup_restore_target' config option passed into
