@@ -90,6 +90,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -460,10 +461,11 @@ public:
             "ExpCtxDiagnostics",
             diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
-        if (collectionOrView->isView()) {
+        if (collectionOrView->isView() ||
+            timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, *collectionOrView)) {
             // Relinquish locks. The aggregation command will re-acquire them.
             collectionOrView.reset();
-            runDistinctOnView(opCtx, std::move(canonicalQuery), verbosity, replyBuilder);
+            runDistinctAsAgg(opCtx, std::move(canonicalQuery), verbosity, replyBuilder);
             return Status::OK();
         }
 
@@ -582,10 +584,11 @@ public:
                 .getAsync([](auto) {});
         }
 
-        if (collectionOrView->isView()) {
+        if (collectionOrView->isView() ||
+            timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, *collectionOrView)) {
             // Relinquish locks. The aggregation command will re-acquire them.
             collectionOrView.reset();
-            runDistinctOnView(
+            runDistinctAsAgg(
                 opCtx, std::move(canonicalQuery), boost::none /* verbosity */, replyBuilder);
             return true;
         }
@@ -728,14 +731,14 @@ public:
         return true;
     }
 
-    void runDistinctOnView(OperationContext* opCtx,
-                           std::unique_ptr<CanonicalQuery> canonicalQuery,
-                           boost::optional<ExplainOptions::Verbosity> verbosity,
-                           rpc::ReplyBuilderInterface* replyBuilder) const {
+    void runDistinctAsAgg(OperationContext* opCtx,
+                          std::unique_ptr<CanonicalQuery> canonicalQuery,
+                          boost::optional<ExplainOptions::Verbosity> verbosity,
+                          rpc::ReplyBuilderInterface* replyBuilder) const {
         const auto& nss = canonicalQuery->nss();
         const auto& dbName = nss.dbName();
         const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
-        const auto viewAggCmd =
+        const auto distinctAggCmd =
             OpMsgRequestBuilder::create(
                 vts,
                 dbName,
@@ -744,9 +747,9 @@ public:
         const auto serializationContext = vts != boost::none
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
-        auto viewAggRequest = aggregation_request_helper::parseFromBSON(
-            viewAggCmd, vts, verbosity, serializationContext);
-        viewAggRequest.setQuerySettings(canonicalQuery->getExpCtx()->getQuerySettings());
+        auto distinctAggRequest = aggregation_request_helper::parseFromBSON(
+            distinctAggCmd, vts, verbosity, serializationContext);
+        distinctAggRequest.setQuerySettings(canonicalQuery->getExpCtx()->getQuerySettings());
 
         auto curOp = CurOp::get(opCtx);
 
@@ -755,13 +758,13 @@ public:
         auto ownedQueryStatsKey = std::move(curOp->debug().queryStatsInfo.key);
         curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
 
-        // If running explain distinct on view, then aggregate is executed without privilege checks
+        // If running explain distinct as agg, then aggregate is executed without privilege checks
         // and without response formatting.
         if (verbosity) {
             uassertStatusOK(runAggregate(opCtx,
-                                         viewAggRequest,
-                                         {viewAggRequest},
-                                         viewAggCmd,
+                                         distinctAggRequest,
+                                         {distinctAggRequest},
+                                         distinctAggCmd,
                                          PrivilegeVector(),
                                          verbosity,
                                          replyBuilder));
@@ -770,13 +773,13 @@ public:
 
         const auto privileges = uassertStatusOK(
             auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
-                                            viewAggRequest.getNamespace(),
-                                            viewAggRequest,
+                                            distinctAggRequest.getNamespace(),
+                                            distinctAggRequest,
                                             false /* isMongos */));
         uassertStatusOK(runAggregate(opCtx,
-                                     viewAggRequest,
-                                     {viewAggRequest},
-                                     viewAggCmd,
+                                     distinctAggRequest,
+                                     {distinctAggRequest},
+                                     distinctAggCmd,
                                      privileges,
                                      verbosity,
                                      replyBuilder));

@@ -58,3 +58,5 @@ validateBuckets(bucketsDocs, numDocs);
 
 bucketsDocs = coll.find().rawData().toArray();
 validateBuckets(bucketsDocs, numDocs);
+
+assert.eq(numDocs, coll.distinct('_id').length);
