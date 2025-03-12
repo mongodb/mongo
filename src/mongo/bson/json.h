@@ -42,11 +42,6 @@
 
 namespace mongo {
 
-namespace fromjson_detail {
-/** Private implementation detail of fromjson. */
-BSONObj fromJsonImpl(const char* jsonString, size_t len);
-}  // namespace fromjson_detail
-
 /**
  * Create a BSONObj from a JSON <http://www.json.org>,
  * <http://www.ietf.org/rfc/rfc4627.txt> string.  In addition to the JSON
@@ -67,35 +62,8 @@ BSONObj fromJsonImpl(const char* jsonString, size_t len);
  *   - Otherwise, the message includes the character offset where parsing failed.
  */
 
-inline BSONObj fromjson(const char* str) {
-    return fromjson_detail::fromJsonImpl(str, strlen(str));
-}
 
-inline BSONObj fromjson(char* str) {
-    return fromjson_detail::fromJsonImpl(str, strlen(str));
-}
-
-inline BSONObj fromjson(const std::string& str) {
-    return fromjson_detail::fromJsonImpl(str.c_str(), str.size());
-}
-
-inline BSONObj fromjson(const str::stream& ss) {
-    return fromjson(std::string{ss});
-}
-
-/** Inefficiently promote to std::string, temporarily. */
-inline BSONObj fromjson(StringData str) {
-    return fromjson(std::string{str});
-}
-
-/** Decay arrays (literals) to `const char*`. */
-template <size_t N>
-BSONObj fromjson(const char (&str)[N]) {
-    return fromjson_detail::fromJsonImpl(str, N - 1);
-}
-
-/** Prevent conversion. Caller must choose a directly supported overload. */
-BSONObj fromjson(const auto& str) = delete;
+BSONObj fromjson(StringData str);
 
 /**
  * Tests whether the JSON string is an Array.
@@ -147,7 +115,7 @@ class JParse {
 
 public:
     constexpr static int kMaxDepth = BSONDepth::kDefaultMaxAllowableDepth;
-    explicit JParse(StringData str);
+    explicit JParse(StringData str) : _buf(str), _input(str) {}
 
     /*
      * Notation: All-uppercase symbols denote non-terminals; all other
@@ -181,6 +149,7 @@ public:
      *
      *   | new CONSTRUCTOR
      */
+
 private:
     Status value(StringData fieldName, BSONObjBuilder&, int depth);
 
@@ -512,7 +481,7 @@ private:
      * we reach the end of our buffer.  Do not update the pointer to our
      * buffer (same as calling readTokenImpl with advance=false).
      */
-    inline bool peekToken(const char* token);
+    inline bool peekToken(StringData token);
 
     /**
      * @return true if the given token matches the next non whitespace
@@ -520,7 +489,7 @@ private:
      * we reach the end of our buffer.  Updates the pointer to our
      * buffer (same as calling readTokenImpl with advance=true).
      */
-    inline bool readToken(const char* token);
+    inline bool readToken(StringData token);
 
     /**
      * @return true if the given token matches the next non whitespace
@@ -528,7 +497,7 @@ private:
      * we reach the end of our buffer.  Do not update the pointer to our
      * buffer if advance is false.
      */
-    bool readTokenImpl(const char* token, bool advance = true);
+    bool readTokenImpl(StringData token, bool advance = true);
 
     /**
      * @return true if the next field in our stream matches field.
@@ -581,28 +550,20 @@ private:
 
 public:
     inline int offset() const {
-        return (_input - _buf);
+        return _input.data() - _buf.data();
     }
 
     inline int length() const {
-        return (_input_end - _buf);
+        return _buf.size();
     }
 
 private:
-    /*
-     * _buf - start of our input buffer
-     * _input - cursor we advance in our input buffer
-     * _input_end - sentinel for the end of our input buffer
-     *
-     * _buf is the null terminated buffer containing the JSON std::string we
-     * are parsing.  _input_end points to the null byte at the end of
-     * the buffer.  strtoll, strtol, and strtod will access the null
-     * byte at the end of the buffer because they are assuming a c-style
-     * string.
+    /**
+     * _buf is the buffer containing the JSON string we are parsing.
+     * _input is the not-yet-parsed part of the buffer
      */
-    const char* const _buf;
-    const char* _input;
-    const char* const _input_end;
+    StringData _buf;
+    StringData _input;
 };
 
 }  // namespace mongo
