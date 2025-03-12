@@ -53,7 +53,11 @@ __wt_metadata_turtle_rewrite(WT_SESSION_IMPL *session)
 
     char *existing_config;
     WT_RET(__wti_turtle_read(session, WT_METAFILE_URI, &existing_config));
-    WT_RET(__wti_turtle_update(session, WT_METAFILE_URI, existing_config));
+
+    if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+        WT_RET(__wt_live_restore_turtle_update(session, WT_METAFILE_URI, existing_config, false));
+    else
+        WT_RET(__wt_turtle_update(session, WT_METAFILE_URI, existing_config));
 
     __wt_free(session, existing_config);
     return (0);
@@ -227,7 +231,10 @@ __wt_metadata_update(WT_SESSION_IMPL *session, const char *key, const char *valu
       __metadata_turtle(key) ? "" : "not ");
 
     if (__metadata_turtle(key)) {
-        WT_WITH_TURTLE_LOCK(session, ret = __wti_turtle_update(session, key, value));
+        if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+            ret = __wt_live_restore_turtle_update(session, key, value, true);
+        else
+            WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_update(session, key, value));
         return (ret);
     }
 

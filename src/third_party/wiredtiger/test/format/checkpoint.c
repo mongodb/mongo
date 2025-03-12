@@ -150,9 +150,9 @@ checkpoint(void *arg)
         testutil_assert(ret == 0 || (ret == EBUSY && ebusy_ok));
 
         if (ckpt_config == NULL)
-            trace_msg(session, "Checkpoint #%u stop", counter);
+            trace_msg(session, "Checkpoint #%u stop, ret=%d", counter, ret);
         else
-            trace_msg(session, "Checkpoint #%u stop (%s)", counter, ckpt_config);
+            trace_msg(session, "Checkpoint #%u stop (%s), ret=%d", counter, ckpt_config, ret);
 
         if (backup_locked)
             lock_writeunlock(session, &g.backup_lock);

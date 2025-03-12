@@ -105,23 +105,27 @@ __live_restore_worker_stop(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     server->threads_working--;
 
     if (server->threads_working == 0) {
-        /* If all the threads are stopped and the queue is empty, background migration is done. */
-        if (TAILQ_EMPTY(&server->work_queue))
+        if (!F_ISSET(S2C(session), WT_CONN_CLOSING)) {
             /*
-             * FIXME-WT-14113 This is currently the only location where we call live restore clean
-             * up, but it requires us to start up the background migration threads first. When
-             * WiredTiger starts in a post-background migration state, we should call live restore
-             * clean up directly instead of spinning up the server to eventually trigger clean up.
+             * If all the threads are stopped and the queue is empty, background migration is done.
              */
-            WT_ERR(__live_restore_clean_up(session, ctx));
+            if (TAILQ_EMPTY(&server->work_queue))
+                /*
+                 * FIXME-WT-14113 This is currently the only location where we call live restore
+                 * clean up, but it requires us to start up the background migration threads first.
+                 * When WiredTiger starts in a post-background migration state, we should call live
+                 * restore clean up directly instead of spinning up the server to eventually trigger
+                 * clean up.
+                 */
+                WT_ERR(__live_restore_clean_up(session, ctx));
 
-        /*
-         * Future proofing: in general unless the conn is closing the queue must be empty if there
-         * are zero threads working.
-         */
-        if (!F_ISSET(S2C(session), WT_CONN_CLOSING))
+            /*
+             * Future proofing: in general unless the conn is closing the queue must be empty if
+             * there are zero threads working.
+             */
             WT_ASSERT_ALWAYS(session, TAILQ_EMPTY(&server->work_queue),
               "All background migration threads have finished but there is still work to do!");
+        }
     }
 
 err:
@@ -309,7 +313,7 @@ __live_restore_init_work_queue(WT_SESSION_IMPL *session)
     /* Initialize the work queue. */
     TAILQ_INIT(&server->work_queue);
     __wt_verbose_debug1(
-      session, WT_VERB_FILEOPS, "%s", "Live restore server: Initializing the work queue");
+      session, WT_VERB_LIVE_RESTORE, "%s", "Live restore server: Initializing the work queue");
 
     WT_CURSOR *cursor;
     WT_RET(__wt_metadata_cursor(session, &cursor));

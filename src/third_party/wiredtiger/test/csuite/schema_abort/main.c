@@ -691,6 +691,7 @@ thread_run(void *arg)
     FILE *fp;
     THREAD_DATA *td;
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
+    WT_DECL_RET;
     WT_ITEM data;
     WT_SESSION *oplog_session, *session;
     uint64_t i, iter, reserved_ts, stable_ts;
@@ -835,11 +836,15 @@ thread_run(void *arg)
         data.size = __wt_random(&td->data_rnd) % MAX_VAL;
         data.data = cbuf;
         cur_coll->set_value(cur_coll, &data);
-        testutil_check(cur_coll->insert(cur_coll));
+        if ((ret = cur_coll->insert(cur_coll)) == WT_ROLLBACK)
+            goto rollback;
+        testutil_check(ret);
         data.size = __wt_random(&td->data_rnd) % MAX_VAL;
         data.data = obuf;
         cur_oplog->set_value(cur_oplog, &data);
-        testutil_check(cur_oplog->insert(cur_oplog));
+        if ((ret = cur_oplog->insert(cur_oplog)) == WT_ROLLBACK)
+            goto rollback;
+        testutil_check(ret);
         if (use_ts) {
             /*
              * Run with prepare every once in a while. And also yield after prepare sometimes too.
@@ -889,6 +894,13 @@ thread_run(void *arg)
          */
         if (fprintf(fp, "%" PRIu64 " %" PRIu64 "\n", stable_ts, i) < 0)
             testutil_die(EIO, "fprintf");
+
+        if (0) {
+rollback:
+            testutil_check(session->rollback_transaction(session, NULL));
+            if (use_prep)
+                testutil_check(oplog_session->rollback_transaction(oplog_session, NULL));
+        }
     }
     /* NOTREACHED */
 }

@@ -85,7 +85,7 @@ CONFIG configuration_list[] = {
 
 {"backup.incr_granularity", "incremental backup block granularity (KB)", 0x0, 4, 16384, 16384}
 
-{"backup.live_restore", "configure backup live restore recovery", C_BOOL, 0, 0, 0}
+{"backup.live_restore", "configure backup live restore recovery", C_BOOL, 25, 0, 0}
 
 {"backup.live_restore_read_size", "live restore read size (KB power of 2)", C_POW2, 1, 16384, 16384}
 

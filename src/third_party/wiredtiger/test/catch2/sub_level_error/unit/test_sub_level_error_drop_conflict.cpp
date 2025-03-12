@@ -155,7 +155,7 @@ TEST_CASE("Test conflicts with checkpoint/schema/table locks", "[sub_level_error
 
         utils::check_error_info(
           err_info_a, EBUSY, WT_CONFLICT_CHECKPOINT_LOCK, CONFLICT_CHECKPOINT_LOCK_MSG);
-        utils::check_error_info(err_info_b, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
+        utils::check_error_info(err_info_b, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
     SECTION("Test CONFLICT_SCHEMA_LOCK")
@@ -166,7 +166,7 @@ TEST_CASE("Test conflicts with checkpoint/schema/table locks", "[sub_level_error
 
         utils::check_error_info(
           err_info_a, EBUSY, WT_CONFLICT_SCHEMA_LOCK, CONFLICT_SCHEMA_LOCK_MSG);
-        utils::check_error_info(err_info_b, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
+        utils::check_error_info(err_info_b, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 #endif
 
@@ -177,7 +177,7 @@ TEST_CASE("Test conflicts with checkpoint/schema/table locks", "[sub_level_error
                                  REQUIRE(session_a->drop(session_a, URI, "lock_wait=0") == EBUSY););
 
         utils::check_error_info(err_info_a, EBUSY, WT_CONFLICT_TABLE_LOCK, CONFLICT_TABLE_LOCK_MSG);
-        utils::check_error_info(err_info_b, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
+        utils::check_error_info(err_info_b, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
     /* Drop the table once the tests are completed. */

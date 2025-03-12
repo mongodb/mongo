@@ -113,7 +113,7 @@ class test_error_info01(error_info_util, compact_util):
         codes/message should reflect the result of the most recent API call, regardless of whether
         it failed or succeeded.
         """
-        self.assert_error_equal(0, wiredtiger.WT_NONE, "")
+        self.assert_error_equal(0, wiredtiger.WT_NONE, "last API call was successful")
         self.test_success()
         self.test_einval_wt_background_compaction_already_running()
         self.test_ebusy_wt_uncommitted_data()
@@ -129,7 +129,7 @@ class test_error_info01(error_info_util, compact_util):
         Test that successive API calls with the same outcome result in the same error codes and
         message being stored. The codes/message should only change when the result changes.
         """
-        self.assert_error_equal(0, wiredtiger.WT_NONE, "")
+        self.assert_error_equal(0, wiredtiger.WT_NONE, "last API call was successful")
         self.test_success()
         self.test_success()
         self.test_einval_wt_background_compaction_already_running()

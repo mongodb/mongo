@@ -38,6 +38,10 @@ extern int __wt_live_restore_server_create(WT_SESSION_IMPL *session, const char 
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_live_restore_server_destroy(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_live_restore_turtle_rewrite(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_live_restore_turtle_update(WT_SESSION_IMPL *session, const char *key,
+  const char *value, bool take_turtle_lock) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_live_restore_validate_non_lr_system(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_os_live_restore_fs(WT_SESSION_IMPL *session, const char *cfg[],

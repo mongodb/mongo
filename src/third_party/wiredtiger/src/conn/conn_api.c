@@ -2647,6 +2647,7 @@ __conn_config_file_system(WT_SESSION_IMPL *session, const char *cfg[])
             WT_RET_MSG(
               session, EINVAL, "Live restore is not compatible with an in-memory connections");
 #ifdef _MSC_VER
+        /* FIXME-WT-14051 Add support for Windows */
         WT_RET_MSG(session, EINVAL, "Live restore is not supported on Windows");
 #endif
     }
@@ -2672,10 +2673,8 @@ __conn_config_file_system(WT_SESSION_IMPL *session, const char *cfg[])
         }
     }
 
-#ifndef _MSC_VER
     if (!live_restore_enabled)
         WT_RET(__wt_live_restore_validate_non_lr_system(session));
-#endif
 
     return (__conn_chk_file_system(session, F_ISSET(conn, WT_CONN_READONLY)));
 }
@@ -3061,10 +3060,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     WT_ERR(__wt_conf_compile_init(session, cfg));
     WT_ERR(__wti_conn_statistics_config(session, cfg));
-#ifndef _MSC_VER
-    /* FIXME-WT-14051 Add windows support. */
     __wt_live_restore_init_stats(session);
-#endif
     WT_ERR(__wti_sweep_config(session, cfg));
 
     /* Initialize the OS page size for mmap */

@@ -598,9 +598,9 @@ backup(void *arg)
 
         testutil_check(backup_cursor->close(backup_cursor));
         if (config == NULL)
-            trace_msg(session, "Backup #%u stop", counter);
+            trace_msg(session, "Backup #%u stop, ret=%d", counter, ret);
         else
-            trace_msg(session, "Backup #%u stop: (%s)", counter, config);
+            trace_msg(session, "Backup #%u stop: (%s), ret=%d", counter, config, ret);
 
         lock_writeunlock(session, &g.backup_lock);
         active_files_sort(active_now);

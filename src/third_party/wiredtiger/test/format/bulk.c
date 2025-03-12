@@ -223,7 +223,7 @@ table_load(TABLE *base, TABLE *table)
     if (g.transaction_timestamps_config)
         bulk_commit_transaction(session);
 
-    trace_msg(session, "=============== %s bulk load stop", table->uri);
+    trace_msg(session, "=============== %s bulk load stop, ret=%d", table->uri, ret);
     wt_wrap_close_session(session);
 
     /*

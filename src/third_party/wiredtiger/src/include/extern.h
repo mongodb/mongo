@@ -1035,6 +1035,8 @@ extern int __wt_turtle_exists(WT_SESSION_IMPL *session, bool *existp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_turtle_validate_version(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_activity_drain(WT_SESSION_IMPL *session)
@@ -1401,8 +1403,6 @@ extern int __wti_tree_walk_skip(WT_SESSION_IMPL *session, WT_REF **refp, uint64_
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_txn_checkpoint_logread(WT_SESSION_IMPL *session, const uint8_t **pp,
   const uint8_t *end, WT_LSN *ckpt_lsn) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
@@ -1541,6 +1541,7 @@ extern void __wt_session_dhandle_sweep(WT_SESSION_IMPL *session);
 extern void __wt_session_dhandle_writeunlock(WT_SESSION_IMPL *session);
 extern void __wt_session_gen_enter(WT_SESSION_IMPL *session, int which);
 extern void __wt_session_gen_leave(WT_SESSION_IMPL *session, int which);
+extern void __wt_session_reset_last_error(WT_SESSION_IMPL *session);
 extern void __wt_session_set_last_error(
   WT_SESSION_IMPL *session, int err, int sub_level_err, const char *fmt, ...);
 extern void __wt_stash_discard(WT_SESSION_IMPL *session);

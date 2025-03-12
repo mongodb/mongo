@@ -90,9 +90,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
      * Shut down server threads. Some of these threads access btree handles and eviction, shut them
      * down before the eviction server, and shut all servers down before closing open data handles.
      */
-#ifndef _MSC_VER
     WT_TRET(__wt_live_restore_server_destroy(session));
-#endif
     WT_TRET(__wti_background_compact_server_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));
     WT_TRET(__wti_statlog_destroy(session, true));
@@ -238,14 +236,12 @@ __wti_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
      */
     WT_RET(__wt_txn_recover(session, cfg));
 
-#ifndef _MSC_VER
     /*
      * If we're performing a live restore start the server. This is intentionally placed after
      * recovery finishes as we depend on the metadata file containing the list of objects that need
      * live restoration.
      */
     WT_RET(__wt_live_restore_server_create(session, cfg));
-#endif
 
     /* Initialize metadata tracking, required before creating tables. */
     WT_RET(__wt_meta_track_init(session));

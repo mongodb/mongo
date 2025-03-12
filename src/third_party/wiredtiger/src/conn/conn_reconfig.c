@@ -152,7 +152,10 @@ __wti_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
      * don't rewrite the turtle file if there is an error.
      */
     if (reconfig) {
-        WT_WITH_TURTLE_LOCK(session, ret = __wt_metadata_turtle_rewrite(session));
+        if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+            ret = __wt_live_restore_turtle_rewrite(session);
+        else
+            WT_WITH_TURTLE_LOCK(session, ret = __wt_metadata_turtle_rewrite(session));
         WT_RET(ret);
     }
 

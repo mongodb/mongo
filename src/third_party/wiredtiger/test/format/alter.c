@@ -72,7 +72,7 @@ alter(void *arg)
 
         while ((ret = session->alter(session, table->uri, buf)) != 0 && ret != EBUSY)
             testutil_die(ret, "session.alter");
-        trace_msg(session, "Alter #%u URI %s stop", counter, table->uri);
+        trace_msg(session, "Alter #%u URI %s stop, ret=%d", counter, table->uri, ret);
         while (period > 0 && !g.workers_finished) {
             --period;
             __wt_sleep(1, 0);

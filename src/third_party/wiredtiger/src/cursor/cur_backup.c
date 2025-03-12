@@ -982,10 +982,7 @@ __backup_list_uri_append(WT_SESSION_IMPL *session, const char *name, bool *skip)
     /* Add the metadata entry to the backup file. */
     WT_RET(__wt_metadata_search(session, name, &value));
 
-#ifndef _MSC_VER
-    /* FIXME-WT-14051 Add windows support. */
     WT_ERR(__wt_live_restore_clean_metadata_string(session, value));
-#endif
 
     WT_ERR(__wt_fprintf(session, cb->bfs, "%s\n%s\n", name, value));
     /*
