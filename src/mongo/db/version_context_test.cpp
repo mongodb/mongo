@@ -28,7 +28,11 @@
  */
 #include "mongo/db/version_context.h"
 
+#include <fmt/format.h>
+
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+#include "src/mongo/bson/bsonmisc.h"
 
 namespace mongo {
 namespace {
@@ -155,6 +159,84 @@ TEST(VersionContextTest, SerializeDeserialize) {
         ASSERT_TRUE(vCtxB.getOperationFCV().has_value());
         ASSERT_EQ(vCtxB.getOperationFCV()->getVersion(), fcv);
     }
+}
+
+// (Generic FCV reference): used for testing, should exist across LTS binary version
+constexpr auto kLastLTSFCVString = multiversion::toString(GenericFCV::kLastLTS);
+constexpr auto kLastContinuousFCVString = multiversion::toString(GenericFCV::kLastContinuous);
+constexpr auto kLatestFCVString = multiversion::toString(GenericFCV::kLatest);
+
+VersionContext makeFromOFCVString(StringData ofcvString) {
+    return VersionContext{BSON(VersionContextMetadata::kOFCVFieldName << ofcvString)};
+}
+VersionContext makeFromUpgradingOFCVString(StringData from, StringData to) {
+    return makeFromOFCVString(fmt::format("upgrading from {} to {}", from, to));
+}
+VersionContext makeFromDowngradingOFCVString(StringData from, StringData to) {
+    return makeFromOFCVString(fmt::format("downgrading from {} to {}", from, to));
+}
+
+TEST(VersionContextTest, DeserializeFromValidDocument) {
+    ASSERT_EQ(VersionContext{}, VersionContext{BSONObj()});
+
+    // (Generic FCV reference): used for testing, should exist across LTS binary version
+    ASSERT_EQ(VersionContext{GenericFCV::kLastLTS}, makeFromOFCVString(kLastLTSFCVString));
+    ASSERT_EQ(VersionContext{GenericFCV::kLastContinuous},
+              makeFromOFCVString(kLastContinuousFCVString));
+    ASSERT_EQ(VersionContext{GenericFCV::kLatest}, makeFromOFCVString(kLatestFCVString));
+
+    // (Generic FCV reference): used for testing, should exist across LTS binary version
+    ASSERT_EQ(VersionContext{GenericFCV::kUpgradingFromLastLTSToLatest},
+              makeFromUpgradingOFCVString(kLastLTSFCVString, kLatestFCVString));
+    ASSERT_EQ(VersionContext{GenericFCV::kUpgradingFromLastContinuousToLatest},
+              makeFromUpgradingOFCVString(kLastContinuousFCVString, kLatestFCVString));
+    if constexpr (multiversion::GenericFCV::kLastLTS != multiversion::GenericFCV::kLastContinuous) {
+        ASSERT_EQ(VersionContext{GenericFCV::kUpgradingFromLastLTSToLastContinuous},
+                  makeFromUpgradingOFCVString(kLastLTSFCVString, kLastContinuousFCVString));
+    }
+
+    // (Generic FCV reference): used for testing, should exist across LTS binary version
+    ASSERT_EQ(VersionContext{GenericFCV::kDowngradingFromLatestToLastLTS},
+              makeFromDowngradingOFCVString(kLatestFCVString, kLastLTSFCVString));
+    ASSERT_EQ(VersionContext{GenericFCV::kDowngradingFromLatestToLastContinuous},
+              makeFromDowngradingOFCVString(kLatestFCVString, kLastContinuousFCVString));
+
+    // Parsing is not strict, so unknown fields are tolerated
+    ASSERT_EQ(VersionContext{}, VersionContext{BSON("dummy" << true)});
+    ASSERT_EQ(VersionContext{GenericFCV::kLatest},
+              VersionContext{BSON(VersionContextMetadata::kOFCVFieldName << kLatestFCVString
+                                                                         << "dummy" << true)});
+}
+
+#define ASSERT_THROWS_BAD_VALUE(EXPRESSION) \
+    ASSERT_THROWS_CODE(EXPRESSION, DBException, ErrorCodes::BadValue)
+
+// Tests that deserializing an invalid input fails gracefully by throwing an exception.
+// This is important since VersionContext is exposed as a generic request argument.
+TEST(VersionContextTest, DeserializeFromInvalidDocument) {
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(""));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(" "));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("xyzzy"));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(fmt::format("{:x^1000000}", "")));  // Long string
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(u8"今日は"_as_char_ptr));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(u8"😊"_as_char_ptr));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("2.0"));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("7.0"));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("99999999999999999999999999999999.0"));
+
+    // TODO(SERVER-102086): "invalid" should be a bad OFCV value
+    // ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("invalid"));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("unset"));
+    ASSERT_THROWS_BAD_VALUE(
+        makeFromOFCVString(fmt::format(StringData("{}\0", 3), kLastLTSFCVString)));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(
+        fmt::format(StringData("{}\0{}", 5), kLastLTSFCVString, kLatestFCVString)));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(fmt::format(" {}", kLastLTSFCVString)));
+    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(fmt::format("{} ", kLatestFCVString)));
+    ASSERT_THROWS_BAD_VALUE(makeFromUpgradingOFCVString(kLatestFCVString, kLastLTSFCVString));
+    ASSERT_THROWS_BAD_VALUE(makeFromDowngradingOFCVString(kLastLTSFCVString, kLatestFCVString));
+    ASSERT_THROWS_BAD_VALUE(makeFromUpgradingOFCVString(kLastLTSFCVString, kLastLTSFCVString));
+    ASSERT_THROWS_BAD_VALUE(makeFromDowngradingOFCVString(kLatestFCVString, kLatestFCVString));
 }
 
 }  // namespace

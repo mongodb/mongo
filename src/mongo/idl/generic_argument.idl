@@ -40,6 +40,7 @@ imports:
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/vector_clock.idl"
+    - "mongo/db/version_context.idl"
     - "mongo/db/write_concern_options.idl"       
     - "mongo/rpc/metadata/audit_metadata.idl"
     - "mongo/s/sharding_types.idl"
@@ -239,6 +240,13 @@ structs:
             txnRetryCounter:
                 type: TxnRetryCounter
                 forward_to_shards: true
+                optional: true
+                stability: "internal"
+            versionContext:
+                type: version_context
+                forward_to_shards: false
+                description: "Snapshot of the FCV used by the operation,
+                              which ensures that feature flag checks are stable through its execution."
                 optional: true
                 stability: "internal"
             mayBypassWriteBlocking:

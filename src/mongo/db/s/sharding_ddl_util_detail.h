@@ -70,6 +70,10 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     if (auto meta = rpc::getAuditAttrsToAuditMetadata(opCtx)) {
         originalOpts->cmd.setDollarAudit(*meta);
     }
+    // TODO SERVER-99655: isInitialized() will always be true once DDL coordinators always use OFCV
+    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+        originalOpts->cmd.setVersionContext(vCtx);
+    }
     originalOpts->cmd.setMayBypassWriteBlocking(
         WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
 

@@ -72,7 +72,7 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
     }
 
     // TODO SERVER-101449: update once 9.0 becomes last LTS.
-    if (auto vCtx = VersionContext::getDecoration(opCtx); vCtx.getOperationFCV()) {
+    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
         setVersionContext(VersionContext::getDecoration(opCtx));
     }
 

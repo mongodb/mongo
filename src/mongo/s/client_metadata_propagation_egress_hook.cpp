@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/write_block_bypass.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
@@ -50,6 +51,10 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
 
         if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
             metadata->writeToMetadata(metadataBob);
+        }
+
+        if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+            metadataBob->append(GenericArguments::kVersionContextFieldName, vCtx.toBSON());
         }
 
         WriteBlockBypass::get(opCtx).writeAsMetadata(metadataBob);

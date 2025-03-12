@@ -39,7 +39,7 @@ VersionContext::VersionContext(FCVSnapshot fcv)
     : _metadataOrTag(std::in_place_type<VersionContextMetadata>, fcv.getVersion()) {}
 
 VersionContext::VersionContext(const BSONObj& bsonObject) {
-    if (bsonObject.isEmpty()) {
+    if (!bsonObject.hasField(VersionContextMetadata::kOFCVFieldName)) {
         return;
     }
     _metadataOrTag =

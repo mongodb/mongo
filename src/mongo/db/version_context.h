@@ -72,6 +72,10 @@ public:
 
     void setOperationFCV(FCVSnapshot fcv);
 
+    inline bool isInitialized() const {
+        return !std::holds_alternative<OperationWithoutOFCVTag>(_metadataOrTag);
+    }
+
     inline boost::optional<FCVSnapshot> getOperationFCV() const {
         if (auto* metadata = std::get_if<VersionContextMetadata>(&_metadataOrTag)) {
             return boost::optional<FCVSnapshot>{metadata->getOFCV()};

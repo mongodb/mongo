@@ -36,6 +36,7 @@ idl_generator(
         "//src/mongo/client:read_preference_setting_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:vector_clock_gen",
+        "//src/mongo/db:version_context_gen",
         "//src/mongo/db:write_concern_options_gen",
         "//src/mongo/db/repl:read_concern_args_gen",
         "//src/mongo/db/repl:read_concern_gen",
