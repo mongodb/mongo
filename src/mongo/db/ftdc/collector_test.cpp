@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
@@ -103,7 +104,7 @@ TEST(FTDCCollectorTest, FilteredCollectorTest) {
 
 TEST_F(SampleCollectorCacheTestFixture, NoCollectorsShouldReturnNothing) {
     SampleCollectorCache collector(
-        ClusterRole::None, Milliseconds(50), 1 /*minThreads*/, 1 /*maxThreads*/);
+        ClusterRole::None, Milliseconds(100), 1 /*minThreads*/, 1 /*maxThreads*/);
 
     auto sample = collect(collector);
     ASSERT_EQ(sample.begin(), sample.end());
@@ -111,7 +112,7 @@ TEST_F(SampleCollectorCacheTestFixture, NoCollectorsShouldReturnNothing) {
 
 TEST_F(SampleCollectorCacheTestFixture, MultipleCollectors) {
     auto role = ClusterRole::None;
-    SampleCollectorCache collector(role, Milliseconds(50), 1 /*minThreads*/, 1 /*maxThreads*/);
+    SampleCollectorCache collector(role, Milliseconds(100), 1 /*minThreads*/, 1 /*maxThreads*/);
 
     collector.addCollector(collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
         bob->append(fieldName, sampleData);
@@ -132,28 +133,34 @@ TEST_F(SampleCollectorCacheTestFixture, MultipleCollectors) {
 
 TEST_F(SampleCollectorCacheTestFixture, CollectorThrowsError) {
     auto role = ClusterRole::None;
-    SampleCollectorCache collector(role, Milliseconds(50), 1 /*minThreads*/, 1 /*maxThreads*/);
+    SampleCollectorCache collector(role, Milliseconds(100), 1 /*minThreads*/, 1 /*maxThreads*/);
 
     collector.addCollector(collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
         uasserted(ErrorCodes::CallbackCanceled, "Collection threw an error.");
     });
 
+    // An error thrown in the collection thread should be passed into the main thread.
     ASSERT_THROWS_CODE(collect(collector), DBException, ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(SampleCollectorCacheTestFixture, TimeoutDuringCollectionShouldFinishInTheNextCycle) {
-    auto timeout = Milliseconds(50);
+    auto timeout = Milliseconds(100);
     auto role = ClusterRole::None;
     SampleCollectorCache collector(ClusterRole::None, timeout, 1 /*minThreads*/, 1 /*maxThreads*/);
 
+    Notification<void> stall;
     collector.addCollector(collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-        sleepmillis(1.5 * timeout.count());
+        stall.get();
         bob->append(fieldName, sampleData);
     });
 
+    // Sample should be empty since collector is stalling.
     auto sample = collect(collector);
     ASSERT_EQ(sample.begin(), sample.end());
 
+    stall.set();
+
+    // After the stall, we should be able to get the data.
     auto nextSample = collect(collector);
     auto subObj = nextSample.getObjectField(collectorName);
     ASSERT_TRUE(subObj.hasField(fieldName));
@@ -163,7 +170,7 @@ TEST_F(SampleCollectorCacheTestFixture, TimeoutDuringCollectionShouldFinishInThe
 }
 
 TEST_F(SampleCollectorCacheTestFixture, TimeoutShouldNotAffectOtherSamples) {
-    auto timeout = Milliseconds(50);
+    auto timeout = Milliseconds(100);
     auto role = ClusterRole::None;
     SampleCollectorCache collector(role, timeout, 1 /*minThreads*/, 2 /*maxThreads*/);
 
@@ -171,27 +178,27 @@ TEST_F(SampleCollectorCacheTestFixture, TimeoutShouldNotAffectOtherSamples) {
         bob->append(fieldName, sampleData);
     });
 
-    // We want to test a scenario where a collector needs to run while another collector is
-    // currently stalling on the pool, but there is no guarantee about which collector runs first so
-    // we need the slow collector to timeout for more than 2 collection periods. Doing so means that
-    // no matter which collector runs first, we must be in a state at the start of the second
-    // collection where the slow collector is already running and the fast collector has to begin
-    // running.
-    auto stall = 2.5 * timeout.count();
+    Notification<void> stall;
     collector.addCollector(
         anotherCollectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-            sleepmillis(stall);
+            stall.get();
             bob->append(anotherFieldName, moreSampleData);
         });
 
+    // Our goal is to check that a collection can start and finish successfully while another
+    // collection is currently stalling. We need to run two samples here because there is no
+    // guarantee about which collector runs first. By running a second, we guarantee that the slow
+    // collector is already running when we want to start the fast collector.
     auto sample1 = collect(collector);
     ASSERT_TRUE(sample1.hasField(collectorName));
     ASSERT_FALSE(sample1.hasField(anotherCollectorName));
-
     auto sample2 = collect(collector);
     ASSERT_TRUE(sample2.hasField(collectorName));
     ASSERT_FALSE(sample2.hasField(anotherCollectorName));
 
+    stall.set();
+
+    // After the stall ends, collection should behave normally.
     auto sample3 = collect(collector);
     ASSERT_TRUE(sample3.hasField(collectorName));
     ASSERT_TRUE(sample3.hasField(anotherCollectorName));
@@ -199,14 +206,14 @@ TEST_F(SampleCollectorCacheTestFixture, TimeoutShouldNotAffectOtherSamples) {
 
 TEST_F(SampleCollectorCacheTestFixture, ShutdownDrainsWork) {
     bool finished = false;
-    auto timeout = Milliseconds(50);
+    auto timeout = Milliseconds(100);
     auto role = ClusterRole::None;
     {
         SampleCollectorCache collector(role, timeout, 1 /*minThreads*/, 1 /*maxThreads*/);
 
         collector.addCollector(
             collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-                sleepmillis(2 * timeout.count());
+                sleepmillis(5 * timeout.count());
                 finished = true;
             });
         collect(collector);
