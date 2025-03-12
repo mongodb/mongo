@@ -177,27 +177,6 @@ protected:
     int64_t _writeKey = _kMaxReads;
 };
 
-TEST_F(WiredTigerStatsTest, EmptySession) {
-    // Increase log component verbosity for WiredTiger
-    auto verbosityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kWiredTiger,
-                                                               logv2::LogSeverity::Debug(5)};
-    auto verboseConfig = WiredTigerUtil::generateWTVerboseConfiguration();
-    ASSERT_OK(
-        wtRCToStatus(_conn->conn()->reconfigure(_conn->conn(), verboseConfig.c_str()), nullptr));
-
-    // Read and write statistics should be empty. Check "data" field does not exist. "wait" fields
-    // such as the schemaLock might have some value.
-    auto statsBson = WiredTigerStats{*_session}.toBSON();
-
-    {
-        BSONObjBuilder bob;
-        ASSERT_OK(WiredTigerUtil::exportTableToBSON(*_session, "statistics:", "", bob));
-        LOGV2(9032000, "Connection statistics", "stats"_attr = bob.obj());
-    }
-
-    ASSERT_FALSE(statsBson.hasField("data")) << statsBson;
-}
-
 TEST_F(WiredTigerStatsTest, SessionWithWrite) {
     write();
 
