@@ -2169,10 +2169,7 @@ mongo_cc_library(
         ":server_base",
         "//src/mongo/db/catalog:cannot_convert_index_to_unique_info",
         "//src/mongo/db/catalog:collection_uuid_mismatch_info",
-    ] + select({
-        "@platforms//os:linux": [":throw_hook_impl"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 mongo_cc_library(
@@ -3173,7 +3170,10 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/util:processinfo",
         "//src/mongo/util:signal_handlers",
-    ],
+    ] + select({
+        "@platforms//os:linux": [":throw_hook_impl"],
+        "//conditions:default": [],
+    }),
 )
 
 mongo_cc_library(
