@@ -1,4 +1,8 @@
 // Tests serverStatus tracking of connections opened
+//
+//  @tags: [
+//   incompatible_with_windows_tls,
+// ]
 
 var numPerTypeToCreate = 50;
 
