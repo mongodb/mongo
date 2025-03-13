@@ -1150,7 +1150,6 @@ mongo_cc_unit_test(
         "//src/mongo/s/catalog:type_shard_test.cpp",
         "//src/mongo/s/catalog:type_tags_test.cpp",
         "//src/mongo/s/client:config_shard_wrapper_test.cpp",
-        "//src/mongo/s/client:shard_registry_test.cpp",
         "//src/mongo/s/client:shard_remote_test.cpp",
         "//src/mongo/s/request_types:add_shard_to_zone_request_test.cpp",
         "//src/mongo/s/request_types:merge_chunks_request_test.cpp",

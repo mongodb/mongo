@@ -93,6 +93,9 @@ public:
 
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override;
+
+private:
+    void _tickTopologyTimeIfNecessary(ServiceContext* service, Timestamp newCommitPointTime);
 };
 
 }  // namespace mongo
