@@ -101,20 +101,6 @@ public:
         }
     };
 
-    static StageConstraints constraints() {
-        StageConstraints constraints{DocumentSource::StreamType::kStreaming,
-                                     DocumentSource::PositionRequirement::kFirst,
-                                     DocumentSource::HostTypeRequirement::kLocalOnly,
-                                     DocumentSource::DiskUseRequirement::kNoDiskUse,
-                                     DocumentSource::FacetRequirement::kNotAllowed,
-                                     DocumentSource::TransactionRequirement::kAllowed,
-                                     DocumentSource::LookupRequirement::kAllowed,
-                                     DocumentSource::UnionRequirement::kAllowed};
-        // Tried to get rid of the 'has to be the first stage in the pipeline' error.
-        constraints.requiresInputDocSource = false;
-        return constraints;
-    }
-
 private:
     // It is illegal to construct a DocumentSourceRankFusion directly, use createFromBson() instead.
     DocumentSourceRankFusion() = default;
