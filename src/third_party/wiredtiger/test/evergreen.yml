@@ -1492,6 +1492,10 @@ tasks:
         vars:
           GNU_C_VERSION: -DGNU_C_VERSION=9
           GNU_CXX_VERSION: -DGNU_CXX_VERSION=9
+      - func: "compile wiredtiger"
+        vars:
+          GNU_C_VERSION: -DGNU_C_VERSION=11
+          GNU_CXX_VERSION: -DGNU_CXX_VERSION=11
 
   - name: compile-clang
     tags: ["pull_request", "pull_request_compilers"]
@@ -1517,6 +1521,26 @@ tasks:
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=8
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=8
+      - func: "compile wiredtiger"
+        vars:
+          CLANG_C_VERSION: -DCLANG_C_VERSION=9
+          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=9
+      - func: "compile wiredtiger"
+        vars:
+          CLANG_C_VERSION: -DCLANG_C_VERSION=10
+          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=10
+      - func: "compile wiredtiger"
+        vars:
+          CLANG_C_VERSION: -DCLANG_C_VERSION=11
+          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=12
+      - func: "compile wiredtiger"
+        vars:
+          CLANG_C_VERSION: -DCLANG_C_VERSION=13
+          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=13
+      - func: "compile wiredtiger"
+        vars:
+          CLANG_C_VERSION: -DCLANG_C_VERSION=14
+          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=14
 
   # Compile WiredTiger with uncommon build flags to make sure we compile code that
   # is often pre-processed out.
@@ -5529,10 +5553,6 @@ buildvariants:
     - name: format-msan-test
     - name: make-check-test
       distros: ubuntu2004-large
-    - name: csuite-long-running
-      # Some of the long-running tests require a large instance to run successfully.
-      distros: ubuntu2004-large
-      batchtime: 1440 # once a day
 
 - name: ubuntu2004-ubsan
   display_name: "! Ubuntu 20.04 UBSAN"
