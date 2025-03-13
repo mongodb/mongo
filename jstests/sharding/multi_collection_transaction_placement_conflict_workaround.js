@@ -5,15 +5,16 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
 
 // Test transaction with concurrent chunk migration.
 {
-    const dbName = 'test';
-    const collName1 = 'foo';
-    const collName2 = 'bar';
+    const dbName = 'test_txn_with_chunk_migration';
+    const collName1 = 'coll1';
+    const collName2 = 'coll2';
     const ns1 = dbName + '.' + collName1;
     const ns2 = dbName + '.' + collName2;
 
@@ -67,14 +68,12 @@ const st = new ShardingTest({mongos: 1, shards: 2});
 
 // Test transaction with concurrent move primary.
 {
-    const dbName1 = 'test';
-    const dbName2 = 'test2';
-    const collName1 = 'foo';
-    const collName2 = 'foo';
-
     function runTest(readConcernLevel) {
-        st.getDB(dbName1).dropDatabase();
-        st.getDB(dbName2).dropDatabase();
+        const dbName1 = 'test_txn_with_move_primary_and_' + readConcernLevel;
+        const dbName2 = 'test_txn_with_move_primary_and_' + readConcernLevel + '_2';
+        const collName1 = 'coll1';
+        const collName2 = 'coll2';
+
         st.adminCommand({enableSharding: dbName1, primaryShard: st.shard0.shardName});
         st.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName});
 
@@ -125,15 +124,13 @@ const st = new ShardingTest({mongos: 1, shards: 2});
 
 // Test transaction with concurrent move collection.
 {
-    const dbName1 = 'test';
-    const dbName2 = 'test2';
-    const collName1 = 'foo';
-    const collName2 = 'foo';
-    const ns2 = dbName2 + '.' + collName2;
-
     function runTest(readConcernLevel) {
-        st.getDB(dbName1).dropDatabase();
-        st.getDB(dbName2).dropDatabase();
+        const dbName1 = 'test_move_collection_' + readConcernLevel;
+        const dbName2 = 'test_move_collection_' + readConcernLevel + '_2';
+        const collName1 = 'coll1';
+        const collName2 = 'coll2';
+        const ns2 = dbName2 + '.' + collName2;
+
         st.adminCommand({enableSharding: dbName1, primaryShard: st.shard0.shardName});
         st.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName});
 
@@ -188,16 +185,6 @@ const st = new ShardingTest({mongos: 1, shards: 2});
 
 // Tests transactions with concurrent DDL operations.
 {
-    const dbName = 'test';
-    const collName1 = 'foo';
-    const collName2 = 'bar';
-    const collName3 = 'foo2';
-    const ns1 = dbName + '.' + collName1;
-
-    let coll1 = st.s.getDB(dbName)[collName1];
-    let coll2 = st.s.getDB(dbName)[collName2];
-    let coll3 = st.s.getDB(dbName)[collName3];
-
     const readConcerns = ['local', 'snapshot'];
     const commands = ['find', 'aggregate', 'update'];
 
@@ -205,6 +192,16 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     // attempts to read the renamed-to collection.
     {
         function runTest(readConcernLevel, command) {
+            const dbName = 'test_rename_with_' + command + '_and_' + readConcernLevel;
+            const collName1 = 'coll1';
+            const collName2 = 'coll2';
+            const collName3 = 'coll3';
+            const ns1 = dbName + '.' + collName1;
+
+            let coll1 = st.s.getDB(dbName)[collName1];
+            let coll2 = st.s.getDB(dbName)[collName2];
+            let coll3 = st.s.getDB(dbName)[collName3];
+
             jsTest.log("Running transaction + rename test with read concern " + readConcernLevel +
                        " and command " + command);
 
@@ -218,7 +215,6 @@ const st = new ShardingTest({mongos: 1, shards: 2});
             //    Transaction should conflict, otherwise the txn would see half the collection.
 
             // Setup initial state:
-            st.getDB(dbName).dropDatabase();
             st.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName});
 
             st.adminCommand({shardCollection: ns1, key: {x: 1}});
@@ -274,6 +270,17 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     // attempts to read the dropped collection.
     {
         function runTest(readConcernLevel, command) {
+            const dbName = 'test_txn_and_drop_with_' + command + '_and_' + readConcernLevel;
+            const collName1 = 'coll1';
+            const collName2 = 'coll2';
+            const ns1 = dbName + '.' + collName1;
+
+            let coll1 = st.s.getDB(dbName)[collName1];
+            let coll2 = st.s.getDB(dbName)[collName2];
+
+            jsTest.log("Running transaction + drop test with read concern " + readConcernLevel +
+                       " and command " + command);
+            assert(command === 'find' || command === 'aggregate' || command === 'update');
             // Initial state:
             //    shard0 (dbPrimary): collA(sharded) and collB(unsharded)
             //    shard1: collA(sharded)
@@ -284,12 +291,7 @@ const st = new ShardingTest({mongos: 1, shards: 2});
             //    sharded, so it would read the sharded coll (but just half of it). Therefore, a
             //    conflict must be raised.
 
-            jsTest.log("Running transaction + drop test with read concern " + readConcernLevel +
-                       " and command " + command);
-            assert(command === 'find' || command === 'aggregate' || command === 'update');
-
             // Setup initial state:
-            assert.commandWorked(st.s.getDB(dbName).dropDatabase());
             st.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName});
 
             st.adminCommand({shardCollection: ns1, key: {x: 1}});
@@ -345,11 +347,19 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     // Test transaction concurrent with reshardCollection.
     {
         function runTest(readConcernLevel, command) {
+            const dbName =
+                'test_txn_and_reshardCollection_with_' + command + '_and_' + readConcernLevel;
+            const collName1 = 'coll1';
+            const collName2 = 'coll2';
+            const ns1 = dbName + '.' + collName1;
+
+            let coll1 = st.s.getDB(dbName)[collName1];
+            let coll2 = st.s.getDB(dbName)[collName2];
+
             jsTest.log("Running transaction + resharding test with read concern " +
                        readConcernLevel + " and command " + command);
 
             // Setup initial state:
-            assert.commandWorked(st.s.getDB(dbName).dropDatabase());
             st.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName});
 
             st.adminCommand({shardCollection: ns1, key: {x: 1}});
@@ -370,15 +380,16 @@ const st = new ShardingTest({mongos: 1, shards: 2});
                                           "reshardingPauseBeforeTellingParticipantsToCommit");
 
             // On parallel shell, start resharding
-            const joinResharding = startParallelShell(() => {
-                assert.commandWorked(db.adminCommand({
-                    reshardCollection: 'test.foo',
-                    key: {y: 1},
-                    // We set this to 2 because we want there to be one chunk on each shard post
-                    // resharding for tests below.
-                    numInitialChunks: 2,
-                }));
-            }, st.s.port);
+            const joinResharding =
+                startParallelShell(funWithArgs((nss) => {
+                                       assert.commandWorked(db.adminCommand({
+                                           reshardCollection: nss,
+                                           key: {y: 1},
+                                           // We set this to 2 because we want there to be one chunk
+                                           // on each shard post resharding for tests below.
+                                           numInitialChunks: 2,
+                                       }));
+                                   }, ns1), st.s.port);
 
             // Await configsvr to have done its part of the commit.
             fp.wait();
@@ -400,7 +411,7 @@ const st = new ShardingTest({mongos: 1, shards: 2});
             fp.off();
             joinResharding();
 
-            // Make sure the router is aware of the new (post-resharding) routing table for test.foo
+            // Make sure the router is aware of the new (post-resharding) routing table for ns1
             assert.eq(2, coll1.find({y: 0}).itcount());
 
             // Now operate on coll1 within the transaction and expect to get a conflict.
@@ -433,10 +444,9 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     function runTest(command) {
         jsTest.log("Running non-txn snapshot read with command: " + command);
 
-        const db = st.s.getDB('test');
+        const db = st.s.getDB('test_non_transaction_reads_with_' + command);
         const coll = db['sharded'];
 
-        assert.commandWorked(st.s.getDB(db.getName()).dropDatabase());
         assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
         assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {x: 0}}));
         assert.commandWorked(st.s.adminCommand({
