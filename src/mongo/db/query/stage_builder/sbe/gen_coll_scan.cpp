@@ -245,12 +245,22 @@ std::pair<SbStage, PlanStageSlots> generateClusteredCollScan(
     sbe::RuntimeEnvironment* env = state.env.runtimeEnv;
 
     invariant(csn->doClusteredCollectionScanSbe());
-    invariant(!csn->resumeScanPoint || forward);
-    invariant(!csn->resumeScanPoint || !csn->tailable);
-    // The minRecord and maxRecord optimizations are not compatible with resumeAfterRecordId.
-    invariant(!(csn->resumeScanPoint && (csn->minRecord || csn->maxRecord)));
+
+    tassert(9884900,
+            "Expected forward collection scan with 'resumeScanPoint'",
+            !csn->resumeScanPoint || forward);
+
+    tassert(9884901,
+            "Cannot use resume token with a tailable cursor",
+            !csn->resumeScanPoint || !csn->tailable);
+    // The minRecord and maxRecord optimizations are not compatible with resume tokens.
+    tassert(9884902,
+            "'resumeScanPoint' cannot be used with 'minRecord' or 'maxRecord'",
+            !(csn->resumeScanPoint && (csn->minRecord || csn->maxRecord)));
     // 'stopApplyingFilterAfterFirstMatch' is only for oplog scans; this method doesn't do them.
-    invariant(!csn->stopApplyingFilterAfterFirstMatch);
+    tassert(9884903,
+            "Cannot use 'stopApplyingFilterAfterFirstMatch' when generating clustered scan",
+            !csn->stopApplyingFilterAfterFirstMatch);
 
     SbStage resumeRecordIdTree;
     boost::optional<SbSlot> seekSlot;
@@ -367,9 +377,17 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
 
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
 
-    invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
-    invariant(!csn->resumeScanPoint || forward);
-    invariant(!csn->resumeScanPoint || !csn->tailable);
+    tassert(9884904,
+            "'shouldTrackLatestOplogTimestamp' can only be used with oplog collections",
+            !csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
+
+    tassert(9884905,
+            "Expected forward collection scan with 'resumeScanPoint'",
+            !csn->resumeScanPoint || forward);
+
+    tassert(9884906,
+            "Cannot use resume token with a tailable cursor",
+            !csn->resumeScanPoint || !csn->tailable);
 
     if (csn->filter) {
         DepsTracker deps;
