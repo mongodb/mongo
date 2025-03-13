@@ -654,9 +654,11 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShardWi
     const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
         operationContext(), dbInGlobalCatalog);
 
-    assertOneInconsistencyFound(
-        MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalog,
-        inconsistencies);
+    ASSERT_EQ(2, inconsistencies.size());
+    ASSERT_EQ(MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalog,
+              inconsistencies[0].getType());
+    ASSERT_EQ(MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,
+              inconsistencies[1].getType());
 }
 
 TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard) {

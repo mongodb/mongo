@@ -87,7 +87,7 @@ enums:
             kTrackedUnshardedCollectionHasMultipleChunks: "Found tracked unsharded collection with more than one chunks"
             kTrackedUnshardedCollectionHasInvalidKey: "Found tracked unsharded collection with invalid shard-key"
             kInconsistentDatabaseVersionInShardLocalCatalog: "Found database metadata in the shard-local catalog that is not aligned with one in global catalog"
-            kInconsistentDatabaseVersionInShardLocalCatalogCache: "Found database metadata in the shard-local catalog cache that is not aligned with one in the global catalog"
+            kInconsistentDatabaseVersionInShardLocalCatalogCache: "Found database metadata in the shard-local catalog cache that is not aligned with one in the global or shard-local catalog"
             kMissingDatabaseMetadataInShardLocalCatalog: "Found database metadata in the global catalog but not in the shard-local catalog or not in a consistent state"
             kMissingDatabaseMetadataInShardLocalCatalogCache: "Found database metadata in the global catalog but not in shard-local catalog cache"
             kMisplacedDatabaseMetadataInShardLocalCatalog: "Found some database metadata in the shard-local catalog that is not owned by this shard"
@@ -428,7 +428,7 @@ structs:
                 type: database_version
 
     InconsistentDatabaseVersionInShardLocalCatalogCacheDetails:
-        description: "Details about an inconsistent database metadata from the shard-local catalog cache compared to the one in the global catalog"
+        description: "Details about an inconsistent database metadata from the shard-local catalog cache compared to the one in the global or shard-local catalog"
         strict: false 
         fields:
             dbName:
@@ -441,6 +441,9 @@ structs:
                 description: "The database version of the global catalog."
                 type: database_version
             dbVersionInShardLocalCatalogCache:
+                description: "The database version of the shard-local catalog."
+                type: database_version
+            dbVersionInShardLocalCatalogCacheCache:
                 description: "The database version of the shard-local catalog cache."
                 type: database_version
 

@@ -405,6 +405,39 @@ std::unique_ptr<DBClientCursor> _getCollectionChunksCursor(DBDirectClient* clien
         false /* useExhaust */));
 }
 
+std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const DatabaseVersion& dbVersionInGlobalCatalog,
+    const DatabaseVersion& dbVersionInShardLocalCatalog,
+    const ShardId& primaryShard) {
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+
+    const auto dbVersionInCache = [&]() {
+        AutoGetDb autoDb(opCtx, dbName, MODE_IS);
+        const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+        return scopedDss->getDbVersion(opCtx, true /* useDssForTesting */);
+    }();
+
+    if (!dbVersionInCache) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalogCache,
+            MissingDatabaseMetadataInShardLocalCatalogCacheDetails{
+                dbName, primaryShard, dbVersionInGlobalCatalog}));
+    } else if (dbVersionInGlobalCatalog != *dbVersionInCache ||
+               dbVersionInShardLocalCatalog != *dbVersionInCache) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,
+            InconsistentDatabaseVersionInShardLocalCatalogCacheDetails{dbName,
+                                                                       primaryShard,
+                                                                       dbVersionInGlobalCatalog,
+                                                                       dbVersionInShardLocalCatalog,
+                                                                       *dbVersionInCache}));
+    }
+
+    return inconsistencies;
+}
+
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalog(
     OperationContext* opCtx,
     const DatabaseName& dbName,
@@ -441,6 +474,13 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLo
                 InconsistentDatabaseVersionInShardLocalCatalogDetails{
                     dbName, primaryShard, dbVersionInGlobalCatalog, dbVersionInShardLocalCatalog}));
         }
+
+        auto cacheInconsistencies = checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
+            opCtx, dbName, dbVersionInGlobalCatalog, dbVersionInShardLocalCatalog, primaryShard);
+
+        inconsistencies.insert(inconsistencies.end(),
+                               std::make_move_iterator(cacheInconsistencies.begin()),
+                               std::make_move_iterator(cacheInconsistencies.end()));
     } catch (const AssertionException&) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalog,
@@ -451,34 +491,6 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLo
     tassert(9980501,
             "Found duplicated database metadata in the shard-local catalog with the same _id value",
             !cursor->more());
-
-    return inconsistencies;
-}
-
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const DatabaseVersion& dbVersionInGlobalCatalog,
-    const ShardId& primaryShard) {
-    std::vector<MetadataInconsistencyItem> inconsistencies;
-
-    const auto dbVersionInCache = [&]() {
-        AutoGetDb autoDb(opCtx, dbName, MODE_IS);
-        const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
-        return scopedDss->getDbVersion(opCtx, true /* useDssForTesting */);
-    }();
-
-    if (!dbVersionInCache) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalogCache,
-            MissingDatabaseMetadataInShardLocalCatalogCacheDetails{
-                dbName, primaryShard, dbVersionInGlobalCatalog}));
-    } else if (dbVersionInGlobalCatalog != *dbVersionInCache) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,
-            InconsistentDatabaseVersionInShardLocalCatalogCacheDetails{
-                dbName, primaryShard, dbVersionInGlobalCatalog, *dbVersionInCache}));
-    }
 
     return inconsistencies;
 }
@@ -1127,22 +1139,8 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     const auto dbVersionInGlobalCatalog = dbInGlobalCatalog.getVersion();
     const auto primaryShard = dbInGlobalCatalog.getPrimary();
 
-    auto shardLocalCatalogCacheInconsistencies =
-        checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
-            opCtx, dbName, dbVersionInGlobalCatalog, primaryShard);
-
-    inconsistencies.insert(inconsistencies.end(),
-                           std::make_move_iterator(shardLocalCatalogCacheInconsistencies.begin()),
-                           std::make_move_iterator(shardLocalCatalogCacheInconsistencies.end()));
-
-    auto shardLocalCatalogInconsistencies = checkDatabaseMetadataConsistencyInShardLocalCatalog(
+    return checkDatabaseMetadataConsistencyInShardLocalCatalog(
         opCtx, dbName, dbVersionInGlobalCatalog, primaryShard);
-
-    inconsistencies.insert(inconsistencies.end(),
-                           std::make_move_iterator(shardLocalCatalogInconsistencies.begin()),
-                           std::make_move_iterator(shardLocalCatalogInconsistencies.end()));
-
-    return inconsistencies;
 }
 
 }  // namespace metadata_consistency_util
