@@ -1169,8 +1169,9 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         }
 
         auto txnRouterForAbort = TransactionRouter::get(opCtx);
-        if (txnRouterForAbort)
+        if (txnRouterForAbort && txnRouterForAbort.isInitialized()) {
             txnRouterForAbort.implicitlyAbortTransaction(opCtx, e.toStatus());
+        }
 
         throw;
     }
