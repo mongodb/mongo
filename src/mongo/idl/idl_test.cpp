@@ -1196,7 +1196,9 @@ TEST(IDLStructTests, TestStrictStruct) {
     {
         auto testDoc =
             BSON("field1" << 12 << "field2" << 123 << "field3" << 1234 << "field2" << 12345);
-        ASSERT_THROWS(RequiredStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS_CODE(RequiredStrictField3::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 }
 // Positive: non-strict, ensure extra fields work
@@ -1238,14 +1240,18 @@ TEST(IDLStructTests, TestNonStrictStruct) {
     // Negative: Duplicate field
     {
         auto testDoc = BSON("1" << 12 << "2" << 123 << "3" << 1234 << "2" << 12345);
-        ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS_CODE(RequiredNonStrictField3::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 
     // Negative: Duplicate extra field
     {
         auto testDoc =
             BSON("field4" << 1234 << "1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
-        ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS_CODE(RequiredNonStrictField3::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 
     // Negative: null required field
@@ -1425,7 +1431,21 @@ TEST(IDLFieldTests, TestStrictDuplicateIgnoredFields) {
     {
         auto testDoc =
             BSON("required_field" << 12 << "ignored_field" << 123 << "ignored_field" << 456);
-        ASSERT_THROWS(IgnoredField::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS_CODE(
+            IgnoredField::parse(ctxt, testDoc), AssertionException, ErrorCodes::IDLDuplicateField);
+    }
+}
+
+TEST(IDLFieldTests, TestNonStrictDuplicateIgnoredFields) {
+    IDLParserContext ctxt("root");
+
+    // Negative: Test duplicate ignored fields fail for a non-strict struct.
+    {
+        auto testDoc =
+            BSON("required_field" << 12 << "ignored_field" << 123 << "ignored_field" << 456);
+        ASSERT_THROWS_CODE(IgnoredFieldNonStrict::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 }
 
@@ -2068,6 +2088,29 @@ TEST(IDLNestedStruct, TestDuplicateTypes) {
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+TEST(IDLNestedStruct, RejectDuplicateFieldWithinNestedStruct) {
+    IDLParserContext ctxt("root");
+
+    // Positive example.
+    {
+        auto testDoc =
+            BSON("field1" << BSON("field1" << 1 << "field2" << 2 << "field3" << 3) << "field3"
+                          << BSON("field1" << 4 << "field2" << 5 << "field3" << 6));
+        NestedWithDuplicateTypes::parse(ctxt, testDoc);
+    }
+
+    // Add a duplicate nested field at path "field2.field2".
+    {
+        auto testDoc =
+            BSON("field1" << BSON("field1" << 1 << "field2" << 2 << "field3" << 3) << "field2"
+                          << BSON("field1" << 7 << "field2" << 8 << "field3" << 9 << "field2" << 10)
+                          << "field3" << BSON("field1" << 4 << "field2" << 5 << "field3" << 6));
+        ASSERT_THROWS_CODE(NestedWithDuplicateTypes::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 }
 
@@ -2734,7 +2777,9 @@ TEST(IDLChainedType, TestDuplicateFields) {
                         << "abc"
                         << "field2" << 5 << "field2" << 123456);
 
-    ASSERT_THROWS(Chained_struct_only::parse(ctxt, testDoc), AssertionException);
+    ASSERT_THROWS_CODE(Chained_struct_only::parse(ctxt, testDoc),
+                       AssertionException,
+                       ErrorCodes::IDLDuplicateField);
 }
 
 
@@ -2798,7 +2843,9 @@ TEST(IDLChainedType, TestChainedStructWithExtraFields) {
                             << BSON("random"
                                     << "pair")
                             << "anyField" << 787);
-        ASSERT_THROWS(Chained_struct_mixed::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS_CODE(Chained_struct_mixed::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 
     // Duplicate object
@@ -2810,7 +2857,9 @@ TEST(IDLChainedType, TestChainedStructWithExtraFields) {
                                           << "anyField" << 123.456 << "objectField"
                                           << BSON("random"
                                                   << "pair"));
-        ASSERT_THROWS(Chained_struct_mixed::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS_CODE(Chained_struct_mixed::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 
     // Duplicate field3
@@ -2822,7 +2871,9 @@ TEST(IDLChainedType, TestChainedStructWithExtraFields) {
                                     << "pair")
                             << "field3"
                             << "def");
-        ASSERT_THROWS(Chained_struct_mixed::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS_CODE(Chained_struct_mixed::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 }
 
@@ -3002,7 +3053,7 @@ OpMsgRequest makeOMRWithTenant(BSONObj obj, TenantId tenant, VTS::TenantProtocol
 }
 
 // Positive: demonstrate a command with concatenate with db
-TEST(IDLCommand, TestConcatentateWithDb) {
+TEST(IDLCommand, TestConcatenateWithDb) {
     IDLParserContext ctxt("root");
 
     auto testDoc = BSON(BasicConcatenateWithDbCommand::kCommandName << "coll1"
@@ -3050,7 +3101,101 @@ TEST(IDLCommand, TestConcatentateWithDb) {
     }
 }
 
-TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
+TEST(IDLCommand, ConcatenateWithDbCommandRejectsDuplicateField) {
+    IDLParserContext ctxt("root");
+    auto testDoc = BSON(BasicConcatenateWithDbCommand::kCommandName << "coll1"
+                                                                    << "field1" << 3 << "field2"
+                                                                    << "five"
+                                                                    << "$db"
+                                                                    << "db"
+                                                                    << "field1" << 4);
+    ASSERT_THROWS_CODE(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
+                       AssertionException,
+                       ErrorCodes::IDLDuplicateField);
+}
+
+TEST(IDLCommand, ConcatenateWithDbCommandRejectsDuplicateGenericArg) {
+    IDLParserContext ctxt("root");
+
+    {
+        auto withGenericArgValid =
+            BSON(BasicConcatenateWithDbCommand::kCommandName << "coll1"
+                                                             << "field1" << 3 << "field2"
+                                                             << "five"
+                                                             << "genericArg"
+                                                             << "foo"
+                                                             << "$db"
+                                                             << "db");
+        BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(withGenericArgValid));
+    }
+
+    {
+        auto withDuplicateGenericArg =
+            BSON(BasicConcatenateWithDbCommand::kCommandName << "coll1"
+                                                             << "field1" << 3 << "field2"
+                                                             << "five"
+                                                             << "genericArg"
+                                                             << "foo"
+                                                             << "genericArg"
+                                                             << "bar"
+                                                             << "$db"
+                                                             << "db");
+        ASSERT_THROWS_CODE(
+            BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(withDuplicateGenericArg)),
+            AssertionException,
+            ErrorCodes::IDLDuplicateField);
+    }
+}
+
+TEST(IDLCommand, NonStrictCommandRejectsDuplicateFields) {
+    IDLParserContext ctxt("root");
+
+    // Test that a duplicate required command parameter is rejected for a non-strict command.
+    {
+        auto testDoc =
+            BSON(NonStrictConcatenateWithDbCommand::kCommandName << "coll1"
+                                                                 << "field1" << 3 << "field2"
+                                                                 << "five"
+                                                                 << "$db"
+                                                                 << "db"
+                                                                 << "field1" << 4);
+        ASSERT_THROWS_CODE(NonStrictConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
+    }
+
+    // Positive case to show that for a non-strict command, unknown fields are allowed.
+    {
+        auto testDoc =
+            BSON(NonStrictConcatenateWithDbCommand::kCommandName << "coll1"
+                                                                 << "unknownField"
+                                                                 << "foo"
+                                                                 << "field1" << 3 << "field2"
+                                                                 << "five"
+                                                                 << "$db"
+                                                                 << "db");
+        NonStrictConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc));
+    }
+
+    // Test that an unknown duplicate field is rejected.
+    {
+        auto testDoc =
+            BSON(NonStrictConcatenateWithDbCommand::kCommandName << "coll1"
+                                                                 << "unknownField"
+                                                                 << "foo"
+                                                                 << "field1" << 3 << "field2"
+                                                                 << "five"
+                                                                 << "$db"
+                                                                 << "db"
+                                                                 << "unknownField"
+                                                                 << "bar");
+        ASSERT_THROWS_CODE(NonStrictConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
+    }
+}
+
+TEST(IDLCommand, TestConcatenateWithDb_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     const auto tenantId = TenantId(OID::gen());
     const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
@@ -3084,7 +3229,7 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
     ASSERT_BSONOBJ_EQ(targetDoc, serializeCmd(testStruct));
 }
 
-TEST(IDLCommand, TestConcatentateWithDb_TestConstructor) {
+TEST(IDLCommand, TestConcatenateWithDb_TestConstructor) {
     const auto tenantId = TenantId(OID::gen());
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "db");
 
@@ -3094,7 +3239,7 @@ TEST(IDLCommand, TestConcatentateWithDb_TestConstructor) {
     ASSERT_EQUALS(testRequest.getDbName(), dbName);
 }
 
-TEST(IDLCommand, TestConcatentateWithDbSymbol) {
+TEST(IDLCommand, TestConcatenateWithDbSymbol) {
     IDLParserContext ctxt("root");
 
     // Postive - symbol???
@@ -3111,7 +3256,7 @@ TEST(IDLCommand, TestConcatentateWithDbSymbol) {
 }
 
 
-TEST(IDLCommand, TestConcatentateWithDbNegative) {
+TEST(IDLCommand, TestConcatenateWithDbNegative) {
     IDLParserContext ctxt("root");
 
     // Negative - duplicate namespace field
@@ -3120,8 +3265,14 @@ TEST(IDLCommand, TestConcatentateWithDbNegative) {
             BSON("BasicConcatenateWithDbCommand" << 1 << "field1" << 3
                                                  << "BasicConcatenateWithDbCommand" << 1 << "field2"
                                                  << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
-                      AssertionException);
+
+        // This fails with an "unknown field" error rather than a "duplicate field" error because
+        // the parser expects the namespace field to be first. Therefore, the loop which traverses
+        // the remainder of the document does not consider the namespace field as one of the valid
+        // expected field names.
+        ASSERT_THROWS_CODE(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
+                           AssertionException,
+                           ErrorCodes::IDLUnknownField);
     }
 
     // Negative -  namespace field wrong order
@@ -3159,7 +3310,7 @@ TEST(IDLCommand, TestConcatentateWithDbNegative) {
 }
 
 // Positive: demonstrate a command with concatenate with db or uuid - test NSS
-TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
+TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestNSS) {
     IDLParserContext ctxt("root");
 
     auto testDoc =
@@ -3208,7 +3359,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
     }
 }
 
-TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
+TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestNSS_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     const auto tenantId = TenantId(OID::gen());
     const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
@@ -3243,7 +3394,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
 }
 
 // Positive: demonstrate a command with concatenate with db or uuid - test UUID
-TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
+TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestUUID) {
     IDLParserContext ctxt("root");
 
     UUID uuid = UUID::gen();
@@ -3291,7 +3442,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
     }
 }
 
-TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
+TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestUUID_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     UUID uuid = UUID::gen();
@@ -3329,7 +3480,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
     ASSERT_BSONOBJ_EQ(targetDoc, serializeCmd(testStruct));
 }
 
-TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestConstructor) {
+TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestConstructor) {
     const UUID uuid = UUID::gen();
     const auto tenantId = TenantId(OID::gen());
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "db");
@@ -3346,7 +3497,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestConstructor) {
     ASSERT_EQUALS(testRequest2.getDbName(), dbName);
 }
 
-TEST(IDLCommand, TestConcatentateWithDbOrUUIDNegative) {
+TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
     IDLParserContext ctxt("root");
 
     // Negative - duplicate namespace field
@@ -3355,16 +3506,23 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUIDNegative) {
             BSON("BasicConcatenateWithDbOrUUIDCommand"
                  << 1 << "field1" << 3 << "BasicConcatenateWithDbOrUUIDCommand" << 1 << "field2"
                  << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
-                      AssertionException);
+
+        // This fails with an "unknown field" error rather than a "duplicate field" error because
+        // the parser expects the namespace field to be first. Therefore, the loop which traverses
+        // the remainder of the document does not consider the namespace field as one of the valid
+        // expected field names.
+        ASSERT_THROWS_CODE(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
+                           AssertionException,
+                           ErrorCodes::IDLUnknownField);
     }
 
     // Negative -  namespace field wrong order
     {
         auto testDoc = BSON("field1" << 3 << "BasicConcatenateWithDbOrUUIDCommand" << 1 << "field2"
                                      << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
-                      AssertionException);
+        ASSERT_THROWS_CODE(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
+                           AssertionException,
+                           ErrorCodes::IDLUnknownField);
     }
 
     // Negative -  namespace missing
@@ -3436,14 +3594,23 @@ TEST(IDLCommand, TestIgnoredNegative) {
         auto testDoc = BSON("BasicIgnoredCommand" << 1 << "field1" << 3 << "BasicIgnoredCommand"
                                                   << 1 << "field2"
                                                   << "five");
-        ASSERT_THROWS(BasicIgnoredCommand::parse(ctxt, makeOMR(testDoc)), AssertionException);
+
+        // This fails with an "unknown field" error rather than a "duplicate field" error because
+        // the parser expects the namespace field to be first. Therefore, the loop which traverses
+        // the remainder of the document does not consider the namespace field as one of the valid
+        // expected field names.
+        ASSERT_THROWS_CODE(BasicIgnoredCommand::parse(ctxt, makeOMR(testDoc)),
+                           AssertionException,
+                           ErrorCodes::IDLUnknownField);
     }
 
     // Negative -  namespace field wrong order
     {
         auto testDoc = BSON("field1" << 3 << "BasicIgnoredCommand" << 1 << "field2"
                                      << "five");
-        ASSERT_THROWS(BasicIgnoredCommand::parse(ctxt, makeOMR(testDoc)), AssertionException);
+        ASSERT_THROWS_CODE(BasicIgnoredCommand::parse(ctxt, makeOMR(testDoc)),
+                           AssertionException,
+                           ErrorCodes::IDLUnknownField);
     }
 
     // Negative -  namespace missing
@@ -3668,7 +3835,8 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
                                            << "world")}});
         request.sequences.push_back({"structs", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS(TestT::parse(ctxt, request), AssertionException);
+        ASSERT_THROWS_CODE(
+            TestT::parse(ctxt, request), AssertionException, ErrorCodes::IDLDuplicateField);
     }
 
     // Negative: Extra field in document sequence
@@ -3752,7 +3920,9 @@ void TestDuplicateDocSequences(StringData name) {
                                       BSON("value"
                                            << "world")}});
 
-        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), AssertionException);
+        ASSERT_THROWS_CODE(DocSequenceCommand::parse(ctxt, request),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 
     // Negative: Duplicate fields in doc sequence and body
@@ -3773,7 +3943,9 @@ void TestDuplicateDocSequences(StringData name) {
                                         testTempDoc);
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), AssertionException);
+        ASSERT_THROWS_CODE(DocSequenceCommand::parse(ctxt, request),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 }
 
@@ -3806,7 +3978,9 @@ TEST(IDLDocSequence, TestEmptySequence) {
                                         testTempDoc);
         request.sequences.push_back({"structs", {}});
 
-        ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), AssertionException);
+        ASSERT_THROWS_CODE(DocSequenceCommand::parse(ctxt, request),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 
     // Positive: Empty document sequence
@@ -5607,8 +5781,9 @@ TEST(IDLDangerousIgnoreChecks, ValidateDuplicateChecking) {
                             << "field0"
                             << "def"
                             << "extra" << 1);
-        ASSERT_THROWS(Struct_with_ignore_extra_duplicates::parse(ctxt, testDoc),
-                      AssertionException);
+        ASSERT_THROWS_CODE(Struct_with_ignore_extra_duplicates::parse(ctxt, testDoc),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 }
 

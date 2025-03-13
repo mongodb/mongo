@@ -290,13 +290,13 @@ structs:
         description: Struct that is chained with a view struct.
         chained_structs:
             ViewStruct: ViewStruct
-    
+
     ViewStructChainedType:
         description: Struct that is chained with a view type.
         strict: false
         chained_types:
             ViewChainedType: ViewChainedType
-    
+
     ViewStructWithViewStructMember:
         description: Struct that has a type that is a view and a struct.
         fields:
@@ -376,6 +376,15 @@ structs:
 ##################################################################################################
     ignoredField:
         description: UnitTest for a struct with an ignored_field
+        fields:
+            required_field: int
+            ignored_field:
+                type: int
+                ignore: true
+
+    IgnoredFieldNonStrict:
+        description: UnitTest for a non-strict struct with an ignored_field
+        strict: false
         fields:
             required_field: int
             ignored_field:
@@ -1568,3 +1577,13 @@ commands:
         access_check:
             none: true
         reply_type: OkReply
+
+    NonStrictConcatenateWithDbCommand:
+        description: UnitTest for a non-strict concatenate_with_db command
+        command_name: NonStrictConcatenateWithDbCommand
+        namespace: concatenate_with_db
+        strict: false
+        api_version: ""
+        fields:
+            field1: int
+            field2: string
