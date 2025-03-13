@@ -327,12 +327,12 @@ configs:
         cpp_varname: 'wiredTigerGlobalOptions.engineConfig'
         short_name: wiredTigerEngineConfigString
         hidden: true
-    "storage.wiredTiger.engineConfig.wiredTigerLiveRestoreSource":
+    "storage.wiredTiger.engineConfig.liveRestoreSource":
         description: 'Path to the source for live restore.'
         arg_vartype: String
         cpp_varname: 'wiredTigerGlobalOptions.liveRestoreSource'
         short_name: wiredTigerLiveRestoreSource
-    "storage.wiredTiger.engineConfig.wiredTigerLiveRestoreThreads":
+    "storage.wiredTiger.engineConfig.liveRestoreThreads":
         description: 'Number of live restore background threads.'
         arg_vartype: Int
         cpp_varname: 'wiredTigerGlobalOptions.liveRestoreThreads'
@@ -341,7 +341,7 @@ configs:
             gte: 0
             lte: 12
         default: 8
-    "storage.wiredTiger.engineConfig.wiredTigerLiveRestoreReadSizeMB":
+    "storage.wiredTiger.engineConfig.liveRestoreReadSizeMB":
         description: >-
             'The read size for data migration, in MB, must be a power of two.
             This setting is a best effort. It does not force every read to be this size.'
