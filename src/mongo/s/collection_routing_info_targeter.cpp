@@ -643,11 +643,13 @@ StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQue
     }
 
     std::set<ShardId> shardIds;
-    QueryTargetingInfo info;
     try {
-        getShardIdsForQuery(expCtx, query, collation, _cri.cm, &shardIds, &info);
         if (chunkRanges) {
+            QueryTargetingInfo info;
+            getShardIdsForQuery(expCtx, query, collation, _cri.cm, &shardIds, &info);
             chunkRanges->swap(info.chunkRanges);
+        } else {
+            getShardIdsForQuery(expCtx, query, collation, _cri.cm, &shardIds);
         }
     } catch (const DBException& ex) {
         return ex.toStatus();
