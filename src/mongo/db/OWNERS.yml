@@ -301,3 +301,6 @@ filters:
   - "shutdown_in_progress_quiesce_info*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "startup_warnings_mongod_thp_test*":
+    approvers:
+      - 10gen/server-workload-scheduling
