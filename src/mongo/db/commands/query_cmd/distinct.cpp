@@ -481,7 +481,7 @@ public:
                                verbosity,
                                BSONObj(),
                                SerializationContext::stateCommandReply(serializationCtx),
-                               originalCmdObj,
+                               cmdObj,
                                &bodyBuilder);
         return Status::OK();
     }

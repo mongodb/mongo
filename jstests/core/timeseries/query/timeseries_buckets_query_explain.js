@@ -52,22 +52,13 @@ const assertQueryPlannerNamespace = function(explain) {
     }
 };
 
-const assertCommandNamespace = function(explain, commandRun) {
-    assert.eq(
-        explain.command[commandRun],
-        coll.getName(),
-        `Expected command namespace to be ${tojson(coll.getName())} but got ${tojson(explain)}`);
-};
-
-const assertExplain = function(explain, commandRun) {
+const assertExplain = function(explain) {
     assertQueryPlannerNamespace(explain);
-    assertCommandNamespace(explain, commandRun);
     assert(!getPlanStage(explain, "UNPACK_TS_BUCKET"),
            `Expected to find no unpack stage but got ${tojson(explain)}`);
 };
 
-assertExplain(coll.explain().aggregate([{$match: {"control.count": 2}}], {rawData: true}),
-              "aggregate");
-assertExplain(coll.explain().count({"control.count": 2}, {rawData: true}), "count");
-assertExplain(coll.explain().distinct("control.count", {}, {rawData: true}), "distinct");
-assertExplain(coll.explain().find({"control.count": 2}).rawData().finish(), "find");
+assertExplain(bucketsColl.explain().aggregate([{$match: {"control.count": 2}}]));
+assertExplain(coll.explain().count({"control.count": 2}, {rawData: true}));
+assertExplain(coll.explain().distinct("control.count", {}, {rawData: true}));
+assertExplain(coll.explain().find({"control.count": 2}).rawData().finish());
