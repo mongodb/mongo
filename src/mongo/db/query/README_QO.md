@@ -19,7 +19,7 @@ _Disclaimer_: This guide (SPM-2301) is a work in progress.
   - [Cost Based Ranker](#)
     - [Cost Model](#)
     - [Cardinality Estimation](#)
-- [IV. Explain](#)
+- [IV. Explain](README_explain.md)
 - [V. Plan Cache](#)
 - [VI. Cluster Planning](../../s/query/planner/README.md)
 - [VII. Testing](#)
