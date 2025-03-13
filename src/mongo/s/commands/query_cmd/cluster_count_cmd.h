@@ -41,6 +41,7 @@
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -69,6 +70,32 @@ inline BSONObj prepareCountForPassthrough(const BSONObj& cmdObj, bool requestQue
     BSONObjBuilder bob(cmdObj);
     bob.append("includeQueryStatsMetrics", true);
     return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
+}
+
+inline bool convertAndRunAggregateIfViewlessTimeseries(
+    OperationContext* const opCtx,
+    BSONObjBuilder& bodyBuilder,
+    const CountCommandRequest& request,
+    const CollectionRoutingInfo& cri,
+    const NamespaceString& nss,
+    boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
+    if (!timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, cri)) {
+        return false;
+    } else {
+        // We only need to route the viewless timeseries request to
+        // runAggregate() which will perform the pipeline rewrites.
+        const auto hasExplain = verbosity.has_value();
+        bodyBuilder.resetToEmpty();
+        auto aggRequest = query_request_conversion::asAggregateCommandRequest(request, hasExplain);
+        uassertStatusOK(ClusterAggregate::runAggregate(
+            opCtx,
+            ClusterAggregate::Namespaces{nss, nss},
+            aggRequest,
+            {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
+            verbosity,
+            &bodyBuilder));
+        return true;
+    }
 }
 
 /**
@@ -150,13 +177,18 @@ public:
             auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
 
-            if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
-                processFLECountS(opCtx, nss, countRequest);
-            }
-
             const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
+
+            if (convertAndRunAggregateIfViewlessTimeseries(opCtx, result, countRequest, cri, nss)) {
+                // We've delegated execution to agg.
+                return true;
+            }
+
+            if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
+                processFLECountS(opCtx, nss, countRequest);
+            }
 
             const auto expCtx =
                 makeExpressionContextWithDefaultsForTargeter(opCtx,
@@ -240,8 +272,8 @@ public:
                     auth::ValidatedTenancyScope::get(opCtx), dbName, resolvedAggRequest.toBSON()));
 
             result.resetToEmpty();
-            ViewResponseFormatter formatter(aggResult);
-            formatter.appendAsCountResponse(&result, boost::none);
+            ViewResponseFormatter{aggResult}.appendAsCountResponse(&result,
+                                                                   boost::none /*tenantId*/);
             return true;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             // If there's no collection with this name, the count aggregation behavior below
@@ -326,6 +358,21 @@ public:
             return exceptionToStatus();
         }
 
+        const auto cri =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+        {
+            // This scope is used to end the use of the builder
+            // whether or not we convert to a view-less timeseries
+            // aggregate request.
+            auto bodyBuilder = result->getBodyBuilder();
+            if (convertAndRunAggregateIfViewlessTimeseries(
+                    opCtx, bodyBuilder, countRequest, cri, nss, verbosity)) {
+                // We've delegated execution to agg.
+                return Status::OK();
+            }
+        }
+
         // If the command has encryptionInformation, rewrite the query as necessary.
         if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
             processFLECountS(opCtx, nss, countRequest);
@@ -341,8 +388,6 @@ public:
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
-            const auto cri = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                            nss.dbName(),

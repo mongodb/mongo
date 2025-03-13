@@ -31,14 +31,16 @@ function runTest(docs, query, results) {
     assert.commandWorked(
         db.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));
 
-    // Construct our pipelines for later use.
-    const pipeline = [{$match: query}, {$sort: {_id: 1}}, {$project: {_id: 0, time: 0}}];
-
     // Populate the collection with documents.
     docs.forEach(d => tsColl.insert(Object.assign({[timeFieldName]: new Date("2021-01-01")}, d)));
 
+    // Construct our pipelines for later use.
+    const pipeline = [{$match: query}, {$sort: {_id: 1}}, {$project: {_id: 0, time: 0}}];
+
     // Check that the result is in the result set.
     assert.docEq(results, tsColl.aggregate(pipeline).toArray());
+    // Sneak in some basic coverage of the count() command.
+    assert.eq(results.length, tsColl.count(query));
 
     // Ensure $type operator was not used.
     const explain = tsColl.explain().aggregate(pipeline);

@@ -81,6 +81,7 @@
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -236,11 +237,15 @@ public:
                 return _ns;
             }();
 
-            if (collOrViewAcquisition->isView()) {
-                // Relinquish locks. The aggregation command will re-acquire them.
-                collOrViewAcquisition.reset();
-                statsTracker.reset();
-                return runExplainOnView(opCtx, request(), verbosity, replyBuilder);
+            if (collOrViewAcquisition) {
+                if (collOrViewAcquisition->isView() ||
+                    timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx,
+                                                                        *collOrViewAcquisition)) {
+                    // Relinquish locks. The aggregation command will re-acquire them.
+                    collOrViewAcquisition.reset();
+                    statsTracker.reset();
+                    return runExplainAsAgg(opCtx, request(), verbosity, replyBuilder);
+                }
             }
 
             tassert(10168300,
@@ -353,11 +358,15 @@ public:
             registerRequestForQueryStats(
                 opCtx, expCtx, curOp, *collOrViewAcquisition, request(), *parsedFind);
 
-            if (collOrViewAcquisition->isView()) {
-                // Relinquish locks. The aggregation command will re-acquire them.
-                collOrViewAcquisition.reset();
-                statsTracker.reset();
-                return runCountOnView(opCtx, request());
+            if (collOrViewAcquisition) {
+                if (collOrViewAcquisition->isView() ||
+                    timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx,
+                                                                        *collOrViewAcquisition)) {
+                    // Relinquish locks. The aggregation command will re-acquire them.
+                    collOrViewAcquisition.reset();
+                    statsTracker.reset();
+                    return runCountAsAgg(opCtx, request());
+                }
             }
 
             tassert(10168301,
@@ -558,10 +567,10 @@ public:
             return reply;
         }
 
-        void runExplainOnView(OperationContext* opCtx,
-                              const RequestType& req,
-                              ExplainOptions::Verbosity verbosity,
-                              rpc::ReplyBuilderInterface* replyBuilder) {
+        void runExplainAsAgg(OperationContext* opCtx,
+                             const RequestType& req,
+                             ExplainOptions::Verbosity verbosity,
+                             rpc::ReplyBuilderInterface* replyBuilder) {
             auto curOp = CurOp::get(opCtx);
             curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
@@ -579,7 +588,7 @@ public:
             uassertStatusOK(runStatus);
         }
 
-        CountCommandReply runCountOnView(OperationContext* opCtx, const RequestType& req) {
+        CountCommandReply runCountAsAgg(OperationContext* opCtx, const RequestType& req) {
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
             auto aggRequest = query_request_conversion::asAggregateCommandRequest(req);
             auto opMsgAggRequest =
