@@ -30,11 +30,13 @@
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
-#include <vector>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+#include <string>
+#include <vector>
+
 
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -67,10 +69,6 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using boost::optional;
-using std::list;
-using std::string;
-using std::vector;
 
 namespace {
 auto& changeStreamsShowExpandedEvents =
@@ -165,25 +163,26 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target namespace exactly.
-            return "^" +
+            return fmt::format(
+                "^{}$",
                 // Change streams will only be enabled in serverless when multitenancy and
                 // featureFlag are on, therefore we don't have a tenantid prefix.
                 regexEscapeNsForChangeStream(
-                       NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext())) +
-                "$";
+                    NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext())));
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
             // '$' or 'system.' unless 'showSystemEvents' is set.
-            return "^" +
+            return fmt::format(
+                "^{}\\.{}",
                 // Change streams will only be enabled in serverless when multitenancy and
                 // featureFlag are on, therefore we don't have a tenantid prefix.
-                regexEscapeNsForChangeStream(DatabaseNameUtil::serialize(
-                    nss.dbName(), expCtx->getSerializationContext())) +
-                "\\." + resolveAllCollectionsRegex(expCtx);
+                regexEscapeNsForChangeStream(
+                    DatabaseNameUtil::serialize(nss.dbName(), expCtx->getSerializationContext())),
+                resolveAllCollectionsRegex(expCtx));
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
             // followed by ".", then NOT '$' or 'system.' unless 'showSystemEvents' is set.
-            return kRegexAllDBs + "\\." + resolveAllCollectionsRegex(expCtx);
+            return fmt::format("{}\\.{}", kRegexAllDBs, resolveAllCollectionsRegex(expCtx));
         default:
             MONGO_UNREACHABLE;
     }
@@ -196,13 +195,12 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
         case ChangeStreamType::kSingleDatabase:
             // For a single database, match any events on the system.views collection on that
             // database.
-            return "^" +
-                regexEscapeNsForChangeStream(DatabaseNameUtil::serialize(
-                    nss.dbName(), expCtx->getSerializationContext())) +
-                "\\.system.views$";
+            return fmt::format("^{}\\.system.views$",
+                               regexEscapeNsForChangeStream(DatabaseNameUtil::serialize(
+                                   nss.dbName(), expCtx->getSerializationContext())));
         case ChangeStreamType::kAllChangesForCluster:
             // Match all system.views collections on all databases.
-            return kRegexAllDBs + "\\.system.views$";
+            return fmt::format("{}\\.system.views$", kRegexAllDBs);
         default:
             // We should never attempt to generate this regex for a single-collection stream.
             MONGO_UNREACHABLE_TASSERT(6394400);
@@ -216,11 +214,11 @@ std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target collection exactly.
-            return "^" + regexEscapeNsForChangeStream(nss.coll()) + "$";
+            return fmt::format("^{}$", regexEscapeNsForChangeStream(nss.coll()));
         case ChangeStreamType::kSingleDatabase:
         case ChangeStreamType::kAllChangesForCluster:
             // Match any collection; database filtering will be done elsewhere.
-            return "^" + resolveAllCollectionsRegex(expCtx);
+            return fmt::format("^{}", resolveAllCollectionsRegex(expCtx));
         default:
             MONGO_UNREACHABLE;
     }
@@ -234,21 +232,23 @@ std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
         case ChangeStreamType::kSingleCollection:
         case ChangeStreamType::kSingleDatabase:
             // Match the target database command namespace exactly.
-            return "^" +
-                regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(
-                    nss.getCommandNS(), SerializationContext::stateDefault())) +
-                "$";
+            return fmt::format("^{}$",
+                               regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(
+                                   nss.getCommandNS(), SerializationContext::stateDefault())));
         case ChangeStreamType::kAllChangesForCluster:
             // Match all command namespaces on any database.
-            return kRegexAllDBs + "\\." + kRegexCmdColl;
+            return fmt::format("{}\\.{}", kRegexAllDBs, kRegexCmdColl);
         default:
             MONGO_UNREACHABLE;
     }
 }
 
 std::string DocumentSourceChangeStream::regexEscapeNsForChangeStream(StringData source) {
-    std::string result = "";
-    std::string escapes = "*+|()^?[]./\\$";
+    std::string result;
+    // Output string must be at least as long as the input string.
+    result.reserve(source.size());
+
+    constexpr StringData escapes = "*+|()^?[]./\\$";
     for (const char& c : source) {
         if (escapes.find(c) != std::string::npos) {
             result.append("\\");
@@ -276,7 +276,7 @@ Timestamp DocumentSourceChangeStream::getStartTimeForNewStream(
     return currentTime.addTicks(1).asTimestamp();
 }
 
-list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
+std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(50808,
             "$changeStream stage expects a document as argument",

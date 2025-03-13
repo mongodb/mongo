@@ -82,6 +82,49 @@ using AggExpressionRewrite =
                                                    std::vector<BSONObj>&)>;
 
 namespace {
+const auto kExistsTrue = Document{{"$exists", true}};
+const auto kExistsFalse = Document{{"$exists", false}};
+
+// Maps the operation type to the corresponding rewritten document in the oplog format.
+const StringMap<Document> kOpTypeRewriteMap = {
+    {"insert", {{"op", "i"_sd}}},
+    {"delete", {{"op", "d"_sd}}},
+    {"update", {{"op", "u"_sd}, {"o._id"_sd, kExistsFalse}}},
+    {"replace", {{"op", "u"_sd}, {"o._id"_sd, kExistsTrue}}},
+    {"drop", {{"op", "c"_sd}, {"o.drop"_sd, kExistsTrue}}},
+    {"create", {{"op", "c"_sd}, {"o.create"_sd, kExistsTrue}}},
+    {"createIndexes",
+     {{"op", "c"_sd},
+      {"$or"_sd,
+       std::vector<Value>{Value({{"o.createIndexes"_sd, kExistsTrue}}),
+                          Value({{"o.commitIndexBuild"_sd, kExistsTrue}})}}}},
+    {"startIndexBuild", {{"op", "c"_sd}, {"o.startIndexBuild"_sd, kExistsTrue}}},
+    {"abortIndexBuild", {{"op", "c"_sd}, {"o.abortIndexBuild"_sd, kExistsTrue}}},
+    {"dropIndexes", {{"op", "c"_sd}, {"o.dropIndexes"_sd, kExistsTrue}}},
+    {"modify", {{"op", "c"_sd}, {"o.collMod"_sd, kExistsTrue}}},
+    {"rename", {{"op", "c"_sd}, {"o.renameCollection"_sd, kExistsTrue}}},
+    {"dropDatabase", {{"op", "c"_sd}, {"o.dropDatabase"_sd, kExistsTrue}}}};
+
+// $exists and null-equality checks on 'updateDescription' or its immediate subfields are AlwaysTrue
+// or AlwaysFalse, since these fields are always present in the update event.
+const std::set<StringData> kUpdateExistentFields = {"updateDescription",
+                                                    "updateDescription.updatedFields",
+                                                    "updateDescription.removedFields",
+                                                    "updateDescription.truncatedArrays"};
+
+// The oplog field corresponding to "updateDescription.updatedFields" can be in any one of three
+// locations. We will attempt to construct a filter to match against them all.
+const std::array<std::string, 3> kUpdateDescriptionUpdateOplogFields = {
+    "o.diff.i", "o.diff.u", "o.$set"};
+
+// The oplog field corresponding to "updateDescription.removedFields" can be in either of two
+// locations. Construct an $or filter to match against them both. Because we have already validated
+// that this is an equality string match, we do not need to check whether the predicate matches a
+// missing field in this case.
+const std::array<std::string, 2> kUpdateDescriptionRemoveOplogFields = {"o.diff.d", "o.$unset"};
+
+const std::set<std::string> kNSValidSubFieldNames = {"ns.db", "ns.coll"};
+
 /**
  * Helpers to clone an expression to the same type and rename the fields to which it applies.
  */
@@ -132,29 +175,6 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
     if (predicate->fieldRef()->numParts() > 1) {
         return resolvePredicateOnNonExistentField(predicate);
     }
-
-    static const auto kExistsTrue = Document{{"$exists", true}};
-    static const auto kExistsFalse = Document{{"$exists", false}};
-
-    // Maps the operation type to the corresponding rewritten document in the oplog format.
-    static const StringMap<Document> kOpTypeRewriteMap = {
-        {"insert", {{"op", "i"_sd}}},
-        {"delete", {{"op", "d"_sd}}},
-        {"update", {{"op", "u"_sd}, {"o._id"_sd, kExistsFalse}}},
-        {"replace", {{"op", "u"_sd}, {"o._id"_sd, kExistsTrue}}},
-        {"drop", {{"op", "c"_sd}, {"o.drop"_sd, kExistsTrue}}},
-        {"create", {{"op", "c"_sd}, {"o.create"_sd, kExistsTrue}}},
-        {"createIndexes",
-         {{"op", "c"_sd},
-          {"$or"_sd,
-           std::vector<Value>{Value({{"o.createIndexes"_sd, kExistsTrue}}),
-                              Value({{"o.commitIndexBuild"_sd, kExistsTrue}})}}}},
-        {"startIndexBuild", {{"op", "c"_sd}, {"o.startIndexBuild"_sd, kExistsTrue}}},
-        {"abortIndexBuild", {{"op", "c"_sd}, {"o.abortIndexBuild"_sd, kExistsTrue}}},
-        {"dropIndexes", {{"op", "c"_sd}, {"o.dropIndexes"_sd, kExistsTrue}}},
-        {"modify", {{"op", "c"_sd}, {"o.collMod"_sd, kExistsTrue}}},
-        {"rename", {{"op", "c"_sd}, {"o.renameCollection"_sd, kExistsTrue}}},
-        {"dropDatabase", {{"op", "c"_sd}, {"o.dropDatabase"_sd, kExistsTrue}}}};
 
     // Helper to convert a BSONElement opType into a rewritten MatchExpression.
     auto getRewrittenOpType = [&](auto& opType) -> std::unique_ptr<MatchExpression> {
@@ -416,7 +436,8 @@ boost::intrusive_ptr<Expression> exprRewriteDocumentKey(
     auto exprObj = exprBuilder.obj();
 
     // Parse the expression BSON object into an Expression and return the Expression.
-    return Expression::parseExpression(expCtx.get(), exprObj, expCtx->variablesParseState);
+    return Expression::parseExpression(
+        expCtx.get(), std::move(exprObj), expCtx->variablesParseState);
 }
 
 /**
@@ -519,14 +540,9 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
     // We can't determine whether we can perform a strict rewrite until we examine the predicate. We
     // wrap this in a helper function that we can call while building the filter. We try to rewrite
     // the predicate assuming that it will only be applied to non-replacement update oplog events.
-    auto tryExactRewriteForUpdateEvents = [](auto predicate) -> std::unique_ptr<MatchExpression> {
-        // $exists and null-equality checks on 'updateDescription' or its immediate subfields are
-        // AlwaysTrue or AlwaysFalse, since these fields are always present in the update event.
-        static const std::set<std::string> existentFields = {"updateDescription",
-                                                             "updateDescription.updatedFields",
-                                                             "updateDescription.removedFields",
-                                                             "updateDescription.truncatedArrays"};
-        if (existentFields.count(predicate->path().toString())) {
+    auto tryExactRewriteForUpdateEvents =
+        [](const PathMatchExpression* predicate) -> std::unique_ptr<MatchExpression> {
+        if (kUpdateExistentFields.count(predicate->path())) {
             // An {$exists:true} predicate will always match against any of these fields.
             if (predicate->matchType() == MatchExpression::EXISTS) {
                 return std::make_unique<AlwaysTrueMatchExpression>();
@@ -556,9 +572,6 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
         //   ]}
         if (predicate->fieldRef()->numParts() == 3 &&
             predicate->fieldRef()->getPart(1) == "updatedFields"_sd) {
-            // The oplog field corresponding to "updateDescription.updatedFields" can be in any one
-            // of three locations. We will attempt to construct a filter to match against them all.
-            static const std::vector<std::string> oplogFields = {"o.diff.i", "o.diff.u", "o.$set"};
             // If this predicate matches against a missing field, then we must apply an $and to all
             // three potential locations, since at least two of them will always be missing. If not,
             // then we build an $or to match if the field is present at any of the locations.
@@ -569,7 +582,9 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
                 return std::make_unique<OrMatchExpression>();
             }();
             // Rewrite the predicate for each of the three potential oplog locations.
-            for (auto&& oplogField : oplogFields) {
+            // The oplog field corresponding to "updateDescription.updatedFields" can be in any one
+            // of three locations. We will attempt to construct a filter to match against them all.
+            for (auto&& oplogField : kUpdateDescriptionUpdateOplogFields) {
                 rewrittenUserPredicate->add(cloneWithSubstitution(
                     predicate, {{"updateDescription.updatedFields", oplogField}}));
             }
@@ -617,13 +632,12 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
                 if (FieldRef(fieldName).numParts() > 1) {
                     return nullptr;
                 }
+                auto rewrittenEquality = std::make_unique<OrMatchExpression>();
                 // The oplog field corresponding to "updateDescription.removedFields" can be in
                 // either of two locations. Construct an $or filter to match against them both.
                 // Because we have already validated that this is an equality string match, we do
                 // not need to check whether the predicate matches a missing field in this case.
-                static const std::vector<std::string> oplogFields = {"o.diff.d", "o.$unset"};
-                auto rewrittenEquality = std::make_unique<OrMatchExpression>();
-                for (auto&& oplogField : oplogFields) {
+                for (auto&& oplogField : kUpdateDescriptionRemoveOplogFields) {
                     rewrittenEquality->add(std::make_unique<ExistsMatchExpression>(
                         StringData(fmt::format("{}.{}", oplogField, fieldName))));
                 }
@@ -778,7 +792,7 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                 if (nsFieldIsCmdNs) {
                     auto rewrittenPred = std::make_unique<AndMatchExpression>();
                     rewrittenPred->add(std::make_unique<EqualityMatchExpression>(
-                        nsField, Value(dbElem.str() + ".$cmd")));
+                        nsField, Value(fmt::format("{}.$cmd", dbElem.valueStringDataSafe()))));
 
                     if (collNameField) {
                         // If we are rewriting to a combination of cmdNs and collName, we match on
@@ -792,7 +806,9 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                 // Otherwise, we are rewriting to a full namespace field. Convert the object's
                 // subfields into an exact match on the oplog field.
                 return std::make_unique<EqualityMatchExpression>(
-                    nsField, Value(dbElem.str() + "." + collElem.str()));
+                    nsField,
+                    Value(fmt::format(
+                        "{}.{}", dbElem.valueStringDataSafe(), collElem.valueStringData())));
             }
             case BSONType::String: {
                 // Handles case with field path, like '{"ns.coll": "coll"}'. There must be 2 parts
@@ -815,8 +831,8 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                 // If the predicate is on 'db' and 'nsFieldIsCmdNs' is set to true, match the $cmd
                 // namespace.
                 if (nsFieldIsCmdNs && fieldName == "db") {
-                    return std::make_unique<EqualityMatchExpression>(nsField,
-                                                                     Value(nsElem.str() + ".$cmd"));
+                    return std::make_unique<EqualityMatchExpression>(
+                        nsField, Value(fmt::format("{}.$cmd", nsElem.valueStringDataSafe())));
                 }
                 // If the predicate is on 'coll', match the 'collNameField' if we have one.
                 if (collNameField && fieldName == "coll") {
@@ -829,13 +845,16 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                 // the predicate is on 'coll', match that collection in all DBs.
                 auto nsRegex = [&]() {
                     if (fieldName == "db") {
-                        return "^" +
-                            DocumentSourceChangeStream::regexEscapeNsForChangeStream(nsElem.str()) +
-                            "\\." + DocumentSourceChangeStream::resolveAllCollectionsRegex(expCtx);
+                        return fmt::format(
+                            "^{}\\.{}",
+                            DocumentSourceChangeStream::regexEscapeNsForChangeStream(
+                                nsElem.valueStringDataSafe()),
+                            DocumentSourceChangeStream::resolveAllCollectionsRegex(expCtx));
                     }
-                    return DocumentSourceChangeStream::kRegexAllDBs + "\\." +
-                        DocumentSourceChangeStream::regexEscapeNsForChangeStream(nsElem.str()) +
-                        "$";
+                    return fmt::format("{}\\.{}$",
+                                       DocumentSourceChangeStream::kRegexAllDBs,
+                                       DocumentSourceChangeStream::regexEscapeNsForChangeStream(
+                                           nsElem.valueStringDataSafe()));
                 }();
 
                 return std::make_unique<RegexMatchExpression>(nsField, nsRegex, "");
@@ -1225,8 +1244,7 @@ boost::intrusive_ptr<Expression> exprRewriteNs(
             fieldPath.getFieldName(0) == DocumentSourceChangeStream::kNamespaceField);
 
     // If the field path is not 'ns', 'ns.db' or 'ns.coll', it does not exist.
-    static const std::set<std::string> validSubFieldNames = {"ns.db", "ns.coll"};
-    if (fieldPath.getPathLength() > 1 && !validSubFieldNames.count(fieldPath.fullPath())) {
+    if (fieldPath.getPathLength() > 1 && !kNSValidSubFieldNames.count(fieldPath.fullPath())) {
         return ExpressionConstant::create(expCtx.get(), Value());
     }
 
@@ -1268,7 +1286,8 @@ boost::intrusive_ptr<Expression> exprRewriteNs(
     }();
 
     // Parse the expression BSON object into an Expression and return it.
-    return Expression::parseExpression(expCtx.get(), rewrittenExpr, expCtx->variablesParseState);
+    return Expression::parseExpression(
+        expCtx.get(), std::move(rewrittenExpr), expCtx->variablesParseState);
 }
 
 /**
@@ -1360,7 +1379,8 @@ boost::intrusive_ptr<Expression> exprRewriteTo(
     }
 
     // Parse the expression BSON object into an Expression and return it.
-    return Expression::parseExpression(expCtx.get(), condRename, expCtx->variablesParseState);
+    return Expression::parseExpression(
+        expCtx.get(), std::move(condRename), expCtx->variablesParseState);
 }
 
 /**

@@ -76,6 +76,11 @@ const StringDataSet kOpsWithoutNs = {
     DocumentSourceChangeStream::kEndOfTransactionOpType,
 };
 
+const StringDataSet kPreImageOps = {DocumentSourceChangeStream::kUpdateOpType,
+                                    DocumentSourceChangeStream::kReplaceOpType,
+                                    DocumentSourceChangeStream::kDeleteOpType};
+const StringDataSet kPostImageOps = {DocumentSourceChangeStream::kUpdateOpType};
+
 // Possible collection types, for the "type" field returned by collection / view create events.
 enum class CollectionType {
     kCollection,
@@ -143,7 +148,7 @@ void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocum
 
     // We set the resume token as the document's sort key in both the sharded and non-sharded cases,
     // since we will subsequently rely upon it to generate a correct postBatchResumeToken.
-    const bool isSingleElementKey = true;
+    constexpr bool isSingleElementKey = true;
     doc->metadata().setSortKey(resumeToken, isSingleElementKey);
 }
 
@@ -548,12 +553,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // Determine whether the preImageId should be included, for eligible operations. Note that we
     // will include preImageId even if the user requested a post-image but no pre-image, because the
     // pre-image is required to compute the post-image.
-    static const std::set<StringData> preImageOps = {DocumentSourceChangeStream::kUpdateOpType,
-                                                     DocumentSourceChangeStream::kReplaceOpType,
-                                                     DocumentSourceChangeStream::kDeleteOpType};
-    static const std::set<StringData> postImageOps = {DocumentSourceChangeStream::kUpdateOpType};
-    if ((_preImageRequested && preImageOps.count(operationType)) ||
-        (_postImageRequested && postImageOps.count(operationType))) {
+    if ((_preImageRequested && kPreImageOps.count(operationType)) ||
+        (_postImageRequested && kPostImageOps.count(operationType))) {
         // Set 'kPreImageIdField' to the 'ChangeStreamPreImageId'. The DSCSAddPreImage stage
         // will use the id in order to fetch the pre-image from the pre-images collection.
         const auto preImageId = ChangeStreamPreImageId(

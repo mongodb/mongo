@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/feature_flag.h"
@@ -67,13 +66,16 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
-
 namespace mongo {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamUnwindTransaction,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamUnwindTransaction::createFromBson,
                                   true);
+
+namespace {
+const std::set<std::string> kUnwindExcludedFields = {"clusterTime", "lsid", "txnNumber"};
+}
 
 namespace change_stream_filter {
 /**
@@ -107,9 +109,8 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
     // this separately because we need to exclude certain fields from the user's filters. Unwound
     // transaction events do not have these fields until we populate them from the commitTransaction
     // event. We already applied these predicates during the oplog scan, so we know that they match.
-    static const std::set<std::string> excludedFields = {"clusterTime", "lsid", "txnNumber"};
     if (auto rewrittenMatch = change_stream_rewrite::rewriteFilterForFields(
-            expCtx, userMatch, bsonObj, {}, excludedFields)) {
+            expCtx, userMatch, bsonObj, {}, kUnwindExcludedFields)) {
         unwindFilter->add(std::move(rewrittenMatch));
     }
     return MatchExpression::optimize(std::move(unwindFilter));
