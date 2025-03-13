@@ -205,17 +205,13 @@ public:
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
 
-            BSONObj cmdObj = _cmdRequest->toBSON();
             NamespaceString expNs = ns();
             if (_cmdRequest->getRawData() &&
                 _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&
                 CollectionRoutingInfoTargeter{opCtx, _cmdRequest->getNamespaceOrUUID().nss()}
                     .timeseriesNamespaceNeedsRewrite(_cmdRequest->getNamespaceOrUUID().nss())) {
-                auto expNs =
-                    _cmdRequest->getNamespaceOrUUID().nss().makeTimeseriesBucketsNamespace();
+                expNs = _cmdRequest->getNamespaceOrUUID().nss().makeTimeseriesBucketsNamespace();
                 _cmdRequest->setNss(expNs);
-                cmdObj =
-                    rewriteCommandForRawDataOperation<FindCommandRequest>(cmdObj, expNs.coll());
             }
 
             auto expCtx = ExpressionContextBuilder{}
@@ -275,8 +271,13 @@ public:
                     _cmdRequest = uassertStatusOK(ClusterFind::transformQueryForShards(cq));
                 }
 
-                const auto explainCmd =
-                    ClusterExplain::wrapAsExplain(cmdObj, verbosity, querySettings.toBSON());
+                const auto explainCmd = ClusterExplain::wrapAsExplain(
+                    !_cmdRequest->getRawData() || expNs == ns()
+                        ? _cmdRequest->toBSON()
+                        : rewriteCommandForRawDataOperation<FindCommandRequest>(
+                              _cmdRequest->toBSON(), expNs.coll()),
+                    verbosity,
+                    querySettings.toBSON());
 
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
