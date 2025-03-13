@@ -147,12 +147,14 @@ mongo_cc_library(
         "//src/mongo/rpc/metadata:audit_metadata.cpp",
         "//src/mongo/rpc/metadata:audit_user_attrs.cpp",
         "//src/mongo/rpc/metadata:audit_user_attrs_client_observer.cpp",
+        "//src/mongo/rpc/metadata:impersonated_client_session.cpp",
     ],
     hdrs = [
         "//src/mongo/rpc/metadata:audit_client_attrs.h",
         "//src/mongo/rpc/metadata:audit_metadata.h",
         "//src/mongo/rpc/metadata:audit_user_attrs.h",
         "//src/mongo/rpc/metadata:audit_user_attrs_client_observer.h",
+        "//src/mongo/rpc/metadata:impersonated_client_session.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -260,6 +262,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/third_party/wiredtiger:wiredtiger_checksum",
     ],
 )

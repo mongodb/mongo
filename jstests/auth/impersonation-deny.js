@@ -25,20 +25,35 @@ function testMongod(mongod, systemuserpwd = undefined) {
     jsTest.log('Negative tests - Add impersonation metadata to hello command');
 
     // Adding impersonation metadata is forbidden if we're not permitted to use it.
-    const kImpersonatedHello = {
+    const kImpersonatedUserHello = {
         hello: 1,
         "$audit": {
             "$impersonatedUser": {user: 'admin', db: 'admin'},
             "$impersonatedRoles": [{role: 'root', db: 'admin'}],
         }
     };
-    assertError(
-        kImpersonatedHello, 'Unauthorized use of impersonation metadata', ErrorCodes.Unauthorized);
+    const kImpersonatedClientHello = {
+        hello: 1,
+        "$audit": {
+            "$impersonatedClient": {hosts: ['172.23.55.11:23890', '192.43.22.3:14089']},
+            "$impersonatedRoles": [],
+        }
+    };
+    assertError(kImpersonatedUserHello,
+                'Unauthorized use of impersonation metadata',
+                ErrorCodes.Unauthorized);
+    assertError(kImpersonatedClientHello,
+                'Unauthorized use of impersonation metadata',
+                ErrorCodes.Unauthorized);
 
     // Try as admin (root role), should still fail.
     admin.auth('admin', 'admin');
-    assertError(
-        kImpersonatedHello, 'Unauthorized use of impersonation metadata', ErrorCodes.Unauthorized);
+    assertError(kImpersonatedUserHello,
+                'Unauthorized use of impersonation metadata',
+                ErrorCodes.Unauthorized);
+    assertError(kImpersonatedClientHello,
+                'Unauthorized use of impersonation metadata',
+                ErrorCodes.Unauthorized);
     admin.logout();
 
     if (systemuserpwd !== undefined) {
@@ -47,7 +62,8 @@ function testMongod(mongod, systemuserpwd = undefined) {
 
         const local = mongod.getDB('local');
         local.auth('__system', systemuserpwd);
-        assert.commandWorked(admin.runCommand(kImpersonatedHello));
+        assert.commandWorked(admin.runCommand(kImpersonatedUserHello));
+        assert.commandWorked(admin.runCommand(kImpersonatedClientHello));
         local.logout();
     }
 

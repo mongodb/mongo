@@ -836,6 +836,7 @@ const ActionSet kClusterActionsQuickList({
     ActionType::advanceClusterTime,
     ActionType::bypassDefaultMaxTimeMS,
     ActionType::bypassWriteBlockingMode,
+    ActionType::impersonate,
     ActionType::internal,
     ActionType::useTenant,
 });

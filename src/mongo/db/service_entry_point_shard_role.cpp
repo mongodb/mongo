@@ -142,6 +142,7 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/impersonated_client_session.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -612,8 +613,10 @@ private:
             APIParameters::get(opCtx) = APIParameters::fromClient(apiParameters);
         }
 
-        rpc::readRequestMetadata(
-            opCtx, _invocation->getGenericArguments(), command->requiresAuth());
+        rpc::readRequestMetadata(opCtx,
+                                 _invocation->getGenericArguments(),
+                                 command->requiresAuth(),
+                                 _clientSessionGuard);
 
         const auto session = _execContext.getOpCtx()->getClient()->session();
         if (session) {
@@ -669,6 +672,7 @@ private:
 
     boost::optional<RunCommandOpTimes> _runCommandOpTimes;
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
+    boost::optional<rpc::ImpersonatedClientSessionGuard> _clientSessionGuard;
     boost::optional<auth::SecurityTokenAuthenticationGuard> _tokenAuthorizationSessionGuard;
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
@@ -1649,11 +1653,18 @@ void ExecCommandDatabase::_initiateCommand() {
 
     if (auto auditUserAttrs = rpc::AuditUserAttrs::get(opCtx);
         auditUserAttrs && auditUserAttrs->getIsImpersonating()) {
-        uassert(ErrorCodes::Unauthorized,
-                "Unauthorized use of impersonation metadata.",
-                authzSession->isAuthorizedForPrivilege(
-                    Privilege(ResourcePattern::forClusterResource(authzSession->getUserTenantId()),
-                              ActionType::impersonate)));
+        uassert(
+            ErrorCodes::Unauthorized,
+            "Unauthorized use of impersonation metadata.",
+            authzSession->isAuthorizedForClusterActions({ActionType::impersonate}, boost::none));
+    }
+
+    if (auto auditClientAttrs = rpc::AuditClientAttrs::get(client);
+        auditClientAttrs && auditClientAttrs->getIsImpersonating()) {
+        uassert(
+            ErrorCodes::Unauthorized,
+            "Unauthorized use of impersonation metadata.",
+            authzSession->isAuthorizedForClusterActions({ActionType::impersonate}, boost::none));
     }
 
     _invocation->checkAuthorization(opCtx, _execContext.getRequest());

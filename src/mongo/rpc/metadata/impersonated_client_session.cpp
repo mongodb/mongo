@@ -27,36 +27,46 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <boost/optional.hpp>
-#include <vector>
-
-#include "mongo/db/auth/role_name.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/audit_attrs_gen.h"
-#include "mongo/rpc/metadata/audit_metadata_gen.h"
+#include "mongo/rpc/metadata/impersonated_client_session.h"
 
 namespace mongo::rpc {
 
-class AuditClientAttrs : public rpc::AuditClientAttrsBase {
-public:
-    AuditClientAttrs(HostAndPort local,
-                     HostAndPort remote,
-                     std::vector<HostAndPort> proxies = {},
-                     bool isImpersonating = false)
-        : AuditClientAttrsBase(
-              std::move(local), std::move(remote), std::move(proxies), isImpersonating) {}
+ImpersonatedClientSessionGuard::ImpersonatedClientSessionGuard(
+    Client* client, const ImpersonatedClientMetadata& parsedClientMetadata)
+    : _client(client) {
+    auto session = client->session();
+    auto local = session ? session->local() : HostAndPort{};
+    const auto& hosts = parsedClientMetadata.getHosts();
 
-    explicit AuditClientAttrs(const BSONObj& obj);
+    uassert(ErrorCodes::BadValue, "$audit must contain at least one host", hosts.size() > 0);
 
-    static boost::optional<AuditClientAttrs> get(Client* client);
-    static void set(Client* client, AuditClientAttrs clientAttrs);
-    static void resetToPeerClient(Client* client);
-    static void reset(Client* client);
+    auto remote = hosts[0];
+    std::vector<HostAndPort> intermediates;
+    for (size_t i = 1; i < hosts.size(); ++i) {
+        // In rare occasions a node will send a request to itself (e.g.
+        // checkCatalogConsistencyAcrossShards), adding itself as an intermediate. We check if the
+        // host is the same to skip it.
+        if (MONGO_unlikely(hosts[i] == local)) {
+            continue;
+        }
+        intermediates.push_back(hosts[i]);
+    }
 
-    ImpersonatedClientMetadata generateClientMetadataObj();
-};
+    _oldClientAttrs = AuditClientAttrs::get(client);
+
+    AuditClientAttrs::set(client,
+                          AuditClientAttrs(std::move(local),
+                                           std::move(remote),
+                                           std::move(intermediates),
+                                           true /* isImpersonating */));
+}
+
+ImpersonatedClientSessionGuard::~ImpersonatedClientSessionGuard() {
+    if (_oldClientAttrs) {
+        AuditClientAttrs::set(_client, _oldClientAttrs.value());
+    } else {
+        AuditClientAttrs::reset(_client);
+    }
+}
 
 }  // namespace mongo::rpc

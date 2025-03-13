@@ -92,6 +92,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/impersonated_client_session.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -373,6 +374,7 @@ private:
     const StringData _commandName;
 
     std::shared_ptr<CommandInvocation> _invocation;
+    boost::optional<rpc::ImpersonatedClientSessionGuard> _clientSessionGuard;
     boost::optional<NamespaceString> _ns;
     OperationSessionInfoFromClient _osi;
     boost::optional<WriteConcernOptions> _wc;
@@ -521,7 +523,8 @@ void ParseAndRunCommand::_parseCommand() {
         APIParameters::get(opCtx) = APIParameters::fromClient(std::move(apiParams));
     }
 
-    rpc::readRequestMetadata(opCtx, _invocation->getGenericArguments(), command->requiresAuth());
+    rpc::readRequestMetadata(
+        opCtx, _invocation->getGenericArguments(), command->requiresAuth(), _clientSessionGuard);
 
     CommandInvocation::set(opCtx, _invocation);
 

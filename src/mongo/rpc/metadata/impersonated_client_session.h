@@ -29,34 +29,26 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
-
-#include "mongo/db/auth/role_name.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/audit_attrs_gen.h"
-#include "mongo/rpc/metadata/audit_metadata_gen.h"
+#include "mongo/db/client.h"
+#include "mongo/rpc/metadata/audit_client_attrs.h"
 
 namespace mongo::rpc {
 
-class AuditClientAttrs : public rpc::AuditClientAttrsBase {
+/**
+ * RAII class to optionally set impersonated client attributes .
+ */
+class ImpersonatedClientSessionGuard {
 public:
-    AuditClientAttrs(HostAndPort local,
-                     HostAndPort remote,
-                     std::vector<HostAndPort> proxies = {},
-                     bool isImpersonating = false)
-        : AuditClientAttrsBase(
-              std::move(local), std::move(remote), std::move(proxies), isImpersonating) {}
+    ImpersonatedClientSessionGuard(Client* client,
+                                   const ImpersonatedClientMetadata& parsedClientMetadata);
+    ~ImpersonatedClientSessionGuard();
 
-    explicit AuditClientAttrs(const BSONObj& obj);
+    ImpersonatedClientSessionGuard(const ImpersonatedClientSessionGuard&) = delete;
+    ImpersonatedClientSessionGuard& operator=(const ImpersonatedClientSessionGuard&) = delete;
 
-    static boost::optional<AuditClientAttrs> get(Client* client);
-    static void set(Client* client, AuditClientAttrs clientAttrs);
-    static void resetToPeerClient(Client* client);
-    static void reset(Client* client);
-
-    ImpersonatedClientMetadata generateClientMetadataObj();
+private:
+    boost::optional<AuditClientAttrs> _oldClientAttrs;
+    Client* _client;
 };
 
 }  // namespace mongo::rpc

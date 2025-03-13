@@ -86,3 +86,6 @@ structs:
                 type: array<HostAndPort>
                 description: "The intermediate load balancers or mongos addresses that the request passed through between 'remote' and 'local'"
                 optional: false
+            isImpersonating:
+                type: bool
+                description: "Set to true if the information came from $audit.$impersonatedClient"

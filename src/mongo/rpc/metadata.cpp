@@ -73,7 +73,8 @@ BSONObj makeEmptyMetadata() {
 
 void readRequestMetadata(OperationContext* opCtx,
                          const GenericArguments& requestArgs,
-                         bool cmdRequiresAuth) {
+                         bool cmdRequiresAuth,
+                         boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
     auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
 
@@ -111,7 +112,7 @@ void readRequestMetadata(OperationContext* opCtx,
         opCtx->setRoutedByReplicaSetEndpoint(true);
     }
 
-    setAuditMetadata(opCtx, requestArgs.getDollarAudit());
+    setAuditMetadata(opCtx, requestArgs.getDollarAudit(), clientSessionGuard);
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
     // a top-level field.
