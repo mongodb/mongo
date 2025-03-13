@@ -360,6 +360,8 @@ public:
      */
     static int handleWtEvictionEvent(WT_SESSION* session);
 
+    static long long getCancelledCacheMetric_forTest();
+
 private:
     /**
      * Casts unsigned 64-bit statistics value to T.

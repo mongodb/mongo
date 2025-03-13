@@ -34,6 +34,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
@@ -57,6 +58,7 @@ namespace {
 auto kLogKeyName = "log"_sd;
 auto kLogEnabledKeyName = "enabled"_sd;
 
+auto& cancelledCacheMetric = *MetricBuilder<Counter64>("storage.cancelledCacheEvictions");
 }  // namespace
 
 namespace {
@@ -1407,9 +1409,15 @@ int WiredTigerUtil::handleWtEvictionEvent(WT_SESSION* session) {
 
     if (feature_flags::gStorageEngineInterruptibility.isEnabled() && ru->isInterrupted()) {
         ru->notifyInterruptionAcknowledged();
+        cancelledCacheMetric.increment();
         return -1;
     }
+
     return 0;
+}
+
+long long WiredTigerUtil::getCancelledCacheMetric_forTest() {
+    return cancelledCacheMetric.get();
 }
 
 }  // namespace mongo

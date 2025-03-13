@@ -1047,6 +1047,9 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, OptionalEvictionCanBeInterrupted) {
         if (enableFeature) {
             auto stats = StorageExecutionContext::get(opCtx)->getStorageMetrics();
             ASSERT_EQ(23, stats.interruptDelayMs.load());
+            ASSERT_EQ(WiredTigerUtil::getCancelledCacheMetric_forTest(), 1);
+        } else {
+            ASSERT_EQ(WiredTigerUtil::getCancelledCacheMetric_forTest(), 0);
         }
     }
 }
