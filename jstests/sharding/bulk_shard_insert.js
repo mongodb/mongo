@@ -4,7 +4,10 @@
  *
  * This test is labeled resource intensive because its total io_write is ~26MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
- * @tags: [resource_intensive]
+ * @tags: [
+ *      resource_intensive,
+ *      tsan_incompatible,
+ *      incompatible_aubsan]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
