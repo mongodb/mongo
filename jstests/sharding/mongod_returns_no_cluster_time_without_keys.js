@@ -11,6 +11,7 @@
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isTimestamp} from "jstests/libs/timestamp_util.js";
 
 // This test uses authentication and runs commands without authenticating, which is not
 // compatible with implicit sessions.
@@ -40,8 +41,7 @@ function assertContainsValidLogicalTime(adminConn) {
         assert(res.$clusterTime.signature.keyId > NumberLong(0));
 
         assert.hasFields(res, ["operationTime"]);
-        assert(Object.prototype.toString.call(res.operationTime) === "[object Timestamp]",
-               "operationTime must be a timestamp");
+        assert(isTimestamp(res.operationTime), "operationTime must be a timestamp", {res});
         return true;
     } catch (error) {
         return false;

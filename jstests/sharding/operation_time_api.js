@@ -7,13 +7,10 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isTimestamp} from "jstests/libs/timestamp_util.js";
 
 function responseContainsTimestampOperationTime(res) {
     return res.operationTime !== undefined && isTimestamp(res.operationTime);
-}
-
-function isTimestamp(val) {
-    return Object.prototype.toString.call(val) === "[object Timestamp]";
 }
 
 // A mongos that talks to a non-sharded collection on a sharded replica set returns an

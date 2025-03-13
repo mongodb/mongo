@@ -59,6 +59,7 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
+
 namespace mongo {
 namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
@@ -213,17 +214,19 @@ ChangeStreamDefaultEventTransformation::ChangeStreamDefaultEventTransformation(
     : ChangeStreamEventTransformation(expCtx, spec) {}
 
 std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDependencies() const {
-    std::set<std::string> accessedFields = {repl::OplogEntry::kOpTypeFieldName.toString(),
-                                            repl::OplogEntry::kTimestampFieldName.toString(),
-                                            repl::OplogEntry::kNssFieldName.toString(),
-                                            repl::OplogEntry::kUuidFieldName.toString(),
-                                            repl::OplogEntry::kObjectFieldName.toString(),
-                                            repl::OplogEntry::kObject2FieldName.toString(),
-                                            repl::OplogEntry::kSessionIdFieldName.toString(),
-                                            repl::OplogEntry::kTxnNumberFieldName.toString(),
-                                            DocumentSourceChangeStream::kTxnOpIndexField.toString(),
-                                            repl::OplogEntry::kWallClockTimeFieldName.toString(),
-                                            repl::OplogEntry::kTidFieldName.toString()};
+    std::set<std::string> accessedFields = {
+        repl::OplogEntry::kOpTypeFieldName.toString(),
+        repl::OplogEntry::kTimestampFieldName.toString(),
+        repl::OplogEntry::kNssFieldName.toString(),
+        repl::OplogEntry::kUuidFieldName.toString(),
+        repl::OplogEntry::kObjectFieldName.toString(),
+        repl::OplogEntry::kObject2FieldName.toString(),
+        repl::OplogEntry::kSessionIdFieldName.toString(),
+        repl::OplogEntry::kTxnNumberFieldName.toString(),
+        DocumentSourceChangeStream::kTxnOpIndexField.toString(),
+        repl::OplogEntry::kWallClockTimeFieldName.toString(),
+        DocumentSourceChangeStream::kCommitTimestampField.toString(),
+        repl::OplogEntry::kTidFieldName.toString()};
 
     if (_preImageRequested || _postImageRequested) {
         accessedFields.insert(DocumentSourceChangeStream::kApplyOpsIndexField.toString());
@@ -526,6 +529,10 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     doc.addField(DocumentSourceChangeStream::kClusterTimeField, Value(resumeTokenData.clusterTime));
 
     if (_changeStreamSpec.getShowExpandedEvents()) {
+        // Commit timestamp for prepared transactions.
+        doc.addField(DocumentSourceChangeStream::kCommitTimestampField,
+                     input[DocumentSourceChangeStream::kCommitTimestampField]);
+
         // Note: If the UUID is a missing value (which can be true for events like 'dropDatabase'),
         // 'addField' will not add anything to the document.
         doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);

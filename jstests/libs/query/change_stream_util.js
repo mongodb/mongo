@@ -82,14 +82,13 @@ export function canonicalizeEventForTesting(event, expected) {
                            "collectionUUID",
                            "wallTime",
                            "operationDescription",
+                           "updateDescription",
+                           "commitTimestamp",
                            "nsType"]) {
         if (!expected.hasOwnProperty(fieldName)) {
             delete event[fieldName];
         }
     }
-
-    if (!expected.hasOwnProperty("updateDescription"))
-        delete event.updateDescription;
 
     return event;
 }
@@ -127,6 +126,15 @@ export function assertChangeStreamEventEq(actualEvent, expectedEvent, eventModif
     assert(isChangeStreamEventEq(actualEvent, expectedEvent, eventModifier),
            () => "Change events did not match. Expected: " + tojsonMaybeTruncate(expectedEvent) +
                ", Actual: " + tojsonMaybeTruncate(actualEvent));
+}
+
+/**
+ * Asserts that there are no changes waiting on the change stream cursor.
+ */
+export function assertNoChanges(cursor) {
+    assert(!cursor.hasNext(), () => {
+        return "Unexpected change set: " + tojson(cursor.toArray());
+    });
 }
 
 /**

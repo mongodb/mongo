@@ -8,6 +8,7 @@
  *   uses_change_streams,
  * ]
  */
+import {assertNoChanges} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
@@ -35,15 +36,6 @@ function assertWriteVisible(cursor, operationType, documentKey) {
 function assertWriteVisibleWithCapture(cursor, operationType, documentKey, changeList) {
     const changeDoc = assertWriteVisible(cursor, operationType, documentKey);
     changeList.push(changeDoc);
-}
-
-/**
- * Asserts that there are no changes waiting on the change stream cursor.
- */
-function assertNoChanges(cursor) {
-    assert(!cursor.hasNext(), () => {
-        return "Unexpected change set: " + tojson(cursor.toArray());
-    });
 }
 
 function runTest(conn) {

@@ -116,6 +116,14 @@ using DSChangeStream = DocumentSourceChangeStream;
 // Deterministic values used for testing
 const UUID testConstUuid = UUID::parse("6948DF80-14BD-4E04-8842-7668D9C001F5").getValue();
 
+void assertCommitTimestamp(bool expandedEvents, const Document& doc) {
+    if (expandedEvents) {
+        ASSERT_EQ(kDefaultCommitTs, doc[DSChangeStream::kCommitTimestampField].getTimestamp());
+    } else {
+        ASSERT_TRUE(doc[DSChangeStream::kCommitTimestampField].missing());
+    }
+}
+
 class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
     bool isExpectedToExecuteQueries() override {
         return true;
@@ -336,8 +344,9 @@ public:
         return stages;
     }
 
-    vector<intrusive_ptr<DocumentSource>> makeStages(const OplogEntry& entry) {
-        return makeStages(entry.getEntry().toBSON(), kDefaultSpec);
+    std::vector<intrusive_ptr<DocumentSource>> makeStages(const OplogEntry& entry,
+                                                          const BSONObj& spec = kDefaultSpec) {
+        return makeStages(entry.getEntry().toBSON(), spec);
     }
 
     OplogEntry createCommand(const BSONObj& oField,
@@ -1655,43 +1664,72 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
     OperationSessionInfo sessionInfo;
     sessionInfo.setTxnNumber(1);
     sessionInfo.setSessionId(makeLogicalSessionIdForTest());
-    auto oplogEntry =
-        repl::DurableOplogEntry(kDefaultOpTime,                   // optime
-                                OpTypeEnum::kCommand,             // opType
-                                nss.getCommandNS(),               // namespace
-                                boost::none,                      // uuid
-                                boost::none,                      // fromMigrate
-                                boost::none,                      // checkExistenceForDiffInsert
-                                repl::OplogEntry::kOplogVersion,  // version
-                                BSON("commitTransaction" << 1),   // o
-                                boost::none,                      // o2
-                                sessionInfo,                      // sessionInfo
-                                boost::none,                      // upsert
-                                Date_t(),                         // wall clock time
-                                {},                               // statement ids
-                                applyOpsOpTime,  // optime of previous write within same transaction
-                                boost::none,     // pre-image optime
-                                boost::none,     // post-image optime
-                                boost::none,     // ShardId of resharding recipient
-                                boost::none,     // _id
-                                boost::none);    // needsRetryImage
+    auto oplogEntry = repl::DurableOplogEntry(
+        kDefaultOpTime,                   // optime
+        OpTypeEnum::kCommand,             // opType
+        nss.getCommandNS(),               // namespace
+        boost::none,                      // uuid
+        boost::none,                      // fromMigrate
+        boost::none,                      // checkExistenceForDiffInsert
+        repl::OplogEntry::kOplogVersion,  // version
+        BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
+        boost::none,                                                              // o2
+        sessionInfo,                                                              // sessionInfo
+        boost::none,                                                              // upsert
+        Date_t(),                                                                 // wall clock time
+        {},                                                                       // statement ids
+        applyOpsOpTime,  // optime of previous write within same transaction
+        boost::none,     // pre-image optime
+        boost::none,     // post-image optime
+        boost::none,     // ShardId of resharding recipient
+        boost::none,     // _id
+        boost::none);    // needsRetryImage
 
-    // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
-    // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
-    Document expectedResult{
-        {DSChangeStream::kTxnNumberField, static_cast<int>(*sessionInfo.getTxnNumber())},
-        {DSChangeStream::kLsidField, Document{{sessionInfo.getSessionId()->toBSON()}}},
-        {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), BSONObj(), DSChangeStream::kInsertOpType)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 123}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{}},
-    };
+    {
+        // No expanded events.
 
-    checkTransformation(oplogEntry, expectedResult, kDefaultSpec, {}, {preparedTransaction});
+        // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
+        // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
+        Document expectedResult{
+            {DSChangeStream::kTxnNumberField, static_cast<int>(*sessionInfo.getTxnNumber())},
+            {DSChangeStream::kLsidField, Document{{sessionInfo.getSessionId()->toBSON()}}},
+            {DSChangeStream::kIdField,
+             makeResumeToken(kDefaultTs, testUuid(), BSONObj(), DSChangeStream::kInsertOpType)},
+            {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+            {DSChangeStream::kClusterTimeField, kDefaultTs},
+            {DSChangeStream::kWallTimeField, Date_t()},
+            {DSChangeStream::kFullDocumentField, D{{"_id", 123}}},
+            {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+            {DSChangeStream::kDocumentKeyField, D{}},
+        };
+
+        checkTransformation(oplogEntry, expectedResult, kDefaultSpec, {}, {preparedTransaction});
+    }
+
+    {
+        // Expanded events: this will additionally emit the 'commitTimestamp' and 'collectionUUID'
+        // fields.
+
+        // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
+        // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
+        Document expectedResult{
+            {DSChangeStream::kTxnNumberField, static_cast<int>(*sessionInfo.getTxnNumber())},
+            {DSChangeStream::kLsidField, Document{{sessionInfo.getSessionId()->toBSON()}}},
+            {DSChangeStream::kIdField,
+             makeResumeToken(kDefaultTs, testUuid(), BSONObj(), DSChangeStream::kInsertOpType)},
+            {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+            {DSChangeStream::kClusterTimeField, kDefaultTs},
+            {DSChangeStream::kCommitTimestampField, kDefaultCommitTs},
+            {DSChangeStream::kCollectionUuidField, testUuid()},
+            {DSChangeStream::kWallTimeField, Date_t()},
+            {DSChangeStream::kFullDocumentField, D{{"_id", 123}}},
+            {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+            {DSChangeStream::kDocumentKeyField, D{}},
+        };
+
+        checkTransformation(
+            oplogEntry, expectedResult, kShowExpandedEventsSpec, {}, {preparedTransaction});
+    }
 }
 
 TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
@@ -1752,71 +1790,87 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
                                             sessionInfo,
                                             applyOpsOpTime1);
 
-    // We do not use the checkTransformation() pattern that other tests use since we expect multiple
-    // documents to be returned from one applyOps.
-    auto stages = makeStages(transactionEntry2);
-    auto transform = stages[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    // We are testing both default change stream options and 'showExpandedEvents: true'.
+    for (auto&& expandedEvents : {false, true}) {
+        // We do not use the checkTransformation() pattern that other tests use since we expect
+        // multiple documents to be returned from one applyOps.
+        auto stages =
+            makeStages(transactionEntry2, expandedEvents ? kShowExpandedEventsSpec : kDefaultSpec);
+        auto transform = stages[3].get();
+        invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
-    // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
-        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
+        // Populate the MockTransactionHistoryEditor in reverse chronological order.
+        getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+            std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
 
-    // We should get three documents from the change stream, based on the documents in the two
-    // applyOps entries.
-    auto next = transform->getNext();
-    ASSERT(next.isAdvanced());
-    auto nextDoc = next.releaseDocument();
-    ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
-    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
-              DSChangeStream::kInsertOpType);
-    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
-    ASSERT_EQ(
-        nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
-    auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
-    ASSERT_DOCUMENT_EQ(resumeToken,
-                       makeResumeToken(applyOpsOpTime2.getTimestamp(),
-                                       testUuid(),
-                                       V{D{{"_id", 123}}},
-                                       DSChangeStream::kInsertOpType,
-                                       ResumeTokenData::FromInvalidate::kNotFromInvalidate,
-                                       0));
+        // We should get three documents from the change stream, based on the documents in the two
+        // applyOps entries.
+        auto next = transform->getNext();
+        ASSERT(next.isAdvanced());
+        auto nextDoc = next.releaseDocument();
+        ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
+        ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kInsertOpType);
+        ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+        // Note that we never expect to see a 'commitTimestamp' event field because the events are
+        // not from a prepared transaction.
+        assertCommitTimestamp(false /* expandedEvents */, nextDoc);
+        ASSERT_EQ(
+            nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()),
+            0);
+        auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
+        ASSERT_DOCUMENT_EQ(resumeToken,
+                           makeResumeToken(applyOpsOpTime2.getTimestamp(),
+                                           testUuid(),
+                                           V{D{{"_id", 123}}},
+                                           DSChangeStream::kInsertOpType,
+                                           ResumeTokenData::FromInvalidate::kNotFromInvalidate,
+                                           0));
 
-    next = transform->getNext();
-    ASSERT(next.isAdvanced());
-    nextDoc = next.releaseDocument();
-    ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
-    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
-              DSChangeStream::kInsertOpType);
-    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
-    ASSERT_EQ(
-        nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
-    resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
-    ASSERT_DOCUMENT_EQ(resumeToken,
-                       makeResumeToken(applyOpsOpTime2.getTimestamp(),
-                                       testUuid(),
-                                       V{D{{"_id", 456}}},
-                                       DSChangeStream::kInsertOpType,
-                                       ResumeTokenData::FromInvalidate::kNotFromInvalidate,
-                                       1));
+        next = transform->getNext();
+        ASSERT(next.isAdvanced());
+        nextDoc = next.releaseDocument();
+        ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
+        ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kInsertOpType);
+        ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
+        // Note that we never expect to see a 'commitTimestamp' event field because the events are
+        // not from a prepared transaction.
+        assertCommitTimestamp(false /* expandedEvents */, nextDoc);
+        ASSERT_EQ(
+            nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()),
+            0);
+        resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
+        ASSERT_DOCUMENT_EQ(resumeToken,
+                           makeResumeToken(applyOpsOpTime2.getTimestamp(),
+                                           testUuid(),
+                                           V{D{{"_id", 456}}},
+                                           DSChangeStream::kInsertOpType,
+                                           ResumeTokenData::FromInvalidate::kNotFromInvalidate,
+                                           1));
 
-    next = transform->getNext();
-    ASSERT(next.isAdvanced());
-    nextDoc = next.releaseDocument();
-    ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
-    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
-              DSChangeStream::kInsertOpType);
-    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 789);
-    ASSERT_EQ(
-        nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
-    resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
-    ASSERT_DOCUMENT_EQ(resumeToken,
-                       makeResumeToken(applyOpsOpTime2.getTimestamp(),
-                                       testUuid(),
-                                       V{D{{"_id", 789}}},
-                                       DSChangeStream::kInsertOpType,
-                                       ResumeTokenData::FromInvalidate::kNotFromInvalidate,
-                                       2));
+        next = transform->getNext();
+        ASSERT(next.isAdvanced());
+        nextDoc = next.releaseDocument();
+        ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
+        ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kInsertOpType);
+        ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 789);
+        // Note that we never expect to see a 'commitTimestamp' event field because the events are
+        // not from a prepared transaction.
+        assertCommitTimestamp(false /* expandedEvents */, nextDoc);
+        ASSERT_EQ(
+            nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()),
+            0);
+        resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
+        ASSERT_DOCUMENT_EQ(resumeToken,
+                           makeResumeToken(applyOpsOpTime2.getTimestamp(),
+                                           testUuid(),
+                                           V{D{{"_id", 789}}},
+                                           DSChangeStream::kInsertOpType,
+                                           ResumeTokenData::FromInvalidate::kNotFromInvalidate,
+                                           2));
+    }
 }
 
 TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
@@ -2097,18 +2151,18 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         boost::none,                      // fromMigrate
         boost::none,                      // checkExistenceForDiffInsert
         repl::OplogEntry::kOplogVersion,  // version
-        BSON("commitTransaction" << 1),   // o
-        boost::none,                      // o2
-        sessionInfo,                      // sessionInfo
-        boost::none,                      // upsert
-        Date_t(),                         // wall clock time
-        {},                               // statement ids
-        applyOpsOpTime2,                  // optime of previous write within same transaction
-        boost::none,                      // pre-image optime
-        boost::none,                      // post-image optime
-        boost::none,                      // ShardId of resharding recipient
-        boost::none,                      // _id
-        boost::none);                     // needsRetryImage
+        BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
+        boost::none,                                                              // o2
+        sessionInfo,                                                              // sessionInfo
+        boost::none,                                                              // upsert
+        Date_t(),                                                                 // wall clock time
+        {},                                                                       // statement ids
+        applyOpsOpTime2,  // optime of previous write within same transaction
+        boost::none,      // pre-image optime
+        boost::none,      // post-image optime
+        boost::none,      // ShardId of resharding recipient
+        boost::none,      // _id
+        boost::none);     // needsRetryImage
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
@@ -2243,71 +2297,78 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
         boost::none,                      // fromMigrate
         boost::none,                      // checkExistenceForDiffInsert
         repl::OplogEntry::kOplogVersion,  // version
-        BSON("commitTransaction" << 1),   // o
-        boost::none,                      // o2
-        sessionInfo,                      // sessionInfo
-        boost::none,                      // upsert
-        Date_t(),                         // wall clock time
-        {},                               // statement ids
-        applyOpsOpTime2,                  // optime of previous write within same transaction
-        boost::none,                      // pre-image optime
-        boost::none,                      // post-image optime
-        boost::none,                      // ShardId of resharding recipient
-        boost::none,                      // _id
-        boost::none);                     // needsRetryImage
+        BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
+        boost::none,                                                              // o2
+        sessionInfo,                                                              // sessionInfo
+        boost::none,                                                              // upsert
+        Date_t(),                                                                 // wall clock time
+        {},                                                                       // statement ids
+        applyOpsOpTime2,  // optime of previous write within same transaction
+        boost::none,      // pre-image optime
+        boost::none,      // post-image optime
+        boost::none,      // ShardId of resharding recipient
+        boost::none,      // _id
+        boost::none);     // needsRetryImage
 
-    // We do not use the checkTransformation() pattern that other tests use since we expect multiple
-    // documents to be returned from one applyOps.
-    auto stages = makeStages(commitEntry);
-    auto transform = stages[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    for (auto&& expandedEvents : {false, true}) {
+        // We do not use the checkTransformation() pattern that other tests use since we expect
+        // multiple documents to be returned from one applyOps.
+        auto stages =
+            makeStages(commitEntry, expandedEvents ? kShowExpandedEventsSpec : kDefaultSpec);
+        auto transform = stages[3].get();
+        invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
-    // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
-        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1}));
+        // Populate the MockTransactionHistoryEditor in reverse chronological order.
+        getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+            std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1}));
 
-    // We should get two documents from the change stream, based on the documents in the non-empty
-    // applyOps entry.
-    auto next = transform->getNext();
-    ASSERT(next.isAdvanced());
-    auto nextDoc = next.releaseDocument();
-    ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
-    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
-              DSChangeStream::kInsertOpType);
-    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
-    ASSERT_EQ(
-        nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
-    auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
-    ASSERT_DOCUMENT_EQ(
-        resumeToken,
-        makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
-                        testUuid(),
-                        V{D{{"_id", 123}}},
-                        DSChangeStream::kInsertOpType,
-                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
-                        0));
+        // We should get two documents from the change stream, based on the documents in the
+        // non-empty applyOps entry.
+        auto next = transform->getNext();
+        ASSERT(next.isAdvanced());
+        auto nextDoc = next.releaseDocument();
+        ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
+        ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kInsertOpType);
+        ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+        assertCommitTimestamp(expandedEvents, nextDoc);
+        ASSERT_EQ(
+            nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()),
+            0);
+        auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
+        ASSERT_DOCUMENT_EQ(
+            resumeToken,
+            makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
+                            testUuid(),
+                            V{D{{"_id", 123}}},
+                            DSChangeStream::kInsertOpType,
+                            ResumeTokenData::FromInvalidate::kNotFromInvalidate,
+                            0));
 
-    next = transform->getNext();
-    ASSERT(next.isAdvanced());
-    nextDoc = next.releaseDocument();
-    ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
-    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
-              DSChangeStream::kInsertOpType);
-    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
-    ASSERT_EQ(
-        nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
-    resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
-    ASSERT_DOCUMENT_EQ(
-        resumeToken,
-        makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
-                        testUuid(),
-                        V{D{{"_id", 456}}},
-                        DSChangeStream::kInsertOpType,
-                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
-                        1));
+        next = transform->getNext();
+        ASSERT(next.isAdvanced());
+        nextDoc = next.releaseDocument();
+        ASSERT_EQ(nextDoc[DSChangeStream::kTxnNumberField].getLong(), *sessionInfo.getTxnNumber());
+        ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kInsertOpType);
+        ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
+        assertCommitTimestamp(expandedEvents, nextDoc);
+        ASSERT_EQ(
+            nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()),
+            0);
+        resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
+        ASSERT_DOCUMENT_EQ(
+            resumeToken,
+            makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
+                            testUuid(),
+                            V{D{{"_id", 456}}},
+                            DSChangeStream::kInsertOpType,
+                            ResumeTokenData::FromInvalidate::kNotFromInvalidate,
+                            1));
 
-    next = transform->getNext();
-    ASSERT(!next.isAdvanced());
+        next = transform->getNext();
+        ASSERT(!next.isAdvanced());
+    }
 }
 
 TEST_F(ChangeStreamStageTest, TransformApplyOps) {

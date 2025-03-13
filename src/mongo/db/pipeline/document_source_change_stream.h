@@ -224,6 +224,10 @@ public:
     // path to the cluster time will be kIdField + "." + kClusterTimeField.
     static constexpr StringData kClusterTimeField = "clusterTime"_sd;
 
+    // The name of the field where the commit timestamp of a prepared transaction will be located.
+    // Only shown if 'showExpandedEvents' is used.
+    static constexpr StringData kCommitTimestampField = "commitTimestamp"_sd;
+
     // The name of the field with the nsType of a changestream create event. Will contain
     // "collection", "view" or "timeseries". Will only be exposed if 'showExpandedEvents' is used.
     static constexpr StringData kNsTypeField = "nsType"_sd;

@@ -67,8 +67,6 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 
@@ -339,6 +337,12 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
         tassert(5543803,
                 str::stream() << "Unexpected op at " << input["ts"].getTimestamp().toString(),
                 !commandObj["commitTransaction"].missing());
+
+        if (auto commitTimestamp = commandObj["commitTimestamp"]; !commitTimestamp.missing()) {
+            // Track commit timestamp of the prepared transaction if it's present in the oplog
+            // entry.
+            _commitTimestamp = commitTimestamp.getTimestamp();
+        }
     }
 
     // We need endOfTransaction only for unprepared transactions: so this must be an applyOps with
@@ -471,6 +475,9 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addRequired
 
     newDoc.addField(repl::OplogEntry::kTimestampFieldName, Value(_clusterTime));
     newDoc.addField(repl::OplogEntry::kWallClockTimeFieldName, Value(_wallTime));
+
+    newDoc.addField(DocumentSourceChangeStream::kCommitTimestampField,
+                    _commitTimestamp ? Value(*_commitTimestamp) : Value());
 
     newDoc.addField(repl::OplogEntry::kSessionIdFieldName, _lsid ? Value(*_lsid) : Value());
     newDoc.addField(repl::OplogEntry::kTxnNumberFieldName,

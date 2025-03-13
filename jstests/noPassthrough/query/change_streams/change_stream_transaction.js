@@ -1,14 +1,11 @@
 /**
  * Confirms that change streams only see committed operations for prepared transactions.
- * @tags: [
- *   requires_majority_read_concern,
- *   uses_change_streams,
- *   uses_prepare_transaction,
- *   uses_transactions,
- * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {assertNoChanges} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {isTimestamp} from "jstests/libs/timestamp_util.js";
 
 const dbName = "test";
 const collName = "change_stream_transaction";
@@ -27,7 +24,9 @@ function assertWriteVisible(cursor, operationType, documentKey) {
     assert.soon(() => cursor.hasNext());
     const changeDoc = cursor.next();
     assert.eq(operationType, changeDoc.operationType, changeDoc);
-    assert.eq(documentKey, changeDoc.documentKey, changeDoc);
+    if (operationType !== 'endOfTransaction') {
+        assert.eq(documentKey, changeDoc.documentKey, changeDoc);
+    }
     return changeDoc;
 }
 
@@ -35,24 +34,37 @@ function assertWriteVisible(cursor, operationType, documentKey) {
  * Asserts that the expected operation type and documentKey are found on the change stream
  * cursor. Pushes the corresponding resume token and change stream document to an array.
  */
-function assertWriteVisibleWithCapture(cursor, operationType, documentKey, changeList) {
+function assertWriteVisibleWithCapture(
+    cursor, operationType, documentKey, changeList, expectedCommitTimestamp = null) {
     const changeDoc = assertWriteVisible(cursor, operationType, documentKey);
+    if (expectedCommitTimestamp !== null) {
+        assert(changeDoc.hasOwnProperty("commitTimestamp"), changeDoc);
+        assert.eq(changeDoc["commitTimestamp"], expectedCommitTimestamp, changeDoc);
+    } else {
+        assert(!changeDoc.hasOwnProperty("commitTimestamp"), changeDoc);
+    }
     changeList.push(changeDoc);
-}
-
-/**
- * Asserts that there are no changes waiting on the change stream cursor.
- */
-function assertNoChanges(cursor) {
-    assert(!cursor.hasNext(), () => {
-        return "Unexpected change set: " + tojson(cursor.toArray());
-    });
 }
 
 function runTest(conn) {
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
     const unwatchedColl = db.getCollection(collName + "_unwatched");
+
+    const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    const is81OrHigher =
+        (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0);
+
+    // This function will return null for all versions < 8.1, because these won't emit the
+    // "commitTimestamp" as part of the events of prepared transactions.
+    const buildCommitTimestamp = (prepareTimestamp) => {
+        assert(isTimestamp(prepareTimestamp), prepareTimestamp);
+        if (is81OrHigher) {
+            return prepareTimestamp;
+        }
+        return null;
+    };
+
     let changeList = [];
 
     // Collections must be created outside of any transaction.
@@ -84,7 +96,7 @@ function runTest(conn) {
     session3.startTransaction({readConcern: {level: "majority"}});
 
     // Open a change stream on the test collection.
-    const changeStreamCursor = coll.watch();
+    const changeStreamCursor = coll.watch([], {showExpandedEvents: true});
     const resumeToken = changeStreamCursor.getResumeToken();
 
     // Insert a document and confirm that the change stream has it.
@@ -131,8 +143,7 @@ function runTest(conn) {
     assert.commandWorked(coll.insert({_id: "no-txn-doc-2"}, {writeConcern: {w: "majority"}}));
     assertWriteVisibleWithCapture(changeStreamCursor, "insert", {_id: "no-txn-doc-2"}, changeList);
 
-    let prepareTimestampTxn1;
-    prepareTimestampTxn1 = PrepareHelpers.prepareTransaction(session1);
+    let prepareTimestampTxn1 = PrepareHelpers.prepareTransaction(session1);
 
     assert.commandWorked(coll.insert({_id: "no-txn-doc-3"}, {writeConcern: {w: "majority"}}));
     assertWriteVisibleWithCapture(changeStreamCursor, "insert", {_id: "no-txn-doc-3"}, changeList);
@@ -141,11 +152,15 @@ function runTest(conn) {
     // Commit first transaction and confirm expected changes.
     //
     assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestampTxn1));
-    assertWriteVisibleWithCapture(changeStreamCursor, "insert", {_id: "txn1-doc-1"}, changeList);
-    assertWriteVisibleWithCapture(changeStreamCursor, "insert", {_id: "txn1-doc-2"}, changeList);
-    assertWriteVisibleWithCapture(changeStreamCursor, "update", {_id: "txn1-doc-1"}, changeList);
-    assertWriteVisibleWithCapture(changeStreamCursor, "update", {_id: "txn1-doc-2"}, changeList);
-    assertWriteVisibleWithCapture(changeStreamCursor, "delete", {_id: "txn1-doc-2"}, changeList);
+    [["insert", {_id: "txn1-doc-1"}],
+     ["insert", {_id: "txn1-doc-2"}],
+     ["update", {_id: "txn1-doc-1"}],
+     ["update", {_id: "txn1-doc-2"}],
+     ["delete", {_id: "txn1-doc-2"}],
+    ].forEach(([opType, id]) => {
+        assertWriteVisibleWithCapture(
+            changeStreamCursor, opType, id, changeList, buildCommitTimestamp(prepareTimestampTxn1));
+    });
 
     // Transition the second transaction to prepared. We skip capturing the prepare
     // timestamp it is not required for abortTransaction_forTesting().
@@ -204,7 +219,11 @@ function runTest(conn) {
     assertNoChanges(changeStreamCursor);
     assert.commandWorked(PrepareHelpers.commitTransaction(session5, prepareTimestampTxn5));
     txn5Inserts.forEach(function(doc) {
-        assertWriteVisibleWithCapture(changeStreamCursor, "insert", doc, changeList);
+        assertWriteVisibleWithCapture(changeStreamCursor,
+                                      "insert",
+                                      doc,
+                                      changeList,
+                                      buildCommitTimestamp(prepareTimestampTxn5));
     });
 
     //
@@ -214,13 +233,17 @@ function runTest(conn) {
     txn4Inserts.forEach(function(doc) {
         assertWriteVisibleWithCapture(changeStreamCursor, "insert", doc, changeList);
     });
-    assertNoChanges(changeStreamCursor);
+    if (FeatureFlagUtil.isEnabled(db, "EndOfTransactionChangeEvent")) {
+        assertWriteVisibleWithCapture(changeStreamCursor, "endOfTransaction", {}, changeList);
+    } else {
+        assertNoChanges(changeStreamCursor);
+    }
 
     changeStreamCursor.close();
 
     // Test that the change stream returns the expected set of documents at each point captured by
     // this test, and not any additional events.
-    const resumeCursor = coll.watch([], {startAfter: resumeToken});
+    const resumeCursor = coll.watch([], {startAfter: resumeToken, showExpandedEvents: true});
     for (let i = 0; i < changeList.length; ++i) {
         const expectedChangeDoc = changeList[i];
         const actualChangeDoc = assertWriteVisible(
@@ -233,8 +256,7 @@ function runTest(conn) {
     //
     // Prepare and commit the third transaction and confirm that there are no visible changes.
     //
-    let prepareTimestampTxn3;
-    prepareTimestampTxn3 = PrepareHelpers.prepareTransaction(session3);
+    const prepareTimestampTxn3 = PrepareHelpers.prepareTransaction(session3);
     assertNoChanges(changeStreamCursor);
 
     assert.commandWorked(PrepareHelpers.commitTransaction(session3, prepareTimestampTxn3));
