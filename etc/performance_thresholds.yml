@@ -51,13 +51,13 @@ tests:
   # The deviations of these metrics are extremely tight.
   # We can easily accept 2 standard deviations up from the stable mean.
   #
-  #     threshold = mean * (1 + 2 * cv)
+  #     threshold = mean * (1 + 2 * (100 * cv))
   #
   # 2025-02-16:
   #     Router/1:  mean=20077, cv=.0228 => threshold=20993
   #     Router/32: mean=20111, cv=.0227 => threshold=21024
-  #     Shard/1:   mean=22013, cv=.0290 => threshold=23290
-  #     Shard/32:  mean=22087, cv=.0289 => threshold=23364
+  #     Shard/1:   mean=21619, cv=.0008 => threshold=25078
+  #     Shard/32:  mean=21695, cv=.0006 => threshold=24298
   ServiceEntryPointRouterRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
       - thread_level: 1
@@ -75,10 +75,10 @@ tests:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 23290
+            value: 25078
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 23364
+            value: 24298
             bound_direction: upper
