@@ -78,7 +78,7 @@ class FCVGatedFeatureFlag {
 public:
     FCVGatedFeatureFlag(bool enabled,
                         StringData versionString,
-                        bool enableInTransitionalFCV = false);
+                        bool enableOnTransitionalFCV = false);
 
     // Non-copyable, non-movable
     FCVGatedFeatureFlag(const FCVGatedFeatureFlag&) = delete;
@@ -154,7 +154,7 @@ private:
 
 private:
     bool _enabled;
-    bool _enableInTransitionalFCV;
+    bool _enableOnTransitionalFCV;
     multiversion::FeatureCompatibilityVersion _version;
 };
 

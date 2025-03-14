@@ -1385,7 +1385,7 @@ class TestGenerator(testcase.IDLTestcase):
             ],
         )
 
-    def test_fcv_gated_feature_flag_disabled_on_all_versions_by_default_with_enableOnTransitionalFCV(
+    def test_fcv_gated_feature_flag_disabled_on_all_versions_by_default_with_enable_on_transitional_fcv(
         self,
     ) -> None:
         """Test generation of an FCV-gated feature flag that specifies to transition on kUpgrading"""
@@ -1399,7 +1399,7 @@ class TestGenerator(testcase.IDLTestcase):
                     default: true
                     version: 123
                     shouldBeFCVGated: true
-                    enableOnTransitionalFCV: true
+                    enable_on_transitional_fcv: true
             """
             )
         )
@@ -1415,10 +1415,10 @@ class TestGenerator(testcase.IDLTestcase):
             ],
         )
 
-    def test_fcv_gated_feature_flag_disabled_on_all_versions_by_default_with_enableOnTransitionalFCV_false(
+    def test_fcv_gated_feature_flag_disabled_on_all_versions_by_default_with_enable_on_transitional_fcv_false(
         self,
     ) -> None:
-        """Test that the generation of an FCV-gated feature flag that specifies enableOnTransitionalFCV: false is equivalent to the default"""
+        """Test that the generation of an FCV-gated feature flag that specifies enable_on_transitional_fcv: false is equivalent to the default"""
         header, source = self.assert_generate_with_basic_types(
             dedent(
                 """
@@ -1429,7 +1429,7 @@ class TestGenerator(testcase.IDLTestcase):
                     default: true
                     version: 123
                     shouldBeFCVGated: true
-                    enableOnTransitionalFCV: false
+                    enable_on_transitional_fcv: false
             """
             )
         )

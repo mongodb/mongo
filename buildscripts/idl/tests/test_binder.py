@@ -3083,7 +3083,7 @@ class TestBinder(testcase.IDLTestcase):
             idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
         )
 
-        # if shouldBeFCVGated is false, enableOnTransitionalFCV is not allowed
+        # if shouldBeFCVGated is false, enable_on_transitional_fcv is not allowed
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -3092,12 +3092,12 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     shouldBeFCVGated: false
-                    enableOnTransitionalFCV: true
+                    enable_on_transitional_fcv: true
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
         )
 
-        # if shouldBeFCVGated: true, enableOnTransitionalFCV is allowed
+        # if shouldBeFCVGated: true, enable_on_transitional_fcv is allowed
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -3107,7 +3107,7 @@ class TestBinder(testcase.IDLTestcase):
                     default: true
                     version: 123
                     shouldBeFCVGated: true
-                    enableOnTransitionalFCV: true
+                    enable_on_transitional_fcv: true
             """)
         )
 

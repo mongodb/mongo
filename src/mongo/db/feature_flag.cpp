@@ -39,9 +39,9 @@ namespace mongo {
 // (Generic FCV reference): feature flag support
 FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled,
                                          StringData versionString,
-                                         bool enableInTransitionalFCV)
+                                         bool enableOnTransitionalFCV)
     : _enabled(enabled),
-      _enableInTransitionalFCV(enableInTransitionalFCV),
+      _enableOnTransitionalFCV(enableOnTransitionalFCV),
       _version(multiversion::GenericFCV::kLatest) {
 
     // Verify the feature flag invariants. IDL binder verifies these hold but we add these checks to
@@ -118,7 +118,7 @@ bool FCVGatedFeatureFlag::isEnabledOnVersion(
         return true;
     }
 
-    if (_enableInTransitionalFCV &&
+    if (_enableOnTransitionalFCV &&
         ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(targetFCV)) {
         const auto transitionInfo = multiversion::getTransitionFCVInfo(targetFCV);
         // During upgrade, enable the feature flag, as if we were already on the target FCV

@@ -687,7 +687,7 @@ A feature flag has the following properties:
   - Must be a string acceptable to FeatureCompatibilityVersionParser.
 - shouldBeFCVGated: boolean
   - When set to `true`, an FCV-gated feature flag will be created. Thus, it will only be enabled once the FCV is reaches the version
-    set in the `version` field, unless `enableOnTransitionalFCV: true` is specified (see below). For example, if a feature flag has `shouldBeFCVGated: true` and
+    set in the `version` field, unless `enable_on_transitional_fcv: true` is specified (see below). For example, if a feature flag has `shouldBeFCVGated: true` and
     `version: 8.0`, this means that in a mixed version replica set, where some nodes are on the
     7.0 binary version while others are on 8.0 binary version, the feature flag will not be enabled.
     It will only be enabled once all nodes are on the 8.0 binary version AND the FCV of the replica
@@ -699,12 +699,12 @@ A feature flag has the following properties:
     version, the feature flag will already be enabled on the nodes on the 8.0 binary version, but not
     on the nodes with the 7.0 binary version.
   - See [Determining if a feature flag should be binary-compatible or FCV-gated](#determining-if-a-feature-flag-should-be-binary-compatible-or-fcv-gated) for guidelines on when each type of feature flag should be used.
-- enableOnTransitionalFCV: boolean
+- enable_on_transitional_fcv: boolean
   - Optional. Can only be specified for FCV-gated feature flags (`shouldBeFCVGated: true`). Default
     value is `false`.
   - When set to `true`, an FCV-gated feature flag will also be enabled during `kUpgradingFrom_X_To_Y`
     or `kDowngradingFrom_Y_To_X`, where `Y` is the version specified in `version`. For example, if
-    a feature flag specifies `version: 8.0` and `enableOnTransitionalFCV: true`, then it will be
+    a feature flag specifies `version: 8.0` and `enable_on_transitional_fcv: true`, then it will be
     enabled during `kUpgradingFrom_7_0_To_8_0` or `kDowngradingFrom_8_0_To_7_0`. Notably, it won't
     be enabled during `kUpgradingFrom_7_0_To_7_3`.
   - Can be used to enable certain complex features in a staged fashion. For example, one can use

@@ -902,7 +902,7 @@ properties:
           shouldBeFCVGated:
             type: boolean
             description: Whether or not the feature flag should be FCV gated
-          enableOnTransitionalFCV:
+          enable_on_transitional_fcv:
             type: boolean
             description: >
               Also enable this feature flag during the transitional FCV state (kUpgrade,
