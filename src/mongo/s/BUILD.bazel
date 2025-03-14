@@ -400,7 +400,6 @@ mongo_cc_library(
         "//src/mongo/s/catalog:type_index_catalog_gen",
         "//src/mongo/s/catalog:type_mongos.cpp",
         "//src/mongo/s/catalog:type_namespace_placement_gen",
-        "//src/mongo/s/catalog:type_oplog_catalog_metadata_gen",
         "//src/mongo/s/catalog:type_remove_shard_event_gen",
         "//src/mongo/s/catalog:type_shard.cpp",
         "//src/mongo/s/catalog:type_tags.cpp",

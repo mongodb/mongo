@@ -57,15 +57,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "type_oplog_catalog_metadata_gen",
-    src = "type_oplog_catalog_metadata.idl",
-    deps = [
-        ":type_database_gen",
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-idl_generator(
     name = "type_database_gen",
     src = "type_database.idl",
     hdrs = [

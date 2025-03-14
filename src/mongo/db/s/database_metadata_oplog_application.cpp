@@ -31,7 +31,7 @@
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/s/catalog/type_oplog_catalog_metadata_gen.h"
+#include "mongo/db/s/type_oplog_catalog_metadata_gen.h"
 
 namespace mongo {
 
