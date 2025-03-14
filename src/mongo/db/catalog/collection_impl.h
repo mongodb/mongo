@@ -330,7 +330,7 @@ public:
      */
     void setMinimumValidSnapshot(Timestamp newMinimumValidSnapshot) final;
 
-    boost::optional<TimeseriesOptions> getTimeseriesOptions() const final;
+    const boost::optional<TimeseriesOptions>& getTimeseriesOptions() const final;
     void setTimeseriesOptions(OperationContext* opCtx, const TimeseriesOptions& tsOptions) final;
 
     /**

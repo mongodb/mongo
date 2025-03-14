@@ -718,7 +718,7 @@ public:
      * Returns the time-series options for this buckets collection, or boost::none if not a
      * time-series buckets collection.
      */
-    virtual boost::optional<TimeseriesOptions> getTimeseriesOptions() const = 0;
+    virtual const boost::optional<TimeseriesOptions>& getTimeseriesOptions() const = 0;
 
     /**
      * Sets the time-series options for this buckets collection.

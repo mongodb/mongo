@@ -1001,10 +1001,12 @@ void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext*
 }
 
 bool CollectionImpl::areTimeseriesBucketsFixed() const {
-    const auto tsOptions = getTimeseriesOptions();
-    // Assume parameters have changed unless otherwise specified.
-    const auto parametersChanged = timeseriesBucketingParametersHaveChanged().value_or(true);
-    return tsOptions && timeseries::areTimeseriesBucketsFixed(*tsOptions, parametersChanged);
+    if (const auto& optTsOptions = getTimeseriesOptions(); optTsOptions) {
+        // Assume parameters have changed unless otherwise specified.
+        const auto parametersChanged = timeseriesBucketingParametersHaveChanged().value_or(true);
+        return timeseries::areTimeseriesBucketsFixed(optTsOptions.get(), parametersChanged);
+    }
+    return false;
 }
 
 bool CollectionImpl::isClustered() const {
@@ -1417,7 +1419,7 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
     return Status::OK();
 }
 
-boost::optional<TimeseriesOptions> CollectionImpl::getTimeseriesOptions() const {
+const boost::optional<TimeseriesOptions>& CollectionImpl::getTimeseriesOptions() const {
     return _metadata->options.timeseries;
 }
 

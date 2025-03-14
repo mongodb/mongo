@@ -49,8 +49,8 @@ public:
           _isNewTimeseriesWithoutView(isNewTimeseriesWithoutView) {}
     ~TimeseriesRewritesCollectionMock() override = default;
 
-    boost::optional<TimeseriesOptions> getTimeseriesOptions() const override {
-        return {_timeseriesOptions};
+    const boost::optional<TimeseriesOptions>& getTimeseriesOptions() const override {
+        return _timeseriesOptions;
     }
 
     timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState() const override {
@@ -470,7 +470,7 @@ public:
     }
 
 private:
-    const TimeseriesOptions _timeseriesOptions;
+    const boost::optional<TimeseriesOptions> _timeseriesOptions;
     const timeseries::MixedSchemaBucketsState _timeseriesMixedSchemaBucketsState;
     const boost::optional<bool> _timeseriesBucketingParametersHaveChanged;
     const bool _isTimeseriesCollection;

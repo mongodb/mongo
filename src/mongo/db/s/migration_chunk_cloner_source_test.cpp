@@ -552,7 +552,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<TimeseriesOptions> getTimeseriesOptions() const override {
+    const boost::optional<TimeseriesOptions>& getTimeseriesOptions() const override {
         return _coll->getTimeseriesOptions();
     }
 

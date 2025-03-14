@@ -347,8 +347,8 @@ public:
         // no-op, called by unittests
     }
 
-    boost::optional<TimeseriesOptions> getTimeseriesOptions() const override {
-        return boost::none;
+    const boost::optional<TimeseriesOptions>& getTimeseriesOptions() const override {
+        return _options.timeseries;
     }
 
     void setTimeseriesOptions(OperationContext* opCtx,
