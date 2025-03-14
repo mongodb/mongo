@@ -270,34 +270,14 @@ size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* op
     return numCoordField.numberLong();
 }
 
-void ShardingDDLCoordinatorService::_waitForRecovery(OperationContext* opCtx,
-                                                     std::unique_lock<stdx::mutex>& lock) const {
-    opCtx->waitForConditionOrInterrupt(_recoveredOrCoordinatorCompletedCV, lock, [this]() {
-        return _state != State::kRecovering;
-    });
+void ShardingDDLCoordinatorService::waitForRecovery(OperationContext* opCtx) const {
+    stdx::unique_lock lk(_mutex);
+    opCtx->waitForConditionOrInterrupt(
+        _recoveredOrCoordinatorCompletedCV, lk, [this]() { return _state != State::kRecovering; });
 
     uassert(ErrorCodes::NotWritablePrimary,
             "Not primary when trying to create a DDL coordinator",
             _state != State::kPaused);
-}
-
-void ShardingDDLCoordinatorService::waitForRecovery(OperationContext* opCtx) const {
-    stdx::unique_lock lk(_mutex);
-    _waitForRecovery(opCtx, lk);
-}
-
-bool ShardingDDLCoordinatorService::areAllCoordinatorsOfTypeFinished(
-    OperationContext* opCtx, DDLCoordinatorTypeEnum coordinatorType) {
-    stdx::unique_lock lk(_mutex);
-
-    _waitForRecovery(opCtx, lk);
-
-    const auto it = _numActiveCoordinatorsPerType.find(coordinatorType);
-    if (it == _numActiveCoordinatorsPerType.end()) {
-        return true;
-    }
-
-    return it->second == 0;
 }
 
 ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(

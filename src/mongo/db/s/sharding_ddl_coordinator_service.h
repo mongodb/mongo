@@ -122,9 +122,6 @@ public:
 
     void waitForRecovery(OperationContext* opCtx) const override;
 
-    bool areAllCoordinatorsOfTypeFinished(OperationContext* opCtx,
-                                          DDLCoordinatorTypeEnum coordinatorType);
-
 private:
     friend class ShardingDDLCoordinatorServiceTest;
 
@@ -136,8 +133,6 @@ private:
     size_t _countCoordinatorDocs(OperationContext* opCtx);
 
     void _transitionToRecovered(WithLock lk, OperationContext* opCtx);
-
-    void _waitForRecovery(OperationContext* opCtx, std::unique_lock<stdx::mutex>& lock) const;
 
     mutable stdx::mutex _mutex;
 
