@@ -21,13 +21,29 @@ import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
  * generated without any query settings.
  */
 function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, makeFuncArgs) {
+    let resultWithQuerySettings = undefined;
+    const computeAndStoreResult = () => {
+        resultWithQuerySettings = clientFunction.apply(conn, makeFuncArgs(cmdObj));
+    };
+
     const assertFallbackPlanMatchesOriginalPlan = () => {
-        if (isInternalDbName(dbName)) {
-            // Query settings cannot be set over internal databases.
+        // Initialize the 'db' instance.
+        const db = (() => {
+            if (isInternalDbName(dbName)) {
+                // Query settings cannot be set over internal databases.
+                return undefined;
+            }
+            try {
+                return conn.getDB(dbName);
+            } catch (e) {
+                // Bail when faced with 'getDB()' exceptions, such as invalid database names.
+                return undefined;
+            }
+        })();
+        if (!db) {
             return;
         }
 
-        const db = conn.getDB(dbName);
         const innerCmd = getInnerCommand(cmdObj);
         if (!QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd))) {
             return;
@@ -68,18 +84,14 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
 
         const ns = {db: dbName, coll: collectionName};
         const qsutils = new QuerySettingsUtils(db, collectionName);
+        qsutils.onSetQuerySettings(computeAndStoreResult);
         const qstests = new QuerySettingsIndexHintsTests(qsutils);
         const representativeQuery = qsutils.makeQueryInstance(innerCmd);
         qstests.assertQuerySettingsFallback(representativeQuery, ns);
     };
 
-    const res = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-    if (res.ok) {
-        // Only run the test if the original command works. Some tests assert on commands failing,
-        // so we should simply bubble these commands through without any additional checks.
-        OverrideHelpers.withPreOverrideRunCommand(assertFallbackPlanMatchesOriginalPlan);
-    }
-    return res;
+    OverrideHelpers.withPreOverrideRunCommand(assertFallbackPlanMatchesOriginalPlan);
+    return resultWithQuerySettings || clientFunction.apply(conn, makeFuncArgs(cmdObj));
 }
 
 // Override the default runCommand with our custom version.

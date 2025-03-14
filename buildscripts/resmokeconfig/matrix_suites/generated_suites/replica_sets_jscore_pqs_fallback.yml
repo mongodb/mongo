@@ -71,8 +71,27 @@ selector:
     - jstests/core/timeseries/write/timeseries_update.js
     - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
     - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/index/index_filter_catalog_independent.js
+    - jstests/core/index/index_filter_collation.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/index/index_filter_on_hidden_index.js
+    - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+    - jstests/core/index/wildcard/wildcard_index_filter.js
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/plan_cache/cache_correctness_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
+    - jstests/core/query/api/api_version_unstable_indexes.js
+    - jstests/core/txns/disallow_operations_on_prepared_transaction.js
+    - jstests/core/index/index_multiple_compatibility.js
+    - jstests/core/query/single_field_hashed_index.js
+    - jstests/core/index/geo/geo6.js
+    - jstests/core/capped/capped.js
+    - jstests/core/index/wildcard/*.js
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/plan_cache/cache_correctness_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js

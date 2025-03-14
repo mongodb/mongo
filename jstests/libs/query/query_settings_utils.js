@@ -18,6 +18,7 @@ export class QuerySettingsUtils {
         this._db = db;
         this._adminDB = this._db.getSiblingDB("admin");
         this._collName = collName;
+        this._onSetQuerySettingsHooks = [];
     }
 
     /**
@@ -205,6 +206,9 @@ export class QuerySettingsUtils {
             queryShapeHash =
                 assert.commandWorked(this._db.adminCommand(setQuerySettingsCmd)).queryShapeHash;
             assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 1));
+            for (const hook of this._onSetQuerySettingsHooks) {
+                hook();
+            }
             return runTest();
         } finally {
             if (queryShapeHash) {
@@ -213,6 +217,14 @@ export class QuerySettingsUtils {
                 assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 0));
             }
         }
+    }
+
+    /**
+     * Register a hook to be executed after the "setQuerySettings" command on every
+     * withQuerySettings() invocation.
+     */
+    onSetQuerySettings(hook) {
+        this._onSetQuerySettingsHooks.push(hook);
     }
 
     withoutDollarDB(cmd) {

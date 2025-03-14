@@ -34,6 +34,13 @@
       - jstests/core/timeseries/write/timeseries_update.js
       - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
       - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
+      # Query settings have a higher precedence over index filters.
+      - jstests/core/index/index_filter_catalog_independent.js
+      - jstests/core/index/index_filter_collation.js
+      - jstests/core/index/index_filter_commands.js
+      - jstests/core/index/index_filter_on_hidden_index.js
+      - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+      - jstests/core/index/wildcard/wildcard_index_filter.js
       # Query settings application is skipped for queries targeting collections containing encryption information.
       - jstests/core/query/queryable_encryption/**/*.js
       - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
@@ -89,6 +96,26 @@
 - name: fallback_core_excludes
   value:
     exclude_files:
+      # TODO SERVER-102392 Re-enable api_version_unstable_indexes.js.
+      - jstests/core/query/api/api_version_unstable_indexes.js
+      # TODO SERVER-101603 Validate against explain commands in prepared transactions.
+      - jstests/core/txns/disallow_operations_on_prepared_transaction.js
+      # TODO SERVER-101455 Re-enable index_multiple_compatibility.js.
+      - jstests/core/index/index_multiple_compatibility.js
+      # TODO SERVER-101454 Re-enable single_field_hashed_index.js.
+      - jstests/core/query/single_field_hashed_index.js
+      # TODO SERVER-100915 Re-enable geo6.js on PQS implicit fallback suites.
+      - jstests/core/index/geo/geo6.js
+      # TODO SERVER-100911 Ensure PQS fallback preserves $natural sort order.
+      - jstests/core/capped/capped.js
+      # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
+      - jstests/core/index/wildcard/*.js
+      - jstests/core/query/index_correctness_pbt.js
+      - jstests/core/query/plan_cache/cache_correctness_pbt.js
+      - jstests/core/query/run_all_plans_pbt.js
+      - jstests/core/query/index_correctness_pbt.js
+      - jstests/core/query/plan_cache/cache_correctness_pbt.js
+      - jstests/core/query/run_all_plans_pbt.js
       # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
       # queries.
       - jstests/core/query/find_with_resume_after_param.js
@@ -127,13 +154,6 @@
       - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
       - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
       - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
-      # Query settings have a higher precedence over index filters.
-      - jstests/core/index/index_filter_catalog_independent.js
-      - jstests/core/index/index_filter_collation.js
-      - jstests/core/index/index_filter_commands.js
-      - jstests/core/index/index_filter_on_hidden_index.js
-      - jstests/core/index/wildcard/compound_wildcard_index_filter.js
-      - jstests/core/index/wildcard/wildcard_index_filter.js
       # Tests partial/sparse indexes. These cannot be forced using query settings if they
       # lead to an incomplete result set.
       - jstests/core/index/index_multiple_compatibility.js

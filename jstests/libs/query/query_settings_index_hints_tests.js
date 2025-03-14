@@ -436,47 +436,48 @@ export class QuerySettingsIndexHintsTests {
 
     /**
      * Ensure that queries that fallback to multiplanning when the provided settings don't generate
-     * any viable plans have the same winning plan as the queries that have no query settings
+     * any viable plans have the same generated plans as the queries that have no query settings
      * attached to them.
      */
     assertQuerySettingsFallback(querySettingsQuery, ns) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
-        const getAllQueryPlans = (explain) => getQueryPlanners(explain).flatMap(queryPlanner => {
-            const {winningPlan, rejectedPlans} = formatQueryPlanner(queryPlanner);
-            return rejectedPlans.concat([winningPlan]);
-        });
+        const explainCmd = getExplainCommand(query);
+
+        const explainWithQuerySettings =
+            this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
+                this.assertQuerySettingsInCacheForCommand(query, settings);
+                return assert.commandWorked(
+                    this._db.runCommand(explainCmd),
+                    `Failed running ${tojson(explainCmd)} after setting query settings`);
+            });
+        const explainWithoutQuerySettings = assert.commandWorked(
+            this._db.runCommand(explainCmd),
+            `Failed running ${tojson(explainCmd)} before setting query settings`);
 
         // It's not guaranteed for all the queries to preserve the order of the stages when
         // replanning (namely in the case of subplanning with $or statements). Flatten the plan tree
         // & check that the plans' elements are equal using `assert.sameMembers` to accommodate this
         // behavior and avoid potential failures.
-        const explainCmd = getExplainCommand(query);
-        const explainWithoutQuerySettings = assert.commandWorked(
-            this._db.runCommand(explainCmd),
-            `Failed running ${tojson(explainCmd)} before setting query settings`);
-        const queryPlansWithoutQuerySettings = getAllQueryPlans(explainWithoutQuerySettings);
-        const changeStreamIgnoreFields = ["t", "ts", "minRecord"];
-        this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-            const explainWithQuerySettings = assert.commandWorked(
-                this._db.runCommand(explainCmd),
-                `Failed running ${tojson(explainCmd)} after setting query settings`);
-            const queryPlansWithQuerySettings = getAllQueryPlans(explainWithQuerySettings);
-            assert(anyEq(queryPlansWithoutQuerySettings,
-                         queryPlansWithQuerySettings,
-                         false /* verbose */,
-                         undefined /* valueComparator - will use bsonWoCompare */,
-                         changeStreamIgnoreFields),
-                   "Expected the query without query settings and the one with query settings to " +
-                       "have identical plans: " + tojson(queryPlansWithoutQuerySettings) +
-                       " != " + tojson(queryPlansWithQuerySettings));
-            assert.eq(
-                explainWithQuerySettings.pipeline,
-                explainWithoutQuerySettings.pipeline,
-                "Expected the query without query settings and the one with settings to have " +
-                    "identical pipelines.");
-            this.assertQuerySettingsInCacheForCommand(query, settings);
+        const getAllQueryPlans = (explain) => getQueryPlanners(explain).flatMap(queryPlanner => {
+            const {winningPlan, rejectedPlans} = formatQueryPlanner(queryPlanner);
+            return rejectedPlans.concat([winningPlan]);
         });
+        const queryPlansWithoutQuerySettings = getAllQueryPlans(explainWithoutQuerySettings);
+        const queryPlansWithQuerySettings = getAllQueryPlans(explainWithQuerySettings);
+        const changeStreamIgnoreFields = ["t", "ts", "minRecord"];
+        assert(anyEq(queryPlansWithoutQuerySettings,
+                     queryPlansWithQuerySettings,
+                     false /* verbose */,
+                     undefined /* valueComparator - will use bsonWoCompare */,
+                     changeStreamIgnoreFields),
+               "Expected the query without query settings and the one with query settings to " +
+                   "have identical plans: " + tojson(queryPlansWithoutQuerySettings) +
+                   " != " + tojson(queryPlansWithQuerySettings));
+        assert.eq(explainWithQuerySettings.pipeline,
+                  explainWithoutQuerySettings.pipeline,
+                  "Expected the query without query settings and the one with settings to have " +
+                      "identical pipelines.");
     }
 
     /**

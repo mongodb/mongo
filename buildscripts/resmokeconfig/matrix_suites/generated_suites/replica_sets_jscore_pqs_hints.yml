@@ -74,6 +74,12 @@ selector:
     - jstests/core/timeseries/write/timeseries_update.js
     - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
     - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/index/index_filter_catalog_independent.js
+    - jstests/core/index/index_filter_collation.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/index/index_filter_on_hidden_index.js
+    - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+    - jstests/core/index/wildcard/wildcard_index_filter.js
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
     - jstests/core/query/index_correctness_pbt.js
@@ -93,12 +99,6 @@ selector:
     - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
     - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
-    - jstests/core/index/index_filter_catalog_independent.js
-    - jstests/core/index/index_filter_collation.js
-    - jstests/core/index/index_filter_commands.js
-    - jstests/core/index/index_filter_on_hidden_index.js
-    - jstests/core/index/wildcard/compound_wildcard_index_filter.js
-    - jstests/core/index/wildcard/wildcard_index_filter.js
     - jstests/core/index/index_multiple_compatibility.js
     - jstests/core/index/indext.js
     - jstests/core/index/sparse_index_internal_expr.js

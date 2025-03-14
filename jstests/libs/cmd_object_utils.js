@@ -26,14 +26,39 @@ export function getInnerCommand(cmdObj) {
 }
 
 /**
+ * Splits 'cmdObj' into a pair of [<command without generic args>, <generic args>].
+ */
+function extractGenericArgs(cmdObj) {
+    const kGenericArgs = ["apiVersion", "apiStrict"];
+    let cmd = {}, genericArgs = {};
+    for (const [key, value] of Object.entries(cmdObj)) {
+        const isGenericArg = kGenericArgs.includes(key);
+        if (isGenericArg) {
+            genericArgs[key] = value;
+        } else {
+            cmd[key] = value;
+        }
+    }
+    return [cmd, genericArgs];
+}
+
+/**
  *  Returns the explain command object for the given 'cmdObj'.
  */
 export function getExplainCommand(cmdObj) {
+    // Extract the generic arguments out of 'cmd' so they can be re-added on root of the final
+    // explain command.
+    const [cmd, genericArgs] = extractGenericArgs(cmdObj);
+
+    // Ensure there's no 'writeConcern' as it can't be passed to the final explain command.
+    delete cmd["writeConcern"];
+
+    // Explained aggregate commands require a cursor argument.
     const isAggregateCmd = getCommandName(cmdObj) === "aggregate";
-    // Extract the 'writeConcern' from the command, as it can not be passed to explain.
-    const {writeConcern, ...cmdWithoutWriteConcern} = cmdObj;
-    return isAggregateCmd ? {explain: {...cmdWithoutWriteConcern, cursor: {}}}
-                          : {explain: cmdWithoutWriteConcern};
+    if (isAggregateCmd) {
+        cmd.cursor = {};
+    }
+    return {explain: cmd, ...genericArgs};
 }
 
 /**
