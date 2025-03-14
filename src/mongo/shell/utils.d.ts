@@ -46,6 +46,7 @@ declare function printStackTrace()
 declare function replSetMemberStatePrompt()
 declare function retryOnNetworkError()
 declare function retryOnRetryableError()
+declare module rs {}
 declare function shellAutocomplete()
 declare module shellHelper {}
 declare function shellPrint()

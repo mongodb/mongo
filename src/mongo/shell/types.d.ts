@@ -1,6 +1,7 @@
 // type declarations for types.js
 
 declare class BSONAwareMap {}
+declare class ISODate {}
 declare function isNumber()
 declare function isObject()
 declare function isString()

@@ -75,3 +75,5 @@ declare class DBCollection {
     watch(pipeline, options)
     checkMetadataConsistency(options = {})
 }
+
+declare class PlanCache {}

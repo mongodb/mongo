@@ -43,3 +43,5 @@ declare class Mongo {
     waitForClusterTime(maxRetries = 10)
     watch(pipeline, options)
 }
+
+declare function connect()

@@ -3,3 +3,4 @@
 declare class BinData {}
 declare class HexData {}
 declare class MD5 {}
+declare class UUID {}
