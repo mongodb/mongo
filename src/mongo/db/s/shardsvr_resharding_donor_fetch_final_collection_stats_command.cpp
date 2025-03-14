@@ -125,7 +125,9 @@ public:
     };
 };
 
-MONGO_REGISTER_COMMAND(ShardsvrReshardingDonorFetchFinalCollectionStatsCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardsvrReshardingDonorFetchFinalCollectionStatsCommand)
+    .requiresFeatureFlag(resharding::gFeatureFlagReshardingVerification)
+    .forShard();
 
 }  // namespace
 }  // namespace mongo
