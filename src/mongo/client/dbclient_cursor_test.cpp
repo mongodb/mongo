@@ -424,15 +424,16 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
     DBClientConnectionForTest conn;
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
-    cursor.setBatchSize(0);
+    auto cursor = std::make_unique<DBClientCursor>(
+        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    cursor->setBatchSize(0);
 
     // Set up mock 'find' response.
     const long long cursorId = 42;
     Message findResponseMsg = mockFindResponse(nss, cursorId, {});
 
     conn.setCallResponse(findResponseMsg);
-    ASSERT(cursor.init());
+    ASSERT(cursor->init());
 
     // Verify that the initial 'find' request was sent.
     auto m = conn.getLastSentMessage();
@@ -441,13 +442,57 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
     ASSERT_EQ(msg.body.getStringField("find"), nss.coll());
 
     // Create and set a mock error response.
-    cursor.setBatchSize(2);
+    cursor->setBatchSize(2);
     auto errResponseMsg = mockErrorResponse(ErrorCodes::Interrupted);
     conn.setCallResponse(errResponseMsg);
 
     // Try to request more results, and expect an error.
     conn.clearLastSentMessage();
-    ASSERT_THROWS_CODE(cursor.more(), DBException, ErrorCodes::Interrupted);
+    ASSERT_THROWS_CODE(cursor->more(), DBException, ErrorCodes::Interrupted);
+    ASSERT(cursor->wasError());
+    ASSERT_FALSE(cursor->isDead());
+
+    // Ensure that the cursor was killed on destruction even though it threw an error.
+    cursor.reset();
+    ASSERT(conn.killedCursor(cursorId));
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionAndDoesntKillCursorOnCursorNotFound) {
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    FindCommandRequest findCmd{nss};
+    auto cursor = std::make_unique<DBClientCursor>(
+        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    cursor->setBatchSize(0);
+
+    // Set up mock 'find' response.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {});
+
+    conn.setCallResponse(findResponseMsg);
+    ASSERT(cursor->init());
+
+    // Verify that the initial 'find' request was sent.
+    auto m = conn.getLastSentMessage();
+    ASSERT(!m.empty());
+    auto msg = OpMsg::parse(m);
+    ASSERT_EQ(msg.body.getStringField("find"), nss.coll());
+
+    // Create and set a mock error response.
+    cursor->setBatchSize(2);
+    auto errResponseMsg = mockErrorResponse(ErrorCodes::CursorNotFound);
+    conn.setCallResponse(errResponseMsg);
+
+    // Try to request more results, and expect an error.
+    conn.clearLastSentMessage();
+    ASSERT_THROWS_CODE(cursor->more(), DBException, ErrorCodes::CursorNotFound);
+    ASSERT(cursor->wasError());
+    ASSERT(cursor->isDead());
+
+    // Ensure that the cursor was not killed due to a CursorNotFound error.
+    cursor.reset();
+    ASSERT_FALSE(conn.killedCursor(cursorId));
 }
 
 TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSetWithZeroCursorId) {
@@ -455,15 +500,16 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
     DBClientConnectionForTest conn;
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
-    cursor.setBatchSize(0);
+    auto cursor = std::make_unique<DBClientCursor>(
+        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    cursor->setBatchSize(0);
 
     // Set up mock 'find' response.
     const long long cursorId = 42;
     Message findResponseMsg = mockFindResponse(nss, cursorId, {});
 
     conn.setCallResponse(findResponseMsg);
-    ASSERT(cursor.init());
+    ASSERT(cursor->init());
 
     // Verify that the initial 'find' request was sent.
     auto m = conn.getLastSentMessage();
@@ -473,14 +519,20 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
 
     // Create and set a getMore response that has the 'moreToCome' flag but also a cursor id of
     // zero.
-    cursor.setBatchSize(2);
+    cursor->setBatchSize(2);
     auto getMoreResponseMsg = mockGetMoreResponse(nss, 0, {});
     OpMsg::setFlag(&getMoreResponseMsg, OpMsg::kMoreToCome);
     conn.setCallResponse(getMoreResponseMsg);
 
     // Try to request more results, and expect an error.
     conn.clearLastSentMessage();
-    ASSERT_THROWS_CODE(cursor.more(), DBException, 50935);
+    ASSERT_THROWS_CODE(cursor->more(), DBException, 50935);
+    // The cursorId of 0 marks the cursor as dead.
+    ASSERT(cursor->isDead());
+
+    // The cursorId of 0 means that this will not be killed & is already marked as dead.
+    cursor.reset();
+    ASSERT_FALSE(conn.killedCursor(cursorId));
 }
 
 TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {

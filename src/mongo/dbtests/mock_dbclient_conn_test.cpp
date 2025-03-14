@@ -854,12 +854,15 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
         ASSERT_STRING_CONTAINS(exception.what(), "Fake socket timeout");
     });
     // Cursor is still valid on network exceptions.
+    ASSERT_FALSE(cursor.wasError());
     ASSERT_FALSE(cursor.isDead());
 
     // Throw exception on non-OK response.
     ASSERT_THROWS_CODE(cursor.more(), mongo::DBException, mongo::ErrorCodes::Interrupted);
-    // Cursor is dead on command errors.
-    ASSERT_TRUE(cursor.isDead());
+    // Cursor indicates error on command errors.
+    ASSERT_TRUE(cursor.wasError());
+    // The cursor still isn't dead, it will be killed on destruction
+    ASSERT_FALSE(cursor.isDead());
 }
 
 bool blockedOnNetworkSoon(MockDBClientConnection* conn) {

@@ -66,7 +66,8 @@ class AggregateCommandRequest;
  * - The caller set 'keepCursorOpen' to true. The cursor is expected to be killed by the caller when
  *   it is no longer needed.
  * - The client used to created the cursor has been interrupted.
- * - The last command (find, aggregate or getMore) returned an error.
+ * - The last command (find, aggregate or getMore) returned an error that indicated the cursor is no
+ *   longer open on the server side.
  */
 class DBClientCursor {
     DBClientCursor(const DBClientCursor&) = delete;
@@ -181,6 +182,10 @@ public:
      */
     bool isDead() const {
         return _cursorId == 0;
+    }
+
+    bool wasError() const {
+        return _wasError;
     }
 
     bool isInitialized() const {
