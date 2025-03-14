@@ -339,9 +339,9 @@ public:
     }
 
     /**
-     * Returns true if there is an idle cursor with the given namespace.
+     * Returns true if there is an open cursor with the given namespace.
      */
-    bool hasIdleCursor(const NamespaceString& nss) {
+    bool hasOpenCursor(const NamespaceString& nss) {
         // Create an alternative client and opCtx since the original opCtx may have been used to
         // run a transaction and $currentOp is not supported in a transaction.
         auto client = opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
@@ -350,10 +350,11 @@ public:
 
         std::vector<BSONObj> pipeline;
         pipeline.push_back(BSON("$currentOp" << BSON("allUsers" << true << "idleCursors" << true)));
+        // Specify {"cursor.originatingCommand": {$exists: true}} to exclude the operation for this
+        // currentOp command.
         pipeline.push_back(
-            BSON("$match" << BSON("type"
-                                  << "idleCursor"
-                                  << "ns"
+            BSON("$match" << BSON("cursor.originatingCommand"
+                                  << BSON("$exists" << true) << "ns"
                                   << NamespaceStringUtil::serialize(
                                          nss, SerializationContext::stateDefault()))));
 
@@ -364,7 +365,7 @@ public:
             &dbclient, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
         if (cursor->more()) {
             while (cursor->more()) {
-                LOGV2(10066810, "Found idle cursor", "doc"_attr = cursor->next());
+                LOGV2(10066810, "Found open cursor", "doc"_attr = cursor->next());
             }
             return true;
         }
@@ -504,7 +505,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
         monitor->startMonitoring(executor, cleanupExecutor, cancelSource.token(), *factory);
 
     // Wait for the monitor to open a change stream cursor.
-    assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+    assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
 
     cancelSource.cancel();
     executor->shutdown();
@@ -513,7 +514,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
     // The cleanup should still succeed.
     monitor->awaitCleanup().get();
     // Verify that the cursor got killed.
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss));
     awaitCompletion.get();
 }
 
@@ -528,11 +529,11 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
         monitor0->startMonitoring(executor, cleanupExecutor, cancelSource.token(), *factory);
 
     // Wait for the monitor to open a change stream cursor.
-    assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+    assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
 
     // Shut down the cleanup executor and verify that the cursor did not get killed.
     cleanupExecutor->shutdown();
-    ASSERT(hasIdleCursor(tempNss));
+    ASSERT(hasOpenCursor(tempNss));
 
     // Start another monitor and make it run to completion successfully.
     auto executor1 = makeTaskExecutor("New");
@@ -551,7 +552,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
     awaitCompletion1.get();
 
     // Verify that the cursor from the previous try got killed.
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss));
 
     tearDownExecutors({executor1, cleanupExecutor1});
 }
@@ -604,8 +605,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
                                                                       recipientFactory);
 
     // Wait for both donor and recipient monitors to open a change stream cursor.
-    assertSoon(opCtx, [&] { return hasIdleCursor(sourceNss); });
-    assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+    assertSoon(opCtx, [&] { return hasOpenCursor(sourceNss); });
+    assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
 
     DBDirectClient client(opCtx);
     client.insert(sourceNss, BSON("_id" << 10));
@@ -619,8 +620,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
     awaitDonorCompletion.get();
 
     // Verify that the donor monitor's cursor got killed but the recipient monitor's cursor did not.
-    ASSERT(!hasIdleCursor(sourceNss));
-    ASSERT(hasIdleCursor(tempNss));
+    ASSERT(!hasOpenCursor(sourceNss));
+    ASSERT(hasOpenCursor(tempNss));
 
     client.insert(tempNss, BSON("_id" << 11));
 
@@ -631,8 +632,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
     recipientMonitor->awaitCleanup().get();
     awaitRecipientCompletion.get();
 
-    ASSERT(!hasIdleCursor(sourceNss));
-    ASSERT(!hasIdleCursor(tempNss));
+    ASSERT(!hasOpenCursor(sourceNss));
+    ASSERT(!hasOpenCursor(tempNss));
 
     tearDownExecutors({donorExecutor, donorCleanupExecutor, donorMarkKilledExecutor});
     tearDownExecutors({recipientExecutor, recipientCleanupExecutor, recipientMarkKilledExecutor});
@@ -796,7 +797,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ProcessMultipleInsertsDeletes) {
     ASSERT_EQ(delta, 4);
 
     monitor->awaitCleanup().get();
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss));
     awaitCompletion.get();
 }
 
@@ -1037,7 +1038,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ResumeWithLastTokenAfterFailure) {
         ASSERT_EQ(monitor->awaitFinalChangeEvent().getNoThrow().code(), ErrorCodes::InternalError);
         // The cleanup should still succeed.
         monitor->awaitCleanup().get();
-        ASSERT_FALSE(hasIdleCursor(tempNss));
+        ASSERT_FALSE(hasOpenCursor(tempNss));
         awaitCompletion.get();
     });
 
@@ -1062,7 +1063,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ResumeWithLastTokenAfterFailure) {
     ASSERT(completed);
 
     monitor->awaitCleanup().get();
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss));
     awaitCompletion.get();
 }
 
@@ -1135,7 +1136,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen)
     monitorInternalErrorFp->setMode(FailPoint::off);
 
     ASSERT_EQ(delta, numInserts);
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss));
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDonor) {
