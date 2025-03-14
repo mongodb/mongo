@@ -1019,19 +1019,13 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
         _updateRecipientDocument(newChangeStreamsCtx, factory);
     };
 
-    if (_changeStreamsMonitorCtx->getResumeToken()) {
-        _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
-            _metadata.getReshardingUUID(),
-            _metadata.getTempReshardingNss(),
-            *_changeStreamsMonitorCtx->getResumeToken(),
-            batchCallback);
-    } else {
-        _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
-            _metadata.getReshardingUUID(),
-            _metadata.getTempReshardingNss(),
-            _changeStreamsMonitorCtx->getStartAtOperationTime(),
-            batchCallback);
-    }
+    _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        _metadata.getReshardingUUID(),
+        _metadata.getTempReshardingNss(),
+        _changeStreamsMonitorCtx->getStartAtOperationTime(),
+        _changeStreamsMonitorCtx->getResumeToken(),
+        batchCallback);
+
     LOGV2(9858301,
           "Starting the change streams monitor",
           "reshardingUUID"_attr = _metadata.getReshardingUUID());

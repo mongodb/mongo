@@ -1057,19 +1057,12 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                 _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
             };
 
-            if (_changeStreamsMonitorCtx->getResumeToken()) {
-                _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
-                    _metadata.getReshardingUUID(),
-                    _metadata.getSourceNss(),
-                    *_changeStreamsMonitorCtx->getResumeToken(),
-                    batchCallback);
-            } else {
-                _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
-                    _metadata.getReshardingUUID(),
-                    _metadata.getSourceNss(),
-                    _changeStreamsMonitorCtx->getStartAtOperationTime(),
-                    batchCallback);
-            }
+            _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+                _metadata.getReshardingUUID(),
+                _metadata.getSourceNss(),
+                _changeStreamsMonitorCtx->getStartAtOperationTime(),
+                _changeStreamsMonitorCtx->getResumeToken(),
+                batchCallback);
 
             LOGV2(9858401,
                   "Starting the change streams monitor",

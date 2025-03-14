@@ -108,11 +108,7 @@ public:
     ReshardingChangeStreamsMonitor(UUID reshardingUUID,
                                    NamespaceString monitorNss,
                                    Timestamp startAtOperationTime,
-                                   BatchProcessedCallback callback);
-
-    ReshardingChangeStreamsMonitor(UUID reshardingUUID,
-                                   NamespaceString monitorNss,
-                                   BSONObj startAfterToken,
+                                   boost::optional<BSONObj> startAfterResumeToken,
                                    BatchProcessedCallback callback);
 
     /**
@@ -173,8 +169,8 @@ private:
 
     const UUID _reshardingUUID;
     const NamespaceString _monitorNss;
-    const boost::optional<Timestamp> _startAt;
-    const boost::optional<BSONObj> _startAfter;
+    const Timestamp _startAtOperationTime;
+    const boost::optional<BSONObj> _startAfterResumeToken;
     const Role _role;
     const BatchProcessedCallback _batchProcessedCallback;
 

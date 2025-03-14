@@ -153,25 +153,22 @@ ReshardingChangeStreamsMonitor::Role getRole(NamespaceString monitorNss) {
 
 }  // namespace
 
-ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(UUID reshardingUUID,
-                                                               NamespaceString monitorNss,
-                                                               Timestamp startAtOperationTime,
-                                                               BatchProcessedCallback callback)
+ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(
+    UUID reshardingUUID,
+    NamespaceString monitorNss,
+    Timestamp startAtOperationTime,
+    boost::optional<BSONObj> startAfterResumeToken,
+    BatchProcessedCallback callback)
     : _reshardingUUID(reshardingUUID),
       _monitorNss(monitorNss),
-      _startAt(startAtOperationTime),
+      _startAtOperationTime(startAtOperationTime),
+      _startAfterResumeToken(startAfterResumeToken),
       _role(getRole(monitorNss)),
-      _batchProcessedCallback(callback) {}
-
-ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(UUID reshardingUUID,
-                                                               NamespaceString monitorNss,
-                                                               BSONObj startAfterToken,
-                                                               BatchProcessedCallback callback)
-    : _reshardingUUID(reshardingUUID),
-      _monitorNss(monitorNss),
-      _startAfter(startAfterToken),
-      _role(getRole(monitorNss)),
-      _batchProcessedCallback(callback) {}
+      _batchProcessedCallback(callback) {
+    uassert(10220100,
+            "Expected the resume token to be non-empty",
+            !_startAfterResumeToken.has_value() || !_startAfterResumeToken->isEmpty());
+}
 
 SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
     std::shared_ptr<executor::TaskExecutor> executor,
@@ -188,24 +185,15 @@ SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
 
     return ExecutorFuture<void>(executor)
         .then([this, executor, cancelToken, factory]() {
-            tassert(1009071,
-                    str::stream() << "Expected the change streams monitor to have 'startAt' or "
-                                     "'startAfter' but it has neither of them",
-                    _startAt || _startAfter);
-            tassert(1009072,
-                    str::stream() << "Expected the change streams monitor to have 'startAt' or "
-                                     "'startAfter' but it has both of them",
-                    !_startAt || !_startAfter);
-
-            if (_startAt) {
-                LOGV2(1006683,
-                      "The change streams monitor is starting",
-                      "reshardingUUID"_attr = _reshardingUUID,
-                      "startAtOperationTime"_attr = _startAt);
-            } else {
+            if (_startAfterResumeToken) {
                 LOGV2(1006684,
                       "The change streams monitor is resuming",
                       "reshardingUUID"_attr = _reshardingUUID);
+            } else {
+                LOGV2(1006683,
+                      "The change streams monitor is starting",
+                      "reshardingUUID"_attr = _reshardingUUID,
+                      "startAtOperationTime"_attr = _startAtOperationTime);
             }
             return _consumeChangeEvents(executor, cancelToken, factory);
         })
@@ -281,14 +269,12 @@ std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() co
     // 'reshardBlockingWrites' event, which is the final event on a donor, is only output when
     // "showSystemEvents" is true.
     changeStreamSpec.setShowSystemEvents(_role == Role::kDonor);
-    if (_startAt) {
-        changeStreamSpec.setStartAtOperationTime(*_startAt);
-    } else {
-        auto resumeToken = ResumeToken::parse(*_startAfter);
+    if (_startAfterResumeToken) {
+        auto resumeToken = ResumeToken::parse(*_startAfterResumeToken);
         changeStreamSpec.setStartAfter(std::move(resumeToken));
+    } else {
+        changeStreamSpec.setStartAtOperationTime(_startAtOperationTime);
     }
-    BSONObj changeStreamStage =
-        BSON(DocumentSourceChangeStream::kStageName << changeStreamSpec.toBSON());
 
     BSONArrayBuilder operationTypesArrayBuilder;
     operationTypesArrayBuilder.append(DocumentSourceChangeStream::kInsertOpType);
@@ -298,8 +284,39 @@ std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() co
     } else {
         operationTypesArrayBuilder.append(DocumentSourceChangeStream::kReshardBlockingWritesOpType);
     }
-    BSONObj matchStage = BSON("$match" << BSON(DocumentSourceChangeStream::kOperationTypeField
-                                               << BSON("$in" << operationTypesArrayBuilder.arr())));
+
+    auto matchStage = [&] {
+        if (_role == Role::kRecipient) {
+            return BSON("$match" << BSON(DocumentSourceChangeStream::kOperationTypeField
+                                         << BSON("$in" << operationTypesArrayBuilder.arr())));
+        }
+
+        // The monitor for a donor needs to additionally filter out events for prepared transactions
+        // have commit timestamp (i.e. visible timestamp) less than the 'startAtOperationTime' but
+        // commit oplog entry after the 'startAtOperationTime'. The monitor for a recipient does
+        // not need to do this because resharding cloning does not involve running prepared
+        // (cross-shard) transactions.
+
+        // TODO (SERVER-86688): Remove this once events for prepared transactions always have the
+        // 'commitTimestamp'.
+        changeStreamSpec.setShowExpandedEvents(true);
+
+        BSONArrayBuilder matchAndArrayBuilder;
+        matchAndArrayBuilder.append(BSON(DocumentSourceChangeStream::kOperationTypeField
+                                         << BSON("$in" << operationTypesArrayBuilder.arr())));
+
+        BSONArrayBuilder commitTimestampArrayBuilder;
+        commitTimestampArrayBuilder.append(
+            BSON(DocumentSourceChangeStream::kCommitTimestampField << BSON("$exists" << false)));
+        commitTimestampArrayBuilder.append(BSON(DocumentSourceChangeStream::kCommitTimestampField
+                                                << BSON("$gte" << _startAtOperationTime)));
+        matchAndArrayBuilder.append(BSON("$or" << commitTimestampArrayBuilder.arr()));
+
+        return BSON("$match" << BSON("$and" << matchAndArrayBuilder.arr()));
+    }();
+
+    BSONObj changeStreamStage =
+        BSON(DocumentSourceChangeStream::kStageName << changeStreamSpec.toBSON());
 
     BSONObj projectStage = BSON("$project" << BSON("operationType" << 1));
 
