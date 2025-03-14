@@ -142,14 +142,6 @@ mongo_cc_unit_test(
     ],
 )
 
-mongo_cc_library(
-    name = "benchmark",
-    srcs = [],
-    hdrs = [
-        "benchmark/benchmark.h",
-    ],
-)
-
 mongo_cc_benchmark(
     name = "status_bm",
     srcs = [
