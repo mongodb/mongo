@@ -201,8 +201,7 @@ public:
     PlanExecutor::QueryFramework getQueryFramework() const final;
 
     bool usesCollectionAcquisitions() const final {
-        // TODO SERVER-78724: Replace this whenever aggregations use shard role acquisitions.
-        return false;
+        return true;
     }
 
 private:

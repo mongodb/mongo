@@ -121,10 +121,6 @@ CursorLocks::CursorLocks(OperationContext* opCtx,
     // drop and reacquire locks when the cursor is awaitData, but we don't want to update
     // the stats twice.
     if (cursorPin->getExecutor()->lockPolicy() == PlanExecutor::LockPolicy::kLocksInternally) {
-        // TODO SERVER-78724: This invariant can be safely removed once aggregations uses
-        // collection acquisitions.
-        invariant(!cursorPin->getExecutor()->usesCollectionAcquisitions());
-
         // Profile whole-db/cluster change stream getMore commands.
         if (!nss.isCollectionlessCursorNamespace() ||
             CurOp::get(opCtx)->debug().isChangeStreamQuery) {

@@ -62,7 +62,7 @@ awaitShell = startParallelShell(funWithArgs(function(dbName, collName) {
                                     ];
                                     assert.throwsWithCode(
                                         () => db.getSiblingDB(dbName)[collName].aggregate(pipeline),
-                                        ErrorCodes.NamespaceNotFound);
+                                        ErrorCodes.QueryPlanKilled);
                                 }, db.getName(), db.coll.getName()), conn.port);
 
 fp.wait();

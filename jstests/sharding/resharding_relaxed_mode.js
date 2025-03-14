@@ -85,16 +85,18 @@ function reshardingCommandWithRelaxed(relaxed) {
 // assert that shard0's collection UUID matches config.collections and shard1's doesn't
 checkShardUUIDsAgainstConfig(false);
 
-// assert that running reshard command without relaxed mode fails due to a CollectionUUIDMismatch
+// assert that running reshard command without relaxed mode fails due to a CollectionUUIDMismatch or
+// SnapshotUnavailable (the later can happen when the shard detects the mismatch between the local
+// and sharding catalogs).
 assert.commandFailedWithCode(reshardingCommandWithRelaxed(undefined),
-                             ErrorCodes.CollectionUUIDMismatch);
+                             [ErrorCodes.CollectionUUIDMismatch, ErrorCodes.SnapshotUnavailable]);
 
 // assert that the collection UUID is still mistmached
 checkShardUUIDsAgainstConfig(false);
 
 // assert that running reshard command with relaxed mode = false fails as well
 assert.commandFailedWithCode(reshardingCommandWithRelaxed(false),
-                             ErrorCodes.CollectionUUIDMismatch);
+                             [ErrorCodes.CollectionUUIDMismatch, ErrorCodes.SnapshotUnavailable]);
 
 // assert that the collection UUID is still mistmached
 checkShardUUIDsAgainstConfig(false);
