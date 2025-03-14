@@ -360,9 +360,17 @@ std::vector<TestOptions> makeAllTestOptions() {
     return testOptions;
 }
 
-BSONObj makeTestDocument(int i) {
-    auto id = UUID::gen();
+BSONObj makeTestDocumentForInsert(int i, UUID& id) {
     return BSON("_id" << id.toBSON() << "x" << i << "y" << i);
+}
+
+BSONObj makeTestDocumentForInsert(int i) {
+    auto id = UUID::gen();
+    return makeTestDocumentForInsert(i, id);
+}
+
+BSONObj makeTestDocumentUpdateStatement() {
+    return BSON("$inc" << BSON("x" << 1));
 }
 
 struct RecipientMetricsCommon {
@@ -419,7 +427,7 @@ TestRecipientMetrics makeTestRecipientMetrics(const TestOptions& testOptions,
         RecipientMetricsForDonor metricsForDonor;
         metricsForDonor.shardId = donors[i].getShardId();
 
-        auto bytesPerDoc = makeTestDocument(0).objsize();
+        auto bytesPerDoc = makeTestDocumentForInsert(0).objsize();
         metricsForDonor.metrics.docsCopied = i;
         metricsForDonor.metrics.bytesCopied = bytesPerDoc * metricsForDonor.metrics.docsCopied;
         metricsForDonor.metrics.oplogFetched = i * 2;
@@ -581,9 +589,12 @@ public:
         auto status = recipient.awaitChangeStreamsMonitorStartedForTest().getNoThrow(opCtx);
         if (recipientDoc.getPerformVerification() && !recipientDoc.getSkipCloningAndApplying()) {
             ASSERT_OK(status);
-            writeToCollection(opCtx, recipientDoc, _numInserts, _numDeletes, _numUpdates);
         } else {
             ASSERT_EQ(status, ErrorCodes::IllegalOperation);
+        }
+        if (!_noChunksToCopy) {
+            // Only mock writes during the 'applying' state if the recipient has chunks to copy.
+            writeToCollection(opCtx, recipientDoc, _numInserts, _numDeletes, _numUpdates);
         }
     }
 
@@ -596,7 +607,7 @@ public:
             ASSERT_OK(swDocumentsDelta.getStatus());
 
             // Verify the delta.
-            int documentsDelta = _numInserts - _numDeletes;
+            int documentsDelta = getExpectedDocumentsDelta();
             ASSERT_EQ(swDocumentsDelta.getValue(), documentsDelta);
 
             auto persistedDoc =
@@ -692,11 +703,10 @@ protected:
             // Set up the temporary collection.
             std::vector<BSONObj> docs;
             for (int i = 0; i < docsCopied; i++) {
-                docs.push_back(makeTestDocument(i));
+                docs.push_back(makeTestDocumentForInsert(i));
             }
             insertDocuments(opCtx, metadata.getTempReshardingNss(), docs);
         }
-
         metrics.onDocumentsProcessed(docsCopied, bytesCopied, Milliseconds(1));
     }
 
@@ -788,6 +798,21 @@ protected:
         }
     }
 
+    int64_t getExpectedDocumentsDelta() {
+        if (_noChunksToCopy) {
+            return 0;
+        }
+        return _numInserts - _numDeletes;
+    }
+
+    int64_t getExpectedDocumentsDeltaBytes() {
+        if (_noChunksToCopy) {
+            return 0;
+        }
+        auto objectSize = makeTestDocumentForInsert(0).objsize();
+        return objectSize * _numInserts - objectSize * _numDeletes;
+    }
+
     void checkRecipientToCopyMetrics(const TestOptions& testOptions,
                                      const ReshardingRecipientDocument& recipientDoc,
                                      const boost::optional<BSONObj>& currOp) {
@@ -821,10 +846,10 @@ protected:
         }
     }
 
-    void checkRecipientCopiedMetrics(const TestOptions& testOptions,
-                                     const TestRecipientMetrics& testRecipientMetrics,
-                                     const ReshardingRecipientDocument& recipientDoc,
-                                     const boost::optional<BSONObj>& currOp) {
+    void checkRecipientDocumentMetrics(const TestOptions& testOptions,
+                                       const TestRecipientMetrics& testRecipientMetrics,
+                                       const ReshardingRecipientDocument& recipientDoc,
+                                       const boost::optional<BSONObj>& currOp) {
         auto mutableState = recipientDoc.getMutableState();
         auto state = mutableState.getState();
 
@@ -852,15 +877,21 @@ protected:
         // If verification is enabled, the metrics below are populated upon transitioning to the
         // "applying" state after cloning completes and are updated as oplog entries are applied. If
         // verification is disabled, they are populated upon transitioning to the "done" state.
-        if (testOptions.performVerification || state == RecipientStateEnum::kDone) {
+        if (testOptions.performVerification &&
+            (state == RecipientStateEnum::kApplying ||
+             state == RecipientStateEnum::kStrictConsistency)) {
             ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
+            ASSERT_EQ(*mutableState.getTotalDocumentSize(), expectedBytesCopied);
+        } else if (state == RecipientStateEnum::kDone) {
+            ASSERT_EQ(*mutableState.getTotalNumDocuments(),
+                      expectedDocsCopied + getExpectedDocumentsDelta());
             // Upon transitioning to the "done" state, 'totalDocumentSize' is set to the fast count
             // size. This test deliberately leaves the temporary collection empty when testing
-            // verification so this is expected to be equal to 0.
-            bool expectInaccurateSize =
-                testOptions.performVerification && state == RecipientStateEnum::kDone;
+            // verification so this is expected to be equal to the delta.
             ASSERT_EQ(*mutableState.getTotalDocumentSize(),
-                      expectInaccurateSize ? 0 : expectedBytesCopied);
+                      testOptions.performVerification
+                          ? getExpectedDocumentsDeltaBytes()
+                          : expectedBytesCopied + getExpectedDocumentsDeltaBytes());
         } else {
             ASSERT_FALSE(mutableState.getTotalNumDocuments());
             ASSERT_FALSE(mutableState.getTotalDocumentSize());
@@ -906,14 +937,14 @@ protected:
                                const ReshardingRecipientDocument& recipientDoc,
                                const boost::optional<BSONObj>& currOp) {
         checkRecipientToCopyMetrics(testOptions, recipientDoc, currOp);
-        checkRecipientCopiedMetrics(testOptions, testRecipientMetrics, recipientDoc, currOp);
+        checkRecipientDocumentMetrics(testOptions, testRecipientMetrics, recipientDoc, currOp);
         checkRecipientOplogMetrics(testRecipientMetrics, recipientDoc, currOp);
     }
 
-    void checkCoordinatorCopiedMetrics(const TestOptions& testOptions,
-                                       const TestRecipientMetrics& testRecipientMetrics,
-                                       const ReshardingCoordinatorDocument& coordinatorDoc,
-                                       RecipientStateEnum recipientState) {
+    void checkCoordinatorDocumentMetrics(const TestOptions& testOptions,
+                                         const TestRecipientMetrics& testRecipientMetrics,
+                                         const ReshardingCoordinatorDocument& coordinatorDoc,
+                                         RecipientStateEnum recipientState) {
         if (recipientState < RecipientStateEnum::kApplying) {
             return;
         }
@@ -922,13 +953,14 @@ protected:
         for (const auto& recipientShard : coordinatorDoc.getRecipientShards()) {
             if (recipientShard.getId() == recipientShardId) {
                 auto mutableState = recipientShard.getMutableState();
+                auto state = mutableState.getState();
 
                 auto expectedDocsCopied = testRecipientMetrics.getMetricsTotal().docsCopied;
                 auto expectedBytesCopied = testRecipientMetrics.getMetricsTotal().bytesCopied;
 
                 // The metrics below are populated upon transitioning to the "strict-consistency"
                 // state.
-                if (recipientState >= RecipientStateEnum::kStrictConsistency) {
+                if (state >= RecipientStateEnum::kStrictConsistency) {
                     // There is currently no 'documentsCopied'.
                     ASSERT_EQ(*mutableState.getBytesCopied(), expectedBytesCopied);
                 } else {
@@ -939,18 +971,20 @@ protected:
                 // the "applying" state after cloning completes and are updated upon transitioning
                 // to the "strict-consistency" state. If verification is disabled, they are
                 // populated upon transitioning to the "strict-consistency" state.
-                if (testOptions.performVerification ||
-                    recipientState >= RecipientStateEnum::kStrictConsistency) {
-
+                if (testOptions.performVerification && state == RecipientStateEnum::kApplying) {
                     ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
+                    ASSERT_EQ(*mutableState.getTotalDocumentSize(), expectedBytesCopied);
+                } else if (state >= RecipientStateEnum::kStrictConsistency) {
+                    ASSERT_EQ(*mutableState.getTotalNumDocuments(),
+                              expectedDocsCopied + getExpectedDocumentsDelta());
                     // Upon transitioning to the "strict-consistency" state, 'totalDocumentSize' is
                     // set to the fast count size. This test deliberately leaves the temporary
                     // collection empty when testing verification so this is expected to be equal to
-                    // 0.
-                    bool expectInaccurateSize = testOptions.performVerification &&
-                        recipientState >= RecipientStateEnum::kStrictConsistency;
+                    // the delta.
                     ASSERT_EQ(*mutableState.getTotalDocumentSize(),
-                              expectInaccurateSize ? 0 : expectedBytesCopied);
+                              testOptions.performVerification
+                                  ? getExpectedDocumentsDeltaBytes()
+                                  : expectedBytesCopied + getExpectedDocumentsDeltaBytes());
                 } else {
                     ASSERT_FALSE(mutableState.getTotalNumDocuments());
                     ASSERT_FALSE(mutableState.getTotalDocumentSize());
@@ -990,7 +1024,7 @@ protected:
                                  const TestRecipientMetrics& testRecipientMetrics,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  RecipientStateEnum recipientState) {
-        checkCoordinatorCopiedMetrics(
+        checkCoordinatorDocumentMetrics(
             testOptions, testRecipientMetrics, coordinatorDoc, recipientState);
         checkCoordinatorOplogMetrics(testRecipientMetrics, coordinatorDoc, recipientState);
     }
@@ -1007,20 +1041,27 @@ protected:
 
         DBDirectClient client(opCtx);
 
+        std::vector<UUID> idsInserted;
+        idsInserted.reserve(numInserts);
+
         for (int i = 0; i <= numInserts; i++) {
-            client.insert(recipientDoc.getTempReshardingNss(), BSON("_id" << i << "x" << i));
+            auto id = UUID::gen();
+            auto doc = makeTestDocumentForInsert(i, id);
+            client.insert(recipientDoc.getTempReshardingNss(), doc);
+            idsInserted.emplace_back(id);
         }
 
         for (int i = 0; i <= numUpdates; i++) {
             client.update(recipientDoc.getTempReshardingNss(),
-                          BSON("_id" << i),
-                          BSON("$inc" << BSON("x" << 1)),
+                          BSON("_id" << idsInserted[i].toBSON()),
+                          makeTestDocumentUpdateStatement(),
                           false,
                           false);
         }
 
         for (int i = 0; i <= numDeletes; i++) {
-            client.remove(recipientDoc.getTempReshardingNss(), BSON("_id" << i), false);
+            client.remove(
+                recipientDoc.getTempReshardingNss(), BSON("_id" << idsInserted[i].toBSON()), false);
         }
     }
 
@@ -1762,7 +1803,7 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
         auto testRecipientMetrics =
             makeTestRecipientMetrics(testOptions, recipientDoc.getDonorShards());
 
-        auto checkPersistedState = [&]() {
+        auto checkPersistedState = [&](RecipientStateMachine& recipient) {
             auto persistedRecipientDoc =
                 getPersistedRecipientDocument(opCtx.get(), recipientDoc.getReshardingUUID());
             auto persistedCoordinatorDoc =
@@ -1825,7 +1866,12 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
                     notifyToStartCloning(opCtx.get(), *recipient, recipientDoc);
                     break;
                 }
+                case RecipientStateEnum::kStrictConsistency: {
+                    awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, recipientDoc);
+                    break;
+                }
                 case RecipientStateEnum::kDone: {
+                    awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, recipientDoc);
                     notifyReshardingCommitting(opCtx.get(), *recipient, recipientDoc);
                     break;
                 }
@@ -1834,7 +1880,7 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
             }
 
             stateTransitionsGuard.wait(state);
-            checkPersistedState();
+            checkPersistedState(*recipient);
 
             prevState = state;
         }
@@ -1846,10 +1892,11 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
         auto recipient = *maybeRecipient;
 
         stateTransitionsGuard.unset(RecipientStateEnum::kDone);
+        awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, recipientDoc);
         notifyReshardingCommitting(opCtx.get(), *recipient, recipientDoc);
 
         removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-        checkPersistedState();
+        checkPersistedState(*recipient);
 
         removeRecipientDocFailpoint->setMode(FailPoint::off);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());

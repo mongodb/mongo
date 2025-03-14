@@ -977,9 +977,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDoneWithInterrupt) {
     auto reshardingOptions = makeDefaultReshardingOptions();
-    // TODO (SERVER-100735): Investigate why 'documentsFinal' can be missing from the recipient
-    // state doc in when there is interrupt.
-    reshardingOptions.performVerification = false;
+    reshardingOptions.performVerification = true;
     const auto interrupt = [this] {
         killAllReshardingCoordinatorOps();
     };
