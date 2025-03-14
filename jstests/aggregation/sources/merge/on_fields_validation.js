@@ -6,6 +6,7 @@
  * that implicitly shard the collection with a hashed shard key.
  * @tags: [
  *   cannot_create_unique_index_when_using_hashed_shard_key,
+ *   requires_fcv_81,
  * ]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";

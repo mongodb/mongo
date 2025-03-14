@@ -1,3 +1,6 @@
+// @tags: [
+//   requires_fcv_81,
+// ]
 import {assertErrCodeAndErrMsgContains, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.aggregation_count;

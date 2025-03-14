@@ -1,5 +1,8 @@
 /**
  * Test that standard deviation works as a window function.
+ * @tags: [
+ *   requires_fcv_81,
+ * ]
  */
 import {
     seedWithTickerData,

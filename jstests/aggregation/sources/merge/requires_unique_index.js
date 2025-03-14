@@ -5,6 +5,10 @@
 // Note that this test does *not* use the drop shell helper but instead runs the drop command
 // manually. This is to avoid implicit creation and sharding of the $merge target collections in the
 // passthrough suites.
+//
+// @tags: [
+//   requires_fcv_81,
+// ]
 import {
     assertMergeFailsWithoutUniqueIndex,
     withEachMergeMode

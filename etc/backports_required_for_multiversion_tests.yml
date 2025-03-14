@@ -21,10 +21,20 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/aggregation/expressions/null_chars_string_input.js
+      ticket: SERVER-95687
     - test_file: jstests/core/query/explain/explain_plan_cache.js
       ticket: SERVER-97662
     - test_file: jstests/core/query/json_schema/json_schema.js
       ticket: SERVER-98676
+    - test_file: jstests/aggregation/sources/setWindowFields/partition_results.js
+      ticket: SERVER-96405
+    - test_file: jstests/aggregation/sources/sort_by_count_validation.js
+      ticket: SERVER-98214
+    - test_file: jstests/aggregation/sources/foreign_coll_read_foreign_db_write.js
+      ticket: SERVER-96197
+    - test_file: jstests/aggregation/sources/lookup/lookup_absorb_match.js
+      ticket: SERVER-99121
     - test_file: jstests/change_streams/change_streams_namespace_match_expressions.js
       ticket: SERVER-100489
     - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
@@ -397,10 +407,20 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/aggregation/expressions/null_chars_string_input.js
+      ticket: SERVER-95687
     - test_file: jstests/core/query/explain/explain_plan_cache.js
       ticket: SERVER-97662
     - test_file: jstests/core/query/json_schema/json_schema.js
       ticket: SERVER-98676
+    - test_file: jstests/aggregation/sources/setWindowFields/partition_results.js
+      ticket: SERVER-96405
+    - test_file: jstests/aggregation/sources/sort_by_count_validation.js
+      ticket: SERVER-98214
+    - test_file: jstests/aggregation/sources/foreign_coll_read_foreign_db_write.js
+      ticket: SERVER-96197
+    - test_file: jstests/aggregation/sources/lookup/lookup_absorb_match.js
+      ticket: SERVER-99121
     - test_file: jstests/change_streams/change_streams_namespace_match_expressions.js
       ticket: SERVER-100489
     - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js

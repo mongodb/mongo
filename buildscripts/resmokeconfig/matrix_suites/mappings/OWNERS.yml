@@ -17,7 +17,7 @@ filters:
   - "aggregation_sharded_collections_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
-  - "aggregation_sharded_collections_query_shape_hash_stability.yml":
+  - "aggregation_sharded_collections_query_shape_hash_stability*":
     approvers:
       - 10gen/query-execution-query-settings
       - 10gen/query-integration-query-stats
@@ -42,7 +42,7 @@ filters:
   - "sharded_collections_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
-  - "sharded_collections_query_shape_hash_stability.yml":
+  - "sharded_collections_query_shape_hash_stability*":
     approvers:
       - 10gen/query-execution-query-settings
       - 10gen/query-integration-query-stats

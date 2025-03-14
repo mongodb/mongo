@@ -1035,6 +1035,50 @@ tasks:
         vars:
           use_large_distro: "true"
 
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_query_shape_hash_stability_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "multiversion_passthrough",
+        "multiversion",
+        "experimental",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          aggregation_sharded_collections_query_shape_hash_stability_last_lts_new_old: last_lts
+          aggregation_sharded_collections_query_shape_hash_stability_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
+
+  - <<: *gen_task_template
+    name: sharded_collections_query_shape_hash_stability_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "multiversion_passthrough",
+        "multiversion",
+        "experimental",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
+
   - <<: *task_template
     name: jsCore
     tags:

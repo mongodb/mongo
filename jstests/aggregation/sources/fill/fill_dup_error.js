@@ -1,5 +1,8 @@
 // Ensure that if sort values are duplicated in different partition $fill succeeds.
-
+//
+// @tags: [
+//   requires_fcv_81,
+// ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];

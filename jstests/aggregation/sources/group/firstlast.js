@@ -1,5 +1,9 @@
 /**
  * Tests the $first and $last accumulators in $group.
+ *
+ *  @tags: [
+ *   requires_fcv_81,
+ * ]
  */
 const coll = db.jstests_aggregation_firstlast;
 coll.drop();

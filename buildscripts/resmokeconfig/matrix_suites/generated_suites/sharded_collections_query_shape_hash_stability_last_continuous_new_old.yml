@@ -3,13 +3,13 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_collections_query_shape_hash_stability.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_collections_query_shape_hash_stability_last_continuous_new_old.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 description:
   This suite runs through all existing core tests and ensures that the
-  'queryShapeHash' attribute returned in explain is same for multiple explain invocations
-  in sharded cluster deployments which implicitly shards accessed collections.
+  'queryShapeHash' attribute returned in explain is same for multiple explain invocations,
+  across all nodes of two sharded clusters, with different binaries version.
 executor:
   archive:
     hooks:
@@ -21,21 +21,29 @@ executor:
       eval:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
         await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+      global_vars:
+        TestData:
+          isMultiShardedClusterFixture: true
   fixture:
-    class: ShardedClusterFixture
-    enable_balancer: false
-    mongod_options:
+    class: MultiShardedClusterFixture
+    common_mongod_options:
       set_parameters:
         enableTestCommands: 1
+      verbose: ""
+    enable_balancer: false
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-    num_shards: 2
+    num_rs_nodes_per_shard: 2
+    num_sharded_clusters: 2
+    num_shards: 1
+    per_sharded_cluster_options:
+      - mixed_bin_versions: old_old
+        old_bin_version: last_continuous
+      - {}
+    persist_connection_strings: true
   hooks:
-    - class: CheckReplDBHash
-    - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
-    - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
 matrix_suite: true
@@ -97,6 +105,14 @@ selector:
     - jstests/core/query/api/api_version_new_52_language_features.js
     - jstests/core/index/express_id_eq.js
     - jstests/core/query/query_settings/query_shape_hash_in_slow_query_logs.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
+    - jstests/core/index/express.js
+    - jstests/core/query/idhack.js
+    - jstests/core/query/explain/explain_all_plans_execution_stats.js
+    - jstests/core/timeseries/ddl/rename_system_buckets_collections.js
+    - jstests/core/timeseries/write/timeseries_delete_with_meta.js
+    - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
@@ -111,6 +127,8 @@ selector:
     - requires_fsync
     - known_query_shape_computation_problem
     - directly_against_shardsvrs_incompatible
+    - multiversion_incompatible
+    - requires_2_or_more_shards
   roots:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js

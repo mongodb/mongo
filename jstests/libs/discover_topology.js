@@ -150,8 +150,8 @@ export var DiscoverTopology = (function() {
      * Return list of nodes in the cluster given a connection NOT including config servers (if
      * there are any).
      */
-    function findNonConfigNodes(conn) {
-        const topology = findConnectedNodes(conn);
+    function findNonConfigNodes(conn, options = {connectFn: kDefaultConnectFn}) {
+        const topology = findConnectedNodes(conn, options);
         let hostList = [];
         addNonConfigNodesToList(topology, hostList);
         return hostList;

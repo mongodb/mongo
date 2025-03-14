@@ -1,5 +1,8 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
-
+//
+// @tags: [
+//   requires_fcv_81,
+// ]
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";

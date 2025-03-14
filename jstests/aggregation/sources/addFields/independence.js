@@ -9,6 +9,7 @@
  * @tags: [
  *   # $documents is not allowed to be used within a $facet stage
  *   do_not_wrap_aggregations_in_facets,
+ *   requires_fcv_81,
  * ]
  */
 

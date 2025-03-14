@@ -4,7 +4,6 @@ description: >-
   attribute returned in explain is same for multiple explain invocations in sharded cluster
   deployments which implicitly shards accessed collections.
 excludes:
-  - "query_settings.common_core_excludes"
-  - "query_settings.query_shape_hash_stability_core"
+  - "query_shape_hash_stability.common_core_excludes"
 eval:
-  - "query_settings.eval_query_shape_hash_stability"
+  - "query_shape_hash_stability.eval_query_shape_hash_stability"

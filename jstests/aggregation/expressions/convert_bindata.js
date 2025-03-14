@@ -2,7 +2,7 @@
  * Tests behavior of BinData $convert.
  * @tags: [
  *   # BinData $convert was added in v8.0.
- *   requires_fcv_80,
+ *   requires_fcv_81,
  * ]
  */
 

@@ -3,37 +3,41 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/aggregation_sharded_collections_query_shape_hash_stability.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/aggregation_sharded_collections_query_shape_hash_stability_last_continuous_new_old.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 description:
   This suite runs through all existing aggregation tests and ensures that
   the 'queryShapeHash' attribute returned in explain is same for multiple explain
-  invocations on sharded cluster deployments.
+  invocations, across all nodes of two sharded clusters, with different binaries version.
 executor:
   archive:
     hooks:
-      - CheckReplDBHash
-      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
         await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+      global_vars:
+        TestData:
+          isMultiShardedClusterFixture: true
   fixture:
-    class: ShardedClusterFixture
-    mongod_options:
+    class: MultiShardedClusterFixture
+    common_mongod_options:
       set_parameters:
         enableTestCommands: 1
-    mongos_options:
-      set_parameters:
-        enableTestCommands: 1
+      verbose: ""
+    num_rs_nodes_per_shard: 2
+    num_sharded_clusters: 2
+    num_shards: 1
+    per_sharded_cluster_options:
+      - mixed_bin_versions: old_old
+        old_bin_version: last_continuous
+      - {}
+    persist_connection_strings: true
   hooks:
-    - class: CheckReplDBHash
-    - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
-    - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
 matrix_suite: true
@@ -41,10 +45,6 @@ selector:
   exclude_files:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
-    - jstests/aggregation/sources/group/groupMissing.js
-    - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
-    - jstests/aggregation/expressions/internal_js_emit_with_scope.js
-    - jstests/aggregation/sources/unionWith/unionWith_explain.js
     - jstests/aggregation/sources/geonear/geonear_hint.js
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
@@ -60,12 +60,26 @@ selector:
     - jstests/aggregation/exec/query_limits_test.js
     - jstests/aggregation/sources/internal_document_sources.js
     - jstests/aggregation/timeseries/timeseries_group_aggregations.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
+    - jstests/aggregation/sources/densify/memory_limit.js
+    - jstests/aggregation/sources/setWindowFields/memory_limit.js
+    - jstests/aggregation/sources/densify/densify_sort_opt_comparison.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
+    - jstests/aggregation/explain/explain_limit.js
+    - jstests/aggregation/sources/densify/generated_limit.js
+    - jstests/aggregation/sources/unionWith/unionWith.js
+    - jstests/aggregation/sources/lookup/hash_lookup_spill_large_and_small_documents_correctly.js
+    - jstests/aggregation/js/agg_infinite_recursion.js
+    - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+    - jstests/aggregation/optimization/lookup_let_optimization.js
+    - jstests/aggregation/sources/project/remove_redundant_projects.js
+    - jstests/aggregation/exec/spill_to_disk.js
+    - jstests/aggregation/parsing/aggregation_with_uuids.js
+    - jstests/aggregation/sources/collection_uuid_coll_stats_index_stats.js
   exclude_with_any_tags:
-    - assumes_against_mongod_not_mongos
-    - requires_profiling
-    - requires_sharding
-    - requires_replication
-    - requires_2_or_more_shards
     - assumes_standalone_mongod
     - does_not_support_repeated_reads
     - requires_profiling
@@ -74,6 +88,8 @@ selector:
     - assumes_against_mongod_not_mongos
     - known_query_shape_computation_problem
     - directly_against_shardsvrs_incompatible
+    - multiversion_incompatible
+    - requires_2_or_more_shards
   roots:
     - jstests/aggregation/**/*.js
 test_kind: js_test

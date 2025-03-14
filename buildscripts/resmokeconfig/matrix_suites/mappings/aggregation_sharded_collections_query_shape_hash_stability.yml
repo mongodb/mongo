@@ -3,7 +3,6 @@ description: >-
   This suite runs through all existing aggregation tests and ensures that the 'queryShapeHash'
   attribute returned in explain is same for multiple explain invocations on sharded cluster deployments.
 excludes:
-  - "query_settings.common_aggregation_excludes"
-  - "query_settings.query_shape_hash_stability_aggregation"
+  - "query_shape_hash_stability.common_aggregation_excludes"
 eval:
-  - "query_settings.eval_query_shape_hash_stability"
+  - "query_shape_hash_stability.eval_query_shape_hash_stability"

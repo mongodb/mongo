@@ -1,6 +1,9 @@
 // Test validation of $facet pipelines. Test that we correctly report the name of the stage not
 // allowed inside $facet even if it is deeply nested in subpipelines.
-
+//
+// @tags: [
+//   requires_fcv_81,
+// ]
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.coll_facet;

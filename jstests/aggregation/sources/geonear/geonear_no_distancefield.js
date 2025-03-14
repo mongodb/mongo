@@ -3,6 +3,7 @@
  * @tags: [
  *   # $geoNear is not allowed in a facet.
  *   do_not_wrap_aggregations_in_facets,
+ *   requires_fcv_81,
  * ]
  */
 

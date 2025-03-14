@@ -1,4 +1,8 @@
 // Tests that the $setMetadata stage is not allowed in user requests.
+//
+// @tags: [
+//   requires_fcv_81,
+// ]
 
 const coll = db[jsTestName()];
 coll.drop();
