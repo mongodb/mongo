@@ -219,7 +219,7 @@ void dumpScopedDebugInfo(std::ostream& os) {
     os << "ScopedDebugInfo: [";
     StringData sep;
     for (const auto& s : diagStack) {
-        os << sep << "(" << s << ")";
+        os << sep << '"' << s << '"';
         sep = ", "_sd;
     }
     os << "]\n";
