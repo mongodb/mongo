@@ -648,11 +648,6 @@ getLastOpTime = function(conn) {
 getFirstOplogEntry = function(server, opts = {}) {
     server.getDB("admin").getMongo().setSecondaryOk();
 
-    let firstEntryQuery = server.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1);
-    if (opts.readConcern) {
-        firstEntryQuery = firstEntryQuery.readConcern(opts.readConcern);
-    }
-
     // The query plan may yield between the cursor establishment and iterating to retrieve the first
     // result. During this yield it's possible for the oplog to "roll over" or shrink. This is rare,
     // but if these both happen the cursor will be unable to resume after yielding and return a
@@ -660,6 +655,11 @@ getFirstOplogEntry = function(server, opts = {}) {
     let firstEntry;
     assert.soon(() => {
         try {
+            let firstEntryQuery =
+                server.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1);
+            if (opts.readConcern) {
+                firstEntryQuery = firstEntryQuery.readConcern(opts.readConcern);
+            }
             firstEntry = firstEntryQuery.toArray()[0];
             return true;
         } catch (e) {
