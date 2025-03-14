@@ -274,7 +274,7 @@ struct HandleRequest {
     };
 
     HandleRequest(OperationContext* opCtx, const Message& msg)
-        : executionContext(ExecutionContext(opCtx, const_cast<Message&>(msg))) {}
+        : executionContext(opCtx, const_cast<Message&>(msg)) {}
 
     void startOperation();
     DbResponse runOperation();
@@ -809,7 +809,6 @@ private:
 };
 
 void InvokeCommand::run() {
-    const auto dbName = _ecd->getInvocation()->ns().dbName();
     runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
 }
 
@@ -817,8 +816,6 @@ void CheckoutSessionAndInvokeCommand::run() {
     auto status = [&] {
         try {
             _checkOutSession();
-
-            const auto dbName = _ecd->getInvocation()->ns().dbName();
 
             if (auto scoped = failWithErrorCodeAfterSessionCheckOut.scoped();
                 MONGO_unlikely(scoped.isActive())) {
