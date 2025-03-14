@@ -61,6 +61,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
+#include "mongo/db/s/resharding/resharding_test_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/service_context.h"
@@ -254,9 +255,23 @@ public:
             opCtx, donorDoc.getTempReshardingNss(), options);
     }
 
+    void awaitDonorState(OperationContext* opCtx,
+                         const UUID& reshardingUUID,
+                         DonorStateEnum minState) {
+        resharding_test_util::assertSoon(opCtx, [&] {
+            auto persistedDonorDoc = getPersistedDonorDocumentOptional(opCtx, reshardingUUID);
+            return persistedDonorDoc &&
+                (persistedDonorDoc->getMutableState().getState() == minState);
+        });
+    }
+
     void notifyToStartChangeStreamsMonitor(OperationContext* opCtx,
                                            DonorStateMachine& donor,
                                            const ReshardingDonorDocument& donorDoc) {
+        // Wait for the donor to be in the "donating-initial-data" state since the change streams
+        // monitor should only start after the clone timestamp has been chosen.
+        awaitDonorState(opCtx, donorDoc.getReshardingUUID(), DonorStateEnum::kDonatingInitialData);
+
         auto status = donor.createAndStartChangeStreamsMonitor(cloneTimestamp).getNoThrow(opCtx);
         if (donorDoc.getPerformVerification()) {
             ASSERT_OK(status);
@@ -317,27 +332,32 @@ public:
         ASSERT_TRUE(bool(donorColl->isEmpty(opCtx)));
     }
 
-    ReshardingDonorDocument getPersistedDonorDocument(OperationContext* opCtx,
-                                                      UUID reshardingUUID) {
-        boost::optional<ReshardingDonorDocument> persistedDonorDocument;
+    boost::optional<ReshardingDonorDocument> getPersistedDonorDocumentOptional(
+        OperationContext* opCtx, const UUID& reshardingUUID) {
+        boost::optional<ReshardingDonorDocument> doc;
         PersistentTaskStore<ReshardingDonorDocument> store(
             NamespaceString::kDonorReshardingOperationsNamespace);
         store.forEach(opCtx,
                       BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << reshardingUUID),
                       [&](const auto& donorDocument) {
-                          persistedDonorDocument.emplace(donorDocument);
+                          doc.emplace(donorDocument);
                           return false;
                       });
+        return doc;
+    }
 
-        ASSERT(persistedDonorDocument);
-        return persistedDonorDocument.get();
+    ReshardingDonorDocument getPersistedDonorDocument(OperationContext* opCtx,
+                                                      const UUID& reshardingUUID) {
+        auto doc = getPersistedDonorDocumentOptional(opCtx, reshardingUUID);
+        ASSERT(doc);
+        return doc.get();
     }
 
     void checkChangeStreamsMonitor(OperationContext* opCtx,
                                    const ReshardingDonorDocument& donorDoc,
                                    boost::optional<int64_t> documentsDelta) {
-        auto coordinatorDoc = getPersistedDonorDocument(opCtx, donorDoc.getReshardingUUID());
-        auto changeStreamsMonitorCtx = coordinatorDoc.getChangeStreamsMonitor();
+        auto persistedDonorDoc = getPersistedDonorDocument(opCtx, donorDoc.getReshardingUUID());
+        auto changeStreamsMonitorCtx = persistedDonorDoc.getChangeStreamsMonitor();
         ASSERT(changeStreamsMonitorCtx);
         ASSERT_EQ(changeStreamsMonitorCtx->getStartAtOperationTime(), cloneTimestamp + 1);
         if (documentsDelta) {

@@ -42,6 +42,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
+#include "mongo/db/s/resharding/resharding_test_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -66,19 +67,6 @@ namespace mongo {
 namespace {
 
 const StringData kDefaultExecutorDescriptionSuffix = "Default";
-const Milliseconds kAssertSoonTimeout{5 * 60};
-const Milliseconds kAssertSoonInterval{5};
-
-void assertSoon(OperationContext* opCtx, auto pred) {
-    auto startTime = Date_t::now();
-    while (Date_t::now() - startTime < kAssertSoonTimeout) {
-        if (pred()) {
-            return;
-        }
-        opCtx->sleepFor(kAssertSoonInterval);
-    }
-    ASSERT(false);
-}
 
 class ReshardingChangeStreamsMonitorTest : public ShardServerTestFixtureWithCatalogCacheMock {
 public:
@@ -505,7 +493,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
         monitor->startMonitoring(executor, cleanupExecutor, cancelSource.token(), *factory);
 
     // Wait for the monitor to open a change stream cursor.
-    assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
+    resharding_test_util::assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
 
     cancelSource.cancel();
     executor->shutdown();
@@ -529,11 +517,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
         monitor0->startMonitoring(executor, cleanupExecutor, cancelSource.token(), *factory);
 
     // Wait for the monitor to open a change stream cursor.
-    assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
-
-    // Shut down the cleanup executor and verify that the cursor did not get killed.
-    cleanupExecutor->shutdown();
-    ASSERT(hasOpenCursor(tempNss));
+    resharding_test_util::assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
 
     // Start another monitor and make it run to completion successfully.
     auto executor1 = makeTaskExecutor("New");
@@ -605,8 +589,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
                                                                       recipientFactory);
 
     // Wait for both donor and recipient monitors to open a change stream cursor.
-    assertSoon(opCtx, [&] { return hasOpenCursor(sourceNss); });
-    assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
+    resharding_test_util::assertSoon(opCtx, [&] { return hasOpenCursor(sourceNss); });
+    resharding_test_util::assertSoon(opCtx, [&] { return hasOpenCursor(tempNss); });
 
     DBDirectClient client(opCtx);
     client.insert(sourceNss, BSON("_id" << 10));

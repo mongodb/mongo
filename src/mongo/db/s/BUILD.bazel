@@ -1546,6 +1546,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_recipient_service_external_state_test.cpp",
         "//src/mongo/db/s/resharding:resharding_recipient_service_test.cpp",
         "//src/mongo/db/s/resharding:resharding_service_test_helpers.h",
+        "//src/mongo/db/s/resharding:resharding_test_util.cpp",
+        "//src/mongo/db/s/resharding:resharding_test_util.h",
         "//src/mongo/db/s/resharding:resharding_txn_cloner_test.cpp",
     ],
     tags = [
