@@ -2719,6 +2719,7 @@ let wcCommandsTests = {
     startSession: {skip: "does not accept write concern"},
     stopRecordingTraffic: {skip: "does not accept write concern"},
     sysprofile: {skip: "internal command"},
+    testCommandFeatureFlaggedOnLatestFCV: {skip: "internal command"},
     testDeprecation: {skip: "test command"},
     testDeprecationInVersion2: {skip: "test command"},
     testInternalTransactions: {skip: "internal command"},

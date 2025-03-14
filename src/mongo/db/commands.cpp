@@ -1224,12 +1224,10 @@ void CommandConstructionPlan::execute(CommandRegistry* registry,
             LOGV2_DEBUG(8043401, 3, "Skipping test-only command", "entry"_attr = *entry);
             continue;
         }
-        if (!entry->featureFlag.isEnabled([](auto& fcvGatedFlag) {
-                // TODO(SERVER-100448): This check should not depend on the current FCV
-                return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(
-                    kVersionContextIgnored,
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-            })) {
+        // (Ignore FCV check): Skip only if the flag is disabled. (see requiresFeatureFlag
+        // documentation).
+        if (!entry->featureFlag.isEnabled(
+                [](auto& fcvGatedFlag) { return fcvGatedFlag.isEnabledAndIgnoreFCVUnsafe(); })) {
             LOGV2_DEBUG(8043402, 3, "Skipping FeatureFlag gated command", "entry"_attr = *entry);
             continue;
         }

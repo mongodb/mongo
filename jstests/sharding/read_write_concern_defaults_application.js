@@ -784,6 +784,7 @@ let testCases = {
     startSession: {skip: "does not accept read or write concern"},
     stopRecordingTraffic: {skip: "does not accept read or write concern"},
     sysprofile: {skip: "internal command"},
+    testCommandFeatureFlaggedOnLatestFCV: {skip: "internal command"},
     testDeprecation: {skip: "does not accept read or write concern"},
     testDeprecationInVersion2: {skip: "does not accept read or write concern"},
     testInternalTransactions: {skip: "internal command"},
