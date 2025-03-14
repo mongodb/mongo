@@ -17,6 +17,63 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
+// Test addShard sets the proper user writes blocking state on the new shard.
+{
+    (() => {
+        // Cluster with 0 shards in embedded config server mode is prohibited
+        if (TestData.configShard) {
+            return;
+        }
+
+        const st = new ShardingTest({shards: 0});
+        const newShardName = 'newShard';
+        const newShard = new ReplSetTest({name: newShardName, nodes: 1});
+        newShard.startSet({shardsvr: ''});
+        newShard.initiate();
+
+        // Create a collection on the new shard before adding it to the cluster.
+        const newShardDB = 'newShardDB';
+        const newShardColl = 'newShardColl';
+        const newShardCollDirect =
+            newShard.getPrimary().getDB(newShardDB).getCollection(newShardColl);
+        assert.commandWorked(newShardCollDirect.insert({x: 1}));
+        const newShardCollMongos = st.s.getDB(newShardDB).getCollection(newShardColl);
+
+        // Start blocking user writes.
+        assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+
+        // Add a new shard.
+        assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
+
+        // Check that we cannot write on the new shard.
+        assert.commandFailedWithCode(newShardCollMongos.insert({x: 2}),
+                                     ErrorCodes.UserWritesBlocked);
+
+        // Now unblock and check we can write to the new shard.
+        assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+        assert.commandWorked(newShardCollMongos.insert({x: 2}));
+
+        // Add a new shard in order to be able to drop the old one
+        const secondShardName = 'secondShard';
+        const secondShard = new ReplSetTest({name: secondShardName, nodes: 1});
+        secondShard.startSet({shardsvr: ''});
+        secondShard.initiate();
+        assert.commandWorked(
+            st.s.adminCommand({addShard: secondShard.getURL(), name: secondShardName}));
+
+        // Block again and see we can remove the shard even when write blocking is enabled. Before
+        // removing the shard we first need to drop the dbs for which 'newShard' is the db-primary
+        // shard.
+        assert.commandWorked(st.s.getDB(newShardDB).dropDatabase());
+        assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+        removeShard(st, newShardName);
+
+        st.stop();
+        newShard.stopSet();
+        secondShard.stopSet();
+    })();
+}
+
 const st = new ShardingTest({shards: 2});
 
 const dbName = "test";
@@ -33,43 +90,6 @@ const newShardName = 'newShard';
 const newShard = new ReplSetTest({name: newShardName, nodes: 1});
 newShard.startSet({shardsvr: ''});
 newShard.initiate();
-
-// Test addShard sets the proper user writes blocking state on the new shard.
-{
-    // Create a collection on the new shard before adding it to the cluster.
-    const newShardDB = 'newShardDB';
-    const newShardColl = 'newShardColl';
-    const newShardCollDirect = newShard.getPrimary().getDB(newShardDB).getCollection(newShardColl);
-    assert.commandWorked(newShardCollDirect.insert({x: 1}));
-    const newShardCollMongos = st.s.getDB(newShardDB).getCollection(newShardColl);
-
-    // Start blocking user writes.
-    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
-
-    // Add a new shard.
-    assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
-
-    // Check that we cannot write on the new shard.
-    assert.commandFailedWithCode(newShardCollMongos.insert({x: 2}), ErrorCodes.UserWritesBlocked);
-
-    // Now unblock and check we can write to the new shard.
-    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
-    assert.commandWorked(newShardCollMongos.insert({x: 2}));
-
-    // Block again and see we can remove the shard even when write blocking is enabled. Before
-    // removing the shard we first need to drop the dbs for which 'newShard' is the db-primary
-    // shard.
-    assert.commandWorked(st.s.getDB(newShardDB).dropDatabase());
-    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
-    removeShard(st, newShardName);
-
-    // Disable write blocking while 'newShard' is not part of the cluster.
-    assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
-
-    // Add the shard back and check that user write blocking is disabled.
-    assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
-    assert.commandWorked(newShardCollDirect.insert({x: 10}));
-}
 
 // Test addShard serializes with setUserWriteBlockMode.
 {

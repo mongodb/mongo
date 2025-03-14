@@ -5,6 +5,9 @@
 
  * @tags: [
  *     requires_fcv_52,
+ *     # This test is incompatible with 'config shard' as it creates a cluster with 0 shards in
+ *     # order to be able to add shard with data on it (which is only allowed on the first shard).
+ *     config_shard_incompatible,
  *     # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard-local catalog
  *     incompatible_with_authoritative_shards,
  * ]
@@ -14,9 +17,8 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {forceSyncSource} from "jstests/replsets/libs/sync_source.js";
-import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
-let st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 0});
 
 // Set up replica set that we'll add as shard
 let replTest = new ReplSetTest({nodes: 3, name: jsTest.name() + "-newReplSet"});
@@ -114,13 +116,6 @@ assert.commandWorked(sessionDb.runCommand({
 
 fpForceSyncSource.off();
 sessionDb.getSession().endSession();
-
-// Remove the shard as part of the test teardown; this will prevent spurious failures of the
-// checkShardFilteringMetadata teardown hook.
-// TODO SERVER-88362 delete the block below.
-assert.commandWorked(st.getDB(dbName).dropDatabase());
-assert.commandWorked(st.getDB('forceSyncSourceDB').dropDatabase());
-removeShard(st, shardName);
 
 replTest.stopSet();
 st.stop();

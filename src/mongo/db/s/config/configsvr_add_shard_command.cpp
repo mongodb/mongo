@@ -51,6 +51,8 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/add_shard_coordinator.h"
+#include "mongo/db/s/add_shard_coordinator_document_gen.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
@@ -59,6 +61,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/request_types/add_shard_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -101,7 +104,18 @@ public:
 
             audit::logAddShard(Client::getCurrent(), name ? name.value() : "", target.toString());
 
+            if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                return _runNewPath(opCtx, target, name);
+            }
 
+            return _runOldPath(opCtx, target, name);
+        }
+
+    private:
+        Response _runOldPath(OperationContext* opCtx,
+                             const mongo::ConnectionString& target,
+                             boost::optional<std::string> name) {
             StatusWith<std::string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
                 opCtx, name ? &(name.value()) : nullptr, target, false);
 
@@ -121,7 +135,43 @@ public:
             return result;
         }
 
-    private:
+        Response _runNewPath(OperationContext* opCtx,
+                             const mongo::ConnectionString& target,
+                             boost::optional<std::string> name) {
+            const auto addShardCoordinator =
+                checked_pointer_cast<AddShardCoordinator>(std::invoke([&]() {
+                    auto coordinatorDoc = AddShardCoordinatorDocument();
+                    coordinatorDoc.setConnectionString(target);
+                    coordinatorDoc.setIsConfigShard(false);
+                    coordinatorDoc.setProposedName(name);
+                    auto metadata =
+                        ShardingDDLCoordinatorMetadata({{NamespaceString::kConfigsvrShardsNamespace,
+                                                         DDLCoordinatorTypeEnum::kAddShard}});
+                    auto fwdOpCtx = metadata.getForwardableOpMetadata();
+                    if (!fwdOpCtx) {
+                        fwdOpCtx = ForwardableOperationMetadata(opCtx);
+                    }
+                    fwdOpCtx->setMayBypassWriteBlocking(true);
+                    metadata.setForwardableOpMetadata(fwdOpCtx);
+                    coordinatorDoc.setShardingDDLCoordinatorMetadata(metadata);
+
+                    const auto apiParameters = APIParameters::get(opCtx);
+                    if (apiParameters.getParamsPassed()) {
+                        coordinatorDoc.setApiParams(apiParameters.toBSON());
+                    }
+
+                    return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
+                        opCtx, coordinatorDoc.toBSON());
+                }));
+
+            const auto finalName = addShardCoordinator->getResult(opCtx);
+
+            Response result;
+            result.setShardAdded(finalName);
+
+            return result;
+        }
+
         bool supportsWriteConcern() const override {
             return true;
         }

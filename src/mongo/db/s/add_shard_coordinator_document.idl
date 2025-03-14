@@ -72,3 +72,7 @@ structs:
                 type: string
                 description: "The chosen name for the new shard"
                 optional: true
+            apiParams:
+                type: object
+                description: "The API parameter attached to the config server command"
+                optional: true

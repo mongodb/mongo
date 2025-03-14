@@ -689,7 +689,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         try {
             topology_change_helpers::createShardIdentity(
-                opCtx, *targeter, shardName, boost::none, _executorForAddShard);
+                opCtx, *targeter, shardName, boost::none, boost::none, _executorForAddShard);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }

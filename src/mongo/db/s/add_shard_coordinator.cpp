@@ -31,6 +31,7 @@
 
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/topology_change_helpers.h"
@@ -113,14 +114,29 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 auto& targeter = _getTargeter(opCtx);
 
+                std::string shardName;
+                try {
+                    shardName = topology_change_helpers::createShardName(opCtx,
+                                                                         targeter,
+                                                                         _doc.getIsConfigShard(),
+                                                                         _doc.getProposedName(),
+                                                                         **executor);
+                } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
+                    triggerCleanup(opCtx, ex.toStatus());
+                }
+
+                _dropSessionsCollection(opCtx, **executor);
+
                 topology_change_helpers::getClusterTimeKeysFromReplicaSet(
                     opCtx, targeter, **executor);
 
-                std::string shardName = topology_change_helpers::createShardName(
-                    opCtx, targeter, _doc.getIsConfigShard(), _doc.getProposedName(), **executor);
+                boost::optional<APIParameters> apiParameters;
+                if (const auto params = _doc.getApiParams(); params.has_value()) {
+                    apiParameters = APIParameters::fromBSON(params.value());
+                }
 
                 topology_change_helpers::createShardIdentity(
-                    opCtx, targeter, shardName, _osiGenerator(), **executor);
+                    opCtx, targeter, shardName, apiParameters, _osiGenerator(), **executor);
 
                 _doc.setChosenName(shardName);
 
@@ -178,7 +194,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 ShardType shard;
                 shard.setName(_doc.getChosenName()->toString());
-                shard.setHost(_doc.getConnectionString().toString());
+                shard.setHost(targeter.connectionString().toString());
                 shard.setState(ShardType::ShardState::kShardAware);
 
                 auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
@@ -279,6 +295,7 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
 
             _unblockUserWrites(opCtx, **executor);
+            topology_change_helpers::unblockDDLCoordinators(opCtx);
             topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
         });
 }
@@ -287,6 +304,10 @@ const std::string& AddShardCoordinator::getResult(OperationContext* opCtx) const
     const_cast<AddShardCoordinator*>(this)->getCompletionFuture().get(opCtx);
     invariant(_result.is_initialized());
     return *_result;
+}
+
+bool AddShardCoordinator::canAlwaysStartWhenUserWritesAreDisabled() const {
+    return true;
 }
 
 bool AddShardCoordinator::_mustAlwaysMakeProgress() {
@@ -367,6 +388,9 @@ AddShardCoordinator::_osiGenerator() {
 
 void AddShardCoordinator::_standardizeClusterParameters(
     OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    ConfigsvrCoordinatorService::getService(opCtx)->waitForAllOngoingCoordinatorsOfType(
+        opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);
+
     auto configSvrClusterParameterDocs =
         topology_change_helpers::getClusterParametersLocally(opCtx);
 
@@ -438,6 +462,26 @@ void AddShardCoordinator::_unblockUserWrites(OperationContext* opCtx,
         false, /* unblock writes */
         _osiGenerator(),
         executor);
+}
+
+// TODO(SERVER-102352): add OSI support here
+void AddShardCoordinator::_dropSessionsCollection(
+    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
+
+    BSONObjBuilder builder;
+    builder.append("drop", NamespaceString::kLogicalSessionsNamespace.coll());
+    {
+        BSONObjBuilder wcBuilder(builder.subobjStart("writeConcern"));
+        wcBuilder.append("w", "majority");
+    }
+
+    uassertStatusOK(topology_change_helpers::runCommandForAddShard(
+                        opCtx,
+                        _getTargeter(opCtx),
+                        NamespaceString::kLogicalSessionsNamespace.dbName(),
+                        builder.done(),
+                        executor)
+                        .commandStatus);
 }
 
 }  // namespace mongo

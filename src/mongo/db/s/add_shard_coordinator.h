@@ -51,6 +51,8 @@ public:
 
     const std::string& getResult(OperationContext* opCtx) const;
 
+    bool canAlwaysStartWhenUserWritesAreDisabled() const override;
+
 protected:
     bool _mustAlwaysMakeProgress() override;
 
@@ -94,6 +96,9 @@ private:
 
     void _unblockUserWrites(OperationContext* opCtx,
                             std::shared_ptr<executor::TaskExecutor> executor);
+
+    void _dropSessionsCollection(OperationContext* opCtx,
+                                 std::shared_ptr<executor::TaskExecutor> executor);
 
     // Set on successful completion of the coordinator.
     boost::optional<std::string> _result;
