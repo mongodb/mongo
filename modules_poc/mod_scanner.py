@@ -57,8 +57,6 @@ out_from_env = os.environ.get("MOD_SCANNER_OUTPUT", None)
 is_local = out_from_env is None
 
 
-file_mod_map: dict[str, str] = {}
-
 with open(root / ".github/CODEOWNERS") as f:
     code_owners = CodeOwners(f.read())
 
@@ -145,38 +143,63 @@ def get_visibility(c: Cursor, scanning_parent=False):
     return get_visibility(c.semantic_parent, scanning_parent=True)
 
 
-def mod_for_file(f: ClangFile | str | None) -> str | None:
+def normpath_for_file(f: ClangFile | str | None) -> str | None:
     if f is None:
         return None
 
     name = f.name if type(f) == ClangFile else f
-    prefix = "src/mongo/"
-    offset = name.find(prefix)
+    if "/third_party/" in name:
+        return None
+
+    offset = name.find("src/mongo")
     if offset == -1:
         return None
-    rest = name[offset + len(prefix) :]
-    if "/third_party/" in rest:
-        return None
 
-    rest = os.path.normpath(rest)  # fix up a/X/../b/c.h -> a/b/c.h
-    if rest in file_mod_map:
-        return file_mod_map[rest]
+    name = name[offset:]
+    return os.path.normpath(name)  # fix up a/X/../b/c.h -> a/b/c.h
 
-    # TODO use a real module definition file rather than deriving from CODEOWNERS.
-    use_codeowners = False
-    source = code_owners if use_codeowners else modules
-    owners = []
-    for kind, owner in source.of(prefix + rest):
-        if kind != "TEAM":
+
+file_mod_map: dict[str | None, str | None] = {None: None}
+
+
+def mod_for_file(f: ClangFile | str | None) -> str | None:
+    name = normpath_for_file(f)
+    if name in file_mod_map:
+        return file_mod_map[name]
+
+    match modules.of(name):
+        case []:
+            mod = "__NONE__"
+        case [[kind, mod]]:
+            assert kind == "TEAM"
+            ignore = "@10gen/"
+            assert mod.startswith(ignore)
+            mod = mod[len(ignore) :]
+        case owners:
+            perr_exit(
+                f"ERROR: multiple owners for file {name}: {', '.join(mod for (_, mod) in owners)}"
+            )
+    file_mod_map[name] = mod
+    return mod
+
+
+def teams_for_file(f: ClangFile | str | None):
+    name = normpath_for_file(f)
+    if name is None:
+        return []
+
+    # No need to cache since this is called once per file
+    teams = []
+    for kind, owner in code_owners.of(name):
+        if kind != "TEAM":  # ignore both individual engineers and svc-auto-approve-bot
             continue
         ignore = "@10gen/"
         assert owner.startswith(ignore)
-        owners.append(owner[len(ignore) :])
-    assert use_codeowners or len(owners) <= 1
-    mod = "+".join(owners)
-    mod = mod if mod else "__NONE__"
-    file_mod_map[rest] = mod
-    return mod
+        owner = owner[len(ignore) :]
+        owner = owner.replace("-", "_")  # easier for processing with jq
+        teams.append(owner)
+
+    return teams if teams else ["__NO_OWNER__"]
 
 
 @dataclass
@@ -531,23 +554,29 @@ class Timer:
 timer = Timer()
 
 
-def dump_modules():
-    out: dict[str, dict[str, list[str]]] = {}
+# TODO: this should probably be pulled out to a separate program, with all functions
+# only called by it moved out as well. That requires pulling mod_for_file() out to a lib.
+# It is only part of mod_scanner because it needs that function.
+def dump_modules() -> None:
+    out: dict[str, dict[str, dict[str, list[str]]]] = {}
     for path in glob("src/mongo/**/*", recursive=True):
         if "/third_party/" in path:
             continue
-        if not any(path.endswith(f".{ext}") for ext in ("h", "cpp", "c", "idl")):
+        extensions = ("h", "cpp", "idl", "c", "defs", "inl", "hpp")
+        if not any(path.endswith(f".{ext}") for ext in extensions):
             continue
         mod = mod_for_file(path)
-        if not mod:
-            mod = "__NONE__"
+        assert mod  # None would mean not first-party, but that is already filtered out.
         (dir, leaf) = path.rsplit("/", 1)
-        out.setdefault(mod, {}).setdefault(dir, []).append(leaf)
-    print(len(out))
+        for team in teams_for_file(path):
+            # In cases where multiple teams own a file, this will list the file multiple times.
+            # This is intended to play nicely with teams trying to filter to just the files they own.
+            out.setdefault(mod, {}).setdefault(team, {}).setdefault(dir, []).append(leaf)
 
-    for dirs in out.values():
-        for files in dirs.values():
-            files.sort()
+    for teams in out.values():
+        for dirs in teams.values():
+            for files in dirs.values():
+                files.sort()
     yaml.dump(out, open("modules.yaml", "w"))
 
 

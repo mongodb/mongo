@@ -3,8 +3,44 @@
 This folder contains a POC implementation of a module metrics tracker and enforcement. The following
 commands will run the scanner across the entire first-party codebase, and merge the results. All
 commands are assumed to run at the root of the checkout, inside of a correctly activated python
-virtual env. It will leave `merged_decls.json` and `unowned.yaml` files in the current
-directory.
+virtual env.
+
+## Showing assigned and unassigned files
+
+Run `modules_poc/mod_scanner.py --dump-modules` to produce a `modules.yaml` file
+in current directory. This file is a multi-level map from
+module name to team name to directory path to list of file names.
+For unassigned files it uses `__NONE__` as the module name, and for unowned
+files it uses `__NO_OWNER__` as the team, both of which conveniently sort first.
+For owned files it uses the part of the team-name after `@10gen/` with `-`
+replaced with `*` to be friendlier to querying. In cases where multiple teams
+own a file, the file is duplicated to each team's list.
+
+This file can be viewed directly in VSCode. The yaml plugin's breadcrumbs and
+folding are very helpful. [`yq`](https://github.com/kislyuk/yq)
+([`jq`](https://jqlang.org) for yaml) is also a powerful tool. Here are a few
+examples using it, some of which produce enough output to be worth opening in vscode:
+
+```bash
+# list of teams
+yq '[.[] | keys] | add | sort | unique[]' -r modules.yaml
+# unassigned files owned by server-programmability
+yq '.__NONE__.server_programmability' modules.yaml
+# files owned by server-programmability across all modules (or lack thereof)
+yq '.[] |= (.server_programmability | values)' modules.yaml
+# assigned files owned by server-programmability outside of the core module
+yq '.[] |= (.server_programmability | values) | del(.core) | del(.__NONE__)' modules.yaml
+# assigned files owned by server-programmability in modules that don't start with core
+yq '.[] |= (.server_programmability | values) |  with_entries(select(.key | startswith("core") | not)) | del(.__NONE__)' modules.yaml
+# unowned files as a flat list
+yq '.[].__NO_OWNER__ | values | to_entries | map("\(.key)/\(.value[])") | .[] ' modules.yaml -r | sort
+# unowned files grouped by directory
+yq '[.[].__NO_OWNER__ | to_entries? | .[]] | group_by(.key) | map({key: .[0].key, value: ([.[].value] | add | sort)}) | from_entries' modules.yaml
+```
+
+## Running the scanner
+
+This will build the `merged_decls.json` files in the current directory:
 
 ```bash
 buildscripts/poetry_sync.sh # make sure the python env has the right packages installed
@@ -71,12 +107,10 @@ way to see your public IP address
 You can also scan a single file which is useful when iterating on this. You can
 either pass it the same flags used to compile, or pass it just a cpp file and it
 will figure out the flags from your compile_commands.json. It will create a file
-called `decls.yaml` to the current directory when run this way. If you pass it
-`--dump-modules` as the only argument it will produce a `modules.yaml` file.
+called `decls.yaml` to the current directory when run this way.
 
 ```bash
 python modules_poc/mod_scanner.py src/mongo/bson/bsonobj.cpp
-python modules_poc/mod_scanner.py --dump-modules
 ```
 
 ## Future Work
