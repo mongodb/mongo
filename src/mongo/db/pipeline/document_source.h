@@ -41,7 +41,6 @@
 #include <functional>
 #include <iterator>
 #include <list>
-#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -53,7 +52,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -61,26 +59,20 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/client_cursor/generic_cursor.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/version_context.h"
-#include "mongo/platform/basic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -89,8 +81,6 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo {
-
-class Document;
 
 /**
  * Registers a DocumentSource to have the name 'key'.

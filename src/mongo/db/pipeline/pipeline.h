@@ -47,7 +47,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -58,23 +57,16 @@
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/timer.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 class BSONObj;
-class BSONObjBuilder;
-class CollatorInterface;
 class DocumentSource;
 class ExpressionContext;
 class OperationContext;
@@ -113,7 +105,7 @@ struct MakePipelineOptions {
  */
 class Pipeline {
 public:
-    typedef std::list<boost::intrusive_ptr<DocumentSource>> SourceContainer;
+    using SourceContainer = std::list<boost::intrusive_ptr<DocumentSource>>;
 
     /**
      * A SplitState specifies whether the pipeline is currently unsplit, split for the shards, or
@@ -290,7 +282,7 @@ public:
     /**
      * Checks to see if disk is ever used within the pipeline.
      */
-    bool usedDisk();
+    bool usedDisk() const;
 
     /**
      * Communicates to the pipeline which part of a split pipeline it is when the pipeline has been
@@ -320,12 +312,12 @@ public:
      * Returns 'true' if a pipeline's structure is eligible for parameterization. It must have a
      * $match first stage.
      */
-    bool canParameterize();
+    bool canParameterize() const;
 
     /**
      * Returns 'true' if a pipeline is parameterized.
      */
-    bool isParameterized() {
+    bool isParameterized() const {
         return _isParameterized;
     }
 

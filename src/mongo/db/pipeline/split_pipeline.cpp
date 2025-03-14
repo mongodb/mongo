@@ -33,7 +33,6 @@
 
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -466,7 +465,7 @@ private:
         boost::intrusive_ptr<DocumentSource> project = DocumentSourceProject::createFromBson(
             BSON("$project" << mergeDeps.toProjectionWithoutMetadata()).firstElement(),
             _splitPipeline.shardsPipeline->getContext());
-        _splitPipeline.shardsPipeline->pushBack(project);
+        _splitPipeline.shardsPipeline->pushBack(std::move(project));
     }
 
     /**

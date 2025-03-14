@@ -27,18 +27,14 @@
  *    it in the license file.
  */
 
-
-#include <absl/meta/type_traits.h>
-
 #include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/base/initializer.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -48,8 +44,6 @@
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/logv2/log.h"
@@ -62,9 +56,6 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::list;
-using std::string;
-using std::vector;
 
 StringMap<DocumentSource::ParserRegistration> DocumentSource::parserMap;
 
@@ -90,24 +81,23 @@ void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
     }
 }
 
-void DocumentSource::registerParser(string name,
+void DocumentSource::registerParser(std::string name,
                                     Parser parser,
                                     CheckableFeatureFlagRef featureFlag) {
     auto it = parserMap.find(name);
     massert(28707,
             str::stream() << "Duplicate document source (" << name << ") registered.",
             it == parserMap.end());
-    parserMap[name] = {parser, featureFlag};
+    parserMap[std::move(name)] = {std::move(parser), featureFlag};
 }
 
-void DocumentSource::registerParser(string name,
+void DocumentSource::registerParser(std::string name,
                                     SimpleParser simpleParser,
                                     CheckableFeatureFlagRef featureFlag) {
 
-    Parser parser =
-        [simpleParser = std::move(simpleParser)](
-            BSONElement stageSpec,
-            const intrusive_ptr<ExpressionContext>& expCtx) -> list<intrusive_ptr<DocumentSource>> {
+    Parser parser = [simpleParser = std::move(simpleParser)](
+                        BSONElement stageSpec, const intrusive_ptr<ExpressionContext>& expCtx)
+        -> std::list<intrusive_ptr<DocumentSource>> {
         return {simpleParser(std::move(stageSpec), expCtx)};
     };
     return registerParser(std::move(name), std::move(parser), std::move(featureFlag));
@@ -128,7 +118,7 @@ BSONObj DocumentSource::getQuery() const {
     MONGO_UNREACHABLE;
 }
 
-list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
+std::list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
     const intrusive_ptr<ExpressionContext>& expCtx, BSONObj stageObj) {
     uassert(16435,
             "A pipeline stage specification object must contain exactly one field.",
@@ -325,24 +315,14 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
     return doOptimizeAt(itr, container);
 }
 
-void DocumentSource::serializeToArray(vector<Value>& array,
+void DocumentSource::serializeToArray(std::vector<Value>& array,
                                       const SerializationOptions& opts) const {
     Value entry = serialize(opts);
     if (!entry.missing()) {
-        array.push_back(entry);
+        array.push_back(std::move(entry));
     }
 }
 
-namespace {
-std::list<boost::intrusive_ptr<DocumentSource>> throwOnParse(
-    BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    uasserted(6047400, spec.fieldNameStringData() + " stage is only allowed on MongoDB Atlas");
-}
-std::unique_ptr<LiteParsedDocumentSource> throwOnParseLite(NamespaceString nss,
-                                                           const BSONElement& spec) {
-    uasserted(6047401, spec.fieldNameStringData() + " stage is only allowed on MongoDB Atlas");
-}
-}  // namespace
 MONGO_INITIALIZER_GROUP(BeginDocumentSourceRegistration,
                         ("default"),
                         ("EndDocumentSourceRegistration"))

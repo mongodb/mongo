@@ -37,10 +37,8 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <bitset>
 #include <exception>
 #include <iterator>
-#include <ostream>
 #include <string>
 #include <utility>
 
@@ -55,7 +53,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -67,7 +64,6 @@
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/views/resolved_view.h"
@@ -183,15 +179,10 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
 MONGO_FAIL_POINT_DEFINE(disablePipelineOptimization);
 
 using boost::intrusive_ptr;
-using std::ostringstream;
-using std::string;
-using std::vector;
 
-using ChangeStreamRequirement = StageConstraints::ChangeStreamRequirement;
 using HostTypeRequirement = StageConstraints::HostTypeRequirement;
 using PositionRequirement = StageConstraints::PositionRequirement;
 using DiskUseRequirement = StageConstraints::DiskUseRequirement;
-using FacetRequirement = StageConstraints::FacetRequirement;
 using StreamType = StageConstraints::StreamType;
 
 constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kAllowedMatcherFeatures;
@@ -393,7 +384,7 @@ void Pipeline::optimizeEachStage(SourceContainer* container) {
         // We should have our final number of stages. Optimize each individually.
         for (auto&& source : *container) {
             if (auto out = source->optimize()) {
-                optimizedSources.push_back(out);
+                optimizedSources.push_back(std::move(out));
             }
         }
         container->swap(optimizedSources);
@@ -416,8 +407,8 @@ bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
             return false;
         }
 
-        if (stage.Obj().hasField(DocumentSourceOut::kStageName) ||
-            stage.Obj().hasField(DocumentSourceMerge::kStageName)) {
+        if (auto obj = stage.Obj(); obj.hasField(DocumentSourceOut::kStageName) ||
+            obj.hasField(DocumentSourceMerge::kStageName)) {
             return true;
         }
     }
@@ -485,7 +476,7 @@ void Pipeline::forceSpill() {
     }
 }
 
-bool Pipeline::usedDisk() {
+bool Pipeline::usedDisk() const {
     return std::any_of(
         _sources.begin(), _sources.end(), [](const auto& stage) { return stage->usedDisk(); });
 }
@@ -523,7 +514,7 @@ void Pipeline::unparameterize() {
     }
 }
 
-bool Pipeline::canParameterize() {
+bool Pipeline::canParameterize() const {
     if (!_sources.empty()) {
         // First stage must be a DocumentSourceMatch.
         return _sources.begin()->get()->getSourceName() == DocumentSourceMatch::kStageName;
@@ -596,20 +587,21 @@ stdx::unordered_set<NamespaceString> Pipeline::getInvolvedCollections() const {
     return collectionNames;
 }
 
-vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
-                                           boost::optional<const SerializationOptions&> opts) {
-    vector<Value> serializedSources;
+std::vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
+                                                boost::optional<const SerializationOptions&> opts) {
+    std::vector<Value> serializedSources;
     for (auto&& source : container) {
         source->serializeToArray(serializedSources, opts ? opts.get() : SerializationOptions());
     }
     return serializedSources;
 }
 
-vector<Value> Pipeline::serialize(boost::optional<const SerializationOptions&> opts) const {
+std::vector<Value> Pipeline::serialize(boost::optional<const SerializationOptions&> opts) const {
     return serializeContainer(_sources, opts);
 }
 
-vector<BSONObj> Pipeline::serializeToBson(boost::optional<const SerializationOptions&> opts) const {
+std::vector<BSONObj> Pipeline::serializeToBson(
+    boost::optional<const SerializationOptions&> opts) const {
     const auto serialized = serialize(opts);
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
@@ -651,8 +643,8 @@ boost::optional<Document> Pipeline::getNext() {
                               : boost::optional<Document>{nextResult.releaseDocument()};
 }
 
-vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
-    vector<Value> array;
+std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
+    std::vector<Value> array;
     for (auto&& stage : _sources) {
         auto beforeSize = array.size();
         stage->serializeToArray(array, opts);
@@ -867,7 +859,7 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popBack() {
     if (_sources.empty()) {
         return nullptr;
     }
-    auto targetStage = _sources.back();
+    auto targetStage = std::move(_sources.back());
     _sources.pop_back();
     return targetStage;
 }
@@ -876,7 +868,7 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFront() {
     if (_sources.empty()) {
         return nullptr;
     }
-    auto targetStage = _sources.front();
+    auto targetStage = std::move(_sources.front());
     _sources.pop_front();
     stitch();
     return targetStage;
@@ -895,7 +887,7 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithNameAndCriteria(
     if (_sources.empty() || _sources.front()->getSourceName() != targetStageName) {
         return nullptr;
     }
-    auto targetStage = _sources.front();
+    const auto& targetStage = _sources.front();
 
     if (predicate && !predicate(targetStage.get())) {
         return nullptr;
