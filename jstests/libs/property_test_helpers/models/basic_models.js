@@ -26,8 +26,9 @@ export const intArb = oneof(
  * because it can indicate the end of a string in string implementations, so it may need special
  * logic.
  */
-const charArb =
-    oneof(fc.base64(), fc.unicode(), fc.ascii(), fc.constant('\0')).filter(c => c !== '$');
+const nullByte =
+    fc.constantFrom('\0', '\x00', '\x01', '\x02', '\x03', '\x08', '\x18', '\x28', '\xff');
+const charArb = oneof(fc.base64(), fc.unicode(), fc.ascii(), nullByte).filter(c => c !== '$');
 const stringArb = fc.stringOf(charArb, {maxLength: 3});
 
 const kMinDate = ISODate("0000-01-01T00:00:00Z");
@@ -44,4 +45,5 @@ export const dateArb = oneof(
 export const scalarArb = oneof(intArb, fc.boolean(), stringArb, dateArb, fc.constant(null));
 
 export const fieldArb = fc.constantFrom('a', 'b', 't', 'm', '_id', 'm.m1', 'm.m2', 'array');
+export const dollarFieldArb = fieldArb.map(f => "$" + f);
 export const assignableFieldArb = fc.constantFrom('a', 'b', 't', 'm');

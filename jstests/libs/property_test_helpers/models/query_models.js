@@ -9,9 +9,11 @@
  */
 import {
     assignableFieldArb,
+    dollarFieldArb,
     fieldArb,
     scalarArb
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -30,12 +32,7 @@ const leafParameterArb =
         return new LeafParameter(constants);
     });
 
-const dollarFieldArb = fieldArb.map(f => "$" + f);
-const accumulatorArb =
-    fc.constantFrom(undefined, '$count', '$min', '$max', '$minN', '$maxN', '$sum');
-
 // Inclusion/Exclusion projections. {$project: {_id: 1, a: 0}}
-
 export function getSingleFieldProjectArb(isInclusion, {simpleFieldsOnly = false} = {}) {
     const projectedFieldArb = simpleFieldsOnly ? assignableFieldArb : fieldArb;
     return fc.record({field: projectedFieldArb, includeId: fc.boolean()})
@@ -64,31 +61,10 @@ const addFieldsVarArb = fc.tuple(fieldArb, dollarFieldArb).map(function([destFie
 });
 
 export const sortArb = fc.tuple(fieldArb, fc.constantFrom(1, -1)).map(function([field, sortOrder]) {
-    // TODO SERVER-91164 sort on multiple fields
+    // If we sort on two or more fields, we run into the problem of sorting keys that
+    // are parallel arrays. This is not allowed in MQL.
     return {$sort: {[field]: sortOrder}};
 });
-
-// TODO SERVER-91164 include $top/$bottom and other accumulators, allow null as the groupby argument
-// {$group: {_id: '$a', b: {$min: '$c'}}}
-export const groupArb =
-    fc.tuple(
-          dollarFieldArb, assignableFieldArb, accumulatorArb, dollarFieldArb, fc.integer({min: 1}))
-        .map(function([gbField, outputField, acc, dataField, minMaxNumResults]) {
-            if (acc === undefined) {
-                // Simple $group with no accumulator
-                return {$group: {_id: gbField}};
-            }
-
-            let accSpec;
-            if (acc === '$count') {
-                accSpec = {[acc]: {}};
-            } else if (acc === '$minN' || acc === '$maxN') {
-                accSpec = {[acc]: {input: dataField, n: minMaxNumResults}};
-            } else {
-                accSpec = {[acc]: dataField};
-            }
-            return {$group: {_id: gbField, [outputField]: accSpec}};
-        });
 
 export const limitArb = fc.record({$limit: fc.integer({min: 1, max: 5})});
 export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});

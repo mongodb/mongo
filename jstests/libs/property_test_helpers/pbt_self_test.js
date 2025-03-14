@@ -20,17 +20,21 @@ function avg(arrOfInts) {
     return sum / arrOfInts.length;
 }
 
-function avgDocumentsIsAbove100(isTS) {
+function testAvgNumDocumentsAndAvgNumIndexes(isTS) {
     const collModel = getCollectionModel({isTS});
     const sample = fc.sample(collModel, {seed, numRuns: 1000});
 
     const avgNumDocs = avg(sample.map(coll => coll.docs.length));
     assert.gt(avgNumDocs, 100);
     jsTestLog('Average number of documents was: ' + avgNumDocs);
+
+    const avgNumIndexes = avg(sample.map(coll => coll.indexes.length));
+    assert.gt(avgNumIndexes, 4);
+    jsTestLog('Average number of indexes was: ' + avgNumIndexes);
 }
 
-avgDocumentsIsAbove100(false);
-avgDocumentsIsAbove100(true);
+testAvgNumDocumentsAndAvgNumIndexes(false);
+testAvgNumDocumentsAndAvgNumIndexes(true);
 
 /*
  * Fails if we have 1 or more docs, or any indexes.

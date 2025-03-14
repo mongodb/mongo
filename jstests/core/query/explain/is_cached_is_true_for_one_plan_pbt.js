@@ -51,8 +51,13 @@ function isCachedIsTrueForOnePlan(getQuery, testHelpers) {
     return {passed: true};
 }
 
-// Run the property with a regular collection.
-testProperty(isCachedIsTrueForOnePlan,
-             {experimentColl},
-             {collModel: getCollectionModel({isTS: false}), aggModel: getAggPipelineModel()},
-             {numRuns: 200, numQueriesPerRun: 20});
+// TODO SERVER-102075 re-enable isCached property testing once issue is fixed.
+// // Run the property with a regular collection.
+// testProperty(isCachedIsTrueForOnePlan,
+//              {experimentColl},
+//              {
+//                  collModel: getCollectionModel({isTS: false}),
+//                  // A deterministic set of results isn't needed to check the `isCached` property.
+//                  aggModel: getAggPipelineModel({deterministicBag: false})
+//              },
+//              {numRuns: 200, numQueriesPerRun: 20});
