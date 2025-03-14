@@ -60,7 +60,10 @@ resetCollection();
 for (let i = 0; i < numMeasurements; i++) {
     // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
     const value = (i % 2 == 0 ? "a" : "b");
-    const doc = {_id: i, [timeFieldName]: ISODate(), value: value.repeat(measurementValueLength)};
+    // Increment the timestamp to test ordering of documents. If the same timestamp
+    // were given to all measurements, there would be no guarantee on ordering.
+    let timestamp = new Date(ISODate("2024-01-01T01:00:00Z").getTime() + i * 1000);
+    const doc = {_id: i, [timeFieldName]: timestamp, value: value.repeat(measurementValueLength)};
     assert.commandWorked(coll.insert(doc));
 }
 checkAverageBucketSize();
@@ -72,7 +75,10 @@ let batch = [];
 for (let i = 0; i < numMeasurements; i++) {
     // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
     const value = (i % 2 == 0 ? "a" : "b");
-    const doc = {_id: i, [timeFieldName]: ISODate(), value: value.repeat(measurementValueLength)};
+    // Increment the timestamp to test ordering of documents. If the same timestamp
+    // were given to all measurements, there would be no guarantee on ordering.
+    let timestamp = new Date(ISODate("2024-01-01T01:00:00Z").getTime() + i * 1000);
+    const doc = {_id: i, [timeFieldName]: timestamp, value: value.repeat(measurementValueLength)};
     batch.push(doc);
 }
 assert.commandWorked(coll.insertMany(batch), {ordered: false});

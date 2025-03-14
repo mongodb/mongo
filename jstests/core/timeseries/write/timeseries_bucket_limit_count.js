@@ -39,7 +39,10 @@ TimeseriesTest.run((insert) => {
 
         let docs = [];
         for (let i = 0; i < numDocs; i++) {
-            docs.push({_id: i, [timeFieldName]: ISODate("2024-01-01T01:00:00Z"), x: i});
+            // Increment the timestamp to test ordering of documents. If the same timestamp
+            // were given to all measurements, there would be no guarantee on ordering.
+            let timestamp = new Date(ISODate("2024-01-01T01:00:00Z").getTime() + i * 1000);
+            docs.push({_id: i, [timeFieldName]: timestamp, x: i});
             if ((i + 1) % numDocsPerInsert === 0) {
                 assert.commandWorked(insert(coll, docs), 'failed to insert docs: ' + tojson(docs));
                 docs = [];
