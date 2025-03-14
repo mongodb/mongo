@@ -30,8 +30,8 @@
 #include <boost/algorithm/string/case_conv.hpp>
 
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/query/str_trim_utils.h"
-#include "mongo/db/query/substr_utils.h"
+#include "mongo/db/exec/str_trim_utils.h"
+#include "mongo/db/exec/substr_utils.h"
 
 namespace mongo {
 namespace sbe {

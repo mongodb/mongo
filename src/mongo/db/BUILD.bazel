@@ -2577,6 +2577,7 @@ mongo_cc_library(
     hdrs = [
         "//src/mongo/bson:unordered_fields_bsonelement_comparator.h",
         "//src/mongo/db/exec:projection_executor_utils.h",
+        "//src/mongo/db/exec:substr_utils.h",
         "//src/mongo/db/exec/expression:evaluate.h",
         "//src/mongo/db/exec/matcher:match_details.h",
         "//src/mongo/db/exec/matcher:matcher.h",
@@ -2663,7 +2664,6 @@ mongo_cc_library(
         "//src/mongo/db/query:expression_walker.h",
         "//src/mongo/db/query:indexability.h",
         "//src/mongo/db/query:query_utils.h",
-        "//src/mongo/db/query:substr_utils.h",
         "//src/mongo/db/query/fle:implicit_validator.h",
         "//src/mongo/db/query/query_shape:let_shape_component.h",
     ],
@@ -2679,6 +2679,8 @@ mongo_cc_library(
         "//src/mongo/crypto:fle_crypto",
         "//src/mongo/crypto:fle_tokens",
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec:str_trim_utils",
+        "//src/mongo/db/exec:substr_utils",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/fts:fts_query_noop",
         "//src/mongo/db/geo:geometry",  # TODO(SERVER-93876): Remove.
@@ -2690,8 +2692,6 @@ mongo_cc_library(
         "//src/mongo/db/query:query_knob_configuration",
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:random_utils",
-        "//src/mongo/db/query:str_trim_utils",
-        "//src/mongo/db/query:substr_utils",
         "//src/mongo/db/query/boolean_simplification",
         "//src/mongo/db/query/bson:dotted_path_support",
         "//src/mongo/db/query/collation:collator_factory_interface",

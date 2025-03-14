@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
-#include "mongo/db/query/str_trim_utils.h"
-#include "mongo/db/query/substr_utils.h"
+#include "mongo/db/exec/str_trim_utils.h"
+#include "mongo/db/exec/substr_utils.h"
 
 namespace mongo {
 

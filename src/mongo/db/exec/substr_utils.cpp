@@ -30,7 +30,7 @@
 #include <string_view>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/query/substr_utils.h"
+#include "mongo/db/exec/substr_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

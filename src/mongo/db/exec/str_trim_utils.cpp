@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/query/str_trim_utils.h"
+#include "mongo/db/exec/str_trim_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
