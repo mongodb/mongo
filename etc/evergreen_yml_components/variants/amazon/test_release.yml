@@ -37,7 +37,7 @@ buildvariants:
       large_distro_name: amazon2-latest-large
       compile_variant: amazon2
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_and_package_serial_TG
         distros:
           - amazon2-latest-large
       - name: test_packages
@@ -89,7 +89,7 @@ buildvariants:
       core_analyzer_distro_name: amazon2-latest-large
       large_distro_name: amazon2-latest-large
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_and_package_serial_TG
         distros:
           - amazon2-latest-large
       - name: test_packages
@@ -234,7 +234,7 @@ buildvariants:
       large_distro_name: amazon2023.3-large
       compile_variant: amazon2023
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_and_package_serial_TG
         distros:
           - amazon2023.3-large
       - name: test_packages
@@ -281,7 +281,7 @@ buildvariants:
       scons_cache_scope: shared
       compile_variant: enterprise-amazon2023
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_and_package_serial_TG
         distros:
           - amazon2023.3-large
       - name: test_packages
@@ -376,7 +376,7 @@ buildvariants:
       large_distro_name: amazon2023.3-arm64-large
       compile_variant: amazon2023-arm64
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_and_package_serial_TG
         distros:
           - amazon2023.3-arm64-large
       - name: test_packages
@@ -424,7 +424,7 @@ buildvariants:
       scons_cache_scope: shared
       compile_variant: enterprise-amazon2023-arm64
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_and_package_serial_TG
         distros:
           - amazon2023.3-arm64-large
       - name: test_packages
@@ -518,7 +518,7 @@ buildvariants:
       compile_variant: enterprise-amazon2023-streams
       large_distro_name: amazon2023-latest-large
     tasks:
-      - name: compile_test_and_package_serial_no_unittests_TG
+      - name: compile_test_and_package_serial_TG
         distros:
           - amazon2023-latest-large
       - name: .development_critical !.requires_large_host
