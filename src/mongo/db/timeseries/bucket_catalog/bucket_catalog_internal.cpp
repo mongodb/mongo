@@ -309,13 +309,14 @@ std::vector<Bucket*> findOpenBuckets(Stripe& stripe,
     return openBuckets;
 }
 
-bool isBucketStateEligibleForInsertsAndCleanup(BucketCatalog& catalog,
-                                               Stripe& stripe,
-                                               WithLock stripeLock,
-                                               Bucket* bucket) {
+BucketStateForInsertAndCleanup isBucketStateEligibleForInsertsAndCleanup(BucketCatalog& catalog,
+                                                                         Stripe& stripe,
+                                                                         WithLock stripeLock,
+                                                                         Bucket* bucket) {
     auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, bucket);
     if (!state) {
-        return false;
+        invariant(bucket->preparedBatch);
+        return BucketStateForInsertAndCleanup::kNoState;
     }
 
     if (conflictsWithInsertions(state.value())) {
@@ -329,10 +330,10 @@ bool isBucketStateEligibleForInsertsAndCleanup(BucketCatalog& catalog,
               statsStorage,
               /*batch=*/nullptr,
               getTimeseriesBucketClearedError(bucket->bucketId.oid));
-        return false;
+        return BucketStateForInsertAndCleanup::kInsertionConflict;
     }
 
-    return true;
+    return BucketStateForInsertAndCleanup::kEligibleForInsert;
 }
 
 Bucket* useBucket(BucketCatalog& catalog,

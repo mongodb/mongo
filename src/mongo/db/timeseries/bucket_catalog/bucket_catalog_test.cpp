@@ -2498,11 +2498,11 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithBucketWithDirectWrite) {
     directWriteStart(_bucketCatalog->bucketStateRegistry, bucket.bucketId);
 
     // Ineligible for inserts. Remove from 'openBucketsByKey'.
-    ASSERT(!internal::isBucketStateEligibleForInsertsAndCleanup(
-        *_bucketCatalog,
-        *_bucketCatalog->stripes[insertCtx.stripeNumber],
-        WithLock::withoutLock(),
-        &bucket));
+    ASSERT(internal::isBucketStateEligibleForInsertsAndCleanup(
+               *_bucketCatalog,
+               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+               WithLock::withoutLock(),
+               &bucket) == internal::BucketStateForInsertAndCleanup::kInsertionConflict);
     ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
 }
 
@@ -2524,11 +2524,11 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithClearedBucket) {
     clear(*_bucketCatalog, bucket.bucketId.collectionUUID);
 
     // Ineligible for inserts. Remove from 'openBucketsByKey'.
-    ASSERT(!internal::isBucketStateEligibleForInsertsAndCleanup(
-        *_bucketCatalog,
-        *_bucketCatalog->stripes[insertCtx.stripeNumber],
-        WithLock::withoutLock(),
-        &bucket));
+    ASSERT(internal::isBucketStateEligibleForInsertsAndCleanup(
+               *_bucketCatalog,
+               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+               WithLock::withoutLock(),
+               &bucket) == internal::BucketStateForInsertAndCleanup::kInsertionConflict);
     ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
 }
 
@@ -2550,11 +2550,11 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithFrozenBucket) {
     freezeBucket(_bucketCatalog->bucketStateRegistry, bucket.bucketId);
 
     // Ineligible for inserts. Remove from 'openBucketsByKey'.
-    ASSERT(!internal::isBucketStateEligibleForInsertsAndCleanup(
-        *_bucketCatalog,
-        *_bucketCatalog->stripes[insertCtx.stripeNumber],
-        WithLock::withoutLock(),
-        &bucket));
+    ASSERT(internal::isBucketStateEligibleForInsertsAndCleanup(
+               *_bucketCatalog,
+               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+               WithLock::withoutLock(),
+               &bucket) == internal::BucketStateForInsertAndCleanup::kInsertionConflict);
     ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
 }
 

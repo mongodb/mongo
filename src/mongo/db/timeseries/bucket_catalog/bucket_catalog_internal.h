@@ -91,6 +91,11 @@ enum class BucketPrepareAction { kPrepare, kUnprepare };
 enum class AllowQueryBasedReopening { kAllow, kDisallow };
 
 /**
+ * Mode enum to let us know what the isBucketStateEligibleForInsertsAndCleanup returns.
+ */
+enum class BucketStateForInsertAndCleanup { kNoState, kInsertionConflict, kEligibleForInsert };
+
+/**
  * Maps bucket identifier to the stripe that is responsible for it.
  */
 StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketKey& key);
@@ -153,13 +158,14 @@ std::vector<Bucket*> findOpenBuckets(Stripe& stripe,
                                      const BucketKey& bucketKey);
 
 /**
- * Return true if a given bucket's state is eligible for new inserts. Otherwise, return false.
- * Clean up the bucket from the catalog if there is a conflicting state.
+ * Returns kEligibleForInsert if a given bucket's state is eligible for new inserts. If the bucket
+ * has no state, returns kNoState. Returns kInsertionConflict and cleans up the bucket from the
+ * catalog if we have an insertion conflict.
  */
-bool isBucketStateEligibleForInsertsAndCleanup(BucketCatalog& catalog,
-                                               Stripe& stripe,
-                                               WithLock stripeLock,
-                                               Bucket* bucket);
+BucketStateForInsertAndCleanup isBucketStateEligibleForInsertsAndCleanup(BucketCatalog& catalog,
+                                                                         Stripe& stripe,
+                                                                         WithLock stripeLock,
+                                                                         Bucket* bucket);
 
 /**
  * Rollover 'bucket' according to 'reason' if the bucket does not contain uncommitted measurements.
