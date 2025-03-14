@@ -32,9 +32,8 @@ selector:
     # Uses the unsupported 'autoIndexId' option.
     - jstests/core/**/queryoptimizera.js
     - jstests/core/**/index9.js
-    # Expects the collection creation options not to change.
+    # Expects the rename options not to change.
     - jstests/core/**/internal_rename_if_options_and_indexes_match.js
-    - jstests/core/timeseries/ddl/timeseries_user_system_buckets.js
     # The _id index is expected to not have a 'unique' field.
     - jstests/core/**/list_indexes.js
     # Expects createIndex with 'clustered' option fails on a non-clustered collection.

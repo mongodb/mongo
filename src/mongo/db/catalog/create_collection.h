@@ -92,4 +92,13 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const BSONObj& cmdObj,
                                    bool allowRenameOutOfTheWay,
                                    const boost::optional<BSONObj>& idIndex = boost::none);
+
+/**
+ * Updates collection options if collections must be clustered by default.
+ */
+CollectionOptions translateOptionsIfClusterByDefault(
+    const NamespaceString& nss,
+    CollectionOptions collectionOptions,
+    const boost::optional<BSONObj>& idIndex = boost::none);
+
 }  // namespace mongo

@@ -185,13 +185,6 @@ assert.commandFailedWithCode(db.createCollection('size_no_capped', {size: 256}),
 assert.commandFailedWithCode(db.createCollection('size_capped_false', {capped: false, size: 256}),
                              ErrorCodes.InvalidOptions);
 
-// The remainder of this test file will not work if all collections are automatically clustered
-// because a repeat attempt to create a collection will not have ``clusteredIndex`` set but
-// the existing collection will.
-if (ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo())) {
-    quit();
-}
-
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
 
 // Creating a collection that already exists with no options specified reports success.

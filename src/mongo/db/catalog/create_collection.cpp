@@ -759,24 +759,6 @@ Status _createCollection(
     });
 }
 
-CollectionOptions clusterByDefaultIfNecessary(const NamespaceString& nss,
-                                              CollectionOptions collectionOptions,
-                                              const boost::optional<BSONObj>& idIndex) {
-    if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
-        !collectionOptions.isView() && !collectionOptions.timeseries &&
-        !collectionOptions.clusteredIndex.has_value() && (!idIndex || idIndex->isEmpty()) &&
-        !collectionOptions.capped &&
-        !clustered_util::requiresLegacyFormat(nss, collectionOptions)) {
-        // Capped, clustered collections differ in behavior significantly from normal
-        // capped collections. Notably, they allow out-of-order insertion.
-        //
-        // Additionally, don't set the collection to be clustered in the default format if it
-        // requires legacy format.
-        collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
-    }
-    return collectionOptions;
-}
-
 /**
  * Shared part of the implementation of the createCollection versions for replicated and regular
  * collection creation.
@@ -820,7 +802,7 @@ Status createCollection(OperationContext* opCtx,
             options["clusteredIndex"].isBoolean() && !options["clusteredIndex"].boolean();
         if (!hasExplicitlyDisabledClustering) {
             collectionOptions =
-                clusterByDefaultIfNecessary(nss, std::move(collectionOptions), idIndex);
+                translateOptionsIfClusterByDefault(nss, std::move(collectionOptions), idIndex);
         }
     }
 
@@ -845,7 +827,8 @@ Status createCollection(OperationContext* opCtx, const CreateCommand& cmd) {
     bool hasExplicitlyDisabledClustering = cmd.getClusteredIndex() &&
         holds_alternative<bool>(*cmd.getClusteredIndex()) && !get<bool>(*cmd.getClusteredIndex());
     if (!hasExplicitlyDisabledClustering) {
-        options = clusterByDefaultIfNecessary(cmd.getNamespace(), std::move(options), idIndex);
+        options =
+            translateOptionsIfClusterByDefault(cmd.getNamespace(), std::move(options), idIndex);
     }
     return createCollection(opCtx, cmd.getNamespace(), options, idIndex);
 }
@@ -1074,6 +1057,24 @@ Status createVirtualCollection(OperationContext* opCtx,
     CollectionOptions options;
     options.setNoIdIndex();
     return _createCollection(opCtx, ns, options, boost::none, vopts);
+}
+
+CollectionOptions translateOptionsIfClusterByDefault(const NamespaceString& nss,
+                                                     CollectionOptions collectionOptions,
+                                                     const boost::optional<BSONObj>& idIndex) {
+    if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
+        !collectionOptions.isView() && !collectionOptions.timeseries &&
+        !collectionOptions.clusteredIndex.has_value() && (!idIndex || idIndex->isEmpty()) &&
+        !collectionOptions.capped &&
+        !clustered_util::requiresLegacyFormat(nss, collectionOptions)) {
+        // Capped, clustered collections differ in behavior significantly from normal
+        // capped collections. Notably, they allow out-of-order insertion.
+        //
+        // Additionally, don't set the collection to be clustered in the default format if it
+        // requires legacy format.
+        collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    }
+    return collectionOptions;
 }
 
 }  // namespace mongo

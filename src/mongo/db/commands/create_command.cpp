@@ -126,8 +126,9 @@ BSONObj pipelineAsBsonObj(const std::vector<BSONObj>& pipeline) {
  */
 void checkCollectionOptions(OperationContext* opCtx,
                             const Status& originalStatus,
-                            const NamespaceString& ns,
+                            const CreateCommand& cmd,
                             const CollectionOptions& options) {
+    const auto& ns = cmd.getNamespace();
     AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, ns, MODE_IS);
 
@@ -137,7 +138,12 @@ void checkCollectionOptions(OperationContext* opCtx,
     const auto coll = catalog->lookupCollectionByNamespace(opCtx, ns);
     if (coll) {
 
-        auto requestedOptions = options;
+        const bool hasExplicitlyDisabledClustering = cmd.getClusteredIndex() &&
+            holds_alternative<bool>(*cmd.getClusteredIndex()) &&
+            !get<bool>(*cmd.getClusteredIndex());
+        auto requestedOptions =
+            (hasExplicitlyDisabledClustering ? options
+                                             : translateOptionsIfClusterByDefault(ns, options));
         auto existingOptions = coll->getCollectionOptions();
 
         if (requestedOptions.timeseries) {
@@ -557,7 +563,7 @@ public:
                             opCtx, createStatus, cmd.getNamespace(), options);
                     }
                 } else {
-                    checkCollectionOptions(opCtx, createStatus, cmd.getNamespace(), options);
+                    checkCollectionOptions(opCtx, createStatus, cmd, options);
                 }
             } else {
                 uassertStatusOK(createStatus);
