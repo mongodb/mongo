@@ -13,7 +13,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - rhel81-power8-small
-    activate: false
+    cron: "0 4 * * 0" # Run once a week
     stepback: false
     expansions:
       additional_package_targets: >-
@@ -68,7 +68,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - rhel83-zseries-small
-    activate: false
+    cron: "0 4 * * 0" # Run once a week
     stepback: false
     expansions:
       additional_package_targets: >-
@@ -114,6 +114,59 @@ buildvariants:
       - name: .release_critical .requires_large_host !.publish !.incompatible_s390x
         distros:
           - rhel83-zseries-large
+
+  - name: enterprise-rhel-9-ppc64le-toolchain-v5
+    display_name: Enterprise RHEL 9 PPC64LE (v5 toolchain)
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - rhel9-power-small
+    activate: false
+    stepback: false
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel9
+        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
+        --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+        -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      resmoke_jobs_factor: 0.25
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: ppc64le
+      packager_distro: rhel9
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: ppc64le-enterprise-rhel9
+      repo_edition: enterprise
+      multiversion_platform: rhel9
+      multiversion_architecture: ppc64le
+      multiversion_edition: enterprise
+      compile_variant: enterprise-rhel-9-ppc64le-toolchain-v5
+      timeout_secs: 3600 # 1 hour idle timeout
+      exec_timeout_secs: 21600 # 6 hours exec timeout
+    tasks:
+      - name: compile_test_serial_no_unittests_TG
+        distros:
+          - rhel9-power-large
+      - name: compile_integration_and_test_no_audit_parallel_stream_TG
+        distros:
+          - rhel9-power-large
+      - name: .development_critical !.requires_large_host !.incompatible_ppc
+      - name: .development_critical .requires_large_host !.incompatible_ppc
+        distros:
+          - rhel9-power-large
+      - name: .release_critical !.requires_large_host !.publish !.incompatible_ppc
+      - name: .release_critical .requires_large_host !.publish !.incompatible_ppc
+        distros:
+          - rhel9-power-large
 
   - name: enterprise-rhel-9-s390x-toolchain-v5
     display_name: Enterprise RHEL 9 s390x (v5 toolchain)

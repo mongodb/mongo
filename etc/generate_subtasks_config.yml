@@ -22,6 +22,7 @@ build_variant_large_distro_exceptions:
   - enterprise-rhel-81-ppc64le
   - enterprise-rhel-81-ppc64le-toolchain-v5
   - enterprise-rhel-9-ppc64le
+  - enterprise-rhel-9-ppc64le-toolchain-v5
   - enterprise-rhel-8-arm64
   - enterprise-rhel-8-arm64-toolchain-v5
   - enterprise-rhel-83-s390x
