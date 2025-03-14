@@ -75,8 +75,6 @@ namespace {
 constexpr auto kRawFieldName = "raw"_sd;
 constexpr auto kTopologyVersionFieldName = "topologyVersion"_sd;
 
-// TODO (SERVER-101903) Make CreateIndexesCmd a TypedCommand once CreateIndexesReply won't be strict
-// anymore.
 class CreateIndexesCmd : public BasicCommandWithRequestParser<CreateIndexesCmd> {
 public:
     using Request = CreateIndexesCommand;

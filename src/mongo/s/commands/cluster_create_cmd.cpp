@@ -60,17 +60,8 @@
 namespace mongo {
 namespace {
 
-// TODO (SERVER-101903) Make CreateCmd a TypedCommand once CreateCommandReply won't be strict
-// anymore.
-class CreateCmd final : public BasicCommandWithRequestParser<CreateCmd> {
+class CreateCmd final : public CreateCmdVersion1Gen<CreateCmd> {
 public:
-    using Request = CreateCommand;
-    using Reply = CreateCommandReply;
-
-    const std::set<std::string>& apiVersions() const final {
-        return kApiVersions1;
-    }
-
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
@@ -83,84 +74,62 @@ public:
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const final {
-        return true;
-    }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const override {
-        const auto& request =
-            Request::parse(IDLParserContext("checkAuthForCreateCollection"), cmdObj);
-        return auth::checkAuthForCreate(
-            opCtx, AuthorizationSession::get(opCtx->getClient()), request, true);
-    }
+        bool supportsWriteConcern() const final {
+            return true;
+        }
 
-    bool runWithRequestParser(OperationContext* opCtx,
-                              const DatabaseName& dbName,
-                              const BSONObj& cmdObj,
-                              const RequestParser& requestParser,
-                              BSONObjBuilder& output) final {
-        const auto& request = requestParser.request();
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
 
-        if (request.getClusteredIndex()) {
-            clustered_util::checkCreationOptions(request);
-        } else {
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            uassertStatusOK(auth::checkAuthForCreate(
+                opCtx, AuthorizationSession::get(opCtx->getClient()), request(), true));
+        }
+
+        CreateCommandReply typedRun(OperationContext* opCtx) final {
+            auto cmd = request();
+            auto dbName = cmd.getDbName();
+
+            if (cmd.getClusteredIndex()) {
+                clustered_util::checkCreationOptions(cmd);
+            } else {
+                uassert(ErrorCodes::InvalidOptions,
+                        "specify size:<n> when capped is true",
+                        !cmd.getCapped() || cmd.getSize());
+            }
+
             uassert(ErrorCodes::InvalidOptions,
-                    "specify size:<n> when capped is true",
-                    !request.getCapped() || request.getSize());
+                    "the 'temp' field is an invalid option",
+                    !cmd.getTemp());
+
+            auto nss = cmd.getNamespace();
+            ShardsvrCreateCollection shardsvrCollCommand(nss);
+
+            auto cmdObj = cmd.toBSON();
+            // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj
+            // guaratees to propagate the apiVersion and apiStrict paramers. Note that
+            // shardsvrCreateCollection as internal command will skip the apiVersionCheck.
+            // However in case of view, the create command might run an aggregation. Having those
+            // fields propagated guaratees the api version check will keep working within the
+            // aggregation framework
+            auto request =
+                ShardsvrCreateCollectionRequest::parse(IDLParserContext("create"), cmdObj);
+
+            request.setUnsplittable(true);
+            request.setShardKey(BSON("_id" << 1));
+
+            shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
+            shardsvrCollCommand.setDbName(nss.dbName());
+
+            cluster::createCollection(opCtx, std::move(shardsvrCollCommand));
+            return CreateCommandReply();
         }
-
-        uassert(ErrorCodes::InvalidOptions,
-                "the 'temp' field is an invalid option",
-                !request.getTemp());
-
-        const auto& nss = request.getNamespace();
-        ShardsvrCreateCollection shardsvrCollCommand(nss);
-
-        const auto& shardCmdObj = request.toBSON();
-        // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj
-        // guaratees to propagate the apiVersion and apiStrict paramers. Note that
-        // shardsvrCreateCollection as internal command will skip the apiVersionCheck.
-        // However in case of view, the create command might run an aggregation. Having those
-        // fields propagated guaratees the api version check will keep working within the
-        // aggregation framework
-        auto shardRequest =
-            ShardsvrCreateCollectionRequest::parse(IDLParserContext("create"), shardCmdObj);
-
-        shardRequest.setUnsplittable(true);
-        shardRequest.setShardKey(BSON("_id" << 1));
-
-        shardsvrCollCommand.setShardsvrCreateCollectionRequest(shardRequest);
-        shardsvrCollCommand.setDbName(nss.dbName());
-
-        const auto& shardResponse =
-            cluster::createCollectionNoThrowOnError(opCtx, std::move(shardsvrCollCommand));
-        const auto& remoteResponse = uassertStatusOK(shardResponse.swResponse);
-
-        const auto& status = getStatusFromCommandResult(remoteResponse.data);
-        CommandHelpers::appendCommandStatusNoThrow(output, status);
-
-        const auto& wce = getWriteConcernErrorDetailFromBSONObj(remoteResponse.data);
-        if (wce) {
-            appendWriteConcernErrorDetailToCommandResponse(shardResponse.shardId, *wce, output);
-        }
-
-        const bool ok = status.isOK();
-        CommandHelpers::appendSimpleCommandStatus(output, ok);
-        return ok;
-    }
-
-
-    void validateResult(const BSONObj& result) final {
-        const auto ctx = IDLParserContext("createCommandReply");
-        if (checkIsErrorStatus(result, ctx)) {
-            return;
-        }
-
-        StringDataSet ignorableFields({kWriteConcernErrorFieldName, ErrorReply::kOkFieldName});
-        Reply::parse(ctx, result.removeFields(ignorableFields));
-    }
+    };
 };
 MONGO_REGISTER_COMMAND(CreateCmd).forRouter();
 

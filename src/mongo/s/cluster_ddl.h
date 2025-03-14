@@ -36,7 +36,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
@@ -57,12 +56,8 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
  * TODO (SERVER-100309): remove `againstFirstShard` once 9.0 becomes last LTS.
  */
 CreateCollectionResponse createCollection(OperationContext* opCtx,
-                                          const ShardsvrCreateCollection& request,
+                                          ShardsvrCreateCollection request,
                                           bool againstFirstShard = false);
-
-AsyncRequestsSender::Response createCollectionNoThrowOnError(OperationContext* opCtx,
-                                                             ShardsvrCreateCollection request,
-                                                             bool againstFirstShard = false);
 
 /**
  * Creates a collection with the options specified in `request`. Calls the above createCollection
