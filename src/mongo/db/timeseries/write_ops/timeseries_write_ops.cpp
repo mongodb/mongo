@@ -32,10 +32,10 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
-#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
-#include "mongo/db/transaction/transaction_participant.h"
+
 namespace mongo::timeseries::write_ops {
 
 mongo::write_ops::InsertCommandReply performTimeseriesWrites(

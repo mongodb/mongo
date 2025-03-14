@@ -22,6 +22,11 @@ import {
     summaryFieldsValidator
 } from "jstests/libs/bulk_write_utils.js";
 
+const serverStatus = assert.commandWorked(db.getSiblingDB("admin").runCommand({serverStatus: 1}));
+const currVersion = serverStatus.version;
+const is82OrHigher = MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(currVersion),
+                                                    MongoRunner.getBinVersionFor("8.2")) >= 1;
+
 var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
 coll.drop();
@@ -372,37 +377,49 @@ cursorEntryValidator(res.cursor.firstBatch[2],
 coll.drop();
 
 coll.insert({skey: "MongoDB"});
+
 // Test constants is not supported on non-pipeline update.
-res = db.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {
-            update: 0,
-            filter: {$expr: {$eq: ["$skey", "MongoDB"]}},
-            updateMods: {skey: "$$targetKey"},
-            constants: {targetKey: "MongoDB2"}
-        },
-    ],
-    nsInfo: [{ns: "test.coll"}],
+// In all versions with a value that's present ("MongoDB").
+let keysToTest = ["MongoDB"];
+if (is82OrHigher) {
+    // In 8.2 and higher, also test with a value that's not present ("NotPresent") and that is a
+    // no-op update. 8.2 and higher react with error 51198 ("Constant values may only be specified
+    // for pipeline updates"), but versions before that will not validate the operation and simply
+    // do nothing.
+    keysToTest.push("NotPresent");
+}
+keysToTest.forEach((value) => {
+    res = db.adminCommand({
+        bulkWrite: 1,
+        ops: [
+            {
+                update: 0,
+                filter: {$expr: {$eq: ["$skey", value]}},
+                updateMods: {skey: "$$targetKey"},
+                constants: {targetKey: "MongoDB2"}
+            },
+        ],
+        nsInfo: [{ns: "test.coll"}],
+    });
+
+    assert.commandWorked(res);
+    cursorSizeValidator(res, 1);
+    summaryFieldsValidator(
+        res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+
+    cursorEntryValidator(res.cursor.firstBatch[0],
+                         {ok: 0, idx: 0, n: 0, nModified: 0, code: 51198});
+
+    // TODO SERVER-99035: Re-enable exact match assertion and delete partial match assertion.
+    // Currently the TXN API returns a CommitResult struct which pre-pends "Command error committing
+    // internal transaction" even for transactions that failed before committing. SERVER-99035 will
+    // refactor it so that a general struct is returned instead that will not prepend that message.
+    //
+    // assert.eq(res.cursor.firstBatch[0].errmsg,
+    //           "Constant values may only be specified for pipeline updates");
+    assert(res.cursor.firstBatch[0].errmsg.includes(
+        "Constant values may only be specified for pipeline updates"));
 });
-
-assert.commandWorked(res);
-cursorSizeValidator(res, 1);
-summaryFieldsValidator(
-    res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
-
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 51198});
-
-// TODO SERVER-99035: Re-enable exact match assertion and delete partial match assertion. Currently
-// the TXN API returns a CommitResult struct which pre-pends "Command error committing internal
-// transaction" even for transactions that failed before committing. SERVER-99035 will refactor it
-// so that a general struct is returned instead that will not prepend that message.
-//
-// assert.eq(res.cursor.firstBatch[0].errmsg,
-//           "Constant values may only be specified for pipeline updates");
-assert(res.cursor.firstBatch[0].errmsg.includes(
-    "Constant values may only be specified for pipeline updates"));
-
 coll.drop();
 
 // Test Upsert = True with UpsertSupplied = True (no match and constants.new is missing)

@@ -280,13 +280,13 @@ db.runCommand({
 });
 assert.eq([{_id: 1, x: {$add: [1, 2]}, foo: "$x"}], coll.find({_id: 1}).toArray());
 
-// Cannot use constants with regular updates.
-assert.commandFailedWithCode(
-    db.runCommand({update: collName, updates: [{q: {_id: 1}, u: {x: "$$foo"}, c: {foo: "bar"}}]}),
-    51198);
-assert.commandFailedWithCode(
-    db.runCommand(
-        {update: collName, updates: [{q: {_id: 1}, u: {$set: {x: "$$foo"}}, c: {foo: "bar"}}]}),
-    51198);
-assert.commandFailedWithCode(
-    db.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {x: "1"}}, c: {}}]}), 51198);
+// Cannot use constants with regular updates, regardless of whether the update is a no-op or not.
+[{q: {_id: 1}, u: {x: "$$foo"}, c: {foo: "bar"}},
+ {q: {_id: "NotPresent"}, u: {x: "$$foo"}, c: {foo: "bar"}},
+ {q: {_id: 1}, u: {$set: {x: "$$foo"}}, c: {foo: "bar"}},
+ {q: {_id: "NotPresent"}, u: {$set: {x: "$$foo"}}, c: {foo: "bar"}},
+ {q: {_id: 1}, u: {$set: {x: "1"}}, c: {}},
+ {q: {_id: "NotPresent"}, u: {$set: {x: "1"}}, c: {}},
+].forEach((update) => {
+    assert.commandFailedWithCode(db.runCommand({update: collName, updates: [update]}), 51198);
+});

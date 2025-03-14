@@ -194,13 +194,13 @@ void BatchedCommandRequest::evaluateAndReplaceLetParams(OperationContext* opCtx)
         case BatchedCommandRequest::BatchType_Insert:
             break;
         case BatchedCommandRequest::BatchType_Update:
-            if (auto let = _updateReq->getLet()) {
+            if (const auto& let = _updateReq->getLet()) {
                 _updateReq->setLet(
                     freezeLet(opCtx, *let, _updateReq->getLegacyRuntimeConstants(), getNS()));
             }
             break;
         case BatchedCommandRequest::BatchType_Delete:
-            if (auto let = _deleteReq->getLet()) {
+            if (const auto& let = _deleteReq->getLet()) {
                 _deleteReq->setLet(
                     freezeLet(opCtx, *let, _deleteReq->getLegacyRuntimeConstants(), getNS()));
             }

@@ -29,14 +29,20 @@
 
 #pragma once
 
-#include "mongo/db/curop.h"
-#include "mongo/db/jsobj.h"
+#include <boost/optional/optional.hpp>
+#include <string>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/util/str.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -75,6 +81,14 @@ public:
           _sampleId(updateOp.getSampleId()),
           _allowShardKeyUpdatesWithoutFullShardKeyInQuery(
               updateOp.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()) {}
+
+    /**
+     * Unconditionally throws error 51198. Centralized here so that we can use the same error code
+     * from multiple places.
+     */
+    MONGO_COMPILER_NORETURN static void throwUnexpectedConstantValuesException() {
+        uasserted(51198, "Constant values may only be specified for pipeline updates");
+    }
 
     void setNamespaceString(const NamespaceString& nsString) {
         _nsString = nsString;

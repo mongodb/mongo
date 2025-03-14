@@ -338,6 +338,18 @@ public:
     }
 
     /**
+     * Returns the `c` (constants) value for the update operation this `UpdateRef` refers to.
+     */
+    const boost::optional<BSONObj>& getConstants() const {
+        if (_batchUpdateRequest) {
+            return _batchUpdateRequest->getC();
+        } else {
+            tassert(8202500, "invalid bulkWrite update op reference", _bulkWriteUpdateRequest);
+            return _bulkWriteUpdateRequest->getConstants();
+        }
+    }
+
+    /**
      * Returns the BSON representation of the update operation this `UpdateRef` refers to.
      */
     BSONObj toBSON() const {

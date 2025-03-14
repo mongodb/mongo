@@ -48,19 +48,13 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/resource_yielder.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/transaction/transaction_api.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/inline_executor.h"
-#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -77,7 +71,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
-#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -431,6 +424,7 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
 
     // Assemble requests
     std::vector<AsyncRequestsSender::Request> requests;
+    requests.reserve(endpoints.size());
     for (const auto& endpoint : endpoints) {
         BSONObj cmdObjWithVersions = BSONObj(command);
         if (endpoint.databaseVersion) {
@@ -440,7 +434,7 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
         if (endpoint.shardVersion) {
             cmdObjWithVersions = appendShardVersion(cmdObjWithVersions, *endpoint.shardVersion);
         }
-        requests.emplace_back(endpoint.shardName, cmdObjWithVersions);
+        requests.emplace_back(endpoint.shardName, std::move(cmdObjWithVersions));
     }
 
     // Send the requests.
@@ -461,7 +455,7 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
 
         // If the response status was OK, the response must contain which host was targeted.
         invariant(response.shardHostAndPort);
-        results->push_back(response);
+        results->push_back(std::move(response));
     }
 }
 
@@ -570,7 +564,7 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
     // Target the command to the shards based on the singleton batch item.
     BatchItemRef targetingBatchItem(requestPtr, 0);
     std::vector<AsyncRequestsSender::Response> shardResponses;
-    commandOpWrite(opCtx, nss, explainCmd, targetingBatchItem, &shardResponses);
+    commandOpWrite(opCtx, nss, explainCmd, std::move(targetingBatchItem), &shardResponses);
     uassertStatusOK(ClusterExplain::buildExplainResult(
         ExpressionContext::makeBlankExpressionContext(opCtx, nss),
         shardResponses,

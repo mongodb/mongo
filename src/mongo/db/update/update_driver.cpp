@@ -48,6 +48,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/update/delta_executor.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/object_replace_executor.h"
@@ -147,7 +148,10 @@ void UpdateDriver::parse(
         return;
     }
 
-    uassert(51198, "Constant values may only be specified for pipeline updates", !constants);
+    if (MONGO_unlikely(constants)) {
+        // Throws "Constant values may be only be specified for pipeline updates" error.
+        UpdateRequest::throwUnexpectedConstantValuesException();
+    }
 
     // Check if the update expression is a full object replacement.
     if (updateMod.type() == write_ops::UpdateModification::Type::kReplacement) {

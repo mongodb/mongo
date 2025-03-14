@@ -929,8 +929,6 @@ public:
         // sessions.
         boost::optional<repl::OpTime> _checkStatementExecutedSelf(StmtId stmtId) const;
 
-        UpdateRequest _makeUpdateRequest(const SessionTxnRecord& sessionTxnRecord) const;
-
         void _registerUpdateCacheOnCommit(OperationContext* opCtx,
                                           std::vector<StmtId> stmtIdsWritten,
                                           const repl::OpTime& lastStmtIdWriteTs);

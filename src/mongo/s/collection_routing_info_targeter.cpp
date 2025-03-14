@@ -29,7 +29,6 @@
 
 #include "mongo/s/collection_routing_info_targeter.h"
 
-#include "mongo/s/transaction_router.h"
 #include <fmt/format.h>
 #include <memory>
 #include <string>
@@ -46,15 +45,14 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/raw_data_operation.h"
@@ -66,6 +64,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -79,7 +78,6 @@
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -105,10 +103,16 @@ using UpdateType = write_ops::UpdateModification::Type;
  *            or
  *          coll.update({x: 1}, [{$addFields: {y: 2}}])
  */
-void validateUpdateDoc(const UpdateRef updateRef) {
+void validateUpdateDoc(const UpdateRef& updateRef) {
     const auto& updateMod = updateRef.getUpdateMods();
     if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
         return;
+    }
+
+    // Non-pipeline style update.
+    if (MONGO_unlikely(updateRef.getConstants())) {
+        // Using 'c' field (constants) for a non-pipeline update is disallowed.
+        UpdateRequest::throwUnexpectedConstantValuesException();
     }
 
     const auto updateType = updateMod.type();
