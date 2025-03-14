@@ -52,7 +52,6 @@
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
-#include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -76,7 +75,7 @@ using DocumentSourceGraphLookUpTest = AggregationContextFixture;
  * A MongoProcessInterface use for testing that supports making pipelines with an initial
  * DocumentSourceMock source.
  */
-class MockMongoInterface final : public SpillingTestMongoProcessInterface {
+class MockMongoInterface final : public StubMongoProcessInterface {
 public:
     MockMongoInterface(std::deque<DocumentSource::GetNextResult> results)
         : _results(std::move(results)) {}
@@ -332,6 +331,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     ASSERT_TRUE(graphLookupStage->getNext().isPaused());
 
     ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
@@ -408,6 +408,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     ASSERT_TRUE(graphLookupStage->getNext().isPaused());
 
+    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
     ASSERT_TRUE(graphLookupStage->getNext().isEOF());
 }
 
@@ -863,6 +864,83 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 1UL);
     ASSERT_EQ(1ul, involvedNssSet.count(graphLookupNs));
+}
+
+
+TEST_F(DocumentSourceGraphLookUpTest, CheckFrontierMemoryUsage) {
+    auto expCtx = getExpCtx();
+    auto inputMock = DocumentSourceMock::createForTest({}, expCtx);
+    std::deque<DocumentSource::GetNextResult> contents{};
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(contents)));
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+
+    graphLookupStage->setSource(inputMock.get());
+
+    // On resize, the flat set used for 'frontier' sets new size = 2*(old size) + 1.
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 0UL);
+
+    graphLookupStage->frontierInsertWithMemoryTracking_forTest(Value(1));
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 16UL);
+
+    graphLookupStage->frontierInsertWithMemoryTracking_forTest(Value(2));
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 48UL);
+
+    graphLookupStage->frontierInsertWithMemoryTracking_forTest(Value(3));
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 48UL);
+
+    graphLookupStage->frontierInsertWithMemoryTracking_forTest(Value(3));
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 48UL);
+
+    graphLookupStage->frontierInsertWithMemoryTracking_forTest(Value(4));
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 112UL);
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, CheckFrontierMemoryUsageInternalAllocs) {
+    auto expCtx = getExpCtx();
+    auto inputMock = DocumentSourceMock::createForTest({}, expCtx);
+    std::deque<DocumentSource::GetNextResult> contents{};
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(contents)));
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+
+    graphLookupStage->setSource(inputMock.get());
+
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 0UL);
+
+    Document hasInternalAllocs{{"_id", "b"_sd}};
+    Value v(hasInternalAllocs);
+    graphLookupStage->frontierInsertWithMemoryTracking_forTest(v);
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), v.getApproximateSize());
+
+    // Resize to capacity 3 with no additional internal allocations.
+    //
+    graphLookupStage->frontierInsertWithMemoryTracking_forTest(Value(1));
+    ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 32UL + v.getApproximateSize());
 }
 
 }  // namespace

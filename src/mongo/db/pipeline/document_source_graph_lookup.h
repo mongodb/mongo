@@ -67,8 +67,6 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/spilling/spillable_deque.h"
-#include "mongo/db/pipeline/spilling/spillable_map.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -115,7 +113,6 @@ public:
 
     DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&,
                               const boost::intrusive_ptr<ExpressionContext>&);
-
     ~DocumentSourceGraphLookUp() override;
 
     const char* getSourceName() const final;
@@ -186,6 +183,12 @@ public:
         return DepsTracker::State::SEE_NEXT;
     };
 
+    size_t getFrontierUsageBytes_forTest() const {
+        return _frontierUsageBytes;
+    }
+
+    void frontierInsertWithMemoryTracking_forTest(Value value);
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
         expression::addVariableRefs(_startWith.get(), refs);
         if (_additionalFilter) {
@@ -221,12 +224,6 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
-    void spill(int64_t maximumMemoryUsage);
-
-    bool usedDisk() override {
-        return _visited.usedDisk() || _queue.usedDisk();
-    }
-
     const SpecificStats* getSpecificStats() const final {
         return &_stats;
     }
@@ -247,9 +244,6 @@ protected:
                                                      Pipeline::SourceContainer* container) final;
 
 private:
-    static constexpr StringData kFrontierValueField = "f"_sd;
-    static constexpr StringData kDepthField = "d"_sd;
-
     DocumentSourceGraphLookUp(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         NamespaceString from,
@@ -269,26 +263,14 @@ private:
 
     /**
      * Prepares the query to execute on the 'from' collection wrapped in a $match by using the
-     * contents of '_queue'. Consumes from the _queue until it is empty or the match stage reached
-     * BSONObjMaxUserSize.
+     * contents of '_frontier'.
+     *
+     * Fills 'cached' with any values that were retrieved from the cache.
+     *
+     * Returns boost::none if no query is necessary, i.e., all values were retrieved from the cache.
+     * Otherwise, returns a query object.
      */
-    struct Query {
-        // Valid $match stage that we have to query, or boost::none if no query is needed.
-        boost::optional<BSONObj> match;
-        // Documents that are returned from in-memory cache.
-        DocumentUnorderedSet cached;
-        // Values from _queue that are processed by this query.
-        ValueFlatUnorderedSet queried;
-        // Depth of the documents, returned by the given query.
-        long long depth;
-    };
-    Query makeQueryFromQueue();
-
-    /**
-     * Create pipeline to get documents from the foreign collection.
-     */
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(BSONObj match,
-                                                            bool allowForeignSharded);
+    boost::optional<BSONObj> makeMatchStageFromFrontier(DocumentUnorderedSet* cached);
 
     /**
      * If we have internalized a $unwind, getNext() dispatches to this function.
@@ -296,14 +278,14 @@ private:
     GetNextResult getNextUnwound();
 
     /**
-     * Perform a breadth-first search of the 'from' collection. '_queue' should already be
-     * populated with the values for the initial query. Populates '_visited' with the result(s)
+     * Perform a breadth-first search of the 'from' collection. '_frontier' should already be
+     * populated with the values for the initial query. Populates '_discovered' with the result(s)
      * of the query.
      */
     void doBreadthFirstSearch();
 
     /**
-     * Populates '_queue' with the '_startWith' value(s) from '_input' and then performs a
+     * Populates '_frontier' with the '_startWith' value(s) from '_input' and then performs a
      * breadth-first search. Caller should check that _input is not boost::none.
      */
     void performSearch();
@@ -315,28 +297,28 @@ private:
     void addToCache(const Document& result, const ValueFlatUnorderedSet& queried);
 
     /**
-     * Assert that '_visited' and '_queue' have not exceeded the maximum meory usage, and then
-     * evict from '_cache' until this source is using less than 'maxMemoryUsageBytes'.
+     * Assert that '_visited' and '_frontier' have not exceeded the maximum meory usage, and then
+     * evict from '_cache' until this source is using less than '_maxMemoryUsageBytes'.
      */
     void checkMemoryUsage();
 
     /**
-     * Wraps frontier value and depth into a Document format for the _queue.
+     * Process 'result', adding it to '_visited' with the given 'depth', and updating '_frontier'
+     * with the object's 'connectTo' values.
+     *
+     * Returns whether '_visited' was updated, and thus, whether the search should recurse.
      */
-    Document wrapFrontierValue(Value value, long long depth) const;
+    bool addToVisitedAndFrontier(Document result, long long depth);
 
     /**
-     * Process 'result', adding it to '_visited' with the given 'depth', and updating '_queue'
-     * with the object's 'connectTo' values.
+     * Insert into 'frontier' and update '_frontierUsageBytes.'
      */
-    void addToVisitedAndQueue(Document result, long long depth);
+    inline void frontierInsertWithMemoryTracking(Value value);
 
     /**
      * Returns true if we are not in a transaction.
      */
     bool foreignShardedGraphLookupAllowed() const;
-
-    void updateSpillingStats();
 
     // $graphLookup options.
     NamespaceString _from;
@@ -355,18 +337,19 @@ private:
     // The aggregation pipeline to perform against the '_from' namespace.
     std::vector<BSONObj> _fromPipeline;
 
-    // Tracks memory for _queue and _visited. _cache is allowed to use the remaining memory limit.
-    MemoryUsageTracker _memoryUsageTracker;
+    size_t _maxMemoryUsageBytes;
+
+    // Track memory usage to ensure we don't exceed '_maxMemoryUsageBytes'.
+    size_t _visitedUsageBytes = 0;
+    size_t _frontierUsageBytes = 0;
 
     // Only used during the breadth-first search, tracks the set of values on the current frontier.
-    // Contains documents with two fields: kFrontierValueField with a lookup value and kDepthField
-    // with depth.
-    SpillableDeque _queue;
+    ValueFlatUnorderedSet _frontier;
 
     // Tracks nodes that have been discovered for a given input. Keys are the '_id' value of the
     // document from the foreign collection, value is the document itself.  The keys are compared
     // using the simple collation.
-    SpillableDocumentMap _visited;
+    ValueUnorderedMap<Document> _visited;
 
     // Caches query results to avoid repeating any work. This structure is maintained across calls
     // to getNext().
@@ -378,7 +361,6 @@ private:
 
     // Keep track of a $unwind that was absorbed into this stage.
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;
-    SpillableDocumentMap::Iterator _unwindIterator = _visited.end();
 
     // If we absorbed a $unwind that specified 'includeArrayIndex', this is used to populate that
     // field, tracking how many results we've returned so far for the current input document.

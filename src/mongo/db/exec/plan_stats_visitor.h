@@ -224,8 +224,8 @@ struct PlanStatsVisitorBase : public PlanStatsVisitor<IsConst> {
     void visit(tree_walker::MaybeConstPtr<IsConst, SpoolStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, EofStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceIdLookupStats> stats) override {}
-    void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceGraphLookupStats> stats) override {
-    }
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceGraphLookupStats> stats) override {}
 };
 
 using PlanStatsMutableVisitor = PlanStatsVisitor<false>;
