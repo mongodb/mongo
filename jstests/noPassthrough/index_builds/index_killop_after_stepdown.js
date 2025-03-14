@@ -45,12 +45,22 @@ const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_
 // Kill the index build.
 assert.commandWorked(testDB.killOp(opId));
 
-// Wait for the command thread to observe the killOp.
-assert.commandWorked(primary.adminCommand({
-    waitForFailPoint: "hangBeforeIndexBuildAbortOnInterrupt",
-    timesEntered: hangBeforeAbortFailpointTimesEntered + 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+// Wait for the command thread to observe the killOp, or quit early if the index build was killed
+// prematurely, escaping the failpoint forever. Retry up to 10 times.
+let retry = 0;
+while ((assert.commandWorkedOrFailedWithCode(primary.adminCommand({
+           waitForFailPoint: "hangBeforeIndexBuildAbortOnInterrupt",
+           timesEntered: hangBeforeAbortFailpointTimesEntered + 1,
+           maxTimeMS: kDefaultWaitForFailPointTimeout / 10
+       }),
+                                             ErrorCodes.MaxTimeMSExpired))
+           .code == ErrorCodes.MaxTimeMSExpired) {
+    if (IndexBuildTest.getIndexBuildOpId(testDB, coll.getName(), 'a_1') === -1) {
+        jsTestLog("Index build killed too early, exiting.");
+        quit();
+    }
+    assert.lt(++retry, 10, 'waitForFailPoint hangBeforeIndexBuildAbortOnInterrupt timed out');
+}
 
 // Step down the primary, preventing the index build from generating an abort oplog entry.
 assert.commandWorked(testDB.adminCommand({replSetStepDown: 30, force: true}));
