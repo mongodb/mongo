@@ -101,12 +101,5 @@ bool isWildcardObjectSubpathScan(const IndexEntry& index, const IndexBounds& bou
  * is for documents missing the wildcard field.
  */
 std::vector<Interval> makeAllValuesForPath();
-
-/**
- * If the compound wildcard index is expanded to any known field and the index is used to answer a
- * $or query, we should expand the index bounds of the wildcard field in such IndexEntry to include
- * all keys. Returns false if the query plan cannot use the index.
- */
-bool expandWildcardFieldBounds(std::vector<std::unique_ptr<QuerySolutionNode>>& ixscanNodes);
 }  // namespace wildcard_planning
 }  // namespace mongo

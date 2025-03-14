@@ -80,7 +80,7 @@ public:
      */
     struct QueryContext {
         ElemMatchContext elemMatchContext;
-        const CollatorInterface* collator;
+        const CollatorInterface* collator = nullptr;
         // Query will require an indexed plan if contains TEXT or GEO predicates
         bool mustUseIndexedPlan = false;
     };
@@ -286,6 +286,51 @@ private:
      */
     static void stripInvalidAssignmentsToWildcardIndexes(MatchExpression* root,
                                                          const std::vector<IndexEntry>& indices);
+
+    /**
+     * This function removes invalid compound wildcard index (CWI) assignments within an expression.
+     *
+     * Background: In the function expandWildcardIndexEntry(), there are two ways to expand a CWI.
+     * In the following explanation, let's take a CWI {a: 1, $**: 1} as an example.
+     * - Non-$_path expansion: The wildcard field expands by resolving to one specific field, e.g.,
+     *   {a: 1, b: 1}, where the wildcard field expands to "b".
+     * - $_path expansion: The wildcard field expands without resolving to a specific field,
+     *   indicated by the placeholder $_path, e.g., {a: 1, $_path: 1}.
+     * In the following, we are interested in non-$_path expansion as their assignments have the
+     * potential to become invalid.
+     *
+     * An assignment to a non-$_path CWI (e.g., {a: 1, b: 1}) is considered invalid if its wildcard
+     * field is unassigned, i.e., the field "b" remains unassigned. If the wildcard field is
+     * unassigned, the assignment becomes redundant. This is because the index bounds would be
+     * effectively the same as those derived from a $_path expanded CWI (i.e., {a: 1, $_path: 1}).
+     * This can lead to redundant enumeration of query plans and also difficulty in building correct
+     * index bounds, thus we need to remove such cases.
+     *
+     * This function first checks if an index is a non-$_path expanded CWI. If found, then it
+     * proceeds as follows:
+     * - Traverses each node in the tree, checking nodes that are conjunctive, which means they
+     *   consist of a set of predicates suitable for logical conjunction (such as $and and
+     *   $elemMatch nodes).
+     * - For nodes that are not conjunctive, it checks the current assignment (if any) and strips if
+     *   invalid.
+     * - When there are several AND-related leaf predicates, in post-traversal, if none of the
+     *   predicates are assigned to the wildcard field, then the assignments are stripped from all
+     *   predicates.
+     *
+     * Example 1:
+     * For a query {$and: [{a: {$gt: 10}}, {$and: [{b: 1}, {a: {$lt: 20}}]}]}, all the 3 AND-related
+     * leaf predicates may have been assigned with index {a: 1, b: 1} where "b" is the wildcard
+     * field. Because the root $and is a conjunctive node, we need to evaluate them collectively in
+     * post-traversal at the root $and. Given that the assignment for {b: 1} is valid, no
+     * assignments are stripped.
+     *
+     * Example 2:
+     * Conversely, for a query {$and: [{a: {$gt: 10}}, {$and: [{c: 1}, {a: {$lt: 20}}]}]}, the
+     * wildcard field "b" is unassigned. In this case, at the root $and, all the 3 assignments
+     * are stripped in post-traversal as no valid assignments involving the wildcard field exist.
+     */
+    static void stripInvalidAssignmentsToCompoundWildcardIndexes(
+        MatchExpression* root, const std::vector<IndexEntry>& indices);
 
     /**
      * This function strips RelevantTag assignments to partial indices, where the assignment is
