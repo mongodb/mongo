@@ -284,7 +284,7 @@ private:
         CompareHelper() = default;
         CompareHelper(ControlBlock<Ts...>* object) : _object(object) {}
 
-        bool operator==(const CompareHelper& rhs) const noexcept {
+        bool operator==(const CompareHelper& rhs) const {
             static constexpr std::array cmp = {ControlBlockVTable<Ts, Ts...>::compareEq...};
             return cmp[tag()](_object, rhs._object);
         }
@@ -509,12 +509,12 @@ public:
         std::swap(other._object, _object);
     }
 
-    bool operator==(const PolyValue& rhs) const noexcept {
+    bool operator==(const PolyValue& rhs) const {
         static constexpr std::array cmpTbl = {ControlBlockVTable<Ts, Ts...>::compareEq...};
         return cmpTbl[tag()](_object, rhs._object);
     }
 
-    bool operator==(const Reference& rhs) const noexcept {
+    bool operator==(const Reference& rhs) const {
         static constexpr std::array cmpTbl = {ControlBlockVTable<Ts, Ts...>::compareEq...};
         return cmpTbl[tag()](_object, rhs._object);
     }
