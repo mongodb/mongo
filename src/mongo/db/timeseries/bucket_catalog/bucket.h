@@ -123,10 +123,10 @@ public:
     // The number of committed measurements in the bucket.
     uint32_t numCommittedMeasurements = 0;
 
-    // Whether the bucket has been marked for a rollover action. It can be marked for closure
+    // Whether the bucket has been marked for a rollover reason. It can be marked for closure
     // due to number of measurements, size, or schema changes, or it can be marked for archival
     // due to time range.
-    RolloverAction rolloverAction = RolloverAction::kNone;
+    RolloverReason rolloverReason = RolloverReason::kNone;
 
     // Minimum timestamp over contained measurements.
     const Date_t minTime;

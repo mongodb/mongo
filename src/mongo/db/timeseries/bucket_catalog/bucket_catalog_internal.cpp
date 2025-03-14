@@ -92,16 +92,22 @@ stdx::mutex _bucketIdGenLock;
 PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
 AtomicWord<uint64_t> _bucketIdGenCounter{static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64())};
 
-std::string rolloverActionToString(RolloverAction action) {
-    switch (action) {
-        case RolloverAction::kNone:
+std::string rolloverReasonToString(RolloverReason reason) {
+    switch (reason) {
+        case RolloverReason::kCount:
+            return "kCount";
+        case RolloverReason::kSchemaChange:
+            return "kSchemaChange";
+        case RolloverReason::kCachePressure:
+            return "kCachePressure";
+        case RolloverReason::kSize:
+            return "kSize";
+        case RolloverReason::kTimeForward:
+            return "kTimeForward";
+        case RolloverReason::kTimeBackward:
+            return "kTimeBackward";
+        case RolloverReason::kNone:
             return "kNone";
-        case RolloverAction::kArchive:
-            return "kArchive";
-        case RolloverAction::kHardClose:
-            return "kHardClose";
-        case RolloverAction::kSoftClose:
-            return "kSoftClose";
     }
     MONGO_UNREACHABLE;
 }
@@ -112,7 +118,7 @@ void assertNoOpenUnclearedBucketsForKey(Stripe& stripe,
     if (it != stripe.openBucketsByKey.end()) {
         auto& openSet = it->second;
         for (Bucket* bucket : openSet) {
-            if (bucket->rolloverAction == RolloverAction::kNone) {
+            if (bucket->rolloverReason == RolloverReason::kNone) {
                 if (auto state = materializeAndGetBucketState(registry, bucket);
                     state && !conflictsWithInsertions(state.value())) {
                     for (Bucket* b : openSet) {
@@ -122,10 +128,10 @@ void assertNoOpenUnclearedBucketsForKey(Stripe& stripe,
                                    "bucketId"_attr = b->bucketId.oid,
                                    "bucketState"_attr = bucketStateToString(
                                        materializeAndGetBucketState(registry, b).value()),
-                                   "rolloverAction"_attr =
-                                       rolloverActionToString(b->rolloverAction));
+                                   "rolloverReason"_attr =
+                                       rolloverReasonToString(b->rolloverReason));
                     }
-                    invariant(bucket->rolloverAction != RolloverAction::kNone || !state ||
+                    invariant(bucket->rolloverReason != RolloverReason::kNone || !state ||
                               conflictsWithInsertions(state.value()));
                 }
             }
@@ -178,8 +184,9 @@ void doRollover(BucketCatalog& catalog,
                 Stripe& stripe,
                 WithLock stripeLock,
                 Bucket& bucket,
-                RolloverAction action) {
-    invariant(action != RolloverAction::kNone);
+                RolloverReason reason) {
+    invariant(reason != RolloverReason::kNone);
+    auto action = getRolloverAction(reason);
     if (allCommitted(bucket)) {
         // The bucket does not contain any measurements that are yet to be committed, so we can take
         // action now.
@@ -191,8 +198,8 @@ void doRollover(BucketCatalog& catalog,
         }
     } else {
         // We must keep the bucket around until all measurements are committed, just mark
-        // the action we chose now so it we know what to do when the last batch finishes.
-        bucket.rolloverAction = action;
+        // the reason we chose now so it we know what to do when the last batch finishes.
+        bucket.rolloverReason = reason;
     }
 }
 }  // namespace
@@ -362,7 +369,7 @@ Bucket* useBucket(BucketCatalog& catalog,
 
     auto& openSet = it->second;
     for (Bucket* potentialBucket : openSet) {
-        if (potentialBucket->rolloverAction == RolloverAction::kNone) {
+        if (potentialBucket->rolloverReason == RolloverReason::kNone) {
             auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, potentialBucket);
             if (state && !conflictsWithInsertions(state.value())) {
                 markBucketNotIdle(stripe, stripeLock, *potentialBucket);
@@ -418,9 +425,8 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
     // straightforward range iteration, and use the somewhat awkward pattern below.
     for (auto it = openSet.begin(); it != openSet.end();) {
         Bucket* potentialBucket = *it++;
-
-        if (potentialBucket->rolloverAction == RolloverAction::kNone ||
-            potentialBucket->rolloverAction == RolloverAction::kHardClose) {
+        auto action = getRolloverAction(potentialBucket->rolloverReason);
+        if (action == RolloverAction::kNone || action == RolloverAction::kHardClose) {
             continue;
         }
 
@@ -709,7 +715,7 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
     if (auto it = stripe.openBucketsByKey.find(key); it != stripe.openBucketsByKey.end()) {
         auto& openSet = it->second;
         for (Bucket* existingBucket : openSet) {
-            if (existingBucket->rolloverAction == RolloverAction::kNone) {
+            if (existingBucket->rolloverReason == RolloverReason::kNone) {
                 auto state =
                     materializeAndGetBucketState(catalog.bucketStateRegistry, unownedBucket);
                 if (state && !conflictsWithInsertions(state.value())) {
@@ -717,7 +723,7 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
                     if (allCommitted(*existingBucket)) {
                         closeOpenBucket(catalog, stripe, stripeLock, *existingBucket, stats);
                     } else {
-                        existingBucket->rolloverAction = RolloverAction::kSoftClose;
+                        existingBucket->rolloverReason = RolloverReason::kTimeForward;
                     }
                     // We should only have one open, uncleared bucket at a time.
                     break;
@@ -751,7 +757,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     uint64_t storageCacheSizeBytes,
     const StringDataComparator* comparator,
     Bucket* excludedBucket,
-    boost::optional<RolloverAction> excludedAction) {
+    boost::optional<RolloverReason> excludedReason) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
@@ -788,11 +794,11 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                    existingBucket,
                                    insertContext.key,
                                    insertContext.options,
-                                   action,
+                                   reason,
                                    time,
                                    comparator,
                                    excludedBucket,
-                                   excludedAction,
+                                   excludedReason,
                                    insertContext.stats);
             isNewlyOpenedBucket = true;
             // Recalculate the fields and size change for the newly opened bucket we got from
@@ -859,7 +865,7 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
             // We cannot insert this measurement without rolling over the bucket.
             // Mark the bucket's RolloverAction so this bucket won't be eligible for staging the
             // next measurement.
-            bucket.rolloverAction = getRolloverAction(reason);
+            bucket.rolloverReason = reason;
             return false;
         }
     }
@@ -1425,16 +1431,16 @@ Bucket& rollover(BucketCatalog& catalog,
                  Bucket& bucket,
                  const BucketKey& key,
                  const TimeseriesOptions& timeseriesOptions,
-                 RolloverAction action,
+                 RolloverReason reason,
                  const Date_t& time,
                  const StringDataComparator* comparator,
                  Bucket* additionalBucket,
-                 boost::optional<RolloverAction> additionalAction,
+                 boost::optional<RolloverReason> additionalReason,
                  ExecutionStatsController& stats) {
-    doRollover(catalog, stripe, stripeLock, bucket, action);
+    doRollover(catalog, stripe, stripeLock, bucket, reason);
     if (additionalBucket) {
-        invariant(additionalAction.has_value());
-        doRollover(catalog, stripe, stripeLock, *additionalBucket, additionalAction.value());
+        invariant(additionalReason.has_value());
+        doRollover(catalog, stripe, stripeLock, *additionalBucket, additionalReason.value());
     }
 
     return allocateBucket(
@@ -1445,8 +1451,9 @@ void rollover(BucketCatalog& catalog,
               Stripe& stripe,
               WithLock stripeLock,
               Bucket& bucket,
-              RolloverAction action) {
-    invariant(action != RolloverAction::kNone);
+              RolloverReason reason) {
+    invariant(reason != RolloverReason::kNone);
+    auto action = getRolloverAction(reason);
     if (allCommitted(bucket)) {
         // The bucket does not contain any measurements that are yet to be committed, so we can take
         // action now.
@@ -1458,8 +1465,8 @@ void rollover(BucketCatalog& catalog,
         }
     } else {
         // We must keep the bucket around until all measurements are committed, just mark
-        // the action we chose now so we know what to do when the last batch finishes.
-        bucket.rolloverAction = action;
+        // the reason we chose now so we know what to do when the last batch finishes.
+        bucket.rolloverReason = reason;
     }
 }
 

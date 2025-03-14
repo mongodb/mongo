@@ -132,7 +132,7 @@ protected:
 
     BSONObj _getCompressedBucketDoc(const BSONObj& bucketDoc);
 
-    RolloverAction _rolloverAction(const std::shared_ptr<WriteBatch>& batch);
+    RolloverReason _rolloverReason(const std::shared_ptr<WriteBatch>& batch);
 
     void _testUseBucketSkipsConflictingBucket(std::function<void(BucketCatalog&, Bucket&)>);
 
@@ -415,11 +415,11 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
         .getStatus();
 }
 
-RolloverAction BucketCatalogTest::_rolloverAction(const std::shared_ptr<WriteBatch>& batch) {
+RolloverReason BucketCatalogTest::_rolloverReason(const std::shared_ptr<WriteBatch>& batch) {
     auto& stripe =
         _bucketCatalog->stripes[internal::getStripeNumber(*_bucketCatalog, batch->bucketId)];
     auto& [key, bucket] = *stripe->openBucketsById.find(batch->bucketId);
-    return bucket->rolloverAction;
+    return bucket->rolloverReason;
 }
 
 void BucketCatalogTest::_testUseBucketSkipsConflictingBucket(
@@ -486,7 +486,7 @@ void BucketCatalogTest::_testUseAlternateBucketSkipsConflictingBucket(
                                                nullptr,
                                                insertCtx.stats);
     // Temporarily mark bucket2 rolled over so we can open another.
-    bucket2.rolloverAction = RolloverAction::kArchive;
+    bucket2.rolloverReason = RolloverReason::kTimeBackward;
 
     Bucket& bucket3 = internal::allocateBucket(*_bucketCatalog,
                                                *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -497,8 +497,8 @@ void BucketCatalogTest::_testUseAlternateBucketSkipsConflictingBucket(
                                                nullptr,
                                                insertCtx.stats);
     // Unmark bucket2 to ensure we have an open bucket to skip as well.
-    bucket2.rolloverAction = RolloverAction::kNone;
-    bucket3.rolloverAction = RolloverAction::kArchive;
+    bucket2.rolloverReason = RolloverReason::kNone;
+    bucket3.rolloverReason = RolloverReason::kTimeBackward;
 
     ASSERT_EQ(&bucket3,
               internal::useAlternateBucket(*_bucketCatalog,
@@ -649,13 +649,16 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
         // the helper.
         auto currentMeasurementTime =
             std::get<Date_t>(currentBatch.measurementsTimesAndIndices[currentPosition]);
+
+        // We rollover with kSchemaChange regardless of the rollover reason. This will make our
+        // stats inaccurate, but shouldn't impact testing stageInsertBatchIntoEligibleBucket itself.
         auto newBucketToInsertInto = &internal::rollover(*_bucketCatalog,
                                                          stripe,
                                                          stripeLock,
                                                          bucketToInsertInto,
                                                          prevBatch.key,
                                                          prevBatch.options,
-                                                         RolloverAction::kHardClose,
+                                                         RolloverReason::kSchemaChange,
                                                          currentMeasurementTime,
                                                          bucketsColl->getDefaultCollator(),
                                                          nullptr,
@@ -1162,7 +1165,7 @@ TEST_F(BucketCatalogTest, InsertRollsOverAlternateBucket) {
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << (Date_t::now() - Days{1})));
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(batch1->bucketId.oid, batch2->bucketId.oid);
-    ASSERT_EQ(_rolloverAction(batch1), RolloverAction::kArchive);
+    ASSERT_EQ(_rolloverReason(batch1), RolloverReason::kTimeBackward);
 
     // Continue to insert more to the initial bucket until we rollover to new bucket.
     size_t bucketCount = 1;
@@ -1176,11 +1179,11 @@ TEST_F(BucketCatalogTest, InsertRollsOverAlternateBucket) {
         if (batch->bucketId.oid != batch1->bucketId.oid) {
             // We expect this rollover only happened because we hit a limit that results in a hard
             // closure.
-            ASSERT_EQ(_rolloverAction(batch1), RolloverAction::kHardClose);
+            ASSERT_EQ(_rolloverReason(batch1), RolloverReason::kCount);
             // We should go back and mark the open (non-alternate) bucket closed.
-            ASSERT_EQ(_rolloverAction(batch2), RolloverAction::kSoftClose);
+            ASSERT_EQ(_rolloverReason(batch2), RolloverReason::kTimeForward);
             // The new bucket should be open.
-            ASSERT_EQ(_rolloverAction(batch), RolloverAction::kNone);
+            ASSERT_EQ(_rolloverReason(batch), RolloverReason::kNone);
             break;
         }
 
@@ -2596,7 +2599,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
                                               nullptr,
                                               insertCtx.stats);
 
-    bucket.rolloverAction = RolloverAction::kSoftClose;
+    bucket.rolloverReason = RolloverReason::kTimeForward;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
                                    *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2623,7 +2626,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
                                               nullptr,
                                               insertCtx.stats);
 
-    bucket.rolloverAction = RolloverAction::kArchive;
+    bucket.rolloverReason = RolloverReason::kTimeBackward;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
                                    *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2640,26 +2643,32 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
         prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
     ASSERT_OK(swResult);
     auto& [insertCtx, time] = swResult.getValue();
+    std::vector<RolloverReason> allHardClosedRolloverReasons = {RolloverReason::kCount,
+                                                                RolloverReason::kSchemaChange,
+                                                                RolloverReason::kCachePressure,
+                                                                RolloverReason::kSize};
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    for (size_t i = 0; i < allHardClosedRolloverReasons.size(); i++) {
+        Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
+                                                  *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                                  WithLock::withoutLock(),
+                                                  insertCtx.key,
+                                                  insertCtx.options,
+                                                  time,
+                                                  nullptr,
+                                                  insertCtx.stats);
 
-    bucket.rolloverAction = RolloverAction::kHardClose;
-    auto potentialBuckets =
-        findAndRolloverOpenBuckets(*_bucketCatalog,
-                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                   WithLock::withoutLock(),
-                                   insertCtx.key,
-                                   time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
-    ASSERT_EQ(0, potentialBuckets.size());
-    ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+        bucket.rolloverReason = allHardClosedRolloverReasons[i];
+        auto potentialBuckets =
+            findAndRolloverOpenBuckets(*_bucketCatalog,
+                                       *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                       WithLock::withoutLock(),
+                                       insertCtx.key,
+                                       time,
+                                       Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
+        ASSERT_EQ(0, potentialBuckets.size());
+        ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+    }
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
@@ -2667,31 +2676,37 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
         prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
     ASSERT_OK(swResult);
     auto& [insertCtx, time] = swResult.getValue();
+    std::vector<RolloverReason> allHardClosedRolloverReasons = {RolloverReason::kCount,
+                                                                RolloverReason::kSchemaChange,
+                                                                RolloverReason::kCachePressure,
+                                                                RolloverReason::kSize};
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    for (size_t i = 0; i < allHardClosedRolloverReasons.size(); i++) {
+        Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
+                                                  *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                                  WithLock::withoutLock(),
+                                                  insertCtx.key,
+                                                  insertCtx.options,
+                                                  time,
+                                                  nullptr,
+                                                  insertCtx.stats);
 
-    bucket.rolloverAction = RolloverAction::kHardClose;
-    std::shared_ptr<WriteBatch> batch;
-    auto opId = 0;
-    bucket.batches.emplace(opId, batch);
-    auto potentialBuckets =
-        findAndRolloverOpenBuckets(*_bucketCatalog,
-                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                   WithLock::withoutLock(),
-                                   insertCtx.key,
-                                   time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
+        bucket.rolloverReason = allHardClosedRolloverReasons[i];
+        std::shared_ptr<WriteBatch> batch;
+        auto opId = 0;
+        bucket.batches.emplace(opId, batch);
+        auto potentialBuckets =
+            findAndRolloverOpenBuckets(*_bucketCatalog,
+                                       *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                       WithLock::withoutLock(),
+                                       insertCtx.key,
+                                       time,
+                                       Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
 
-    // No results returned. Do not close the bucket because of uncommitted batches.
-    ASSERT_EQ(0, potentialBuckets.size());
-    ASSERT(!_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+        // No results returned. Do not close the bucket because of uncommitted batches.
+        ASSERT_EQ(0, potentialBuckets.size());
+        ASSERT(!_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+    }
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
@@ -2708,7 +2723,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
                                                time,
                                                nullptr,
                                                insertCtx.stats);
-    bucket1.rolloverAction = RolloverAction::kArchive;
+    bucket1.rolloverReason = RolloverReason::kTimeBackward;
 
     Bucket& bucket2 = internal::allocateBucket(*_bucketCatalog,
                                                *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2769,7 +2784,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
                                          batchedInsertCtx.stats,
                                          bucketOpenedDueToMetadata);
         ASSERT_EQ(0, bucket.size);
-        ASSERT_EQ(RolloverAction::kNone, bucket.rolloverAction);
+        ASSERT_EQ(RolloverReason::kNone, bucket.rolloverReason);
         ASSERT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
         ASSERT_EQ(1,
@@ -2826,7 +2841,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
                               batchedInsertCtx.stats,
                               bucketOpenedDueToMetadata);
         ASSERT_EQ(&bucketAllocated, &bucketFound);
-        ASSERT_EQ(RolloverAction::kNone, bucketFound.rolloverAction);
+        ASSERT_EQ(RolloverReason::kNone, bucketFound.rolloverReason);
         ASSERT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
         ASSERT_EQ(1,

@@ -162,14 +162,14 @@ bool isBucketStateEligibleForInsertsAndCleanup(BucketCatalog& catalog,
                                                Bucket* bucket);
 
 /**
- * Rollover 'bucket' according to 'action' if the bucket does not contain uncommitted measurements.
- * Mark the bucket's 'rolloverAction' otherwise.
+ * Rollover 'bucket' according to 'reason' if the bucket does not contain uncommitted measurements.
+ * Mark the bucket's 'rolloverReason' otherwise.
  */
 void rollover(BucketCatalog& catalog,
               Stripe& stripe,
               WithLock stripeLock,
               Bucket& bucket,
-              RolloverAction action);
+              RolloverReason reason);
 
 /**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
@@ -257,7 +257,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     uint64_t storageCacheSizeBytes,
     const StringDataComparator* comparator,
     Bucket* excludedBucket = nullptr,
-    boost::optional<RolloverAction> excludedAction = boost::none);
+    boost::optional<RolloverReason> excludedReason = boost::none);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -427,11 +427,11 @@ Bucket& rollover(BucketCatalog& catalog,
                  Bucket& bucket,
                  const BucketKey& key,
                  const TimeseriesOptions& timeseriesOptions,
-                 RolloverAction action,
+                 RolloverReason reason,
                  const Date_t& time,
                  const StringDataComparator* comparator,
                  Bucket* additionalBucket,
-                 boost::optional<RolloverAction> additionalAction,
+                 boost::optional<RolloverReason> additionalReason,
                  ExecutionStatsController& stats);
 
 /**

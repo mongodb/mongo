@@ -140,7 +140,7 @@ void updateBucketFetchAndQueryStats(const ReopeningContext& context,
 
 /**
  * Determines if 'measurement' will cause rollover to 'bucket'.
- * Returns the rollover reason and marks the bucket with rollover action if it needs to be rolled
+ * Returns the rollover reason and marks the bucket with rollover reason if it needs to be rolled
  * over.
  */
 RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
@@ -172,14 +172,13 @@ RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
         storageCacheSizeBytes,
         comparator,
         stats);
-    auto rolloverAction = getRolloverAction(rolloverReason);
 
-    if (rolloverAction == RolloverAction::kNone) {
+    if (rolloverReason == RolloverReason::kNone) {
         // The measurement can be inserted into the open bucket.
         internal::markBucketNotIdle(stripe, stripeLock, bucket);
     } else {
-        // Update the bucket's 'rolloverAction'.
-        bucket.rolloverAction = rolloverAction;
+        // Update the bucket's 'rolloverReason'.
+        bucket.rolloverReason = rolloverReason;
         internal::updateRolloverStats(stats, rolloverReason);
     }
     bucketOpenedDueToMetadata = false;
@@ -440,9 +439,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                                          storageCacheSizeBytes,
                                                          comparator,
                                                          bucket,
-                                                         *reason == RolloverReason::kTimeBackward
-                                                             ? RolloverAction::kArchive
-                                                             : RolloverAction::kSoftClose);
+                                                         *reason);
             if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
                 return SuccessfulInsertion{std::move(*batch)};
             }
@@ -720,7 +717,8 @@ void finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
                             internal::getTimeseriesBucketClearedError(bucket->bucketId.oid));
         }
     } else if (allCommitted(*bucket)) {
-        switch (bucket->rolloverAction) {
+        auto action = getRolloverAction(bucket->rolloverReason);
+        switch (action) {
             case RolloverAction::kHardClose:
             case RolloverAction::kSoftClose: {
                 internal::closeOpenBucket(catalog, stripe, stripeLock, *bucket, stats);
@@ -884,7 +882,9 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
     auto openBuckets = internal::findOpenBuckets(stripe, stripeLock, bucketKey);
     Bucket* bucketWithoutRolloverAction = nullptr;
     for (const auto& openBucket : openBuckets) {
-        switch (openBucket->rolloverAction) {
+        auto reason = openBucket->rolloverReason;
+        auto action = getRolloverAction(reason);
+        switch (action) {
             case RolloverAction::kNone:
                 if (internal::isBucketStateEligibleForInsertsAndCleanup(
                         catalog, stripe, stripeLock, openBucket)) {
@@ -896,8 +896,7 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                 }
                 break;
             case RolloverAction::kHardClose:
-                internal::rollover(
-                    catalog, stripe, stripeLock, *openBucket, openBucket->rolloverAction);
+                internal::rollover(catalog, stripe, stripeLock, *openBucket, reason);
                 break;
             case RolloverAction::kArchive:
             case RolloverAction::kSoftClose:
@@ -908,8 +907,7 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                     // The time range and the state of the bucket are eligible.
                     potentialBuckets.push_back(openBucket);
                 } else {
-                    internal::rollover(
-                        catalog, stripe, stripeLock, *openBucket, openBucket->rolloverAction);
+                    internal::rollover(catalog, stripe, stripeLock, *openBucket, reason);
                 }
                 break;
         }
