@@ -9,14 +9,23 @@
  * collection, dropping and creating a collection, or refining the sharding key.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function checkTimestampConsistencyInPersistentMetadata(
     dbName, nss, dbTimestampInConfig, collTimestampInConfig) {
-    // Checking consistency on local shard collection: config.cache.database
-    st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName, syncFromConfig: true});
-    let dbTimestampInShard =
-        st.shard0.getDB('config').cache.databases.findOne({_id: dbName}).version.timestamp;
+    // Checking consistency on shard-local catalog.
+    function getDbMetadata() {
+        const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
+            st.s.getDB('admin'), "ShardAuthoritativeDbMetadata");
+        if (!isAuthoritativeShardEnabled) {
+            st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName, syncFromConfig: true});
+            return st.shard0.getDB('config').cache.databases.findOne({_id: dbName});
+        }
+        return st.shard0.getDB('config').shard.databases.findOne({_id: dbName});
+    }
+
+    const dbTimestampInShard = getDbMetadata().version.timestamp;
     assert.neq(null, dbTimestampInShard);
     assert.eq(timestampCmp(dbTimestampInConfig, dbTimestampInShard), 0);
 

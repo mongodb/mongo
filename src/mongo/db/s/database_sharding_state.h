@@ -157,45 +157,43 @@ public:
     }
 
     /**
+     * Sets this node's cached database info in a non-authoritative way.
+     *
+     * The caller must hold the database lock in MODE_IX.
+     */
+    void setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo);
+
+    /**
      * Sets this node's cached database info.
      *
      * The caller must hold the database lock in MODE_IX.
-     *
-     * If `useDssForTesting` is true, a duplicate copy of the container for the database metadata
-     * will be used solely for testing purposes.
-     * TODO (SERVER-100036): Remove the `useDssForTesting` parameter.
      */
-    void setDbInfo(OperationContext* opCtx,
-                   const DatabaseType& dbInfo,
-                   bool useDssForTesting = false);
+    void setAuthoritativeDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo);
 
     /**
-     * Resets this node's cached database info.
+     * Resets this node's cached database info in a non-authoritative way.
      *
      * NOTE: Only the thread that refreshes the database metadata (which calls the function
      * `onDbVersionMismatch`) actually needs to change the default initialization of
      * `cancelOngoingRefresh`. This parameter must be ignored in any other case.
      *
      * The caller must hold the database lock in MODE_IX.
-     *
-     * If `useDssForTesting` is true, a duplicate copy of the container for the database metadata
-     * will be used solely for testing purposes.
-     * TODO (SERVER-100036): Remove the `useDssForTesting` parameter.
      */
-    void clearDbInfo(OperationContext* opCtx,
-                     bool cancelOngoingRefresh = true,
-                     bool useDssForTesting = false);
+    void clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh = true);
+
+    /**
+     * Resets this node's cached database info.
+     *
+     * The caller must hold the database lock in MODE_IX.
+     */
+    void clearAuthoritativeDbInfo(OperationContext* opCtx);
+
 
     /**
      * Returns this node's cached  database version if the database info is cached, otherwise
      * it returns `boost::none`.
-     *
-     * If `useDssForTesting` is true, a duplicate copy of the container for the database metadata
-     * will be used solely for testing purposes.
-     * TODO (SERVER-100036): Remove the `useDssForTesting` parameter.
      */
-    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx,
-                                                  bool useDssForTesting = false) const;
+    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx) const;
 
     /**
      * Methods to control the databases's critical section. Must be called with the database X lock
@@ -276,11 +274,6 @@ private:
 
     // This node's cached database info.
     boost::optional<DatabaseType> _dbInfo;
-
-    // This node's cached database info that the DDLs will populate when shards persist database
-    // metadata authoritatively.
-    // TODO (SERVER-100036): Remove this temporary workaround.
-    boost::optional<DatabaseType> _dbInfo_forTesting;
 
     // Modifying the state below requires holding the DBLock in X mode; holding the DBLock in any
     // mode is acceptable for reading it. (Note: accessing this class at all requires holding the

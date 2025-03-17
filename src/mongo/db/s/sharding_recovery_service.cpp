@@ -657,7 +657,7 @@ void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
     const auto allDatabases = DatabaseShardingState::getDatabaseNames(opCtx);
     for (const auto& dbName : allDatabases) {
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->clearDbInfo(opCtx, true /* cancelOngoingRefresh */, true /* useDssForTesting */);
+        scopedDss->clearAuthoritativeDbInfo(opCtx);
     }
 
     const auto dssMetadataCursor = shard_local_catalog_operations::readAllDatabaseMetadata(opCtx);
@@ -666,7 +666,7 @@ void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
             DatabaseType::parse(IDLParserContext("DatabaseType"), dssMetadataCursor->next());
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbInfo.getDbName());
-        scopedDss->setDbInfo(opCtx, dbInfo, true /* useDssForTesting */);
+        scopedDss->setAuthoritativeDbInfo(opCtx, dbInfo);
     }
 }
 

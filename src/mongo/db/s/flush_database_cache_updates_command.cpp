@@ -167,6 +167,13 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
                     !opCtx->readOnly());
+
+            if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled()) {
+                // When the feature flag for authoritative database metadata is enabled, this should
+                // act as a noop. Refreshing the database metadata is no longer supported.
+                return;
+            }
+
             const auto dbName = _dbName();
             if (dbName.isAdminDB() || dbName.isConfigDB()) {
                 // The admin and config databases have fixed metadata that does not need to be

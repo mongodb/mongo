@@ -41,13 +41,13 @@ void applyOplogEntryToInsertDatabaseMetadata(OperationContext* opCtx, const Data
     AutoGetDb autoDb(opCtx, db.getDbName(), MODE_IX);
     auto scopedDss =
         DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, db.getDbName());
-    scopedDss->setDbInfo(opCtx, db, true /* useDssForTesting */);
+    scopedDss->setAuthoritativeDbInfo(opCtx, db);
 }
 
 void applyOplogEntryToRemoveDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
     AutoGetDb autoDb(opCtx, dbName, MODE_IX);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDss->clearDbInfo(opCtx, false /* cancelOngoingRefresh */, true /* useDssForTesting */);
+    scopedDss->clearAuthoritativeDbInfo(opCtx);
 }
 
 }  // namespace

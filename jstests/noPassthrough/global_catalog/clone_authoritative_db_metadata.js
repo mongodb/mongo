@@ -10,7 +10,7 @@
  * TODO (SERVER-101884): Remove or update this test once the upgrade procedure is completed.
  *
  * @tags: [
- *     incompatible_with_authoritative_shards,
+ *     featureFlagShardAuthoritativeDbMetadata,
  * ]
  */
 
@@ -29,8 +29,7 @@ function validateShardLocalCatalog(dbName, shard, expectedDbMetadata) {
 }
 
 function validateShardLocalCatalogCache(dbName, shard, expectedDbMetadata) {
-    const dbMetadataFromShard =
-        shard.adminCommand({getDatabaseVersion: dbName, useDssForTesting: true});
+    const dbMetadataFromShard = shard.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(dbMetadataFromShard);
 
     if (expectedDbMetadata) {

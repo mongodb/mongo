@@ -24,8 +24,7 @@ function validateShardLocalCatalog(dbName, shard, expectedDbMetadata) {
 }
 
 function validateShardLocalCatalogCache(dbName, shard, expectedDbMetadata) {
-    const dbMetadataFromShard =
-        shard.adminCommand({getDatabaseVersion: dbName, useDssForTesting: true});
+    const dbMetadataFromShard = shard.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(dbMetadataFromShard);
 
     if (expectedDbMetadata) {

@@ -51,6 +51,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/mutex.h"
@@ -277,9 +278,14 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx) c
             primaryShardId == thisShardId);
 }
 
-void DatabaseShardingState::setDbInfo(OperationContext* opCtx,
-                                      const DatabaseType& dbInfo,
-                                      bool useDssForTesting) {
+void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
+    if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled()) {
+        // When the feature flag for authoritative database metadata is enabled, this should act as
+        // a noop. Clearing and setting the database metadata is only managed by the recover from
+        // disk during startup/rollback or as part of a DDL commit to the shard-local catalog.
+        return;
+    }
+
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     LOGV2(7286900,
@@ -287,15 +293,43 @@ void DatabaseShardingState::setDbInfo(OperationContext* opCtx,
           logAttrs(_dbName),
           "dbVersion"_attr = dbInfo.getVersion());
 
-    if (useDssForTesting)
-        _dbInfo_forTesting.emplace(dbInfo);
-    else
-        _dbInfo.emplace(dbInfo);
+    _dbInfo.emplace(dbInfo);
 }
 
-void DatabaseShardingState::clearDbInfo(OperationContext* opCtx,
-                                        bool cancelOngoingRefresh,
-                                        bool useDssForTesting) {
+void DatabaseShardingState::setAuthoritativeDbInfo(OperationContext* opCtx,
+                                                   const DatabaseType& dbInfo) {
+    tassert(10003603,
+            "Expected to find the authoritative database metadata feature flag enabled",
+            feature_flags::gShardAuthoritativeDbMetadata.isEnabled());
+
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+    tassert(10003604,
+            fmt::format(
+                "Expected to be setting this node's cached database info with its corresponding "
+                "database version. Found primary shard in the database info: {}, expected: {} for "
+                "database: {} and dbVersion: {}.",
+                dbInfo.getPrimary().toString(),
+                thisShardId.toString(),
+                _dbName.toStringForErrorMsg(),
+                dbInfo.getVersion().toString()),
+            !thisShardId.isValid() || dbInfo.getPrimary() == thisShardId);
+
+    LOGV2(10003605,
+          "Setting this node's cached database info",
+          logAttrs(_dbName),
+          "dbVersion"_attr = dbInfo.getVersion());
+
+    _dbInfo.emplace(dbInfo);
+}
+
+void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh) {
+    if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled()) {
+        // When the feature flag for authoritative database metadata is enabled, this should act as
+        // a noop. Clearing and setting the database metadata is only managed by the recover from
+        // disk during startup/rollback or as part of a DDL commit to the shard-local catalog.
+        return;
+    }
+
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     if (cancelOngoingRefresh) {
@@ -304,19 +338,21 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx,
 
     LOGV2(7286901, "Clearing this node's cached database info", logAttrs(_dbName));
 
-    if (useDssForTesting)
-        _dbInfo_forTesting = boost::none;
-    else
-        _dbInfo = boost::none;
+    _dbInfo = boost::none;
 }
 
-boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(OperationContext* opCtx,
-                                                                     bool useDssForTesting) const {
-    if (useDssForTesting)
-        return _dbInfo_forTesting
-            ? boost::optional<DatabaseVersion>(_dbInfo_forTesting->getVersion())
-            : boost::none;
+void DatabaseShardingState::clearAuthoritativeDbInfo(OperationContext* opCtx) {
+    tassert(10003601,
+            "Expected to find the authoritative database metadata feature flag enabled",
+            feature_flags::gShardAuthoritativeDbMetadata.isEnabled());
 
+    LOGV2(10003602, "Clearing this node's cached database info", logAttrs(_dbName));
+
+    _dbInfo = boost::none;
+}
+
+boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
+    OperationContext* opCtx) const {
     return _dbInfo ? boost::optional<DatabaseVersion>(_dbInfo->getVersion()) : boost::none;
 }
 

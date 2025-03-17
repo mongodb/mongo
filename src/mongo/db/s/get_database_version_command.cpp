@@ -98,15 +98,13 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
             const auto dbName = _targetDb();
-            const auto useDssForTesting = request().getUseDssForTesting();
 
             AutoGetDb autoDb(opCtx, dbName, MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
 
             BSONObj versionObj;
-            if (const auto dbVersion =
-                    scopedDss->getDbVersion(opCtx, useDssForTesting.value_or(false))) {
+            if (const auto dbVersion = scopedDss->getDbVersion(opCtx)) {
                 versionObj = dbVersion->toBSON();
             }
             result->getBodyBuilder().append("dbVersion", versionObj);

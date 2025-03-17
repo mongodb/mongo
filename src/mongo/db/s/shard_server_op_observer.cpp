@@ -975,7 +975,7 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(
     {
         AutoGetDb autoDb(opCtx, dbName, MODE_IX);
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->setDbInfo(opCtx, dbMetadata, true /* useDssForTesting */);
+        scopedDss->setAuthoritativeDbInfo(opCtx, dbMetadata);
     }
 
     // Step 3: Write an oplog 'c' entry to inform secondaries.
@@ -998,8 +998,7 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
     {
         AutoGetDb autoDb(opCtx, dbName, MODE_IX);
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->clearDbInfo(
-            opCtx, false /* cancelOngoingRefresh */, true /* useDssForTesting */);
+        scopedDss->clearAuthoritativeDbInfo(opCtx);
     }
 
     // Step 3: Write an oplog 'c' entry to inform secondaries.

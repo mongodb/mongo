@@ -127,16 +127,15 @@ bool waitForRefreshToComplete(OperationContext* opCtx, SharedSemiFuture<void> re
 }
 
 /**
- * Blocking method, which will wait for any concurrent operations that could change the database
- * version to complete (namely critical section and concurrent onDbVersionMismatch invocations).
+ * Blocking method, which will wait for any critical section to be released.
  *
- * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
- * will be dropped). If there were none, returns false and the locks continue to be held.
+ * Returns 'true' if there was a concurrent critical section that had to be waited (in which case
+ * all locks will be dropped). If there was none, returns false and the locks continue to be held.
  */
 template <typename ScopedDatabaseShardingState>
-bool joinDbVersionOperation(OperationContext* opCtx,
-                            boost::optional<Lock::DBLock>* dbLock,
-                            boost::optional<ScopedDatabaseShardingState>* scopedDss) {
+bool waitForDbCriticalSectionToComplete(OperationContext* opCtx,
+                                        boost::optional<Lock::DBLock>* dbLock,
+                                        boost::optional<ScopedDatabaseShardingState>* scopedDss) {
     invariant(dbLock->has_value());
     invariant(scopedDss->has_value());
 
@@ -152,8 +151,26 @@ bool joinDbVersionOperation(OperationContext* opCtx,
         dbLock->reset();
 
         uassertStatusOK(refresh_util::waitForCriticalSectionToComplete(opCtx, *critSect));
+
         return true;
     }
+
+    return false;
+}
+
+/**
+ * Blocking method, which will wait for any concurrent database metadata refresh to complete.
+ *
+ * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
+ * will be dropped). If there were none, returns false and the locks continue to be held.
+ */
+template <typename ScopedDatabaseShardingState>
+bool waitForOngoingDbMetadataRefreshToComplete(
+    OperationContext* opCtx,
+    boost::optional<Lock::DBLock>* dbLock,
+    boost::optional<ScopedDatabaseShardingState>* scopedDss) {
+    invariant(dbLock->has_value());
+    invariant(scopedDss->has_value());
 
     if (auto refreshVersionFuture = (**scopedDss)->getDbMetadataRefreshFuture()) {
         LOGV2_DEBUG(6697202,
@@ -170,6 +187,24 @@ bool joinDbVersionOperation(OperationContext* opCtx,
     }
 
     return false;
+}
+
+/**
+ * Blocking method, which will wait for any concurrent operations that could change the database
+ * version to complete (namely critical section and concurrent onDbVersionMismatch invocations).
+ *
+ * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
+ * will be dropped). If there were none, returns false and the locks continue to be held.
+ */
+template <typename ScopedDatabaseShardingState>
+bool joinDbVersionOperation(OperationContext* opCtx,
+                            boost::optional<Lock::DBLock>* dbLock,
+                            boost::optional<ScopedDatabaseShardingState>* scopedDss) {
+    if (waitForDbCriticalSectionToComplete(opCtx, dbLock, scopedDss)) {
+        return true;
+    }
+
+    return waitForOngoingDbMetadataRefreshToComplete(opCtx, dbLock, scopedDss);
 }
 
 /**
@@ -435,7 +470,12 @@ Status FilteringMetadataCache::onDbVersionMismatch(
     const DatabaseName& dbName,
     boost::optional<DatabaseVersion> clientDbVersion) noexcept {
     try {
-        _onDbVersionMismatch(opCtx, dbName, clientDbVersion);
+        if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled()) {
+            tassert(10003600, "Expected to be called with a clientDbVersion", clientDbVersion);
+            _onDbVersionMismatchAuthoritative(opCtx, dbName, *clientDbVersion);
+        } else {
+            _onDbVersionMismatch(opCtx, dbName, clientDbVersion);
+        }
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(22065,
@@ -795,6 +835,86 @@ void FilteringMetadataCache::_onDbVersionMismatch(
             // The refresh was canceled by a 'clearFilteringMetadata'. Retry the refresh.
             continue;
         }
+
+        break;
+    }
+}
+
+// TODO (SERVER-100711): Place this method inside the new class to maintain DSS/CSS caches.
+void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
+    OperationContext* opCtx, const DatabaseName& dbName, const DatabaseVersion& receivedDbVersion) {
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(!opCtx->getClient()->isInDirectClient());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+
+    tassert(ErrorCodes::IllegalOperation,
+            fmt::format("Can't check version of {} database", dbName.toStringForErrorMsg()),
+            !dbName.isAdminDB() && !dbName.isConfigDB());
+
+    LOGV2_DEBUG(10003606,
+                2,
+                "Handle database version mismatch",
+                "db"_attr = dbName,
+                "receivedDbVersion"_attr = receivedDbVersion);
+
+    // If this node is a secondary, and the version received from the router may be older than the
+    // cached version, there is no point in proceeding unless the oplog has been applied up to the
+    // timestamp referenced by the received version.
+    // On the other hand, if this node is a primary, it should have already applied the timestamp
+    // received from the router, making this a no-op.
+    // Additionally, we need to wait to see the timestamp with majority read concern to avoid split-
+    // brain scenarios, where writes with local read concern might bypass the following wait, and we
+    // end up seeing an intermediate state.
+    auto readConcern = repl::ReadConcernArgs(LogicalTime{receivedDbVersion.getTimestamp()},
+                                             repl::ReadConcernLevel::kMajorityReadConcern);
+    uassertStatusOK(
+        repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(opCtx, readConcern));
+
+    while (true) {
+        boost::optional<Lock::DBLock> dbLock;
+        dbLock.emplace(opCtx, dbName, MODE_IS);
+
+        auto scopedDss = boost::make_optional(
+            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName));
+
+        if (waitForDbCriticalSectionToComplete(opCtx, &dbLock, &scopedDss)) {
+            // Waited for another thread to exit from the critical section, so reacquire the locks.
+            continue;
+        }
+
+        // From now until the end of this block: no thread is in the critical section or can enter
+        // it (would require to X-lock the database). Therefore, the database version can be
+        // accessed safely.
+
+        const auto wantedVersion = (*scopedDss)->getDbVersion(opCtx);
+
+        // If shards are the authoritative source for database metadata, at this stage this node
+        // has waited until the received version's optime and that any necessary critical section
+        // has been released. This guarantees the following:
+        //
+        //      1) If there is an entry in the DSS, it means the database information is up to date.
+        //      In this case, we either serve the request (if both versions match) or inform the
+        //      router that its version is stale.
+        //
+        //      2) If there is no entry in the DSS, it indicates that another DDL operation has
+        //      moved the database elsewhere or dropped, meaning this node is no longer the primary
+        //      shard for this database.
+
+        uassert(StaleDbRoutingVersion(dbName, receivedDbVersion, boost::none),
+                str::stream() << "No cached info for the database " << dbName.toStringForErrorMsg(),
+                wantedVersion);
+
+        tassert(StaleDbRoutingVersion(dbName, receivedDbVersion, *wantedVersion),
+                str::stream() << "Version mismatch for the database: "
+                              << dbName.toStringForErrorMsg()
+                              << ". Shard is authoritative and we have waited long enough for it "
+                                 "to catch up. It can't have a version behind the routers anymore.",
+                receivedDbVersion <= *wantedVersion);
+
+        uassert(StaleDbRoutingVersion(dbName, receivedDbVersion, *wantedVersion),
+                str::stream() << "Version mismatch for the database "
+                              << dbName.toStringForErrorMsg(),
+                receivedDbVersion == *wantedVersion);
 
         break;
     }

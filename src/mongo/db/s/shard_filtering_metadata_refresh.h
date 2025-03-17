@@ -189,6 +189,11 @@ private:
                               const DatabaseName& dbName,
                               boost::optional<DatabaseVersion> receivedDbVersion);
 
+    // TODO (SERVER-100711): Place this method inside the new class to maintain DSS/CSS caches.
+    void _onDbVersionMismatchAuthoritative(OperationContext* opCtx,
+                                           const DatabaseName& dbName,
+                                           const DatabaseVersion& receivedDbVersion);
+
     SharedSemiFuture<void> _recoverRefreshCollectionPlacementVersion(
         ServiceContext* serviceContext,
         const NamespaceString& nss,
