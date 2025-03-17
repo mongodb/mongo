@@ -37,6 +37,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         [$super.data.executionContextTypes.kClientSession]: true,
     };
 
+    // Threads only begin killing sessions once every thread has finished init(), where a thread
+    // will decrement killCountdownLatch.
+    $config.data.killCountdown = new CountDownLatch($config.threadCount);
+
     $config.data.runInternalTransaction = function runInternalTransaction(
         defaultDb, collName, executionCtxType, crudOp) {
         assert.neq(executionCtxType, this.executionContextTypes.kClientRetryableWrite);
@@ -44,15 +48,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         try {
             $super.data.runInternalTransaction.apply(this, arguments);
         } catch (e) {
-            if (e.code == ErrorCodes.Interrupted) {
+            if (KilledSessionUtil.hasKilledSessionError(e) ||
+                KilledSessionUtil.hasKilledSessionWCError(e)) {
                 return;
-            }
-            if (e.writeErrors) {
-                for (let writeError of e.writeErrors) {
-                    if (writeError.code == ErrorCodes.Interrupted) {
-                        return;
-                    }
-                }
             }
             throw e;
         }
@@ -68,6 +66,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.killSession = function(db, collName, connCache) {
+        if ($config.data.killCountdown.getCount() > 0) {
+            return;
+        }
         fsm.forceRunningOutsideTransaction(this);
 
         print("Starting killSession");
@@ -145,6 +146,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             }
         } while (ourSessionWasKilled);
         print("Finished killSession");
+    };
+
+    $config.states.init = function init(db, collName, connCache) {
+        $super.states.init.apply(this, arguments);
+        $config.data.killCountdown.countDown();
     };
 
     $config.transitions = {
