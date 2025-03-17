@@ -722,20 +722,16 @@ void MovePrimaryCoordinator::commitMetadataToShards(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
-        sharding_ddl_util::DatabaseMetadataCommitRequest removeRequest{
-            CommitToShardLocalCatalogOpEnum::kDropDatabase,
-            _dbName,
-            ShardingState::get(opCtx)->shardId()};
-        sharding_ddl_util::commitDatabaseMetadataToShardLocalCatalog(
-            opCtx, removeRequest, getNewSession(opCtx), executor, token);
+        const auto thisShardId = ShardingState::get(opCtx)->shardId();
+        sharding_ddl_util::commitDropDatabaseMetadataToShardLocalCatalog(
+            opCtx, _dbName, thisShardId, getNewSession(opCtx), executor, token);
 
-        sharding_ddl_util::DatabaseMetadataCommitRequest insertRequest{
-            CommitToShardLocalCatalogOpEnum::kCreateDatabase,
-            _dbName,
-            _doc.getToShardId(),
-            preCommitDbVersion};
-        sharding_ddl_util::commitDatabaseMetadataToShardLocalCatalog(
-            opCtx, insertRequest, getNewSession(opCtx), executor, token);
+        sharding_ddl_util::commitCreateDatabaseMetadataToShardLocalCatalog(
+            opCtx,
+            {_dbName, _doc.getToShardId(), preCommitDbVersion},
+            getNewSession(opCtx),
+            executor,
+            token);
     }
 }
 

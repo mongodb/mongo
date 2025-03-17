@@ -37,6 +37,11 @@ namespace mongo {
 /**
  * Applies the oplog 'c' entry to insert database metadata into the local catalog cache.
  */
-void applyDatabaseMetadataUpdate(OperationContext* opCtx, const repl::OplogEntry& op);
+void applyCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op);
+
+/**
+ * Applies the oplog 'c' entry to delete database metadata from the local catalog cache.
+ */
+void applyDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op);
 
 }  // namespace mongo

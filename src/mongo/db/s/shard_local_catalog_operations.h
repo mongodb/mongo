@@ -31,6 +31,7 @@
 
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/type_database_gen.h"
 
 namespace mongo {
 
@@ -52,6 +53,22 @@ std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx)
  */
 std::unique_ptr<DBClientCursor> readDatabaseMetadata(OperationContext* opCtx,
                                                      const DatabaseName& dbName);
+
+/**
+ * Adds database metadata to the shard-local catalog.
+ *
+ * This function inserts the database metadata into the replicated durable collection
+ * `config.shard.databases`.
+ */
+void insertDatabaseMetadata(OperationContext* opCtx, const DatabaseType& dbMetadata);
+
+/**
+ * Deletes database metadata from the shard-local catalog.
+ *
+ * This function removes the database metadata from the replicated durable collection
+ * `config.shard.databases`.
+ */
+void deleteDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName);
 
 }  // namespace shard_local_catalog_operations
 

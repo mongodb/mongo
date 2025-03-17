@@ -514,7 +514,8 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
             case OplogEntry::CommandType::kDropDatabase:
             case OplogEntry::CommandType::kCommitTransaction:
             case OplogEntry::CommandType::kAbortTransaction:
-            case OplogEntry::CommandType::kDatabaseMetadataUpdate: {
+            case OplogEntry::CommandType::kCreateDatabaseMetadata:
+            case OplogEntry::CommandType::kDropDatabaseMetadata: {
                 // There is no specific namespace to save for these operations.
                 break;
             }

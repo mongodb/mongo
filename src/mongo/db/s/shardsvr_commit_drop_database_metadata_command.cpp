@@ -31,10 +31,10 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/s/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/grid.h"
@@ -46,8 +46,8 @@
 namespace mongo {
 namespace {
 
-class ShardsvrCommitToShardLocalCatalogCommand final
-    : public TypedCommand<ShardsvrCommitToShardLocalCatalogCommand> {
+class ShardsvrCommitDropDatabaseMetadataCommand final
+    : public TypedCommand<ShardsvrCommitDropDatabaseMetadataCommand> {
 public:
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -59,14 +59,15 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command. This command aims to commit metadata to the shard-local catalog.";
+        return "Internal command. This command aims to commit a dropDatabase operation to the "
+               "shard-local catalog.";
     }
 
     bool supportsRetryableWrite() const final {
         return true;
     }
 
-    using Request = ShardsvrCommitToShardLocalCatalog;
+    using Request = ShardsvrCommitDropDatabaseMetadata;
 
     class Invocation final : public InvocationBase {
     public:
@@ -83,6 +84,22 @@ public:
                                 Request::kCommandName),
                     TransactionParticipant::get(opCtx));
 
+            const auto dbName = request().getDbName();
+
+            {
+                AutoGetDb autoDb(opCtx, dbName, MODE_IS);
+                auto scopedDss =
+                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+                tassert(
+                    10105901,
+                    "The critical section must be taken in order to execute this command",
+                    scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+            }
+
+            LOGV2(10105902,
+                  "About to commit dropDatabase metadata in the shard-local catalog",
+                  "dbName"_attr = dbName);
+
             {
                 // Using the original operation context, the write operations to update the
                 // shard-local catalog would fail since retryable writes are not compatible with
@@ -91,7 +108,7 @@ public:
 
                 auto newClient = getGlobalServiceContext()
                                      ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("ShardsvrCommitToShardLocalCatalog");
+                                     ->makeClient("ShardsvrCommitDropDatabaseMetadata");
                 AlternativeClientRegion acr(newClient);
                 auto newOpCtx = CancelableOperationContext(
                     cc().makeOperationContext(),
@@ -99,49 +116,17 @@ public:
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-                switch (request().getOperation()) {
-                    case CommitToShardLocalCatalogOpEnum::kCreateDatabase: {
-                        tassert(1003890,
-                                "Expecting database metadata in the command",
-                                request().getDbMetadata());
+                const auto dbNameStr =
+                    DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
 
-                        const auto db = *request().getDbMetadata();
-                        const auto dbNameStr = DatabaseNameUtil::serialize(
-                            db.getDbName(), SerializationContext::stateDefault());
-
-                        tassert(1003891,
-                                "Expecting to be in the shard from the primary shard of the "
-                                "database metadata",
-                                db.getPrimary() == ShardingState::get(newOpCtx.get())->shardId());
-
-                        auto newOpCtxPtr = newOpCtx.get();
-                        newOpCtxPtr->getServiceContext()->getOpObserver()->onDatabaseMetadataUpdate(
-                            newOpCtxPtr,
-                            {dbNameStr,
-                             DatabaseMetadataUpdateOpEnum::kCreate,
-                             DatabaseMetadataUpdateCreateEntry{db}});
-                        break;
-                    }
-                    case CommitToShardLocalCatalogOpEnum::kDropDatabase: {
-                        const auto dbName = request().getDbName();
-                        const auto dbNameStr = DatabaseNameUtil::serialize(
-                            dbName, SerializationContext::stateDefault());
-
-                        auto newOpCtxPtr = newOpCtx.get();
-                        newOpCtxPtr->getServiceContext()->getOpObserver()->onDatabaseMetadataUpdate(
-                            newOpCtxPtr,
-                            {dbNameStr,
-                             DatabaseMetadataUpdateOpEnum::kDrop,
-                             DatabaseMetadataUpdateDropEntry{dbName}});
-                        break;
-                    }
-                    default:
-                        tasserted(ErrorCodes::IllegalOperation,
-                                  str::stream() << "Received an unkown commit operation: "
-                                                << CommitToShardLocalCatalogOp_serializer(
-                                                       request().getOperation()));
-                }
+                auto newOpCtxPtr = newOpCtx.get();
+                newOpCtxPtr->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(
+                    newOpCtxPtr, {dbNameStr, dbName});
             }
+
+            LOGV2(10105903,
+                  "Committed dropDatabase metadata in the shard-local catalog",
+                  "dbName"_attr = dbName);
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
             // txnNumber happened, we need to make a dummy write so that the session gets durably
@@ -174,7 +159,7 @@ public:
     };
 };
 
-MONGO_REGISTER_COMMAND(ShardsvrCommitToShardLocalCatalogCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardsvrCommitDropDatabaseMetadataCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

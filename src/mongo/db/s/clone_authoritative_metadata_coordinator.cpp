@@ -146,11 +146,8 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     DDLLockManager::ScopedDatabaseDDLLock dbLock(
         opCtx, dbName, "cloneAuthoritativeMetadata"_sd, MODE_IX);
 
-    opCtx->getServiceContext()->getOpObserver()->onDatabaseMetadataUpdate(
-        opCtx,
-        {dbNameStr,
-         DatabaseMetadataUpdateOpEnum::kCreate,
-         DatabaseMetadataUpdateCreateEntry{dbMetadata}});
+    opCtx->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(opCtx,
+                                                                          {dbNameStr, dbMetadata});
 }
 
 void CloneAuthoritativeMetadataCoordinator::_removeDbFromCloningList(OperationContext* opCtx,

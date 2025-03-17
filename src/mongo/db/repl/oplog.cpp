@@ -1159,10 +1159,16 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          }
          return Status::OK();
      }}},
-    {"databaseMetadataUpdate",
+    {"createDatabaseMetadata",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
-         applyDatabaseMetadataUpdate(opCtx, *op);
+         applyCreateDatabaseMetadata(opCtx, *op);
+         return Status::OK();
+     }}},
+    {"dropDatabaseMetadata",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+         applyDropDatabaseMetadata(opCtx, *op);
          return Status::OK();
      }}},
 };

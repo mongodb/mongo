@@ -50,9 +50,18 @@ sendAuthenticatedCommandToShards<ShardsvrDropCollectionParticipant>(
     bool throwOnError);
 
 template std::vector<AsyncRequestsSender::Response>
-sendAuthenticatedCommandToShards<ShardsvrCommitToShardLocalCatalog>(
+sendAuthenticatedCommandToShards<ShardsvrCommitCreateDatabaseMetadata>(
     OperationContext* opCtx,
-    std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitToShardLocalCatalog>> originalOpts,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitCreateDatabaseMetadata>> originalOpts,
+    const std::vector<ShardId>& shardIds,
+    const boost::optional<std::vector<ShardVersion>>& shardVersions,
+    ReadPreferenceSetting readPref,
+    bool throwOnError);
+
+template std::vector<AsyncRequestsSender::Response>
+sendAuthenticatedCommandToShards<ShardsvrCommitDropDatabaseMetadata>(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitDropDatabaseMetadata>> originalOpts,
     const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,

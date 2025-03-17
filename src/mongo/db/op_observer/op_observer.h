@@ -676,10 +676,16 @@ public:
                                              const repl::OpTime& newCommitPoint) = 0;
 
     /**
-     * Called when the authoritative DSS is updated.
+     * Called when the authoritative DSS needs to be updated with a createDatabase operation.
      */
-    virtual void onDatabaseMetadataUpdate(OperationContext* opCtx,
-                                          const DatabaseMetadataUpdateOplogEntry& entry) = 0;
+    virtual void onCreateDatabaseMetadata(OperationContext* opCtx,
+                                          const CreateDatabaseMetadataOplogEntry& entry) = 0;
+
+    /**
+     * Called when the authoritative DSS needs to be updated with a dropDatabase operation.
+     */
+    virtual void onDropDatabaseMetadata(OperationContext* opCtx,
+                                        const DropDatabaseMetadataOplogEntry& entry) = 0;
 
     struct Times;
 

@@ -310,24 +310,29 @@ void assertDataMovementAllowed();
  */
 void assertNamespaceLengthLimit(const NamespaceString& nss, bool isUnsharded);
 
-struct DatabaseMetadataCommitRequest {
-    CommitToShardLocalCatalogOpEnum op;
-    DatabaseName dbName;
-    ShardId shardId;
-    boost::optional<DatabaseVersion> dbVersion;
-};
-
 /**
- *  Commits database metadata changes to the shard-local catalog by sending the command
- * `_shardsvrCommitToShardLocalCatalog` to the appropiate shard. This command can be used to update
- * the database metadata of the shard-local catalog of any shard.
+ *  Commits a create of the database metadata to the shard-local catalog by sending the command
+ * `_shardsvrCommitCreateDatabaseMetadata` to the appropiate shard. This command can be
+ * used to update the database metadata of the shard-local catalog of any shard.
  */
-void commitDatabaseMetadataToShardLocalCatalog(
+void commitCreateDatabaseMetadataToShardLocalCatalog(
     OperationContext* opCtx,
-    const DatabaseMetadataCommitRequest& request,
+    const DatabaseType& db,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
 
+/**
+ *  Commits a drop of the database metadata to the shard-local catalog by sending the command
+ * `_shardsvrCommitDropDatabaseMetadata` to the appropiate shard. This command can be
+ * used to update the database metadata of the shard-local catalog of any shard.
+ */
+void commitDropDatabaseMetadataToShardLocalCatalog(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const ShardId& shardId,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
 }  // namespace sharding_ddl_util
 }  // namespace mongo

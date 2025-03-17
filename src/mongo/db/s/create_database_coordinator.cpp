@@ -188,14 +188,8 @@ void CreateDatabaseCoordinator::_commitShardLocalCatalog(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
-        sharding_ddl_util::DatabaseMetadataCommitRequest request{
-            CommitToShardLocalCatalogOpEnum::kCreateDatabase,
-            db.getDbName(),
-            db.getPrimary(),
-            db.getVersion()};
-
-        sharding_ddl_util::commitDatabaseMetadataToShardLocalCatalog(
-            opCtx, request, getNewSession(opCtx), executor, token);
+        sharding_ddl_util::commitCreateDatabaseMetadataToShardLocalCatalog(
+            opCtx, db, getNewSession(opCtx), executor, token);
     }
 }
 

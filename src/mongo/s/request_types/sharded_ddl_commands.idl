@@ -73,13 +73,6 @@ enums:
             # will to start accepting sharded DDL operations again.
             kComplete: "complete"
 
-    CommitToShardLocalCatalogOp:
-        description: "Operation to execute for the _shardsvrCommitToShardLocalCatalog command."
-        type: string
-        values:
-            kCreateDatabase: "createDatabase"
-            kDropDatabase: "dropDatabase"
-
 structs:
 
     ConfigsvrCreateDatabaseResponse:
@@ -849,22 +842,28 @@ commands:
         api_version: ""
         reply_type: OkReply
 
-    _shardsvrCommitToShardLocalCatalog:
-        command_name: _shardsvrCommitToShardLocalCatalog
-        cpp_name: ShardsvrCommitToShardLocalCatalog
-        description: "Internal command to commit metadata to the shard-local catalog"
+    _shardsvrCommitCreateDatabaseMetadata:
+        command_name: _shardsvrCommitCreateDatabaseMetadata
+        cpp_name: ShardsvrCommitCreateDatabaseMetadata
+        description: "Internal command to commit a createDatabase operation to the shard-local catalog"
         strict: false
         namespace: type
         type: namespacestring
         api_version: ""
         fields:
-            operation:
-                type: CommitToShardLocalCatalogOp
-                description: "Type of operation to execute for this command."
-            dbMetadata:
-                type: DatabaseType
-                description: "The database metadata to commit."
-                optional: true
+            dbVersion:
+                type: database_version
+                description: "The database version to commit."
+        reply_type: OkReply
+
+    _shardsvrCommitDropDatabaseMetadata:
+        command_name: _shardsvrCommitDropDatabaseMetadata
+        cpp_name: ShardsvrCommitDropDatabaseMetadata
+        description: "Internal command to commit a dropDatabase operation to the shard-local catalog"
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
         reply_type: OkReply
 
     _shardsvrCloneAuthoritativeMetadata:

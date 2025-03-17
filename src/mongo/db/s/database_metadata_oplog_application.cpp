@@ -52,25 +52,18 @@ void applyOplogEntryToRemoveDatabaseMetadata(OperationContext* opCtx, const Data
 
 }  // namespace
 
-void applyDatabaseMetadataUpdate(OperationContext* opCtx, const repl::OplogEntry& op) {
-    auto databaseMetadataOplog = DatabaseMetadataUpdateOplogEntry::parse(
-        IDLParserContext("OplogDatabaseMetadataUpdateEntryContext"), op.getObject());
+void applyCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) {
+    auto oplogEntry = CreateDatabaseMetadataOplogEntry::parse(
+        IDLParserContext("OplogCreateDatabaseMetadataOplogEntryyContext"), op.getObject());
 
-    std::visit(
-        OverloadedVisitor{
-            [&](const DatabaseMetadataUpdateCreateEntry& entry) {
-                tassert(9980403,
-                        "Expecting an operation of type create",
-                        databaseMetadataOplog.getOp() == DatabaseMetadataUpdateOpEnum::kCreate);
-                applyOplogEntryToInsertDatabaseMetadata(opCtx, entry.getDb());
-            },
-            [&](const DatabaseMetadataUpdateDropEntry& entry) {
-                tassert(9980404,
-                        "Expecting an operation of type drop",
-                        databaseMetadataOplog.getOp() == DatabaseMetadataUpdateOpEnum::kDrop);
-                applyOplogEntryToRemoveDatabaseMetadata(opCtx, entry.getDbName());
-            }},
-        databaseMetadataOplog.getMetadata());
+    applyOplogEntryToInsertDatabaseMetadata(opCtx, oplogEntry.getDb());
+}
+
+void applyDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) {
+    auto oplogEntry = DropDatabaseMetadataOplogEntry::parse(
+        IDLParserContext("OplogDropDatabaseMetadataOplogEntryContext"), op.getObject());
+
+    applyOplogEntryToRemoveDatabaseMetadata(opCtx, oplogEntry.getDbName());
 }
 
 }  // namespace mongo
