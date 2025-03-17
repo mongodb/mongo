@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/version_context.h"
 
 namespace mongo {
 
@@ -92,7 +93,7 @@ public:
      * underlying collection.
      */
     AggregateCommandRequest asExpandedViewAggregation(
-        const AggregateCommandRequest& aggRequest) const;
+        const VersionContext& vCtx, const AggregateCommandRequest& aggRequest) const;
 
     const NamespaceString& getNamespace() const {
         return _namespace;

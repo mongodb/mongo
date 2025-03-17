@@ -72,6 +72,7 @@
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/query/util/deferred.h"
+#include "mongo/db/version_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
@@ -852,6 +853,7 @@ public:
 
     bool isFeatureFlagMongotIndexedViewsEnabled() const {
         return feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(getOperationContext()),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }
 
@@ -911,7 +913,8 @@ public:
     }
 
     bool isFeatureFlagShardFilteringDistinctScanEnabled() const {
-        return _featureFlagShardFilteringDistinctScan.get();
+        return _featureFlagShardFilteringDistinctScan.get(
+            VersionContext::getDecoration(getOperationContext()));
     }
 
     /**
@@ -936,7 +939,8 @@ public:
     }
 
     bool isBasicRankFusionEnabled() const {
-        return _featureFlagRankFusionBasic.get();
+        return _featureFlagRankFusionBasic.get(
+            VersionContext::getDecoration(getOperationContext()));
     }
 
     bool isFeatureFlagStreamsEnabled() const {
@@ -1170,16 +1174,19 @@ private:
             return QueryKnobConfiguration(querySettings);
         }};
 
-    Deferred<bool (*)()> _featureFlagShardFilteringDistinctScan{[] {
-        return feature_flags::gFeatureFlagShardFilteringDistinctScan
-            .isEnabledUseLastLTSFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    }};
+    Deferred<bool (*)(const VersionContext&)> _featureFlagShardFilteringDistinctScan{
+        [](const VersionContext& vCtx) {
+            return feature_flags::gFeatureFlagShardFilteringDistinctScan
+                .isEnabledUseLastLTSFCVWhenUninitialized(
+                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        }};
 
-    Deferred<bool (*)()> _featureFlagRankFusionBasic{[] {
-        return feature_flags::gFeatureFlagRankFusionBasic.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    }};
+    Deferred<bool (*)(const VersionContext&)> _featureFlagRankFusionBasic{
+        [](const VersionContext& vCtx) {
+            return feature_flags::gFeatureFlagRankFusionBasic
+                .isEnabledUseLastLTSFCVWhenUninitialized(
+                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        }};
 
     // Initialized in constructor to avoid including server_feature_flags_gen.h
     // in this header file.

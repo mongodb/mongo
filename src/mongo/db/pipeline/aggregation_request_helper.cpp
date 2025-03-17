@@ -225,18 +225,20 @@ const mongo::OptionalBool& getFromRouter(const AggregateCommandRequest& request)
     return request.getFromMongos();
 }
 
-void setFromRouter(AggregateCommandRequest& request, mongo::OptionalBool value) {
+void setFromRouter(const VersionContext& vCtx,
+                   AggregateCommandRequest& request,
+                   mongo::OptionalBool value) {
     if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         request.setFromRouter(value);
     } else {
         request.setFromMongos(value);
     }
 }
 
-void setFromRouter(MutableDocument& doc, mongo::Value value) {
+void setFromRouter(const VersionContext& vCtx, MutableDocument& doc, mongo::Value value) {
     if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         doc[AggregateCommandRequest::kFromRouterFieldName] = value;
     } else {
         doc[AggregateCommandRequest::kFromMongosFieldName] = value;

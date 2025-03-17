@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
@@ -125,10 +126,12 @@ PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateComm
 const mongo::OptionalBool& getFromRouter(const AggregateCommandRequest& request);
 
 // TODO SERVER-95358 remove once 9.0 becomes last LTS.
-void setFromRouter(AggregateCommandRequest& request, mongo::OptionalBool value);
+void setFromRouter(const VersionContext& vCtx,
+                   AggregateCommandRequest& request,
+                   mongo::OptionalBool value);
 
 // TODO SERVER-95358 remove once 9.0 becomes last LTS.
-void setFromRouter(MutableDocument& doc, mongo::Value value);
+void setFromRouter(const VersionContext& vCtx, MutableDocument& doc, mongo::Value value);
 }  // namespace aggregation_request_helper
 
 /**

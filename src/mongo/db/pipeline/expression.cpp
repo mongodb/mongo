@@ -3756,7 +3756,8 @@ boost::intrusive_ptr<Expression> ExpressionConvert::create(
         nullptr,
         byteOrder ? ExpressionConstant::create(expCtx, Value(toStringData(*byteOrder))) : nullptr,
         checkBinDataConvertAllowed(),
-        checkBinDataConvertNumericAllowed());
+        checkBinDataConvertNumericAllowed(
+            VersionContext::getDecoration(expCtx->getOperationContext())));
 }
 
 ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
@@ -3789,7 +3790,8 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
             expr.type() == BSONType::Object);
 
     const bool allowBinDataConvert = checkBinDataConvertAllowed();
-    const bool allowBinDataConvertNumeric = checkBinDataConvertNumericAllowed();
+    const bool allowBinDataConvertNumeric = checkBinDataConvertNumericAllowed(
+        VersionContext::getDecoration(expCtx->getOperationContext()));
 
     boost::intrusive_ptr<Expression> input;
     boost::intrusive_ptr<Expression> to;
@@ -3979,9 +3981,9 @@ bool ExpressionConvert::checkBinDataConvertAllowed() {
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
-bool ExpressionConvert::checkBinDataConvertNumericAllowed() {
+bool ExpressionConvert::checkBinDataConvertNumericAllowed(const VersionContext& vCtx) {
     return feature_flags::gFeatureFlagBinDataConvertNumeric.isEnabledUseLatestFCVWhenUninitialized(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 namespace {

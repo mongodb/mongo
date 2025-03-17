@@ -80,6 +80,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/generic_argument_gen.h"
@@ -251,7 +252,8 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     MutableDocument mergeCmd(serializedCommand);
 
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
-    aggregation_request_helper::setFromRouter(mergeCmd, Value(true));
+    aggregation_request_helper::setFromRouter(
+        VersionContext::getDecoration(mergeCtx->getOperationContext()), mergeCmd, Value(true));
 
     mergeCmd[AggregateCommandRequest::kLetFieldName] =
         Value(mergeCtx->variablesParseState.serialize(mergeCtx->variables));

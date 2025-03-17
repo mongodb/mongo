@@ -89,6 +89,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog_cache.h"
@@ -863,7 +864,8 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                       "Failed to resolve view after max number of retries.");
     }
 
-    auto resolvedAggRequest = resolvedView.asExpandedViewAggregation(request);
+    auto resolvedAggRequest =
+        resolvedView.asExpandedViewAggregation(VersionContext::getDecoration(opCtx), request);
 
     result->resetToEmpty();
 

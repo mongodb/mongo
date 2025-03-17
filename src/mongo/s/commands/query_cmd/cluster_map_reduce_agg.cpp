@@ -69,6 +69,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/map_reduce_output_format.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -168,7 +169,10 @@ Document serializeToCommand(const MapReduceCommandRequest& parsedMr, Pipeline* p
     translatedCmd[AggregateCommandRequest::kCursorFieldName] =
         Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
     translatedCmd[AggregateCommandRequest::kAllowDiskUseFieldName] = Value(true);
-    aggregation_request_helper::setFromRouter(translatedCmd, Value(true));
+    aggregation_request_helper::setFromRouter(
+        VersionContext::getDecoration(pipeline->getContext()->getOperationContext()),
+        translatedCmd,
+        Value(true));
     translatedCmd[AggregateCommandRequest::kLetFieldName] = Value(
         pipeline->getContext()->variablesParseState.serialize(pipeline->getContext()->variables));
     translatedCmd[AggregateCommandRequest::kIsMapReduceCommandFieldName] = Value(true);

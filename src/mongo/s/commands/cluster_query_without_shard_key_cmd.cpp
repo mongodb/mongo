@@ -79,6 +79,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/idl_parser.h"
@@ -220,7 +221,8 @@ BSONObj createAggregateCmdObj(
 
     aggregate.setCollation(parsedInfo.collation);
     aggregate.setIsClusterQueryWithoutShardKeyCmd(true);
-    aggregation_request_helper::setFromRouter(aggregate, true);
+    aggregation_request_helper::setFromRouter(
+        VersionContext::getDecoration(opCtx), aggregate, true);
 
     if (parsedInfo.sort) {
         aggregate.setNeedsMerge(true);

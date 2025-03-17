@@ -85,6 +85,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -180,7 +181,8 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
               << BSON(DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
                       << startMonitoringAtTime
                       << DocumentSourceChangeStreamSpec::kAllowToRunOnConfigDBFieldName << true))});
-    aggregation_request_helper::setFromRouter(aggReq, true);
+    aggregation_request_helper::setFromRouter(
+        VersionContext::getDecoration(expCtx->getOperationContext()), aggReq, true);
     aggReq.setNeedsMerge(true);
 
     SimpleCursorOptions cursor;
@@ -204,7 +206,10 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     cmdForShards[AggregateCommandRequest::kLetFieldName] =
         Value(expCtx->variablesParseState.serialize(expCtx->variables));
 
-    aggregation_request_helper::setFromRouter(cmdForShards, Value(expCtx->getInRouter()));
+    aggregation_request_helper::setFromRouter(
+        VersionContext::getDecoration(expCtx->getOperationContext()),
+        cmdForShards,
+        Value(expCtx->getInRouter()));
 
     if (auto collationObj = expCtx->getCollatorBSON();
         !collationObj.isEmpty() && !expCtx->getIgnoreCollator()) {
@@ -1375,6 +1380,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
             if (mergePipeline->canRunOnRouter().isOK() && !specificMergeShardId) {
                 if (mergeCtx->getInRouter()) {
                     if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
+                            VersionContext::getDecoration(mergeCtx->getOperationContext()),
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                         return "router";
                     }

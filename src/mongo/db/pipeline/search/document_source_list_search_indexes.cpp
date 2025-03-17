@@ -32,6 +32,7 @@
 #include "mongo/db/query/search/search_index_command_testing_helper.h"
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
+#include "mongo/db/version_context.h"
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -74,6 +75,7 @@ retrieveCollectionUUIDAndResolveView(const boost::intrusive_ptr<ExpressionContex
             "You may need to enable the "
             "correponding feature flag",
             feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
         // The request is on a view! Therefore, currentOperationNss refers to the view
         // NS and the namespace on resolvedView refers to the underlying source collection.

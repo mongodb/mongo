@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 
 namespace mongo {
@@ -669,7 +670,8 @@ void AggExState::setView(std::unique_ptr<AggCatalogState>& aggCatalogStage,
     _resolvedView = resolvedView;
 
     // Parse the resolved view into a new AggregationRequestDerivatives object.
-    _resolvedViewRequest = resolvedView.asExpandedViewAggregation(_aggReqDerivatives->request);
+    _resolvedViewRequest = resolvedView.asExpandedViewAggregation(
+        VersionContext::getDecoration(_opCtx), _aggReqDerivatives->request);
     _resolvedViewLiteParsedPipeline = _resolvedViewRequest.value();
     _aggReqDerivatives = std::make_unique<AggregateRequestDerivatives>(
         _resolvedViewRequest.value(), _resolvedViewLiteParsedPipeline.value(), [this]() {

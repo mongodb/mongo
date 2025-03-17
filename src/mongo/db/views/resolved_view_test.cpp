@@ -68,7 +68,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithEmptyPipelineOnNoOpViewYieldsEmpty
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
     AggregateCommandRequest requestOnView{viewNss, emptyPipeline};
 
-    auto result = resolvedView.asExpandedViewAggregation(requestOnView);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, requestOnView);
     BSONObj expected =
         BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
                          << kDefaultCursorOptionDocument << "collation" << BSONObj());
@@ -80,7 +80,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipel
     const ResolvedView resolvedView{backingNss, viewPipeline, kSimpleCollation};
     AggregateCommandRequest requestOnView{viewNss, std::vector<BSONObj>{BSON("limit" << 3)}};
 
-    auto result = resolvedView.asExpandedViewAggregation(requestOnView);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, requestOnView);
 
     BSONObj expected =
         BSON("aggregate" << backingNss.coll() << "pipeline"
@@ -94,7 +94,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesExplain) {
     AggregateCommandRequest aggRequest{viewNss, std::vector<mongo::BSONObj>()};
     aggRequest.setExplain(true);
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT(result.getExplain());
     ASSERT(*result.getExplain() == true);
 }
@@ -107,7 +107,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExpla
     aggRequest.setCursor(cursor);
     aggRequest.setExplain(true);
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT(result.getExplain());
     ASSERT(*result.getExplain() == true);
     ASSERT_EQ(
@@ -120,7 +120,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesBypassDocumentValidation) {
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
     aggRequest.setBypassDocumentValidation(true);
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_TRUE(result.getBypassDocumentValidation().value_or(false));
 }
 
@@ -129,7 +129,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesAllowDiskUse) {
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
     aggRequest.setAllowDiskUse(true);
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_TRUE(result.getAllowDiskUse());
 }
 
@@ -138,7 +138,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesHint) {
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
     aggRequest.setHint(BSON("a" << 1));
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_BSONOBJ_EQ(result.getHint().value_or(BSONObj()), BSON("a" << 1));
 }
 
@@ -148,7 +148,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesReadPreference) {
     aggRequest.setUnwrappedReadPref(BSON("$readPreference"
                                          << "nearest"));
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_BSONOBJ_EQ(result.getUnwrappedReadPref().value_or(BSONObj()),
                       BSON("$readPreference"
                            << "nearest"));
@@ -159,7 +159,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesReadConcern) {
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
     aggRequest.setReadConcern(repl::ReadConcernArgs::kLinearizable);
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_BSONOBJ_EQ(result.getReadConcern().value_or(repl::ReadConcernArgs()).toBSONInner(),
                       BSON("level"
                            << "linearizable"));
@@ -170,7 +170,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesMaxTimeMS) {
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
     aggRequest.setMaxTimeMS(100u);
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_EQ(result.getMaxTimeMS().value_or(0), 100u);
 }
 
@@ -184,7 +184,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesDefaultCollationOfView) {
                            << "fr_CA"));
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
 
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_BSONOBJ_EQ(result.getCollation().value_or(BSONObj()),
                       BSON("locale"
                            << "fr_CA"));
@@ -195,7 +195,8 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
 
     AggregateCommandRequest requestOnViewDefault{viewNss, emptyPipeline};
 
-    auto resultDefault = resolvedView.asExpandedViewAggregation(requestOnViewDefault);
+    auto resultDefault =
+        resolvedView.asExpandedViewAggregation(kNoVersionContext, requestOnViewDefault);
     ASSERT_TRUE(resultDefault.getSerializationContext() ==
                 SerializationContext::stateCommandRequest());
 
@@ -203,7 +204,8 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
     scCommand.setPrefixState(true);
     AggregateCommandRequest requestOnViewCommand{viewNss, emptyPipeline, scCommand};
 
-    auto resultCommand = resolvedView.asExpandedViewAggregation(requestOnViewCommand);
+    auto resultCommand =
+        resolvedView.asExpandedViewAggregation(kNoVersionContext, requestOnViewCommand);
     ASSERT_EQ(resultCommand.getSerializationContext().getSource(),
               SerializationContext::Source::Command);
     ASSERT_EQ(resultCommand.getSerializationContext().getCallerType(),
@@ -217,11 +219,11 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesIncludeQueryStatsMetrics) {
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
 
     aggRequest.setIncludeQueryStatsMetrics(false);
-    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_FALSE(result.getIncludeQueryStatsMetrics());
 
     aggRequest.setIncludeQueryStatsMetrics(true);
-    result = resolvedView.asExpandedViewAggregation(aggRequest);
+    result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
     ASSERT_TRUE(result.getIncludeQueryStatsMetrics());
 }
 
