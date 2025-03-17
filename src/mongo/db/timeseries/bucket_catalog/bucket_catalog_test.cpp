@@ -142,12 +142,37 @@ protected:
     void _testBucketMetadataFieldOrdering(const BSONObj& inputMetadata,
                                           const BSONObj& expectedMetadata);
 
-    void _testStageInsertBatchIntoEligibleBucket(const NamespaceString& ns,
-                                                 const UUID& collectionUUID,
-                                                 std::vector<BSONObj> batchOfMeasurements,
-                                                 std::vector<size_t> currBatchedInsertContextsIndex,
-                                                 std::vector<size_t> numMeasurementsInWriteBatch,
-                                                 size_t numBatchedInsertContexts) const;
+    void _testStageInsertBatchIntoEligibleBucket(
+        const NamespaceString& ns,
+        const UUID& collectionUUID,
+        const std::vector<BSONObj>& batchOfMeasurements,
+        const std::vector<size_t>& currBatchedInsertContextsIndex,
+        const std::vector<size_t>& numMeasurementsInWriteBatch,
+        size_t numBatchedInsertContexts) const;
+
+    void _testStageInsertBatchIntoEligibleBucketWithMetaField(
+        const NamespaceString& ns,
+        const UUID& collectionUUID,
+        const std::vector<BSONObj>& batchOfMeasurements,
+        const std::vector<size_t>& currBatchedInsertContextsIndex,
+        const std::vector<size_t>& numMeasurementsInWriteBatch,
+        size_t numBatchedInsertContexts) const;
+
+    void _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
+        const NamespaceString& ns,
+        const UUID& collectionUUID,
+        const std::vector<BSONObj>& batchOfMeasurements,
+        const std::vector<size_t>& currBatchedInsertContextsIndex,
+        const std::vector<size_t>& numMeasurementsInWriteBatch,
+        size_t numBatchedInsertContexts) const;
+
+    void _testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+        const NamespaceString& ns,
+        const UUID& collectionUUID,
+        const std::vector<BSONObj>& batchOfMeasurements,
+        const std::vector<size_t>& currBatchedInsertContextsIndex,
+        const std::vector<size_t>& numMeasurementsInWriteBatch,
+        size_t numBatchedInsertContexts) const;
 };
 
 
@@ -174,7 +199,6 @@ BucketCatalogTest::_makeOperationContext() {
     auto opCtx = client->makeOperationContext();
     return {std::move(client), std::move(opCtx)};
 }
-
 
 void BucketCatalogTest::_commit(const NamespaceString& ns,
                                 const std::shared_ptr<WriteBatch>& batch,
@@ -573,9 +597,9 @@ void BucketCatalogTest::_testBucketMetadataFieldOrdering(const BSONObj& inputMet
 void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     const NamespaceString& ns,
     const UUID& collectionUUID,
-    std::vector<BSONObj> batchOfMeasurements,
-    std::vector<size_t> currBatchedInsertContextsIndex,
-    std::vector<size_t> numMeasurementsInWriteBatch,
+    const std::vector<BSONObj>& batchOfMeasurements,
+    const std::vector<size_t>& currBatchedInsertContextsIndex,
+    const std::vector<size_t>& numMeasurementsInWriteBatch,
     size_t numBatchedInsertContexts) const {
     ASSERT(numMeasurementsInWriteBatch.size() > 0 && numBatchedInsertContexts > 0);
     // These size values are equivalent to the total number of buckets that should be written to
@@ -691,6 +715,54 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
             ASSERT(!successfulInsertion);
         }
     }
+}
+
+void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketWithMetaField(
+    const NamespaceString& ns,
+    const UUID& collectionUUID,
+    const std::vector<BSONObj>& batchOfMeasurements,
+    const std::vector<size_t>& currBatchedInsertContextsIndex,
+    const std::vector<size_t>& numMeasurementsInWriteBatch,
+    size_t numBatchedInsertContexts) const {
+    _assertCollWithMetaField(ns, batchOfMeasurements);
+    _testStageInsertBatchIntoEligibleBucket(ns,
+                                            collectionUUID,
+                                            batchOfMeasurements,
+                                            currBatchedInsertContextsIndex,
+                                            numMeasurementsInWriteBatch,
+                                            numBatchedInsertContexts);
+}
+
+void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
+    const NamespaceString& ns,
+    const UUID& collectionUUID,
+    const std::vector<BSONObj>& batchOfMeasurements,
+    const std::vector<size_t>& currBatchedInsertContextsIndex,
+    const std::vector<size_t>& numMeasurementsInWriteBatch,
+    size_t numBatchedInsertContexts) const {
+    _assertCollWithoutMetaField(ns, batchOfMeasurements);
+    _testStageInsertBatchIntoEligibleBucket(ns,
+                                            collectionUUID,
+                                            batchOfMeasurements,
+                                            currBatchedInsertContextsIndex,
+                                            numMeasurementsInWriteBatch,
+                                            numBatchedInsertContexts);
+}
+
+void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+    const NamespaceString& ns,
+    const UUID& collectionUUID,
+    const std::vector<BSONObj>& batchOfMeasurements,
+    const std::vector<size_t>& currBatchedInsertContextsIndex,
+    const std::vector<size_t>& numMeasurementsInWriteBatch,
+    size_t numBatchedInsertContexts) const {
+    _assertNoMetaFieldsInCollWithMetaField(ns, batchOfMeasurements);
+    _testStageInsertBatchIntoEligibleBucket(ns,
+                                            collectionUUID,
+                                            batchOfMeasurements,
+                                            currBatchedInsertContextsIndex,
+                                            numMeasurementsInWriteBatch,
+                                            numBatchedInsertContexts);
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
@@ -866,7 +938,6 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
 }
 
 TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
-
     auto insertContextAndTime1 =
         uassertStatusOK(prepareInsert(*_bucketCatalog,
                                       _uuid1,
@@ -2873,23 +2944,38 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketFillsUpSingleBucket)
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone});
     std::vector<size_t> currBatchedInsertContextsIndex{0};
     std::vector<size_t> numMeasurementsInWriteBatch{static_cast<size_t>(gTimeseriesBucketMaxCount)};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            batchOfMeasurementsTimeseriesBucketMaxCount,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
 
-    // Testing the same configuration as above, but in a collection without a meta field.
+    // Inserting a batch of measurements with meta field values into a collection with a meta field.
+    _testStageInsertBatchIntoEligibleBucketWithMetaField(
+        _ns1,
+        _uuid1,
+        batchOfMeasurementsTimeseriesBucketMaxCount,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements without meta field values into a collection without a meta
+    // field.
     std::vector<BSONObj> batchOfMeasurementsTimeseriesBucketMaxCountNoMetaField =
         _generateMeasurementsWithRolloverReason(
             {.reason = RolloverReason::kNone, .metaValue = boost::none});
-    _testStageInsertBatchIntoEligibleBucket(_nsNoMeta,
-                                            _uuidNoMeta,
-                                            batchOfMeasurementsTimeseriesBucketMaxCountNoMetaField,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
+        _nsNoMeta,
+        _uuidNoMeta,
+        batchOfMeasurementsTimeseriesBucketMaxCountNoMetaField,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements without meta field values into a collection with a meta
+    // field.
+    _testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+        _ns1,
+        _uuid1,
+        batchOfMeasurementsTimeseriesBucketMaxCountNoMetaField,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkCount) {
@@ -2901,26 +2987,41 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkCoun
     std::vector<size_t> numMeasurementsInWriteBatch{static_cast<size_t>(gTimeseriesBucketMaxCount),
                                                     static_cast<size_t>(gTimeseriesBucketMaxCount)};
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            batchOfMeasurementsWithCount,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
 
-    // Testing the same configuration as above, but in a collection without a meta field.
+    // Inserting a batch of measurements with meta field values into a collection with a meta field.
+    _testStageInsertBatchIntoEligibleBucketWithMetaField(_ns1,
+                                                         _uuid1,
+                                                         batchOfMeasurementsWithCount,
+                                                         currBatchedInsertContextsIndex,
+                                                         numMeasurementsInWriteBatch,
+                                                         /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements without meta field values into a collection without a meta
+    // field.
     std::vector<BSONObj> batchOfMeasurementsWithCountNoMetaField =
         _generateMeasurementsWithRolloverReason(
             {.reason = RolloverReason::kCount, .metaValue = boost::none});
-    _testStageInsertBatchIntoEligibleBucket(_nsNoMeta,
-                                            _uuidNoMeta,
-                                            batchOfMeasurementsWithCountNoMetaField,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
+        _nsNoMeta,
+        _uuidNoMeta,
+        batchOfMeasurementsWithCountNoMetaField,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements without meta field values into a collection with a meta
+    // field.
+    _testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+        _ns1,
+        _uuid1,
+        batchOfMeasurementsWithCountNoMetaField,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkTimeForward) {
+    // Max bucket size with only the last measurement having kTimeForward.
     std::vector<BSONObj> batchOfMeasurementsWithTimeForwardAtEnd =
         _generateMeasurementsWithRolloverReason(
             {.reason = RolloverReason::kTimeForward, .metaValue = _metaValue});
@@ -2931,23 +3032,25 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkTime
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
     std::vector<size_t> numMeasurementsInWriteBatchAtEnd{
         static_cast<size_t>(gTimeseriesBucketMaxCount - 1), 1};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            batchOfMeasurementsWithTimeForwardAtEnd,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatchAtEnd,
-                                            /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements with meta field values into a collection with a meta field.
+    _testStageInsertBatchIntoEligibleBucketWithMetaField(_ns1,
+                                                         _uuid1,
+                                                         batchOfMeasurementsWithTimeForwardAtEnd,
+                                                         currBatchedInsertContextsIndex,
+                                                         numMeasurementsInWriteBatchAtEnd,
+                                                         /*numBatchedInsertContexts=*/1);
 
     // Max bucket size with measurements[1:gTimeseriesBucketMaxCount] having kTimeForward.
-    // We declare a different meta field so we don't attempt to use a bucket created above.
-    // For this case, we are specifically testing not having a meta field.
+    // Inserting a batch of measurements without meta field values into a collection without a meta
+    // field.
     auto batchOfMeasurementsWithTimeForwardAfterFirstMeasurementNoMetaField =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
                                                  .idxWithDiffMeasurement = 1,
                                                  .metaValue = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatchAfterFirstMeasurement{
         1, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
-    _testStageInsertBatchIntoEligibleBucket(
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
         _nsNoMeta,
         _uuidNoMeta,
         batchOfMeasurementsWithTimeForwardAfterFirstMeasurementNoMetaField,
@@ -2956,19 +3059,21 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkTime
         /*numBatchedInsertContexts=*/1);
 
     // 50 measurements with measurements[25:50] having kTimeForward.
-    // We declare a different meta field so we don't attempt to use the buckets created above.
+    // Inserting a batch of measurements without meta field values into a collection with a meta
+    // field.
     std::vector<size_t> numMeasurementsInWriteBatchInMiddle{25, 25};
     auto batchOfMeasurementsWithTimeForwardInMiddle =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
                                                  .numMeasurements = 50,
                                                  .idxWithDiffMeasurement = 25,
-                                                 .metaValue = _metaValue2});
-    _testStageInsertBatchIntoEligibleBucket(_ns2,
-                                            _uuid2,
-                                            batchOfMeasurementsWithTimeForwardInMiddle,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatchInMiddle,
-                                            /*numBatchedInsertContexts=*/1);
+                                                 .metaValue = boost::none});
+    _testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+        _ns1,
+        _uuid1,
+        batchOfMeasurementsWithTimeForwardInMiddle,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatchInMiddle,
+        /*numBatchedInsertContexts=*/1);
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkSchemaChange) {
@@ -2979,26 +3084,27 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkSche
     // The last measurement in batchOfMeasurementsWithSchemaChangeAtEnd will have a int rather
     // than a string for field "deathGrips", which means this measurement will be in a different
     // bucket.
+    // Inserting a batch of measurements with meta field values into a collection with a meta field.
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
     std::vector<size_t> numMeasurementsInWriteBatchAtEnd{
         static_cast<size_t>(gTimeseriesBucketMaxCount - 1), 1};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            batchOfMeasurementsWithSchemaChangeAtEnd,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatchAtEnd,
-                                            /*numBatchedInsertContexts=*/1);
+    _testStageInsertBatchIntoEligibleBucketWithMetaField(_ns1,
+                                                         _uuid1,
+                                                         batchOfMeasurementsWithSchemaChangeAtEnd,
+                                                         currBatchedInsertContextsIndex,
+                                                         numMeasurementsInWriteBatchAtEnd,
+                                                         /*numBatchedInsertContexts=*/1);
 
     // Max bucket size with measurements[1:gTimeseriesBucketMaxCount] having kSchemaChange.
-    // We declare a different meta field so we don't attempt to use the buckets created above.
-    // For this case, we are specifically testing not having a meta field.
+    // Inserting a batch of measurements without meta field values into a collection without a meta
+    // field.
     auto batchOfMeasurementsWithSchemaChangeAfterFirstMeasurementNoMetaField =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
                                                  .idxWithDiffMeasurement = 1,
                                                  .metaValue = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatchAfterFirstMeasurement{
         1, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
-    _testStageInsertBatchIntoEligibleBucket(
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
         _nsNoMeta,
         _uuidNoMeta,
         batchOfMeasurementsWithSchemaChangeAfterFirstMeasurementNoMetaField,
@@ -3007,19 +3113,21 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkSche
         /*numBatchedInsertContexts=*/1);
 
     // 50 measurements with measurements[25:50] having kSchemaChange.
-    // We declare a different meta field so we don't attempt to use the buckets created above.
+    // Inserting a batch of measurements without meta field values into a collection with a meta
+    // field.
     auto batchOfMeasurementsWithTimeForwardInMiddle =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
                                                  .numMeasurements = 50,
                                                  .idxWithDiffMeasurement = 25,
-                                                 .metaValue = _metaValue2});
+                                                 .metaValue = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatchInMiddle{25, 25};
-    _testStageInsertBatchIntoEligibleBucket(_ns2,
-                                            _uuid2,
-                                            batchOfMeasurementsWithTimeForwardInMiddle,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatchInMiddle,
-                                            /*numBatchedInsertContexts=*/1);
+    _testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+        _ns1,
+        _uuid1,
+        batchOfMeasurementsWithTimeForwardInMiddle,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatchInMiddle,
+        /*numBatchedInsertContexts=*/1);
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkSize) {
@@ -3030,23 +3138,37 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkSize
     // so the measurement will be in a different bucket.
     std::vector<size_t> numMeasurementsInWriteBatch{124, 1};
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            batchOfMeasurementsWithSize,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
 
-    // Testing the same configuration as above, but in a collection without a meta field.
+    // Inserting a batch of measurements with meta field values into a collection with a meta field.
+    _testStageInsertBatchIntoEligibleBucketWithMetaField(_ns1,
+                                                         _uuid1,
+                                                         batchOfMeasurementsWithSize,
+                                                         currBatchedInsertContextsIndex,
+                                                         numMeasurementsInWriteBatch,
+                                                         /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements without meta field values into a collection without a meta
+    // field.
     std::vector<BSONObj> batchOfMeasurementsWithSizeNoMetaField =
         _generateMeasurementsWithRolloverReason(
             {.reason = RolloverReason::kSize, .metaValue = boost::none});
-    _testStageInsertBatchIntoEligibleBucket(_nsNoMeta,
-                                            _uuidNoMeta,
-                                            batchOfMeasurementsWithSizeNoMetaField,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
+        _nsNoMeta,
+        _uuidNoMeta,
+        batchOfMeasurementsWithSizeNoMetaField,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements without meta field values into a collection with a meta
+    // field.
+    _testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+        _ns1,
+        _uuid1,
+        batchOfMeasurementsWithSizeNoMetaField,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkCachePressure) {
@@ -3061,29 +3183,44 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkCach
     // different bucket.
     std::vector<size_t> numMeasurementsInWriteBatch{3, 1};
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            batchOfMeasurementsWithCachePressure,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
 
-    // Testing the same configuration as above, but in a collection without a meta field.
+    // Inserting a batch of measurements with meta field values into a collection with a meta field.
+    _testStageInsertBatchIntoEligibleBucketWithMetaField(_ns1,
+                                                         _uuid1,
+                                                         batchOfMeasurementsWithCachePressure,
+                                                         currBatchedInsertContextsIndex,
+                                                         numMeasurementsInWriteBatch,
+                                                         /*numBatchedInsertContexts=*/1);
+
     std::vector<BSONObj> batchOfMeasurementsWithCachePressureNoMetaField =
         _generateMeasurementsWithRolloverReason(
             {.reason = RolloverReason::kCachePressure, .metaValue = boost::none});
-    _testStageInsertBatchIntoEligibleBucket(_nsNoMeta,
-                                            _uuidNoMeta,
-                                            batchOfMeasurementsWithCachePressureNoMetaField,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements without meta field values into a collection without a meta
+    // field.
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
+        _nsNoMeta,
+        _uuidNoMeta,
+        batchOfMeasurementsWithCachePressureNoMetaField,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
+
+    // Inserting a batch of measurements without meta field values into a collection with a meta
+    // field.
+    _testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+        _ns1,
+        _uuid1,
+        batchOfMeasurementsWithCachePressureNoMetaField,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
 
     // Reset _storageCacheSizeBytes back to a representative value.
     _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
 }
 
-TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed1) {
+TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed) {
     auto batchOfMeasurementsWithCount = _generateMeasurementsWithRolloverReason(
         {.reason = RolloverReason::kCount, .timeValue = Date_t::now()});
 
@@ -3130,26 +3267,38 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed
                                                     25,
                                                     static_cast<size_t>(gTimeseriesBucketMaxCount),
                                                     25};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            mixedRolloverReasonsMeasurements,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
+
+    // Test in a collection without a meta field.
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(_nsNoMeta,
+                                                                  _uuidNoMeta,
+                                                                  mixedRolloverReasonsMeasurements,
+                                                                  currBatchedInsertContextsIndex,
+                                                                  numMeasurementsInWriteBatch,
+                                                                  /*numBatchedInsertContexts=*/1);
+
+    // Test in a collection with a meta field.
+    _testStageInsertBatchIntoEligibleBucketWithMetaField(_ns1,
+                                                         _uuid1,
+                                                         mixedRolloverReasonsMeasurements,
+                                                         currBatchedInsertContextsIndex,
+                                                         numMeasurementsInWriteBatch,
+                                                         /*numBatchedInsertContexts=*/1);
 }
 
-TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed2) {
+TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixedWithNoMeta) {
     auto batchOfMeasurementsWithSize = _generateMeasurementsWithRolloverReason(
-        {.reason = RolloverReason::kSize, .timeValue = Date_t::now()});
+        {.reason = RolloverReason::kSize, .metaValue = boost::none, .timeValue = Date_t::now()});
 
     std::vector<BSONObj> batchOfMeasurements =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone,
                                                  .numMeasurements = 50,
+                                                 .metaValue = boost::none,
                                                  .timeValue = Date_t::now() + Seconds(1)});
 
     auto batchOfMeasurementsWithTimeForward =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
                                                  .idxWithDiffMeasurement = 1,
+                                                 .metaValue = boost::none,
                                                  .timeValue = Date_t::now() + Seconds(2)});
 
     std::vector<BSONObj> mixedRolloverReasonsMeasurements =
@@ -3172,15 +3321,26 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed
     // batchOfMeasurementsWithTimeForward.
     std::vector<size_t> numMeasurementsInWriteBatch{
         124, 52, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            mixedRolloverReasonsMeasurements,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
+
+    // Test in collection without a meta field.
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(_nsNoMeta,
+                                                                  _uuidNoMeta,
+                                                                  mixedRolloverReasonsMeasurements,
+                                                                  currBatchedInsertContextsIndex,
+                                                                  numMeasurementsInWriteBatch,
+                                                                  /*numBatchedInsertContexts=*/1);
+
+    // Test in collection with a meta field.
+    _testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
+        _ns1,
+        _uuid1,
+        mixedRolloverReasonsMeasurements,
+        currBatchedInsertContextsIndex,
+        numMeasurementsInWriteBatch,
+        /*numBatchedInsertContexts=*/1);
 }
 
-TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed3) {
+TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixedWithCachePressure) {
     // Artificially lower _storageCacheSizeBytes so we can simulate kCachePressure.
     _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes;
 
@@ -3223,12 +3383,23 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed
     // third bucket. Finally, we insert all 10 measurements from batchOfMeasurements into the
     // third bucket.
     std::vector<size_t> numMeasurementsInWriteBatch{1, 11, 12};
-    _testStageInsertBatchIntoEligibleBucket(_ns1,
-                                            _uuid1,
-                                            mixedRolloverReasonsMeasurements,
-                                            currBatchedInsertContextsIndex,
-                                            numMeasurementsInWriteBatch,
-                                            /*numBatchedInsertContexts=*/1);
+
+    // Test in collection without a meta field.
+    _testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(_nsNoMeta,
+                                                                  _uuidNoMeta,
+                                                                  mixedRolloverReasonsMeasurements,
+                                                                  currBatchedInsertContextsIndex,
+                                                                  numMeasurementsInWriteBatch,
+                                                                  /*numBatchedInsertContexts=*/1);
+
+    // Test in collection with a meta field.
+    _testStageInsertBatchIntoEligibleBucketWithMetaField(_ns1,
+                                                         _uuid1,
+                                                         mixedRolloverReasonsMeasurements,
+                                                         currBatchedInsertContextsIndex,
+                                                         numMeasurementsInWriteBatch,
+                                                         /*numBatchedInsertContexts=*/1);
+
 
     // Reset _storageCacheSizeBytes back to a representative value.
     _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;

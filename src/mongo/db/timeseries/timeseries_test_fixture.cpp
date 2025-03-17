@@ -69,6 +69,46 @@ void TimeseriesTestFixture::setUpCollectionsHelper(
     }
 }
 
+// Ensure that the input collection has a meta field and that at least one measurement has a
+// meta field value.
+void TimeseriesTestFixture::_assertCollWithMetaField(
+    const NamespaceString& ns, std::vector<BSONObj> batchOfMeasurements) const {
+    // Ensure that the input collection has a meta field.
+    auto tsOptions = _getTimeseriesOptions(ns);
+    auto metaField = tsOptions.getMetaField();
+    ASSERT(metaField);
+
+    // Ensure that that at least one measurement has a meta field value.
+    ASSERT(std::any_of(
+        batchOfMeasurements.begin(), batchOfMeasurements.end(), [metaField](BSONObj measurement) {
+            return measurement.hasField(*metaField);
+        }));
+}
+
+// Ensure that the input collection doesn't have a meta field. We don't have to check the
+// measurements because we don't have a meta field in the collection.
+void TimeseriesTestFixture::_assertCollWithoutMetaField(
+    const NamespaceString& ns, std::vector<BSONObj> batchOfMeasurements) const {
+    auto tsOptions = _getTimeseriesOptions(ns);
+    auto metaField = tsOptions.getMetaField();
+    ASSERT(!metaField);
+}
+
+// Ensure that the input collection is configured with a meta field. Ensure that no measurements in
+// the collection have meta field values.
+void TimeseriesTestFixture::_assertNoMetaFieldsInCollWithMetaField(
+    const NamespaceString& ns, std::vector<BSONObj> batchOfMeasurements) const {
+    // Ensure that the input collection has a meta field.
+    auto tsOptions = _getTimeseriesOptions(ns);
+    auto metaField = tsOptions.getMetaField();
+    ASSERT(metaField);
+
+    // Ensure that there no measurements have meta field values.
+    ASSERT(std::none_of(batchOfMeasurements.begin(),
+                        batchOfMeasurements.end(),
+                        [](BSONObj measurement) { return measurement.hasField(_metaField); }));
+}
+
 void TimeseriesTestFixture::setUp() {
     CatalogTestFixture::setUp();
 
