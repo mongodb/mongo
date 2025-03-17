@@ -29,23 +29,10 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/slots_provider.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::stage_builder::abt {
 

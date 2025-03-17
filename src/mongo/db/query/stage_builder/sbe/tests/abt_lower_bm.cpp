@@ -28,29 +28,9 @@
  */
 
 #include <benchmark/benchmark.h>
-#include <cstdint>
-#include <string>
-#include <utility>
-#include <vector>
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
-#include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
-#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
-#include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo::stage_builder::abt {
 namespace {

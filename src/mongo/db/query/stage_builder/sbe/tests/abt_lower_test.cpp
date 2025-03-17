@@ -27,40 +27,12 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <initializer_list>
-#include <ostream>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/util/debug_print.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/strong_alias.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
-#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo::stage_builder::abt {
 namespace {

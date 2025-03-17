@@ -14,11 +14,12 @@ mongo_cc_benchmark(
     srcs = [
         "sbe_builder_bm.cpp",
     ],
+    header_deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
     tags = ["query_bm"],
     deps = [
-        "//src/mongo/db:query_exec",
         "//src/mongo/db/catalog:catalog_test_fixture",
-        "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
@@ -33,9 +34,7 @@ mongo_cc_library(
         "abt_lower_defs.h",
     ],
     deps = [
-        "//src/mongo/db/exec/sbe:query_sbe",
         "//src/mongo/db/exec/sbe:query_sbe_stages",
-        "//src/mongo/db/exec/sbe:query_sbe_storage",
         "//src/mongo/db/query/optimizer:optimizer_base",
     ],
 )
@@ -46,11 +45,16 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/stage_builder/sbe/tests:abt_lower_test.cpp",
     ],
     data = ["//src/mongo/db/test_output/query/stage_builder/sbe/a_b_t_plan_generation:test_data"],
+    header_deps = [
+        "//src/mongo/db/exec/sbe:query_sbe_stages",
+        "//src/mongo/db/exec/sbe:query_sbe_storage",
+        ":abt_unit_test_utils",
+        "//src/mongo/unittest",
+    ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
-        ":abt_unit_test_utils",
         ":query_sbe_abt",
-        "//src/mongo/unittest",
+        "//src/mongo/db/exec/sbe:query_sbe",
     ],
 )
 
@@ -107,8 +111,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/query/stage_builder/sbe/tests:abt_lower_bm.cpp",
     ],
     deps = [
-        ":abt_unit_test_utils",
         ":query_sbe_abt",
-        "//src/mongo/unittest",
+        "//src/mongo/db/exec/sbe:query_sbe",
     ],
 )
