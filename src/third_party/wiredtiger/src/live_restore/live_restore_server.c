@@ -46,8 +46,8 @@ __live_restore_clean_up(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     case WTI_LIVE_RESTORE_STATE_BACKGROUND_MIGRATION:
         /*
          * We need our metadata updates to be written out. Force a checkpoint on all trees before
-         * marking background migration complete. All empty extent lists must be written to the
-         * metadata durably first with the checkpoint.
+         * marking background migration complete. All empty bitmaps must be written to the metadata
+         * durably first with the checkpoint.
          */
         WT_RET(__wt_checkpoint_db(ctx->session, force_ckpt_cfg, true));
 
@@ -74,7 +74,7 @@ __live_restore_clean_up(WT_SESSION_IMPL *session, WT_THREAD *ctx)
 
         /*
          * Run a second forced checkpoint now that clean up has finished. Checkpointing files on or
-         * after the clean up stage will remove any extent list strings from the metadata file.
+         * after the clean up stage will remove any bitmap strings from the metadata file.
          */
         WT_RET(__wt_checkpoint_db(ctx->session, force_ckpt_cfg, true));
         WT_RET(__wti_live_restore_set_state(session, lr_fs, WTI_LIVE_RESTORE_STATE_COMPLETE));

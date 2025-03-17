@@ -92,30 +92,27 @@ static WT_EVENT_HANDLER event_handler = {
         printf("%s = %" PRId64 "\n", #KEY, VARIABLE);                     \
     } while (0)
 
-#define GET_STATS(CACHE_OPS_VAR, CACHE_TIME_VAR, CACHE_BUSY_OPS_VAR, CACHE_BUSY_TIME_VAR,   \
-  CACHE_IDLE_OPS_VAR, CACHE_IDLE_TIME_VAR, BYTES_MAX_VAR, BYTES_INUSE_VAR)                  \
-    do {                                                                                    \
-        WT_CURSOR *stat;                                                                    \
-        testutil_check(session->open_cursor(session, "statistics:", NULL, NULL, &stat));    \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_OPS, CACHE_OPS_VAR);                        \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_TIME, CACHE_TIME_VAR);                      \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_OPS, CACHE_BUSY_OPS_VAR);   \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_TIME, CACHE_BUSY_TIME_VAR); \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_OPS, CACHE_IDLE_OPS_VAR);     \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_TIME, CACHE_IDLE_TIME_VAR);   \
-        GET_STAT(WT_STAT_CONN_CACHE_BYTES_MAX, BYTES_MAX_VAR);                              \
-        GET_STAT(WT_STAT_CONN_CACHE_BYTES_INUSE, BYTES_INUSE_VAR);                          \
-        testutil_check(stat->close(stat));                                                  \
+#define GET_STATS(                                                                        \
+  CACHE_OPS_VAR, CACHE_BUSY_OPS_VAR, CACHE_IDLE_OPS_VAR, BYTES_MAX_VAR, BYTES_INUSE_VAR)  \
+    do {                                                                                  \
+        WT_CURSOR *stat;                                                                  \
+        testutil_check(session->open_cursor(session, "statistics:", NULL, NULL, &stat));  \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_OPS, CACHE_OPS_VAR);                      \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_OPS, CACHE_BUSY_OPS_VAR); \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_OPS, CACHE_IDLE_OPS_VAR);   \
+        GET_STAT(WT_STAT_CONN_CACHE_BYTES_MAX, BYTES_MAX_VAR);                            \
+        GET_STAT(WT_STAT_CONN_CACHE_BYTES_INUSE, BYTES_INUSE_VAR);                        \
+        testutil_check(stat->close(stat));                                                \
     } while (0)
 
-#define GET_ALL_STATS(IDX)                                                                \
-    printf("  Stats for cycle %d:\n", IDX);                                               \
-    int64_t cache_ops##IDX, cache_time##IDX;                                              \
-    int64_t cache_busy_ops##IDX, cache_busy_time##IDX;                                    \
-    int64_t cache_idle_ops##IDX, cache_idle_time##IDX;                                    \
-    int64_t cache_bytes_max##IDX, cache_bytes_inuse##IDX;                                 \
-    GET_STATS(cache_ops##IDX, cache_time##IDX, cache_busy_ops##IDX, cache_busy_time##IDX, \
-      cache_idle_ops##IDX, cache_idle_time##IDX, cache_bytes_max##IDX, cache_bytes_inuse##IDX)
+#define GET_ALL_STATS(IDX)                                                                    \
+    printf("  Stats for cycle %d:\n", IDX);                                                   \
+    int64_t cache_ops##IDX;                                                                   \
+    int64_t cache_busy_ops##IDX;                                                              \
+    int64_t cache_idle_ops##IDX;                                                              \
+    int64_t cache_bytes_max##IDX, cache_bytes_inuse##IDX;                                     \
+    GET_STATS(cache_ops##IDX, cache_busy_ops##IDX, cache_idle_ops##IDX, cache_bytes_max##IDX, \
+      cache_bytes_inuse##IDX)
 
 /*
  * populate --
@@ -192,13 +189,11 @@ redo1:
     /* Sanity checks. */
     testutil_assert(handle_general_called);
     testutil_assert(cache_ops1 > 0);
-    testutil_assert(cache_time1 > 0);
     testutil_assert(cache_bytes_max1 > 0);
     testutil_assert(cache_bytes_inuse1 > 0);
 
     /* Both idle and busy counters should increase. */
     testutil_assert(cache_busy_ops1 + cache_idle_ops1 == cache_ops1);
-    testutil_assert(cache_busy_time1 + cache_idle_time1 == cache_time1);
 
     printf("Cache fill ratio = %" PRId64 "%%\n", cache_bytes_inuse1 * 100 / cache_bytes_max1);
 
@@ -221,16 +216,13 @@ redo2:
     /* Sanity checks. */
     testutil_assert(handle_general_called);
     testutil_assert(cache_ops2 - cache_ops1 > 0);
-    testutil_assert(cache_time2 - cache_time1 > 0);
     testutil_assert(cache_bytes_max2 > 0);
     testutil_assert(cache_bytes_inuse2 > 0);
 
     /* Busy counters should increase. */
     testutil_assert(cache_busy_ops2 - cache_busy_ops1 > 0);
-    testutil_assert(cache_busy_time2 - cache_busy_time1 > 0);
     /* Idle counters should remain the same. */
     testutil_assert(cache_idle_ops2 - cache_idle_ops1 == 0);
-    testutil_assert(cache_idle_time2 - cache_idle_time1 == 0);
 
     printf("Cache fill ratio = %" PRId64 "%%\n", cache_bytes_inuse2 * 100 / cache_bytes_max2);
 

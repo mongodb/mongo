@@ -32,7 +32,8 @@
          * already hold it.                                                       \
          */                                                                       \
         if ((s)->id != 0 && (s)->thread_check.owning_thread != __tmp_api_tid) {   \
-            WT_ASSERT((s), __wt_spin_trylock((s), &(s)->thread_check.lock) == 0); \
+            bool lock_success = __wt_spin_trylock((s), &(s)->thread_check.lock);  \
+            WT_ASSERT((s), lock_success == 0);                                    \
             (s)->thread_check.owning_thread = __tmp_api_tid;                      \
         }                                                                         \
                                                                                   \
