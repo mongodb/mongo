@@ -20,7 +20,7 @@ _Disclaimer_: This guide (SPM-2301) is a work in progress.
 1. [Plan Cache](#)
 1. [Cluster Planning](../../s/query/planner/README.md)
 1. Testing
-   - [Golden Testing](#)
+   - [Golden Testing](../../../../docs/golden_data_test_framework.md)
    - [QueryTester](query_tester/README.md)
    - [Fuzzers](https://github.com/10gen/jstestfuzz/blob/master/HitchhikersGuide.md)
 
