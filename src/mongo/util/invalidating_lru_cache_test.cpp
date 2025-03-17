@@ -31,7 +31,6 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <cstdint>
-#include <list>
 #include <ostream>
 
 #include <boost/optional/optional.hpp>
@@ -471,6 +470,19 @@ TEST(InvalidatingLRUCacheTest, AdvanceTimeSameTime) {
     TestValueCacheCausallyConsistent cache(1);
     cache.insertOrAssignAndGet(100, TestValue("Value @ TS 30"), Timestamp(30));
     ASSERT(!cache.advanceTimeInStore(100, Timestamp(30)));
+}
+
+TEST(InvalidatingLRUCacheTest, TimeMonotonicityViolation) {
+    TestValueCacheCausallyConsistent cache(2);
+    cache.insertOrAssign(100, TestValue("Value @ TS 30"), Timestamp(30));
+    cache.insertOrAssign(200, TestValue("Value @ TS 30"), Timestamp(30));
+
+    ASSERT_THROWS_CODE(cache.insertOrAssign(100, TestValue("Value @ TS 20"), Timestamp(20)),
+                       DBException,
+                       ErrorCodes::ReadThroughCacheTimeMonotonicityViolation);
+    ASSERT_THROWS_CODE(cache.insertOrAssign(200, TestValue("Value @ TS 20"), Timestamp(20)),
+                       DBException,
+                       ErrorCodes::ReadThroughCacheTimeMonotonicityViolation);
 }
 
 template <class TCache, typename TestFunc>

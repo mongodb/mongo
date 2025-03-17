@@ -331,7 +331,7 @@ TEST_F(ShardRegistryTest, PeriodicReloaderUpdatesTopologyTime) {
     expectCSRSLookup();
 }
 
-DEATH_TEST_F(ShardRegistryTest, TopologyTimeMonotonicityViolation, "Tripwire assertion") {
+TEST_F(ShardRegistryTest, TopologyTimeMonotonicityViolation) {
     // Unless there's an entry in the cache, there is no timeInStore to compare.
     reloadAndWait();
 
@@ -346,7 +346,9 @@ DEATH_TEST_F(ShardRegistryTest, TopologyTimeMonotonicityViolation, "Tripwire ass
 
     auto future = launchAsync([this] { getData(); });
     expectCSRSLookup();
-    future.default_timed_get();
+    ASSERT_THROWS_CODE(future.default_timed_get(),
+                       DBException,
+                       ErrorCodes::ReadThroughCacheTimeMonotonicityViolation);
 }
 
 TEST_F(ShardRegistryTest, ConfigShardsWithNoTopologyTimeDueToUpgrade) {

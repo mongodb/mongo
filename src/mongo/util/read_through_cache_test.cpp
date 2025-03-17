@@ -406,6 +406,30 @@ TEST_F(ReadThroughCacheTest, CausalConsistencyWithLookupArgs) {
         cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown, kName, 2).isValid());
 }
 
+TEST_F(ReadThroughCacheTest, TimeMonotonicityViolation) {
+    boost::optional<CausallyConsistentCache::LookupResult> nextToReturn;
+
+    CacheWithThreadPool<CausallyConsistentCache> cache(
+        getService(),
+        1,
+        [&](OperationContext*,
+            const std::string& key,
+            const CausallyConsistentCache::ValueHandle&,
+            const Timestamp& timeInStore) {
+            ASSERT_EQ("TestKey", key);
+            return CausallyConsistentCache::LookupResult(std::move(*nextToReturn));
+        });
+
+    nextToReturn.emplace(CachedValue(1), Timestamp(100));
+    ASSERT_EQ(1, cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown)->counter);
+
+    cache.advanceTimeInStore("TestKey", Timestamp(120));
+    nextToReturn.emplace(CachedValue(2), Timestamp(110));
+    ASSERT_THROWS_CODE(cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown),
+                       DBException,
+                       ErrorCodes::ReadThroughCacheTimeMonotonicityViolation);
+}
+
 /**
  * Fixture for tests, which need to control the creation/destruction of their operation contexts.
  */
@@ -441,8 +465,9 @@ TEST_F(ReadThroughCacheAsyncTest, SuccessfulInProgressLookupForNotCausallyConsis
     ASSERT(inProgress.valid(WithLock::withoutLock()));
     ASSERT(res.v);
     ASSERT_EQ(500, res.v->counter);
-    auto promisesToSet = inProgress.getPromisesLessThanOrEqualToTime(WithLock::withoutLock(),
-                                                                     CacheNotCausallyConsistent());
+
+    auto [promisesToSet, timeOfOldestPromise] = inProgress.getPromisesLessThanOrEqualToTime(
+        WithLock::withoutLock(), CacheNotCausallyConsistent());
     ASSERT_EQ(1U, promisesToSet.size());
     promisesToSet.front()->emplaceValue(std::move(*res.v));
 
