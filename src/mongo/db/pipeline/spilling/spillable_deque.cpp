@@ -107,7 +107,7 @@ void SpillableDeque::clear() {
 
 void SpillableDeque::spillToDisk() {
     if (!_diskCache) {
-        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+        tassert(5643008,
                 "Exceeded memory limit and can't spill to disk. Set allowDiskUse: true to allow "
                 "spilling",
                 _expCtx->getAllowDiskUse());

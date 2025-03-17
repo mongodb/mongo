@@ -91,7 +91,6 @@ selector:
     - jstests/aggregation/expressions/substrbytes.js
     - jstests/aggregation/sources/setWindowFields/set_union.js
     - jstests/aggregation/accumulators/set_union.js
-    - jstests/aggregation/sources/graphLookup/spilling.js
     - jstests/aggregation/expressions/current_date.js
 
     # These tests run larger aggregations that can take a long time and can repeatedly get interrupted by config transitions.
