@@ -1331,6 +1331,7 @@ mongo_cc_library(
         "//src/mongo/db/query:plan_yield_policy_sbe.h",
         "//src/mongo/db/query:planner_interface.h",
         "//src/mongo/db/query:query_planner_params.h",
+        "//src/mongo/db/query:query_planner_params_diagnostic_printer.h",
         "//src/mongo/db/query:sbe_plan_ranker.h",
         "//src/mongo/db/query:sbe_trial_runtime_executor.h",
         "//src/mongo/db/query:shard_filterer_factory_impl.h",

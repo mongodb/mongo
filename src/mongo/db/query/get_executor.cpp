@@ -108,6 +108,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_planner_params_diagnostic_printer.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -514,6 +515,10 @@ public:
             return buildSingleSolutionPlan(std::move(solutions[0]), std::move(cbrResult));
         }
         return buildMultiPlan(std::move(solutions), std::move(cbrResult));
+    }
+
+    const QueryPlannerParams& getPlannerParams() {
+        return *_plannerParams.get();
     }
 
 protected:
@@ -1042,6 +1047,10 @@ std::unique_ptr<PlannerInterface> getClassicPlanner(
         yieldPolicy,
         std::move(plannerParams),
     };
+
+    ScopedDebugInfo queryPlannerParams(
+        "queryPlannerParams",
+        diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
     auto planningResult = uassertStatusOK(helper.prepare());
     setOpDebugPlanCacheInfo(opCtx, planningResult->planCacheInfo());
     uassertStatusOK(planningResult->runtimePlanner->plan());
@@ -1065,6 +1074,9 @@ std::unique_ptr<PlannerInterface> getClassicPlannerForSbe(
         std::move(sbeYieldPolicy),
         std::move(plannerParams),
     };
+    ScopedDebugInfo queryPlannerParams(
+        "queryPlannerParams",
+        diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
     auto planningResult = uassertStatusOK(helper.prepare());
     setOpDebugPlanCacheInfo(opCtx, planningResult->planCacheInfo());
     return std::move(planningResult->runtimePlanner);
@@ -1586,6 +1598,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         });
     ClassicPrepareExecutionHelper helper{
         opCtx, collections, std::move(ws), cq.get(), policy, std::move(plannerParams)};
+
+    ScopedDebugInfo queryPlannerParams(
+        "queryPlannerParams",
+        diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
     auto result = uassertStatusOK(helper.prepare());
     setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
     result->runtimePlanner->addDeleteStage(
@@ -1754,6 +1770,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             .canonicalQuery = *cq,
             .collections = collections,
         })};
+
+    ScopedDebugInfo queryPlannerParams(
+        "queryPlannerParams",
+        diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
     auto result = uassertStatusOK(helper.prepare());
     setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
     result->runtimePlanner->addUpdateStage(
@@ -1859,6 +1879,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         });
     ClassicPrepareExecutionHelper helper{
         opCtx, collections, std::move(ws), cq.get(), yieldPolicy, std::move(plannerParams)};
+
+    ScopedDebugInfo queryPlannerParams(
+        "queryPlannerParams",
+        diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
     auto result = uassertStatusOK(helper.prepare());
     result->runtimePlanner->addCountStage(limit, skip);
     if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
