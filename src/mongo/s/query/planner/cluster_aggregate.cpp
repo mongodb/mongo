@@ -625,8 +625,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     // pipelineBuilder will be invoked within AggregationTargeter::make() if and only if it chooses
     // any policy other than "specific shard only".
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    auto pipeline = [&]() -> std::unique_ptr<Pipeline, PipelineDeleter> {
+    auto [pipeline, expCtx] = [&]() -> std::tuple<std::unique_ptr<Pipeline, PipelineDeleter>,
+                                                  boost::intrusive_ptr<ExpressionContext>> {
         auto pipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
                                                involvedNamespaces,
@@ -638,7 +638,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                requiresCollationForParsingUnshardedAggregate,
                                                resolvedView,
                                                verbosity);
-        expCtx = pipeline->getContext();
+        auto expCtx = pipeline->getContext();
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
@@ -685,7 +685,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(pipeline->peekFront());
             searchStage->setDocsNeededBounds(bounds);
         }
-        return pipeline;
+        return {std::move(pipeline), expCtx};
     }();
 
     // Create an RAII object that prints useful information about the ExpressionContext in the case
@@ -727,7 +727,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         request.setQuerySettings(querySettings);
     }
 
-    auto status = [&]() {
+    // Need to explicitly assign expCtx because lambdas can't capture structured bindings.
+    auto status = [&](auto& expCtx) {
         bool requestQueryStatsFromRemotes = query_stats::shouldRequestRemoteMetrics(
             CurOp::get(expCtx->getOperationContext())->debug());
         try {
@@ -803,7 +804,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         } catch (const DBException& dbe) {
             return dbe.toStatus();
         }
-    }();
+    }(expCtx);
 
     if (status.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
         // Increment counters and set flags even in case of failed aggregate commands.
