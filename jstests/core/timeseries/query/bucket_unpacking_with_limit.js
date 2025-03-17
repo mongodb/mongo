@@ -59,7 +59,7 @@ const setupColl = (coll, collName, usesMeta) => {
 
 // Helper function to check the PlanStage.
 const assertPlanStagesInPipeline =
-    ({pipeline, expectedStages, expectedResults = [], onlyMeta = false}) => {
+    ({pipeline, expectedStages, expectedResults = [], expectedResultLength, onlyMeta = false}) => {
         // If onlyMeta is set to true, we only want to include the collection with onlyMeta field
         // specified to ensure sort can be done on the onlyMeta field
         var colls = onlyMeta ? [metaColl] : [coll, metaColl];
@@ -81,6 +81,9 @@ const assertPlanStagesInPipeline =
                 for (var i = 0; i < expectedResults.length; i++) {
                     assert.docEq(result[i], expectedResults[i], tojson(result));
                 }
+            } else if (expectedResultLength) {
+                const result = c.aggregate(pipeline).toArray();
+                assert(expectedResultLength == result.length);
             }
         }
     };
@@ -194,6 +197,8 @@ assertPlanStagesInPipeline({
     expectedResults: [metaDocs[2]],
     onlyMeta: true
 });
+
+// Test limit comes before sort.
 assertPlanStagesInPipeline({
     pipeline: [
         {
@@ -209,12 +214,12 @@ assertPlanStagesInPipeline({
         {$limit: 2}
     ],
     expectedStages: ["$_internalUnpackBucket", "$limit", "$sort", "$skip"],
-    expectedResults: [metaDocs[2], metaDocs[3]],
+    expectedResultLength: 2,
     onlyMeta: true
 });
-// Test limit comes before sort.
 assertPlanStagesInPipeline({
     pipeline: [{$limit: 2}, {$sort: {"m.sensorId": 1}}],
     expectedStages: ["$_internalUnpackBucket", "$limit", "$sort"],
+    expectedResultLength: 2,
     onlyMeta: true
 });
