@@ -1,7 +1,10 @@
 /**
  * Tests the $top/$bottom fast paths for blocks of homogeneous data.
  * @tags: [
- *   requires_timeseries
+ *   requires_timeseries,
+ *   # This test runs aggregate() with explain, which can return incomplete results if there's
+ *   # a stepdown.
+ *   does_not_support_stepdowns,
  * ]
  */
 
