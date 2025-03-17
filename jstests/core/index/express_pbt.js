@@ -200,4 +200,9 @@ fc.assert(
                     // queryList[0] should always produce exactly 1 match.
                     verifyWriteOperations(coll, queryList[0], updateValue);
                 }),
-    {seed: 413, numRuns: 500});
+    {
+        seed: 413,
+        // The search space for this PBT is small because express path covers a narrow range of
+        // queries. 300 runs should be enough.
+        numRuns: 300
+    });

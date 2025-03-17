@@ -74,6 +74,9 @@ selector:
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
 
+    # Express has no interaction with FCV, and thus this test does not provide valuable coverage.
+    - jstests/core/index/express_pbt.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
