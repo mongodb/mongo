@@ -573,22 +573,12 @@ last-continuous:
     ticket: SERVER-95670
   - test_file: jstests/sharding/query/owning_shard_expression.js
     ticket: SERVER-95670
-  - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
-    ticket: SERVER-84089
   - test_file: jstests/change_streams/update_lookup_before_ddl.js
     ticket: SERVER-95976
   - test_file: jstests/change_streams/lookup_post_image.js
     ticket: SERVER-95976
   - test_file: jstests/sharding/change_stream_update_lookup_collation.js
     ticket: SERVER-95976
-  - test_file: jstests/concurrency/fsm_workloads/upsert_unique_index_collation.js
-    ticket: SERVER-94156
-  - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
-    ticket: SERVER-92930
-  - test_file: jstests/replsets/sync_source_clears_post_failure.js
-    ticket: SERVER-91960
-  - test_file: jstests/sharding/catalog_cache_refresh_with_persisted_collection_cache_corrupted.js
-    ticket: SERVER-95807
   - test_file: jstests/sharding/timeseries_query_extended_range.js
     ticket: SERVER-73641
   - test_file: jstests/core/timeseries/timeseries_index_partial.js
@@ -1222,22 +1212,12 @@ last-lts:
     ticket: SERVER-95670
   - test_file: jstests/sharding/query/owning_shard_expression.js
     ticket: SERVER-95670
-  - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
-    ticket: SERVER-84089
   - test_file: jstests/change_streams/update_lookup_before_ddl.js
     ticket: SERVER-95976
   - test_file: jstests/change_streams/lookup_post_image.js
     ticket: SERVER-95976
   - test_file: jstests/sharding/change_stream_update_lookup_collation.js
     ticket: SERVER-95976
-  - test_file: jstests/concurrency/fsm_workloads/upsert_unique_index_collation.js
-    ticket: SERVER-94156
-  - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
-    ticket: SERVER-92930
-  - test_file: jstests/replsets/sync_source_clears_post_failure.js
-    ticket: SERVER-91960
-  - test_file: jstests/sharding/catalog_cache_refresh_with_persisted_collection_cache_corrupted.js
-    ticket: SERVER-95807
   - test_file: jstests/sharding/timeseries_query_extended_range.js
     ticket: SERVER-73641
   - test_file: jstests/core/timeseries/timeseries_index_partial.js
