@@ -163,8 +163,9 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
         solnToCache = _winningSolution.get();
     }
 
-    if (cachedPlanSolutionHash() && solnToCache &&
-        *cachedPlanSolutionHash() == solnToCache->hash()) {
+    tassert(10221200, "solnToCache must be non-null.", solnToCache);
+
+    if (cachedPlanSolutionHash() && *cachedPlanSolutionHash() == solnToCache->hash()) {
         _incrementReplannedPlanIsCachedPlanCounterCb();
     }
 
