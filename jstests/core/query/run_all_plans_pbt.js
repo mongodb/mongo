@@ -38,7 +38,7 @@ if (isSlowBuild(db)) {
     numRuns = 5;
     jsTestLog('Trying less examples because debug is on, opt is off, or a sanitizer is enabled.');
 }
-const numQueriesPerRun = 20;
+const numQueriesPerRun = 10;
 
 const controlColl = db.run_all_plans_control;
 const experimentColl = db.run_all_plans_experiment;

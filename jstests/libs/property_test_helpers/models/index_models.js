@@ -90,15 +90,16 @@ const hashedIndexModel = fc.record({def: hashedIndexDefArb, options: fc.constant
 
 // This models wildcard indexes where the wildcard field is at the top-level, like "$**" rather than
 // "a.$**". These definitions are allowed to specify a `wildcardProjection` in the index options.
-const fullWildcardOptionsArb = oneof(fc.constant({}), fc.record({
-    wildcardProjection: fc.uniqueArray(fieldArb, {minLength: 0, maxLength: 8}).map(fields => {
+const wildcardOptionsArb = fc.record({
+    wildcardProjection: fc.uniqueArray(fieldArb, {minLength: 1, maxLength: 8}).map(fields => {
         const options = {};
         for (const field of fields) {
             options[field] = 1;
         }
         return options;
     })
-}));
+});
+
 // Generate a simple index definition, a position into that definition, and replace the key at the
 // position with '$**'.
 const fullWildcardDefArb = fc.record({
@@ -126,8 +127,12 @@ const dottedWildcardDefArb = fc.record({
 
 // A wildcard index can be at the top-level (fullWildcardDef) or on a field (dottedWildcardDef).
 const wildcardIndexModel =
-    oneof(fc.record({def: fullWildcardDefArb, options: fullWildcardOptionsArb}),
-          fc.record({def: dottedWildcardDefArb, options: fc.constant({})}));
+    oneof(fc.record({def: fullWildcardDefArb, options: wildcardOptionsArb}),
+          fc.record({def: dottedWildcardDefArb, options: fc.constant({}, wildcardOptionsArb)}))
+        .filter(({def, options}) => {
+            // Wildcard indexes are not allowed to be multikey.
+            return !Object.keys(def).includes('array');
+        });
 
 // Map to an object with the definition and options, so it's more clear what each object is.
 export const defaultIndexModel = oneof(

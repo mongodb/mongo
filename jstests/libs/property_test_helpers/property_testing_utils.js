@@ -42,6 +42,19 @@ function createColl(coll, isTS = false) {
     assert.commandWorked(db.createCollection(coll.getName(), args));
 }
 
+// Error codes from creating an index that are acceptable. We could change our model or add filters
+// to the model to remove these cases, but that would cause them to become overcomplicated.
+const okIndexCreationErrorCodes = [
+    // Index already exists.
+    85,
+    // Overlapping fields and path collisions in wildcard projection.
+    31249,
+    31250,
+    7246200,
+    7246204,
+    7246208,
+];
+
 /*
  * Clear any state in the collection (other than data, which doesn't change). Create indexes the
  * test uses, then run the property test.
@@ -74,9 +87,12 @@ function runProperty(propertyFn, namespaces, collectionSpec, queries) {
     assert(experimentColl.drop());
     createColl(experimentColl, collectionSpec.isTS);
     assert.commandWorked(experimentColl.insert(collectionSpec.docs));
-    for (const index of collectionSpec.indexes) {
-        experimentColl.createIndex(index.def, index.options);
-    }
+    collectionSpec.indexes.forEach((indexSpec, num) => {
+        const name = "index_" + num;
+        assert.commandWorkedOrFailedWithCode(
+            experimentColl.createIndex(indexSpec.def, Object.extend(indexSpec.options, {name})),
+            okIndexCreationErrorCodes);
+    });
 
     const testHelpers = {
         comp: _resultSetsEqualUnordered,
