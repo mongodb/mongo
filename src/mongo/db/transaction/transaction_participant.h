@@ -802,32 +802,11 @@ public:
         // concurrency control rules.
         //
 
-        std::string getTransactionInfoForLogForTest(
-            OperationContext* opCtx,
-            const SingleThreadedLockStats* lockStats,
-            bool committed,
-            const APIParameters& apiParameters,
-            const repl::ReadConcernArgs& readConcernArgs) const {
-
-            TerminationCause terminationCause =
-                committed ? TerminationCause::kCommitted : TerminationCause::kAborted;
-            return _transactionInfoForLog(
-                opCtx, lockStats, terminationCause, apiParameters, readConcernArgs);
-        }
-
-        BSONObj getTransactionInfoBSONForLogForTest(
-            OperationContext* opCtx,
-            const SingleThreadedLockStats* lockStats,
-            bool committed,
-            const APIParameters& apiParameters,
-            const repl::ReadConcernArgs& readConcernArgs) const {
-
-            TerminationCause terminationCause =
-                committed ? TerminationCause::kCommitted : TerminationCause::kAborted;
-            return _transactionInfoBSONForLog(
-                opCtx, lockStats, terminationCause, apiParameters, readConcernArgs);
-        }
-
+        BSONObj getTransactionInfoForLogForTest(OperationContext* opCtx,
+                                                const SingleThreadedLockStats* lockStats,
+                                                bool committed,
+                                                const APIParameters& apiParameters,
+                                                const repl::ReadConcernArgs& readConcernArgs) const;
 
         SingleTransactionStats& getSingleTransactionStatsForTest() {
             return _tp->_o.transactionMetricsObserver.getSingleTransactionStats();
@@ -1004,35 +983,20 @@ public:
             const std::string& cmdName) const;
 
         // Logs the transaction information if it has run slower than the global parameter slowMS.
-        // The transaction must be committed or aborted when this function is called.
+        // The transaction must be committed or aborted when this function is called. Defers logging
+        // details to `_transactionInfoForLog`.
         void _logSlowTransaction(OperationContext* opCtx,
                                  const SingleThreadedLockStats* lockStats,
                                  TerminationCause terminationCause,
                                  APIParameters apiParameters,
                                  repl::ReadConcernArgs readConcernArgs);
 
-        // This method returns a string with information about a slow transaction. The format of the
-        // logging string produced should match the format used for slow operation logging. A
-        // transaction must be completed (committed or aborted) and a valid LockStats reference must
-        // be passed in order for this method to be called.
-        std::string _transactionInfoForLog(OperationContext* opCtx,
-                                           const SingleThreadedLockStats* lockStats,
-                                           TerminationCause terminationCause,
-                                           APIParameters apiParameters,
-                                           repl::ReadConcernArgs readConcernArgs) const;
-
         void _transactionInfoForLog(OperationContext* opCtx,
                                     const SingleThreadedLockStats* lockStats,
                                     TerminationCause terminationCause,
                                     APIParameters apiParameters,
                                     repl::ReadConcernArgs readConcernArgs,
-                                    logv2::DynamicAttributes* pAttrs) const;
-
-        BSONObj _transactionInfoBSONForLog(OperationContext* opCtx,
-                                           const SingleThreadedLockStats* lockStats,
-                                           TerminationCause terminationCause,
-                                           APIParameters apiParameters,
-                                           repl::ReadConcernArgs readConcernArgs) const;
+                                    logv2::DynamicAttributes& attrs) const;
 
         // Bumps up the transaction number and transaction retry counter of this transaction and
         // performs the necessary cleanup.

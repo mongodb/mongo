@@ -2857,95 +2857,13 @@ void TransactionParticipant::Observer::_reportTransactionStats(
         builder, readConcernArgs, tickSource, tickSource->getTicks());
 }
 
-std::string TransactionParticipant::Participant::_transactionInfoForLog(
-    OperationContext* opCtx,
-    const SingleThreadedLockStats* lockStats,
-    TerminationCause terminationCause,
-    APIParameters apiParameters,
-    repl::ReadConcernArgs readConcernArgs) const {
-    invariant(lockStats);
-
-    StringBuilder s;
-
-    // User specified transaction parameters.
-    BSONObjBuilder parametersBuilder;
-
-    BSONObjBuilder lsidBuilder(parametersBuilder.subobjStart("lsid"));
-    _sessionId().serialize(&lsidBuilder);
-    lsidBuilder.doneFast();
-
-    parametersBuilder.append("txnNumber", o().activeTxnNumberAndRetryCounter.getTxnNumber());
-    parametersBuilder.append("txnRetryCounter",
-                             *o().activeTxnNumberAndRetryCounter.getTxnRetryCounter());
-    parametersBuilder.append("autocommit", p().autoCommit ? *p().autoCommit : true);
-    apiParameters.appendInfo(&parametersBuilder);
-    readConcernArgs.appendInfo(&parametersBuilder);
-
-    s << "parameters:" << parametersBuilder.obj().toString() << ",";
-
-    const auto& singleTransactionStats = o().transactionMetricsObserver.getSingleTransactionStats();
-
-    s << " readTimestamp:" << singleTransactionStats.getReadTimestamp().toString() << ",";
-
-    s << singleTransactionStats.getOpDebug()->additiveMetrics.report();
-
-    s << " prepareReadConflicts:"
-      << singleTransactionStats.getTransactionStorageMetrics().prepareReadConflicts.loadRelaxed();
-
-    std::string terminationCauseString =
-        terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
-    s << " terminationCause:" << terminationCauseString;
-
-    auto tickSource = opCtx->getServiceContext()->getTickSource();
-    auto curTick = tickSource->getTicks();
-
-    s << " timeActiveMicros:"
-      << durationCount<Microseconds>(
-             singleTransactionStats.getTimeActiveMicros(tickSource, curTick));
-    s << " timeInactiveMicros:"
-      << durationCount<Microseconds>(
-             singleTransactionStats.getTimeInactiveMicros(tickSource, curTick));
-
-    // Number of yields is always 0 in multi-document transactions, but it is included mainly to
-    // match the format with other slow operation logging messages.
-    s << " numYields:" << 0;
-    // Aggregate lock statistics.
-
-    BSONObjBuilder locks;
-    lockStats->report(&locks);
-    s << " locks:" << locks.obj().toString();
-
-    if (singleTransactionStats.getOpDebug()->storageStats)
-        s << " storage:" << singleTransactionStats.getOpDebug()->storageStats->toBSON().toString();
-
-    // It is possible for a slow transaction to have aborted in the prepared state if an
-    // exception was thrown before prepareTransaction succeeds.
-    const auto totalPreparedDuration = durationCount<Microseconds>(
-        singleTransactionStats.getPreparedDuration(tickSource, curTick));
-    const bool txnWasPrepared = totalPreparedDuration > 0;
-    s << " wasPrepared:" << txnWasPrepared;
-    if (txnWasPrepared) {
-        s << " totalPreparedDurationMicros:" << totalPreparedDuration;
-        s << " prepareOpTime:" << o().prepareOpTime.toString();
-    }
-
-    s << " queues:" << singleTransactionStats.getQueueStats().toBson().toString();
-
-    // Total duration of the transaction.
-    s << ", "
-      << duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick));
-
-    return s.str();
-}
-
-
 void TransactionParticipant::Participant::_transactionInfoForLog(
     OperationContext* opCtx,
     const SingleThreadedLockStats* lockStats,
     TerminationCause terminationCause,
     APIParameters apiParameters,
     repl::ReadConcernArgs readConcernArgs,
-    logv2::DynamicAttributes* pAttrs) const {
+    logv2::DynamicAttributes& attrs) const {
     invariant(lockStats);
 
     // User specified transaction parameters.
@@ -2962,142 +2880,56 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
     apiParameters.appendInfo(&parametersBuilder);
     readConcernArgs.appendInfo(&parametersBuilder);
 
-    pAttrs->add("parameters", parametersBuilder.obj());
+    attrs.add("parameters", parametersBuilder.obj());
 
     const auto& singleTransactionStats = o().transactionMetricsObserver.getSingleTransactionStats();
 
-    pAttrs->addDeepCopy("readTimestamp", singleTransactionStats.getReadTimestamp().toString());
+    attrs.addDeepCopy("readTimestamp", singleTransactionStats.getReadTimestamp().toString());
 
-    singleTransactionStats.getOpDebug()->additiveMetrics.report(pAttrs);
+    singleTransactionStats.getOpDebug()->additiveMetrics.report(&attrs);
 
-    pAttrs->add(
+    attrs.add(
         "prepareReadConflicts",
         singleTransactionStats.getTransactionStorageMetrics().prepareReadConflicts.loadRelaxed());
 
     StringData terminationCauseString =
         terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
-    pAttrs->add("terminationCause", terminationCauseString);
+    attrs.add("terminationCause", terminationCauseString);
 
-    auto tickSource = opCtx->getServiceContext()->getTickSource();
-    auto curTick = tickSource->getTicks();
+    const auto tickSource = opCtx->getServiceContext()->getTickSource();
+    const auto curTick = tickSource->getTicks();
 
-    pAttrs->add("timeActive", singleTransactionStats.getTimeActiveMicros(tickSource, curTick));
-    pAttrs->add("timeInactive", singleTransactionStats.getTimeInactiveMicros(tickSource, curTick));
+    attrs.add("timeActive", singleTransactionStats.getTimeActiveMicros(tickSource, curTick));
+    attrs.add("timeInactive", singleTransactionStats.getTimeInactiveMicros(tickSource, curTick));
 
     // Number of yields is always 0 in multi-document transactions, but it is included mainly to
     // match the format with other slow operation logging messages.
-    pAttrs->add("numYields", 0);
+    attrs.add("numYields", 0);
     // Aggregate lock statistics.
 
     BSONObjBuilder locks;
     lockStats->report(&locks);
-    pAttrs->add("locks", locks.obj());
+    attrs.add("locks", locks.obj());
 
     if (singleTransactionStats.getOpDebug()->storageStats)
-        pAttrs->add("storage", singleTransactionStats.getOpDebug()->storageStats->toBSON());
+        attrs.add("storage", singleTransactionStats.getOpDebug()->storageStats->toBSON());
 
     // It is possible for a slow transaction to have aborted in the prepared state if an
     // exception was thrown before prepareTransaction succeeds.
     const auto totalPreparedDuration = durationCount<Microseconds>(
         singleTransactionStats.getPreparedDuration(tickSource, curTick));
     const bool txnWasPrepared = totalPreparedDuration > 0;
-    pAttrs->add("wasPrepared", txnWasPrepared);
+    attrs.add("wasPrepared", txnWasPrepared);
     if (txnWasPrepared) {
-        pAttrs->add("totalPreparedDuration", Microseconds(totalPreparedDuration));
-        pAttrs->add("prepareOpTime", o().prepareOpTime);
+        attrs.add("totalPreparedDuration", Microseconds(totalPreparedDuration));
+        attrs.add("prepareOpTime", o().prepareOpTime);
     }
 
-    pAttrs->add("queues", singleTransactionStats.getQueueStats().toBson());
+    attrs.add("queues", singleTransactionStats.getQueueStats().toBson());
 
     // Total duration of the transaction.
-    pAttrs->add(
-        "duration",
-        duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick)));
-}
-
-// Needs to be kept in sync with _transactionInfoForLog
-BSONObj TransactionParticipant::Participant::_transactionInfoBSONForLog(
-    OperationContext* opCtx,
-    const SingleThreadedLockStats* lockStats,
-    TerminationCause terminationCause,
-    APIParameters apiParameters,
-    repl::ReadConcernArgs readConcernArgs) const {
-    invariant(lockStats);
-
-    // User specified transaction parameters.
-    BSONObjBuilder parametersBuilder;
-
-    BSONObjBuilder lsidBuilder(parametersBuilder.subobjStart("lsid"));
-    _sessionId().serialize(&lsidBuilder);
-    lsidBuilder.doneFast();
-
-    parametersBuilder.append("txnNumber", o().activeTxnNumberAndRetryCounter.getTxnNumber());
-    parametersBuilder.append("autocommit", p().autoCommit ? *p().autoCommit : true);
-    apiParameters.appendInfo(&parametersBuilder);
-    readConcernArgs.appendInfo(&parametersBuilder);
-
-    BSONObjBuilder logLine;
-    {
-        BSONObjBuilder attrs = logLine.subobjStart("attr");
-        attrs.append("parameters", parametersBuilder.obj());
-
-        const auto& singleTransactionStats =
-            o().transactionMetricsObserver.getSingleTransactionStats();
-
-        attrs.append("readTimestamp", singleTransactionStats.getReadTimestamp().toString());
-
-        attrs.appendElements(singleTransactionStats.getOpDebug()->additiveMetrics.reportBSON());
-
-        attrs.append(
-            "prepareReadConflicts",
-            singleTransactionStats.getTransactionStorageMetrics().prepareReadConflicts.load());
-
-        StringData terminationCauseString =
-            terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
-        attrs.append("terminationCause", terminationCauseString);
-
-        auto tickSource = opCtx->getServiceContext()->getTickSource();
-        auto curTick = tickSource->getTicks();
-
-        attrs.append("timeActiveMicros",
-                     durationCount<Microseconds>(
-                         singleTransactionStats.getTimeActiveMicros(tickSource, curTick)));
-        attrs.append("timeInactiveMicros",
-                     durationCount<Microseconds>(
-                         singleTransactionStats.getTimeInactiveMicros(tickSource, curTick)));
-
-        // Number of yields is always 0 in multi-document transactions, but it is included mainly to
-        // match the format with other slow operation logging messages.
-        attrs.append("numYields", 0);
-        // Aggregate lock statistics.
-
-        BSONObjBuilder locks;
-        lockStats->report(&locks);
-        attrs.append("locks", locks.obj());
-
-        if (singleTransactionStats.getOpDebug()->storageStats)
-            attrs.append("storage", singleTransactionStats.getOpDebug()->storageStats->toBSON());
-
-        // It is possible for a slow transaction to have aborted in the prepared state if an
-        // exception was thrown before prepareTransaction succeeds.
-        const auto totalPreparedDuration = durationCount<Microseconds>(
-            singleTransactionStats.getPreparedDuration(tickSource, curTick));
-        const bool txnWasPrepared = totalPreparedDuration > 0;
-        attrs.append("wasPrepared", txnWasPrepared);
-        if (txnWasPrepared) {
-            attrs.append("totalPreparedDurationMicros", totalPreparedDuration);
-            attrs.append("prepareOpTime", o().prepareOpTime.toBSON());
-        }
-
-        attrs.append("queues", singleTransactionStats.getQueueStats().toBson());
-
-        // Total duration of the transaction.
-        attrs.append(
-            "durationMillis",
-            duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick))
-                .count());
-    }
-    return logLine.obj();
+    attrs.add("duration",
+              duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick)));
 }
 
 void TransactionParticipant::Participant::_logSlowTransaction(
@@ -3118,10 +2950,10 @@ void TransactionParticipant::Participant::_logSlowTransaction(
                                         opDuration,
                                         Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
-            logv2::DynamicAttributes attr;
+            logv2::DynamicAttributes attrs;
             _transactionInfoForLog(
-                opCtx, lockStats, terminationCause, apiParameters, readConcernArgs, &attr);
-            LOGV2_OPTIONS(51802, {logv2::LogComponent::kTransaction}, "transaction", attr);
+                opCtx, lockStats, terminationCause, apiParameters, readConcernArgs, attrs);
+            LOGV2_OPTIONS(51802, {logv2::LogComponent::kTransaction}, "transaction", attrs);
         }
     }
 }
@@ -3713,6 +3545,76 @@ boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStateme
 
     return it->second;
 }
+
+namespace {
+template <typename Name, typename Value>
+requires(!std::is_unsigned_v<Value>) void mapLogv2ToBSON(BSONObjBuilder& builder,
+                                                         const Name& name,
+                                                         const Value& value) {
+    builder.append(name, value);
+}
+
+template <typename Name, typename Period>
+void mapLogv2ToBSON(BSONObjBuilder& builder, const Name& name, const Duration<Period>& duration) {
+    builder.append(fmt::format("{}{}", name, Duration<Period>::mongoUnitSuffix()),
+                   duration.count());
+}
+
+template <typename Name>
+void mapLogv2ToBSON(BSONObjBuilder& builder, const Name& name, const bool value) {
+    builder.append(name, value);
+}
+
+template <typename Name, typename Integer>
+requires std::is_unsigned_v<Integer>
+void mapLogv2ToBSON(BSONObjBuilder& builder, const Name& name, std::add_const_t<Integer> integer) {
+    builder.append(name, static_cast<std::make_signed_t<Integer>>(integer));
+}
+
+template <typename Name>
+void mapLogv2ToBSON(BSONObjBuilder& builder,
+                    const Name& name,
+                    const logv2::CustomAttributeValue& value) {
+    if (value.BSONSerialize) {
+        BSONObjBuilder sub = builder.subobjStart(name);
+        value.BSONSerialize(sub);
+        sub.done();
+    } else if (value.toBSONArray) {
+        builder.append(name, value.toBSONArray());
+    } else if (value.BSONAppend) {
+        value.BSONAppend(builder, name);
+    } else if (value.stringSerialize) {
+        fmt::memory_buffer out;
+        value.stringSerialize(out);
+        builder.append(name, StringData{out.data(), out.size()});
+    } else if (value.toString) {
+        builder.append(name, value.toString());
+    } else {
+        // NOTE: hitting this failure indicates we did not correctly handle all cases produced by
+        // construction logic in `attribute_storage.h` that construct CustomAttributeValue instances
+        MONGO_UNREACHABLE;
+    }
+}
+}  // namespace
+
+BSONObj TransactionParticipant::Participant::getTransactionInfoForLogForTest(
+    OperationContext* opCtx,
+    const SingleThreadedLockStats* lockStats,
+    bool committed,
+    const APIParameters& apiParameters,
+    const repl::ReadConcernArgs& readConcernArgs) const {
+
+    TerminationCause terminationCause =
+        committed ? TerminationCause::kCommitted : TerminationCause::kAborted;
+    logv2::DynamicAttributes attrs;
+    _transactionInfoForLog(
+        opCtx, lockStats, terminationCause, apiParameters, readConcernArgs, attrs);
+    BSONObjBuilder builder;
+    logv2::TypeErasedAttributeStorage(attrs).apply(
+        [&](const auto& name, const auto& value) { mapLogv2ToBSON(builder, name, value); });
+    return builder.obj();
+}
+
 
 void TransactionParticipant::Participant::addCommittedStmtIds(
     OperationContext* opCtx,

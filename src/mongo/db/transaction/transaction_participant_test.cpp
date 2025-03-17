@@ -4192,250 +4192,16 @@ void setupMetrics(const int metricValue, OperationContext* opCtx) {
 }
 
 /*
- * Builds expected parameters info string.
- */
-void buildParametersInfoString(StringBuilder* sb,
-                               LogicalSessionId sessionId,
-                               const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                               const APIParameters apiParameters,
-                               const repl::ReadConcernArgs readConcernArgs,
-                               bool autocommitVal) {
-    BSONObjBuilder lsidBuilder;
-    sessionId.serialize(&lsidBuilder);
-    auto autocommitString = autocommitVal ? "true" : "false";
-    auto apiVersionString = apiParameters.getAPIVersion().value_or("1");
-    auto apiStrictString = apiParameters.getAPIStrict().value_or(false) ? "true" : "false";
-    auto apiDeprecationErrorsString =
-        apiParameters.getAPIDeprecationErrors().value_or(false) ? "true" : "false";
-    (*sb) << "parameters:{ lsid: " << lsidBuilder.done().toString()
-          << ", txnNumber: " << txnNumberAndRetryCounter.getTxnNumber()
-          << ", txnRetryCounter: " << txnNumberAndRetryCounter.getTxnRetryCounter()
-          << ", autocommit: " << autocommitString << ", apiVersion: \"" << apiVersionString
-          << "\", apiStrict: " << apiStrictString
-          << ", apiDeprecationErrors: " << apiDeprecationErrorsString
-          << ", readConcern: " << readConcernArgs.toBSON().getObjectField("readConcern") << " },";
-}
-
-/*
- * Builds expected single transaction stats info string.
- */
-void buildSingleTransactionStatsString(StringBuilder* sb, const int metricValue) {
-    (*sb) << " keysExamined:" << metricValue << " docsExamined:" << metricValue
-          << " nMatched:" << metricValue << " nModified:" << metricValue
-          << " ninserted:" << metricValue << " ndeleted:" << metricValue
-          << " keysInserted:" << metricValue << " keysDeleted:" << metricValue
-          << " writeConflicts:" << metricValue << " prepareReadConflicts:" << metricValue;
-}
-
-/*
- * Builds the time active and time inactive info string.
- */
-void buildTimeActiveInactiveString(StringBuilder* sb,
-                                   TransactionParticipant::Participant txnParticipant,
-                                   TickSource* tickSource,
-                                   TickSource::Tick curTick) {
-    // Add time active micros to string.
-    (*sb) << " timeActiveMicros:"
-          << durationCount<Microseconds>(
-                 txnParticipant.getSingleTransactionStatsForTest().getTimeActiveMicros(tickSource,
-                                                                                       curTick));
-
-    // Add time inactive micros to string.
-    (*sb) << " timeInactiveMicros:"
-          << durationCount<Microseconds>(
-                 txnParticipant.getSingleTransactionStatsForTest().getTimeInactiveMicros(tickSource,
-                                                                                         curTick));
-}
-
-/*
- * Builds the total prepared duration info string.
- */
-void buildPreparedDurationString(StringBuilder* sb,
-                                 TransactionParticipant::Participant txnParticipant,
-                                 TickSource* tickSource,
-                                 TickSource::Tick curTick) {
-    (*sb) << " totalPreparedDurationMicros:"
-          << durationCount<Microseconds>(
-                 txnParticipant.getSingleTransactionStatsForTest().getPreparedDuration(tickSource,
-                                                                                       curTick));
-}
-
-/*
- * Builds the entire expected transaction info string and returns it.
- */
-std::string buildTransactionInfoString(OperationContext* opCtx,
-                                       TransactionParticipant::Participant txnParticipant,
-                                       std::string terminationCause,
-                                       const LogicalSessionId sessionId,
-                                       const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                                       const int metricValue,
-                                       const bool wasPrepared,
-                                       bool autocommitVal = false,
-                                       boost::optional<repl::OpTime> prepareOpTime = boost::none) {
-    // Calling transactionInfoForLog to get the actual transaction info string.
-    const auto lockerInfo =
-        shard_role_details::getLocker(opCtx)->getLockerInfo(CurOp::get(*opCtx)->getLockStatsBase());
-    // Building expected transaction info string.
-    StringBuilder parametersInfo;
-    // autocommit must be false for a multi statement transaction, so
-    // getTransactionInfoForLogForTest should theoretically always print false. In certain unit
-    // tests, we compare its output to the output generated in this function.
-    //
-    // Since we clear the state of a transaction on abort, if getTransactionInfoForLogForTest is
-    // called after a transaction is already aborted, it will encounter boost::none for the
-    // autocommit value. In that case, it will print out true.
-    //
-    // In cases where we call getTransactionInfoForLogForTest after aborting a transaction
-    // and check if the output matches this function's output, we must explicitly set autocommitVal
-    // to true.
-    buildParametersInfoString(&parametersInfo,
-                              sessionId,
-                              txnNumberAndRetryCounter,
-                              APIParameters::get(opCtx),
-                              repl::ReadConcernArgs::get(opCtx),
-                              autocommitVal);
-
-    StringBuilder readTimestampInfo;
-    readTimestampInfo
-        << " readTimestamp:"
-        << txnParticipant.getSingleTransactionStatsForTest().getReadTimestamp().toString() << ",";
-
-    StringBuilder singleTransactionStatsInfo;
-    buildSingleTransactionStatsString(&singleTransactionStatsInfo, metricValue);
-
-    auto tickSource = opCtx->getServiceContext()->getTickSource();
-    StringBuilder timeActiveAndInactiveInfo;
-    buildTimeActiveInactiveString(
-        &timeActiveAndInactiveInfo, txnParticipant, tickSource, tickSource->getTicks());
-
-    BSONObjBuilder locks;
-    lockerInfo.stats.report(&locks);
-
-    // Puts all the substrings together into one expected info string. The expected info string will
-    // look something like this:
-    // parameters:{ lsid: { id: UUID("f825288c-100e-49a1-9fd7-b95c108049e6"), uid: BinData(0,
-    // E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855) }, txnNumber: 1,
-    // autocommit: false }, readTimestamp:Timestamp(0, 0), keysExamined:1 docsExamined:1 nMatched:1
-    // nModified:1 ninserted:1 ndeleted:1 keysInserted:1 keysDeleted:1
-    // writeConflicts:1 prepareReadConflicts:1 terminationCause:committed timeActiveMicros:3
-    // timeInactiveMicros:2 numYields:0 locks:{ Global: { acquireCount: { r: 6, w: 4 } }, Database:
-    // { acquireCount: { r: 1, w: 1, W: 2 } }, Collection: { acquireCount: { R: 1 } }, oplog: {
-    // acquireCount: { W: 1 } } } wasPrepared:1 totalPreparedDurationMicros:10
-    // prepareOpTime:<OpTime> 0ms
-    StringBuilder expectedTransactionInfo;
-    expectedTransactionInfo << parametersInfo.str() << readTimestampInfo.str()
-                            << singleTransactionStatsInfo.str()
-                            << " terminationCause:" << terminationCause
-                            << timeActiveAndInactiveInfo.str() << " numYields:" << 0
-                            << " locks:" << locks.done().toString();
-
-    if (auto& storageStats = CurOp::get(opCtx)->debug().storageStats) {
-        expectedTransactionInfo << " storage:" << storageStats->toBSON();
-    }
-
-    expectedTransactionInfo << " wasPrepared:" << wasPrepared;
-
-    if (wasPrepared) {
-        StringBuilder totalPreparedDuration;
-        buildPreparedDurationString(
-            &totalPreparedDuration, txnParticipant, tickSource, tickSource->getTicks());
-        expectedTransactionInfo << totalPreparedDuration.str();
-        expectedTransactionInfo << " prepareOpTime:"
-                                << (prepareOpTime ? prepareOpTime->toString()
-                                                  : txnParticipant.getPrepareOpTime().toString());
-    }
-
-    expectedTransactionInfo
-        << " queues:"
-        << txnParticipant.getSingleTransactionStatsForTest().getQueueStats().toBson().toString();
-
-    expectedTransactionInfo << ", "
-                            << duration_cast<Milliseconds>(
-                                   txnParticipant.getSingleTransactionStatsForTest().getDuration(
-                                       tickSource, tickSource->getTicks()));
-    return expectedTransactionInfo.str();
-}
-
-
-/*
- * Builds expected parameters info BSON.
- */
-void buildParametersInfoBSON(BSONObjBuilder* builder,
-                             LogicalSessionId sessionId,
-                             const TxnNumber txnNum,
-                             const repl::ReadConcernArgs readConcernArgs,
-                             bool autocommitVal) {
-    BSONObjBuilder lsidBuilder;
-    sessionId.serialize(&lsidBuilder);
-    auto autocommitString = autocommitVal ? "true" : "false";
-
-    BSONObjBuilder params = builder->subobjStart("parameters");
-    params.append("lsid", lsidBuilder.obj());
-    params.append("txnNumber", txnNum);
-    params.append("autocommit", autocommitString);
-    readConcernArgs.appendInfo(&params);
-}
-
-/*
- * Builds expected single transaction stats info string.
- */
-void buildSingleTransactionStatsBSON(BSONObjBuilder* builder, const int metricValue) {
-    builder->append("keysExamined", metricValue);
-    builder->append("docsExamined", metricValue);
-    builder->append("nMatched", metricValue);
-    builder->append("nModified", metricValue);
-    builder->append("ninserted", metricValue);
-    builder->append("ndeleted", metricValue);
-    builder->append("keysInserted", metricValue);
-    builder->append("keysDeleted", metricValue);
-    builder->append("writeConflicts", metricValue);
-    builder->append("prepareReadConflicts", metricValue);
-}
-
-/*
- * Builds the time active and time inactive info BSON.
- */
-void buildTimeActiveInactiveBSON(BSONObjBuilder* builder,
-                                 TransactionParticipant::Participant txnParticipant,
-                                 TickSource* tickSource,
-                                 TickSource::Tick curTick) {
-    // Add time active micros to string.
-    builder->append("timeActiveMicros",
-                    durationCount<Microseconds>(
-                        txnParticipant.getSingleTransactionStatsForTest().getTimeActiveMicros(
-                            tickSource, curTick)));
-
-    // Add time inactive micros to string.
-    builder->append("timeInactiveMicros",
-                    durationCount<Microseconds>(
-                        txnParticipant.getSingleTransactionStatsForTest().getTimeInactiveMicros(
-                            tickSource, curTick)));
-}
-
-/*
- * Builds the total prepared duration info BSON.
- */
-void buildPreparedDurationBSON(BSONObjBuilder* builder,
-                               TransactionParticipant::Participant txnParticipant,
-                               TickSource* tickSource,
-                               TickSource::Tick curTick) {
-    builder->append("totalPreparedDurationMicros",
-                    durationCount<Microseconds>(
-                        txnParticipant.getSingleTransactionStatsForTest().getPreparedDuration(
-                            tickSource, curTick)));
-}
-
-/*
  * Builds the entire expected transaction info BSON and returns it.
- *
- * Must be kept in sync with TransactionParticipant::Participant::_transactionInfoForLog.
  */
 BSONObj buildTransactionInfoBSON(OperationContext* opCtx,
                                  TransactionParticipant::Participant txnParticipant,
                                  std::string terminationCause,
+                                 const APIParameters apiParameters,
+                                 const repl::ReadConcernArgs readConcernArgs,
                                  const LogicalSessionId sessionId,
-                                 const TxnNumber txnNum,
-                                 const int metricValue,
+                                 const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+                                 const int64_t metricValue,
                                  const bool wasPrepared,
                                  bool autocommitVal = false,
                                  boost::optional<repl::OpTime> prepareOpTime = boost::none) {
@@ -4458,50 +4224,89 @@ BSONObj buildTransactionInfoBSON(OperationContext* opCtx,
 
     BSONObjBuilder logLine;
     {
-        BSONObjBuilder attrs = logLine.subobjStart("attr");
+        BSONObjBuilder lsidBuilder;
+        sessionId.serialize(&lsidBuilder);
 
-        buildParametersInfoBSON(
-            &attrs, sessionId, txnNum, repl::ReadConcernArgs::get(opCtx), autocommitVal);
+        BSONObjBuilder params = logLine.subobjStart("parameters");
+        params.append("lsid", lsidBuilder.obj());
+        params.append("txnNumber", txnNumberAndRetryCounter.getTxnNumber());
+        params.append("txnRetryCounter", *txnNumberAndRetryCounter.getTxnRetryCounter());
+        params.append("autocommit", autocommitVal);
+        apiParameters.appendInfo(&params);
+        readConcernArgs.appendInfo(&params);
+        params.done();
 
-
-        attrs.append(
+        logLine.append(
             "readTimestamp",
             txnParticipant.getSingleTransactionStatsForTest().getReadTimestamp().toString());
 
-        buildSingleTransactionStatsBSON(&attrs, metricValue);
+        logLine.append("keysExamined", metricValue);
+        logLine.append("docsExamined", metricValue);
+        logLine.append("nMatched", metricValue);
+        logLine.append("nModified", metricValue);
+        logLine.append("ninserted", metricValue);
+        logLine.append("ndeleted", metricValue);
+        logLine.append("keysInserted", metricValue);
+        logLine.append("keysDeleted", metricValue);
+        logLine.append("writeConflicts", metricValue);
+        logLine.append("prepareReadConflicts", metricValue);
+        logLine.append("terminationCause", terminationCause);
 
-        attrs.append("terminationCause", terminationCause);
-        auto tickSource = opCtx->getServiceContext()->getTickSource();
-        buildTimeActiveInactiveBSON(&attrs, txnParticipant, tickSource, tickSource->getTicks());
+        const auto tickSource = opCtx->getServiceContext()->getTickSource();
+        const auto curTick = tickSource->getTicks();
+        logLine.append("timeActiveMicros",
+                       durationCount<Microseconds>(
+                           txnParticipant.getSingleTransactionStatsForTest().getTimeActiveMicros(
+                               tickSource, curTick)));
+        logLine.append("timeInactiveMicros",
+                       durationCount<Microseconds>(
+                           txnParticipant.getSingleTransactionStatsForTest().getTimeInactiveMicros(
+                               tickSource, curTick)));
 
-        attrs.append("numYields", 0);
+        logLine.append("numYields", 0);
 
         BSONObjBuilder locks;
         lockerInfo.stats.report(&locks);
-        attrs.append("locks", locks.obj());
+        logLine.append("locks", locks.obj());
 
-        attrs.append("wasPrepared", wasPrepared);
-
-        if (wasPrepared) {
-            buildPreparedDurationBSON(&attrs, txnParticipant, tickSource, tickSource->getTicks());
-            attrs.append("prepareOpTime",
-                         (prepareOpTime ? prepareOpTime->toBSON()
-                                        : txnParticipant.getPrepareOpTime().toBSON()));
+        if (const auto& stats =
+                txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->storageStats;
+            stats) {
+            logLine.append("storage", stats->toBSON());
         }
 
-        attrs.append("queues",
-                     txnParticipant.getSingleTransactionStatsForTest().getQueueStats().toBson());
+        logLine.append("wasPrepared", wasPrepared);
 
-        attrs.append("durationMillis",
-                     duration_cast<Milliseconds>(
-                         txnParticipant.getSingleTransactionStatsForTest().getDuration(
-                             tickSource, tickSource->getTicks()))
-                         .count());
+        if (wasPrepared) {
+            logLine.append(
+                "totalPreparedDurationMicros",
+                durationCount<Microseconds>(
+                    txnParticipant.getSingleTransactionStatsForTest().getPreparedDuration(
+                        tickSource, curTick)));
+            prepareOpTime.value_or(txnParticipant.getPrepareOpTime())
+                .append("prepareOpTime", &logLine);
+        }
+
+        logLine.append("queues",
+                       txnParticipant.getSingleTransactionStatsForTest().getQueueStats().toBson());
+
+        logLine.append("durationMillis",
+                       duration_cast<Milliseconds>(
+                           txnParticipant.getSingleTransactionStatsForTest().getDuration(
+                               tickSource, tickSource->getTicks()))
+                           .count());
     }
 
     return logLine.obj();
 }
 
+BSONObj formatBSONForLogLine(const BSONObj input) {
+    BSONObjBuilder builder;
+    BSONObjBuilder sub = builder.subobjStart("attr");
+    sub.appendElements(input);
+    sub.done();
+    return builder.obj();
+}
 
 TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     // Initialize SingleTransactionStats AdditiveMetrics objects.
@@ -4531,19 +4336,21 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     txnParticipant.commitUnpreparedTransaction(opCtx());
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
-    std::string testTransactionInfo = txnParticipant.getTransactionInfoForLogForTest(
+    const auto testTransactionInfo = txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, true, apiParameters, readConcernArgs);
 
-    std::string expectedTransactionInfo =
-        buildTransactionInfoString(opCtx(),
-                                   txnParticipant,
-                                   "committed",
-                                   *opCtx()->getLogicalSessionId(),
-                                   {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
-                                   metricValue,
-                                   false);
+    const auto expectedTransactionInfo =
+        buildTransactionInfoBSON(opCtx(),
+                                 txnParticipant,
+                                 "committed",
+                                 apiParameters,
+                                 readConcernArgs,
+                                 *opCtx()->getLogicalSessionId(),
+                                 {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
+                                 metricValue,
+                                 false);
 
-    ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
+    ASSERT_BSONOBJ_EQ(testTransactionInfo, expectedTransactionInfo);
 }
 
 TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterCommit) {
@@ -4580,19 +4387,21 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterCommit) {
     txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
-    std::string testTransactionInfo = txnParticipant.getTransactionInfoForLogForTest(
+    const auto testTransactionInfo = txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, true, apiParameters, readConcernArgs);
 
-    std::string expectedTransactionInfo =
-        buildTransactionInfoString(opCtx(),
-                                   txnParticipant,
-                                   "committed",
-                                   *opCtx()->getLogicalSessionId(),
-                                   {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
-                                   metricValue,
-                                   true);
+    const auto expectedTransactionInfo =
+        buildTransactionInfoBSON(opCtx(),
+                                 txnParticipant,
+                                 "committed",
+                                 apiParameters,
+                                 readConcernArgs,
+                                 *opCtx()->getLogicalSessionId(),
+                                 {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
+                                 metricValue,
+                                 true);
 
-    ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
+    ASSERT_BSONOBJ_EQ(testTransactionInfo, expectedTransactionInfo);
 }
 
 TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
@@ -4623,20 +4432,22 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
 
-    std::string testTransactionInfo = txnParticipant.getTransactionInfoForLogForTest(
+    const auto testTransactionInfo = txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, false, apiParameters, readConcernArgs);
 
-    std::string expectedTransactionInfo =
-        buildTransactionInfoString(opCtx(),
-                                   txnParticipant,
-                                   "aborted",
-                                   *opCtx()->getLogicalSessionId(),
-                                   {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
-                                   metricValue,
-                                   false,
-                                   true);
+    const auto expectedTransactionInfo =
+        buildTransactionInfoBSON(opCtx(),
+                                 txnParticipant,
+                                 "aborted",
+                                 apiParameters,
+                                 readConcernArgs,
+                                 *opCtx()->getLogicalSessionId(),
+                                 {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
+                                 metricValue,
+                                 false,
+                                 true);
 
-    ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
+    ASSERT_BSONOBJ_EQ(testTransactionInfo, expectedTransactionInfo);
 }
 
 TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterAbort) {
@@ -4672,20 +4483,22 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterAbort) {
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
 
-    std::string testTransactionInfo = txnParticipant.getTransactionInfoForLogForTest(
+    const auto testTransactionInfo = txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, false, apiParameters, readConcernArgs);
 
-    std::string expectedTransactionInfo =
-        buildTransactionInfoString(opCtx(),
-                                   txnParticipant,
-                                   "aborted",
-                                   *opCtx()->getLogicalSessionId(),
-                                   {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
-                                   metricValue,
-                                   true,
-                                   true);
+    const auto expectedTransactionInfo =
+        buildTransactionInfoBSON(opCtx(),
+                                 txnParticipant,
+                                 "aborted",
+                                 apiParameters,
+                                 readConcernArgs,
+                                 *opCtx()->getLogicalSessionId(),
+                                 {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
+                                 metricValue,
+                                 true,
+                                 true);
 
-    ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
+    ASSERT_BSONOBJ_EQ(testTransactionInfo, expectedTransactionInfo);
 }
 
 DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoStats, "invariant") {
@@ -4752,12 +4565,11 @@ TEST_F(TransactionsMetricsTest, TransactionLogAggregatesQueueStats) {
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
 
     auto participant = TransactionParticipant::get(opCtx());
-    BSONObj transactionLog = participant.getTransactionInfoBSONForLogForTest(
+    BSONObj transactionLog = participant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, true, apiParameters, readConcernArgs);
 
-    BSONObj logAttr = transactionLog.getObjectField("attr");
-    ASSERT_TRUE(logAttr.getField("queues").isABSONObj());
-    BSONObj queueBsonStats = logAttr.getObjectField("queues");
+    ASSERT_TRUE(transactionLog.getField("queues").isABSONObj());
+    BSONObj queueBsonStats = transactionLog.getObjectField("queues");
 
     int expectedVal = baseValue * numIterations;
     auto expectedBson = BSON(
@@ -4818,9 +4630,9 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
 
-    BSONObj expected = txnParticipant.getTransactionInfoBSONForLogForTest(
+    BSONObj expected = txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, true, apiParameters, readConcernArgs);
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(expected));
+    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expected)));
 }
 
 TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
@@ -4871,15 +4683,20 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
 
-    BSONObj expected = txnParticipant.getTransactionInfoBSONForLogForTest(
+    BSONObj expected = txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, true, apiParameters, readConcernArgs);
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(expected));
+    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expected)));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
     auto tickSource = mockTickSource();
 
     auto sessionCheckout = checkOutSession();
+    APIParameters apiParameters = APIParameters();
+    apiParameters.setAPIVersion("2");
+    apiParameters.setAPIStrict(true);
+    apiParameters.setAPIDeprecationErrors(true);
+    APIParameters::get(opCtx()) = apiParameters;
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(
@@ -4915,16 +4732,19 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
     txnParticipant.abortTransaction(opCtx());
     stopCapturingLogMessages();
 
+    const auto expectedTransactionInfo =
+        buildTransactionInfoBSON(opCtx(),
+                                 txnParticipant,
+                                 "aborted",
+                                 apiParameters,
+                                 readConcernArgs,
+                                 *opCtx()->getLogicalSessionId(),
+                                 {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
+                                 metricValue,
+                                 false);
 
-    auto expectedTransactionInfo = buildTransactionInfoBSON(opCtx(),
-                                                            txnParticipant,
-                                                            "aborted",
-                                                            *opCtx()->getLogicalSessionId(),
-                                                            *opCtx()->getTxnNumber(),
-                                                            metricValue,
-                                                            false);
-
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(expectedTransactionInfo));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expectedTransactionInfo)));
 }
 
 TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
@@ -4975,17 +4795,21 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
     txnParticipant.abortTransaction(opCtx());
     stopCapturingLogMessages();
 
+    const auto expectedTransactionInfo =
+        buildTransactionInfoBSON(opCtx(),
+                                 txnParticipant,
+                                 "aborted",
+                                 apiParameters,
+                                 readConcernArgs,
+                                 *opCtx()->getLogicalSessionId(),
+                                 {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
+                                 metricValue,
+                                 true,
 
-    auto expectedTransactionInfo = buildTransactionInfoBSON(opCtx(),
-                                                            txnParticipant,
-                                                            "aborted",
-                                                            *opCtx()->getLogicalSessionId(),
-                                                            *opCtx()->getTxnNumber(),
-                                                            metricValue,
-                                                            true,
-                                                            false,
-                                                            prepareOpTime);
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(expectedTransactionInfo));
+                                 false,
+                                 prepareOpTime);
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expectedTransactionInfo)));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
@@ -5038,15 +4862,19 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
     ASSERT(txnParticipant.transactionIsAborted());
     stopCapturingLogMessages();
 
-    auto expectedTransactionInfo = buildTransactionInfoBSON(opCtx(),
-                                                            txnParticipant,
-                                                            "aborted",
-                                                            *opCtx()->getLogicalSessionId(),
-                                                            *opCtx()->getTxnNumber(),
-                                                            metricValue,
-                                                            false);
+    const auto expectedTransactionInfo =
+        buildTransactionInfoBSON(opCtx(),
+                                 txnParticipant,
+                                 "aborted",
+                                 apiParameters,
+                                 readConcernArgs,
+                                 *opCtx()->getLogicalSessionId(),
+                                 {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
+                                 metricValue,
+                                 false);
 
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(expectedTransactionInfo));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expectedTransactionInfo)));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
