@@ -472,10 +472,10 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
         return b.makeLet(
             frameId,
             SbExpr::makeSeq(std::move(fieldExpr)),
-            b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                           b.makeFunction("isArray"_sd, SbVar{frameId, 0}),
-                           generateArrayCheckForSort(
-                               state, SbVar{frameId, 0}, fp, level + 1, frameIdGenerator)));
+            b.makeBooleanOpTree(optimizer::Operations::Or,
+                                b.makeFunction("isArray"_sd, SbVar{frameId, 0}),
+                                generateArrayCheckForSort(
+                                    state, SbVar{frameId, 0}, fp, level + 1, frameIdGenerator)));
     }();
 
     if (level == 0) {
@@ -639,9 +639,9 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                             std::make_pair(PlanStageSlots::kField, fp.getFieldName(0)))));
                 };
 
-                return b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                      makeIsNotArrayCheck(*sortPattern[0].fieldPath),
-                                      makeIsNotArrayCheck(*sortPattern[1].fieldPath));
+                return b.makeBooleanOpTree(optimizer::Operations::Or,
+                                           makeIsNotArrayCheck(*sortPattern[0].fieldPath),
+                                           makeIsNotArrayCheck(*sortPattern[1].fieldPath));
             } else {
                 // If the sort pattern has three or more parts, we generate an expression to
                 // perform the "parallel arrays" check that works (and scales well) for an

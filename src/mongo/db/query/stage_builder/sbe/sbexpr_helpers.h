@@ -31,10 +31,10 @@
 
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/stages/window.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
-#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
+#include "mongo/db/query/stage_builder/sbe/builder_state.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
-#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 
 namespace mongo::stage_builder {
@@ -240,15 +240,16 @@ public:
     }
 
     /**
-     * Creates a balanced boolean binary expression tree from given collection of leaf expression.
+     * Creates a boolean expression tree from given collection of leaf expression.
      */
-    SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp, SbExpr::Vector leaves) {
-        return stage_builder::makeBalancedBooleanOpTree(logicOp, std::move(leaves), _state);
+    SbExpr makeBooleanOpTree(optimizer::Operations logicOp, SbExpr lhs, SbExpr rhs) {
+        SbExpr::Vector leaves;
+        leaves.emplace_back(std::move(lhs));
+        leaves.emplace_back(std::move(rhs));
+        return stage_builder::makeBooleanOpTree(logicOp, std::move(leaves), _state);
     }
-
-    SbExpr makeBalancedBooleanOpTree(optimizer::Operations logicOp, SbExpr::Vector leaves) {
-        return stage_builder::makeBalancedBooleanOpTree(
-            abt::getEPrimBinaryOp(logicOp), std::move(leaves), _state);
+    SbExpr makeBooleanOpTree(optimizer::Operations logicOp, SbExpr::Vector leaves) {
+        return stage_builder::makeBooleanOpTree(logicOp, std::move(leaves), _state);
     }
 
     std::unique_ptr<sbe::EExpression> lower(SbExpr& e, const VariableTypes* varTypes = nullptr) {

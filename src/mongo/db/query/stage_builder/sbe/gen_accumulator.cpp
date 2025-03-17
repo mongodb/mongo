@@ -465,9 +465,9 @@ AccumInputsPtr buildAccumExprsAvg(const AccumOp& acc,
     auto binds = SbExpr::makeSeq(inputs->inputExpr.clone());
     auto var = SbVar{frameId, 0};
 
-    auto e = b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                     b.generateNullMissingOrUndefined(var),
-                                     b.generateNonNumericCheck(var)),
+    auto e = b.makeIf(b.makeBooleanOpTree(optimizer::Operations::Or,
+                                          b.generateNullMissingOrUndefined(var),
+                                          b.generateNonNumericCheck(var)),
                       b.makeInt64Constant(0),
                       b.makeInt64Constant(1));
 
@@ -984,9 +984,9 @@ SbExpr wrapMergeObjectsArg(SbExpr arg, StageBuilderState& state) {
     auto var = SbVar{frameId, 0};
 
     auto expr =
-        b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                b.generateNullMissingOrUndefined(var),
-                                b.makeFunction("isObject", var)),
+        b.makeIf(b.makeBooleanOpTree(optimizer::Operations::Or,
+                                     b.generateNullMissingOrUndefined(var),
+                                     b.makeFunction("isObject", var)),
                  SbExpr{var},
                  b.makeFail(ErrorCodes::Error{5911200}, "$mergeObjects only supports objects"));
 
@@ -1053,19 +1053,20 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
             b.makeNumericConvert(std::move(maxSizeExpr), sbe::value::TypeTags::NumberInt64));
         auto var = SbVar{frameId, 0};
 
-        auto e = b.makeIf(
-            b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                           b.makeFunction("exists", var),
-                           b.makeBinaryOp(sbe::EPrimBinary::greater, var, b.makeInt64Constant(0))),
-            b.makeFunction("newArray",
-                           b.makeFunction("newArray"),
-                           b.makeInt64Constant(0),
-                           var,
-                           b.makeInt32Constant(0),
-                           b.makeInt32Constant(maxAccumulatorBytes),
-                           std::move(isGroupAccumExpr)),
-            b.makeFail(ErrorCodes::Error{7548607},
-                       "parameter 'n' must be coercible to a positive 64-bit integer"));
+        auto e =
+            b.makeIf(b.makeBooleanOpTree(
+                         optimizer::Operations::And,
+                         b.makeFunction("exists", var),
+                         b.makeBinaryOp(sbe::EPrimBinary::greater, var, b.makeInt64Constant(0))),
+                     b.makeFunction("newArray",
+                                    b.makeFunction("newArray"),
+                                    b.makeInt64Constant(0),
+                                    var,
+                                    b.makeInt32Constant(0),
+                                    b.makeInt32Constant(maxAccumulatorBytes),
+                                    std::move(isGroupAccumExpr)),
+                     b.makeFail(ErrorCodes::Error{7548607},
+                                "parameter 'n' must be coercible to a positive 64-bit integer"));
 
         auto localBind = b.makeLet(frameId, std::move(binds), std::move(e));
 
@@ -1508,9 +1509,10 @@ SbExpr buildFinalizeDerivative(const AccumOp& acc,
     auto sortByLast = std::move(inputs->sortByLast);
 
     return b.makeIf(
-        b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                       b.makeFunction("exists", slots[0]),
-                       b.makeBinaryOp(sbe::EPrimBinary::greater, slots[0], b.makeInt64Constant(0))),
+        b.makeBooleanOpTree(
+            optimizer::Operations::And,
+            b.makeFunction("exists", slots[0]),
+            b.makeBinaryOp(sbe::EPrimBinary::greater, slots[0], b.makeInt64Constant(0))),
         b.makeFunction("aggDerivativeFinalize",
                        std::move(unit),
                        std::move(inputFirst),

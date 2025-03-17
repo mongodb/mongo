@@ -110,6 +110,14 @@ ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer:
     return ValueType::LocalValue;
 }
 
+ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer::NaryOp& op) {
+    // Process the arguments, but the logical operation is always going to return a local value.
+    for (auto& node : op.nodes()) {
+        node.visit(*this);
+    }
+    return ValueType::LocalValue;
+}
+
 ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer::FunctionCall& op) {
     size_t arity = op.nodes().size();
     if (arity == 3 && (op.name() == "traverseP"s || op.name() == "traverseF"s)) {

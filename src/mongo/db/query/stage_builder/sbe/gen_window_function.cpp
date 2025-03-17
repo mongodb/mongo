@@ -477,9 +477,10 @@ SbExpr buildWindowFinalizeFirstLast(const WindowOp& op,
 
     auto thenExpr = b.makeFillEmpty(std::move(inputExpr), defaultVal.clone());
     return b.makeIf(
-        b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                       b.makeFunction("exists", slots[0]),
-                       b.makeBinaryOp(sbe::EPrimBinary::greater, slots[0], b.makeInt64Constant(0))),
+        b.makeBooleanOpTree(
+            optimizer::Operations::And,
+            b.makeFunction("exists", slots[0]),
+            b.makeBinaryOp(sbe::EPrimBinary::greater, slots[0], b.makeInt64Constant(0))),
         std::move(thenExpr),
         std::move(defaultVal));
 }

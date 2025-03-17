@@ -36,37 +36,42 @@
 #include <iterator>
 #include <limits>
 #include <numeric>
-#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/query/bson_typemask.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
-#include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
-#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/db/query/stage_builder/sbe/type_checker.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
-SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
-                                 std::vector<SbExpr> leaves,
-                                 StageBuilderState& state) {
+SbExpr makeBooleanOpTree(optimizer::Operations logicOp,
+                         std::vector<SbExpr> leaves,
+                         StageBuilderState& state) {
     std::vector<optimizer::ABT> abtExprs;
     abtExprs.reserve(leaves.size());
     for (auto&& e : leaves) {
         abtExprs.push_back(abt::unwrap(e.extractABT()));
     }
-    return abt::wrap(makeBalancedBooleanOpTree(logicOp == sbe::EPrimBinary::logicAnd
-                                                   ? optimizer::Operations::And
-                                                   : optimizer::Operations::Or,
-                                               std::move(abtExprs)));
+    return abt::wrap(makeBooleanOpTree(logicOp, std::move(abtExprs)));
+}
+
+optimizer::ABT makeBooleanOpTree(optimizer::Operations logicOp,
+                                 std::vector<optimizer::ABT> leaves) {
+    invariant(!leaves.empty());
+    if (leaves.size() == 1) {
+        return std::move(leaves[0]);
+    }
+    if ((logicOp == optimizer::Operations::And || logicOp == optimizer::Operations::Or) &&
+        feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+        return optimizer::make<optimizer::NaryOp>(logicOp, std::move(leaves));
+    } else {
+        auto builder = [=](optimizer::ABT lhs, optimizer::ABT rhs) {
+            return optimizer::make<optimizer::BinaryOp>(logicOp, std::move(lhs), std::move(rhs));
+        };
+        return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
+    }
 }
 
 optimizer::ABT makeFillEmpty(optimizer::ABT expr, optimizer::ABT altExpr) {
@@ -199,7 +204,7 @@ optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::Project
 }
 
 optimizer::ABT generateInvalidRoundPlaceArgCheck(const optimizer::ProjectionName& var) {
-    return makeBalancedBooleanOpTree(
+    return makeBooleanOpTree(
         optimizer::Operations::Or,
         {
             // We can perform our numerical test with trunc. trunc will return nothing if we pass a

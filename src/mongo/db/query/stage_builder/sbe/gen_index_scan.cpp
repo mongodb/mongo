@@ -659,10 +659,11 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
     // return EOF. This does not apply when the interval is a point interval, since the interval
     // should always exist in that case.
     if (shouldRegisterLowHighKeyInRuntimeEnv && !isPointInterval) {
-        stage = b.makeConstFilter(std::move(stage),
-                                  b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                                                 b.makeFunction("exists", lowKeyExpr.clone()),
-                                                 b.makeFunction("exists", highKeyExpr.clone())));
+        stage =
+            b.makeConstFilter(std::move(stage),
+                              b.makeBooleanOpTree(optimizer::Operations::And,
+                                                  b.makeFunction("exists", lowKeyExpr.clone()),
+                                                  b.makeFunction("exists", highKeyExpr.clone())));
     }
 
     return {std::move(stage),

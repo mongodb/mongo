@@ -241,6 +241,34 @@ public:
 };
 
 /**
+ * Models arithmetic or logical operations that can take more than two arguments, for instance add,
+ * multiply.
+ */
+class NaryOp final : public ABTOpDynamicArity<0>, public ExpressionSyntaxSort {
+    using Base = ABTOpDynamicArity<0>;
+    Operations _op;
+
+public:
+    NaryOp(Operations inOp, ABTVector exprs) : Base(std::move(exprs)), _op(inOp) {
+        tassert(10199600,
+                "operation doesn't allow multiple operands",
+                _op == Operations::And || _op == Operations::Or);
+        tassert(10199601, "operation needs at least two operands", nodes().size() >= 2);
+        for (auto&& expr : nodes()) {
+            assertExprSort(expr);
+        }
+    }
+
+    bool operator==(const NaryOp& other) const {
+        return _op == other._op && nodes() == other.nodes();
+    }
+
+    auto op() const {
+        return _op;
+    }
+};
+
+/**
  * Branching operator with a condition expression, "then" expression, and an "else" expression.
  */
 class If final : public ABTOpFixedArity<3>, public ExpressionSyntaxSort {
