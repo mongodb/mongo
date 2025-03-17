@@ -39,15 +39,6 @@ namespace mongo {
  */
 class StorageStats {
 public:
-    // This is a pure virtual class, so the constructors will never be called directly, and slicing
-    // should not be an issue.
-    StorageStats() = default;
-    StorageStats(const StorageStats&) = default;
-    StorageStats(StorageStats&&) = default;
-
-    StorageStats& operator=(const StorageStats&) = delete;
-    StorageStats& operator=(StorageStats&&) = delete;
-
     virtual ~StorageStats() = default;
 
     virtual BSONObj toBSON() const = 0;

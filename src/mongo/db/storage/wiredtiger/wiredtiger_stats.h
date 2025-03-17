@@ -47,8 +47,6 @@ public:
     WiredTigerStats(WiredTigerSession& session);
 
     WiredTigerStats() = default;
-    WiredTigerStats(const WiredTigerStats&) = default;
-    WiredTigerStats(WiredTigerStats&&) = default;
 
     BSONObj toBSON() const final;
 
@@ -56,8 +54,6 @@ public:
     Microseconds readingTime() const final;
 
     std::unique_ptr<StorageStats> clone() const final;
-
-    WiredTigerStats& operator=(WiredTigerStats&&) noexcept;
 
     StorageStats& operator+=(const StorageStats&) final;
 

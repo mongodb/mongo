@@ -164,22 +164,6 @@ std::unique_ptr<StorageStats> WiredTigerStats::clone() const {
     return std::make_unique<WiredTigerStats>(*this);
 }
 
-WiredTigerStats& WiredTigerStats::operator=(WiredTigerStats&& other) noexcept {
-    _bytesRead = other._bytesRead;
-    _bytesWrite = other._bytesWrite;
-    _lockDhandleWait = other._lockDhandleWait;
-    _txnBytesDirty = other._txnBytesDirty;
-    _readTime = other._readTime;
-    _writeTime = other._writeTime;
-    _lockSchemaWait = other._lockSchemaWait;
-    _cacheTime = other._cacheTime;
-    _cacheTimeInterruptible = other._cacheTimeInterruptible;
-    _cacheTimeMandatory = other._cacheTimeMandatory;
-    _storageExecutionTime = other._storageExecutionTime;
-
-    return *this;
-}
-
 WiredTigerStats& WiredTigerStats::operator+=(const WiredTigerStats& other) {
     _bytesRead += other._bytesRead;
     _bytesWrite += other._bytesWrite;
