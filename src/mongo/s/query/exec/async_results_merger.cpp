@@ -83,7 +83,7 @@ namespace {
  * and 'compareWholeSortKey'=true, this function will return
  *   {"": <value>}
  */
-BSONObj extractSortKey(BSONObj obj, bool compareWholeSortKey) {
+BSONObj extractSortKey(const BSONObj& obj, bool compareWholeSortKey) {
     auto key = obj[AsyncResultsMerger::kSortKeyField];
     invariant(key);
     if (compareWholeSortKey) {
@@ -97,7 +97,9 @@ BSONObj extractSortKey(BSONObj obj, bool compareWholeSortKey) {
  * Returns an int less than 0 if 'leftSortKey' < 'rightSortKey', 0 if the two are equal, and an int
  * > 0 if 'leftSortKey' > 'rightSortKey' according to the pattern 'sortKeyPattern'.
  */
-int compareSortKeys(BSONObj leftSortKey, BSONObj rightSortKey, BSONObj sortKeyPattern) {
+int compareSortKeys(const BSONObj& leftSortKey,
+                    const BSONObj& rightSortKey,
+                    const BSONObj& sortKeyPattern) {
     // This does not need to sort with a collator, since mongod has already mapped strings to their
     // ICU comparison keys as part of the $sortKey meta projection.
     constexpr BSONObj::ComparisonRulesSet rules = 0;  // 'considerFieldNames' flag is not set.
@@ -160,10 +162,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
     _setInitialHighWaterMark();
 }
 
-AsyncResultsMerger::~AsyncResultsMerger() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_lifecycleState == kKillComplete || _remotesExhausted(lk));
-}
+AsyncResultsMerger::~AsyncResultsMerger() = default;
 
 std::shared_ptr<AsyncResultsMerger> AsyncResultsMerger::create(
     OperationContext* opCtx,
@@ -685,6 +684,8 @@ stdx::shared_future<void> AsyncResultsMerger::releaseMemory(OperationContext* op
 }
 
 Status AsyncResultsMerger::releaseMemoryResult(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
     if (!_status.isOK()) {
         return _status;
     }
