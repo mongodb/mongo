@@ -74,7 +74,7 @@ ShardsvrReshardCollection makeMoveCollectionRequest(
     const DatabaseName& dbName,
     const NamespaceString& nss,
     const ShardId& destinationShard,
-    ProvenanceEnum provenance,
+    ReshardingProvenanceEnum provenance,
     const boost::optional<bool>& performVerification = boost::none,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount = boost::none);
 

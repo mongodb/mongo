@@ -124,7 +124,7 @@ structs:
                 description: "Start time of the operation."
                 optional: true
             provenance:
-                type: Provenance
+                type: ReshardingProvenance
                 description: "The source operation that called this resharding operation."
                 optional: true
             performVerification:

@@ -826,7 +826,7 @@ void ReshardingRecipientService::RecipientStateMachine::
             opCtx.get(), _metadata, *_cloneTimestamp);
 
         if (!_metadata.getProvenance() ||
-            _metadata.getProvenance() == ProvenanceEnum::kReshardCollection) {
+            _metadata.getProvenance() == ReshardingProvenanceEnum::kReshardCollection) {
             _externalState->withShardVersionRetry(
                 opCtx.get(),
                 _metadata.getSourceNss(),
@@ -1137,7 +1137,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                    behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
 
                    if (!_metadata.getProvenance() ||
-                       _metadata.getProvenance() == ProvenanceEnum::kReshardCollection) {
+                       _metadata.getProvenance() == ReshardingProvenanceEnum::kReshardCollection) {
                        auto [collOptions, _] = _externalState->getCollectionOptions(
                            opCtx.get(),
                            _metadata.getSourceNss(),

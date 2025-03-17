@@ -376,7 +376,8 @@ TEST_F(ReshardingUtilTest, SetNumSamplesPerChunkThroughConfigsvrReshardCollectio
     configsvrReshardCollection.setCollation(collationObj);
     configsvrReshardCollection.setNumInitialChunks(numInitialChunks);
 
-    boost::optional<ProvenanceEnum> provenance(ProvenanceEnum::kReshardCollection);
+    boost::optional<ReshardingProvenanceEnum> provenance(
+        ReshardingProvenanceEnum::kReshardCollection);
     configsvrReshardCollection.setProvenance(provenance);
     configsvrReshardCollection.setNumSamplesPerChunk(numSamplesPerChunk);
 

@@ -126,7 +126,8 @@ let expectedReshardingEvents = [
             shardKey: {a: 1},
             oldShardKey: {_id: 1},
             unique: false,
-            numInitialChunks: NumberLong(1)
+            numInitialChunks: NumberLong(1),
+            provenance: "reshardCollection"
         }
     },
     {

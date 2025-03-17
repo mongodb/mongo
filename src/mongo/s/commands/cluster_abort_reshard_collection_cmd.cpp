@@ -78,7 +78,8 @@ public:
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 resharding::gFeatureFlagUnshardCollection.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                configsvrAbortReshardCollection.setProvenance(ProvenanceEnum::kReshardCollection);
+                configsvrAbortReshardCollection.setProvenance(
+                    ReshardingProvenanceEnum::kReshardCollection);
             }
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();

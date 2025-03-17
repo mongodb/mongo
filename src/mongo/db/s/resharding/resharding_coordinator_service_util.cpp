@@ -316,7 +316,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             }
 
             auto provenance = coordinatorDoc.getCommonReshardingMetadata().getProvenance();
-            if (provenance && provenance.get() == ProvenanceEnum::kUnshardCollection) {
+            if (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection) {
                 setFields = setFields.addFields(BSON("unsplittable" << true));
             }
 

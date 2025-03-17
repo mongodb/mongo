@@ -482,14 +482,14 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
     }
 }
 
-bool isMoveCollection(const boost::optional<ProvenanceEnum>& provenance) {
+bool isMoveCollection(const boost::optional<ReshardingProvenanceEnum>& provenance) {
     return provenance &&
-        (provenance.get() == ProvenanceEnum::kMoveCollection ||
-         provenance.get() == ProvenanceEnum::kBalancerMoveCollection);
+        (provenance.get() == ReshardingProvenanceEnum::kMoveCollection ||
+         provenance.get() == ReshardingProvenanceEnum::kBalancerMoveCollection);
 }
 
-bool isUnshardCollection(const boost::optional<ProvenanceEnum>& provenance) {
-    return provenance && provenance.get() == ProvenanceEnum::kUnshardCollection;
+bool isUnshardCollection(const boost::optional<ReshardingProvenanceEnum>& provenance) {
+    return provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection;
 }
 
 std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName) {
@@ -541,7 +541,8 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     // moveCollection/unshardCollection are called with _id as the new shard key since
     // that's an acceptable value for tracked unsharded collections so we can skip this.
     if (collEntry.getTimeseriesFields() &&
-        (!setProvenance || (*request.getProvenance() == ProvenanceEnum::kReshardCollection))) {
+        (!setProvenance ||
+         (*request.getProvenance() == ReshardingProvenanceEnum::kReshardCollection))) {
         auto tsOptions = collEntry.getTimeseriesFields().get().getTimeseriesOptions();
         shardkeyutil::validateTimeseriesShardKey(
             tsOptions.getTimeField(), tsOptions.getMetaField(), request.getKey());

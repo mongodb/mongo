@@ -96,7 +96,7 @@ ShardsvrReshardCollection makeMoveCollectionOrUnshardCollectionRequest(
     const DatabaseName& dbName,
     const NamespaceString& nss,
     const boost::optional<ShardId>& destinationShard,
-    ProvenanceEnum provenance,
+    ReshardingProvenanceEnum provenance,
     const boost::optional<bool>& performVerification,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount) {
     ShardsvrReshardCollection shardsvrReshardCollection(nss);
@@ -127,7 +127,7 @@ ShardsvrReshardCollection makeMoveCollectionRequest(
     const DatabaseName& dbName,
     const NamespaceString& nss,
     const ShardId& destinationShard,
-    ProvenanceEnum provenance,
+    ReshardingProvenanceEnum provenance,
     const boost::optional<bool>& performVerification,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount) {
     return makeMoveCollectionOrUnshardCollectionRequest(
@@ -140,12 +140,13 @@ ShardsvrReshardCollection makeUnshardCollectionRequest(
     const boost::optional<ShardId>& destinationShard,
     const boost::optional<bool>& performVerification,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount) {
-    return makeMoveCollectionOrUnshardCollectionRequest(dbName,
-                                                        nss,
-                                                        destinationShard,
-                                                        ProvenanceEnum::kUnshardCollection,
-                                                        performVerification,
-                                                        oplogBatchApplierTaskCount);
+    return makeMoveCollectionOrUnshardCollectionRequest(
+        dbName,
+        nss,
+        destinationShard,
+        ReshardingProvenanceEnum::kUnshardCollection,
+        performVerification,
+        oplogBatchApplierTaskCount);
 }
 }  // namespace cluster::unsplittable
 

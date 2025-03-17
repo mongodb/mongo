@@ -38,6 +38,16 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
+enums:
+    ReshardingProvenance:
+        description: "The request type that originated the execution of a reshardCollection."
+        type: string
+        values:
+            kReshardCollection: "reshardCollection"
+            kMoveCollection: "moveCollection"
+            kUnshardCollection: "unshardCollection"
+            kBalancerMoveCollection: "balancerMoveCollection"
+
 types:
     shard_id:
         bson_serialization_type: string

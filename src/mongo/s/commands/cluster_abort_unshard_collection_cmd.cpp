@@ -65,7 +65,8 @@ public:
 
             ConfigsvrAbortReshardCollection configsvrAbortReshardCollection(nss);
             configsvrAbortReshardCollection.setDbName(request().getDbName());
-            configsvrAbortReshardCollection.setProvenance(ProvenanceEnum::kUnshardCollection);
+            configsvrAbortReshardCollection.setProvenance(
+                ReshardingProvenanceEnum::kUnshardCollection);
             generic_argument_util::setMajorityWriteConcern(configsvrAbortReshardCollection,
                                                            &opCtx->getWriteConcern());
 

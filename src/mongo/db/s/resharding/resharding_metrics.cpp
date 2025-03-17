@@ -98,12 +98,12 @@ Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fall
     }
 }
 
-ProvenanceEnum readProvenance(const CommonReshardingMetadata& metadata) {
+ReshardingProvenanceEnum readProvenance(const CommonReshardingMetadata& metadata) {
     if (const auto& provenance = metadata.getProvenance()) {
         return provenance.get();
     }
 
-    return ProvenanceEnum::kReshardCollection;
+    return ReshardingProvenanceEnum::kReshardCollection;
 }
 
 }  // namespace
@@ -143,7 +143,7 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                      ClockSource* clockSource,
                                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
                                      State state,
-                                     ProvenanceEnum provenance)
+                                     ReshardingProvenanceEnum provenance)
     : Base{std::move(instanceId),
            createOriginalCommand(nss, std::move(shardKey)),
            nss,
@@ -267,7 +267,7 @@ BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
         reportOplogApplicationCountMetrics(_reshardingFieldNames, &builder);
     }
     builder.appendElementsUnique(Base::reportForCurrentOp());
-    builder.appendElements(BSON("provenance" << Provenance_serializer(_provenance)));
+    builder.appendElements(BSON("provenance" << ReshardingProvenance_serializer(_provenance)));
     return builder.obj();
 }
 
@@ -332,7 +332,7 @@ void ReshardingMetrics::reportOnCompletion(BSONObjBuilder* builder) {
     invariant(builder);
     reportDurationsForAllPhases<Seconds>(
         kTimedPhaseNamesMap, getClockSource(), builder, Seconds{0});
-    builder->appendElements(BSON("provenance" << Provenance_serializer(_provenance)));
+    builder->appendElements(BSON("provenance" << ReshardingProvenance_serializer(_provenance)));
 }
 
 void ReshardingMetrics::fillDonorCtxOnCompletion(DonorShardContext& donorCtx) {

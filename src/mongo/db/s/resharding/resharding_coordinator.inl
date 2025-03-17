@@ -842,7 +842,8 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                        _coordinatorDoc.getShardDistribution().get().front().getShard();
                    return shardIdsSet.find(toShard) != shardIdsSet.end();
                } else if (_metadata.getProvenance() &&
-                          _metadata.getProvenance().get() == ProvenanceEnum::kUnshardCollection) {
+                          _metadata.getProvenance().get() ==
+                              ReshardingProvenanceEnum::kUnshardCollection) {
                    std::set<ShardId> shardIdsSet;
                    cm.getAllShardIds(&shardIdsSet);
                    const auto toShard =
@@ -975,7 +976,7 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
 
     auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
                               opCtx.get(), updatedCoordinatorDoc.getSourceNss()) ||
-        (provenance && provenance.get() == ProvenanceEnum::kUnshardCollection);
+        (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection);
 
     resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
                                                       _metrics.get(),
@@ -1506,7 +1507,9 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
     eventNotification.setNumInitialChunks(_coordinatorDoc.getNumInitialChunks());
     eventNotification.setUnique(_coordinatorDoc.getUnique());
     eventNotification.setCollation(_coordinatorDoc.getCollation());
-
+    if (const auto& provenance = _metadata.getProvenance()) {
+        eventNotification.setProvenance(provenance);
+    }
     ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kCollectionResharded,
                                                eventNotification.toBSON());
 

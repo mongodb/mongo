@@ -159,6 +159,12 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
                 o2Builder.append("collation", notification.getCollation().value());
             }
 
+            if (notification.getProvenance().has_value()) {
+                o2Builder.append(
+                    "provenance",
+                    ReshardingProvenance_serializer(notification.getProvenance().value()));
+            }
+
             if (!zones.empty()) {
                 BSONArrayBuilder zonesBSON(o2Builder.subarrayStart("zones"));
                 for (const auto& zone : zones) {

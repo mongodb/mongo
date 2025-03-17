@@ -58,7 +58,7 @@ public:
                 request().getDbName(),
                 nss,
                 request().getToShard(),
-                ProvenanceEnum::kMoveCollection,
+                ReshardingProvenanceEnum::kMoveCollection,
                 request().getPerformVerification(),
                 request().getOplogBatchApplierTaskCount());
             generic_argument_util::setMajorityWriteConcern(moveCollectionRequest,

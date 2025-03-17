@@ -283,8 +283,9 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveCollectionRequest) {
             IDLParserContext("BalancerCommandsSchedulerTest"), shardDistributionArray.at(0).Obj());
         ASSERT_EQ(kShardId0, shardKeyRange.getShard());
 
-        ASSERT_EQ(Provenance_serializer(ProvenanceEnum::kBalancerMoveCollection),
-                  request.cmdObj.getStringField(ShardsvrReshardCollection::kProvenanceFieldName));
+        ASSERT_EQ(
+            ReshardingProvenance_serializer(ReshardingProvenanceEnum::kBalancerMoveCollection),
+            request.cmdObj.getStringField(ShardsvrReshardCollection::kProvenanceFieldName));
 
         return OkReply().toBSON();
     }});

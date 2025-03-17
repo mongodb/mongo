@@ -170,7 +170,8 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         "Feature flag move collection or unshard collection is not enabled, reject "
                         "provenance",
                         !_doc.getProvenance().has_value() ||
-                            _doc.getProvenance().get() == ProvenanceEnum::kReshardCollection);
+                            _doc.getProvenance().get() ==
+                                ReshardingProvenanceEnum::kReshardCollection);
             }
 
             configsvrReshardCollection.setRelaxed(_doc.getRelaxed());
@@ -187,7 +188,8 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         str::stream()
                             << "MoveCollection can only be called on an unsharded collection.",
                         !cmOld.isSharded());
-            } else if (provenance && provenance.get() == ProvenanceEnum::kUnshardCollection) {
+            } else if (provenance &&
+                       provenance.get() == ReshardingProvenanceEnum::kUnshardCollection) {
                 // If the collection is already unsharded, this request should be a no-op. Check
                 // that the user didn't specify a "to" shard other than the shard the collection
                 // lives on - if it is different, return an error.

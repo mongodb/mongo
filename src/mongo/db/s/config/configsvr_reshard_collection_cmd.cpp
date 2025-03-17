@@ -203,7 +203,8 @@ public:
                             "Expected provenance to be specified",
                             request().getProvenance().has_value());
                 } else if (request().getProvenance().has_value()) {
-                    if (request().getProvenance().get() == ProvenanceEnum::kReshardCollection) {
+                    if (request().getProvenance().get() ==
+                        ReshardingProvenanceEnum::kReshardCollection) {
                         setProvenance = false;
                     } else {
                         uassert(

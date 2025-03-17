@@ -124,15 +124,16 @@ public:
                       ClockSource* clockSource,
                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
 
-    ReshardingMetrics(UUID instanceId,
-                      BSONObj shardKey,
-                      NamespaceString nss,
-                      Role role,
-                      Date_t startTime,
-                      ClockSource* clockSource,
-                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
-                      State state,
-                      ProvenanceEnum provenance = ProvenanceEnum::kReshardCollection);
+    ReshardingMetrics(
+        UUID instanceId,
+        BSONObj shardKey,
+        NamespaceString nss,
+        Role role,
+        Date_t startTime,
+        ClockSource* clockSource,
+        ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+        State state,
+        ReshardingProvenanceEnum provenance = ReshardingProvenanceEnum::kReshardCollection);
 
     ~ReshardingMetrics() override;
 
@@ -162,18 +163,18 @@ public:
     static auto initializeFrom(const T& document, ServiceContext* serviceContext) {
         auto cumulativeMetrics = [&] {
             auto provenance = document.getCommonReshardingMetadata().getProvenance().value_or(
-                ProvenanceEnum::kReshardCollection);
+                ReshardingProvenanceEnum::kReshardCollection);
             switch (provenance) {
-                case ProvenanceEnum::kMoveCollection:
+                case ReshardingProvenanceEnum::kMoveCollection:
                     return ShardingDataTransformCumulativeMetrics::getForMoveCollection(
                         serviceContext);
-                case ProvenanceEnum::kBalancerMoveCollection:
+                case ReshardingProvenanceEnum::kBalancerMoveCollection:
                     return ShardingDataTransformCumulativeMetrics::getForBalancerMoveCollection(
                         serviceContext);
-                case ProvenanceEnum::kUnshardCollection:
+                case ReshardingProvenanceEnum::kUnshardCollection:
                     return ShardingDataTransformCumulativeMetrics::getForUnshardCollection(
                         serviceContext);
-                case ProvenanceEnum::kReshardCollection:
+                case ReshardingProvenanceEnum::kReshardCollection:
                     return ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext);
             }
             MONGO_UNREACHABLE;
@@ -295,7 +296,7 @@ private:
 
     ShardingDataTransformInstanceMetrics::UniqueScopedObserver _scopedObserver;
     ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
-    const ProvenanceEnum _provenance;
+    const ReshardingProvenanceEnum _provenance;
 };
 
 }  // namespace mongo

@@ -89,15 +89,6 @@ enums:
             kRunning: "running"
             kInactive: "inactive"
 
-    Provenance:
-        description: "The source operation that called this resharding operation."
-        type: string
-        values:
-            kReshardCollection: "reshardCollection"
-            kMoveCollection: "moveCollection"
-            kUnshardCollection: "unshardCollection"
-            kBalancerMoveCollection: "balancerMoveCollection"
-
 structs:
     CommonReshardingMetadata:
         description: "Immutable metadata shared across all node types for a resharding operation."
@@ -137,7 +128,7 @@ structs:
                 description: >-
                     The resharding UUID provided by the user, used to identify retries.
             provenance:
-                type: Provenance
+                type: ReshardingProvenance
                 description: "The source operation that called this resharding operation."
                 optional: true
             performVerification:

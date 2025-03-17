@@ -41,7 +41,7 @@ imports:
 structs:
 
     CollectionResharded:
-        description: "Event describing the details of a reshardCollection operation."
+        description: "Event describing the details of a committing reshardCollection operation."
         strict: false
         fields:
             nss:
@@ -73,7 +73,11 @@ structs:
                 type: long
                 description: "The number of chunks the new collection should have after resharding."
                 optional: true
-
+            provenance:
+                type: ReshardingProvenance
+                description: "The type of user/system request that originated
+                              the commit of this reshardCollection."
+                optional: true
 
 commands:
     _shardsvrNotifyShardingEvent:

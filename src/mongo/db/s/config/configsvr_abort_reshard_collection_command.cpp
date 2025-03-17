@@ -104,7 +104,7 @@ void assertExistsReshardingDocument(OperationContext* opCtx, UUID reshardingUUID
 
 auto assertGetReshardingMachine(OperationContext* opCtx,
                                 UUID reshardingUUID,
-                                boost::optional<mongo::ProvenanceEnum> provenance) {
+                                boost::optional<mongo::ReshardingProvenanceEnum> provenance) {
     auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
         ReshardingCoordinatorService,
         ReshardingCoordinator,

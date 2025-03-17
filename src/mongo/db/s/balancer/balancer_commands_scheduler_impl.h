@@ -331,7 +331,7 @@ public:
             getNameSpace().dbName(),
             getNameSpace(),
             _toShardId,
-            ProvenanceEnum::kBalancerMoveCollection);
+            ReshardingProvenanceEnum::kBalancerMoveCollection);
         generic_argument_util::setMajorityWriteConcern(moveCollectionRequest);
         generic_argument_util::setDbVersionIfPresent(moveCollectionRequest, _dbVersion);
         return moveCollectionRequest.toBSON();

@@ -103,7 +103,8 @@ public:
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 resharding::gFeatureFlagUnshardCollection.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                reshardCollectionRequest.setProvenance(ProvenanceEnum::kReshardCollection);
+                reshardCollectionRequest.setProvenance(
+                    ReshardingProvenanceEnum::kReshardCollection);
             }
             reshardCollectionRequest.setPerformVerification(request().getPerformVerification());
 

@@ -54,7 +54,7 @@ commands:
     type: namespacestring
     fields:
       provenance:
-        type: Provenance
+        type: ReshardingProvenance
         description: "The source operation that called this resharding operation."
         optional: true
 
@@ -79,12 +79,12 @@ commands:
     strict: false
     namespace: type
     api_version: ""
-    type: namespacestring 
-  
+    type: namespacestring
+
   abortUnshardCollection:
     description: "The public command on mongos that aborts a unshardCollection commmand."
     command_name: abortUnshardCollection
     strict: false
     namespace: type
     api_version: ""
-    type: namespacestring 
+    type: namespacestring
