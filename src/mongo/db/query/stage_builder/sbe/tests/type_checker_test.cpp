@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
+#include <string>
 
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
@@ -137,7 +139,7 @@ TEST(TypeCheckerTest, FoldFillEmpty) {
 
 TEST(TypeCheckerTest, FoldFillEmptyInComplexCheck) {
     // Run both exists and typeMatch as part of an And, and expect that the resulting expression is
-    // guaranteed to never be Nothing (hence, FillEmpty can be safely removed).
+    // guaranteeded to never be Nothing (hence, FillEmpty can be safely removed).
     auto tree = make<BinaryOp>(
         Operations::FillEmpty,
         make<BinaryOp>(Operations::And,
@@ -153,42 +155,11 @@ TEST(TypeCheckerTest, FoldFillEmptyInComplexCheck) {
     ASSERT(tree.is<BinaryOp>() && tree.cast<BinaryOp>()->op() == Operations::And);
 }
 
-TEST(TypeCheckerTest, FoldFillEmptyInComplexNaryCheck) {
-    // Run both exists and typeMatch as part of an n-ary And, and expect that the resulting
-    // expression is guaranteed to never be Nothing (hence, FillEmpty can be safely removed).
-    auto tree = make<BinaryOp>(
-        Operations::FillEmpty,
-        make<NaryOp>(Operations::And,
-                     makeSeq(make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
-                             make<FunctionCall>("typeMatch",
-                                                makeSeq(make<Variable>("inputVar"),
-                                                        Constant::int32(getBSONTypeMask(
-                                                            sbe::value::TypeTags::NumberInt32)))))),
-        Constant::str("impossible"));
-
-    TypeChecker{}.typeCheck(tree);
-
-    ASSERT(tree.is<NaryOp>() && tree.cast<NaryOp>()->op() == Operations::And);
-}
-
 TEST(TypeCheckerTest, TypeCheckIf) {
     auto tree = make<If>(
         make<BinaryOp>(Operations::And,
                        make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
                        make<FunctionCall>("isNumber", makeSeq(make<Variable>("inputVar")))),
-        make<BinaryOp>(Operations::Mult, Constant::int32(9), make<Variable>("inputVar")),
-        Constant::int32(0));
-
-    TypeSignature sign = TypeChecker{}.typeCheck(tree);
-
-    ASSERT(!TypeSignature::kNothingType.isSubset(sign));
-}
-
-TEST(TypeCheckerTest, TypeCheckIfWithNary) {
-    auto tree = make<If>(
-        make<NaryOp>(Operations::And,
-                     makeSeq(make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
-                             make<FunctionCall>("isNumber", makeSeq(make<Variable>("inputVar"))))),
         make<BinaryOp>(Operations::Mult, Constant::int32(9), make<Variable>("inputVar")),
         Constant::int32(0));
 
@@ -207,17 +178,6 @@ TEST(TypeCheckerTest, TypeCheckSwitch1) {
         Constant::int32(0)});
 
     TypeSignature sign = TypeChecker{}.typeCheck(tree);
-
-    ASSERT(!TypeSignature::kNothingType.isSubset(sign));
-
-    tree = make<Switch>(ABTVector{
-        make<NaryOp>(Operations::And,
-                     makeSeq(make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
-                             make<FunctionCall>("isNumber", makeSeq(make<Variable>("inputVar"))))),
-        make<BinaryOp>(Operations::Mult, Constant::int32(9), make<Variable>("inputVar")),
-        Constant::int32(0)});
-
-    sign = TypeChecker{}.typeCheck(tree);
 
     ASSERT(!TypeSignature::kNothingType.isSubset(sign));
 }

@@ -110,8 +110,6 @@ public:
 
     Tree operator()(const optimizer::ABT& n, const optimizer::BinaryOp& op);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::NaryOp& op);
-
     Tree operator()(const optimizer::ABT& n, const optimizer::UnaryOp& op);
 
     Tree operator()(const optimizer::ABT& n, const optimizer::FunctionCall& op);
@@ -123,13 +121,6 @@ public:
     Tree operator()(const optimizer::ABT& n, const optimizer::Switch& op);
 
 private:
-    // Helper function that encapsulates the logic to vectorize and And/Or statement.
-    template <typename Lhs, typename Rhs>
-    Tree vectorizeLogicalOp(optimizer::Operations opType, Lhs lhsNode, Rhs rhsNode);
-
-    // Helper function that allows the recursive transformation of a N-ary statement.
-    Tree vectorizeNaryHelper(const optimizer::NaryOp& op, size_t argIdx);
-
     // Helper function that encapsules the logic to vectorize an If statement.
     template <typename Cond, typename Then, typename Else>
     Tree vectorizeCond(Cond condNode, Then thenNode, Else elseNode);

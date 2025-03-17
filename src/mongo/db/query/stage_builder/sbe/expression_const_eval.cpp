@@ -336,55 +336,6 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
 }
 
 void ExpressionConstEval::transport(optimizer::ABT& n,
-                                    const optimizer::NaryOp& op,
-                                    std::vector<optimizer::ABT>& args) {
-    switch (op.op()) {
-        case optimizer::Operations::And:
-        case optimizer::Operations::Or: {
-            // Truncate the list at the first constant value that causes the operation to
-            // short-circuit ('false' for And, 'true' for Or). Remove all items that evaluate to the
-            // opposite constant, as they would be ignored.
-            bool shortCircuitValue = op.op() == optimizer::Operations::And ? false : true;
-            for (auto it = args.begin(); it < args.end();) {
-                optimizer::ABT& arg = *it;
-                if (auto argConst = arg.cast<optimizer::Constant>(); argConst) {
-                    auto [argTag, argValue] = argConst->get();
-                    if (argTag == sbe::value::TypeTags::Boolean) {
-                        if (sbe::value::bitcastTo<bool>(argValue) == shortCircuitValue) {
-                            // Truncate the argument list after the short-circuit value, unless it's
-                            // already the last value and we are not modifying anything.
-                            if (it + 1 != args.end()) {
-                                args.erase(it + 1, args.end());
-                                _changed = true;
-                                break;
-                            }
-                        } else {
-                            // Remove argument.
-                            it = args.erase(it);
-                            _changed = true;
-                            continue;
-                        }
-                    }
-                }
-                it++;
-            }
-            if (args.empty()) {
-                // if we are left with no arguments, replace the entire node with the
-                // non-short-circuit value.
-                swapAndUpdate(n, optimizer::Constant::boolean(!shortCircuitValue));
-            } else if (args.size() == 1) {
-                // if we are left with just one argument, replace the entire node with that value.
-                swapAndUpdate(n, std::exchange(args[0], optimizer::make<optimizer::Blackhole>()));
-            }
-            break;
-        }
-        default:
-            // Not implemented.
-            break;
-    }
-}
-
-void ExpressionConstEval::transport(optimizer::ABT& n,
                                     const optimizer::FunctionCall& op,
                                     std::vector<optimizer::ABT>& args) {
     if (args.size() == 1 && args[0].is<optimizer::Constant>()) {

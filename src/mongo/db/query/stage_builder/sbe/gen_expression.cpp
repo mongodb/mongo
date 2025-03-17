@@ -781,10 +781,10 @@ public:
             std::reverse(std::begin(binds), std::end(binds));
 
             auto checkNullAllArguments =
-                makeBooleanOpTree(optimizer::Operations::Or, std::move(checkArgIsNull));
+                makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkArgIsNull));
 
-            auto checkValidTypeAndCountDates =
-                makeBooleanOpTree(optimizer::Operations::Add, std::move(checkArgHasValidType));
+            auto checkValidTypeAndCountDates = makeBalancedBooleanOpTree(
+                optimizer::Operations::Add, std::move(checkArgHasValidType));
 
             auto addOp = makeVariable(names[0]);
             for (size_t idx = 1; idx < arity; ++idx) {
@@ -1029,10 +1029,10 @@ public:
         }
 
         auto checkNullAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));
 
         auto checkStringAllArguments =
-            makeBooleanOpTree(optimizer::Operations::And, std::move(checkStringArg));
+            makeBalancedBooleanOpTree(optimizer::Operations::And, std::move(checkStringArg));
 
         auto concatExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
@@ -1080,7 +1080,7 @@ public:
         }
 
         auto anyArgumentNullOrMissing =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(argIsNullOrMissing));
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(argIsNullOrMissing));
 
         auto nullOrFailExpr = optimizer::make<optimizer::If>(
             std::move(anyArgumentNullOrMissing),
@@ -1667,7 +1667,8 @@ public:
                                               generateABTNullMissingOrUndefined(monthName),
                                               generateABTNullMissingOrUndefined(yearName)};
 
-        auto checkPartsForNull = makeBooleanOpTree(optimizer::Operations::Or, std::move(nullExprs));
+        auto checkPartsForNull =
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(nullExprs));
 
         // Invocation of the datePartsWeekYear and dateParts functions depend on a TimeZoneDatabase
         // for datetime computation. This global object is registered as an unowned value in the
@@ -2537,9 +2538,9 @@ public:
         std::reverse(std::begin(binds), std::end(binds));
 
         auto checkNullAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkExprsNull));
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkExprsNull));
         auto checkNumberAllArguments =
-            makeBooleanOpTree(optimizer::Operations::And, std::move(checkExprsNumber));
+            makeBalancedBooleanOpTree(optimizer::Operations::And, std::move(checkExprsNumber));
         auto multiplication = std::accumulate(
             names.begin() + 1, names.end(), makeVariable(names.front()), [](auto&& acc, auto&& ex) {
                 return optimizer::make<optimizer::BinaryOp>(
@@ -3736,7 +3737,7 @@ private:
         }
         std::reverse(exprs.begin(), exprs.end());
 
-        pushABT(makeBooleanOpTree(logicOp, std::move(exprs)));
+        pushABT(makeBalancedBooleanOpTree(logicOp, std::move(exprs)));
     }
 
     /**
@@ -4246,9 +4247,9 @@ private:
         std::reverse(std::begin(args), std::end(args));
 
         auto checkNullAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkNulls));
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNulls));
         auto checkNotArrayAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkNotArrays));
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNotArrays));
         optimizer::ABT setExpr = [&]() -> optimizer::ABT {
             // To match classic engine semantics, $setEquals and $setIsSubset should throw an error
             // for any non-array arguments including null and missing values.
@@ -4553,7 +4554,7 @@ private:
         checkNullArg.push_back(generateABTNullMissingOrUndefined(tzName));
 
         auto checkNullAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));
 
         auto dateAddExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},

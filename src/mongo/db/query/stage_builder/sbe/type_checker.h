@@ -101,8 +101,6 @@ public:
 
     TypeSignature operator()(optimizer::ABT& n, optimizer::BinaryOp& op, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::NaryOp& op, bool saveInference);
-
     TypeSignature operator()(optimizer::ABT& n, optimizer::FunctionCall& op, bool saveInference);
 
     TypeSignature operator()(optimizer::ABT& n, optimizer::If& op, bool saveInference);

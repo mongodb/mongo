@@ -88,8 +88,6 @@ public:
     std::unique_ptr<sbe::EExpression> transport(const BinaryOp& op,
                                                 std::unique_ptr<sbe::EExpression> lhs,
                                                 std::unique_ptr<sbe::EExpression> rhs);
-    std::unique_ptr<sbe::EExpression> transport(
-        const NaryOp& op, std::vector<std::unique_ptr<sbe::EExpression>> args);
     std::unique_ptr<sbe::EExpression> transport(const UnaryOp& op,
                                                 std::unique_ptr<sbe::EExpression> arg);
     std::unique_ptr<sbe::EExpression> transport(const If&,
