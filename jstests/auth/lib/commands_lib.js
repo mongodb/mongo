@@ -8551,6 +8551,43 @@ export const authCommandsLib = {
           },
         ],
       },
+      {
+        testname: "raw_data",
+        command: {
+          count: "raw_data", rawData: true,
+        },
+        setup: function(db) {
+          const coll = db["raw_data"];
+          const timeField = "t";
+          const metaField = "m";
+          const time = new Date("2024-01-01T00:00:00Z");
+          
+          assert.commandWorked(db.createCollection(
+              coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+
+          assert.commandWorked(coll.insert([
+              {[timeField]: time, [metaField]: 1, a: "a"},
+              {[timeField]: time, [metaField]: 2, a: "b"},
+              {[timeField]: time, [metaField]: 2, a: "c"},
+          ]));
+        },
+        teardown: function(db) {
+          db.raw_data.drop();
+        },
+        skipTest: (conn) => {
+          return !TestData.setParameters.featureFlagRawDataCrudOperations;
+        },
+        testcases: [
+          {
+            runOnDb: firstDbName,
+            privileges: [{
+              resource: {db: firstDbName, collection: "raw_data"},
+              actions: ["performRawDataOperations"]
+            }, {resource: {db: firstDbName, collection: "raw_data"}, actions: ["find"]}],
+            expectFail: true,
+          }
+        ]
+      },
     ],
 
     /************* SHARED TEST LOGIC ****************/
