@@ -100,24 +100,17 @@ public:
                 const auto& dbName = request().getCommandParameter();
                 const auto& csReason = request().getReason();
 
-                {
-                    // Clear database metadata on primary node.
-                    AutoGetDb autoDb(newOpCtx.get(), dbName, MODE_IX);
-                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
-                        newOpCtx.get(), dbName);
-                    scopedDss->clearDbInfo(newOpCtx.get());
-                }
-
                 // The critical section may have been entered by another operation, which implies
                 // that the one with the specified reason has already been exited. Consequently,
                 // this skips the requirement that reason must match.
                 ShardingRecoveryService::get(newOpCtx.get())
-                    ->releaseRecoverableCriticalSection(newOpCtx.get(),
-                                                        NamespaceString(dbName),
-                                                        csReason,
-                                                        ShardingCatalogClient::kLocalWriteConcern,
-                                                        ShardingRecoveryService::NoCustomAction(),
-                                                        false /* throwIfReasonDiffers */);
+                    ->releaseRecoverableCriticalSection(
+                        newOpCtx.get(),
+                        NamespaceString(dbName),
+                        csReason,
+                        ShardingCatalogClient::kLocalWriteConcern,
+                        ShardingRecoveryService::FilteringMetadataClearer(),
+                        false /* throwIfReasonDiffers */);
             }
 
             // Since no write that generated a retryable write oplog entry with this sessionId and

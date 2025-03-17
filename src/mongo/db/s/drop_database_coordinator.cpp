@@ -339,32 +339,6 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     }
 }
 
-void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
-    AutoGetDb autoDb(opCtx, _dbName, MODE_X);
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
-    scopedDss->clearDbInfo(opCtx);
-}
-
-void DropDatabaseCoordinator::_clearDatabaseInfoOnSecondaries(OperationContext* opCtx) {
-    Status signalStatus = shardmetadatautil::updateShardDatabasesEntry(
-        opCtx,
-        BSON(ShardDatabaseType::kDbNameFieldName
-             << DatabaseNameUtil::serialize(_dbName, SerializationContext::stateCommandRequest())),
-        BSONObj(),
-        BSON(ShardDatabaseType::kEnterCriticalSectionCounterFieldName << 1),
-        false /*upsert*/);
-    uassert(ErrorCodes::OperationFailed,
-            str::stream() << "Failed to persist critical section signal for "
-                             "secondaries due to: "
-                          << signalStatus.toString(),
-            signalStatus.isOK());
-    // Wait for majority write concern on the secondaries
-    WriteConcernResult ignoreResult;
-    auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(waitForWriteConcern(
-        opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
-}
-
 ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -539,11 +513,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                             }
                         }
                     }
-                    // Clear the database sharding state info before exiting the critical section so
-                    // that all subsequent write operations with the old database version will fail
-                    // due to StaleDbVersion.
-                    _clearDatabaseInfoOnPrimary(opCtx);
-                    _clearDatabaseInfoOnSecondaries(opCtx);
 
                     removeDatabaseMetadataFromShard(
                         opCtx,

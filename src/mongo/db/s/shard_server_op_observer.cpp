@@ -448,54 +448,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         }
     }
 
-    if (needsSpecialHandling &&
-        args.coll->ns() == NamespaceString::kConfigCacheDatabasesNamespace) {
-        // Notification of routing table changes is only needed on secondaries that are applying
-        // oplog entries.
-        if (opCtx->isEnforcingConstraints()) {
-            return;
-        }
-
-        // This logic runs on updates to the shard's persisted cache of the config server's
-        // config.databases collection.
-        //
-        // If an update occurs to the 'enterCriticalSectionSignal' field, clear the routing
-        // table immediately. This will provoke the next secondary caller to refresh through the
-        // primary, blocking behind the critical section.
-
-        // Extract which database was updated
-        std::string db;
-        fassert(40478,
-                bsonExtractStringField(
-                    args.updateArgs->criteria, ShardDatabaseType::kDbNameFieldName, &db));
-
-        auto enterCriticalSectionCounterFieldNewVal = update_oplog_entry::extractNewValueForField(
-            updateDoc, ShardDatabaseType::kEnterCriticalSectionCounterFieldName);
-
-        if (enterCriticalSectionCounterFieldNewVal.ok()) {
-            // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can
-            // block.
-            AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
-                shard_role_details::getLocker(opCtx));
-
-            DatabaseName dbName = DatabaseNameUtil::deserialize(
-                boost::none, db, SerializationContext::stateDefault());
-            // TODO SERVER-99703: We have to disable the checks here as we're
-            // violating the ordering of locks for databases. This can happen
-            // because a write to a collection in the config database like the
-            // critical section will make us take a lock on a different database.
-            // That is, we have an operation that has taken a lock on config,
-            // followed by a lock on a user database. Other op observers like the
-            // preimages one will take the inverse order, that is they have a lock
-            // on a user database and then take a lock on the config database.
-            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-            AutoGetDb autoDb(opCtx, dbName, MODE_X);
-            auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-            scopedDss->clearDbInfo(opCtx);
-        }
-    }
-
     if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
@@ -710,41 +662,6 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
     if (nss == NamespaceString::kShardConfigCollectionsNamespace) {
         onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(opCtx, documentId);
-    }
-
-    if (nss == NamespaceString::kConfigCacheDatabasesNamespace) {
-        // Primaries take locks when writing to certain internal namespaces. It must
-        // be ensured that those locks are also taken on secondaries, when applying
-        // the related oplog entries. Return early, if the node is not a secondary
-        // in oplog application.
-        if (opCtx->isEnforcingConstraints()) {
-            return;
-        }
-
-        // Extract which database entry is being deleted from the _id field.
-        std::string deletedDatabase;
-        fassert(50772,
-                bsonExtractStringField(
-                    documentId, ShardDatabaseType::kDbNameFieldName, &deletedDatabase));
-
-        // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
-            shard_role_details::getLocker(opCtx));
-
-        DatabaseName dbName = DatabaseNameUtil::deserialize(
-            boost::none, deletedDatabase, SerializationContext::stateDefault());
-        // TODO SERVER-99703: We have to disable the checks here as we're
-        // violating the ordering of locks for databases. This can happen
-        // because a write to a collection in the config database like the
-        // critical section will make us take a lock on a different database.
-        // That is, we have an operation that has taken a lock on config,
-        // followed by a lock on a user database. Other op observers like the
-        // preimages one will take the inverse order, that is they have a lock
-        // on a user database and then take a lock on the config database.
-        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-        AutoGetDb autoDb(opCtx, dbName, MODE_X);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->clearDbInfo(opCtx);
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {
