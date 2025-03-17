@@ -616,6 +616,106 @@ void processBatchResults(OperationContext* opCtx,
     }
 }
 
+void populateDocsToRetryFromWriteBatch(
+    std::shared_ptr<mongo::timeseries::bucket_catalog::WriteBatch> batch,
+    std::vector<size_t>& docsToRetry) {
+    for (auto index : batch->userBatchIndices) {
+        docsToRetry.emplace_back(index);
+    };
+}
+
+void populateErrorsFromWriteBatches(OperationContext* opCtx,
+                                    TimeseriesWriteBatches& batches,
+                                    size_t startIndex,
+                                    size_t endIndex,
+                                    Status errorStatus,
+                                    std::vector<mongo::write_ops::WriteError>& errors) {
+    invariant(endIndex < batches.size() && startIndex >= 0 && startIndex <= endIndex);
+    for (auto batchIndex = startIndex; batchIndex <= endIndex; batchIndex++) {
+        auto batch = batches[batchIndex];
+        for (auto index : batch->userBatchIndices) {
+            auto error = write_ops_exec::generateError(opCtx, errorStatus, index, errors.size());
+            if (error) {
+                errors.emplace_back(std::move(*error));
+            }
+        }
+    }
+}
+
+/**
+ * Handles the result of attempting to commit a WriteBatch as part of an unordered insert. This
+ * function will handle populating the errors vector, vector of documents that need to be retried,
+ * and aborting WriteBatches as needed.
+ *
+ * If a non-continuable error was encountered, populates the errors vector with the indices of all
+ * measurements for all batches after, and including, the batch that encountered a non-continuable
+ * error. Sets `canContinue` to false in this case.
+ */
+void processUnorderedCommitResult(OperationContext* opCtx,
+                                  commit_result::Result commitResult,
+                                  TimeseriesWriteBatches& batches,
+                                  size_t batchIndex,
+                                  std::vector<size_t>& docsToRetry,
+                                  std::vector<mongo::write_ops::WriteError>& errors,
+                                  boost::optional<repl::OpTime>& opTime,
+                                  boost::optional<OID>& electionId,
+                                  bool* canContinue) {
+
+    auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
+    auto batch = batches[batchIndex];
+
+    auto finishBatch = [&]() {
+        timeseries::getOpTimeAndElectionId(opCtx, &opTime, &electionId);
+        bucket_catalog::finish(bucketCatalog, batch);
+    };
+    auto addDocsToRetry = [&]() {
+        populateDocsToRetryFromWriteBatch(batch, docsToRetry);
+    };
+    auto abortBatch = [&](Status errorStatus) {
+        abort(bucketCatalog, batch, errorStatus);
+    };
+    auto abandonSnapshot = [&]() {
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    };
+    auto populateErrorsForBatch = [&](Status errorStatus) {
+        populateErrorsFromWriteBatches(opCtx, batches, batchIndex, batchIndex, errorStatus, errors);
+    };
+    auto handleNonContinuableError = [&](Status errorStatus) {
+        *canContinue = false;
+        populateErrorsFromWriteBatches(
+            opCtx, batches, batchIndex, batches.size() - 1, errorStatus, errors);
+    };
+
+    visit(OverloadedVisitor{
+              [&](const commit_result::Success&) { finishBatch(); },
+              [&](const commit_result::ContinuableError& result) {
+                  populateErrorsForBatch(result.error);
+              },
+              [&](const commit_result::ContinuableErrorWithAbortBatch& result) {
+                  populateErrorsForBatch(result.error);
+                  abortBatch(result.error);
+              },
+              [&](const commit_result::ContinuableRetryableError&) { addDocsToRetry(); },
+              [&](const commit_result::ContinuableRetryableErrorWithAbortBatch& result) {
+                  addDocsToRetry();
+                  abortBatch(result.error);
+              },
+              [&](const commit_result::ContinuableRetryableErrorWithAbortBatchAbandonSnapshot&
+                      result) {
+                  addDocsToRetry();
+                  abortBatch(result.error);
+                  abandonSnapshot();
+              },
+              [&](const commit_result::NonContinuableError& result) {
+                  handleNonContinuableError(result.error);
+              },
+              [&](const commit_result::NonContinuableErrorWithAbortBatch& result) {
+                  handleNonContinuableError(result.error);
+                  abortBatch(result.error);
+              }},
+          commitResult);
+};
+
 /**
  * If no statement has been retried in 'request', fills stmtIds with stmtIds based on 'request'
  * which can explicitly specify all StmtIds, the begin StmtId, or none at all (implied start from
@@ -1221,6 +1321,109 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     bucket_catalog::finish(bucketCatalog, batch);
     return true;
+} catch (const DBException& ex) {
+    auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
+    abort(bucketCatalog, batch, ex.toStatus());
+    throw;
+}
+
+commit_result::Result commitTimeseriesBucketForBatch(
+    OperationContext* opCtx,
+    std::shared_ptr<bucket_catalog::WriteBatch> batch,
+    size_t start,
+    std::vector<mongo::write_ops::WriteError>& errors,
+    boost::optional<repl::OpTime>& opTime,
+    boost::optional<OID>& electionId,
+    std::vector<size_t>& docsToRetry,
+    absl::flat_hash_map<int, int>& retryAttemptsForDup,
+    const mongo::write_ops::InsertCommandRequest& request) try {
+    hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection.pauseWhileSet();
+
+    auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
+    auto metadata = getMetadata(bucketCatalog, batch->bucketId);
+    auto nss = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
+
+    // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
+    // Collection instances remain valid, and the collator is not invalidated.
+    auto catalog = CollectionCatalog::get(opCtx);
+    const CollatorInterface* collator = nullptr;
+
+    try {
+        // The associated collection must be acquired before we check for the presence of
+        // buckets collection. This ensures that a potential ShardVersion mismatch can be
+        // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()'
+        // might block waiting for other batches to complete, limiting the scope of the
+        // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
+        const auto acquisition = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto bucketsColl = acquisition.getCollectionPtr().get();
+        assertTimeseriesBucketsCollection(bucketsColl);
+        collator = bucketsColl->getDefaultCollator();
+    } catch (const DBException& ex) {
+        if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
+            throw;
+        }
+        auto& oss{OperationShardingState::get(opCtx)};
+        oss.setShardingOperationFailedStatus(ex.toStatus());
+
+        return commit_result::NonContinuableError{ex.toStatus()};
+    }
+
+    auto status = prepareCommit(bucketCatalog, batch, collator);
+    if (!status.isOK()) {
+        invariant(bucket_catalog::isWriteBatchFinished(*batch));
+        return commit_result::ContinuableRetryableError{};
+    }
+
+    const auto docId = batch->bucketId.oid;
+    const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
+    if (performInsert) {
+        const auto output = performTimeseriesInsertFromBatch(opCtx, metadata, request, batch);
+        auto insertStatus = output.result.getStatus();
+
+        if (!insertStatus.isOK()) {
+            // Automatically attempts to retry on DuplicateKey error.
+            if (insertStatus.code() == ErrorCodes::DuplicateKey &&
+                retryAttemptsForDup[batch->userBatchIndices.front()]++ <
+                    gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
+                return commit_result::ContinuableRetryableErrorWithAbortBatch{insertStatus};
+            } else {
+                if (output.canContinue)
+                    return commit_result::ContinuableErrorWithAbortBatch{insertStatus};
+                return commit_result::NonContinuableErrorWithAbortBatch{insertStatus};
+                if (output.canContinue) {
+                    return commit_result::ContinuableErrorWithAbortBatch{insertStatus};
+                }
+                return commit_result::NonContinuableErrorWithAbortBatch{insertStatus};
+            }
+        }
+
+        invariant(output.result.getValue().getN() == 1,
+                  str::stream() << "Expected 1 insertion of document with _id '" << docId
+                                << "', but found " << output.result.getValue().getN() << ".");
+    } else {
+        auto op = write_ops_utils::makeTimeseriesCompressedDiffUpdateOpFromBatch(opCtx, batch, nss);
+
+        auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
+        auto updateStatus = output.result.getStatus();
+
+        if ((updateStatus.isOK() && output.result.getValue().getNModified() != 1) ||
+            updateStatus.code() == ErrorCodes::WriteConflict ||
+            updateStatus.code() == ErrorCodes::TemporarilyUnavailable) {
+            return commit_result::ContinuableRetryableErrorWithAbortBatchAbandonSnapshot{
+                updateStatus.isOK()
+                    ? Status{ErrorCodes::WriteConflict, "Could not update non-existent bucket"}
+                    : updateStatus};
+        } else if (!updateStatus.isOK()) {
+            if (output.canContinue) {
+                return commit_result::ContinuableRetryableErrorWithAbortBatch{updateStatus};
+            }
+            return commit_result::NonContinuableErrorWithAbortBatch{updateStatus};
+        }
+    }
+    return commit_result::Success{};
 } catch (const DBException& ex) {
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     abort(bucketCatalog, batch, ex.toStatus());

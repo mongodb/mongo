@@ -41,6 +41,40 @@ struct WriteStageErrorAndIndex {
     size_t index;
 };
 
+namespace commit_result {
+
+struct Success {};
+struct ContinuableError {
+    Status error;
+};
+struct ContinuableErrorWithAbortBatch {
+    Status error;
+};
+struct ContinuableRetryableError {};
+struct ContinuableRetryableErrorWithAbortBatch {
+    Status error;
+};
+struct ContinuableRetryableErrorWithAbortBatchAbandonSnapshot {
+    Status error;
+};
+struct NonContinuableError {
+    Status error;
+};
+struct NonContinuableErrorWithAbortBatch {
+    Status error;
+};
+
+using Result = std::variant<Success,
+                            ContinuableError,
+                            ContinuableErrorWithAbortBatch,
+                            ContinuableRetryableError,
+                            ContinuableRetryableErrorWithAbortBatch,
+                            ContinuableRetryableErrorWithAbortBatchAbandonSnapshot,
+                            NonContinuableError,
+                            NonContinuableErrorWithAbortBatch>;
+
+}  // namespace commit_result
+
 NamespaceString ns(const mongo::write_ops::InsertCommandRequest& request);
 
 /**
@@ -95,6 +129,24 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             std::vector<size_t>* docsToRetry,
                             absl::flat_hash_map<int, int>& retryAttemptsForDup,
                             const mongo::write_ops::InsertCommandRequest& request);
+
+/**
+ * Given a WriteBatch, will commit the write batch and perform a write to the
+ * underlying system.buckets collection for a time-series collection.
+ *
+ * Returns an struct indicating to the caller whether the commit was successful or if there was an
+ * error, and if there was an error, what clean up work to perform (aborting the write batch, etc).
+ */
+commit_result::Result commitTimeseriesBucketForBatch(
+    OperationContext* opCtx,
+    std::shared_ptr<bucket_catalog::WriteBatch> batch,
+    size_t start,
+    std::vector<mongo::write_ops::WriteError>& errors,
+    boost::optional<repl::OpTime>& opTime,
+    boost::optional<OID>& electionId,
+    std::vector<size_t>& docsToRetry,
+    absl::flat_hash_map<int, int>& retryAttemptsForDup,
+    const mongo::write_ops::InsertCommandRequest& request);
 
 /**
  * Given a batch of user measurements for a collection that does not have a metaField value, returns
