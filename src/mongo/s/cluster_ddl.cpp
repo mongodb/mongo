@@ -252,16 +252,11 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
             generic_argument_util::setMajorityWriteConcern(request);
             return request.toBSON();
         }
-        // propagate write concern if asked by the caller otherwise we set
-        //  - majority if we are not in a transaction
-        //  - default wc in case of transaction (no other wc are allowed).
-        if (opCtx->getWriteConcern().getProvenance().isClientSupplied()) {
-            auto wc = opCtx->getWriteConcern();
-            request.setWriteConcern(wc);
-        } else {
-            if (!opCtx->inMultiDocumentTransaction()) {
-                generic_argument_util::setMajorityWriteConcern(request);
-            }
+
+        // Upgrade the request WC to 'majority', unless it is part of a transaction
+        // (where only the implicit default value can be applied).
+        if (!opCtx->inMultiDocumentTransaction()) {
+            generic_argument_util::setMajorityWriteConcern(request);
         }
         return request.toBSON();
     }();

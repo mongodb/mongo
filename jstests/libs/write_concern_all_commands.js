@@ -3791,6 +3791,7 @@ function runCommandTest(
 // they no longer hang until the majority of the shards involved in DDL are available and return
 // WCE on timing out.
 const shardedDDLCommandsRequiringMajorityCommit = [
+    "create",
     "changePrimary",
     "collMod",
     "convertToCapped",
