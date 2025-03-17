@@ -118,8 +118,6 @@ protected:
         const mongo::BSONObj& doc,
         ReopeningContext& reopeningContext);
 
-    long long _getExecutionStat(const UUID& uuid, StringData stat);
-
     // Check that each group of objects has compatible schema with itself, but that inserting the
     // first object in new group closes the existing bucket and opens a new one
     void _testMeasurementSchema(
@@ -295,14 +293,6 @@ StatusWith<InsertResult> BucketCatalogTest::_insertOneWithReopeningContextHelper
                                       _storageCacheSizeBytes);
 }
 
-long long BucketCatalogTest::_getExecutionStat(const UUID& uuid, StringData stat) {
-    BSONObjBuilder builder;
-    appendExecutionStats(*_bucketCatalog, uuid, builder);
-
-    BSONObj obj = builder.obj();
-    BSONElement e = obj.getField(stat);
-    return e.isNumber() ? (int)e.number() : 0;
-}
 
 void BucketCatalogTest::_testMeasurementSchema(
     const std::initializer_list<std::initializer_list<BSONObj>>& groups) {

@@ -457,4 +457,13 @@ uint64_t TimeseriesTestFixture::_getStorageCacheSizeBytes() const {
     return _opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
         1024;
 }
+
+long long TimeseriesTestFixture::_getExecutionStat(const UUID& uuid, StringData stat) {
+    BSONObjBuilder builder;
+    appendExecutionStats(*_bucketCatalog, uuid, builder);
+
+    BSONObj obj = builder.obj();
+    BSONElement e = obj.getField(stat);
+    return e.isNumber() ? (int)e.number() : 0;
+}
 }  // namespace mongo::timeseries

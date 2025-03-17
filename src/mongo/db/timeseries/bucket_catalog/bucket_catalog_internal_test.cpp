@@ -27,29 +27,72 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_test_fixture.h"
+#include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
-const std::string testDbName = "db_bucket_catalog_internal_test";
-const TimeseriesOptions kTimeseriesOptions("time");
+constexpr StringData kNumClosedDueToCount = "numBucketsClosedDueToCount"_sd;
+constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
+constexpr StringData kNumClosedDueToSchemaChanges = "numBucketsClosedDueToSchemaChange"_sd;
+constexpr StringData kNumClosedDueToSize = "numBucketsClosedDueToSize"_sd;
+constexpr StringData kNumClosedDuetoCachePressure = "numBucketsClosedDueToCachePressure"_sd;
 
-class BucketCatalogInternalTest : public CatalogTestFixture {
-protected:
-    using CatalogTestFixture::setUp;
-
+class BucketCatalogInternalTest : public TimeseriesTestFixture {
 protected:
     TrackingContexts _trackingContexts;
     ExecutionStats _globalStats;
+
+    void _rolloverWithRolloverReason(RolloverReason reason);
+    void _testRolloverWithRolloverReasonUpdatesStats(RolloverReason reason, StringData stat);
 };
 
+void BucketCatalogInternalTest::_rolloverWithRolloverReason(RolloverReason reason) {
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
+        *_bucketCatalog, _uuid1, timeseriesOptions, {_measurement}, errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
+
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
+
+    bucket.rolloverReason = reason;
+    ASSERT(allCommitted(bucket));
+    internal::rollover(*_bucketCatalog,
+                       *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                       WithLock::withoutLock(),
+                       bucket,
+                       bucket.rolloverReason);
+}
+
+void BucketCatalogInternalTest::_testRolloverWithRolloverReasonUpdatesStats(RolloverReason reason,
+                                                                            StringData stat) {
+    ASSERT_EQ(0, _getExecutionStat(_uuid1, stat));
+    _rolloverWithRolloverReason(reason);
+    ASSERT_EQ(1, _getExecutionStat(_uuid1, stat));
+}
+
 TEST_F(BucketCatalogInternalTest, UpdateRolloverStats) {
-    auto _collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
+    auto _collectionStats = std::make_shared<ExecutionStats>();
     ExecutionStatsController stats(_collectionStats, _globalStats);
 
     // Ensure that both the globalStats and collectionStats are initially all set to 0.
@@ -90,6 +133,19 @@ TEST_F(BucketCatalogInternalTest, UpdateRolloverStats) {
     internal::updateRolloverStats(stats, RolloverReason::kSchemaChange);
     ASSERT_EQ(_globalStats.numBucketsClosedDueToSchemaChange.load(), 1);
     ASSERT_EQ(_collectionStats->numBucketsClosedDueToSchemaChange.load(), 1);
+}
+
+TEST_F(BucketCatalogInternalTest, RolloverUpdatesRolloverStats) {
+    std::vector<std::tuple<RolloverReason, StringData>> rolloverReasonAndMetricPairs = {
+        std::make_tuple(RolloverReason::kCount, kNumClosedDueToCount),
+        std::make_tuple(RolloverReason::kTimeForward, kNumClosedDueToTimeForward),
+        std::make_tuple(RolloverReason::kSchemaChange, kNumClosedDueToSchemaChanges),
+        std::make_tuple(RolloverReason::kSize, kNumClosedDueToSize),
+        std::make_tuple(RolloverReason::kCachePressure, kNumClosedDuetoCachePressure),
+    };
+    for (const auto& [reason, metric] : rolloverReasonAndMetricPairs) {
+        _testRolloverWithRolloverReasonUpdatesStats(reason, metric);
+    }
 }
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

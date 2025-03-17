@@ -168,8 +168,8 @@ BucketStateForInsertAndCleanup isBucketStateEligibleForInsertsAndCleanup(BucketC
                                                                          Bucket* bucket);
 
 /**
- * Rollover 'bucket' according to 'reason' if the bucket does not contain uncommitted measurements.
- * Mark the bucket's 'rolloverReason' otherwise.
+ * Rollover 'bucket' according to 'reason' and will update rollover stats if the bucket does not
+ * contain uncommitted measurements. Mark the bucket's 'rolloverReason' otherwise.
  */
 void rollover(BucketCatalog& catalog,
               Stripe& stripe,

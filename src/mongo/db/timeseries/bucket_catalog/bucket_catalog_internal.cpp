@@ -1456,9 +1456,10 @@ void rollover(BucketCatalog& catalog,
     invariant(reason != RolloverReason::kNone);
     auto action = getRolloverAction(reason);
     if (allCommitted(bucket)) {
-        // The bucket does not contain any measurements that are yet to be committed, so we can take
-        // action now.
         ExecutionStatsController stats = getExecutionStats(catalog, bucket.bucketId.collectionUUID);
+        updateRolloverStats(stats, reason);
+        // The bucket does not contain any measurements that are yet to be committed, so we can
+        // take action now.
         if (action == RolloverAction::kArchive) {
             archiveBucket(catalog, stripe, stripeLock, bucket, stats);
         } else {

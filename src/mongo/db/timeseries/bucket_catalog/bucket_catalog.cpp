@@ -176,7 +176,6 @@ RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
     if (rolloverReason != RolloverReason::kNone) {
         // Update the bucket's 'rolloverReason'.
         bucket.rolloverReason = rolloverReason;
-        internal::updateRolloverStats(stats, rolloverReason);
     }
     bucketOpenedDueToMetadata = false;
     return rolloverReason;

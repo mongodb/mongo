@@ -134,6 +134,8 @@ protected:
 
     uint64_t _getStorageCacheSizeBytes() const;
 
+    long long _getExecutionStat(const UUID& uuid, StringData stat);
+
     template <typename T>
     inline std::vector<T> _getFlattenedVector(const std::vector<std::vector<T>>& vectors) {
         size_t totalSize = std::accumulate(
