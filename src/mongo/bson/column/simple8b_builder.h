@@ -73,6 +73,15 @@ public:
     Simple8bBuilder& operator=(Simple8bBuilder&&) = default;
 
     /**
+     * Appends a multiple missing value to Simple8b.  Should be called before any other values are
+     * appended.  This is intended to be used to initialize a new builder with a large series of
+     * skips.
+     */
+    template <class F>
+    requires Simple8bBlockWriter<F>
+    void prefillWithSkips(size_t numSkips, F&& writeFn);
+
+    /**
      * Appends val to Simple8b. Returns true if the append was successful and false if the value was
      * outside the range of possible values we can store in Simple8b.
      *

@@ -129,6 +129,14 @@ struct EncodingState {
         // Initializes this encoder to uncompressed element to allow for future delta calculations.
         void initialize(Element elem);
 
+        // Appends multiple skips to simple8b builder, should only be called as first thing appended
+        template <class F>
+        void prefillWithSkips(size_t numSkips,
+                              BSONType type,
+                              allocator_aware::BufBuilder<Allocator>& buffer,
+                              ptrdiff_t& controlByteOffset,
+                              F controlBlockWriter);
+
         // Calculates and appends delta for this element compared to last.
         template <class F>
         bool appendDelta(Element elem,
@@ -233,6 +241,10 @@ struct EncodingState {
     explicit EncodingState(const Allocator&);
 
     template <class F>
+    void prefillWithSkips(size_t numSkips,
+                          allocator_aware::BufBuilder<Allocator>& buffer,
+                          F controlBlockWriter);
+    template <class F>
     void append(Element elem,
                 allocator_aware::BufBuilder<Allocator>& buffer,
                 F controlBlockWriter,
@@ -294,6 +306,11 @@ public:
      * finalize() may not be used after this constructor.
      */
     BSONColumnBuilder(const char* binary, int size, const Allocator& = {});
+
+    /**
+     * BSONColumnBuilder pre-initialized with a given number of skips.
+     */
+    explicit BSONColumnBuilder(size_t numPrefixSkips, const Allocator& = {});
 
     /**
      * Appends a BSONElement to this BSONColumnBuilder.

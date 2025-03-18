@@ -1396,6 +1396,16 @@ BSONColumnBuilder<Allocator>::BSONColumnBuilder(const char* binary,
 }
 
 template <class Allocator>
+BSONColumnBuilder<Allocator>::BSONColumnBuilder(size_t numPrefixSkips, const Allocator& allocator)
+    : BSONColumnBuilder({kDefaultBufferSize, allocator}, allocator) {
+    using namespace bsoncolumn;
+
+    auto* regular = std::get_if<typename InternalState::Regular>(&_is.state);
+    uassert(8575000, "Bad initialization of BSONColumnBuilder", regular);
+    regular->prefillWithSkips(numPrefixSkips, _bufBuilder, NoopControlBlockWriter{});
+}
+
+template <class Allocator>
 BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(BSONElement elem) {
     auto type = elem.type();
     if (elem.eoo()) {
@@ -1727,6 +1737,19 @@ void EncodingState<Allocator>::Encoder64::initialize(Element elem) {
 
 template <class Allocator>
 template <class F>
+void EncodingState<Allocator>::Encoder64::prefillWithSkips(
+    size_t numSkips,
+    BSONType type,
+    allocator_aware::BufBuilder<Allocator>& buffer,
+    ptrdiff_t& controlByteOffset,
+    F controlBlockWriter) {
+    simple8bBuilder.prefillWithSkips(
+        numSkips,
+        Simple8bBlockWriter64<F>(*this, buffer, controlByteOffset, type, controlBlockWriter));
+}
+
+template <class Allocator>
+template <class F>
 bool EncodingState<Allocator>::Encoder64::appendDelta(
     Element elem,
     Element previous,
@@ -1861,6 +1884,17 @@ void EncodingState<Allocator>::Encoder128::initialize(Element elem) {
         default:
             break;
     }
+}
+
+template <class Allocator>
+template <class F>
+void EncodingState<Allocator>::prefillWithSkips(size_t numSkips,
+                                                allocator_aware::BufBuilder<Allocator>& buffer,
+                                                F controlBlockWriter) {
+    uassert(8575001, "prefillWithSkips() called after other appends", buffer.len() == 0);
+    auto& encoder = std::get<Encoder64>(_encoder);
+    encoder.prefillWithSkips(
+        numSkips, _previous().type, buffer, _controlByteOffset, controlBlockWriter);
 }
 
 template <class Allocator>

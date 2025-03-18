@@ -34,6 +34,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <cstdint>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
@@ -186,6 +187,29 @@ Simple8bBuilder<T, Allocator>::Simple8bBuilder(Allocator allocator) : _pendingVa
 
 template <typename T, class Allocator>
 Simple8bBuilder<T, Allocator>::~Simple8bBuilder() = default;
+
+template <typename T, class Allocator>
+template <class F>
+requires Simple8bBlockWriter<F>
+void Simple8bBuilder<T, Allocator>::prefillWithSkips(size_t numSkips, F &&writeFn) {
+    constexpr size_t kMaxSkipsInBlock = 60;
+    constexpr uint64_t kAllSkipsBlock = 0xFFFFFFFFFFFFFFF1; // A simple8b block that contains 60 skips
+
+    // Do checks once, and then process all skips in bulk
+    uassert(8575002, "prefillWithSkips() called after other appends", _rleCount == 0 && _pendingValues.empty() && _lastValidExtensionType == 0);
+
+    if (numSkips > kMaxSkipsInBlock) {
+        // Handle case with initialized _rleCount (this should be the common case)
+        writeFn(kAllSkipsBlock);
+        _rleCount = numSkips - kMaxSkipsInBlock;
+        _lastValueInPrevWord = boost::none;
+    } else {
+        // Insufficient skips to start an _rleCount, just default to appending them
+        // individually (we can skip rle checks)
+        for (size_t i = 0; i < numSkips; ++i)
+            _appendSkip(true, writeFn);
+    }
+}
 
 template <typename T, class Allocator>
 template <class F>

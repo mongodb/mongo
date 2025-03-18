@@ -3999,6 +3999,59 @@ TEST_F(BSONColumnTest, OnlySkipManyTwoControlBytes) {
     verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
 }
 
+TEST_F(BSONColumnTest, BulkSkipConstructor) {
+    size_t num = /*first non-RLE*/ 60 + /*RLE*/ 1920 * 12 + /*non-RLE at end*/ 59;
+    BSONColumnBuilder<> skipCb(num);
+
+    BufBuilder expected;
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected, std::vector<boost::optional<uint64_t>>(num - 1, boost::none), 16);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, std::vector<boost::optional<uint64_t>>(1, boost::none), 1);
+    appendEOO(expected);
+
+    auto binData = skipCb.finalize();
+    verifyBinary(binData, expected, false);
+    verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
+}
+
+TEST_F(BSONColumnTest, BulkSkipConstructorValueAfterSmall) {
+    auto elem = createElementInt32(1);
+    BSONColumnBuilder<> skipCb(1);
+    skipCb.append(elem);
+
+    BufBuilder expected;
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, boost::none);
+    appendLiteral(expected, elem);
+    appendEOO(expected);
+
+    auto binData = skipCb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {BSONElement(), elem});
+}
+
+TEST_F(BSONColumnTest, BulkSkipConstructorValueAfterLarge) {
+    size_t num = /*first non-RLE*/ 60 + /*RLE*/ 1920 * 12 + /*non-RLE at end*/ 59;
+    auto elem = createElementInt32(1);
+    BSONColumnBuilder<> skipCb(num);
+    skipCb.append(elem);
+
+    BufBuilder expected;
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected, std::vector<boost::optional<uint64_t>>(num - 1, boost::none), 16);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, std::vector<boost::optional<uint64_t>>(1, boost::none), 1);
+    appendLiteral(expected, elem);
+    appendEOO(expected);
+
+    auto binData = skipCb.finalize();
+    verifyBinary(binData, expected, false);
+    verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
+}
+
 TEST_F(BSONColumnTest, SimpleOneValueRLE) {
     // This test produces an RLE block after a literal.
     std::vector<BSONElement> elems;
