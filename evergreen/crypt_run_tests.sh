@@ -19,7 +19,7 @@ fi
 EXTRACT_DIR="build/crypt-lib-${version}"
 SOPATH="${EXTRACT_DIR}/lib/mongo_crypt_v1.so"
 UNITTEST_PATH="${EXTRACT_DIR}/bin/mongo_crypt_shlib_test"
-GDB_PATH="/opt/mongodbtoolchain/v4/bin/gdb"
+GDB_PATH="/opt/mongodbtoolchain/v5/bin/gdb"
 
 # dump the contents of the extract dir to log
 find $EXTRACT_DIR

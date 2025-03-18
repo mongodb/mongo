@@ -11,6 +11,10 @@ if [[ -d "/opt/mongodbtoolchain/v4/bin" ]]; then
   export PATH="/opt/mongodbtoolchain/v4/bin:$PATH"
 fi
 
+if [[ -d "/opt/mongodbtoolchain/v5/bin" ]]; then
+  export PATH="/opt/mongodbtoolchain/v5/bin:$PATH"
+fi
+
 rc_file=""
 if [[ -f "$HOME/.bashrc" ]]; then
   rc_file="$HOME/.bashrc"

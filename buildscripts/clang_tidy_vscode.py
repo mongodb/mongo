@@ -43,7 +43,7 @@ if os.path.exists(".mongo_checks_module_path"):
 
 
 def main():
-    toolchain = get_mongo_toolchain()
+    toolchain = get_mongo_toolchain(version="v5", from_bazel=True)
     clang_tidy_args = [toolchain.get_tool_path("clang-tidy")]
     for check_lib in CHECKS_SO:
         if os.path.isfile(check_lib):

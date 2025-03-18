@@ -10,7 +10,7 @@ case "${unameOut}" in
     *)          machine="UNKNOWN:${unameOut}"
 esac
 
-TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v4
+TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v5
 
 SRC_DIR=$(ls -d /data/mci/source-* 2>/dev/null)
 ln -s $SRC_DIR src

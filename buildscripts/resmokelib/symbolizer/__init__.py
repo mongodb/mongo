@@ -24,7 +24,7 @@ _MESSAGE = """TODO"""
 
 _COMMAND = "symbolize"
 
-DEFAULT_SYMBOLIZER_LOCATION = "/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+DEFAULT_SYMBOLIZER_LOCATION = "/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
 
 
 class Symbolizer(Subcommand):
