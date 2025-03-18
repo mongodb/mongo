@@ -754,6 +754,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
     int numRoundsWithoutProgress = 0;
     bool abortBatch = false;
     int maxRoundsWithoutProgress = gMaxRoundsWithoutProgress.load();
+    Backoff backoff(Seconds(1), Seconds(2));
 
     while (!batchOp.isFinished() && !abortBatch) {
         //
@@ -913,6 +914,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                << maxRoundsWithoutProgress << " rounds (" << numCompletedOps
                                << " ops completed in " << rounds << " rounds total)"}));
             break;
+        }
+        if (numRoundsWithoutProgress > 0) {
+            sleepFor(backoff.nextSleep());
         }
     }
 

@@ -742,6 +742,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
     int rounds = 0;
     int numCompletedOps = 0;
     int numRoundsWithoutProgress = 0;
+    Backoff backoff(Seconds(1), Seconds(2));
 
     while (!bulkWriteOp.isFinished()) {
         // Make sure we are not over our maximum memory allocation, if we are then mark the next
@@ -861,6 +862,9 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
                                << kMaxRoundsWithoutProgress << " rounds (" << numCompletedOps
                                << " ops completed in " << rounds << " rounds total)"});
             break;
+        }
+        if (numRoundsWithoutProgress > 0) {
+            sleepFor(backoff.nextSleep());
         }
     }
 
