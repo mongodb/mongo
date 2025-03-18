@@ -156,35 +156,124 @@ could lead to the wrong error being propagated.
 
 ## Using noexcept
 
-One must only use `noexcept` in accordance to specific and conservative criteria that will be
-subsequently enumerated. Using `noexcept` when these criteria do not apply is strongly advised
-against. Ignoring these criteria risks server crashes.
+Server code should generally be written to be exception safe. Historically,
+we've had bugs due to code being overzealously marked `noexcept`. In such
+contexts, throwing an exception crashes the server, which can compromise
+availability. However, _just_ removing `noexcept` from such code is not a viable
+solution \- exception unsafe code may _need_ to crash in order to avoid causing
+an even worse failure. We want to work towards ensuring that functions that
+ought to be are in fact exception safe, and remove `noexcept` usage where it's
+not warranted. Here, we outline guidelines for doing so.
 
-Separately, due to a bug in GCC that exists in v4 and earlier versions of the toolchain,
-information from exceptions that escape from `noexcept` functions may be lost under subtle and
-unpredictable circumstances. See SERVER-70148 for context.
+Noexcept is a runtime check that terminates the process rather than allowing
+the function to exit because of a throw. Noexcept may be used when it can be
+thought of as a bug for any uncaught exception to be thrown. There is no
+compile-time check that exceptions will not be thrown within a `noexcept`
+function. Instead, putting `noexcept` on a function may be thought of as similar
+to using invariant in the following way:
 
-Valid `noexcept` use criteria:
+```c
+// Example noexcept code.
+void func() noexcept {
+    ...
+}
 
-- Absolute certainty that there is no risk at all of an exception happening. This certainty should
-  not be thought of as an invariant, but instead an absolute correctness contract. This contract
-  would imply that receiving an exception violates the assumed laws of physics and C++ compilers.
+// Similar alternative pseudocode.
+void func() try {
+    ...
+} catch (...) {
+    invariant(!"unexpected exception");
+}
+```
 
-- Implementing a move operator. Using `noexcept` with move operations allows operations to skip
-  generating exception handling code. It is strictly worse not to use `noexcept` with a move
-  operation, and as such using `noexcept` can be considered a requirement.
+**As with invariant, be very careful when putting `noexcept` on a function that
+interacts with untrusted input.** This has caused bugs, such as
+[SERVER-94316](https://jira.mongodb.org/browse/SERVER-94316), where an error
+parsing untrusted input was able to cause an exception to reach a `noexcept`
+boundary.
 
-Invalid `noexcept` use criteria:
+### Adding or Removing noexcept
 
-- As a method of modeling the same behavior one would receive with an invariant or rethrowing an
-  exception. In cases where you want to model such behavior, directly invoke that behavior instead.
+When considering removing `noexcept` from a function, the author of that change
+must ensure that the function’s implementation and its callsites are not
+relying on the function not throwing for correctness. Because of this, **be
+careful putting `noexcept` on a function** if there’s a chance it may need to be
+removed later. `noexcept` generally **should not be used** solely for reasons of
+performance optimization. Aside from the cases listed in the next section, it
+should not be assumed to improve performance without solid evidence.
 
-- As a form of documentation to readers that a particular function "should not" throw an exception.
-  If you would like to indicate to readers that a function is not exception-safe, indicate as such
-  using other forms of documentation.
+If a part of the implementation would benefit from relying on not throwing, but
+`noexcept` is not meant to be a part of the function’s contract, it is acceptable
+to use a try/catch/invariant construction similar to the example above or an
+internal `noexcept` helper function.
 
-Please reach out to the Server Programmability team if you wish to use `noexcept` for situations that
-do not match the valid criteria listed above.
+When adding or removing `noexcept`, also consider what types of exceptions are
+possible in that context and in our codebase. Refer to the “Where Exceptions
+are Possible” section for more details.
+
+If you are uncertain about adding or removing `noexcept` in a given situation,
+reach out to \#server-programmability on slack.
+
+### Cases Where noexcept is Encouraged
+
+This list is not exhaustive and there are cases not enumerated here that are
+valid uses of `noexcept`.
+
+#### Move operations
+
+Using `noexcept` with move operations allows operations to skip generating
+exception handling code. If a type’s move operation will not throw exceptions,
+it is strictly worse not to use `noexcept`. For instance, std::vector\<T\> can
+use optimized versions of certain operations when T has `noexcept` move
+operations. In these cases, **`noexcept` can be considered a requirement**. Of
+course, if a move operation genuinely needs to throw exceptions, then don’t
+mark it `noexcept`. This should be very rare – moves should be non-throwing in
+almost all cases.
+
+#### Swap operations
+
+Allows callers to optimize for an exception-free pathway. **Swap operations
+should follow the same `noexcept` guidelines as move operations**.
+
+#### Hash functions
+
+Allows some hashing library types to optimize for an exception-free pathway.
+This can even affect the behavior, performance, and even layout of certain
+container types (such as libstdc++’s
+[unordered_map](https://gcc.gnu.org/onlinedocs/libstdc++/manual/unordered_associative.html)).
+**Hash functions should follow the `noexcept` guidelines as move operations.**
+
+#### Destructors and “Destructor-Safe” Functions
+
+Destructors are generally implicitly `noexcept`, and are encouraged to remain
+implicitly `noexcept` \- that is, by not marking them with `noexcept(false)`.
+Functions where “destructor safety” is a core part of their functionality **may
+be marked `noexcept`**. This is not a requirement – destructors are allowed to
+call potentially-throwing functions. It is also not a blanket recommendation to
+consider `noexcept` for all functions called from destructors. When calling a
+potentially-throwing function from a destructor, think about whether or not it
+can indeed throw in that context, and if exceptions need to be handled. If it
+can indeed throw in that context, exceptions almost certainly need to be
+handled \- otherwise the server will crash.
+
+The lambda passed to `ON_BLOCK_EXIT()` and `ScopeGuard()` should be treated
+similarly to destructors: it is executed in a `noexcept` context (a destructor)
+and marking it as such is discouraged as being noisy. But code intended to be
+called from them can be.
+
+### Where Exceptions are Possible
+
+In our codebase, generally DBException is the only type of exception that
+should be crossing API boundaries. If an exception other than a DBException
+does cross an API boundary, it should be considered a bug. Whichever component
+throws the exception should handle it locally, even if only by translating it
+to a DBException. Generally any caller you would consider to be an external
+caller should be able to rely on DBException being the only exception type your
+function will throw.
+
+Allocations using the global new allocator or std::allocator in our codebase do
+not throw, instead terminating the process directly when OOM conditions are
+encountered. As such, there is no need to handle exceptions from these sources.
 
 ## Gotchas
 
