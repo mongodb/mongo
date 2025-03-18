@@ -87,13 +87,7 @@ void MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(
         return;
     }
 
-    // TODO SERVER-58222: evaluate whether this is safe or whether acquiring the lock can block.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
-        shard_role_details::getLocker(opCtx));
-    Lock::DBLock dblock(opCtx, nss.dbName(), MODE_IS);
-
-    const auto scopedDss =
-        DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+    const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, nss.dbName());
     if (scopedDss->isMovePrimaryInProgress()) {
         LOGV2(4908600, "assertNoMovePrimaryInProgress", logAttrs(nss));
 

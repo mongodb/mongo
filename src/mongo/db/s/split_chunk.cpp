@@ -135,12 +135,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const boost::optional<Timestamp>& expectedTimestamp,
                                           const ChunkRange& chunkRange,
                                           const std::vector<BSONObj>& splitPoints) {
-    // DBLock and CollectionLock must be used in order to avoid shard version checks
-    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-
-    const auto scopedCSR =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+    const auto scopedCSR = CollectionShardingRuntime::acquireShared(opCtx, nss);
     const auto metadataAfterSplit = scopedCSR->getCurrentMetadataIfKnown();
 
     ShardId shardId = ShardingState::get(opCtx)->shardId();

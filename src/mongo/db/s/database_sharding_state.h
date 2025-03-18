@@ -54,8 +54,8 @@ namespace mongo {
  * CollectionShardingState) and contains sharding-related information about the database, such as
  * its database version.
  *
- * SYNCHRONISATION: Requires some combination of the DB lock and the DSS lock, but different methods
- * have different requirements though, so be sure to check the function-level comments for details.
+ * SYNCHRONIZATION: Some methods might require holding a database level lock, so be sure to check
+ * the function-level comments for details.
  */
 class DatabaseShardingState {
 public:
@@ -66,8 +66,8 @@ public:
     DatabaseShardingState& operator=(const DatabaseShardingState&) = delete;
 
     /**
-     * Obtains the sharding state for the specified database along with a resource lock in exclusive
-     * mode, which will be held until the object goes out of scope.
+     * Obtains the sharding state for the specified database along with a lock in exclusive mode,
+     * which will be held until the object goes out of scope.
      */
     class ScopedExclusiveDatabaseShardingState {
     public:
@@ -91,8 +91,8 @@ public:
     };
 
     /**
-     * Obtains the sharding state for the specified database along with a resource lock in shared
-     * mode, which will be held until the object goes out of scope.
+     * Obtains the sharding state for the specified database along with a lock in shared mode, which
+     * will be held until the object goes out of scope.
      */
     class ScopedSharedDatabaseShardingState {
     public:
@@ -275,9 +275,7 @@ private:
     // This node's cached database info.
     boost::optional<DatabaseType> _dbInfo;
 
-    // Modifying the state below requires holding the DBLock in X mode; holding the DBLock in any
-    // mode is acceptable for reading it. (Note: accessing this class at all requires holding the
-    // DBLock in some mode).
+    // Modifying the state below requires holding the DBLock.
 
     // Tracks the movePrimary critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;

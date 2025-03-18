@@ -48,9 +48,7 @@ void ShardingDDLCoordinatorExternalStateImpl::waitForVectorClockDurable(
 
 void ShardingDDLCoordinatorExternalStateImpl::assertIsPrimaryShardForDb(
     OperationContext* opCtx, const DatabaseName& dbName) const {
-    // Check under the dbLock if this is still the primary shard for the database
-    Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-    const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+    const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, dbName);
     scopedDss->assertIsPrimaryShardForDb(opCtx);
 }
 

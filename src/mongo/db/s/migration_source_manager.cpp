@@ -790,11 +790,8 @@ SharedSemiFuture<void> MigrationSourceManager::abort() {
 
 CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckForConflictingErrors() {
     auto metadata = [&] {
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
-        AutoGetCollection autoColl(_opCtx, _args.getCommandParameter(), MODE_IS);
-        const auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
-            _opCtx, _args.getCommandParameter());
+        const auto scopedCsr =
+            CollectionShardingRuntime::acquireShared(_opCtx, _args.getCommandParameter());
 
         const auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
         uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -947,11 +944,8 @@ MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(MigrationSourceManage
 }
 
 MigrationSourceManager::ScopedRegisterer::~ScopedRegisterer() {
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(_msm->_opCtx);  // NOLINT.
-    AutoGetCollection autoColl(_msm->_opCtx, _msm->_args.getCommandParameter(), MODE_IX);
-    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-        _msm->_opCtx, _msm->_args.getCommandParameter());
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_msm->_opCtx,
+                                                                 _msm->_args.getCommandParameter());
     invariant(_msm == std::exchange(msmForCsr(*scopedCsr), nullptr));
 }
 

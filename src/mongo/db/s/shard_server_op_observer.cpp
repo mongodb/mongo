@@ -842,7 +842,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
             oss._allowCollectionCreation);
 
     // If the check above passes, this means the collection doesn't exist and is being created and
-    // that the caller will be responsible to eventially set the proper placement version.
+    // that the caller will be responsible to eventually set the proper placement version.
     auto scopedCsr =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, collectionName);
     if (oss._forceCSRAsUnknownAfterCollectionCreation) {

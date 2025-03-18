@@ -147,15 +147,12 @@ public:
 
     void assertCriticalSectionCatchUpEnteredInMemory(const NamespaceString& nss) {
         if (nss.isDbOnly()) {
-            AutoGetDb db(operationContext(), nss.dbName(), MODE_IS);
-            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
-                operationContext(), nss.dbName());
+            const auto scopedDss =
+                DatabaseShardingState::acquireShared(operationContext(), nss.dbName());
             ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
             ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
-            AutoGetCollection coll(operationContext(), nss, MODE_IS);
-            const auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
-                operationContext(), nss);
+            const auto csr = CollectionShardingRuntime::acquireShared(operationContext(), nss);
             ASSERT(csr->getCriticalSectionSignal(operationContext(),
                                                  ShardingMigrationCriticalSection::kWrite));
             ASSERT(!csr->getCriticalSectionSignal(operationContext(),
@@ -165,15 +162,12 @@ public:
 
     void assertCriticalSectionCommitEnteredInMemory(const NamespaceString& nss) {
         if (nss.isDbOnly()) {
-            AutoGetDb db(operationContext(), nss.dbName(), MODE_IS);
-            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
-                operationContext(), nss.dbName());
+            const auto scopedDss =
+                DatabaseShardingState::acquireShared(operationContext(), nss.dbName());
             ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
             ASSERT(scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
-            AutoGetCollection coll(operationContext(), nss, MODE_IS);
-            const auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
-                operationContext(), nss);
+            const auto csr = CollectionShardingRuntime::acquireShared(operationContext(), nss);
             ASSERT(csr->getCriticalSectionSignal(operationContext(),
                                                  ShardingMigrationCriticalSection::kWrite));
             ASSERT(csr->getCriticalSectionSignal(operationContext(),
@@ -183,15 +177,12 @@ public:
 
     void assertCriticalSectionLeftInMemory(const NamespaceString& nss) {
         if (nss.isDbOnly()) {
-            AutoGetDb db(operationContext(), nss.dbName(), MODE_IS);
-            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
-                operationContext(), nss.dbName());
+            const auto scopedDss =
+                DatabaseShardingState::acquireShared(operationContext(), nss.dbName());
             ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
             ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
-            AutoGetCollection coll(operationContext(), nss, MODE_IS);
-            const auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
-                operationContext(), nss);
+            const auto csr = CollectionShardingRuntime::acquireShared(operationContext(), nss);
             ASSERT(!csr->getCriticalSectionSignal(operationContext(),
                                                   ShardingMigrationCriticalSection::kWrite));
             ASSERT(!csr->getCriticalSectionSignal(operationContext(),

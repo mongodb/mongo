@@ -335,10 +335,8 @@ void replaceShardingIndexCatalogInShardIfNeeded(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid) {
     auto currentShardHasAnyChunks = [&]() -> bool {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        const auto scsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-        const auto optMetadata = scsr->getCurrentMetadataIfKnown();
+        const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+        const auto optMetadata = csr->getCurrentMetadataIfKnown();
         return optMetadata && optMetadata->currentShardHasAnyChunks();
     }();
 
@@ -1046,9 +1044,7 @@ void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
     const NamespaceString& nss,
     const CollectionOptionsAndIndexes& collectionOptionsAndIndexes) {
     bool dropNonDonorIndexes = [&]() -> bool {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        const auto scopedCsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+        const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
         // Only attempt to drop a collection's indexes if we have valid metadata and the collection
         // is sharded
         if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
@@ -1119,9 +1115,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         };
 
         bool isFirstMigration = [&] {
-            AutoGetCollection collection(opCtx, nss, MODE_IS);
-            const auto scopedCsr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+            const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
             if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
                 const auto& metadata = *optMetadata;
                 return metadata.isSharded() && !metadata.currentShardHasAnyChunks();

@@ -338,9 +338,7 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
                 "Request sent without attaching database version",
                 clientDbVersion);
         {
-            Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
-            const auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+            const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, nss.dbName());
             scopedDss->assertIsPrimaryShardForDb(opCtx);
         }
         coorMetadata.setDatabaseVersion(clientDbVersion);

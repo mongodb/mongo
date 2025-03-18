@@ -284,9 +284,8 @@ protected:
         externalState.ensureTempReshardingCollectionExistsWithIndexes(
             operationContext(), kMetadata, kDefaultFetchTimestamp);
 
-        AutoGetCollection autoColl(operationContext(), kReshardingNss, MODE_IX);
-        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), kReshardingNss);
+        auto scopedCsr =
+            CollectionShardingRuntime::acquireShared(operationContext(), kReshardingNss);
         ASSERT(scopedCsr->getCurrentMetadataIfKnown() == boost::none);
     }
 

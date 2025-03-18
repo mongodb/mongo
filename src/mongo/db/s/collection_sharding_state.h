@@ -78,9 +78,8 @@ public:
     CollectionShardingState& operator=(const CollectionShardingState&) = delete;
 
     /**
-     * Obtains the sharding state for the specified collection, along with a resource lock
-     * protecting it from concurrent modifications, which will be held util the object goes out of
-     * scope.
+     * Obtains the sharding state for the specified collection, along with a lock protecting it from
+     * concurrent modifications, which will be held util the object goes out of scope.
      */
     class ScopedCollectionShardingState {
         // This used to be a ResourceMutex, we use a shared_mutex instead to keep similar semantics.
@@ -105,7 +104,7 @@ public:
 
         ScopedCollectionShardingState(LockType lock, CollectionShardingState* css);
 
-        // Constructor without the ResourceLock.
+        // Constructor without the lock.
         // Important: Only for use in non-shard servers!
         ScopedCollectionShardingState(CollectionShardingState* css);
 
@@ -135,8 +134,6 @@ public:
      * StaleConfig error.
      *
      * If the request doesn't have a shard version all collections will be treated as UNSHARDED.
-     *
-     * The returned object *is not safe* to access after the collection lock has been dropped.
      */
     virtual ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const = 0;
 
@@ -169,8 +166,6 @@ public:
      * Use 'getCollectionDescription' for other cases, like obtaining information about
      * sharding-related properties of the collection are necessary that won't change under
      * collection IX/IS lock (e.g., isSharded or the shard key).
-     *
-     * The returned object *is safe* to access even after the collection lock has been dropped.
      */
     enum class OrphanCleanupPolicy { kDisallowOrphanCleanup, kAllowOrphanCleanup };
     virtual ScopedCollectionFilter getOwnershipFilter(

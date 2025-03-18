@@ -182,6 +182,12 @@ CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(OperationCo
         ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_X));
 }
 
+CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
+CollectionShardingRuntime::acquireShared(OperationContext* opCtx, const NamespaceString& nss) {
+    return ScopedSharedCollectionShardingRuntime(
+        ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_IS));
+}
+
 CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime
 CollectionShardingRuntime::acquireExclusive(OperationContext* opCtx, const NamespaceString& nss) {
     return ScopedExclusiveCollectionShardingRuntime(

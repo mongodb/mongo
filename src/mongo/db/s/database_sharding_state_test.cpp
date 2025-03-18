@@ -151,9 +151,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
         auto getActiveDbVersion = [&] {
-            AutoGetDb autoDb(opCtx, kDbName, MODE_IS);
-            const auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, kDbName);
+            const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, kDbName);
             return scopedDss->getDbVersion(opCtx);
         };
 
@@ -188,9 +186,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
             FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(opCtx, kDbName, boost::none));
 
         boost::optional<DatabaseVersion> activeDbVersion = [&] {
-            AutoGetDb autoDb(opCtx, kDbName, MODE_IS);
-            const auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, kDbName);
+            const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, kDbName);
             return scopedDss->getDbVersion(opCtx);
         }();
         ASSERT_TRUE(activeDbVersion);

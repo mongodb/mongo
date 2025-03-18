@@ -279,7 +279,7 @@ void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
                 // tell whether post image doc will fall within the chunk range. If it turns out
                 // both preImage and postImage doc don't fall into the chunk range, it is not wrong
                 // for this op to be added to session migration, but it will result in wasted work
-                // and unneccesary extra oplog storage on the destination.
+                // and unnecessary extra oplog storage on the destination.
                 cloner->_deferProcessingForXferMod(preImageDocKey);
             }
         } else {

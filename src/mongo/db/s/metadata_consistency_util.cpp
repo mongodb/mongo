@@ -414,8 +414,7 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLo
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
     const auto dbVersionInCache = [&]() {
-        AutoGetDb autoDb(opCtx, dbName, MODE_IS);
-        const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+        const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, dbName);
         return scopedDss->getDbVersion(opCtx);
     }();
 

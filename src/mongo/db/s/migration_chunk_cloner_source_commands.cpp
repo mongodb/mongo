@@ -109,13 +109,12 @@ public:
             const auto scopedCsr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, *nss);
 
-            if ((_chunkCloner = MigrationSourceManager::getCurrentCloner(*scopedCsr))) {
-                invariant(_chunkCloner);
-            } else {
-                uasserted(ErrorCodes::IllegalOperation,
-                          str::stream() << "No active migrations were found for collection "
-                                        << nss->toStringForErrorMsg());
-            }
+            _chunkCloner = MigrationSourceManager::getCurrentCloner(*scopedCsr);
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "No active migrations were found for collection "
+                                  << nss->toStringForErrorMsg(),
+                    _chunkCloner);
         }
 
         // Ensure the session ids are correct

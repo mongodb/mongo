@@ -135,6 +135,8 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
     static ScopedExclusiveCollectionShardingRuntime assertCollectionLockedAndAcquireExclusive(
         OperationContext* opCtx, const NamespaceString& nss);
+    static ScopedSharedCollectionShardingRuntime acquireShared(OperationContext* opCtx,
+                                                               const NamespaceString& nss);
     static ScopedExclusiveCollectionShardingRuntime acquireExclusive(OperationContext* opCtx,
                                                                      const NamespaceString& nss);
 
