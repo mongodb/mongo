@@ -166,7 +166,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:service_context",
     ],
 )
 

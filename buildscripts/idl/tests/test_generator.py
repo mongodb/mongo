@@ -1348,12 +1348,12 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster;"],
+            ["mongo::FCVGatedFeatureFlag gToaster;"],
         )
         self.assertStringsInFile(
             source,
             [
-                'mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster{false, ""_sd};',
+                'mongo::FCVGatedFeatureFlag gToaster{false, ""_sd};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
             ],
         )
@@ -1375,12 +1375,12 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster;"],
+            ["mongo::FCVGatedFeatureFlag gToaster;"],
         )
         self.assertStringsInFile(
             source,
             [
-                'mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster{true, "123"_sd};',
+                'mongo::FCVGatedFeatureFlag gToaster{true, "123"_sd};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
             ],
         )

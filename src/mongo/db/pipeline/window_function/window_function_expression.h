@@ -76,7 +76,6 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/db/version_context.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -111,7 +110,6 @@ class PartitionIterator;
         if (!__VA_ARGS__ ||                                                                    \
             !CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {           \
                 return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                    \
-                    kNoVersionContext,                                                         \
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot());             \
             })) {                                                                              \
             return;                                                                            \

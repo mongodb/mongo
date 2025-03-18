@@ -79,7 +79,6 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/version_context.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/unordered_set.h"
@@ -172,7 +171,6 @@ class Document;
         if (!__VA_ARGS__ ||                                                                       \
             !CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {              \
                 return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                       \
-                    kNoVersionContext,                                                            \
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot());                \
             })) {                                                                                 \
             DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, featureFlag); \
