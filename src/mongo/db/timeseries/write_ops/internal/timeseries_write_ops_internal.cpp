@@ -91,6 +91,15 @@ inline uint64_t getStorageCacheSizeBytes(OperationContext* opCtx) {
         1024;
 }
 
+inline void populateError(OperationContext* opCtx,
+                          size_t index,
+                          Status errorStatus,
+                          std::vector<mongo::write_ops::WriteError>* errors) {
+    if (auto error = write_ops_exec::generateError(opCtx, errorStatus, index, errors->size())) {
+        invariant(errorStatus.code() != ErrorCodes::WriteConflict);
+        errors->emplace_back(std::move(*error));
+    }
+}
 TimeseriesSingleWriteResult getTimeseriesSingleWriteResult(
     write_ops_exec::WriteResult&& reply, const mongo::write_ops::InsertCommandRequest& request) {
     invariant(reply.results.size() == 1,
@@ -634,10 +643,7 @@ void populateErrorsFromWriteBatches(OperationContext* opCtx,
     for (auto batchIndex = startIndex; batchIndex <= endIndex; batchIndex++) {
         auto batch = batches[batchIndex];
         for (auto index : batch->userBatchIndices) {
-            auto error = write_ops_exec::generateError(opCtx, errorStatus, index, errors.size());
-            if (error) {
-                errors.emplace_back(std::move(*error));
-            }
+            populateError(opCtx, static_cast<size_t>(index), errorStatus, &errors);
         }
     }
 }
@@ -773,15 +779,6 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     Status collectionAcquisitionStatus = Status::OK();
     TimeseriesOptions timeseriesOptions;
 
-    auto fillErrors = [&](size_t startIndex, Status errorCode) {
-        for (auto i = startIndex; i < measurementDocs.size(); i++) {
-            if (auto error = write_ops_exec::generateError(opCtx, errorCode, i, errors->size())) {
-                invariant(errorCode != ErrorCodes::WriteConflict);
-                errors->emplace_back(std::move(*error));
-            }
-        }
-    };
-
     try {
         // It must be ensured that the CollectionShardingState remains consistent while rebuilding
         // the timeseriesOptions. However, the associated collection must be acquired before
@@ -809,7 +806,7 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     }
 
     if (!collectionAcquisitionStatus.isOK()) {
-        fillErrors(0, collectionAcquisitionStatus);
+        populateError(opCtx, /*index=*/0, collectionAcquisitionStatus, errors);
         return {};
     }
 
@@ -847,13 +844,12 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     if (!swWriteBatches.isOK()) {
         invariant(!errorsAndIndices.empty());
 
-        // Must return errors for the first failed index and all past it for an ordered write.
-        sort(errorsAndIndices.begin(), errorsAndIndices.end(), [](auto& lhs, auto& rhs) {
-            return lhs.index < rhs.index;
-        });
-
-        auto& [firstError, firstIndex] = errorsAndIndices.front();
-        fillErrors(firstIndex, firstError);
+        auto firstErrorAndIndex =
+            std::min_element(errorsAndIndices.begin(),
+                             errorsAndIndices.end(),
+                             [](auto& lhs, auto& rhs) { return lhs.index < rhs.index; });
+        auto& [firstErrorStatus, firstIndex] = *firstErrorAndIndex;
+        populateError(opCtx, firstIndex, firstErrorStatus, errors);
         return {};
     }
 
@@ -970,8 +966,7 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
                     "Failed to compress bucket for time-series insert, please retry your write",
                     "bucketId"_attr = bucketId);
 
-                errors->emplace_back(*write_ops_exec::generateError(
-                    opCtx, ex.toStatus(), start + index, errors->size()));
+                populateError(opCtx, start + index, ex.toStatus(), errors);
             }
 
             batch.reset();
@@ -1254,9 +1249,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         }
         auto& oss{OperationShardingState::get(opCtx)};
         oss.setShardingOperationFailedStatus(ex.toStatus());
-        const auto error{
-            write_ops_exec::generateError(opCtx, ex.toStatus(), start + index, errors->size())};
-        errors->emplace_back(std::move(*error));
+
+        populateError(opCtx, start + index, ex.toStatus(), errors);
         return false;
     }
 
@@ -1755,10 +1749,7 @@ void processErrorsForSubsetOfBatch(OperationContext* opCtx,
                                    std::vector<mongo::write_ops::WriteError>* errors) {
     if (!errorsAndIndices.empty()) {
         for (auto& [errorStatus, index] : errorsAndIndices) {
-            auto error = write_ops_exec::generateError(
-                opCtx, errorStatus, originalIndices[index], errors->size());
-            invariant(errorStatus.code() != ErrorCodes::WriteConflict);
-            errors->emplace_back(std::move(*error));
+            populateError(opCtx, originalIndices[index], errorStatus, errors);
         }
     }
 }
@@ -1814,9 +1805,7 @@ TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
         // inserting, and return an empty vector of WriteBatches.
         for (size_t i = 0; i < numDocsToStage; i++) {
             invariant(startIndex + i < request.getDocuments().size());
-            const auto error{write_ops_exec::generateError(
-                opCtx, collectionAcquisitionStatus, startIndex + i, errors->size())};
-            errors->emplace_back(std::move(*error));
+            populateError(opCtx, startIndex + i, collectionAcquisitionStatus, errors);
         }
         return {};
     }
@@ -1845,9 +1834,7 @@ TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
 
     if (!errorsAndIndices.empty()) {
         for (auto& [errorStatus, index] : errorsAndIndices) {
-            auto error = write_ops_exec::generateError(opCtx, errorStatus, index, errors->size());
-            invariant(errorStatus.code() != ErrorCodes::WriteConflict);
-            errors->emplace_back(std::move(*error));
+            populateError(opCtx, index, errorStatus, errors);
         }
     }
 
@@ -1916,9 +1903,7 @@ TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogWithRetries(
         // inserting, and return an empty vector of WriteBatches.
         for (size_t i = 0; i < numDocsToStage; i++) {
             invariant(startIndex + i < request.getDocuments().size());
-            const auto error{write_ops_exec::generateError(
-                opCtx, collectionAcquisitionStatus, startIndex + i, errors->size())};
-            errors->emplace_back(std::move(*error));
+            populateError(opCtx, startIndex + i, collectionAcquisitionStatus, errors);
         }
         return {};
     }
