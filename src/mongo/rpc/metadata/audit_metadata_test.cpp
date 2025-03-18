@@ -157,6 +157,9 @@ TEST_F(AuditMetadataTest, ReadAuditMetadata) {
         ASSERT_TRUE(auditClientAttrs);
         ASSERT_TRUE(auditUserAttrs);
 
+        ASSERT_EQ(auditUserAttrs->getUser().getUser(), kUserName);
+        ASSERT_EQ(auditUserAttrs->getUser().getDatabaseName().toString_forTest(), kDBName);
+
         ASSERT_EQ(auditClientAttrs->getRemote(), HostAndPort::parse(kRemoteAddr));
         ASSERT_EQ(kExpectedProxies.size(), auditClientAttrs->getProxies().size());
         for (size_t i = 0; i < auditClientAttrs->getProxies().size(); i++) {
@@ -171,6 +174,90 @@ TEST_F(AuditMetadataTest, ReadAuditMetadata) {
     auditUserAttrs = rpc::AuditUserAttrs::get(opCtx());
     ASSERT_FALSE(auditClientAttrs);
     ASSERT_TRUE(auditUserAttrs);
+}
+
+TEST_F(AuditMetadataTest, ReadAuditMetadataUserOnly) {
+    auto auditClientAttrs = rpc::AuditClientAttrs::get(client());
+    auto auditUserAttrs = rpc::AuditUserAttrs::get(opCtx());
+    ASSERT_FALSE(auditClientAttrs);
+    ASSERT_FALSE(auditUserAttrs);
+
+    // Construct an AuditMetadata object representing a parsed $audit object.
+    BSONObj dollarAudit = BSON("$impersonatedUser" << BSON("user" << kUserName << "db" << kDBName)
+                                                   << "$impersonatedRoles" << BSONArray());
+    AuditMetadata parsedDollarAudit =
+        AuditMetadata::parse(IDLParserContext{kImpersonationMetadataSectionName}, dollarAudit);
+    GenericArguments requestArgs;
+    requestArgs.setDollarAudit(parsedDollarAudit);
+
+    {
+        boost::optional<rpc::ImpersonatedClientSessionGuard> clientSessionGuard;
+        ASSERT_FALSE(clientSessionGuard);
+        rpc::readRequestMetadata(opCtx(), requestArgs, false, clientSessionGuard);
+        ASSERT_FALSE(clientSessionGuard.has_value());
+
+        // Now, AuditClientAttrs and AuditUserAttrs should be updated to store the user
+        // info supplied by requestArgs. Since there was nothing in $impersonatedClient,
+        // auditClientAttrs should still be empty.
+        auditClientAttrs = rpc::AuditClientAttrs::get(client());
+        auditUserAttrs = rpc::AuditUserAttrs::get(opCtx());
+        ASSERT_FALSE(auditClientAttrs);
+        ASSERT_TRUE(auditUserAttrs);
+
+        ASSERT_EQ(auditUserAttrs->getUser().getUser(), kUserName);
+        ASSERT_EQ(auditUserAttrs->getUser().getDatabaseName().toString_forTest(), kDBName);
+    }
+
+    // After clientSessionGuard goes out of scope, the AuditClientAttrs should be cleared. Since
+    // AuditUserAttrs is scoped to a single OperationContext and that is still alive, it will be
+    // nonempty.
+    auditClientAttrs = rpc::AuditClientAttrs::get(client());
+    auditUserAttrs = rpc::AuditUserAttrs::get(opCtx());
+    ASSERT_FALSE(auditClientAttrs);
+    ASSERT_TRUE(auditUserAttrs);
+}
+
+TEST_F(AuditMetadataTest, ReadAuditMetadataClientOnly) {
+    auto auditClientAttrs = rpc::AuditClientAttrs::get(client());
+    auto auditUserAttrs = rpc::AuditUserAttrs::get(opCtx());
+    ASSERT_FALSE(auditClientAttrs);
+    ASSERT_FALSE(auditUserAttrs);
+
+    // Construct an AuditMetadata object representing a parsed $audit object.
+    BSONObj dollarAudit =
+        BSON("$impersonatedRoles" << BSONArray() << "$impersonatedClient"
+                                  << BSON("hosts"
+                                          << BSON_ARRAY(kRemoteAddr << kLocalAddr << kProxyAddr)));
+    AuditMetadata parsedDollarAudit =
+        AuditMetadata::parse(IDLParserContext{kImpersonationMetadataSectionName}, dollarAudit);
+    GenericArguments requestArgs;
+    requestArgs.setDollarAudit(parsedDollarAudit);
+
+    {
+        boost::optional<rpc::ImpersonatedClientSessionGuard> clientSessionGuard;
+        ASSERT_FALSE(clientSessionGuard);
+        rpc::readRequestMetadata(opCtx(), requestArgs, false, clientSessionGuard);
+        ASSERT_TRUE(clientSessionGuard.has_value());
+
+        // Now, AuditClientAttrs should be updated to store the client
+        // info supplied by requestArgs.
+        auditClientAttrs = rpc::AuditClientAttrs::get(client());
+        auditUserAttrs = rpc::AuditUserAttrs::get(opCtx());
+        ASSERT_TRUE(auditClientAttrs);
+        ASSERT_FALSE(auditUserAttrs);
+
+        ASSERT_EQ(auditClientAttrs->getRemote(), HostAndPort::parse(kRemoteAddr));
+        ASSERT_EQ(kExpectedProxies.size(), auditClientAttrs->getProxies().size());
+        for (size_t i = 0; i < auditClientAttrs->getProxies().size(); i++) {
+            ASSERT_EQ(auditClientAttrs->getProxies()[i], HostAndPort::parse(kExpectedProxies[i]));
+        }
+    }
+
+    // After clientSessionGuard goes out of scope, the AuditClientAttrs should be cleared.
+    auditClientAttrs = rpc::AuditClientAttrs::get(client());
+    auditUserAttrs = rpc::AuditUserAttrs::get(opCtx());
+    ASSERT_FALSE(auditClientAttrs);
+    ASSERT_FALSE(auditUserAttrs);
 }
 
 TEST_F(AuditMetadataTest, WriteAuditMetadata) {

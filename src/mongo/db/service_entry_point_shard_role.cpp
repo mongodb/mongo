@@ -1648,22 +1648,6 @@ void ExecCommandDatabase::_initiateCommand() {
                          "Skipping command execution for help request"));
     }
 
-    if (auto auditUserAttrs = rpc::AuditUserAttrs::get(opCtx);
-        auditUserAttrs && auditUserAttrs->getIsImpersonating()) {
-        uassert(
-            ErrorCodes::Unauthorized,
-            "Unauthorized use of impersonation metadata.",
-            authzSession->isAuthorizedForClusterActions({ActionType::impersonate}, boost::none));
-    }
-
-    if (auto auditClientAttrs = rpc::AuditClientAttrs::get(client);
-        auditClientAttrs && auditClientAttrs->getIsImpersonating()) {
-        uassert(
-            ErrorCodes::Unauthorized,
-            "Unauthorized use of impersonation metadata.",
-            authzSession->isAuthorizedForClusterActions({ActionType::impersonate}, boost::none));
-    }
-
     _invocation->checkAuthorization(opCtx, _execContext.getRequest());
 
     if (!opCtx->getClient()->isInDirectClient() &&

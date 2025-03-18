@@ -54,7 +54,7 @@
 namespace mongo {
 namespace rpc {
 void setAuditClientMetadata(OperationContext* opCtx,
-                            const boost::optional<AuditMetadata>& data,
+                            const ImpersonatedClientMetadata& clientMetadata,
                             boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard) {
     // TODO SERVER-83990: remove
     if (!gFeatureFlagExposeClientIpInAuditLogs.isEnabledUseLastLTSFCVWhenUninitialized(
@@ -66,20 +66,32 @@ void setAuditClientMetadata(OperationContext* opCtx,
         return;
     }
 
-    if (!data || !data->getClientMetadata()) {
-        return;
-    }
-
-    clientSessionGuard.emplace(opCtx->getClient(), data->getClientMetadata().value());
+    clientSessionGuard.emplace(opCtx->getClient(), clientMetadata);
 }
 
 void setAuditMetadata(OperationContext* opCtx,
                       const boost::optional<AuditMetadata>& data,
                       boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard) {
-    setAuditClientMetadata(opCtx, data, clientSessionGuard);
     if (data) {
-        if (auto& user = data->getUser()) {
-            rpc::AuditUserAttrs::set(opCtx, *user, data->getRoles(), true /* isImpersonating */);
+        const auto& user = data->getUser();
+        const auto& roles = data->getRoles();
+        const auto& clientMetadata = data->getClientMetadata();
+        if (user || !roles.empty() || clientMetadata) {
+            // Only set $impersonatedUser, $impersonatedRoles, or $impersonatedClient if the client
+            // is authorized for cluster-level privileges.
+            auto* authzSession = AuthorizationSession::get(opCtx->getClient());
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized use of impersonation metadata.",
+                    authzSession->isAuthorizedForClusterActions({ActionType::impersonate},
+                                                                boost::none));
+
+            if (clientMetadata) {
+                setAuditClientMetadata(opCtx, clientMetadata.value(), clientSessionGuard);
+            }
+
+            if (user || !roles.empty()) {
+                rpc::AuditUserAttrs::set(opCtx, *user, roles, true /* isImpersonating */);
+            }
         }
     }
 }
