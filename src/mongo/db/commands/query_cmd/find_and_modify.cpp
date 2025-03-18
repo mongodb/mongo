@@ -101,6 +101,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/compiler.h"
@@ -408,6 +409,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         if (isTimeseriesViewRequest) {
             timeseries::timeseriesRequestChecks<DeleteRequest>(
+                VersionContext::getDecoration(opCtx),
                 collection.getCollectionPtr(),
                 &deleteRequest,
                 timeseries::deleteRequestCheckFunction);
@@ -451,6 +453,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
         if (isTimeseriesViewRequest) {
             timeseries::timeseriesRequestChecks<UpdateRequest>(
+                VersionContext::getDecoration(opCtx),
                 collection.getCollectionPtr(),
                 &updateRequest,
                 timeseries::updateRequestCheckFunction);

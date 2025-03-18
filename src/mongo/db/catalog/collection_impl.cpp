@@ -96,6 +96,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -902,8 +903,9 @@ boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged()
         return true;
     }
 
+    // TODO(SERVER-96831): Remove this feature flag check, never fall back to the legacy parameter.
     if (!feature_flags::gTSBucketingParametersUnchanged.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            kVersionContextIgnored, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Pessimistically return true because v7.1+ versions may have missed cloning this catalog
         // option upon chunk migrations, movePrimary, resharding, initial sync or backup/restore
         // (SERVER-91193).

@@ -70,6 +70,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/db/version_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -110,6 +111,7 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
           isRequestToTimeseries
               ? createTimeseriesWritesQueryExprsIfNecessary(
                     feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
                     collection)
               : nullptr),

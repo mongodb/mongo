@@ -72,6 +72,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/remote_command_response.h"
@@ -501,8 +502,10 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
     // timeseries deletes or updates feature flag is enabled.
     const bool arbitraryTimeseriesWritesEnabled =
         feature_flags::gTimeseriesDeletesSupport.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (!arbitraryTimeseriesWritesEnabled || cri.cm.hasRoutingTable() ||
         maybeTsNss.isTimeseriesBucketsCollection()) {

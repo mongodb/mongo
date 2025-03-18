@@ -48,6 +48,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -131,6 +132,7 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     uassert(ErrorCodes::QueryFeatureNotAllowed,
             fmt::format("The {} aggregation stage is not enabled", kStageName),
             feature_flags::gDocumentSourceListCatalog.isEnabled(
+                VersionContext::getDecoration(pExpCtx->getOperationContext()),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     return new DocumentSourceListCatalog(pExpCtx);

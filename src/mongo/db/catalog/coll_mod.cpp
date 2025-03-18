@@ -92,6 +92,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
@@ -1003,6 +1004,7 @@ Status _collModInternal(OperationContext* opCtx,
             if (changed) {
                 writableColl->setTimeseriesOptions(opCtx, newOptions);
                 if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     writableColl->setTimeseriesBucketingParametersChanged(opCtx, true);
                 };

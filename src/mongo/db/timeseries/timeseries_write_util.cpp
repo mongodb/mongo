@@ -82,6 +82,7 @@
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -640,9 +641,11 @@ BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, StringDat
     return b.obj();
 }
 
-void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions& options) {
+void deleteRequestCheckFunction(const VersionContext& vCtx,
+                                DeleteRequest* request,
+                                const TimeseriesOptions& options) {
     if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform a delete with a non-empty query on a time-series "
                 "collection that "
@@ -658,9 +661,11 @@ void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions&
     }
 }
 
-void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions& options) {
+void updateRequestCheckFunction(const VersionContext& vCtx,
+                                UpdateRequest* request,
+                                const TimeseriesOptions& options) {
     if (!feature_flags::gTimeseriesUpdatesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform a non-multi update on a time-series collection",
                 request->isMulti());

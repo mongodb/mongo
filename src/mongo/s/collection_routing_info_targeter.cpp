@@ -63,6 +63,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/chunk.h"
@@ -503,12 +504,14 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
                 feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                     isMulti);
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "An {upsert:true} update on a sharded timeseries collection is disallowed.",
                 feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                     !isUpsert);
 
@@ -523,6 +526,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
             expCtx,
             _cri.cm.getTimeseriesFields()->getTimeseriesOptions(),
             feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     }
 
@@ -651,6 +655,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot perform a non-multi delete on a time-series collection",
                 feature_flags::gTimeseriesDeletesSupport.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                     isMulti);
 
@@ -668,6 +673,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
             expCtx,
             tsFields->getTimeseriesOptions(),
             feature_flags::gTimeseriesDeletesSupport.isEnabled(
+                VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     }
 

@@ -51,6 +51,7 @@
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/version_context.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -205,21 +206,27 @@ void timeseriesHintTranslation(const CollectionPtr& coll, R* request) {
  * Performs checks on an update/delete request being performed on a timeseries view.
  */
 template <typename R>
-void timeseriesRequestChecks(const CollectionPtr& coll,
-                             R* request,
-                             std::function<void(R*, const TimeseriesOptions&)> checkRequestFn) {
+void timeseriesRequestChecks(
+    const VersionContext& vCtx,
+    const CollectionPtr& coll,
+    R* request,
+    std::function<void(const VersionContext&, R*, const TimeseriesOptions&)> checkRequestFn) {
     timeseries::assertTimeseriesBucketsCollection(coll.get());
     auto timeseriesOptions = coll->getTimeseriesOptions().value();
-    checkRequestFn(request, timeseriesOptions);
+    checkRequestFn(vCtx, request, timeseriesOptions);
 }
 
 /**
  * Function that performs checks on a delete request being performed on a timeseries collection.
  */
-void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions& options);
+void deleteRequestCheckFunction(const VersionContext& vCtx,
+                                DeleteRequest* request,
+                                const TimeseriesOptions& options);
 
 /**
  * Function that performs checks on an update request being performed on a timeseries collection.
  */
-void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions& options);
+void updateRequestCheckFunction(const VersionContext& vCtx,
+                                UpdateRequest* request,
+                                const TimeseriesOptions& options);
 }  // namespace mongo::timeseries

@@ -63,6 +63,7 @@
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/idl_parser.h"
@@ -237,8 +238,10 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
 
     bool arbitraryTimeseriesWritesEnabled =
         feature_flags::gTimeseriesDeletesSupport.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     auto shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
         expCtx,

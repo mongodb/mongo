@@ -131,6 +131,7 @@
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/path_support.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -795,8 +796,10 @@ UpdateResult performUpdate(OperationContext* opCtx,
     }
 
     if (isTimeseriesViewUpdate) {
-        timeseries::timeseriesRequestChecks<UpdateRequest>(
-            collection.getCollectionPtr(), updateRequest, timeseries::updateRequestCheckFunction);
+        timeseries::timeseriesRequestChecks<UpdateRequest>(VersionContext::getDecoration(opCtx),
+                                                           collection.getCollectionPtr(),
+                                                           updateRequest,
+                                                           timeseries::updateRequestCheckFunction);
         timeseries::timeseriesHintTranslation<UpdateRequest>(collection.getCollectionPtr(),
                                                              updateRequest);
     }
@@ -923,8 +926,10 @@ long long performDelete(OperationContext* opCtx,
     }
 
     if (isTimeseriesViewDelete) {
-        timeseries::timeseriesRequestChecks<DeleteRequest>(
-            collection.getCollectionPtr(), deleteRequest, timeseries::deleteRequestCheckFunction);
+        timeseries::timeseriesRequestChecks<DeleteRequest>(VersionContext::getDecoration(opCtx),
+                                                           collection.getCollectionPtr(),
+                                                           deleteRequest,
+                                                           timeseries::deleteRequestCheckFunction);
         timeseries::timeseriesHintTranslation<DeleteRequest>(collection.getCollectionPtr(),
                                                              deleteRequest);
     }
@@ -1400,8 +1405,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }();
 
     if (source == OperationSource::kTimeseriesUpdate) {
-        timeseries::timeseriesRequestChecks<UpdateRequest>(
-            collection.getCollectionPtr(), updateRequest, timeseries::updateRequestCheckFunction);
+        timeseries::timeseriesRequestChecks<UpdateRequest>(VersionContext::getDecoration(opCtx),
+                                                           collection.getCollectionPtr(),
+                                                           updateRequest,
+                                                           timeseries::updateRequestCheckFunction);
         timeseries::timeseriesHintTranslation<UpdateRequest>(collection.getCollectionPtr(),
                                                              updateRequest);
     }
@@ -1885,8 +1892,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
     if (source == OperationSource::kTimeseriesDelete) {
-        timeseries::timeseriesRequestChecks<DeleteRequest>(
-            collection.getCollectionPtr(), &request, timeseries::deleteRequestCheckFunction);
+        timeseries::timeseriesRequestChecks<DeleteRequest>(VersionContext::getDecoration(opCtx),
+                                                           collection.getCollectionPtr(),
+                                                           &request,
+                                                           timeseries::deleteRequestCheckFunction);
         timeseries::timeseriesHintTranslation<DeleteRequest>(collection.getCollectionPtr(),
                                                              &request);
     }
@@ -2249,8 +2258,10 @@ void explainUpdate(OperationContext* opCtx,
         MODE_IX);
 
     if (isTimeseriesViewRequest) {
-        timeseries::timeseriesRequestChecks<UpdateRequest>(
-            collection.getCollectionPtr(), &updateRequest, timeseries::updateRequestCheckFunction);
+        timeseries::timeseriesRequestChecks<UpdateRequest>(VersionContext::getDecoration(opCtx),
+                                                           collection.getCollectionPtr(),
+                                                           &updateRequest,
+                                                           timeseries::updateRequestCheckFunction);
         timeseries::timeseriesHintTranslation<UpdateRequest>(collection.getCollectionPtr(),
                                                              &updateRequest);
     }
@@ -2294,8 +2305,10 @@ void explainDelete(OperationContext* opCtx,
                           MODE_IX);
 
     if (isTimeseriesViewRequest) {
-        timeseries::timeseriesRequestChecks<DeleteRequest>(
-            collection.getCollectionPtr(), &deleteRequest, timeseries::deleteRequestCheckFunction);
+        timeseries::timeseriesRequestChecks<DeleteRequest>(VersionContext::getDecoration(opCtx),
+                                                           collection.getCollectionPtr(),
+                                                           &deleteRequest,
+                                                           timeseries::deleteRequestCheckFunction);
         timeseries::timeseriesHintTranslation<DeleteRequest>(collection.getCollectionPtr(),
                                                              &deleteRequest);
     }

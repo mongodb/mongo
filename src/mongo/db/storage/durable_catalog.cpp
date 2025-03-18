@@ -62,6 +62,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
@@ -327,6 +328,7 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
             // earlier.
             md.timeseriesBucketsMayHaveMixedSchemaData = false;
             if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 md.timeseriesBucketingParametersHaveChanged = false;
             }
