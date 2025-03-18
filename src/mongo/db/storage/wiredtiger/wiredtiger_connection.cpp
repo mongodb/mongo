@@ -268,7 +268,9 @@ WT_SESSION* WiredTigerConnection::_openSessionInternal(WiredTigerSession* sessio
                                                        const char* config,
                                                        WT_CONNECTION* conn) {
     WT_SESSION* rawSession;
-    invariantWTOK(conn->open_session(conn, handler, config, &rawSession), nullptr);
+    uassert(8268800,
+            "Failed to open a session",
+            conn->open_session(conn, handler, config, &rawSession) == 0);
     return rawSession;
 }
 
