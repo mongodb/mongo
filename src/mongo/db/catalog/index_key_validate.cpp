@@ -433,7 +433,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
             if (indexSpecElem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
-                            << "The field '" << IndexDescriptor::kIndexNameFieldName
+                            << "The field '" << IndexDescriptor::kHiddenFieldName
                             << "' must be a bool, but got " << typeName(indexSpecElem.type())};
             }
 
