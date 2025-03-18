@@ -200,8 +200,8 @@ private:
     };
     std::list<FinishingClientState> _finishingClientList;
 
-    ServiceContext* _svcCtx;
-    GRPCTransportLayer* _tl;
+    GRPCTransportLayer* _tl = nullptr;
+    ServiceContext* _svcCtx = nullptr;
     transport::ReactorHandle _reactor;
     std::shared_ptr<Client> _client;
 };
