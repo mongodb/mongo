@@ -536,6 +536,54 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
 
+  - name: enterprise-amazon2-streams
+    display_name: "Amazon Linux 2 enterprise build with streams"
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - amazon2-latest-small
+    expansions:
+      test_flags: >-
+        --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
+        --additionalFeatureFlags=featureFlagStreams
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: x86_64-enterprise-amazon2-streams
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --streams-release-build
+      multiversion_platform: amazon2
+      multiversion_edition: enterprise-streams
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: amazon2
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      compile_variant: enterprise-amazon2-streams
+      large_distro_name: amazon2-latest-large
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - amazon2023-latest-large
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2023-latest-large
+      - name: .release_critical !.requires_large_host !crypt_push
+      - name: .release_critical .requires_large_host !crypt_push
+        distros:
+          - amazon2023-latest-large
+      - name: streams
+      - name: streams_kafka
+      - name: streams_kafka_gwproxy
+      - name: streams_kafka_benchmark
+      - name: streams_https
+      - name: streams_lambda
+
   - <<: *enterprise-amazon2023-arm64-template
     name: enterprise-amazon2023-arm64-fuzzers
     display_name: "Enterprise Amazon Linux 2023.3 arm64 Fuzzers"
