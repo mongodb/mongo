@@ -46,7 +46,7 @@ namespace mongo {
 
 class StatsCollectionPermit;
 class WiredTigerConnection;
-class RecoveryUnit;
+class OperationContext;
 
 /**
  * This is a structure that caches 1 cursor for each uri.
@@ -233,12 +233,12 @@ public:
      * state. WT will periodically use callbacks to check whether specific WT operations should be
      * interrupted.
      */
-    void attachRecoveryUnit(RecoveryUnit& ru);
+    void attachOperationContext(OperationContext& opCtx);
 
     /**
      * Remove the recovery unit.
      */
-    void detachRecoveryUnit();
+    void detachOperationContext();
 
     Microseconds getStorageExecutionTime() const {
         return _storageExecutionTime;

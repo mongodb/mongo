@@ -373,15 +373,27 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
         LOGV2(20883, "Interrupted operation as its client disconnected", "opId"_attr = getOpID());
     }
 
+    // Set this before assigning the _killCode to ensure that any thread that observes the interrupt
+    // is guaranteed to see the write. If multiple threads race here, the first one to execute will
+    // win. While it isn't guaranteed to be the same thread that wins the _killCode race, it is
+    // conceptually a better kill time anyway. In theory, we could do better with atomicMin,
+    // however it is probably better to preserve the rule that this is written to exactly once, and
+    // only prior to the store to _killCode.
+    {
+        auto setIfZero = TickSource::Tick(0);
+        auto tickSource =
+            _client ? _client->getServiceContext()->getTickSource() : globalSystemTickSource();
+        auto ticks = tickSource->getTicks();
+        if (!ticks) {
+            ticks = TickSource::Tick(-1);
+        }
+        _killTime.compareAndSwap(&setIfZero, ticks);
+    }
+
     if (auto status = ErrorCodes::OK; _killCode.compareAndSwap(&status, killCode)) {
         _cancelSource.cancel();
         if (_baton) {
             _baton->notify();
-        }
-        if (_recoveryUnit) {
-            // We don't acquire the ClientLock here as it should be held by the caller of
-            // markKilled.
-            _recoveryUnit->notifyOperationInterrupted();
         }
     }
 }

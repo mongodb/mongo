@@ -1420,7 +1420,7 @@ void WiredTigerKVEngine::setOldestActiveTransactionTimestampCallback(
 };
 
 RecoveryUnit* WiredTigerKVEngine::newRecoveryUnit() {
-    return new WiredTigerRecoveryUnit(_connection.get(), getClockSource());
+    return new WiredTigerRecoveryUnit(_connection.get());
 }
 
 void WiredTigerKVEngine::setRecordStoreExtraOptions(const std::string& options) {

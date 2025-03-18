@@ -130,7 +130,7 @@ WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(OperationContext* opCtx,
                                                    const std::string& indexUri)
     : _session(WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
                    ->getConnection()
-                   ->getSession(*shard_role_details::getRecoveryUnit(opCtx))) {
+                   ->getSession(*opCtx)) {
     auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     // Open cursors can cause bulk open_cursor to fail with EBUSY.
     // TODO any other cases that could cause EBUSY?

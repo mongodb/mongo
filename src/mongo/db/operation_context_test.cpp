@@ -368,6 +368,22 @@ TEST_F(OperationDeadlineTests,
     ASSERT_TRUE(cancelToken.isCanceled());
 }
 
+TEST_F(OperationDeadlineTests, InterruptLatency) {
+    auto tickSource = checked_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
+    auto opCtx = client->makeOperationContext();
+
+    tickSource->advance(Milliseconds(5));
+    ASSERT_EQ(0, opCtx->getKillTime());
+
+    opCtx->markKilled();
+    ASSERT_NE(opCtx->getKillTime(), 0);
+    ASSERT_EQ(tickSource->getTicks(), opCtx->getKillTime());
+    tickSource->advance(Milliseconds(8));
+
+    ASSERT_EQ(tickSource->ticksTo<Milliseconds>(tickSource->getTicks() - opCtx->getKillTime()),
+              Milliseconds(8));
+}
+
 template <typename D>
 void assertLargeRelativeDeadlineLikeInfinity(Client& client, D maxTime) {
     auto opCtx = client.makeOperationContext();

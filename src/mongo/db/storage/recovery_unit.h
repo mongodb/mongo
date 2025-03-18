@@ -862,28 +862,6 @@ public:
         return _blockingAllowed;
     }
 
-    /**
-     * Return true if the RecoveryUnit has been notified that it should stop executing the current
-     * operation
-     */
-    virtual bool isInterrupted() {
-        return false;
-    }
-
-    /**
-     * Callback to notify the RecoveryUnit that the current operation should be interrupted.
-     * This may be called by a non-owning thread provided that the lifetime of the RecoveryUnit is
-     * guaranteed
-     */
-    virtual void notifyOperationInterrupted() {}
-
-    /**
-     * Callback to acknowledge that an interrupt was observed.
-     * This may be called by a non-owning thread provided that the lifetime of the RecoveryUnit is
-     * guaranteed
-     */
-    virtual void notifyInterruptionAcknowledged() {}
-
 protected:
     RecoveryUnit() = default;
 

@@ -38,8 +38,9 @@
 
 namespace mongo {
 
-QueryTestServiceContext::QueryTestServiceContext()
-    : _serviceContext(ServiceContext::make()),
+QueryTestServiceContext::QueryTestServiceContext(
+    std::unique_ptr<TickSourceMock<Nanoseconds>> tickSource)
+    : _serviceContext(ServiceContext::make(nullptr, nullptr, std::move(tickSource))),
       _client(_serviceContext->getService()->makeClient("query_test")) {
     ShardingState::create(getServiceContext());
     CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());

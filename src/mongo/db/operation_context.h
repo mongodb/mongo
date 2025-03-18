@@ -480,6 +480,18 @@ public:
     }
 
     /**
+     * Returns when the operation was marked as killed, or 0 if the operation has not been
+     * marked as killed.
+     *
+     * This function can return 0 even after checkForInterrupt() has returned an error as during
+     * global shutdowns checkForInterrupt looks at external flags. In this case the caller is
+     * effectively noticing the interrupt before the opCtx is marked dead.
+     */
+    TickSource::Tick getKillTime() const {
+        return _killTime.load();
+    }
+
+    /**
      * Sets the deadline for this operation to the given point in time.
      *
      * To remove a deadline, pass in Date_t::max().
@@ -918,6 +930,9 @@ private:
     // operation is not killed. If killed, it will contain a specific code. This value changes only
     // once from OK to some kill code.
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
+
+    // When the operation was marked as killed.
+    AtomicWord<TickSource::Tick> _killTime{0};
 
     // Used to cancel all tokens obtained via getCancellationToken() when this OperationContext is
     // killed.

@@ -31,6 +31,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
@@ -41,7 +42,8 @@ namespace mongo {
  */
 class QueryTestServiceContext {
 public:
-    QueryTestServiceContext();
+    QueryTestServiceContext(std::unique_ptr<TickSourceMock<Nanoseconds>> tickSource =
+                                std::unique_ptr<TickSourceMock<Nanoseconds>>());
     ~QueryTestServiceContext();
 
     ServiceContext* getServiceContext() const;

@@ -599,5 +599,30 @@ TEST(CurOpTest, GetCursorMetricsProducesValidObject) {
     ASSERT_DOES_NOT_THROW(metrics.toBSON());
 }
 
+TEST(CurOpTest, KilledOperationReportsLatency) {
+    QueryTestServiceContext serviceContext(std::make_unique<TickSourceMock<Nanoseconds>>());
+    auto opCtx = serviceContext.makeOperationContext();
+    auto tickSourcePtr = dynamic_cast<TickSourceMock<Nanoseconds>*>(
+        serviceContext.getServiceContext()->getTickSource());
+
+    tickSourcePtr->advance(Nanoseconds(3));
+    const int killLatency = 32;
+
+    opCtx->markKilled();
+    ASSERT_FALSE(opCtx->checkForInterruptNoAssert().isOK());
+    tickSourcePtr->advance(Nanoseconds(killLatency));
+
+    auto curop = CurOp::get(*opCtx);
+    const OpDebug& opDebug = curop->debug();
+    SingleThreadedLockStats ls;
+
+    BSONObjBuilder bob;
+    opDebug.append(opCtx.get(), ls, {}, {}, true /*omitCommand*/, bob);
+
+    auto res = bob.done();
+    ASSERT_TRUE(res.hasField("interruptLatencyNanos")) << res.toString();
+    ASSERT_EQ(killLatency, res.getIntField("interruptLatencyNanos"));
+}
+
 }  // namespace
 }  // namespace mongo

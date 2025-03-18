@@ -64,7 +64,7 @@ extern AtomicWord<std::int64_t> snapshotTooOldErrorCount;
 
 class WiredTigerRecoveryUnit final : public RecoveryUnit {
 public:
-    WiredTigerRecoveryUnit(WiredTigerConnection* sc, ClockSource* cs);
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc);
 
     /**
      * It's expected a consumer would want to call the constructor that simply takes a
@@ -73,9 +73,7 @@ public:
      * `WiredTigerConnection` that do not have a valid `WiredTigerKVEngine`. This constructor is
      * expected to only be useful in those cases.
      */
-    WiredTigerRecoveryUnit(WiredTigerConnection* sc,
-                           WiredTigerOplogManager* oplogManager,
-                           ClockSource* cs);
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc, WiredTigerOplogManager* oplogManager);
     ~WiredTigerRecoveryUnit() override;
 
     void prepareUnitOfWork() override;
@@ -209,16 +207,6 @@ public:
 
     void setOperationContext(OperationContext* opCtx) override;
 
-    void notifyOperationInterrupted() override;
-    void notifyInterruptionAcknowledged() override;
-
-    bool isInterrupted() override {
-        if (!_opCtx) {
-            return false;
-        }
-        return !_opCtx->checkForInterruptNoAssert().isOK();
-    }
-
 private:
     void doBeginUnitOfWork() override;
     void doCommitUnitOfWork() override;
@@ -318,12 +306,6 @@ private:
 
     // Detects any attempt to reconfigure options used by an open transaction.
     OpenSnapshotOptions _optionsUsedToOpenSnapshot;
-
-    // Tracks when we received a notification to interrupt any ongoing operation.
-    AtomicWord<long long> _interruptNotifyTimeMs{0};
-
-    // Clock source used for timing events.
-    ClockSource* _clockSource;
 };
 
 }  // namespace mongo

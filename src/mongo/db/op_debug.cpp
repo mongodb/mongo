@@ -298,12 +298,12 @@ void OpDebug::report(OperationContext* opCtx,
     if (storageMetrics.prepareReadConflicts > 0) {
         pAttrs->add("prepareReadConflicts", storageMetrics.prepareReadConflicts);
     }
+    OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", additiveMetrics.writeConflicts);
 
-    if (storageMetrics.interruptDelayMs > 0) {
-        pAttrs->add("storageInterruptResponseMillis", storageMetrics.interruptDelayMs);
+    if (storageMetrics.interruptResponseNs > 0) {
+        pAttrs->add("storageInterruptResponseNanos", storageMetrics.interruptResponseNs);
     }
 
-    OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", additiveMetrics.writeConflicts);
     OPDEBUG_TOATTR_HELP_ATOMIC("temporarilyUnavailableErrors",
                                additiveMetrics.temporarilyUnavailableErrors);
 
@@ -432,9 +432,21 @@ void OpDebug::report(OperationContext* opCtx,
     // workingMillis should always be present for any operation
     pAttrs->add("workingMillis", workingTimeMillis.count());
 
+    // Measures the time from when the operation was killed to when it completed.
+    if (auto killTime = opCtx->getKillTime()) {
+        auto ts = opCtx->getServiceContext()->getTickSource();
+        pAttrs->add(
+            "interruptLatencyNanos",
+            durationCount<Nanoseconds>(ts->ticksTo<Nanoseconds>(ts->getTicks() - killTime)));
+    }
+
     // durationMillis should always be present for any operation
     pAttrs->add("durationMillis",
                 durationCount<Milliseconds>(CurOp::get(opCtx)->elapsedTimeTotal()));
+
+    // ~~~~~~~~~~ NOTHING BELOW HERE ~~~~~~~~~~
+    // We want durationMillis to be the last field to make it easier to find visually in slow query
+    // logs.
 }
 
 void OpDebug::reportStorageStats(logv2::DynamicAttributes* pAttrs) const {
@@ -528,10 +540,10 @@ void OpDebug::append(OperationContext* opCtx,
     if (storageMetrics.prepareReadConflicts > 0) {
         b.append("prepareReadConflicts", storageMetrics.prepareReadConflicts);
     }
-    if (storageMetrics.interruptDelayMs > 0) {
-        b.append("storageInterruptResponseMillis", storageMetrics.interruptDelayMs);
-    }
     OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", additiveMetrics.writeConflicts);
+    if (storageMetrics.interruptResponseNs > 0) {
+        b.append("storageInterruptResponseNanos", storageMetrics.interruptResponseNs);
+    }
     OPDEBUG_APPEND_ATOMIC(
         b, "temporarilyUnavailableErrors", additiveMetrics.temporarilyUnavailableErrors);
 
@@ -665,6 +677,14 @@ void OpDebug::append(OperationContext* opCtx,
 
     if (!execStats.isEmpty()) {
         b.append("execStats", std::move(execStats));
+    }
+
+    // Measures the time from when the operation was killed to when it completed.
+    if (auto killTime = opCtx->getKillTime()) {
+        auto ts = opCtx->getServiceContext()->getTickSource();
+        b.appendNumber(
+            "interruptLatencyNanos",
+            durationCount<Nanoseconds>(ts->ticksTo<Nanoseconds>(ts->getTicks() - killTime)));
     }
 }
 

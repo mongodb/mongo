@@ -38,6 +38,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
@@ -693,10 +694,12 @@ int mdb_handle_general(WT_EVENT_HANDLER* handler,
         }
         case WT_EVENT_COMPACT_CHECK: {
             if (session->app_private) {
-                return reinterpret_cast<RecoveryUnit*>(session->app_private)->isInterrupted()
-                    ? -1  // Returning non-zero indicates an error to WT. The precise value is
-                          // irrelevant.
-                    : 0;
+                return reinterpret_cast<OperationContext*>(session->app_private)
+                           ->checkForInterruptNoAssert()
+                           .isOK()
+                    ? 0
+                    : -1;  // Returning non-zero indicates an error to WT. The precise value is
+                           // irrelevant.
             }
             return 0;
         }
@@ -1405,10 +1408,19 @@ int WiredTigerUtil::handleWtEvictionEvent(WT_SESSION* session) {
     if (!session->app_private) {
         return 0;
     }
-    auto ru = reinterpret_cast<RecoveryUnit*>(session->app_private);
+    auto opCtx = reinterpret_cast<OperationContext*>(session->app_private);
 
-    if (feature_flags::gStorageEngineInterruptibility.isEnabled() && ru->isInterrupted()) {
-        ru->notifyInterruptionAcknowledged();
+    if (feature_flags::gStorageEngineInterruptibility.isEnabled() &&
+        !opCtx->checkForInterruptNoAssert().isOK()) {
+        auto& metrics = StorageExecutionContext::get(opCtx)->getStorageMetrics();
+        // Check killTime as it can be 0 for a short window when interrupted during shutdown.
+        auto killTime = opCtx->getKillTime();
+        if (!metrics.interruptResponseNs.load() && killTime) {
+            auto ts = opCtx->getServiceContext()->getTickSource();
+            auto duration =
+                durationCount<Nanoseconds>(ts->ticksTo<Nanoseconds>(ts->getTicks() - killTime));
+            metrics.incrementInterruptResponseNs(duration);
+        }
         cancelledCacheMetric.increment();
         return -1;
     }

@@ -114,8 +114,7 @@ private:
 class WiredTigerUtilMetadataTest : public ServiceContextTest {
 protected:
     WiredTigerUtilMetadataTest() : _harnessHelper("") {
-        _ru = std::make_unique<WiredTigerRecoveryUnit>(
-            _harnessHelper.getConnection(), nullptr, nullptr);
+        _ru = std::make_unique<WiredTigerRecoveryUnit>(_harnessHelper.getConnection(), nullptr);
     }
 
     const char* getURI() const {
@@ -292,8 +291,7 @@ class WiredTigerUtilTest : public ServiceContextTest {};
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
     auto result = WiredTigerUtil::getStatisticsValue(
         *session, "statistics:table:no_such_table", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
@@ -303,8 +301,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
     ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
     auto result = WiredTigerUtil::getStatisticsValue(
@@ -315,8 +312,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
     ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
     // Use connection statistics key which does not apply to a table.
@@ -328,8 +324,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
     ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
     // Use connection statistics key which does not apply to a table.
@@ -352,8 +347,7 @@ TEST_F(WiredTigerUtilTest, ParseAPIMessages) {
     WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
 
     // Create a session.
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
 
     // Perform simple WiredTiger operations while capturing the generated logs.
@@ -876,8 +870,7 @@ TEST_F(WiredTigerUtilTest, ReconfigureBackgroundCompaction) {
 
     // Initialize WiredTiger.
     WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* wtSession = ru->getSession();
 
     // Turn on background compaction.
@@ -925,8 +918,7 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromSuccessfulCall) {
     const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
 
     WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* wtSession = ru->getSession();
 
 
@@ -953,8 +945,7 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromFailedCall) {
     const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
 
     WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* wtSession = ru->getSession();
 
     const std::string uri = "table:get_last_err_from_failed_call";
@@ -982,8 +973,7 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromLatestAPICall) {
     const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
 
     WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
-    auto ru =
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr, nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* wtSession = ru->getSession();
 
     const std::string uri = "table:get_last_err_from_last_call";
@@ -1085,8 +1075,7 @@ TEST_F(WiredTigerUtilTest, CursorOldestForEviction) {
             "json_output=[error,message],verbose=[compact],cache_size=1MB";
 
         WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
-        auto ru = std::make_unique<WiredTigerRecoveryUnit>(
-            harnessHelper.getConnection(), nullptr, nullptr);
+        auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
 
         WiredTigerSession wtSession = harnessHelper.openSession();
 

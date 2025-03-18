@@ -170,7 +170,7 @@ public:
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<WiredTigerRecoveryUnit>(_connection.get(), nullptr, nullptr);
+        return std::make_unique<WiredTigerRecoveryUnit>(_connection.get(), nullptr);
     }
 
 private:

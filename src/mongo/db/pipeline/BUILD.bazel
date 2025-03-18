@@ -730,6 +730,7 @@ mongo_cc_library(
         "//src/mongo/rpc:command_status",
         "//src/mongo/s:analyze_shard_key_common",
         "//src/mongo/s:grid",
+        "//src/mongo/util:tick_source_mock",
         "//src/third_party/snappy",
     ],
 )

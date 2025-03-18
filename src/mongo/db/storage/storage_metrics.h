@@ -68,7 +68,7 @@ public:
 
     bool isEmpty() const {
         return (counter_ops::get(prepareReadConflicts) == 0 &&
-                counter_ops::get(interruptDelayMs) == 0);
+                counter_ops::get(interruptResponseNs) == 0);
     }
 
     /**
@@ -86,21 +86,21 @@ public:
     /**
      * Increments the time taken to respond to an interrupt.
      */
-    void incrementInterruptDelayMs(CounterType n) {
-        counter_ops::add(interruptDelayMs, n);
+    void incrementInterruptResponseNs(CounterType n) {
+        counter_ops::add(interruptResponseNs, n);
     }
 
     /**
      * Time taken for the storage engine to acknowledge an interrupt. Not set if an interrupt was
      * set but not acknowledged by the storage engine.
      */
-    CounterType interruptDelayMs{0};
+    CounterType interruptResponseNs{0};
 
 private:
     template <typename OtherType>
     StorageMetrics& set(const StorageMetrics<OtherType>& other) {
         counter_ops::set(prepareReadConflicts, other.prepareReadConflicts);
-        counter_ops::set(interruptDelayMs, other.interruptDelayMs);
+        counter_ops::set(interruptResponseNs, other.interruptResponseNs);
         return *this;
     }
 
@@ -113,8 +113,8 @@ private:
         incrementPrepareReadConflicts(positive ? counter_ops::get(other.prepareReadConflicts)
                                                : -counter_ops::get(other.prepareReadConflicts));
 
-        incrementInterruptDelayMs(positive ? counter_ops::get(other.interruptDelayMs)
-                                           : -counter_ops::get(other.interruptDelayMs));
+        incrementInterruptResponseNs(positive ? counter_ops::get(other.interruptResponseNs)
+                                              : -counter_ops::get(other.interruptResponseNs));
         return *this;
     }
 };
