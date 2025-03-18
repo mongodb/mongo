@@ -1223,10 +1223,15 @@ ScriptSource::PinnedUnits<Unit>::PinnedUnits(
     : PinnedUnitsBase(source) {
   MOZ_ASSERT(source->hasSourceType<Unit>(), "must pin units of source's type");
 
-  units_ = source->units<Unit>(cx, holder, begin, len);
-  if (units_) {
+  {
     auto guard = source->readers_.lock();
     guard->count++;
+  }
+
+  units_ = source->units<Unit>(cx, holder, begin, len);
+  if (!units_) {
+    auto guard = source->readers_.lock();
+    guard->count--;
   }
 }
 

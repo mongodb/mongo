@@ -72,6 +72,6 @@
 
 /* MOZILLA JSAPI version number components */
 #define MOZJS_MAJOR_VERSION 115
-#define MOZJS_MINOR_VERSION 20
+#define MOZJS_MINOR_VERSION 21
 
 #endif /* js_config_h */
