@@ -146,7 +146,7 @@ export function assertUnionWithSearchPipelinesApplyViews(
  */
 export function verifyE2ESearchExplainOutput(
     {explainOutput, stageType, verbosity, nReturned = null}) {
-    if (explainOutput.hasOwnProperty("splitPipeline")) {
+    if (explainOutput.hasOwnProperty("splitPipeline") && explainOutput["splitPipeline"] !== null) {
         // We check metadata and protocol version for sharded $search.
         verifyShardsPartExplainOutput({result: explainOutput, searchType: "$search"});
     }
@@ -189,7 +189,7 @@ export function verifyE2ESearchMetaExplainOutput(
     {explainOutput, numFacetBucketsAndCount, verbosity}) {
     // In an unsharded scenario, $searchMeta returns one document with all of the facet values.
     let nReturned = 1;
-    if (explainOutput.hasOwnProperty("splitPipeline")) {
+    if (explainOutput.hasOwnProperty("splitPipeline") && explainOutput["splitPipeline"] !== null) {
         // We check metadata and protocol version for sharded $search.
         verifyShardsPartExplainOutput({result: explainOutput, searchType: "$searchMeta"});
         // In the sharded scenario, $searchMeta returns one document per facet bucket + count, as it

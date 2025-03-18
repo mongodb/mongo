@@ -92,7 +92,7 @@ function runExplainTest(verbosity) {
         nReturned: NumberLong(numFireDocs)
     });
     // On a sharded cluster, $setVariableFromSubPipeline should be inserted.
-    if (result.hasOwnProperty("shards")) {
+    if (result.hasOwnProperty("splitPipeline") && result["splitPipeline"] !== null) {
         let mergingPipeline = result.splitPipeline.mergerPart;
         assert.eq(["$mergeCursors"], Object.keys(mergingPipeline[0]));
         assert.eq(["$setVariableFromSubPipeline"], Object.keys(mergingPipeline[1]));

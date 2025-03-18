@@ -502,10 +502,7 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --excludeWithAnyTags=tsan_incompatible
     tasks:
-      - name: search_end_to_end_sharded_cluster
-      - name: search_end_to_end_single_node
-      - name: search_community_end_to_end_sharded_cluster
-      - name: search_community_end_to_end_single_node
+      - name: .search_e2e_tests
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:

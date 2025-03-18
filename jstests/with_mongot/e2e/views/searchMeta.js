@@ -46,13 +46,18 @@ const facetQuery = [{
 
 // Verify that the explain output doesn't contain the view pipeline.
 let explain = totalPriceView.explain().aggregate(facetQuery);
-if (FixtureHelpers.isSharded(coll)) {
-    for (const [key, shardExplain] of Object.entries(explain.shards)) {
-        // Sharded clusters require a $project stage for guaranteeing only the metadata, and not
-        // actual documents, are returned to mongos.
-        assert(shardExplain.stages.length == 2);
+if (FixtureHelpers.isMongos(db)) {
+    for (const [_, shardExplain] of Object.entries(explain.shards)) {
         assert(Object.keys(shardExplain.stages[0])[0], "$searchMeta");
-        assert(Object.keys(shardExplain.stages[0])[0], "$project");
+
+        if (FixtureHelpers.isSharded(coll)) {
+            // Sharded clusters require a $project stage for guaranteeing only the metadata, and not
+            // actual documents, are returned to mongos.
+            assert.eq(shardExplain.stages.length, 2);
+            assert(Object.keys(shardExplain.stages[0])[0], "$project");
+        } else {
+            assert.eq(shardExplain.stages.length, 1);
+        }
     }
 } else {
     assert(explain.stages.length == 1);
