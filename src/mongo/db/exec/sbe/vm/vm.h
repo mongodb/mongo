@@ -1310,7 +1310,7 @@ private:
     static constexpr size_t offsetVal = 2;
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    FastTuple<bool, value::TypeTags, value::Value> readTuple(uint8_t* ptr) noexcept {
+    FastTuple<bool, value::TypeTags, value::Value> readTuple(uint8_t* ptr) {
         auto owned = readFromMemory<bool>(ptr + offsetOwned);
         auto tag = readFromMemory<value::TypeTags>(ptr + offsetTag);
         auto val = readFromMemory<value::Value>(ptr + offsetVal);
@@ -1318,15 +1318,14 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    void writeTuple(uint8_t* ptr, bool owned, value::TypeTags tag, value::Value val) noexcept {
+    void writeTuple(uint8_t* ptr, bool owned, value::TypeTags tag, value::Value val) {
         writeToMemory(ptr + offsetOwned, owned);
         writeToMemory(ptr + offsetTag, tag);
         writeToMemory(ptr + offsetVal, val);
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    FastTuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset,
-                                                                bool pop = false) noexcept {
+    FastTuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset, bool pop = false) {
         auto ret = readTuple(_argStackTop - offset * sizeOfElement);
 
         if (pop) {
@@ -1337,7 +1336,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    FastTuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) noexcept {
+    FastTuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) {
         if (MONGO_likely(offset == 0)) {
             auto [owned, tag, val] = readTuple(_argStackTop);
             writeToMemory(_argStackTop + offsetOwned, false);
@@ -1361,7 +1360,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    void setTagToNothing(size_t offset) noexcept {
+    void setTagToNothing(size_t offset) {
         if (MONGO_likely(offset == 0)) {
             writeToMemory(_argStackTop + offsetTag, value::TypeTags::Nothing);
         } else {
@@ -1371,7 +1370,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    void setStack(size_t offset, bool owned, value::TypeTags tag, value::Value val) noexcept {
+    void setStack(size_t offset, bool owned, value::TypeTags tag, value::Value val) {
         if (MONGO_likely(offset == 0)) {
             topStack(owned, tag, val);
         } else {
@@ -1380,7 +1379,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    void pushStack(bool owned, value::TypeTags tag, value::Value val) noexcept {
+    void pushStack(bool owned, value::TypeTags tag, value::Value val) {
         auto localPtr = _argStackTop += sizeOfElement;
         if constexpr (kDebugBuild) {
             invariant(localPtr != _argStackEnd);
@@ -1389,13 +1388,11 @@ private:
         writeTuple(localPtr, owned, tag, val);
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void topStack(bool owned,
-                                               value::TypeTags tag,
-                                               value::Value val) noexcept {
+    MONGO_COMPILER_ALWAYS_INLINE void topStack(bool owned, value::TypeTags tag, value::Value val) {
         writeTuple(_argStackTop, owned, tag, val);
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void popStack() noexcept {
+    MONGO_COMPILER_ALWAYS_INLINE void popStack() {
         _argStackTop -= sizeOfElement;
     }
 

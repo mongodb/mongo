@@ -148,7 +148,7 @@ long long performDelete(OperationContext* opCtx,
 boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
                                                      const Status& status,
                                                      int index,
-                                                     size_t numErrors) noexcept;
+                                                     size_t numErrors);
 
 /**
  * Updates the retryable write stats if the write op contains retry.

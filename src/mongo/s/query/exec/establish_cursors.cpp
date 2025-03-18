@@ -152,7 +152,7 @@ private:
      * Favors interruption/unyield failures > UUID mismatch error with actual ns > UUID mismatch
      * error > other errors > retargeting errors
      */
-    void _prioritizeFailures(Status newError, bool isInterruption) noexcept;
+    void _prioritizeFailures(Status newError, bool isInterruption);
 
     OperationContext* const _opCtx;
     const std::shared_ptr<executor::TaskExecutor> _executor;
@@ -348,7 +348,7 @@ void CursorEstablisher::checkForFailedRequests() {
     uassertStatusOK(*_maybeFailure);
 }
 
-void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption) noexcept {
+void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption) {
     invariant(!newError.isOK());
     invariant(!_maybeFailure->isOK());
 

@@ -237,8 +237,6 @@ public:
 
     PlanStageSlots(PlanStageSlots&& other) noexcept : _data(std::move(other._data)) {}
 
-    ~PlanStageSlots() noexcept = default;
-
     PlanStageSlots& operator=(const PlanStageSlots& other) {
         if (this != &other) {
             _data = cloneData(other._data);
@@ -566,8 +564,6 @@ public:
     PlanStageReqs(const PlanStageReqs& other) : _data(cloneData(other._data)) {}
 
     PlanStageReqs(PlanStageReqs&& other) noexcept : _data(std::move(other._data)) {}
-
-    ~PlanStageReqs() noexcept = default;
 
     PlanStageReqs& operator=(const PlanStageReqs& other) {
         if (this != &other) {

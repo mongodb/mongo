@@ -88,8 +88,7 @@ public:
         using ProcessBatchFn =
             void (*)(const ColumnOpFunctorData*, TypeTags, const Value*, TypeTags*, Value*, size_t);
 
-        constexpr MethodTable(ProcessSingleFn processSingleFn,
-                              ProcessBatchFn processBatchFn) noexcept
+        constexpr MethodTable(ProcessSingleFn processSingleFn, ProcessBatchFn processBatchFn)
             : processSingleFn(processSingleFn), processBatchFn(processBatchFn) {}
 
         // processSingleFn() processes a single value.

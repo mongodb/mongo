@@ -187,7 +187,7 @@ struct Instruction {
         }
 
         MONGO_COMPILER_ALWAYS_INLINE_OPT
-        static FastTuple<bool, bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
+        static FastTuple<bool, bool, int> decodeParam(const uint8_t*& pcPointer) {
             auto flags = readFromMemory<uint8_t>(pcPointer);
             bool pop = flags & 1u;
             bool moveFrom = flags & 2u;

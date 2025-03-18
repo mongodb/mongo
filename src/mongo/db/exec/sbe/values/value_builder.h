@@ -225,12 +225,12 @@ protected:
         return {tag, val};
     }
 
-    void appendValue(TypeTags tag, Value val) noexcept {
+    void appendValue(TypeTags tag, Value val) {
         _tagList.push_back(tag);
         _valList.push_back(val);
     }
 
-    void appendValue(std::pair<TypeTags, Value> in) noexcept {
+    void appendValue(std::pair<TypeTags, Value> in) {
         appendValue(in.first, in.second);
     }
 

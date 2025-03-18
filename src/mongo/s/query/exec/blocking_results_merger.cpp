@@ -34,10 +34,14 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 
@@ -78,7 +82,7 @@ StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(
         // This shouldn't throw, but we cannot enforce that.
         result = waitFn();
     } catch (const DBException&) {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9993800);
     }
 
     if (_resourceYielder) {
