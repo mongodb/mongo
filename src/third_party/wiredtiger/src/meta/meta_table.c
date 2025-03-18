@@ -52,7 +52,7 @@ __wt_metadata_turtle_rewrite(WT_SESSION_IMPL *session)
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->turtle_lock);
 
     char *existing_config;
-    WT_RET(__wti_turtle_read(session, WT_METAFILE_URI, &existing_config));
+    WT_RET(__wt_turtle_read(session, WT_METAFILE_URI, &existing_config));
 
     if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
         WT_RET(__wt_live_restore_turtle_update(session, WT_METAFILE_URI, existing_config, false));
@@ -318,7 +318,11 @@ __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
          * otherwise. The code path is used enough that Coverity complains a lot, add an error check
          * to get some peace and quiet.
          */
-        WT_WITH_TURTLE_LOCK(session, ret = __wti_turtle_read(session, key, valuep));
+        if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+            ret = __wt_live_restore_turtle_read(session, key, valuep);
+        else
+            WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_read(session, key, valuep));
+
         if (ret != 0)
             __wt_free(session, *valuep);
         return (ret);

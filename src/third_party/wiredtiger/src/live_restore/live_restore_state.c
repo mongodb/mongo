@@ -195,8 +195,7 @@ __wti_live_restore_set_state(
     lr_fs->state = new_state;
 
     /* Bumping the turtle file will automatically write the latest live restore state. */
-    WT_WITH_TURTLE_LOCK(session, ret = __wt_metadata_turtle_rewrite(session));
-    WT_ERR(ret);
+    WT_ERR(__wt_live_restore_turtle_rewrite(session));
     __live_restore_report_state_to_application(session, new_state);
 
 err:
@@ -301,6 +300,31 @@ __wt_live_restore_turtle_rewrite(WT_SESSION_IMPL *session)
         __wt_spin_lock(session, &lr_fs->state_lock);
 
     WT_WITH_TURTLE_LOCK(session, ret = __wt_metadata_turtle_rewrite(session));
+    WT_ERR(ret);
+
+err:
+    if (!reentrant)
+        __wt_spin_unlock(session, &lr_fs->state_lock);
+
+    return (ret);
+}
+
+/*
+ * __wt_live_restore_turtle_read --
+ *     Intercept calls to read the turtle file so we can take the state lock first. The state lock
+ *     must be held for the entire process and taken before we take the turtle lock.
+ */
+int
+__wt_live_restore_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
+{
+    WT_DECL_RET;
+    WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)S2C(session)->file_system;
+
+    bool reentrant = __wt_spin_owned(session, &lr_fs->state_lock);
+    if (!reentrant)
+        __wt_spin_lock(session, &lr_fs->state_lock);
+
+    WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_read(session, key, valuep));
     WT_ERR(ret);
 
 err:

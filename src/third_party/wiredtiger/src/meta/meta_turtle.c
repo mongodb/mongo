@@ -336,8 +336,11 @@ __wt_turtle_validate_version(WT_SESSION_IMPL *session)
 
     version = WT_NO_VERSION;
 
-    WT_WITH_TURTLE_LOCK(
-      session, ret = __wti_turtle_read(session, WT_METADATA_VERSION, &version_string));
+    if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+        ret = __wt_live_restore_turtle_read(session, WT_METADATA_VERSION, &version_string);
+    else
+        WT_WITH_TURTLE_LOCK(
+          session, ret = __wt_turtle_read(session, WT_METADATA_VERSION, &version_string));
 
     if (ret != 0)
         WT_ERR_MSG(session, ret, "Unable to read version string from turtle file");
@@ -521,8 +524,12 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
          * Failure to read means a bad turtle file. Remove it and create a new turtle file.
          */
         if (F_ISSET(conn, WT_CONN_SALVAGE)) {
-            WT_WITH_TURTLE_LOCK(
-              session, ret = __wti_turtle_read(session, WT_METAFILE_URI, &unused_value));
+            if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+                ret = __wt_live_restore_turtle_read(session, WT_METAFILE_URI, &unused_value);
+            else
+                WT_WITH_TURTLE_LOCK(
+                  session, ret = __wt_turtle_read(session, WT_METAFILE_URI, &unused_value));
+
             __wt_free(session, unused_value);
         }
 
@@ -605,11 +612,11 @@ err:
 }
 
 /*
- * __wti_turtle_read --
+ * __wt_turtle_read --
  *     Read the turtle file.
  */
 int
-__wti_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
+__wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 {
     WT_DECL_ITEM(buf);
     WT_DECL_RET;

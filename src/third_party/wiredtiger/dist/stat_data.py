@@ -539,8 +539,18 @@ conn_stats = [
     ##########################################
     # Live Restore statistics
     ##########################################
+    LiveRestoreStat('live_restore_bytes_copied', 'the number of bytes copied from the source to the destination', 'size'),
+    LiveRestoreStat('live_restore_hist_source_read_latency_gt1000', 'source read latency histogram (bucket 7) - 1000ms+'),
+    LiveRestoreStat('live_restore_hist_source_read_latency_lt10', 'source read latency histogram (bucket 1) - 0-10ms'),
+    LiveRestoreStat('live_restore_hist_source_read_latency_lt50', 'source read latency histogram (bucket 2) - 10-49ms'),
+    LiveRestoreStat('live_restore_hist_source_read_latency_lt100', 'source read latency histogram (bucket 3) - 50-99ms'),
+    LiveRestoreStat('live_restore_hist_source_read_latency_lt250', 'source read latency histogram (bucket 4) - 100-249ms'),
+    LiveRestoreStat('live_restore_hist_source_read_latency_lt500', 'source read latency histogram (bucket 5) - 250-499ms'),
+    LiveRestoreStat('live_restore_hist_source_read_latency_lt1000', 'source read latency histogram (bucket 6) - 500-999ms'),
+    LiveRestoreStat('live_restore_hist_source_read_latency_total_msecs', 'source read latency histogram total (msecs)'),
+    LiveRestoreStat('live_restore_source_read_count', 'number of reads from the source database'),
     LiveRestoreStat('live_restore_state', 'live restore state', 'no_clear,no_scale'),
-    LiveRestoreStat('live_restore_work_remaining', 'the number of files remaining for live restore completion', 'no_clear,no_scale'),
+    LiveRestoreStat('live_restore_work_remaining', 'the number of files remaining for migration completion', 'no_clear,no_scale'),
 
     ##########################################
     # Locking statistics

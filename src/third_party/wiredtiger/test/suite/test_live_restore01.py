@@ -93,3 +93,6 @@ class test_live_restore01(wttest.WiredTigerTestCase):
 
         # Start in read only mode
         self.expect_failure("readonly=true,live_restore=(enabled=true,path=SOURCE)", "/live restore is incompatible with readonly mode/")
+
+        # Specify salvage is enabled.
+        self.expect_failure("salvage=true,live_restore=(enabled=true,path=SOURCE)", "/Live restore is not compatible with salvage/")

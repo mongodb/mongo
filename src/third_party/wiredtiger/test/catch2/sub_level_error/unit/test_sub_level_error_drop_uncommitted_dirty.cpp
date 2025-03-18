@@ -18,8 +18,8 @@
  * codes and messages are stored.
  */
 
-#define URI "table:test_drop_conflict"
-#define FILE_URI "file:test_drop_conflict.wt"
+#define URI "table:test_drop_uncommitted_dirty"
+#define FILE_URI "file:test_drop_uncommitted_dirty.wt"
 #define UNCOMMITTED_DATA_MSG "the table has uncommitted data and cannot be dropped yet"
 #define DIRTY_DATA_MSG "the table has dirty data and can not be dropped yet"
 
@@ -54,14 +54,18 @@ TEST_CASE("Test WT_UNCOMMITTED_DATA and WT_DIRTY_DATA",
 
     SECTION("Test WT_UNCOMMITTED_DATA is not thrown (with uncommitted txn only)")
     {
-        S2BT(session_impl)->max_upd_txn = 2;
+        // The oldest ID is not pinned by a transaction. Set the value to a high number such
+        // that it can never catch up.
+        S2BT(session_impl)->max_upd_txn = 100;
         REQUIRE(__wt_conn_dhandle_close(session_impl, false, false, false) == 0);
         utils::check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
     SECTION("Test WT_UNCOMMITTED_DATA is thrown (with both visibility check and uncommitted txn)")
     {
-        S2BT(session_impl)->max_upd_txn = 2;
+        // The oldest ID is not pinned by a transaction. Set the value to a high number such
+        // that it can never catch up.
+        S2BT(session_impl)->max_upd_txn = 100;
         REQUIRE(__wt_conn_dhandle_close(session_impl, false, false, true) == EBUSY);
         utils::check_error_info(err_info, EBUSY, WT_UNCOMMITTED_DATA, UNCOMMITTED_DATA_MSG);
     }

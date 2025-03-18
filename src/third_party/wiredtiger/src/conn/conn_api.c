@@ -3055,6 +3055,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     if (cval.val) {
         if (F_ISSET(conn, WT_CONN_READONLY))
             WT_ERR_MSG(session, EINVAL, "Readonly configuration incompatible with salvage");
+        if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+            WT_ERR_MSG(session, EINVAL, "Live restore is not compatible with salvage");
         F_SET(conn, WT_CONN_SALVAGE);
     }
 

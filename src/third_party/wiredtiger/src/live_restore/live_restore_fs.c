@@ -9,6 +9,8 @@
 #include "wt_internal.h"
 #include "live_restore_private.h"
 
+WT_STAT_MSECS_HIST_INCR_FUNC(live_restore, live_restore_hist_source_read_latency)
+
 static int __live_restore_fs_directory_list_free(
   WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, char **dirlist, uint32_t count);
 
@@ -613,8 +615,8 @@ __live_restore_fh_write_destination(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_F
  *     Write to a file. Callers of this function must hold the file handle lock.
  */
 static int
-__live_restore_fh_write_int(
-  WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t offset, size_t len, const void *buf)
+__live_restore_fh_write_int(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t offset, size_t len,
+  const void *buf, bool background_thread)
 {
     WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh;
     WT_SESSION_IMPL *session;
@@ -625,6 +627,8 @@ __live_restore_fh_write_int(
     WT_ASSERT_ALWAYS(session, __wt_rwlock_islocked(session, &lr_fh->lock),
       "Live restore lock not taken when needed");
     WT_RET(__live_restore_fh_write_destination(session, lr_fh, offset, len, buf));
+    if (background_thread)
+        WT_STAT_CONN_INCRV(session, live_restore_bytes_copied, len);
     __live_restore_fh_fill_bit_range(lr_fh, session, offset, len);
     return (0);
 }
@@ -653,7 +657,7 @@ __live_restore_fh_write(
         return (__live_restore_fh_write_destination(session, lr_fh, offset, len, buf));
 
     WTI_WITH_LIVE_RESTORE_FH_WRITE_LOCK(
-      session, lr_fh, ret = __live_restore_fh_write_int(fh, wt_session, offset, len, buf));
+      session, lr_fh, ret = __live_restore_fh_write_int(fh, wt_session, offset, len, buf, false));
     return (ret);
 }
 
@@ -662,12 +666,31 @@ __live_restore_fh_write(
  *     Read from the destination file handle.
  */
 static int
-__live_restore_fh_read_destination(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh,
-  wt_off_t offset, size_t len, void *buf)
+__live_restore_fh_read_destination(
+  WT_SESSION_IMPL *session, WT_FILE_HANDLE *destination, wt_off_t offset, size_t len, void *buf)
 {
     __wt_verbose_debug3(session, WT_VERB_LIVE_RESTORE, "%s", "    READ FROM DEST");
-    return (
-      lr_fh->destination->fh_read(lr_fh->destination, (WT_SESSION *)session, offset, len, buf));
+    return (destination->fh_read(destination, (WT_SESSION *)session, offset, len, buf));
+}
+
+/*
+ * __live_restore_fh_read_source --
+ *     Read data from the source directory and update appropriate statistics.
+ */
+static int
+__live_restore_fh_read_source(
+  WT_SESSION_IMPL *session, WT_FILE_HANDLE *source, wt_off_t off, size_t len, void *buf)
+{
+    uint64_t time_start, time_stop;
+
+    __wt_verbose_debug3(session, WT_VERB_LIVE_RESTORE, "%s", "    READ FROM SOURCE");
+
+    time_start = __wt_clock(session);
+    WT_RET(source->fh_read(source, (WT_SESSION *)session, off, len, buf));
+    time_stop = __wt_clock(session);
+    __wt_stat_msecs_hist_incr_live_restore(session, WT_CLOCKDIFF_MS(time_stop, time_start));
+    WT_STAT_CONN_INCR(session, live_restore_source_read_count);
+    return (0);
 }
 
 /*
@@ -697,7 +720,7 @@ __live_restore_fh_read(
      * result.
      */
     if (WTI_DEST_COMPLETE(lr_fh))
-        WT_RET(__live_restore_fh_read_destination(session, lr_fh, offset, len, buf));
+        WT_RET(__live_restore_fh_read_destination(session, lr_fh->destination, offset, len, buf));
 
     __wt_readlock(session, &lr_fh->lock);
     /*
@@ -710,7 +733,8 @@ __live_restore_fh_read(
     WT_LIVE_RESTORE_SERVICE_STATE read_state =
       __live_restore_can_service_read(lr_fh, session, offset, len, &hole_begin_off);
     if (read_state == FULL)
-        WT_ERR(__live_restore_fh_read_destination(session, lr_fh, offset, len, read_data));
+        WT_ERR(
+          __live_restore_fh_read_destination(session, lr_fh->destination, offset, len, read_data));
     else if (read_state == PARTIAL) {
         /*
          * If a portion of the read region is serviceable, combine a read from the source and
@@ -734,23 +758,16 @@ __live_restore_fh_read(
         size_t source_partial_read_len = len - dest_partial_read_len;
 
         /* First read the serviceable portion from the destination. */
-        __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
-          "    PARTIAL READ FROM DEST (offset: %" PRId64 ", len: %" WT_SIZET_FMT ")", offset,
-          dest_partial_read_len);
-        WT_ERR(lr_fh->destination->fh_read(
-          lr_fh->destination, wt_session, offset, dest_partial_read_len, read_data));
+        __wt_verbose_debug3(session, WT_VERB_LIVE_RESTORE, "%s", "    PARTIAL READ TRIGGERED");
+        WT_ERR(__live_restore_fh_read_destination(
+          session, lr_fh->destination, offset, dest_partial_read_len, read_data));
 
         /* Now read the remaining data from the source. */
-        __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
-          "    PARTIAL READ FROM SOURCE (offset: %" PRId64 ", len: %" WT_SIZET_FMT ")",
-          hole_begin_off, source_partial_read_len);
-        WT_ERR(lr_fh->source->fh_read(lr_fh->source, wt_session, hole_begin_off,
+        WT_ERR(__live_restore_fh_read_source(session, lr_fh->source, hole_begin_off,
           source_partial_read_len, read_data + dest_partial_read_len));
-    } else {
-        __wt_verbose_debug3(session, WT_VERB_LIVE_RESTORE, "%s", "    READ FROM SOURCE");
+    } else
         /* Read the full read from the source. */
-        WT_ERR(lr_fh->source->fh_read(lr_fh->source, wt_session, offset, len, read_data));
-    }
+        WT_ERR(__live_restore_fh_read_source(session, lr_fh->source, offset, len, read_data));
 
 err:
     /*
@@ -882,9 +899,9 @@ __live_restore_fill_hole(WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_SESSION *wt_ses
       read_size);
 
     *read_offsetp = read_start;
-    WT_RET(lr_fh->source->fh_read(lr_fh->source, wt_session, read_start, read_size, buf));
-    return (
-      __live_restore_fh_write_int((WT_FILE_HANDLE *)lr_fh, wt_session, read_start, read_size, buf));
+    WT_RET(__live_restore_fh_read_source(session, lr_fh->source, read_start, read_size, buf));
+    return (__live_restore_fh_write_int(
+      (WT_FILE_HANDLE *)lr_fh, wt_session, read_start, read_size, buf, true));
 }
 
 /*
@@ -928,7 +945,6 @@ __wti_live_restore_fs_restore_file(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
               " seconds. Currently copying offset %" PRId64 " of file size %" PRId64,
               lr_fh->iface.name, time_diff_ms / WT_THOUSAND, read_offset, WTI_BITMAP_END(lr_fh));
             msg_count = time_diff_ms / (WT_THOUSAND * WT_PROGRESS_MSG_PERIOD);
-            __wt_tree_modify_set(session);
         }
 
         /*
@@ -944,7 +960,6 @@ __wti_live_restore_fs_restore_file(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
         __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
           "%s: Finished background restoration, closing source file", fh->name);
         WT_ERR(__live_restore_fh_close_source(session, lr_fh, true));
-        __wt_tree_modify_set(session);
     }
 err:
     __wt_free(session, buf);
@@ -1493,7 +1508,7 @@ __live_restore_fs_atomic_copy_file(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS
     WT_ERR(__wt_calloc(session, 1, read_size, &buf));
     for (wt_off_t off = 0; off < source_size; off += (wt_off_t)len) {
         len = WT_MIN((size_t)(source_size - off), read_size);
-        WT_ERR(source_fh->fh_read(source_fh, wt_session, off, len, buf));
+        WT_ERR(__live_restore_fh_read_source(session, source_fh, off, len, buf));
         WT_ERR(dest_fh->fh_write(dest_fh, wt_session, off, len, buf));
 
         /* Check the system has not entered a panic state since the copy can take a long time. */
