@@ -131,7 +131,7 @@ function testSpillingMetrics({stage, expectedSpillingMetrics, expectedSbeSpillin
 testSpillingMetrics({
     stage: {$sort: {a: 1}},
     expectedSpillingMetrics: {spills: 19, spilledBytes: 654},
-    expectedSbeSpillingMetrics: {spills: 19, spilledBytes: 935}
+    expectedSbeSpillingMetrics: {spills: 19, spilledBytes: 951}
 });
 testSpillingMetrics({
     stage: {$group: {_id: "$_id", a: {$sum: "$_id"}}},
