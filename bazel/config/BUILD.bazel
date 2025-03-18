@@ -2167,6 +2167,14 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "ssl_enabled_build_enterprise_disabled",
+    match_all = [
+        ":build_enterprise_disabled",
+        ":ssl_enabled",
+    ],
+)
+
 # --------------------------------------
 # thin_lto
 # --------------------------------------

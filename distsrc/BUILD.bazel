@@ -1,0 +1,34 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "license_files",
+    srcs = glob(
+        ["*"],
+        exclude = ["BUILD.bazel"],
+    ),
+)
+
+filegroup(
+    name = "community_license",
+    srcs = ["LICENSE-Community.txt"],
+)
+
+filegroup(
+    name = "openssl_license",
+    srcs = ["LICENSE.OpenSSL"],
+)
+
+filegroup(
+    name = "mpl",
+    srcs = ["MPL-2"],
+)
+
+filegroup(
+    name = "readme",
+    srcs = ["README"],
+)
+
+filegroup(
+    name = "third_party_notices",
+    srcs = ["THIRD-PARTY-NOTICES"],
+)

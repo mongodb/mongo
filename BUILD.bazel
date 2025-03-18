@@ -261,6 +261,11 @@ mongo_install(
     ],
 )
 
+mongo_install(
+    name = "compass",
+    srcs = ["//src/mongo/installer/compass:compass_files"],
+)
+
 [
     mongo_install(
         name = target_name,

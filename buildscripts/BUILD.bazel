@@ -2,8 +2,10 @@ load("@poetry//:dependencies.bzl", "dependency")
 load("@npm//:eslint/package_json.bzl", "bin")
 
 exports_files([
+    "candle_wrapper.py",
     "cheetah_source_generator.py",
     "clang_tidy_config_gen.py",
+    "msitrim.py",
 ])
 
 py_binary(

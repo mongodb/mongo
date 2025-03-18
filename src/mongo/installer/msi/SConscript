@@ -50,7 +50,7 @@ buildDir = env.Dir("$BUILD_DIR").path
 buildRoot = env.Dir("$BUILD_ROOT").path
 toolBuildDir = buildDir + r"\mongo"
 
-enterprisebase = "src\mongo\db\modules\enterprise"
+enterpriselicensesource = "src\mongo\db\modules\enterprise\distsrc"
 enterpriseToolBuildDir = buildDir + r"\mongo\db\modules\enterprise"
 
 # Set up parameters to pass to wix -
@@ -109,8 +109,9 @@ candle_targets = env.Command(
         + " -dMongoDBVersion="
         + full_version
         + " -dLicenseSource=distsrc"
-        r" -dEnterpriseBase=" + enterprisebase + "\\"
-        " -dBinarySource="
+        r" -dEnterpriseLicenseSource="
+        + enterpriselicensesource
+        + " -dBinarySource="
         + '"$DESTDIR\\$PREFIX_BINDIR"'
         + " -dMergeModulesBasePath="
         + "\"${MSVS['VCREDISTMERGEMODULEPATH']}\""

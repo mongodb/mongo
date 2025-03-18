@@ -111,7 +111,7 @@ def is_binary_file(ctx, basename):
     elif ctx.target_platform_has_constraint(macos_constraint):
         return not basename.startswith("lib")
     elif ctx.target_platform_has_constraint(windows_constraint):
-        return basename.endswith(".exe") or basename.endswith(".pdb") or basename.endswith(".dll")
+        return basename.endswith(".exe") or basename.endswith(".pdb") or basename.endswith(".dll") or basename.endswith(".ps1")
     else:
         ctx.fail("Unknown OS")
         return False

@@ -29,13 +29,14 @@ def exec_update(db, query, column, value):
 def main():
     """Execute Main program."""
     parser = argparse.ArgumentParser(description="Trim MSI.")
-    parser.add_argument("file", type=argparse.FileType("r"), help="file to trim")
-    parser.add_argument("out", type=argparse.FileType("w"), help="file to output to")
+    parser.add_argument("file", type=str, help="file to trim")
+    parser.add_argument("out", type=str, help="file to output to")
 
     args = parser.parse_args()
     print("Trimming MSI")
 
-    db = msilib.OpenDatabase(args.file.name, msilib.MSIDBOPEN_DIRECT)
+    shutil.copyfile(args.file, args.out)
+    db = msilib.OpenDatabase(args.out, msilib.MSIDBOPEN_DIRECT)
 
     exec_delete(
         db,
@@ -55,8 +56,6 @@ def main():
     )
 
     db.Commit()
-
-    shutil.copyfile(args.file.name, args.out.name)
 
 
 if __name__ == "__main__":

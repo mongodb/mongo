@@ -1,0 +1,78 @@
+load("//bazel/install_rules:msi.bzl", "mongo_msi")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "install_bins",
+    testonly = True,
+    srcs = [
+        "//:install-compass",
+        "//:install-dist-test",
+    ],
+)
+
+mongo_msi(
+    name = "mongodb-win32-x86_64-windows",
+    testonly = True,
+    srcs = [
+        "wxs/BinaryFragment.wxs",
+        "wxs/FeatureFragment.wxs",
+        "wxs/Installer_64.wxs",
+        "wxs/LicensingFragment.wxs",
+        "wxs/UIFragment.wxs",
+    ],
+    custom_action = "//src/mongo/installer/msi/ca:mongoca",
+    exec_properties = {
+        "no-cache": "1",
+        "no-remote": "1",
+        "local": "1",
+    },
+    extensions = [
+        "WixUtilExtension.dll",
+        "WixUIExtension.dll",
+    ],
+    # Suppress VC140_CRT_CRT.MSM Internal Consistency Errors
+    # ICE82 - Suppress "duplicate sequence number"
+    # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368798(v=vs.85).aspx
+
+    # ICE03 - Supress "String overflow"
+    # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa369037(v=vs.85).aspx
+
+    # ICE30 - Suppress "different components install same file"
+    # -- mongod.exe is installed in two different components but only one is ever used during an install
+    #    so this consistency check can be ignored.
+    # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368954(v=vs.85).aspx
+    light_sice = [
+        "ICE82",
+        "ICE03",
+        "ICE30",
+    ],
+    mongo_version = "MONGO_VERSION",
+    msvc_version = "MSVC_VERSION",
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    use_merge_modules = True,
+    wix_vars = {
+        "ProductId": "*",
+        "UpgradeCode": "GENERATE_UPGRADE_CODE",
+        "Configuration": "Release",
+        "Flavor": "2008R2Plus",
+        "ProjectName": "MongoDB",
+        "TargetExt": ".msi",
+    } | select({
+        "//bazel/config:build_enterprise_enabled": {"Edition": "Enterprise"},
+        "//bazel/config:ssl_enabled_build_enterprise_disabled": {"Edition": "SSL"},
+        "//conditions:default": {"Edition": "Standard"},
+    }),
+    deps = {
+        "BinarySource": ":install_bins",
+        "ProjectDir": "//buildscripts/packaging/msi:msi_project_files",
+        "SaslSource": "@windows_sasl//:bins",
+        "LicenseSource": "//distsrc:license_files",
+    } | select({
+        "//bazel/config:build_enterprise_enabled": {"EnterpriseLicenseSource": "//src/mongo/db/modules/enterprise/distsrc:enterprise_license_files"},
+        "//conditions:default": {},
+    }),
+)
