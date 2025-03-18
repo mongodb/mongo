@@ -50,7 +50,7 @@ function planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj) {
 
     // Setting index filters on idhack query is no-op for index filter command, but is a failure
     // for query settings command, therefore avoid specifying query settings and return success.
-    const explain = assert.commandWorked(getExplainCommand(queryInstance));
+    const explain = assert.commandWorked(db.runCommand(getExplainCommand(queryInstance)));
     const isIdHackQuery =
         explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
     if (isIdHackQuery) {

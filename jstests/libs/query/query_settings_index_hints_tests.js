@@ -40,7 +40,7 @@ export class QuerySettingsIndexHintsTests {
         const explain = assert.commandWorked(
             db.runCommand(explainCmd),
             `Failed running explain command ${
-                tojson(explainCmd)} for checking the query settings plan cache check.`);
+                toJsonForLog(explainCmd)} for checking the query settings plan cache check.`);
         const isIdhackQuery =
             everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
         const isMinMaxQuery = "min" in command || "max" in command;
@@ -133,7 +133,10 @@ export class QuerySettingsIndexHintsTests {
     }
 
     assertIndexUse(cmd, expectedIndex, stagesExtractor, expectedStrategy) {
-        const explain = assert.commandWorked(this._db.runCommand({explain: cmd}));
+        // For queries involving aggregation pipelines, we may not be able to deduct index usage
+        // unless we run explain with "allPlansExecution" verbosity.
+        const explain = assert.commandWorked(
+            this._db.runCommand(getExplainCommand(cmd, "allPlansExecution" /* verbosity */)));
         const stagesUsingIndex = stagesExtractor(explain);
         if (expectedIndex !== undefined) {
             assert.gte(stagesUsingIndex.length, 1, explain);
@@ -198,7 +201,7 @@ export class QuerySettingsIndexHintsTests {
     }
 
     assertCollScanStage(cmd, allowedDirections) {
-        const explain = assert.commandWorked(this._db.runCommand({explain: cmd}));
+        const explain = assert.commandWorked(this._db.runCommand(getExplainCommand(cmd)));
         const collscanStages = getQueryPlanners(explain)
                                    .map(queryPlan => getWinningPlanFromExplain(queryPlan, false))
                                    .flatMap(winningPlan => getPlanStages(winningPlan, "COLLSCAN"));
@@ -389,7 +392,7 @@ export class QuerySettingsIndexHintsTests {
         const queryWithHint = {...query, hint: this.indexA};
         const settings = {indexHints: {ns, allowedIndexes: [this.indexAB]}};
         const getWinningPlansForQuery = (query) => {
-            const explain = assert.commandWorked(this._db.runCommand({explain: query}));
+            const explain = assert.commandWorked(this._db.runCommand(getExplainCommand(query)));
             return getQueryPlanners(explain).map(queryPlan =>
                                                      getWinningPlanFromExplain(queryPlan, false));
         };
@@ -421,7 +424,8 @@ export class QuerySettingsIndexHintsTests {
             let winningPlans = null;
             this._qsutils.withQuerySettings(
                 {...query, $db: querySettingsQuery.$db}, settings, () => {
-                    const explain = assert.commandWorked(this._db.runCommand({explain: query}));
+                    const explainCmd = getExplainCommand(query);
+                    const explain = assert.commandWorked(this._db.runCommand(explainCmd));
                     winningPlans = getQueryPlanners(explain).map(
                         queryPlan => getWinningPlanFromExplain(queryPlan, false));
                 });

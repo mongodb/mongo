@@ -75,7 +75,7 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     const explain = assert.commandWorked(
         db.runCommand(explainCmd),
         `Failed running explain command ${
-            tojson(explainCmd)} while transforming cursor hints into query settings`);
+            toJsonForLog(explainCmd)} while transforming cursor hints into query settings`);
     const isIdHackQuery =
         explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
     if (isIdHackQuery) {

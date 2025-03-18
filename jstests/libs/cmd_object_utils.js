@@ -45,7 +45,7 @@ function extractGenericArgs(cmdObj) {
 /**
  *  Returns the explain command object for the given 'cmdObj'.
  */
-export function getExplainCommand(cmdObj) {
+export function getExplainCommand(cmdObj, verbosity = "queryPlanner") {
     // Extract the generic arguments out of 'cmd' so they can be re-added on root of the final
     // explain command.
     const [cmd, genericArgs] = extractGenericArgs(cmdObj);
@@ -58,7 +58,7 @@ export function getExplainCommand(cmdObj) {
     if (isAggregateCmd) {
         cmd.cursor = {};
     }
-    return {explain: cmd, ...genericArgs};
+    return {explain: cmd, ...genericArgs, verbosity};
 }
 
 /**

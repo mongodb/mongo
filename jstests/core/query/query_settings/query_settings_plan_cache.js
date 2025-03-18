@@ -24,6 +24,7 @@
 //   requires_getmore,
 // ]
 
+import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
@@ -80,19 +81,20 @@ function assertPlanCacheEntryWithQuerySettings(planCacheKeyHash, expectedQuerySe
     });
 }
 
+const querySettingsQuery = qsutils.makeFindQueryInstance({filter: {a: 1, b: 5}});
+const query = qsutils.withoutDollarDB(querySettingsQuery);
+
 /**
  * Runs the query, asserts that the plan cache entry contains the 'expectedQuerySettings' as well as
  * returns the corresponding planCacheKeyHash.
  */
 function runQueryAndAssertPlanCache(expectedQuerySettings) {
     assert.commandWorked(db.runCommand(query));
-    const planCacheKeyHash = getPlanCacheKeyFromExplain(db.runCommand({explain: query}));
+    const explainCmd = getExplainCommand(query);
+    const planCacheKeyHash = getPlanCacheKeyFromExplain(db.runCommand(explainCmd));
     assertPlanCacheEntryWithQuerySettings(planCacheKeyHash, expectedQuerySettings);
     return planCacheKeyHash;
 }
-
-const querySettingsQuery = qsutils.makeFindQueryInstance({filter: {a: 1, b: 5}});
-const query = qsutils.withoutDollarDB(querySettingsQuery);
 
 assertEmptyPlanCache();
 

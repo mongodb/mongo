@@ -17,6 +17,7 @@
 //   simulate_atlas_proxy_incompatible,
 // ]
 
+import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getPlanStages,
@@ -67,7 +68,7 @@ function assertIndexScan(queryPlanner, expectedIndex) {
  * Runs the explain over 'findCmd' and asserts index filter, query settings and indexes being used.
  */
 function assertExplain(findCmd, {indexFilterSet, querySettings, expectedIndexScan}) {
-    const explain = db.runCommand({explain: findCmd});
+    const explain = db.runCommand(getExplainCommand(findCmd));
 
     getQueryPlanners(explain).forEach((queryPlanner) => {
         assert.eq(queryPlanner.indexFilterSet, indexFilterSet, queryPlanner);
