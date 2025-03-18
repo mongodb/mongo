@@ -12,18 +12,6 @@ functions:
           cp timezonedb.zip timezonedb-latest.zip
 
   "publish":
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_files_include_filter:
-          - src/src/third_party/timelib/dist/zones/timezonedb-*.zip
-        remote_file: olson_tz_db/
-        bucket: downloads.mongodb.org
-        permissions: public-read
-        content_type: application/zip
-        display_name: timezonedb.zip
-  "publish-new":
     - command: ec2.assume_role
       params:
         role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-olson-timezone-database"
@@ -45,7 +33,6 @@ tasks:
     commands:
       - func: "fetch source"
       - func: "publish"
-      - func: "publish-new"
 
 buildvariants:
   - name: linux-64
