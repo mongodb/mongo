@@ -120,9 +120,7 @@ Status validateExtraDiagnostics(const std::vector<std::string>& value,
                                          "slow_operation",
                                          "visibility"};
         for (const auto& diagFlag : value) {
-            bool exists = std::find(flagArr.begin(), flagArr.end(), diagFlag) != flagArr.end();
-
-            if (!exists) {
+            if (!flagArr.contains(diagFlag)) {
                 return Status(ErrorCodes::BadValue,
                               fmt::format("'{}' is not a valid flag option", diagFlag));
             }

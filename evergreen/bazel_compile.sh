@@ -112,8 +112,4 @@ for i in {1..5}; do
   echo "Bazel failed to execute, retrying..."
 done
 
-if [ "${run_for_clang_tidy:-false}" == "true" ]; then
-  exit 0
-fi
-
 exit $RET
