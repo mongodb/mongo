@@ -845,7 +845,7 @@ Status GeoParser::parsePointWithMaxDistance(const BSONElement& elem,
                                             PointWithCRS* out,
                                             double* maxOut) {
     BSONElement lat, lng, maxDist;
-    auto status = GeoParser::parseLegacyPointWithMaxDistance(elem, lng, lat, maxDist);
+    auto status = GeoParser::parseLegacyPointWithMaxDistance(elem, lat, lng, maxDist);
     if (!status.isOK()) {
         return status;
     }
