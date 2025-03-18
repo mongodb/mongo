@@ -476,10 +476,11 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
     const auto syncSourceCandidate = memberConfig.getHostAndPort();
     const auto memberData = _memberData[candidateIndex];
 
-    // Only log this message if it has not been logged in the last second.
-    bool shouldLogIneligibleCandidate =
-        (limitLogFrequency &&
-         ((_recentSyncSourceChanges.lastLoggedIneligibleSrc + Milliseconds(1000)) < now));
+    // If limitLogFrequency is true, only log this message if it has not been logged in the last
+    // second, otherwise always log.
+    bool shouldLogIneligibleCandidate = (!limitLogFrequency) ||
+        ((_recentSyncSourceChanges.lastLoggedIneligibleSrc + Milliseconds(1000)) < now);
+
 
     // Candidate must be up to be considered.
     if (!memberData.up()) {
