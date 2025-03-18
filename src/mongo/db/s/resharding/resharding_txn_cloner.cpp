@@ -67,6 +67,7 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
+#include "mongo/db/s/session_catalog_migration_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
@@ -204,7 +205,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
         sessionId = *getParentSessionId(sessionId);
     }
 
-    return resharding::data_copy::withSessionCheckedOut(
+    return session_catalog_migration_util::runWithSessionCheckedOutIfStatementNotExecuted(
         opCtx, sessionId, txnNumber, boost::none /* stmtId */, [&] {
             // If the TransactionParticipant is flagged as having an incomplete history, then the
             // dead end sentinel is already present in the oplog.

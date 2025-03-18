@@ -51,6 +51,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+#include "mongo/db/s/session_catalog_migration_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
@@ -178,7 +179,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
         postImageOpTime = _logPrePostImage(opCtx, opId, *originalPostImageOpTime);
     }
 
-    return resharding::data_copy::withSessionCheckedOut(
+    return session_catalog_migration_util::runWithSessionCheckedOutIfStatementNotExecuted(
         opCtx, lsid, txnNumber, stmtIds.front(), [&] {
             resharding::data_copy::updateSessionRecord(opCtx,
                                                        std::move(o2Field),

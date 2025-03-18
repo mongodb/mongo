@@ -57,9 +57,11 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
+#include "mongo/db/s/session_catalog_migration_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
@@ -377,14 +379,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                     return !oplogEntry["needsRetryImage"].eoo() ||
                         !oplogEntry["preImageOpTime"].eoo() || !oplogEntry["postImageOpTime"].eoo();
                 });
-            try {
-                lastResult =
-                    _processSessionOplog(oplogEntry, lastResult, service, _cancellationToken);
-            } catch (const ExceptionFor<ErrorCodes::TransactionTooOld>&) {
-                // This means that the server has a newer txnNumber than the oplog being
-                // migrated, so just skip it
-                continue;
-            }
+            lastResult = _processSessionOplog(oplogEntry, lastResult, service, _cancellationToken);
         }
     }
 
@@ -465,104 +460,98 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
     auto opCtx = uniqueOpCtx.get();
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-    {
-        auto lk = stdx::lock_guard(*opCtx->getClient());
-        opCtx->setLogicalSessionId(result.sessionId);
-        opCtx->setTxnNumber(result.txnNum);
-    }
-
     // Irrespective of whether or not the oplog gets logged, we want to update the
     // entriesMigrated counter to signal that we have succesfully recieved the oplog
     // from the source and have processed it.
     _sessionOplogEntriesMigrated.addAndFetch(1);
 
-    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-    auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
+    bool beganOrContinuedTxn = false;
+    bool appendedOplogEntry = false;
+    while (!beganOrContinuedTxn) {
+        auto conflictingTxnCompletionFuture =
+            session_catalog_migration_util::runWithSessionCheckedOutIfStatementNotExecuted(
+                opCtx, result.sessionId, result.txnNum, stmtIds.front(), [&] {
+                    auto txnParticipant = TransactionParticipant::get(opCtx);
 
-    auto txnParticipant = TransactionParticipant::get(opCtx);
+                    if (!result.isPrePostImage &&
+                        !isWouldChangeOwningShardSentinelOplogEntry(oplogEntry)) {
+                        // Do not overwrite the "o" field if this is a pre/post image oplog entry.
+                        // Also do not overwrite it if this is a WouldChangeOwningShard sentinel
+                        // oplog entry since it contains a special BSONObj used for making retries
+                        // fail with an IncompleteTransactionHistory error.
+                        oplogEntry.setObject(SessionCatalogMigration::kSessionOplogTag);
+                    }
+                    setPrePostImageTs(lastResult, &oplogEntry);
+                    oplogEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
 
-    try {
-        txnParticipant.beginOrContinue(opCtx,
-                                       {result.txnNum},
-                                       boost::none /* autocommit */,
-                                       TransactionParticipant::TransactionActions::kNone);
-        if (txnParticipant.checkStatementExecuted(opCtx, stmtIds.front())) {
-            // Skip the incoming statement because it has already been logged locally
-            return lastResult;
+                    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+                    oplogEntry.setFromMigrate(true);
+                    // Reset OpTime so logOp() can assign a new one.
+                    oplogEntry.setOpTime(OplogSlot());
+
+                    writeConflictRetry(
+                        opCtx,
+                        "SessionOplogMigration",
+                        NamespaceString::kSessionTransactionsTableNamespace,
+                        [&] {
+                            // Need to take global lock here so repl::logOp will not unlock it and
+                            // trigger the invariant that disallows unlocking global lock while
+                            // inside a WUOW. Take the transaction table db lock to ensure the same
+                            // lock ordering with normal replicated updates to the table.
+                            Lock::DBLock lk(
+                                opCtx,
+                                NamespaceString::kSessionTransactionsTableNamespace.dbName(),
+                                MODE_IX);
+                            WriteUnitOfWork wunit(opCtx);
+
+                            result.oplogTime = repl::logOp(opCtx, &oplogEntry);
+
+                            const auto& oplogOpTime = result.oplogTime;
+                            uassert(
+                                40633,
+                                str::stream()
+                                    << "Failed to create new oplog entry for oplog with opTime: "
+                                    << oplogEntry.getOpTime().toString() << ": "
+                                    << redact(oplogBSON),
+                                !oplogOpTime.isNull());
+
+                            // Do not call onWriteOpCompletedO nPrimary if we inserted a pre/post
+                            // image, because the next oplog will contain the real operation
+                            if (!result.isPrePostImage) {
+                                SessionTxnRecord sessionTxnRecord;
+                                sessionTxnRecord.setSessionId(result.sessionId);
+                                sessionTxnRecord.setTxnNum(result.txnNum);
+                                sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
+
+                                // Use the same wallTime as oplog since SessionUpdateTracker looks
+                                // at the oplog entry wallTime when replicating.
+                                sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
+
+                                if (isInternalSessionForRetryableWrite(result.sessionId)) {
+                                    sessionTxnRecord.setParentSessionId(
+                                        *getParentSessionId(result.sessionId));
+                                }
+
+                                // We do not migrate transaction oplog entries so don't set the txn
+                                // state.
+                                txnParticipant.onRetryableWriteCloningCompleted(
+                                    opCtx, stmtIds, sessionTxnRecord);
+                            }
+
+                            wunit.commit();
+                        });
+
+                    appendedOplogEntry = true;
+                });
+
+        if (conflictingTxnCompletionFuture) {
+            conflictingTxnCompletionFuture->wait(opCtx);
+        } else {
+            beganOrContinuedTxn = true;
         }
-    } catch (const DBException& ex) {
-        // If the transaction chain is incomplete because oplog was truncated, just ignore the
-        // incoming oplog and don't attempt to 'patch up' the missing pieces.
-        if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
-            return lastResult;
-        }
-
-        if (stmtIds.front() == kIncompleteHistoryStmtId) {
-            // No need to log entries for transactions whose history has been truncated
-            invariant(stmtIds.size() == 1);
-            return lastResult;
-        }
-
-        throw;
     }
 
-    if (!result.isPrePostImage && !isWouldChangeOwningShardSentinelOplogEntry(oplogEntry)) {
-        // Do not overwrite the "o" field if this is a pre/post image oplog entry. Also do not
-        // overwrite it if this is a WouldChangeOwningShard sentinel oplog entry since it contains
-        // a special BSONObj used for making retries fail with an IncompleteTransactionHistory
-        // error.
-        oplogEntry.setObject(SessionCatalogMigration::kSessionOplogTag);
-    }
-    setPrePostImageTs(lastResult, &oplogEntry);
-    oplogEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
-
-    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-    oplogEntry.setFromMigrate(true);
-    // Reset OpTime so logOp() can assign a new one.
-    oplogEntry.setOpTime(OplogSlot());
-
-    writeConflictRetry(
-        opCtx, "SessionOplogMigration", NamespaceString::kSessionTransactionsTableNamespace, [&] {
-            // Need to take global lock here so repl::logOp will not unlock it and trigger the
-            // invariant that disallows unlocking global lock while inside a WUOW. Take the
-            // transaction table db lock to ensure the same lock ordering with normal replicated
-            // updates to the table.
-            Lock::DBLock lk(
-                opCtx, NamespaceString::kSessionTransactionsTableNamespace.dbName(), MODE_IX);
-            WriteUnitOfWork wunit(opCtx);
-
-            result.oplogTime = repl::logOp(opCtx, &oplogEntry);
-
-            const auto& oplogOpTime = result.oplogTime;
-            uassert(40633,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << oplogEntry.getOpTime().toString() << ": " << redact(oplogBSON),
-                    !oplogOpTime.isNull());
-
-            // Do not call onWriteOpCompletedO nPrimary if we inserted a pre/post image, because the
-            // next oplog will contain the real operation
-            if (!result.isPrePostImage) {
-                SessionTxnRecord sessionTxnRecord;
-                sessionTxnRecord.setSessionId(result.sessionId);
-                sessionTxnRecord.setTxnNum(result.txnNum);
-                sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
-
-                // Use the same wallTime as oplog since SessionUpdateTracker looks at the oplog
-                // entry wallTime when replicating.
-                sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
-
-                if (isInternalSessionForRetryableWrite(result.sessionId)) {
-                    sessionTxnRecord.setParentSessionId(*getParentSessionId(result.sessionId));
-                }
-
-                // We do not migrate transaction oplog entries so don't set the txn state.
-                txnParticipant.onRetryableWriteCloningCompleted(opCtx, stmtIds, sessionTxnRecord);
-            }
-
-            wunit.commit();
-        });
-
-    return result;
+    return appendedOplogEntry ? result : lastResult;
 }
 
 std::string SessionCatalogMigrationDestination::getErrMsg() {

@@ -172,29 +172,6 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const boost::optional<ShardingIndexesCatalogCache>& sii,
                                  unique_function<void(OperationContext*)> func);
-/**
- * Checks out the logical session and acts in one of the following ways depending on the state of
- * this shard's config.transactions table:
- *
- *   (a) When this shard already knows about a higher transaction than txnNumber,
- *       withSessionCheckedOut() skips calling the supplied lambda function and returns boost::none.
- *
- *   (b) When this shard already knows about the retryable write statement (txnNumber, *stmtId),
- *       withSessionCheckedOut() skips calling the supplied lambda function and returns boost::none.
- *
- *   (c) When this shard has an earlier prepared transaction still active, withSessionCheckedOut()
- *       skips calling the supplied lambda function and returns a future that becomes ready once the
- *       active prepared transaction on this shard commits or aborts. After waiting for the returned
- *       future to become ready, the caller should then invoke withSessionCheckedOut() with the same
- *       arguments a second time.
- *
- *   (d) Otherwise, withSessionCheckedOut() calls the lambda function and returns boost::none.
- */
-boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* opCtx,
-                                                              LogicalSessionId lsid,
-                                                              TxnNumber txnNumber,
-                                                              boost::optional<StmtId> stmtId,
-                                                              unique_function<void()> callable);
 
 /**
  * Updates this shard's config.transactions table based on a retryable write or multi-statement
