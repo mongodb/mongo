@@ -1537,6 +1537,63 @@ err:
 }
 
 /*
+ * __live_restore_fs_create_destination_data_file --
+ *     Create a destination file backed by a source file for the first time, atomically sizing it.
+ */
+static int
+__live_restore_fs_create_destination_data_file(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_fs,
+  WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, const char *name)
+{
+    WT_DECL_RET;
+
+    char *dest_path, *tmp_dest_path;
+
+    /* This function should only ever be called for data files. */
+    WT_ASSERT(session, lr_fh->file_type == WT_FS_OPEN_FILE_TYPE_DATA);
+
+    WT_RET(__live_restore_fs_backing_filename(
+      &lr_fs->destination, session, lr_fs->destination.home, name, &dest_path));
+
+    WT_FILE_HANDLE *dest_fh = NULL;
+    WT_SESSION *wt_session = (WT_SESSION *)session;
+    wt_off_t source_size;
+    bool closed = false;
+    /* We may have crashed during a temporary file copy, remove that file now. */
+    WT_ERR(__live_restore_remove_temporary_file(
+      session, lr_fs->os_file_system, dest_path, &tmp_dest_path));
+
+    WT_ERR(lr_fs->os_file_system->fs_open_file(lr_fs->os_file_system, wt_session, tmp_dest_path,
+      WT_FS_OPEN_FILE_TYPE_DATA, WT_FS_OPEN_CREATE | WT_FS_OPEN_EXCLUSIVE, &dest_fh));
+
+    /* Get the source size. */
+    WT_ERR(lr_fh->source->fh_size(lr_fh->source, wt_session, &source_size));
+    WT_ASSERT(session, source_size != 0);
+    __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
+      "%s: Creating destination file backed by source file", tmp_dest_path);
+    /*
+     * We're creating a new destination file which is backed by a source file. It currently has a
+     * length of zero, but we want its length to be the same as the source file. Set its size by
+     * truncating. This is a positive length truncate so it actually extends the file. We're
+     * bypassing the live_restore layer so we don't try to modify the relevant bitmap entries.
+     */
+    WT_ERR(dest_fh->fh_truncate(dest_fh, wt_session, source_size));
+
+    /* Sync the truncate, then rename the file so on completion it is an "atomic" operation. */
+    WT_ERR(dest_fh->fh_sync(dest_fh, wt_session));
+    WT_ERR(dest_fh->close(dest_fh, wt_session));
+    closed = true;
+    WT_ERR(lr_fs->os_file_system->fs_rename(
+      lr_fs->os_file_system, wt_session, tmp_dest_path, dest_path, 0));
+
+err:
+    if (dest_fh != NULL && !closed)
+        WT_TRET(dest_fh->close(dest_fh, wt_session));
+    __wt_free(session, dest_path);
+    __wt_free(session, tmp_dest_path);
+    return (ret);
+}
+
+/*
  * __live_restore_setup_lr_fh_file_data --
  *     Open a data file type (probably a b-tree). In live restore these are the only types of files
  *     that we track holes for.
@@ -1546,32 +1603,19 @@ __live_restore_setup_lr_fh_file_data(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_
   const char *name, uint32_t flags, WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, bool dest_exist,
   bool source_exist)
 {
-    WT_RET(__live_restore_fs_open_in_destination(lr_fs, session, lr_fh, name, flags, !dest_exist));
-    if (!source_exist)
-        return (0);
-
-    /*
-     * In theory we have already completed the migration for this file which would mean this open
-     * call is redundant and the file will be immediately closed out. But we know the flags here and
-     * also whether or not the source file exists so it's easier to open it here and close it out
-     * later than to determine that information when importing the bitmap.
-     */
-    WT_RET(__live_restore_fs_open_in_source(lr_fs, session, lr_fh, flags));
-    if (!dest_exist) {
-        WT_SESSION *wt_session = (WT_SESSION *)session;
-        wt_off_t source_size;
-        WT_RET(lr_fh->source->fh_size(lr_fh->source, wt_session, &source_size));
-        WT_ASSERT(session, source_size != 0);
-        __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
-          "%s: Creating destination file backed by source file", lr_fh->iface.name);
+    /* Open the source file and setup the destination file if needed. */
+    if (source_exist) {
         /*
-         * We're creating a new destination file which is backed by a source file. It currently has
-         * a length of zero, but we want its length to be the same as the source file. Set its size
-         * by truncating. This is a positive length truncate so it actually extends the file. We're
-         * bypassing the live_restore layer so we don't try to modify the relevant bitmap entries.
+         * In theory we have already completed the migration for this file which would mean this
+         * open call is redundant and the file will be immediately closed out. But we know the flags
+         * here and also whether or not the source file exists so it's easier to open it here and
+         * close it out later than to determine that information when importing the bitmap.
          */
-        WT_RET(lr_fh->destination->fh_truncate(lr_fh->destination, wt_session, source_size));
+        WT_RET(__live_restore_fs_open_in_source(lr_fs, session, lr_fh, flags));
+        if (!dest_exist)
+            __live_restore_fs_create_destination_data_file(session, lr_fs, lr_fh, name);
     }
+    WT_RET(__live_restore_fs_open_in_destination(lr_fs, session, lr_fh, name, flags, !dest_exist));
     return (0);
 }
 

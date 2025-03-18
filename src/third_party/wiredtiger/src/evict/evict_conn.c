@@ -19,12 +19,9 @@
  */
 static WT_INLINE int
 __evict_config_abs_to_pct(
-  WT_SESSION_IMPL *session, double *param, const char *param_name, bool shared)
+  WT_SESSION_IMPL *session, double *param, const char *param_name, uint64_t cache_size, bool shared)
 {
-    WT_CONNECTION_IMPL *conn;
     double input;
-
-    conn = S2C(session);
 
     WT_ASSERT(session, param != NULL);
     input = *param;
@@ -41,10 +38,10 @@ __evict_config_abs_to_pct(
             WT_RET_MSG(session, EINVAL,
               "Shared cache configuration requires a percentage value for %s", param_name);
         /* An absolute value can't exceed the cache size. */
-        if (input > conn->cache_size)
+        if (input > cache_size)
             WT_RET_MSG(session, EINVAL, "%s should not exceed cache size", param_name);
 
-        *param = (input * 100.0) / (conn->cache_size);
+        *param = (input * 100.0) / cache_size;
     }
 
     return (0);
@@ -77,38 +74,38 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_target", &cval));
     evict->eviction_target = (double)cval.val;
-    WT_RET(
-      __evict_config_abs_to_pct(session, &(evict->eviction_target), "eviction target", shared));
+    WT_RET(__evict_config_abs_to_pct(
+      session, &(evict->eviction_target), "eviction target", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_trigger", &cval));
     evict->eviction_trigger = (double)cval.val;
-    WT_RET(
-      __evict_config_abs_to_pct(session, &(evict->eviction_trigger), "eviction trigger", shared));
+    WT_RET(__evict_config_abs_to_pct(
+      session, &(evict->eviction_trigger), "eviction trigger", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_target", &cval));
     evict->eviction_dirty_target = (double)cval.val;
     WT_RET(__evict_config_abs_to_pct(
-      session, &(evict->eviction_dirty_target), "eviction dirty target", shared));
+      session, &(evict->eviction_dirty_target), "eviction dirty target", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_trigger", &cval));
     evict->eviction_dirty_trigger = (double)cval.val;
-    WT_RET(__evict_config_abs_to_pct(
-      session, &(evict->eviction_dirty_trigger), "eviction dirty trigger", shared));
+    WT_RET(__evict_config_abs_to_pct(session, &(evict->eviction_dirty_trigger),
+      "eviction dirty trigger", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_updates_target", &cval));
     evict->eviction_updates_target = (double)cval.val;
-    WT_RET(__evict_config_abs_to_pct(
-      session, &(evict->eviction_updates_target), "eviction updates target", shared));
+    WT_RET(__evict_config_abs_to_pct(session, &(evict->eviction_updates_target),
+      "eviction updates target", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_updates_trigger", &cval));
     evict->eviction_updates_trigger = (double)cval.val;
-    WT_RET(__evict_config_abs_to_pct(
-      session, &(evict->eviction_updates_trigger), "eviction updates trigger", shared));
+    WT_RET(__evict_config_abs_to_pct(session, &(evict->eviction_updates_trigger),
+      "eviction updates trigger", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_checkpoint_target", &cval));
     evict->eviction_checkpoint_target = (double)cval.val;
-    WT_RET(__evict_config_abs_to_pct(
-      session, &(evict->eviction_checkpoint_target), "eviction checkpoint target", shared));
+    WT_RET(__evict_config_abs_to_pct(session, &(evict->eviction_checkpoint_target),
+      "eviction checkpoint target", conn->cache_size, shared));
 
     /* Check for invalid configurations and automatically fix them to suitable values. */
     if (evict->eviction_dirty_target > evict->eviction_target) {
