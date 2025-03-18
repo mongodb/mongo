@@ -7,7 +7,10 @@
  * to be updated by the addShard command.
  *
  * @tags: [
- *   requires_fcv_80
+ *   requires_fcv_80,
+ *   # The behavior changed in terms of interrupting add shard, and this test reflects the new
+ *   # behavior
+ *   featureFlagUseTopologyChangeCoordinators,
  * ]
  */
 
@@ -83,9 +86,8 @@ addShardThread.start();
 addShardFp.wait();
 interruptConfigsvrAddShard(configPrimary);
 assert.commandFailedWithCode(addShardThread.returnData(), ErrorCodes.Interrupted);
-addShardFp.off();
 
-jsTest.log("Checking the cluster parameter");
+jsTest.log("Checking the cluster parameter during hang");
 // The addShard command has not set the cluster parameter to true again because of the interrupt.
 checkClusterParameter(st.configRS, false);
 checkClusterParameter(st.rs0, false);
@@ -101,6 +103,23 @@ assert.commandFailedWithCode(
     ErrorCodes.IllegalOperation);
 assert.commandFailedWithCode(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}),
                              ErrorCodes.IllegalOperation);
+
+addShardFp.off();
+
+jsTest.log("Checking the cluster parameter after hang");
+// Even if the command is interrupted the coordinator adds the shard eventually
+assert.soon(() => {
+    let res = assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {getClusterParameter: "shardedClusterCardinalityForDirectConns"}));
+    return res.clusterParameters[0].hasTwoOrMoreShards === true;
+});
+
+jsTest.log("Ensure that data can be moved");
+assert.commandWorked(
+    st.s.adminCommand({moveCollection: dbName + "." + unshardedCollName, toShard: shard1Rst.name}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}));
+assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}));
 // The collection should be able to be resharded locally
 assert.commandWorked(st.s.adminCommand({
     reshardCollection: dbName + '.' + shardedCollName2,
@@ -108,24 +127,21 @@ assert.commandWorked(st.s.adminCommand({
     forceRedistribution: true,
     shardDistribution: [{shard: st.shard0.shardName, min: {_id: MinKey}, max: {_id: MaxKey}}]
 }));
-// Resharding to another shard should be disallowed
-assert.commandFailedWithCode(st.s.adminCommand({
+// The collection should be able to be resharded to another shard
+assert.commandWorked(st.s.adminCommand({
     reshardCollection: dbName + '.' + shardedCollName2,
     key: {_id: 1},
     forceRedistribution: true,
     shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}]
-}),
-                             ErrorCodes.IllegalOperation);
+}));
 // The collection should be able to be unsharded locally
 assert.commandWorked(st.s.adminCommand(
     {unshardCollection: dbName + '.' + shardedCollName3, toShard: st.shard0.shardName}));
 assert.commandWorked(
     st.s.adminCommand({shardCollection: dbName + '.' + shardedCollName3, key: {_id: 1}}));
-// Unsharded to another shard should be disallowed
-assert.commandFailedWithCode(
-    st.s.adminCommand(
-        {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}),
-    ErrorCodes.IllegalOperation);
+// The collection should be able to be unsharded to another shard
+assert.commandWorked(st.s.adminCommand(
+    {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}));
 
 jsTest.log("Retry the addShard command");
 assert.commandWorked(st.s.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));

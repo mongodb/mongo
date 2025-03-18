@@ -785,6 +785,11 @@ commands:
                     'previousTime' persisted in the 'config.clusterParameters' collection then
                     'setClusterParameter' will fail."
                 optional: true
+            _compatibleWithTopologyChange:
+                type: bool
+                description: "If true, this cluster parameter change can run during a topology
+                              change"
+                default: false
 
     _configsvrClearJumboFlag:
         command_name: _configsvrClearJumboFlag

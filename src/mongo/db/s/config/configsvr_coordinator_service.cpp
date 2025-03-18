@@ -44,7 +44,9 @@
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
 #include "mongo/db/s/config/set_user_write_block_mode_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_cluster_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/str.h"
@@ -143,6 +145,31 @@ void ConfigsvrCoordinatorService::waitForAllOngoingCoordinatorsOfType(
     for (const auto& inProgressCoordinator : futuresToWait) {
         inProgressCoordinator.wait(opCtx);
     }
+}
+
+void ConfigsvrCoordinatorService::checkIfConflictsWithOtherInstances(
+    OperationContext* opCtx,
+    BSONObj initialState,
+    const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
+    const auto op = extractConfigsvrCoordinatorMetadata(initialState);
+    if (op.getId().getCoordinatorType() != ConfigsvrCoordinatorTypeEnum::kSetClusterParameter) {
+        return;
+    }
+
+    const auto stateDoc = SetClusterParameterCoordinatorDocument::parse(
+        IDLParserContext("CoordinatorDocument"), initialState);
+    if (stateDoc.getCompatibleWithTopologyChange()) {
+        return;
+    }
+
+    const auto service = ShardingDDLCoordinatorService::getService(opCtx);
+    if (!service) {
+        return;
+    }
+
+    uassert(ErrorCodes::AddOrRemoveShardInProgress,
+            "Cannot start SetClusterParameterCoordinator because a topology change is in progress",
+            service->areAllCoordinatorsOfTypeFinished(opCtx, DDLCoordinatorTypeEnum::kAddShard));
 }
 
 }  // namespace mongo

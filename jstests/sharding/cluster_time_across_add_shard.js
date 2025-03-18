@@ -156,7 +156,7 @@ if (isShardSvrRst) {
     st = new ShardingTest({
         mongos: 1,
         config: 1,
-        shards: 1,
+        shards: 0,
         other: {keyFile},
         configOptions: {
             // Additionally test TTL deletion of key documents. To speed up the test, make the
@@ -229,13 +229,10 @@ for (let session of sessions) {
         // the config server) instead of the shardsvr replica set's key.
         assert.neq(session.getClusterTime().signature.keyId, lastClusterTime.signature.keyId);
 
-        // Verify that the old cluster time can also be used against the mongos, config server, and
-        // other shard.
+        // Verify that the old cluster time can also be used against the mongos and config server
         assert.commandWorked(
             st.s.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}));
         assert.commandWorked(st.configRS.getPrimary().getDB("admin").runCommand(
-            {hello: 1, $clusterTime: lastClusterTime}));
-        assert.commandWorked(st.rs0.getPrimary().getDB("admin").runCommand(
             {hello: 1, $clusterTime: lastClusterTime}));
     } else {
         // Verify that the new cluster time was signed with the existing key.

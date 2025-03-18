@@ -205,6 +205,7 @@ void createShardIdentity(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
     const std::string& shardName,
+    boost::optional<APIParameters> apiParameters,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor);
 

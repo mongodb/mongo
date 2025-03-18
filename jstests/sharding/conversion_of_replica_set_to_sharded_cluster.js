@@ -8,7 +8,10 @@
  *   # TODO (SERVER-97257): Re-enable this test.
  *   # Test doesn't start enough mongods to have num_mongos routers
  *   embedded_router_incompatible,
- *   requires_scripting
+ *   requires_scripting,
+ *   # This test is incompatible with 'config shard' as it creates a cluster with 0 shards in order
+ *   # to be able to add shard with data on it (which is only allowed on the first shard).
+ *   config_shard_incompatible,
  * ]
  */
 
@@ -317,7 +320,7 @@ checkCRUDCommands(rst0.getPrimary().getDB(dbName));
 checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
 
 let st = new ShardingTest({
-    shards: TestData.configShard ? 1 : 0,
+    shards: 0,
     mongos: 1,
 });
 

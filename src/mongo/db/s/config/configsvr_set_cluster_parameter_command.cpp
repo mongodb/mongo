@@ -137,6 +137,8 @@ public:
                 coordinatorDoc.setParameter(cmdParamObj);
                 coordinatorDoc.setTenantId(tenantId);
                 coordinatorDoc.setPreviousTime(request().getPreviousTime());
+                coordinatorDoc.setCompatibleWithTopologyChange(
+                    request().get_compatibleWithTopologyChange());
 
                 const auto service = ConfigsvrCoordinatorService::getService(opCtx);
                 return dynamic_pointer_cast<SetClusterParameterCoordinator>(

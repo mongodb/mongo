@@ -15,7 +15,7 @@ print("=== Testing disabled cluster ===");
 mixedShardTest(disabled, disabled, true);
 
 print("=== Testing disabled/preferTLS cluster - SHOULD FAIL ===");
-mixedShardTest(disabled, preferTLS, false);
+mixedShardTest(preferTLS, disabled, false);
 
 print("=== Testing allowTLS/disabled cluster ===");
 mixedShardTest(disabled, allowTLS, true);

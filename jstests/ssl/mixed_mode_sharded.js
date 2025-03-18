@@ -22,4 +22,4 @@ mixedShardTest(preferTLS, allowTLS, true);
 mixedShardTest(allowTLS, preferTLS, true);
 
 print("=== Testing allowTLS/requireTLS cluster - SHOULD FAIL ===");
-mixedShardTest(requireTLS, allowTLS, false);
+mixedShardTest(allowTLS, requireTLS, false);

@@ -75,3 +75,7 @@ structs:
                     'setClusterParameter' will fail unless the 'parameter' value matches the current
                     cluster parameter value."
                 optional: true
+            compatibleWithTopologyChange:
+                type: bool
+                description: "If true, this cluster parameter change can run during a topology
+                              change"

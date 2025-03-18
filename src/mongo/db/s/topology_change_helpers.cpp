@@ -303,6 +303,7 @@ void setAddOrRemoveShardInProgressClusterParam(OperationContext* opCtx, bool new
             ConfigsvrSetClusterParameter setClusterParameter(
                 BSON("addOrRemoveShardInProgress" << BSON("inProgress" << newState)));
             setClusterParameter.setDbName(DatabaseName::kAdmin);
+            setClusterParameter.set_compatibleWithTopologyChange(true);
 
             DBDirectClient client(opCtx);
             BSONObj res;
@@ -1180,9 +1181,14 @@ void createShardIdentity(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
     const std::string& shardName,
+    boost::optional<APIParameters> apiParameters,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor) {
     ShardsvrAddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardName);
+
+    if (apiParameters) {
+        apiParameters->setInfo(addShardCmd);
+    }
 
     if (osiGenerator) {
         auto const osi = (*osiGenerator)(opCtx);
@@ -1722,6 +1728,7 @@ void updateClusterCardinalityParameter(const Lock::ExclusiveLock&, OperationCont
         "shardedClusterCardinalityForDirectConns" << BSON(
             ShardedClusterCardinalityParam::kHasTwoOrMoreShardsFieldName << hasTwoOrMoreShard)));
     configsvrSetClusterParameter.setDbName(DatabaseName::kAdmin);
+    configsvrSetClusterParameter.set_compatibleWithTopologyChange(true);
 
     while (true) {
         const auto cmdResponse = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(

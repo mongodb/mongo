@@ -2,6 +2,9 @@
  * @tags: [
  *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard-local catalog
  *   incompatible_with_authoritative_shards,
+ *   # This test is incompatible with 'config shard' as it creates a cluster with 0 shards in order
+ *   # to be able to add shard with data on it (which is only allowed on the first shard).
+ *   config_shard_incompatible,
  * ]
  */
 
@@ -12,10 +15,9 @@ import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
-var s = new ShardingTest({name: "add_shard1", shards: 1, useHostname: false});
+var s = new ShardingTest({name: "add_shard1", shards: 0, useHostname: false});
 
-// Create a shard and add a database; if the database is not duplicated the mongod should accept
-// it as shard
+// Create a shard and add a database; for the first shard we allow data on the replica set
 var rs1 = new ReplSetTest({name: "addshard1-1", host: 'localhost', nodes: 1});
 rs1.startSet({shardsvr: ""});
 rs1.initiate();
@@ -44,16 +46,13 @@ assert.commandFailedWithCode(
     s.admin.runCommand({addShard: rs1.getURL(), name: newShardMaxSize, maxSize: 1024}),
     ErrorCodes.InvalidOptions);
 
-// a mongod with an existing database name should not be allowed to become a shard
+// a second shard with existing data is rejected
 var rs2 = new ReplSetTest({name: "addshard1-2", nodes: 1});
 rs2.startSet({shardsvr: ""});
 rs2.initiate();
 
 var db2 = rs2.getPrimary().getDB("otherDB");
 assert.commandWorked(db2.foo.save({a: 1}));
-
-var db3 = rs2.getPrimary().getDB("testDB");
-assert.commandWorked(db3.foo.save({a: 1}));
 
 s.config.databases.find().forEach(printjson);
 
@@ -72,6 +71,11 @@ assert.eq(0, sdb2.foo.count(), "database of rejected shard appears through mongo
 assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
           newShard,
           "DB primary is wrong");
+
+var rs3 = new ReplSetTest({name: "addshard1-3", host: 'localhost', nodes: 1});
+rs3.startSet({shardsvr: ""});
+rs3.initiate();
+assert.commandWorked(s.admin.runCommand({addShard: rs3.getURL()}));
 
 var origShard = s.getNonPrimaries("testDB")[0];
 moveDatabaseAndUnshardedColls(s.s.getDB("testDB"), origShard);
@@ -95,3 +99,4 @@ assert.eq(numObjs, sdb1.foo.count(), "wrong count after splitting collection tha
 s.stop();
 rs1.stopSet();
 rs2.stopSet();
+rs3.stopSet();
