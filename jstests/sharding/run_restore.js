@@ -22,9 +22,10 @@ TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 const s =
     new ShardingTest({name: "runRestore", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
 
-// TODO (SERVER-100083): Re-enable this test to run with `featureFlagShardAuthoritativeDbMetadata`.
-if (FeatureFlagUtil.isPresentAndEnabled(s.s, "ShardAuthoritativeDbMetadata")) {
-    jsTestLog("Skipping test since featureFlagShardAuthoritativeDbMetadata is enabled");
+// TODO (SERVER-100083): Re-enable this test to run with
+// `featureFlagShardAuthoritativeDbMetadataDDL`.
+if (FeatureFlagUtil.isPresentAndEnabled(s.s, "ShardAuthoritativeDbMetadataDDL")) {
+    jsTestLog("Skipping test since featureFlagShardAuthoritativeDbMetadataDDL is enabled");
     s.stop();
     quit();
 }

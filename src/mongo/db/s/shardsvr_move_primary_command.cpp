@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
 #include <string>
 #include <utility>
 
@@ -51,7 +50,6 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -102,7 +100,8 @@ public:
                 FixedFCVRegion fcvRegion(opCtx);
 
                 const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
-                    feature_flags::gShardAuthoritativeDbMetadata.isEnabled();
+                    feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                        fcvRegion->acquireFCVSnapshot());
 
                 auto shardRegistry = Grid::get(opCtx)->shardRegistry();
                 // Ensure that the shard information is up-to-date as possible to catch the case

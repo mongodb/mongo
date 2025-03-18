@@ -33,7 +33,7 @@ if (isTrackUnshardedUponCreationEnabled) {
 // shards that are not the primary shard. This test shuld be re-written thinking about that shards
 // are database authoritative and don't need to refresh anymore.
 const isAuthoritativeShardEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "ShardAuthoritativeDbMetadata");
+    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "ShardAuthoritativeDbMetadataDDL");
 if (isAuthoritativeShardEnabled) {
     st.stop();
     quit();

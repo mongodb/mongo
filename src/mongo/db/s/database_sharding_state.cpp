@@ -279,7 +279,8 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx) c
 }
 
 void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
-    if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled()) {
+    if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // When the feature flag for authoritative database metadata is enabled, this should act as
         // a noop. Clearing and setting the database metadata is only managed by the recover from
         // disk during startup/rollback or as part of a DDL commit to the shard-local catalog.
@@ -300,7 +301,8 @@ void DatabaseShardingState::setAuthoritativeDbInfo(OperationContext* opCtx,
                                                    const DatabaseType& dbInfo) {
     tassert(10003603,
             "Expected to find the authoritative database metadata feature flag enabled",
-            feature_flags::gShardAuthoritativeDbMetadata.isEnabled());
+            feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
     tassert(10003604,
@@ -323,7 +325,8 @@ void DatabaseShardingState::setAuthoritativeDbInfo(OperationContext* opCtx,
 }
 
 void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh) {
-    if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled()) {
+    if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // When the feature flag for authoritative database metadata is enabled, this should act as
         // a noop. Clearing and setting the database metadata is only managed by the recover from
         // disk during startup/rollback or as part of a DDL commit to the shard-local catalog.
@@ -344,7 +347,8 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngo
 void DatabaseShardingState::clearAuthoritativeDbInfo(OperationContext* opCtx) {
     tassert(10003601,
             "Expected to find the authoritative database metadata feature flag enabled",
-            feature_flags::gShardAuthoritativeDbMetadata.isEnabled());
+            feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     LOGV2(10003602, "Clearing this node's cached database info", logAttrs(_dbName));
 

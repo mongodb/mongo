@@ -999,17 +999,17 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata() {
-    if (FeatureFlagUtil.isPresentAndEnabled(st.s, "ShardAuthoritativeDbMetadata")) {
+    if (FeatureFlagUtil.isPresentAndEnabled(st.s, "ShardAuthoritativeDbMetadataDDL")) {
         jsTestLog(
-            "Skipping test since featureFlagShardAuthoritativeDbMetadata is enabled and do \
-         not refresh database metadata.");
+            "Skipping test since featureFlagShardAuthoritativeDbMetadataDDL is enabled and do " +
+            "not refresh database metadata.");
         return;
     }
 
     if (jsTest.options().storageEngine === "inMemory") {
         jsTestLog(
-            "Skipping testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata because we \
-            need persistance to restart nodes");
+            "Skipping testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata because " +
+            "we need persistance to restart nodes");
         return;
     }
 

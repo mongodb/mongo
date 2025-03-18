@@ -113,7 +113,8 @@ public:
                     feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
                         (*fixedFcvRegion).acquireFCVSnapshot());
                 bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
-                    feature_flags::gShardAuthoritativeDbMetadata.isEnabled();
+                    feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                        fixedFcvRegion->acquireFCVSnapshot());
 
                 if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
                     getCreateDatabaseResponse = [&]() {

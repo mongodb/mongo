@@ -474,7 +474,7 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_view_of_un
 const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 const isAuthoritativeShardEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "ShardAuthoritativeDbMetadata");
+    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "ShardAuthoritativeDbMetadataCRUD");
 if (!isTrackUnshardedUponCreationEnabled && !isAuthoritativeShardEnabled) {
     // Test $lookup when it is routed to a secondary which is not yet aware of the foreign
     // collection.

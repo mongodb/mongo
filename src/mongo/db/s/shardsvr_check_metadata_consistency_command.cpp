@@ -320,7 +320,8 @@ public:
                     auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
                     tassert(9980500, "StaleDbVersion must have extraInfo", extraInfo);
 
-                    if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled()) {
+                    if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                         // If versionWanted exists:
                         //    - This means that the wanted version is higher than the one initially
                         //      looked at the config server. There has been a drop-create under the

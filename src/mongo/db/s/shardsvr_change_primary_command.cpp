@@ -102,7 +102,8 @@ public:
                 FixedFCVRegion fcvRegion(opCtx);
 
                 const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
-                    feature_flags::gShardAuthoritativeDbMetadata.isEnabled();
+                    feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                        fcvRegion->acquireFCVSnapshot());
 
                 // TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
                 uassert(

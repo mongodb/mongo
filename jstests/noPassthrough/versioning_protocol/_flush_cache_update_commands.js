@@ -17,7 +17,7 @@ function checkTimestampConsistencyInPersistentMetadata(
     // Checking consistency on shard-local catalog.
     function getDbMetadata() {
         const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
-            st.s.getDB('admin'), "ShardAuthoritativeDbMetadata");
+            st.s.getDB('admin'), "ShardAuthoritativeDbMetadataDDL");
         if (!isAuthoritativeShardEnabled) {
             st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName, syncFromConfig: true});
             return st.shard0.getDB('config').cache.databases.findOne({_id: dbName});

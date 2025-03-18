@@ -674,7 +674,8 @@ void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
                                                         bool isMajority,
                                                         bool isRollback) {
 
-    if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled() &&
+    if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         MONGO_likely(!skipShardLocalCatalogRecovery.shouldFail())) {
         // Has to be called on rollback too. Takes the global lock.
         _reloadShardingState(opCtx);

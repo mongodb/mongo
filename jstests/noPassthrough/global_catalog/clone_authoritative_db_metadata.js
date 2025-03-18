@@ -10,7 +10,8 @@
  * TODO (SERVER-101884): Remove or update this test once the upgrade procedure is completed.
  *
  * @tags: [
- *     featureFlagShardAuthoritativeDbMetadata,
+ *     featureFlagShardAuthoritativeDbMetadataCRUD,
+ *     featureFlagShardAuthoritativeDbMetadataDDL,
  * ]
  */
 

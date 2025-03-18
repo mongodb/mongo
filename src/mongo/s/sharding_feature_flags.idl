@@ -144,12 +144,21 @@ feature_flags:
     default: false
     shouldBeFCVGated: true
   # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-  featureFlagShardAuthoritativeDbMetadata:
+  featureFlagShardAuthoritativeDbMetadataCRUD:
+    description: "Feature flag to enable the authoritative model to read database metadata from
+                  stored shard-local information"
+    cpp_varname: feature_flags::gShardAuthoritativeDbMetadataCRUD
+    default: false
+    shouldBeFCVGated: true
+    enable_on_transitional_fcv: false
+  # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+  featureFlagShardAuthoritativeDbMetadataDDL:
     description: "Feature flag to enable the authoritative model to store shard-local information
                   for database metadata."
-    cpp_varname: feature_flags::gShardAuthoritativeDbMetadata
+    cpp_varname: feature_flags::gShardAuthoritativeDbMetadataDDL
     default: false
-    shouldBeFCVGated: false
+    shouldBeFCVGated: true
+    enable_on_transitional_fcv: true
   # TODO (SERVER-89169): remove once 9.0 becomes last LTS.
   featureFlagShardAuthoritativeCollMetadata:
     description: "Feature flag to enable the authoritative model for storing shard-local information 

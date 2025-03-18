@@ -168,7 +168,8 @@ public:
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
                     !opCtx->readOnly());
 
-            if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled()) {
+            if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 // When the feature flag for authoritative database metadata is enabled, this should
                 // act as a noop. Refreshing the database metadata is no longer supported.
                 return;
