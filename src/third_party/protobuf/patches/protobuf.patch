@@ -1,0 +1,56 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+index 2d43e46df..b52736fb4 100644
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -1,2 +1,19 @@
+ # TODO: migrate all dependencies from WORKSPACE to MODULE.bazel
+ # https://github.com/protocolbuffers/protobuf/issues/14313
++
++module(
++    name = "protobuf",
++)
++
++bazel_dep(name = "rules_cc", version = "0.0.9")
++bazel_dep(name = "rules_java", version = "4.0.0")
++bazel_dep(name = "rules_pkg", version = "0.7.0")
++bazel_dep(name = "rules_proto", version = "4.0.0")
++bazel_dep(name = "bazel_skylib", version = "1.4.1")
++bazel_dep(name = "rules_python", version = "0.10.2")
++bazel_dep(name = "platforms", version = "0.0.8")
++bazel_dep(name = "abseil-cpp", version = "20230802.0.bcr.1", repo_name = "com_google_absl")
++bazel_dep(name = "zlib", version = "1.2.11")
++
++non_module_deps = use_extension("//:non_module_deps.bzl", "non_module_deps")
++use_repo(non_module_deps, "rules_ruby", "utf8_range")
+diff --git a/non_module_deps.bzl b/non_module_deps.bzl
+new file mode 100644
+index 000000000..4256d6326
+--- /dev/null
++++ b/non_module_deps.bzl
+@@ -0,0 +1,26 @@
++load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
++
++def _github_archive(repo, commit, **kwargs):
++    repo_name = repo.split("/")[-1]
++    http_archive(
++        urls = [repo + "/archive/" + commit + ".zip"],
++        strip_prefix = repo_name + "-" + commit,
++        **kwargs
++    )
++
++def _non_module_deps_impl(ctx):
++    _github_archive(
++        name = "utf8_range",
++        repo = "https://github.com/protocolbuffers/utf8_range",
++        commit = "de0b4a8ff9b5d4c98108bdfe723291a33c52c54f",
++        sha256 = "5da960e5e5d92394c809629a03af3c7709d2d3d0ca731dacb3a9fb4bf28f7702",
++    )
++    _github_archive(
++        name = "rules_ruby",
++        repo = "https://github.com/protocolbuffers/rules_ruby",
++        commit = "b7f3e9756f3c45527be27bc38840d5a1ba690436",
++        sha256 = "347927fd8de6132099fcdc58e8f7eab7bde4eb2fd424546b9cd4f1c6f8f8bad8",
++    )
++
++non_module_deps = module_extension(implementation = _non_module_deps_impl)
++

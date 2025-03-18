@@ -7,7 +7,7 @@ set REPO_ROOT=%~dp0..
 
 for %%I in (%REPO_ROOT%) do set cur_dir=%%~nxI
 
-set bazel_python="%REPO_ROOT%\bazel-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
+set bazel_python="%REPO_ROOT%\bazel-%cur_dir%\external\_main~setup_mongo_python_toolchains~py_windows_x86_64\dist\python.exe"
 set compdb_python="%REPO_ROOT%\.compiledb\compiledb-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
 set python=%bazel_python%
 if not exist "%python%" (

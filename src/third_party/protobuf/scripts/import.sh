@@ -11,6 +11,7 @@ REVISION="v4.25.0"
 VERSION="4.25.0"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf
+PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf/patches
 if [[ -d $DEST_DIR/dist ]]; then
     echo "You must remove '$DEST_DIR/dist' before running $0" >&2
     exit 1
@@ -18,6 +19,7 @@ fi
 
 git clone --branch $REVISION https://github.com/mongodb-forks/protobuf.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
+git apply $PATCH_DIR/*.patch
 rm -rf benchmarks
 rm -rf cmake
 rm -rf conformance

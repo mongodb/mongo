@@ -110,7 +110,7 @@ for cert in ${cert_locs[@]}; do
 done
 
 cur_dir=$(basename $REPO_ROOT)
-bazel_python="$REPO_ROOT/bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
+bazel_python="$REPO_ROOT/bazel-$cur_dir/external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
 compdb_python="$REPO_ROOT/.compiledb/compiledb-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
 python=$bazel_python
 if [ ! -f $python ]; then

@@ -1,0 +1,12 @@
+diff --git MODULE.bazel MODULE.bazel
+new file mode 100644
+index 0000000..c09945f
+--- /dev/null
++++ MODULE.bazel
+@@ -0,0 +1,6 @@
++module(
++    name = "rules_poetry",
++)
++
++bazel_dep(name = "bazel_skylib", version = "1.5.0")
++bazel_dep(name = "platforms", version = "0.0.8")

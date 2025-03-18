@@ -11,6 +11,7 @@ REVISION="v1.59.5-bazel-gen-mod"
 VERSION="1.59.5"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/grpc
+PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/grpc/patches
 if [[ -d $DEST_DIR/dist ]]; then
     echo "You must remove '$DEST_DIR/dist' before running $0" >&2
     exit 1
@@ -18,6 +19,7 @@ fi
 
 git clone --branch $REVISION https://github.com/mongodb-forks/grpc.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
+git apply $PATCH_DIR/*.patch
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 rm -rf cmake
 rm -rf doc

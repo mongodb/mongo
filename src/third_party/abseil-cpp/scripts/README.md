@@ -8,7 +8,7 @@ To update abseil you should:
 
 1. update the version/repo information in the import.py script
 2. remove the existing abseil-cpp/dist directory
-3. run the import.py script
+3. run the import.sh script
 4. run the parse_libs_from_ninja.py
 
 # Updating the SConscript generated libraries

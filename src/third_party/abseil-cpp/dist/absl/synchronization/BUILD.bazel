@@ -231,6 +231,28 @@ cc_library(
 )
 
 cc_test(
+    name = "mutex_test",
+    size = "large",
+    srcs = ["mutex_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    flaky = 1,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    shard_count = 25,
+    deps = [
+        ":synchronization",
+        ":thread_pool",
+        "//absl/base",
+        "//absl/base:config",
+        "//absl/base:core_headers",
+        "//absl/log",
+        "//absl/log:check",
+        "//absl/memory",
+        "//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "mutex_method_pointer_test",
     srcs = ["mutex_method_pointer_test.cc"],
     copts = ABSL_TEST_COPTS,

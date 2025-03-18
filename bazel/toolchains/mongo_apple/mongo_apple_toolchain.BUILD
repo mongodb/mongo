@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 [
     toolchain(
-        name = "mongo_apple_" + apple_arch + " _toolchain",
+        name = "mongo_apple_" + apple_arch + "_toolchain",
         exec_compatible_with = [
             "@platforms//os:macos",
             "@platforms//cpu:" + cpu,

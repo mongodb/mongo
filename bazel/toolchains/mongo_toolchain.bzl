@@ -181,3 +181,7 @@ def setup_mongo_toolchain_aliases():
             name = local_alias,
             actual = select(selects[target]),
         )
+
+setup_mongo_toolchains_extension = module_extension(
+    implementation = lambda ctx: setup_mongo_toolchains(),
+)

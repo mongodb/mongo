@@ -1,41 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchains")
 
-# Apple cc toolchain needs to be loaded before regular cc toolchain or else Apple will just use regular cc toolchain
-http_archive(
-    name = "build_bazel_apple_support",
-    sha256 = "b53f6491e742549f13866628ddffcc75d1f3b2d6987dc4f14a16b242113c890b",
-    url = "https://github.com/bazelbuild/apple_support/releases/download/1.17.1/apple_support.1.17.1.tar.gz",
-)
-
-load(
-    "@build_bazel_apple_support//lib:repositories.bzl",
-    "apple_support_dependencies",
-)
-
-apple_support_dependencies()
-
-load("@bazel_features//:deps.bzl", "bazel_features_deps")
-
-bazel_features_deps()
-
-http_archive(
-    name = "bazel_clang_tidy",
-    integrity = "sha256-nar8iWq+4goJBEfmQZPWGsRlHdt+paVu5LY1WQ/BCZA=",
-    strip_prefix = "bazel_clang_tidy-a46e57159bfe2d5d41135cec61f1c9cd514c1964",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-    ],
-)
-
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
 http_archive(
     name = "aspect_rules_lint",
     sha256 = "f60e4a737a5e09402f5fa3bd182efa80dac5523ca4b9bc5c6fa8c06fbfb46630",
@@ -43,83 +8,7 @@ http_archive(
     url = "https://github.com/aspect-build/rules_lint/releases/download/v1.1.0/rules_lint-v1.1.0.tar.gz",
 )
 
-# aspect_rules_lint depends on aspect_bazel_lib.
-http_archive(
-    name = "aspect_bazel_lib",
-    sha256 = "57a777c5d4d0b79ad675995ee20fc1d6d2514a1ef3000d98f5c70cf0c09458a3",
-    strip_prefix = "bazel-lib-2.13.0",
-    url = "https://github.com/bazel-contrib/bazel-lib/releases/download/v2.13.0/bazel-lib-v2.13.0.tar.gz",
-)
-
-load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
-
-# aspect_bazel_lib depends on bazel_skylib
-aspect_bazel_lib_dependencies()
-
-load(
-    "@aspect_rules_lint//format:repositories.bzl",
-    # Fetch additional formatter binaries you need:
-    "fetch_java_format",
-    "fetch_ktfmt",
-    "fetch_swiftformat",
-    "rules_lint_dependencies",
-)
-
-rules_lint_dependencies()
-
-fetch_java_format()
-
-fetch_ktfmt()
-
-fetch_swiftformat()
-
-load("@aspect_rules_lint//lint:checkstyle.bzl", "fetch_checkstyle")
-
-fetch_checkstyle()
-
-load("@aspect_rules_lint//lint:pmd.bzl", "fetch_pmd")
-
-fetch_pmd()
-
-load("@aspect_rules_lint//lint:vale.bzl", "fetch_vale")
-
-fetch_vale()
-
-load("@aspect_rules_lint//lint:ktlint.bzl", "fetch_ktlint")
-
-fetch_ktlint()
-
-load("@aspect_rules_lint//lint:spotbugs.bzl", "fetch_spotbugs")
-
-fetch_spotbugs()
-
-########################
-# Optional: multitool provides defaults for some tools such as yamlfmt
-# If you do not set up multitool, you must provide these tools yourself
-load("@rules_multitool//multitool:multitool.bzl", "multitool")
-
-multitool(
-    name = "multitool",
-    lockfiles = [
-        "@aspect_rules_lint//format:multitool.lock.json",
-        "@aspect_rules_lint//lint:multitool.lock.json",
-    ],
-)
-
-load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
-load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
-
-setup_local_config_platform(name = "internal_platforms_do_not_use")
-
 setup_mongo_toolchains()
-
-load("//bazel/toolchains/mongo_apple:mongo_apple_toolchain.bzl", "mongo_apple_toolchain_config", "mongo_apple_toolchain_setup")
-
-mongo_apple_toolchain_config(name = "mongo_apple_toolchain_config")
-
-mongo_apple_toolchain_setup(name = "mongo_apple_toolchain")
-
-register_toolchains("@mongo_apple_toolchain//...")
 
 http_archive(
     name = "windows_sasl",
@@ -154,10 +43,6 @@ filegroup(
     url = "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
 )
 
-load("//bazel/toolchains:python_toolchain.bzl", "setup_mongo_python_toolchains")
-
-[register_toolchains(toolchain) for toolchain in setup_mongo_python_toolchains()]
-
 load("//bazel/coverity:coverity_toolchain.bzl", "coverity_toolchain")
 
 coverity_toolchain(
@@ -167,62 +52,6 @@ coverity_toolchain(
 load("@rules_coverity//coverity:repositories.bzl", "rules_coverity_toolchains")
 
 rules_coverity_toolchains()
-
-http_archive(
-    name = "platforms",
-    sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-    ],
-)
-
-# We need skylib to be able to use config_setting_group in rule_poetry below
-# https://github.com/bazelbuild/bazel-skylib/blob/main/docs/selects_doc.md#selectsconfig_setting_group
-http_archive(
-    name = "bazel_skylib",
-    sha256 = "cd55a062e763b9349921f0f5db8c3933288dc8ba4f76dd9416aac68acee3cb94",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-    ],
-)
-
-# Poetry rules for managing Python dependencies
-http_archive(
-    name = "rules_poetry",
-    sha256 = "48001b928488e78f03a47bcc712c56432a471fc6cdd90fe57c884efbfcd13696",
-    strip_prefix = "rules_poetry-917630033c736c188605cf0f558c34afc1eca540",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
-    ],
-)
-
-load("@rules_poetry//rules_poetry:defs.bzl", "poetry_deps")
-
-poetry_deps()
 
 load("@rules_poetry//rules_poetry:poetry.bzl", "poetry")
 
@@ -237,25 +66,6 @@ poetry(
     python_interpreter_target_mac = "@py_host//:dist/bin/python3",
     python_interpreter_target_win = "@py_host//:dist/python.exe",
 )
-
-http_archive(
-    name = "aspect_rules_js",
-    sha256 = "875b8d01af629dbf626eddc5cf239c9f0da20330f4d99ad956afc961096448dd",
-    strip_prefix = "rules_js-2.1.3",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
-    ],
-)
-
-load("@aspect_rules_js//js:repositories.bzl", "rules_js_dependencies")
-
-rules_js_dependencies()
 
 load("@aspect_rules_js//js:toolchains.bzl", "DEFAULT_NODE_VERSION", "rules_js_register_toolchains")
 
@@ -303,47 +113,6 @@ cc_library(
 
 # Note: rules_python is implicitly loaded with a grpc-compatible version.
 
-local_repository(
-    name = "com_google_absl",
-    path = "src/third_party/abseil-cpp/dist",
-)
-
-local_repository(
-    name = "com_google_protobuf",
-    path = "src/third_party/protobuf/dist",
-)
-
-local_repository(
-    name = "com_github_grpc_grpc",
-    path = "src/third_party/grpc/dist",
-)
-
-load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
-
-grpc_deps()
-
-load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
-
-grpc_extra_deps()
-
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-http_archive(
-    name = "rules_pkg",
-    sha256 = "8f9ee2dc10c1ae514ee599a8b42ed99fa262b757058f65ad3c384289ff70c4b8",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
-        "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
-        "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
-    ],
-)
-
-load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
-
-rules_pkg_dependencies()
-
 load("//bazel/install_rules:pigz.bzl", "setup_pigz")
 
 setup_pigz(
@@ -361,33 +130,8 @@ new_local_repository(
 package(default_visibility = ["//visibility:public"])
 filegroup(
     name = "mongot_binaries",
-    srcs = glob(["**"], exclude = ["BUILD.bazel", "WORKSPACE"]),
+    srcs = glob(["**"], exclude = ["BUILD", "WORKSPACE"]),
 )
 """,
     path = "mongot-localdev",
 )
-
-http_archive(
-    name = "buildifier_prebuilt",
-    sha256 = "8ada9d88e51ebf5a1fdff37d75ed41d51f5e677cdbeafb0a22dda54747d6e07e",
-    strip_prefix = "buildifier-prebuilt-6.4.0",
-    urls = [
-        "http://github.com/keith/buildifier-prebuilt/archive/6.4.0.tar.gz",
-    ],
-)
-
-load("@buildifier_prebuilt//:deps.bzl", "buildifier_prebuilt_deps")
-
-buildifier_prebuilt_deps()
-
-load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
-
-bazel_skylib_workspace()
-
-load("@buildifier_prebuilt//:defs.bzl", "buildifier_prebuilt_register_toolchains")
-
-buildifier_prebuilt_register_toolchains()
-
-load("//bazel/platforms:local_host_values.bzl", "setup_local_host_values")
-
-setup_local_host_values(name = "local_host_values")

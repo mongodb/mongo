@@ -6,6 +6,11 @@ info --config=local
 
 # Don't use legacy toolchain resolution.
 common --incompatible_enable_cc_toolchain_resolution
+# https://github.com/bazelbuild/bazel/issues/8766
+# there is WIP to allow users to inject constraints
+# this flag is required because the default for BZLMOD is @platform//host:host
+build --platforms=@internal_platforms_do_not_use//host
+common --enable_workspace=true
 
 # Improves build performance after first clean pull by
 # about 1 minute on developer machines
@@ -27,9 +32,6 @@ common --experimental_cc_shared_library
 
 # Reuse sandboxes to save sandbox execution and deletion times.
 common --experimental_reuse_sandbox_directories
-
-# Disabled until we do the work to move over to bzlmod
-common --enable_bzlmod=false
 
 # Enable Build without the Bytes
 common --remote_download_outputs=toplevel

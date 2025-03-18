@@ -19,3 +19,5 @@ src/third_party/wiredtiger/dist
 # or disable this check by setting `verify_node_modules_ignored = None` in `npm_translate_lock(name = "npm")`
 node_modules
 src/mongo/db/modules/jstestfuzz/node_modules
+
+.ijwb

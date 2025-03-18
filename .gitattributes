@@ -4,3 +4,5 @@
 **/third_party/**/* rules-lint-ignored=true
 external rules-lint-ignored=true
 *.idl linguist-language=yaml
+
+MODULE.bazel.lock rules-lint-ignored=true linguist-generated

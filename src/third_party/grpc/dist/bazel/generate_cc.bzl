@@ -196,7 +196,7 @@ _generate_cc = rule(
         ),
         "disable_sandbox": attr.bool(default = False, mandatory = False),
         "_protoc": attr.label(
-            default = Label("//external:protocol_compiler"),
+            default = Label("@com_google_protobuf//:protoc"),
             executable = True,
             cfg = "host",
         ),
