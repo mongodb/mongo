@@ -51,6 +51,7 @@
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog/snapshot_helper.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
@@ -86,10 +87,11 @@
 
 namespace mongo {
 
-
 using TransactionResources = shard_role_details::TransactionResources;
 
 namespace {
+auto& killedDueToRangeDeletionCounter =
+    *MetricBuilder<Counter64>("operation.killedDueToRangeDeletion");
 
 enum class ResolutionType { kUUID, kNamespace };
 
@@ -1585,10 +1587,11 @@ void restoreTransactionResourcesToOperationContext(
                     (prerequisites.readConcern.getLevel() !=
                          repl::ReadConcernLevel::kSnapshotReadConcern &&
                      prerequisites.readConcern.getLevel() !=
-                         repl::ReadConcernLevel::kAvailableReadConcern)) {
-                    uassert(ErrorCodes::QueryPlanKilled,
-                            "Read has been terminated due to orphan range cleanup.",
-                            acquiredCollection.ownershipFilter->isRangePreserverStillValid());
+                         repl::ReadConcernLevel::kAvailableReadConcern) &&
+                    !acquiredCollection.ownershipFilter->isRangePreserverStillValid()) {
+                    killedDueToRangeDeletionCounter.increment();
+                    uasserted(ErrorCodes::QueryPlanKilled,
+                              "Read has been terminated due to orphan range cleanup.");
                 }
             };
 

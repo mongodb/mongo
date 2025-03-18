@@ -126,6 +126,24 @@ function runFindCommandWithCursor(readConcernLevel,
     }
 }
 
+const shards = st.getAllShards();
+const prevKilledDueToRangeDeletionS0P = shards[0]
+                                            .getPrimary()
+                                            .adminCommand({serverStatus: 1})
+                                            .metrics.operation.killedDueToRangeDeletion;
+const prevKilledDueToRangeDeletionS1P = shards[1]
+                                            .getPrimary()
+                                            .adminCommand({serverStatus: 1})
+                                            .metrics.operation.killedDueToRangeDeletion;
+const prevKilledDueToRangeDeletionS0S = shards[0]
+                                            .getSecondary()
+                                            .adminCommand({serverStatus: 1})
+                                            .metrics.operation.killedDueToRangeDeletion;
+const prevKilledDueToRangeDeletionS1S = shards[1]
+                                            .getSecondary()
+                                            .adminCommand({serverStatus: 1})
+                                            .metrics.operation.killedDueToRangeDeletion;
+
 // The query must be killed on secondary.
 runFindCommandWithCursor('local', true, st.shard0, st.shard1);
 // Test when the range is moved back.
@@ -141,7 +159,6 @@ runFindCommandWithCursor('available', false, st.shard1, st.shard0, 105);
 runFindCommandWithCursor('local', false, st.shard0, st.shard1, 10, true);
 
 // Disable terminateSecondaryReadsOnOrphanCleanup
-const shards = st.getAllShards();
 shards.forEach((rs) => {
     rs.getSecondaries().forEach((conn) => {
         assert.commandWorked(
@@ -173,5 +190,31 @@ waitUntilMoveRangeFinished(st.shard0);
 assert.throwsWithCode(() => cursorBefore.itcount(), ErrorCodes.QueryPlanKilled);
 // The query initiated after a range deletion begins must not be killed.
 assert.eq(100, cursorAfter.itcount(), "failed to read the documents from the secondary");
+
+// Check killedDueToRangeDeletion metric, number of terminations on each node.
+assert.eq(0,
+          shards[0]
+                  .getPrimary()
+                  .adminCommand({serverStatus: 1})
+                  .metrics.operation.killedDueToRangeDeletion -
+              prevKilledDueToRangeDeletionS0P);
+assert.eq(0,
+          shards[1]
+                  .getPrimary()
+                  .adminCommand({serverStatus: 1})
+                  .metrics.operation.killedDueToRangeDeletion -
+              prevKilledDueToRangeDeletionS1P);
+assert.eq(2,
+          shards[0]
+                  .getSecondary()
+                  .adminCommand({serverStatus: 1})
+                  .metrics.operation.killedDueToRangeDeletion -
+              prevKilledDueToRangeDeletionS0S);
+assert.eq(1,
+          shards[1]
+                  .getSecondary()
+                  .adminCommand({serverStatus: 1})
+                  .metrics.operation.killedDueToRangeDeletion -
+              prevKilledDueToRangeDeletionS1S);
 
 st.stop();
