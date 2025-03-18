@@ -1,14 +1,15 @@
 // confirm that undefined no longer counts as 0 in $avg
 let c = db.c;
-c.drop();
-c.save({a: 1});
-c.save({a: 4});
-c.save({b: 1});
+assert(c.drop());
+assert.commandWorked(c.insert([{a: 1}, {a: 4}, {b: 1}]));
 assert.eq(c.aggregate({$group: {_id: null, avg: {$avg: "$a"}}}).toArray()[0].avg, 2.5);
 
 // again ensuring numberLongs work properly
-c.drop();
-c.save({a: NumberLong(1)});
-c.save({a: NumberLong(4)});
-c.save({b: NumberLong(1)});
+assert(c.drop());
+assert.commandWorked(c.insert([{a: NumberLong(1)}, {a: NumberLong(4)}, {b: NumberLong(1)}]));
 assert.eq(c.aggregate({$group: {_id: null, avg: {$avg: "$a"}}}).toArray()[0].avg, 2.5);
+
+// and now vs Infinity
+assert(c.drop());
+assert.commandWorked(c.insert([{a: null}, {a: Infinity}]));
+assert.eq(c.aggregate({$group: {_id: null, avg: {$avg: "$a"}}}).toArray()[0].avg, Infinity);

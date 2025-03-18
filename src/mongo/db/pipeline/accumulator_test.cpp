@@ -252,56 +252,58 @@ TEST(Accumulators, Avg) {
     auto expCtx = ExpressionContextForTest{};
     assertExpectedResults2<AccumulatorAvg>(
         &expCtx,
-        {
-            // No documents evaluated.
-            {{}, Value(BSONNULL)},
+        {// No documents evaluated.
+         {{}, Value(BSONNULL)},
 
-            // One int value is converted to double.
-            {{Value(3)}, Value(3.0)},
-            // One long value is converted to double.
-            {{Value(-4LL)}, Value(-4.0)},
-            // One double value.
-            {{Value(22.6)}, Value(22.6)},
+         // One int value is converted to double.
+         {{Value(3)}, Value(3.0)},
+         // One long value is converted to double.
+         {{Value(-4LL)}, Value(-4.0)},
+         // One double value.
+         {{Value(22.6)}, Value(22.6)},
 
-            // Averaging two ints.
-            {{Value(10), Value(11)}, Value(10.5)},
-            // Averaging two longs.
-            {{Value(10LL), Value(11LL)}, Value(10.5)},
-            // Averaging two doubles.
-            {{Value(10.0), Value(11.0)}, Value(10.5)},
+         // Averaging two ints.
+         {{Value(10), Value(11)}, Value(10.5)},
+         // Averaging two longs.
+         {{Value(10LL), Value(11LL)}, Value(10.5)},
+         // Averaging two doubles.
+         {{Value(10.0), Value(11.0)}, Value(10.5)},
 
-            // The average of an int and a double is a double.
-            {{Value(10), Value(11.0)}, Value(10.5)},
-            // The average of a long and a double is a double.
-            {{Value(5LL), Value(1.0)}, Value(3.0)},
-            // The average of an int and a long is a double.
-            {{Value(5), Value(3LL)}, Value(4.0)},
-            // Averaging an int, long, and double.
-            {{Value(1), Value(2LL), Value(6.0)}, Value(3.0)},
+         // The average of an int and a double is a double.
+         {{Value(10), Value(11.0)}, Value(10.5)},
+         // The average of a long and a double is a double.
+         {{Value(5LL), Value(1.0)}, Value(3.0)},
+         // The average of an int and a long is a double.
+         {{Value(5), Value(3LL)}, Value(4.0)},
+         // Averaging an int, long, and double.
+         {{Value(1), Value(2LL), Value(6.0)}, Value(3.0)},
 
-            // Unlike $sum, two ints do not overflow in the 'total' portion of the average.
-            {{Value(std::numeric_limits<int>::max()), Value(std::numeric_limits<int>::max())},
-             Value(static_cast<double>(std::numeric_limits<int>::max()))},
-            // Two longs do overflow in the 'total' portion of the average.
-            {{Value(std::numeric_limits<long long>::max()),
-              Value(std::numeric_limits<long long>::max())},
-             Value(static_cast<double>(std::numeric_limits<long long>::max()))},
+         // Unlike $sum, two ints do not overflow in the 'total' portion of the average.
+         {{Value(std::numeric_limits<int>::max()), Value(std::numeric_limits<int>::max())},
+          Value(static_cast<double>(std::numeric_limits<int>::max()))},
+         // Two longs do overflow in the 'total' portion of the average.
+         {{Value(std::numeric_limits<long long>::max()),
+           Value(std::numeric_limits<long long>::max())},
+          Value(static_cast<double>(std::numeric_limits<long long>::max()))},
 
-            // Averaging two decimals.
-            {{Value(Decimal128("-1234567890.1234567889")),
-              Value(Decimal128("-1234567890.1234567891"))},
-             Value(Decimal128("-1234567890.1234567890"))},
+         // Averaging two decimals.
+         {{Value(Decimal128("-1234567890.1234567889")),
+           Value(Decimal128("-1234567890.1234567891"))},
+          Value(Decimal128("-1234567890.1234567890"))},
 
-            // Averaging two longs and a decimal results in an accurate decimal result.
-            {{Value(1234567890123456788LL),
-              Value(1234567890123456789LL),
-              Value(Decimal128("1234567890123456790.037037036703702"))},
-             Value(Decimal128("1234567890123456789.012345678901234"))},
+         // Averaging two longs and a decimal results in an accurate decimal result.
+         {{Value(1234567890123456788LL),
+           Value(1234567890123456789LL),
+           Value(Decimal128("1234567890123456790.037037036703702"))},
+          Value(Decimal128("1234567890123456789.012345678901234"))},
 
-            // Averaging a double and a decimal
-            {{Value(1.0E22), Value(Decimal128("9999999999999999999999.9999999999"))},
-             Value(Decimal128("9999999999999999999999.99999999995"))},
-        });
+         // Averaging a double and a decimal
+         {{Value(1.0E22), Value(Decimal128("9999999999999999999999.9999999999"))},
+          Value(Decimal128("9999999999999999999999.99999999995"))},
+
+         // Averaging null and Infinity = Infinity
+         {{Value(BSONNULL), Value(std::numeric_limits<double>::infinity())},
+          Value(std::numeric_limits<double>::infinity())}});
 }
 
 TEST(Accumulators, First) {
