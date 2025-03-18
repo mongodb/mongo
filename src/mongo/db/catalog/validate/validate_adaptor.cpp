@@ -165,10 +165,7 @@ Status _validateTimeseriesCount(const BSONObj& control,
                                 bool shouldDecompressBSON) {
     // Skips the check if a bucket is compressed, but we are not in a validate mode that will
     // decompress the bucket to actually go through the measurements.
-    if (version == timeseries::kTimeseriesControlUncompressedVersion ||
-        ((version == timeseries::kTimeseriesControlCompressedSortedVersion ||
-          timeseries::kTimeseriesControlCompressedUnsortedVersion) &&
-         !shouldDecompressBSON)) {
+    if (version == timeseries::kTimeseriesControlUncompressedVersion || !shouldDecompressBSON) {
         return Status::OK();
     }
     long long controlCount;
