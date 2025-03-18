@@ -427,10 +427,6 @@ private:
         // Set to an error status if there is an error retrieving a response from this remote or if
         // the command result contained an error.
         Status status = Status::OK();
-
-        // Count of fetched docs during ARM processing of the current batch. Used to reduce the
-        // batchSize in getMore when mongod returned less docs than the requested batchSize.
-        long long fetchedCount = 0;
     };
 
     using RemoteCursorPtr = boost::intrusive_ptr<RemoteCursorData>;

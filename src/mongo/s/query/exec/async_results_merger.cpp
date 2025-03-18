@@ -604,17 +604,8 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock,
                                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) const {
     invariant(!remote.cbHandle.isValid());
 
-    // If mongod returned less docs than the requested batchSize then modify the next getMore
-    // request to fetch the remaining docs only. If the remote node has a plan with OR for top k and
-    // a full sort as is the case for the OP_QUERY find then this optimization will prevent
-    // switching to the full sort plan branch.
-    auto adjustedBatchSize = _params.getBatchSize();
-    if (_params.getBatchSize() && *_params.getBatchSize() > remote.fetchedCount) {
-        adjustedBatchSize = *_params.getBatchSize() - remote.fetchedCount;
-    }
-
     GetMoreCommandRequest getMoreRequest(remote.cursorId, remote.cursorNss.coll().toString());
-    getMoreRequest.setBatchSize(adjustedBatchSize);
+    getMoreRequest.setBatchSize(_params.getBatchSize());
     if (_awaitDataTimeout) {
         getMoreRequest.setMaxTimeMS(
             static_cast<std::int64_t>(durationCount<Milliseconds>(*_awaitDataTimeout)));
@@ -1118,7 +1109,6 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
         }
 
         remote->docBuffer.push(obj);
-        ++remote->fetchedCount;
     }
 
     // If we're doing a sorted merge, then we have to make sure to put this remote onto the merge

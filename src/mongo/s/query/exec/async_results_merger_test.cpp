@@ -1603,7 +1603,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
                                             scheduledCmd.addField(BSON("$db"
                                                                        << "anydbname")
                                                                       .firstElement()));
-    ASSERT_EQ(*cmd.getBatchSize(), 1LL);
+    ASSERT_EQ(*cmd.getBatchSize(), 3LL);
     ASSERT_EQ(cmd.getCommandParameter(), 1LL);
     scheduleNetworkResponses(std::move(responses));
     executor()->waitForEvent(readyEvent);
