@@ -29,7 +29,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/matcher/expression_leaf.h"

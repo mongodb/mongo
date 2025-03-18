@@ -28,7 +28,10 @@
  */
 
 #include "mongo/db/query/ce/test_utils.h"
+
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
+#include "mongo/db/query/stats/value_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -110,28 +110,41 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "stats_test_utils",
+    name = "maxdiff_test_utils",
     srcs = [
         "maxdiff_test_utils.cpp",
+    ],
+    hdrs = [
+        "maxdiff_test_utils.h",
+    ],
+    deps = [
+        ":stats_histograms",
+        "//src/mongo:base",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:plan_executor",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "stats_test_utils",
+    srcs = [
         "rand_utils.cpp",
         "rand_utils_new.cpp",
     ],
     hdrs = [
-        "maxdiff_test_utils.h",
         "rand_utils.h",
         "rand_utils_new.h",
     ],
     deps = [
-        ":collection_statistics_mock",
-        ":stats_gen",
         ":stats_histograms",
         "//src/mongo:base",
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db/pipeline",
-        "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/db/query/ce:histogram_common",
-        "//src/mongo/unittest",
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/stdx",
     ],
 )
 
@@ -172,6 +185,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [
+        ":stats_gen",
         ":stats_test_utils",
     ],
 )
@@ -194,6 +208,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
+        ":stats_gen",
         ":stats_test_utils",
     ],
 )
@@ -207,6 +222,7 @@ mongo_cc_unit_test(
     deps = [
         ":stats_test_utils",
         ":test_utils",
+        "//src/mongo/db/query:index_bounds_builder",
         "//src/mongo/db/query:index_bounds_builder_test_fixture",
     ],
 )

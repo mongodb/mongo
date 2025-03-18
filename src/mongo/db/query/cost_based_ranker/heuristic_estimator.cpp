@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 
-#include <fmt/format.h>
 #include <span>
 
 #include "mongo/db/matcher/expression_leaf.h"

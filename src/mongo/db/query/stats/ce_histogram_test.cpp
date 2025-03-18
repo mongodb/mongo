@@ -28,8 +28,6 @@
  */
 #include <algorithm>
 #include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
 #include <iterator>
 #include <limits>
 #include <memory>

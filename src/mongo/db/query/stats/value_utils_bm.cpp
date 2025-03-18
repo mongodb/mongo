@@ -29,7 +29,6 @@
 
 
 #include <benchmark/benchmark.h>
-#include <fmt/format.h>
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/test_utils.h"

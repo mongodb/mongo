@@ -29,13 +29,9 @@
 
 #pragma once
 
-#include "mongo/bson/json.h"
-#include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/query/ce/histogram_estimator.h"
-#include "mongo/db/query/stats/max_diff.h"
-#include "mongo/db/query/stats/maxdiff_test_utils.h"
-#include "mongo/db/query/stats/rand_utils_new.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/query/ce/histogram_common.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::ce {

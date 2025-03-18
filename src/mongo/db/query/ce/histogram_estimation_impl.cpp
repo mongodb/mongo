@@ -28,6 +28,9 @@
  */
 
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
+
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/query/stats/value_utils.h"
 #include "mongo/util/debug_util.h"
 
 namespace mongo::ce {

@@ -32,6 +32,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
+#include "mongo/db/query/ce/histogram_estimator.h"
+#include "mongo/db/query/stats/max_diff.h"
+#include "mongo/db/query/stats/rand_utils_new.h"
 
 namespace mongo::ce {
 

@@ -39,7 +39,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/stats/ce_histogram.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
 
 namespace mongo::stats {

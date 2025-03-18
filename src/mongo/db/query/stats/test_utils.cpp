@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/stats/test_utils.h"
 
-#include "mongo/logv2/log.h"
-
 namespace mongo::stats {
 
 bool sameTypeClassByComparingMin(sbe::value::TypeTags tag1, sbe::value::TypeTags tag2) {

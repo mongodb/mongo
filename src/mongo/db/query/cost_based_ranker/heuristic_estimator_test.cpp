@@ -29,12 +29,8 @@
 
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 
-#include <limits>
-
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/index_bounds.h"
-#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::cost_based_ranker {

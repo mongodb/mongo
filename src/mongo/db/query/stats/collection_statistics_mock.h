@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/collection_statistics.h"
 

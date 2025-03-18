@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -38,7 +37,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/platform/decimal128.h"

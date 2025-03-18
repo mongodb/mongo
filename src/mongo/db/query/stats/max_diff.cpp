@@ -43,12 +43,8 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/value_utils.h"
-#include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::stats {
 namespace {

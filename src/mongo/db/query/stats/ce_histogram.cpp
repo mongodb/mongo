@@ -31,7 +31,6 @@
 
 #include <cstddef>
 #include <functional>
-#include <ostream>
 #include <tuple>
 #include <utility>
 #include <vector>

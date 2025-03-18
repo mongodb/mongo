@@ -29,9 +29,6 @@
 
 #include "mongo/db/query/stats/scalar_histogram.h"
 
-#include <algorithm>
-#include <cmath>
-#include <ostream>
 #include <utility>
 
 #include "mongo/bson/bsonobjbuilder.h"

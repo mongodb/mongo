@@ -28,10 +28,12 @@
  */
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/stats/max_diff.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo::ce {

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/stats/ce_histogram.h"
 
 namespace mongo::stats {

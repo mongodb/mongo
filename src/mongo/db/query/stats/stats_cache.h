@@ -32,21 +32,14 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
-#include <map>
 #include <memory>
-#include <utility>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/stats/collection_statistics.h"
 #include "mongo/db/query/stats/stats_cache_loader.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
-#include "mongo/util/invalidating_lru_cache.h"
 #include "mongo/util/read_through_cache.h"
 
 namespace mongo::stats {

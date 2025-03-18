@@ -27,7 +27,11 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/stats/ce_histogram.h"
+#include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::ce {
 

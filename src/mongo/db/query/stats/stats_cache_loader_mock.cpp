@@ -31,10 +31,7 @@
 
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::stats {
 

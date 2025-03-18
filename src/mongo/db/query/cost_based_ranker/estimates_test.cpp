@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::cost_based_ranker {

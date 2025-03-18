@@ -44,9 +44,9 @@ mongo_cc_library(
     ],
     deps = [
         ":histogram_estimator",
-        "//src/mongo/db:sbe_values",
-        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/stats:stats_gen",
         "//src/mongo/db/query/stats:stats_test_utils",
+        "//src/mongo/unittest",
     ],
 )
 
@@ -74,6 +74,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":ce_test_utils",
+        "//src/mongo/db/query/stats:stats_gen",
     ],
 )
 
@@ -85,6 +86,9 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":ce_test_utils",
+        "//src/mongo/db/query/stats:maxdiff_test_utils",
+        "//src/mongo/db/query/stats:stats_gen",
+        "//src/mongo/db/query/stats:stats_test_utils",
     ],
 )
 
@@ -124,6 +128,7 @@ mongo_cc_library(
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
+        "//src/mongo/db/query:query_index_bounds",
         "//src/mongo/db/query/cost_based_ranker:estimates",
         "//src/mongo/db/query/stats:stats_histograms",
     ],

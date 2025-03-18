@@ -31,18 +31,12 @@
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <list>
-#include <type_traits>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/stats_cache.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/future.h"
-#include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

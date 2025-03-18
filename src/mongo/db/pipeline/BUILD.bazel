@@ -1238,6 +1238,9 @@ mongo_cc_library(
     hdrs = [
         "expression_context_for_test.h",
     ],
+    deps = [
+        "//src/mongo/db/query:query_test_service_context",
+    ],
 )
 
 mongo_cc_unit_test(

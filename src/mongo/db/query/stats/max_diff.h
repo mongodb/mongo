@@ -37,7 +37,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/value_utils.h"

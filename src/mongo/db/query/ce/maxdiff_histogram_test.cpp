@@ -29,8 +29,10 @@
 
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
 #include "mongo/db/query/stats/rand_utils.h"
+#include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/db/service_context_test_fixture.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
