@@ -77,6 +77,13 @@ struct TimeseriesSingleWriteResult {
     bool canContinue = true;
 };
 
+enum class StageWritesStatus {
+    kSuccess,
+    kContainsRetry,
+    kCollectionAcquisitionError,
+    kStagingError,
+};
+
 bool isTimeseriesWriteRetryable(OperationContext* opCtx) {
     return (opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction());
 }
@@ -755,17 +762,22 @@ void getStmtIdVectorFromRequest(OperationContext* opCtx,
 
 /**
  * Stages ordered writes.
- * Requires that no retryable writes have been executed prior and no malformed measurements.
- * Returns empty WriteBatches if either of the cases above is true.
  * On success, returns WriteBatches with the staged writes.
+ * Returns empty WriteBatches if:
+    - Collection acquisition fails, or
+    - Retryable writes have been executed, or
+    - Staging the measurements encounters an error
+ * Sets 'stageStatus' accordingly.
  */
 TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
     std::vector<mongo::write_ops::WriteError>* errors,
-    bool* containsRetry) {
+    StageWritesStatus& stageStatus) {
     invariant(errors->empty());
     hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection.pauseWhileSet();
+
+    stageStatus = StageWritesStatus::kSuccess;
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     auto bucketsNs = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
@@ -807,6 +819,7 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
 
     if (!collectionAcquisitionStatus.isOK()) {
         populateError(opCtx, /*index=*/0, collectionAcquisitionStatus, errors);
+        stageStatus = StageWritesStatus::kCollectionAcquisitionError;
         return {};
     }
 
@@ -823,8 +836,10 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     // Early exit before staging if any statements in the user's batch have been retried. Fallback
     // to unordered one-by-one to handle this.
     std::vector<StmtId> stmtIds;
-    getStmtIdVectorFromRequest(opCtx, request, containsRetry, stmtIds);
-    if (*containsRetry) {
+    bool containsRetry;
+    getStmtIdVectorFromRequest(opCtx, request, &containsRetry, stmtIds);
+    if (containsRetry) {
+        stageStatus = StageWritesStatus::kContainsRetry;
         return {};
     }
 
@@ -850,6 +865,7 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
                              [](auto& lhs, auto& rhs) { return lhs.index < rhs.index; });
         auto& [firstErrorStatus, firstIndex] = *firstErrorAndIndex;
         populateError(opCtx, firstIndex, firstErrorStatus, errors);
+        stageStatus = StageWritesStatus::kStagingError;
         return {};
     }
 
