@@ -77,7 +77,7 @@ function testReleaseMemory({func, useSession, cursorsNum, pinCursor, unknownCurs
             // Manually start a session so it can be continued from inside a parallel shell.
             const sessionId = assert.commandWorked(mongosDB.adminCommand({startSession: 1})).id;
             findCmd.lsid = sessionId;
-            sessionIdsArr.push(sessionId)
+            sessionIdsArr.push(sessionId);
         }
 
         jsTest.log(`Running find command ${i}`);
@@ -86,7 +86,7 @@ function testReleaseMemory({func, useSession, cursorsNum, pinCursor, unknownCurs
         let cursor = findRes.cursor;
         assert.neq(cursor.id, NumberLong(0));
         results.push(cursor.firstBatch);
-        cursorIdsArr.push(cursor.id)
+        cursorIdsArr.push(cursor.id);
     }
 
     let shard0DBFailpoint;
@@ -122,7 +122,7 @@ function testReleaseMemory({func, useSession, cursorsNum, pinCursor, unknownCurs
         assert.eq(cmdRes.cursorsAlive, []);
         assert.eq(cmdRes.cursorsNotFound, []);
         assert.eq(cmdRes.cursorsUnknown, []);
-        ++cursorIdx
+        ++cursorIdx;
     }
 
     // Use the function provided by the caller to call the releaseMemory command.

@@ -7,4 +7,4 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 // If additional options need to be passed, use `fc.oneof`.
 export const oneof = function(...arbs) {
     return fc.oneof({withCrossShrink: true}, ...arbs);
-}
+};

@@ -78,6 +78,6 @@ jsTest.log(`Running aggregate command`);
 let aggregateRes = coll.aggregate([{$sort: {_id: 1}}], {cursor: {batchSize: 2}});
 assertArrayEq({actual: aggregateRes._batch, expected: docs.slice(0, 2)});
 assert.neq(aggregateRes._cursorid, NumberLong(0));
-runTest(aggregateRes._cursorid, 2)
+runTest(aggregateRes._cursorid, 2);
 
 st.stop();

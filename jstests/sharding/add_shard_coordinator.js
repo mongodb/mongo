@@ -169,7 +169,7 @@ const clusterParameter4 = {
         const response = st.s.adminCommand({listShards: 1});
         assert.commandWorked(response);
         assert.eq(response.shards.length, 2);
-        assert(response.shards.some(shard => shard._id === "hagymasbab"))
+        assert(response.shards.some(shard => shard._id === "hagymasbab"));
     }
 
     jsTest.log("Non-first RS is unlocked after write");

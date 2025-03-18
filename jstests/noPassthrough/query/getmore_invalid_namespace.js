@@ -4,7 +4,7 @@
 // TODO SERVER-102285: Run this test against a sharded cluster as well.
 
 const conn = MongoRunner.runMongod({});
-const dbName = 'getmore_cmd_test'
+const dbName = 'getmore_cmd_test';
 const collName = 'getmore_cmd_invalid_namespace';
 const db = conn.getDB(dbName);
 const coll = db[collName];

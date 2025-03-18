@@ -201,7 +201,7 @@ function makePropertyFn(checkResultsFn, failMsg) {
             }
         }
         return {passed: true};
-    }
+    };
 }
 
 for (const {stageArb, checkResultsFn, failMsg} of testCases) {

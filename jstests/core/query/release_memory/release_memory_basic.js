@@ -31,7 +31,7 @@ function waitForLog(logId, cursorId) {
             return true;
         }
         return false;
-    })
+    });
 }
 
 function makeParallelShellFunctionString(cursorId, collName, sessionId, txnNumber) {

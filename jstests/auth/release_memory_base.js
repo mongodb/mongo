@@ -70,7 +70,7 @@ export function runTest(conn) {
             resource: {db: "release_memory_base_1", collection: "coll1"},
             actions: ["releaseMemoryAnyCursor"],
         }],
-    })
+    });
     admin.createRole({
         createRole: "releaseDatabase",
         roles: ["readAnyDatabase"],
@@ -78,12 +78,12 @@ export function runTest(conn) {
             resource: {db: "release_memory_base_1", collection: ""},
             actions: ["releaseMemoryAnyCursor"],
         }],
-    })
+    });
     admin.createRole({
         createRole: "releaseCluster",
         roles: ["readAnyDatabase"],
         privileges: [{resource: {cluster: true}, actions: ["releaseMemoryAnyCursor"]}],
-    })
+    });
 
     admin.createUser({user: "userCollection", pwd: "pass", roles: ["releaseCollection"]});
     admin.createUser({user: "userDatabase", pwd: "pass", roles: ["releaseDatabase"]});

@@ -18,7 +18,7 @@ import {
 
 // Create multiple collections in order to correctly run an identity $unionWith query.
 const collAName = "search_rank_fusion_collA";
-const collBName = "search_rank_fusion_collB"
+const collBName = "search_rank_fusion_collB";
 const collA = db.getCollection(collAName);
 const collB = db.getCollection(collBName);
 collA.drop();

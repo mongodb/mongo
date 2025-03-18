@@ -10,7 +10,7 @@
  *
  */
 import {AllCommandsTest} from "jstests/libs/all_commands_test.js";
-import {getCommandName} from "jstests/libs/cmd_object_utils.js"
+import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
@@ -2704,7 +2704,7 @@ let wcCommandsTests = {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
                 assert.eq(bsonWoCompare(getShardKey(coll, fullNs), {x: 1}), 0);
 
-                restartfAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
+                restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             admin: true,
         },

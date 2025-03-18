@@ -186,25 +186,25 @@ def list_files_without_targets(
     return True
 
 
-def run_rules_lint(bazel_bin, args):
+def run_rules_lint(bazel_bin, args) -> bool:
     if platform.system() == "Windows":
         print("eslint not supported on windows")
-        sys.exit(1)
+        return False
 
     if "--fix" in args:
         create_build_files_in_new_js_dirs()
 
     files_with_targets = list_files_with_targets(bazel_bin)
     if not list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"]):
-        sys.exit(1)
+        return False
 
     if not list_files_without_targets(
         files_with_targets, "javascript", "js", ["src/mongo", "jstests"]
     ):
-        sys.exit(1)
+        return False
 
     if not check_for_missing_test_stubs():
-        exit(1)
+        return False
 
     # Default to linting everything if no path was passed in
     if len([arg for arg in args if not arg.startswith("--")]) == 0:
@@ -313,6 +313,7 @@ def run_rules_lint(bazel_bin, args):
                 )
             else:
                 print(f"ERROR: unknown fix type {fix}", file=sys.stderr)
-                sys.exit(1)
+                return False
     elif failing_reports != 0:
-        sys.exit(1)
+        return False
+    return True

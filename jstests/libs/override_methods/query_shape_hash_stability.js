@@ -29,7 +29,7 @@ const topologyCache = {};
 
 function getTopologyConnections(conn) {
     if (!topologyCache.allConnections) {
-        jsTest.log.debug(`Discovering topology...`)
+        jsTest.log.debug(`Discovering topology...`);
         topologyCache.allConnections =
             getAllMongosConnections(conn)
                 .flatMap(connection => DiscoverTopology.findNonConfigNodes(connection, {connectFn}))
@@ -40,7 +40,7 @@ function getTopologyConnections(conn) {
 
 function getAllMongosConnections(conn) {
     if (!topologyCache.mongosConnectionsArr) {
-        jsTest.log.debug(`Settings the mongos connections array...`)
+        jsTest.log.debug(`Settings the mongos connections array...`);
         if (isMultiShardedClusterFixture) {
             const connections =
                 conn.getDB("config").multiShardedClusterFixture.find().sort({_id: 1}).toArray();
@@ -48,8 +48,7 @@ function getAllMongosConnections(conn) {
             // Set the connections array to include both when using a multi-cluster fixture.
             topologyCache.mongosConnectionsArr =
                 connections.map(doc => connectFn(doc.connectionString));
-        }
-        else {
+        } else {
             topologyCache.mongosConnectionsArr = [conn];
         }
     }
@@ -101,7 +100,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
                 const mongosConnArr = getAllMongosConnections(conn);
                 // In case we run the test using the two-cluster fixture, assert we have exactly two
                 // mongos connections.
-                assert.eq(mongosConnArr.length, 2)
+                assert.eq(mongosConnArr.length, 2);
                 // Mirror the command on the second cluster to ensure the collections exists.
                 // TODO SERVER-100658 Explain on non-existent collection returns empty results for
                 // sharded cluster aggregations - Assess if this is still needed.

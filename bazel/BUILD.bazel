@@ -9,6 +9,5 @@ exports_files([
 sh_binary(
     name = "lint",
     srcs = ["lint.sh"],
-    args = ["//..."],
     visibility = ["//visibility:public"],
 )

@@ -18,9 +18,9 @@ const nDocs = 50;
 let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < nDocs; i++) {
     if (i % 2 === 0) {
-        bulk.insert({_id: i, a: "foo", x: i / 3})
+        bulk.insert({_id: i, a: "foo", x: i / 3});
     } else {
-        bulk.insert({_id: i, a: "bar", x: i / 3})
+        bulk.insert({_id: i, a: "bar", x: i / 3});
     }
 }
 assert.commandWorked(bulk.execute());
@@ -76,7 +76,7 @@ const metaFieldName = "tags";
 const timeseriesCollName = "rank_fusion_timeseries";
 
 assert.commandWorked(db.createCollection(
-    timeseriesCollName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}))
+    timeseriesCollName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 const tsColl = db.getCollection(timeseriesCollName);
 
 bulk = tsColl.initializeUnorderedBulkOp();

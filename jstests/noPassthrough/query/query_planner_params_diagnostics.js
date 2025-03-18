@@ -21,7 +21,7 @@ function setup(conn) {
     coll.drop();
     assert.commandWorked(coll.createIndex({a: 1}, {sparse: true, collation: {locale: "en"}}));
     assert.commandWorked(coll.createIndex({b: 1}, {partialFilterExpression: {b: {$gte: 0}}}));
-    coll.insert({a: 1, b: [1]})
+    coll.insert({a: 1, b: [1]});
 
     // Setup other collection
     const otherColl = db[otherCollName];
