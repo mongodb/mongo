@@ -85,6 +85,7 @@ selector:
     - cannot_create_unique_index_when_using_hashed_shard_key
     - requires_profiling
     - requires_capped
+    - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js

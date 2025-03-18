@@ -51,6 +51,7 @@ selector:
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling
+    - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js

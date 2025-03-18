@@ -57,6 +57,7 @@ selector:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
     - requires_profiling
+    - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js

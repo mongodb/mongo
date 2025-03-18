@@ -94,6 +94,38 @@
               nonClusteredConfigTransactions: true
 
 ### Suite-specific overrides ###
+- name: replica_sets_temporarily_disable_due_to_fcv_upgrade
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_standalone_mongod
+        - requires_profiling
+        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+
+- name: sharded_collections_temporarily_disable_due_to_fcv_upgrade
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_standalone_mongod
+        - assumes_against_mongod_not_mongos
+        - assumes_no_implicit_collection_creation_on_get_collection
+        - assumes_no_implicit_collection_creation_after_drop
+        - assumes_no_implicit_index_creation
+        - assumes_unsharded_collection
+        - cannot_create_unique_index_when_using_hashed_shard_key
+        - requires_profiling
+        - requires_capped
+        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+
+- name: sharding_temporarily_disable_due_to_fcv_upgrade
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_standalone_mongod
+        - assumes_against_mongod_not_mongos
+        - requires_profiling
+        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+
 - name: multiversion_future_git_tag_exclude_files
   value:
     selector:

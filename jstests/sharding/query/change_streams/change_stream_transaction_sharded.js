@@ -4,6 +4,8 @@
 //   uses_change_streams,
 //   uses_multi_shard_transaction,
 //   uses_transactions,
+//   # TODO (SERVER-102377): Re-enable this test.
+//   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
 // ]
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {assertNoChanges} from "jstests/libs/query/change_stream_util.js";

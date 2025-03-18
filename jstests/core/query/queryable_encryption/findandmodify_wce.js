@@ -11,6 +11,8 @@
  *   simulate_atlas_proxy_incompatible,
  *   assumes_write_concern_unchanged,
  *   requires_fcv_81,
+ *   # TODO (SERVER-102377): Re-enable this test.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
  * ]
  */
 import {

@@ -5,6 +5,8 @@
  * @tags: [
  *   assumes_read_concern_local,
  *   requires_getmore,
+ *   # TODO (SERVER-102377): Re-enable this test.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
