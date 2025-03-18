@@ -86,7 +86,7 @@ flowchart TD
 While `MatchExpressionParser::parse()` creates the initial `MatchExpression` and `ParsedFindCommand` holds the AST in its unoptimized form, `CanonicalQuery` calls [`MatchExpression::normalize()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/canonical_query.cpp#L170), which begins the simplification process. The goal of normalization is to convert the `MatchExpression` AST into its most simple form. By simplifying `MatchExpression`s as much as possible, we ensure that:
 
 1. Any resulting `QuerySolution`s will be as simple as possible
-1. The [plan cache](TODO: SERVER-100255) will recognize logically equivalent queries as equivalent and reuse a cached plan when possible, even if the initial queries are different.
+1. The [plan cache](plan_cache/README.md) will recognize logically equivalent queries as equivalent and reuse a cached plan when possible, even if the initial queries are different.
 
 In this case, we can apply the `$or` to `$in` rewrite rule because we have two `$eq` disjuncts on the same field. After normalization, our AST looks like this:
 

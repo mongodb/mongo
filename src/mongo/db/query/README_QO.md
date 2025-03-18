@@ -17,7 +17,7 @@ _Disclaimer_: This guide (SPM-2301) is a work in progress.
    - [QueryPlanner and Plan Enumeration](#)
    - [Classic Runtime Planning](classic_runtime_planner/README.md)
 1. [Explain](README_explain.md)
-1. [Plan Cache](#)
+1. [Plan Cache](plan_cache/README.md)
 1. [Cluster Planning](../../s/query/planner/README.md)
 1. Testing
    - [Golden Testing](../../../../docs/golden_data_test_framework.md)
