@@ -182,7 +182,11 @@ public:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
 
-            if (convertAndRunAggregateIfViewlessTimeseries(opCtx, result, countRequest, cri, nss)) {
+            auto aggResult = BSONObjBuilder{};
+            if (convertAndRunAggregateIfViewlessTimeseries(
+                    opCtx, aggResult, countRequest, cri, nss)) {
+                ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
+                    &result, boost::none /*tenantId*/);
                 // We've delegated execution to agg.
                 return true;
             }
