@@ -281,6 +281,10 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
             lsid->serialize(&lsidBuilder);
         }
 
+        if (auto& vCtx = VersionContext::getDecoration(clientOpCtx); vCtx.isInitialized()) {
+            infoBuilder->append("versionContext", vCtx.toBSON());
+        }
+
         tassert(7663403,
                 str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
                               << expCtx->getNamespaceString().toStringForErrorMsg(),

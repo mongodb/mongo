@@ -1,6 +1,6 @@
 /**
  * Tests that sharded DDL operations snapshot the FCV in the versionContext when they start running,
- * and pass it to the participant commands of the distributed DDL.
+ * set it on their op, and pass it to the participant commands of the distributed DDL.
  *
  * @tags: [
  *   # The test manually places data across shards.
@@ -40,30 +40,50 @@ const dropThread = new Thread(function(host, dbName, collName) {
     new Mongo(host).getDB(dbName).runCommand({drop: collName, comment: jsTestName()});
 }, db.getMongo().host, db.getName(), collName);
 dropThread.start();
-fpDrop.wait();
+try {
+    fpDrop.wait();
 
-// Expect version context to be present (or not) according to the feature flag state
-const currentFCV =
-    db.getSiblingDB("admin").system.version.findOne({_id: 'featureCompatibilityVersion'}).version;
-const expectedVersionContext =
-    FeatureFlagUtil.isEnabled(db, "SnapshotFCVInDDLCoordinators") ? {OFCV: currentFCV} : undefined;
+    // Expect version context to be present (or not) according to the feature flag state
+    const currentFCV = db.getSiblingDB("admin")
+                           .system.version.findOne({_id: 'featureCompatibilityVersion'})
+                           .version;
+    const expectedVersionContext = FeatureFlagUtil.isEnabled(db, "SnapshotFCVInDDLCoordinators")
+        ? {OFCV: currentFCV}
+        : undefined;
 
-// Check that the participant command has received the version context as a command argument
-const participantOp = db.getSiblingDB("admin")
-                          .aggregate([
-                              {$currentOp: {allUsers: true}},
-                              {
-                                  $match: {
-                                      shard: dataShardName,
-                                      "command._shardsvrDropCollectionParticipant": collName,
-                                      'command.comment': jsTestName()
+    // Check that the DDL coordinator has the version context set on its op
+    const coordinatorOp = db.getSiblingDB("admin")
+                              .aggregate([
+                                  {$currentOp: {allUsers: true}},
+                                  {
+                                      $match: {
+                                          shard: primaryShardName,
+                                          desc: {$regex: "^ShardingDDLCoordinator"},
+                                          'command.comment': jsTestName()
+                                      }
                                   }
-                              }
-                          ])
-                          .toArray();
-assert.eq(1, participantOp.length, tojson(participantOp));
-assert.docEq(
-    expectedVersionContext, participantOp[0].command.versionContext, tojson(participantOp[0]));
+                              ])
+                              .toArray();
+    assert.eq(1, coordinatorOp.length, tojson(coordinatorOp));
+    assert.docEq(expectedVersionContext, coordinatorOp[0].versionContext, tojson(coordinatorOp[0]));
 
-fpDrop.off();
-dropThread.join();
+    // Check that the participant command has received the version context as a command argument
+    const participantOp = db.getSiblingDB("admin")
+                              .aggregate([
+                                  {$currentOp: {allUsers: true}},
+                                  {
+                                      $match: {
+                                          shard: dataShardName,
+                                          "command._shardsvrDropCollectionParticipant": collName,
+                                          'command.comment': jsTestName()
+                                      }
+                                  }
+                              ])
+                              .toArray();
+    assert.eq(1, participantOp.length, tojson(participantOp));
+    assert.docEq(
+        expectedVersionContext, participantOp[0].command.versionContext, tojson(participantOp[0]));
+} finally {
+    fpDrop.off();
+    dropThread.join();
+}

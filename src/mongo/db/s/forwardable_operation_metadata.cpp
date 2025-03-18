@@ -105,7 +105,8 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
 
     // TODO SERVER-101449: update once versionContext becomes a required field.
     if (const auto& vCtx = getVersionContext()) {
-        VersionContext::getDecoration(opCtx) = vCtx.value();
+        ClientLock lk(opCtx->getClient());
+        VersionContext::setDecoration(lk, opCtx, vCtx.value());
     }
 
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());

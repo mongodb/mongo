@@ -35,8 +35,14 @@ namespace mongo {
 
 static auto getVersionContext = OperationContext::declareDecoration<VersionContext>();
 
-VersionContext& VersionContext::getDecoration(OperationContext* opCtx) {
+const VersionContext& VersionContext::getDecoration(const OperationContext* opCtx) {
     return getVersionContext(opCtx);
+}
+
+void VersionContext::setDecoration(ClientLock&,
+                                   OperationContext* opCtx,
+                                   const VersionContext& vCtx) {
+    getVersionContext(opCtx) = vCtx;
 }
 
 }  // namespace mongo

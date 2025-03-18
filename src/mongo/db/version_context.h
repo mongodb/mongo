@@ -38,6 +38,7 @@
 namespace mongo {
 
 class OperationContext;
+class ClientLock;
 
 /**
  * The VersionContext holds metadata related to snapshots of the system state
@@ -52,7 +53,12 @@ public:
     struct OutsideOperationTag {};
     struct IgnoreOFCVTag {};
 
-    static VersionContext& getDecoration(OperationContext*);
+    static const VersionContext& getDecoration(const OperationContext* opCtx);
+    /**
+     * Sets the VersionContext decoration over the OperationContext.
+     * The Client lock must be taken to serialize with concurrent readers, such as $currentOp.
+     */
+    static void setDecoration(ClientLock&, OperationContext* opCtx, const VersionContext& vCtx);
 
     constexpr VersionContext() : _metadataOrTag(OperationWithoutOFCVTag{}) {}
     explicit constexpr VersionContext(OutsideOperationTag tag) : _metadataOrTag(tag) {}

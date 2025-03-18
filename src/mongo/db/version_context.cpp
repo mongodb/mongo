@@ -85,7 +85,7 @@ bool VersionContext::_isMatchingOFCV(FCV fcv) const {
 void VersionContext::_assertOFCVNotInitialized() const {
     uassert(ErrorCodes::AlreadyInitialized,
             "The operation FCV has already been set.",
-            std::holds_alternative<OperationWithoutOFCVTag>(_metadataOrTag));
+            !isInitialized());
 }
 
 bool operator==(const VersionContext& lhs, const VersionContext& rhs) {
