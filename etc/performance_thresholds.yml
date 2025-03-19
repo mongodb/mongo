@@ -58,6 +58,9 @@ tests:
   #     Router/32: mean=20111, cv=.0227 => threshold=21024
   #     Shard/1:   mean=21619, cv=.0008 => threshold=25078
   #     Shard/32:  mean=21695, cv=.0006 => threshold=24298
+  # 2025-03-19:
+  #     Shard/1:   mean=20914, cv=.00073 => threshold=23968
+  #     Shard/32:  mean=20979, cv=.00075 => threshold=24125
   ServiceEntryPointRouterRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
       - thread_level: 1
@@ -75,10 +78,10 @@ tests:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 25078
+            value: 23968
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 24298
+            value: 24125
             bound_direction: upper
