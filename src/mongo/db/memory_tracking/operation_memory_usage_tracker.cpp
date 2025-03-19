@@ -29,8 +29,14 @@
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/op_memory_use.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
 
 namespace mongo {
+
+namespace {
+const ClientCursor::Decoration<std::unique_ptr<OperationMemoryUsageTracker>> getFromClientCursor =
+    ClientCursor::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
+}
 
 /**
  * Return the OperationMemoryUsageTracker for this operation. If we haven't yet created one, do it
@@ -44,6 +50,9 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
         opTracker = uniqueTracker.get();
         opTracker->setDoExtraBookkeeping(
             [opTracker](int64_t currentMemoryBytes, int64_t maxUsedMemoryBytes) {
+                tassert(10076202,
+                        "unable to report memory tracking stats with missing OperationContext",
+                        opTracker->_opCtx);
                 CurOp::get(opTracker->_opCtx)
                     ->setMemoryTrackingStats(currentMemoryBytes, maxUsedMemoryBytes);
             });
@@ -73,6 +82,44 @@ MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage
     OperationContext* opCtx = expCtx.getOperationContext();
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
     return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes};
+}
+
+void OperationMemoryUsageTracker::moveToCursorIfAvailable(OperationContext* opCtx,
+                                                          ClientCursor* cursor) {
+    std::unique_ptr<OperationMemoryUsageTracker> opCtxTracker{
+        std::move(OpMemoryUse::operationMemoryAggregator(opCtx))};
+    if (opCtxTracker) {
+        std::unique_ptr<OperationMemoryUsageTracker>& cursorTracker = getFromClientCursor(cursor);
+        tassert(10076200,
+                "OperationMemoryUsageTracker already attached to ClientCursor",
+                !cursorTracker);
+        cursorTracker = std::move(opCtxTracker);
+        cursorTracker->_opCtx = nullptr;
+    }
+}
+
+void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(ClientCursor* cursor,
+                                                         OperationContext* opCtx) {
+    std::unique_ptr<OperationMemoryUsageTracker> cursorTracker{
+        std::move(getFromClientCursor(cursor))};
+    if (cursorTracker) {
+        std::unique_ptr<OperationMemoryUsageTracker>& opCtxTracker =
+            OpMemoryUse::operationMemoryAggregator(opCtx);
+        tassert(10076201,
+                "OperationMemoryUsageTracker already attached to OperationContext",
+                !opCtxTracker);
+        opCtxTracker = std::move(cursorTracker);
+        opCtxTracker->_opCtx = opCtx;
+
+        // Propagate stats from the previous operation to this one.
+        CurOp::get(opCtx)->setMemoryTrackingStats(opCtxTracker->currentMemoryBytes(),
+                                                  opCtxTracker->maxMemoryBytes());
+    }
+}
+
+OperationMemoryUsageTracker* OperationMemoryUsageTracker::getFromClientCursor_forTest(
+    ClientCursor* clientCursor) {
+    return getFromClientCursor(clientCursor).get();
 }
 
 }  // namespace mongo

@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+class ClientCursor;
+
 /**
  * A memory usage tracker class that aggregates memory statistics for the entire operation. Stages
  * that track memory will report to an instance of this class, which in turn will update statistics
@@ -60,9 +62,25 @@ public:
         bool allowDiskUse = false,
         int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
 
+    /**
+     * Look for an OperationMemoryUsageTracker on the given OperationContext. If there is one, move
+     * it to the cursor.
+     */
+    static void moveToCursorIfAvailable(OperationContext* opCtx, ClientCursor* cursor);
+
+    /**
+     * Look for an OperationMemoryUsageTracker on the given ClientCursor. If there is one, move it
+     * to the OperationContext.
+     */
+    static void moveToOpCtxIfAvailable(ClientCursor* cursor, OperationContext* opCtx);
+
     explicit OperationMemoryUsageTracker(OperationContext* opCtx) : _opCtx(opCtx) {}
 
+    static OperationMemoryUsageTracker* getFromClientCursor_forTest(ClientCursor* clientCursor);
+
 private:
+    friend class RunAggregateTest;
+
     static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
 
     OperationContext* _opCtx;

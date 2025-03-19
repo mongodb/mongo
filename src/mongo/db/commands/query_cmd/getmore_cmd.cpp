@@ -62,6 +62,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -679,6 +680,9 @@ public:
                 exec->detachFromOperationContext();
 
                 cursorPin->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+                // Transfer ownership of the memory tracker from the OpCtx to the cursor so that we
+                // collect memory statistics for subsequent calls to getMore().
+                OperationMemoryUsageTracker::moveToCursorIfAvailable(opCtx, cursorPin.getCursor());
 
                 if (opCtx->isExhaust() && clientsLastKnownCommittedOpTime(opCtx)) {
                     // Update the cursor's lastKnownCommittedOpTime to the current
@@ -790,6 +794,9 @@ public:
 
             auto cursorPin =
                 uassertStatusOK(CursorManager::get(opCtx)->pinCursor(opCtx, cursorId, pinCheck));
+            // Transfer memory tracker ownership from the cursor back to the OpCtx so memory usage
+            // is tracked for the duration of this getMore().
+            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(cursorPin.getCursor(), opCtx);
 
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==

@@ -67,6 +67,7 @@
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
@@ -259,6 +260,10 @@ ClientCursorPin registerCursor(const AggExState& aggExState,
     if (extDataSrcGuard) {
         ExternalDataSourceScopeGuard::get(pin.getCursor()) = extDataSrcGuard;
     }
+
+    // Transfer ownership of the OperationMemoryUsageTracker from the opCtx to the cursor so that it
+    // is tracked across getMore() calls.
+    OperationMemoryUsageTracker::moveToCursorIfAvailable(opCtx, pin.getCursor());
     return pin;
 }
 
