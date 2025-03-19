@@ -1403,10 +1403,6 @@ commit_result::Result commitTimeseriesBucketForBatch(
                 if (output.canContinue)
                     return commit_result::ContinuableErrorWithAbortBatch{insertStatus};
                 return commit_result::NonContinuableErrorWithAbortBatch{insertStatus};
-                if (output.canContinue) {
-                    return commit_result::ContinuableErrorWithAbortBatch{insertStatus};
-                }
-                return commit_result::NonContinuableErrorWithAbortBatch{insertStatus};
             }
         }
 
