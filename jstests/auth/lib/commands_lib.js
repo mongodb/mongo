@@ -8034,7 +8034,7 @@ export const authCommandsLib = {
               }],
               cursor: {},
           },
-          testcases: testcases_transformationOnly,
+          testcases: testcases_transformationOnlyExpectFail,
         },
         {
           testname: "aggregate_$queue",

@@ -30,7 +30,7 @@ const testInternalClient = (function createInternalClient() {
 
 const curDB = testInternalClient.getDB(dbName);
 
-// Tests that the internal stage '$mergeCursors' does not throw 'ApiStrictError' with an internal
+// Tests that the internal stage '$mergeCursors' is allowed in requests with an internal
 // client and 'apiStrict' set to true.
 let result = curDB.runCommand({
     aggregate: collName,
@@ -51,8 +51,8 @@ let result = curDB.runCommand({
 });
 assert.commandWorked(result);
 
-// Tests that the internal stage '$mergeCursors' throws 'ApiStrictError' with default external
-// client when 'apiStrict' is set to true.
+// Tests that the internal stage '$mergeCursors' is not allowed in user requests with default
+// external client when 'apiStrict' is set to true.
 result = testDB.runCommand({
     aggregate: collName,
     pipeline: [{
@@ -69,9 +69,9 @@ result = testDB.runCommand({
     apiVersion: "1",
     apiStrict: true
 });
-assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
+assert.commandFailedWithCode(result, 5491300);
 
-// Tests that the internal stage '$mergeCursors' should not fail with 'ApiStrictError' with default
+// Tests that the internal stage '$mergeCursors' is not allowed with default
 // external client without specifying 'apiStrict' flag.
 result = testDB.runCommand({
     aggregate: collName,
@@ -88,7 +88,7 @@ result = testDB.runCommand({
     writeConcern: {w: "majority"},
     apiVersion: "1"
 });
-assert.commandWorked(result);
+assert.commandFailedWithCode(result, 5491300);
 
 // Tests that the 'exchange' option cannot be specified by external client with 'apiStrict' set to
 // true.

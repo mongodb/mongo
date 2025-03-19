@@ -47,10 +47,10 @@
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE(mergeCursors,
-                         LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceMergeCursors::createFromBson,
-                         AllowedWithApiStrict::kInternal);
+REGISTER_INTERNAL_DOCUMENT_SOURCE(mergeCursors,
+                                  LiteParsedDocumentSourceInternal::parse,
+                                  DocumentSourceMergeCursors::createFromBson,
+                                  true);
 ALLOCATE_DOCUMENT_SOURCE_ID(mergeCursors, DocumentSourceMergeCursors::id)
 
 constexpr StringData DocumentSourceMergeCursors::kStageName;
