@@ -17,12 +17,12 @@
  * requires_getmore,
  * ]
  */
+import {
+    createCacheCorrectnessProperty
+} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
-import {
-    runDeoptimizedQuery,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 let numRuns = 100;
@@ -35,44 +35,11 @@ if (isSlowBuild(db)) {
 
 const controlColl = db.cache_correctness_pbt_control;
 const experimentColl = db.cache_correctness_pbt_experiment;
-
-function queriesUsingCacheHaveSameResultsAsControl(getQuery, testHelpers) {
-    for (let queryShapeIx = 0; queryShapeIx < testHelpers.numQueryShapes; queryShapeIx++) {
-        // Get the query shape cached.
-        const initialQuery = getQuery(queryShapeIx, 0 /* paramIx */);
-        for (let i = 0; i < 3; i++) {
-            experimentColl.aggregate(initialQuery).toArray();
-        }
-
-        // Check that following queries, with different parameters, have correct results. These
-        // queries won't always use the cached plan because we don't model our autoparameterization
-        // rules exactly, but that's okay.
-        for (let paramIx = 1; paramIx < testHelpers.leafParametersPerFamily; paramIx++) {
-            const query = getQuery(queryShapeIx, paramIx);
-            const controlResults = runDeoptimizedQuery(controlColl, query);
-            const experimentResults = experimentColl.aggregate(query).toArray();
-            if (!testHelpers.comp(controlResults, experimentResults)) {
-                return {
-                    passed: false,
-                    message: 'A query potentially using the plan cache has incorrect results. ' +
-                        'The query that created the cache entry likely has different parameters.',
-                    initialQuery,
-                    query,
-                    explain: experimentColl.explain().aggregate(query),
-                    controlResults,
-                    experimentResults
-                };
-            }
-        }
-    }
-
-    return {passed: true};
-}
-
+const correctnessProperty = createCacheCorrectnessProperty(controlColl, experimentColl);
 const aggModel = getAggPipelineModel();
 
 // Test with a regular collection.
-testProperty(queriesUsingCacheHaveSameResultsAsControl,
+testProperty(correctnessProperty,
              {controlColl, experimentColl},
              {collModel: getCollectionModel(), aggModel},
              {numRuns, numQueriesPerRun});
@@ -88,7 +55,7 @@ testProperty(queriesUsingCacheHaveSameResultsAsControl,
 //     }
 //     return true;
 // });
-// testProperty(queriesUsingCacheHaveSameResultsAsControl,
+// testProperty(correctnessProperty,
 //              {controlColl, experimentColl},
 //              {collModel: getCollectionModel({isTS: true}), aggModel: tsAggModel},
 //              {numRuns, numQueriesPerRun});

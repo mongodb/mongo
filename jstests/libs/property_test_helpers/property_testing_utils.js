@@ -170,18 +170,33 @@ function unoptimize(q) {
 }
 
 /*
- * Run the given query against the collection with optimizations disabled, no plan cache, using
- * the classic engine.
+ * Runs the given function with the following settings:
+ * - execution framework set to classic engine
+ * - plan cache disabled
+ * - pipeline optimizations disabled
+ * Returns a map from the position of the query in the list to the result documents.
  */
-export function runDeoptimizedQuery(controlColl, query) {
-    const initialFrameworkSetting =
-        assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-            .internalQueryFrameworkControl;
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+export function runDeoptimized(controlColl, queries) {
+    // The `internalQueryDisablePlanCache` prevents queries from getting cached, but it does not
+    // prevent queries from using existing cache entries. To fully ignore the cache, we clear it
+    // and then set the `internalQueryDisablePlanCache` knob.
     getPlanCache(controlColl).clear();
-    const controlResults = controlColl.aggregate(unoptimize(query)).toArray();
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: initialFrameworkSetting}));
-    return controlResults;
+    const db = controlColl.getDB();
+    const priorSettings = assert.commandWorked(db.adminCommand(
+        {getParameter: 1, internalQueryFrameworkControl: 1, internalQueryDisablePlanCache: 1}));
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryFrameworkControl: 'forceClassicEngine',
+        internalQueryDisablePlanCache: true
+    }));
+
+    const resultMap = queries.map(query => controlColl.aggregate(unoptimize(query)).toArray());
+
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryFrameworkControl: priorSettings.internalQueryFrameworkControl,
+        internalQueryDisablePlanCache: priorSettings.internalQueryDisablePlanCache
+    }));
+
+    return resultMap;
 }

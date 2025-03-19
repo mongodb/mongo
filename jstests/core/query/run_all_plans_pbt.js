@@ -25,10 +25,11 @@
  * requires_getmore,
  * ]
  */
+import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {
-    runDeoptimizedQuery,
+    runDeoptimized,
     testProperty
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -53,12 +54,17 @@ function runHintedAgg(query, index) {
 
 function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
     const indexes = experimentColl.getIndexes();
+    const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
 
-    for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
-        const query = getQuery(queryIx, 0 /* paramIx */);
-        const controlResults = runDeoptimizedQuery(controlColl, query);
+    // Compute the control results all at once.
+    const resultMap = runDeoptimized(controlColl, queries);
+
+    for (let i = 0; i < queries.length; i++) {
+        const query = queries[i];
+        const controlResults = resultMap[i];
         for (const index of indexes) {
             const res = runHintedAgg(query, index);
+            assert(res.err || res.docs);
             if (res.err && res.err !== ErrorCodes.NoQueryExecutionPlans) {
                 return {
                     passed: false,

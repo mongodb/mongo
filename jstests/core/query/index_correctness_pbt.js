@@ -16,12 +16,10 @@
  * requires_getmore,
  * ]
  */
+import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
-import {
-    runDeoptimizedQuery,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 let numRuns = 200;
@@ -33,35 +31,11 @@ const numQueriesPerRun = 20;
 
 const controlColl = db.index_correctness_pbt_control;
 const experimentColl = db.index_correctness_pbt_experiment;
-
-function queryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
-    for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
-        const query = getQuery(queryIx, 0 /* paramIx */);
-        if (query.length === 0) {
-            continue;
-        }
-
-        const controlResults = runDeoptimizedQuery(controlColl, query);
-        const experimentalResults = experimentColl.aggregate(query).toArray();
-        if (!testHelpers.comp(controlResults, experimentalResults)) {
-            return {
-                passed: false,
-                message:
-                    'Query results from experiment collection did not match plain collection using collscan.',
-                query,
-                explain: experimentColl.explain().aggregate(query),
-                controlResults,
-                experimentalResults
-            };
-        }
-    }
-    return {passed: true};
-}
-
+const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
 const aggModel = getAggPipelineModel();
 
 // Test with a regular collection.
-testProperty(queryHasSameResultsAsControlCollScan,
+testProperty(correctnessProperty,
              {controlColl, experimentColl},
              {collModel: getCollectionModel(), aggModel},
              {numRuns, numQueriesPerRun});
@@ -77,7 +51,7 @@ testProperty(queryHasSameResultsAsControlCollScan,
 //     }
 //     return true;
 // });
-// testProperty(queryHasSameResultsAsControlCollScan,
+// testProperty(correctnessProperty,
 //              {controlColl, experimentColl},
 //              {collModel: getCollectionModel({isTS: true}), aggModel: tsAggModel},
 //              {numRuns, numQueriesPerRun});
