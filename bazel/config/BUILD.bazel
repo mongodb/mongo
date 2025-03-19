@@ -338,7 +338,7 @@ selects.config_setting_group(
 
 mongo_toolchain_version(
     name = "mongo_toolchain_version",
-    build_setting_default = "v5",
+    build_setting_default = "v4",
 )
 
 config_setting(
