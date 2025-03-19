@@ -130,6 +130,20 @@ bool checkAuthorizationImplPreParse(
     return false;
 }
 
+void checkAuthForRawData(OperationContext* opCtx,
+                         const GenericArguments& genArg,
+                         const OpMsgRequest& request) {
+    if (!genArg.getRawData())
+        return;
+    auto ns = NamespaceStringUtil::deserialize(request.parseDbName(),
+                                               request.body.firstElement().valueStringDataSafe());
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    uassert(
+        ErrorCodes::Unauthorized,
+        "Not authorized to run command with rawData",
+        authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::performRawDataOperations));
+}
+
 auto getCommandInvocationHooks =
     ServiceContext::declareDecoration<std::unique_ptr<CommandInvocationHooks>>();
 
@@ -924,6 +938,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
             // Blanket authorization: don't need to check anything else.
         } else {
             try {
+                checkAuthForRawData(opCtx, getGenericArguments(), request);
                 doCheckAuthorization(opCtx);
             } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
                 namespace mmb = mutablebson;

@@ -53,6 +53,10 @@ selector:
     - jstests/core/catalog/views/views_drop.js
     - jstests/core/**/query/disallow_system_views_user_writes.js
     - jstests/core/timeseries/ddl/bucket_granularity.js
+    - jstests/core/timeseries/write/basic.js
+    - jstests/core/timeseries/write/timeseries_buckets_crud_ops.js
+    - jstests/core/timeseries/query/timeseries_buckets_query_explain.js
+    - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_cmd_validation.js
     - jstests/core_sharding/resharding/*.js
 
