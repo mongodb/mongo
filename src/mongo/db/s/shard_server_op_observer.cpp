@@ -102,7 +102,7 @@ public:
     CollectionPlacementVersionLogOpHandler(const NamespaceString& nss, bool droppingCollection)
         : _nss(nss), _droppingCollection(droppingCollection) {}
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) noexcept override {
         invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(_nss, MODE_IX));
         invariant(commitTime, "Invalid commit time");
 
@@ -119,7 +119,7 @@ public:
             scopedCss->clearFilteringMetadata(opCtx);
     }
 
-    void rollback(OperationContext* opCtx) override {}
+    void rollback(OperationContext* opCtx) noexcept override {}
 
 private:
     const NamespaceString _nss;

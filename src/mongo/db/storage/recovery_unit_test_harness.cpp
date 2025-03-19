@@ -84,34 +84,16 @@ class TestChange final : public RecoveryUnit::Change {
 public:
     TestChange(int* count) : _count(count) {}
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override {
         *_count = *_count + 1;
     }
 
-    void rollback(OperationContext* opCtx) override {
+    void rollback(OperationContext* opCtx) noexcept override {
         *_count = *_count - 1;
     }
 
 private:
     int* _count;
-};
-
-class ThrowsOnCommitTestChange final : public RecoveryUnit::Change {
-public:
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
-        uasserted(ErrorCodes::OperationFailed, "commit handler threw exception");
-    }
-
-    void rollback(OperationContext* opCtx) override {}
-};
-
-class ThrowsOnRollbackTestChange final : public RecoveryUnit::Change {
-public:
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {}
-
-    void rollback(OperationContext* opCtx) override {
-        uasserted(ErrorCodes::OperationFailed, "rollback handler threw exception");
-    }
 };
 
 TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
@@ -299,71 +281,6 @@ DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
 DEATH_TEST_F(RecoveryUnitTestHarness, AbandonSnapshotMustBeOutOfUnitOfWork, "invariant") {
     ru->beginUnitOfWork(opCtx->readOnly());
     ru->abandonSnapshot();
-}
-
-
-DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
-                   LogCommitHandlerTypeWithTimestampBeforeTerminatingOnException,
-                   "\"F\".*\"STORAGE\".*8861100.*Custom commit "
-                   "failed.*commitTimestamp.*123.*456.*changeName.*ThrowsOnCommitTestChange") {
-    ru->beginUnitOfWork(opCtx->readOnly());
-    ASSERT_OK(ru->setTimestamp(Timestamp(123, 456)));
-    ru->registerChange(std::make_unique<ThrowsOnCommitTestChange>());
-    ru->commitUnitOfWork();
-}
-
-DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
-                   LogCommitHandlerTypeBeforeTerminatingOnException,
-                   "\"F\".*\"STORAGE\".*8861100.*Custom commit "
-                   "failed.*commitTimestamp.*null.*changeName.*ThrowsOnCommitTestChange") {
-    ru->beginUnitOfWork(opCtx->readOnly());
-    ru->registerChange(std::make_unique<ThrowsOnCommitTestChange>());
-    ru->commitUnitOfWork();
-}
-
-DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
-                   LogCommitHandlerTypeBeforeTerminatingOnExceptionCatalogVisibility,
-                   "\"F\".*\"STORAGE\".*8861101.*Custom commit "
-                   "failed.*commitTimestamp.*null.*changeName.*ThrowsOnCommitTestChange") {
-    ru->beginUnitOfWork(opCtx->readOnly());
-    ru->registerChangeForCatalogVisibility(std::make_unique<ThrowsOnCommitTestChange>());
-    ru->commitUnitOfWork();
-}
-
-DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
-                   LogCommitHandlerTypeBeforeTerminatingOnExceptionTwoPhaseDrop,
-                   "\"F\".*\"STORAGE\".*8861102.*Custom commit "
-                   "failed.*commitTimestamp.*null.*changeName.*ThrowsOnCommitTestChange") {
-    ru->beginUnitOfWork(opCtx->readOnly());
-    ru->registerChangeForTwoPhaseDrop(std::make_unique<ThrowsOnCommitTestChange>());
-    ru->commitUnitOfWork();
-}
-
-DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
-                   LogRollbackHandlerTypeBeforeTerminatingOnException,
-                   "\"F\".*\"STORAGE\".*9010900.*Custom rollback "
-                   "failed.*changeName.*ThrowsOnRollbackTestChange") {
-    ru->beginUnitOfWork(opCtx->readOnly());
-    ru->registerChange(std::make_unique<ThrowsOnRollbackTestChange>());
-    ru->abortUnitOfWork();
-}
-
-DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
-                   LogRollbackHandlerTypeBeforeTerminatingOnExceptionCatalogVisibility,
-                   "\"F\".*\"STORAGE\".*9010901.*Custom rollback "
-                   "failed.*changeName.*ThrowsOnRollbackTestChange") {
-    ru->beginUnitOfWork(opCtx->readOnly());
-    ru->registerChangeForCatalogVisibility(std::make_unique<ThrowsOnRollbackTestChange>());
-    ru->abortUnitOfWork();
-}
-
-DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
-                   LogRollbackHandlerTypeBeforeTerminatingOnExceptionTwoPhaseDrop,
-                   "\"F\".*\"STORAGE\".*9010902.*Custom rollback "
-                   "failed.*changeName.*ThrowsOnRollbackTestChange") {
-    ru->beginUnitOfWork(opCtx->readOnly());
-    ru->registerChangeForTwoPhaseDrop(std::make_unique<ThrowsOnRollbackTestChange>());
-    ru->abortUnitOfWork();
 }
 
 }  // namespace

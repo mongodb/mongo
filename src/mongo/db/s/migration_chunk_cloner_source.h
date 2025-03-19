@@ -104,9 +104,9 @@ public:
                                                const std::vector<repl::ReplOperation>& stmts,
                                                repl::OpTime prepareOrCommitOpTime);
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override;
 
-    void rollback(OperationContext* opCtx) override{};
+    void rollback(OperationContext* opCtx) noexcept override{};
 
 private:
     const LogicalSessionId _lsid;
@@ -121,9 +121,9 @@ class LogInsertForShardingHandler final : public RecoveryUnit::Change {
 public:
     LogInsertForShardingHandler(NamespaceString nss, BSONObj doc, repl::OpTime opTime);
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override;
 
-    void rollback(OperationContext* opCtx) override {}
+    void rollback(OperationContext* opCtx) noexcept override {}
 
 private:
     const NamespaceString _nss;
@@ -141,9 +141,9 @@ public:
                                 BSONObj postImageDoc,
                                 repl::OpTime opTime);
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override;
 
-    void rollback(OperationContext* opCtx) override {}
+    void rollback(OperationContext* opCtx) noexcept override {}
 
 private:
     const NamespaceString _nss;
@@ -159,9 +159,9 @@ class LogDeleteForShardingHandler final : public RecoveryUnit::Change {
 public:
     LogDeleteForShardingHandler(NamespaceString nss, DocumentKey documentKey, repl::OpTime opTime);
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override;
 
-    void rollback(OperationContext* opCtx) override {}
+    void rollback(OperationContext* opCtx) noexcept override {}
 
 private:
     const NamespaceString _nss;
@@ -179,9 +179,9 @@ public:
     LogRetryableApplyOpsForShardingHandler(std::vector<NamespaceString> namespaces,
                                            std::vector<repl::OpTime> opTimes);
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override;
 
-    void rollback(OperationContext* opCtx) override{};
+    void rollback(OperationContext* opCtx) noexcept override{};
 
 private:
     std::vector<NamespaceString> _namespaces;

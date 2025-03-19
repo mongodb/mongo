@@ -192,7 +192,7 @@ LogTransactionOperationsForShardingHandler::LogTransactionOperationsForShardingH
       _prepareOrCommitOpTime(std::move(prepareOrCommitOpTime)) {}
 
 void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
-                                                        boost::optional<Timestamp>) {
+                                                        boost::optional<Timestamp>) noexcept {
     std::set<NamespaceString> namespacesTouchedByTransaction;
 
     // Inform the session migration subsystem that a transaction has committed for the given
@@ -1512,7 +1512,8 @@ LogInsertForShardingHandler::LogInsertForShardingHandler(NamespaceString nss,
                                                          repl::OpTime opTime)
     : _nss(std::move(nss)), _doc(doc.getOwned()), _opTime(std::move(opTime)) {}
 
-void LogInsertForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
+void LogInsertForShardingHandler::commit(OperationContext* opCtx,
+                                         boost::optional<Timestamp>) noexcept {
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1530,7 +1531,8 @@ LogUpdateForShardingHandler::LogUpdateForShardingHandler(NamespaceString nss,
       _postImageDoc(postImageDoc.getOwned()),
       _opTime(std::move(opTime)) {}
 
-void LogUpdateForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
+void LogUpdateForShardingHandler::commit(OperationContext* opCtx,
+                                         boost::optional<Timestamp>) noexcept {
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1544,7 +1546,8 @@ LogDeleteForShardingHandler::LogDeleteForShardingHandler(NamespaceString nss,
                                                          repl::OpTime opTime)
     : _nss(std::move(nss)), _documentKey(std::move(documentKey)), _opTime(std::move(opTime)) {}
 
-void LogDeleteForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
+void LogDeleteForShardingHandler::commit(OperationContext* opCtx,
+                                         boost::optional<Timestamp>) noexcept {
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1558,7 +1561,7 @@ LogRetryableApplyOpsForShardingHandler::LogRetryableApplyOpsForShardingHandler(
     : _namespaces(std::move(namespaces)), _opTimes(std::move(opTimes)) {}
 
 void LogRetryableApplyOpsForShardingHandler::commit(OperationContext* opCtx,
-                                                    boost::optional<Timestamp>) {
+                                                    boost::optional<Timestamp>) noexcept {
     for (const auto& nss : _namespaces) {
         // For vectored inserts an applyOps entry will only affect a single namespace that is still
         // under a WUOW, so we should be holding an IX lock on it. Other affected namespaces should

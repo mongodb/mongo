@@ -133,8 +133,8 @@ public:
     AddIdentChange(DurableCatalog* catalog, RecordId catalogId)
         : _catalog(catalog), _catalogId(std::move(catalogId)) {}
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {}
-    void rollback(OperationContext* opCtx) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override {}
+    void rollback(OperationContext* opCtx) noexcept override {
         stdx::lock_guard<stdx::mutex> lk(_catalog->_catalogIdToEntryMapLock);
         _catalog->_catalogIdToEntryMap.erase(_catalogId);
     }

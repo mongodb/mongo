@@ -595,8 +595,9 @@ public:
     public:
         virtual ~Change() {}
 
-        virtual void rollback(OperationContext* opCtx) = 0;
-        virtual void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) = 0;
+        virtual void rollback(OperationContext* opCtx) noexcept = 0;
+        virtual void commit(OperationContext* opCtx,
+                            boost::optional<Timestamp> commitTime) noexcept = 0;
     };
 
     /**
@@ -620,10 +621,10 @@ public:
         public:
             CallbackChange(CommitCallback&& commit, RollbackCallback&& rollback)
                 : _rollback(std::move(rollback)), _commit(std::move(commit)) {}
-            void rollback(OperationContext* opCtx) final {
+            void rollback(OperationContext* opCtx) noexcept final {
                 _rollback(opCtx);
             }
-            void commit(OperationContext* opCtx, boost::optional<Timestamp> ts) final {
+            void commit(OperationContext* opCtx, boost::optional<Timestamp> ts) noexcept final {
                 _commit(opCtx, ts);
             }
 
@@ -671,10 +672,10 @@ public:
         class OnRollbackChange final : public Change {
         public:
             OnRollbackChange(Callback&& callback) : _callback(std::move(callback)) {}
-            void rollback(OperationContext* opCtx) final {
+            void rollback(OperationContext* opCtx) noexcept final {
                 _callback(opCtx);
             }
-            void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {}
+            void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept final {}
 
         private:
             Callback _callback;
@@ -697,8 +698,9 @@ public:
         class OnCommitChange final : public Change {
         public:
             OnCommitChange(Callback&& callback) : _callback(std::move(callback)) {}
-            void rollback(OperationContext* opCtx) final {}
-            void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
+            void rollback(OperationContext* opCtx) noexcept final {}
+            void commit(OperationContext* opCtx,
+                        boost::optional<Timestamp> commitTime) noexcept final {
                 _callback(opCtx, commitTime);
             }
 
@@ -721,8 +723,9 @@ public:
         class OnCommitTwoPhaseChange final : public Change {
         public:
             OnCommitTwoPhaseChange(Callback&& callback) : _callback(std::move(callback)) {}
-            void rollback(OperationContext* opCtx) final {}
-            void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
+            void rollback(OperationContext* opCtx) noexcept final {}
+            void commit(OperationContext* opCtx,
+                        boost::optional<Timestamp> commitTime) noexcept final {
                 _callback(opCtx, commitTime);
             }
 

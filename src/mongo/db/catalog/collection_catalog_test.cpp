@@ -1324,11 +1324,11 @@ private:
                 ChangeForCatalogVisibility(std::function<void()> commitHandler)
                     : callback(std::move(commitHandler)) {}
 
-                void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
+                void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept final {
                     callback();
                 }
 
-                void rollback(OperationContext* opCtx) final {}
+                void rollback(OperationContext* opCtx) noexcept final {}
 
                 std::function<void()> callback;
             };
@@ -1412,11 +1412,12 @@ private:
                     ChangeForCatalogVisibility(std::function<void()> commitHandler)
                         : callback(std::move(commitHandler)) {}
 
-                    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
+                    void commit(OperationContext* opCtx,
+                                boost::optional<Timestamp>) noexcept final {
                         callback();
                     }
 
-                    void rollback(OperationContext* opCtx) final {}
+                    void rollback(OperationContext* opCtx) noexcept final {}
 
                     std::function<void()> callback;
                 };

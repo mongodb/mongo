@@ -63,8 +63,8 @@ public:
     RemoveChange(Data* data, RecordId loc, const EphemeralForTestRecord& rec)
         : _data(data), _loc(loc), _rec(rec) {}
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {}
-    void rollback(OperationContext* opCtx) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override {}
+    void rollback(OperationContext* opCtx) noexcept override {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
         Records::iterator it = _data->records.find(_loc);
@@ -100,8 +100,8 @@ public:
         _data->dataSize -= _dataSize;
     }
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {}
-    void rollback(OperationContext* opCtx) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override {}
+    void rollback(OperationContext* opCtx) noexcept override {
         using std::swap;
 
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);

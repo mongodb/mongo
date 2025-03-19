@@ -630,11 +630,11 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
                                  SessionCatalog::KillToken sessionKillToken)
             : _ti(ti), _sessionKillToken(std::move(sessionKillToken)) {}
 
-        void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
+        void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override {
             rollback(opCtx);
         }
 
-        void rollback(OperationContext* opCtx) override {
+        void rollback(OperationContext* opCtx) noexcept override {
             std::vector<SessionCatalog::KillToken> sessionKillTokenVec;
             sessionKillTokenVec.emplace_back(std::move(_sessionKillToken));
             killSessionTokens(opCtx, _ti, std::move(sessionKillTokenVec));

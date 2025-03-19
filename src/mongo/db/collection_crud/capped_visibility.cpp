@@ -131,10 +131,10 @@ UncommittedRecords* CappedVisibilityObserver::registerWriter(
     public:
         CappedVisibilityChange(CappedVisibilityObserver* observer, CappedWriter* writer)
             : _observer(observer), _writer(writer) {}
-        void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
+        void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) noexcept final {
             _observer->_onWriterCommittedOrAborted(_writer, true /* commit */);
         }
-        void rollback(OperationContext* opCtx) final {
+        void rollback(OperationContext* opCtx) noexcept final {
             _observer->_onWriterCommittedOrAborted(_writer, false /* commit */);
         }
 

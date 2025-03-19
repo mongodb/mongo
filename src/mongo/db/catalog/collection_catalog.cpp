@@ -379,7 +379,7 @@ public:
         });
     }
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) noexcept override {
         boost::container::small_vector<CollectionCatalog::CatalogWriteFn, kNumStaticActions>
             writeJobs;
 
@@ -514,7 +514,7 @@ public:
         }
     }
 
-    void rollback(OperationContext* opCtx) override {
+    void rollback(OperationContext* opCtx) noexcept override {
         auto entries = _uncommittedCatalogUpdates.releaseEntries();
 
         // Skip rollback logic if we failed to preCommit this transaction. We must make sure we
