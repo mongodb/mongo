@@ -171,6 +171,11 @@ def new_testqueue_logger(test_kind):
 
 def configure_exception_capture(test_logger):
     """Configure the test logger to extract exceptions and return the exception extractors."""
+
+    # Capturing exceptions only makes sense for logs in plain format.
+    if config.LOG_FORMAT != "plain":
+        return []
+
     js_exception = ExceptionExtractor(
         start_regex=r"^uncaught exception:",
         end_regex=r"^exiting with code",
