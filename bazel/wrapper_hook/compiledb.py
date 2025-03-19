@@ -208,5 +208,14 @@ def generate_compiledb(bazel_bin, persistent_compdb):
                 )
         else:
             shutil.copyfile(pathlib.Path("bazel-bin") / ".clang-tidy", clang_tidy_file)
-
+    if persistent_compdb:
+        shutdown_proc = subprocess.run(
+            [bazel_bin, f"--output_base={output_base}", "shutdown"], capture_output=True, text=True
+        )
+        if shutdown_proc.returncode != 0:
+            print(f"Failed to shutdown compiledb output_base: {shutdown_proc.returncode}")
+            print("--- stdout ---:")
+            print(shutdown_proc.stdout)
+            print("--- stderr ---:")
+            print(shutdown_proc.stderr)
     print("compiledb target done, finishing any other targets...")
