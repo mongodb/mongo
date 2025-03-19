@@ -14,7 +14,6 @@ mongo_cc_library(
     srcs = [
         "op_memory_use.cpp",
         "operation_memory_usage_tracker.cpp",
-        "//src/mongo/db/query/client_cursor:clientcursor.h",
     ],
     hdrs = [
         "memory_usage_tracker.h",
