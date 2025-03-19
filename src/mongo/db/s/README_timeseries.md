@@ -36,10 +36,14 @@ time-series collections. For this example, the `timeseries` options are `{timeFi
 
 ### Sharding metadata
 
-Only the buckets collection (not the view) is stored on the config server. The config server has a
+For viewful timeseries collections, only the buckets collection (not the view) is stored on the
+config server. The config server has a
 `timeseriesFields` parameter set for each buckets collection, which is identical to `timeseriesOptions`.
 The `timeseriesFields` parameter is then loaded in memory by the `CatalogCache`, `ChunkManager`, and
 the collection metadata.
+
+For viewless timeseries collections, there is no view namespace, so the config server has all of the
+metadata already in the `timeseriesFields` parameter.
 
 If the granularity is updated through a `collMod` command, the config server `timeseriesFields` parameter
 will also be updated. We treat the granularity value on the config server as the source of truth for the
@@ -132,6 +136,8 @@ of each CRUD operation.
 
 ## Query routing for aggregation
 
+### Viewful timeseries collections
+
 This works similarly to queries on a view of a normal sharded collection. Users write a query on the
 **view** namespace. Mongos routes the query to the primary shard. The primary shard resolves the view,
 rewrites the query to be on the buckets collection, and throws a `CommandOnShardedViewNotSupportedOnMongod`
@@ -141,6 +147,14 @@ view definition, and then routes the query as it typically would.
 The aggregation stage to handle time-series buckets collections (`$_internalUnpackBucket`) is pushed
 down to the shards. For more information about `$_internalUnpackBucket` and query rewrites see
 [query/timeseries/README](../query/timeseries/README.md).
+
+### Viewless timeseries collections
+
+[TODO (SERVER-102458)]: # "Update documentation on viewful vs viewless timeseries collections."
+
+Viewless timeseries collections are rewritten to be on the buckets themselves, including setting the
+`rawData` parameter to `true`, before routing the query as before. The rewrites that are applied are
+in [query/timeseries/README](../query/timeseries/README.md).
 
 ## DDL operations
 

@@ -6,7 +6,9 @@ aggregation stage, and assumes knowledge of time-series collections basics.
 
 # Different Types of Time-Series Queries
 
-## Queries on the view
+## Viewful timeseries collections
+
+### Queries on the view
 
 Because the user-created time-series collection is a view, all queries against it (`find`, `count`, `distinct`
 and `aggregate`) are transformed into an aggregation request against the backing system collection with the
@@ -20,7 +22,7 @@ resolved view is turned into a new aggregation request, where an internal aggreg
 (`$_internalUnpackBucket`) is added as the first stage in the pipeline (see `asExpandedViewAggregation()`).
 Then `runAggregate` is called again on this new request.
 
-## Queries on the buckets collection
+### Queries on the buckets collection
 
 Queries directly on the **buckets collection** are executed like non time-series collection
 queries. However, prior to PM-3167 (on versions before 7.2), queries on the buckets collection are forced
@@ -30,6 +32,19 @@ Similar to non time-series collections, the `$_internalUnpackBucket` stage is no
 collection, because the buckets collection is not a view. We do not expect users to directly query
 the buckets collection, since the buckets collection is made automatically when users create time-series
 collections. Also, users should query the view to take advantage of time-series specific optimizations.
+
+## Viewless timeseries collections
+
+[TODO (SERVER-102458)]: # "Update documentation on viewful vs viewless timeseries collections."
+
+Like with queries against viewful timeseries collections, queries against viewless timeseries
+collections are also transformed into aggregation requests. Queries on the buckets now use the same
+namespace as the timeseries, with the differentiating factor being the `rawData` parameter being set
+to `true.`
+
+When a query against a viewless timeseries collection is rewritten, the operation is automatically
+updated to have `rawData` set to true, to reflect that the rewritten query should execute against
+the buckets directly.
 
 # $\_internalUnpackBucket Aggregation Stage Optimizations
 

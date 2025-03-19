@@ -9,7 +9,7 @@ at creation. Optionally, a meta-data field may also be specified to help group
 measurements in the buckets. MongoDB also supports an expiration mechanism on measurements through
 the `expireAfterSeconds` option.
 
-A time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../catalog/README.md) by a
+A (viewful) time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../catalog/README.md) by a
 combination of a view and a system collection:
 
 - The non-materialized view `mydb.mytscoll` is defined with the bucket collection as the source collection with
@@ -486,5 +486,15 @@ identify the time-series as a whole.
 
 **time-series**: A sequence of measurements over a period of time.
 
-**time-series collection**: A collection type representing a writable non-materialized view that
+**time-series collection**: A collection containing time-series data, which can be implemented as
+viewful time-series or viewless time-series. By default, refers to a viewful time-series
+implementation's view.
+
+**viewful time-series**: A time-series collection setup where time-series data is made available
+through a collection type representing a writable non-materialized view. This view
 allows storing and querying a number of time-series, each with different meta-data.
+
+[TODO (SERVER-102458)]: # "Update documentation on viewful vs viewless timeseries collections."
+
+**viewless time-series**: A time-series collection setup where time-series data and buckets use the
+same namespace, without the use of a view.
