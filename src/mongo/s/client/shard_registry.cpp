@@ -64,6 +64,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -192,6 +193,52 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
             Timestamp maxTopologyTime;
             std::tie(lookupData, maxTopologyTime) =
                 ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
+
+            // TODO (SERVER-102087): remove invariant relaxation after 9.0 is branched.
+            {
+                // Detect topologyTime corruption due to SERVER-63742. If config.shards has no
+                // entries with a topologyTime, but there is a non-initial topologyTime being
+                // gossiped, there has been corruption. This scenario is benign, and thus we relax
+                // the time monotonicity invariant by making the expected topologyTime accepted.
+                //
+                // For cases where there is a topologyTime in config.shards, but the gossiped time
+                // is greater than the maximum topologyTime found there, or for cases where
+                // config.shards has no shards but there is a gossiped topologyTime, we still want
+                // to fail.
+                //
+                // Caveat: by design, force reloads install the actual config.shards topologyTime as
+                // the timeInStore, which should be Timestamp(0, 1) in the accepted scenario.
+                // Subsequent getData calls will advance the timeInStore to the corrupted
+                // topologyTime, causing another refresh. Meaning that each forced reload will end
+                // up causing two lookups.
+                const Timestamp kInitialTopologyTime =
+                    VectorClock::kInitialComponentTime.asTimestamp();
+                if (MONGO_unlikely(!lookupData.getAllShardIds().empty() &&
+                                   maxTopologyTime == kInitialTopologyTime &&
+                                   // '>' also ignores Timestamp(0, 0), used for force reloads, or
+                                   // when the cache is empty.
+                                   timeInStore.getTopologyTime() > kInitialTopologyTime)) {
+
+                    // Log severity suppressor for inconsistent topology time message.
+                    static logv2::SeveritySuppressor severitySuppressor{
+                        Days{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+
+                    LOGV2_DEBUG(10173900,
+                                severitySuppressor().toInt(),
+                                "Inconsistent $topologyTime detected. 'config.shards' does not "
+                                "contain any 'topologyTime' in its entries, but a non-initial "
+                                "$topologyTime has been gossiped. An inconsistent $topologyTime "
+                                "could have been created by SERVER-63742, while 'config.shards' "
+                                "not containing any 'topologyTime' is expected when there have "
+                                "been no add or remove shard operations made after upgrading to "
+                                "version 5.0. This scenario is benign and the topologyTime is "
+                                "accepted as valid.",
+                                "topologyTime"_attr = timeInStore.getTopologyTime());
+
+                    maxTopologyTime = timeInStore.getTopologyTime();
+                }
+            }
+
             return maxTopologyTime;
         });
 

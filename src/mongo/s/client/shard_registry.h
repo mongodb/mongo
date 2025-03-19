@@ -439,6 +439,15 @@ private:
          */
         static Time makeWithLookup(std::function<Timestamp(void)>&& lookupFn);
 
+        /**
+         * Get the topologyTime component.
+         *
+         * TODO (SERVER-102087): remove after 9.0 is branched.
+         */
+        const Timestamp& getTopologyTime() const {
+            return _topologyTime;
+        }
+
     private:
         explicit Time(Increment _forceReloadIncrement, Timestamp topologyTime)
             : _forceReloadIncrement(_forceReloadIncrement), _topologyTime(topologyTime) {}

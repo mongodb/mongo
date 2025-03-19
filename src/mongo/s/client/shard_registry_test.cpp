@@ -360,6 +360,39 @@ TEST_F(ShardRegistryTest, ConfigShardsWithNoTopologyTimeDueToUpgrade) {
     future.default_timed_get();
 }
 
+// TODO (SERVER-102087): remove or adapt.
+TEST_F(ShardRegistryTest, ConfigShardsWithNoTopologyTimeWithGossipedTopologyTime) {
+    // Add a shard without a topologyTime. This can be the case when coming from older versions.
+    addShardWithoutTopologyTime({"0"});
+
+    // When a key is not in the ReadThroughCache, timeInStore is Time(). Thus, the expected time
+    // is T(0, 0), and the result is never considered inconsistent.
+    reloadAndWait();
+
+    // Corrupt the topologyTime.
+    VectorClock::get(operationContext())
+        ->advanceTopologyTime_forTest(LogicalTime(Timestamp(100, 0)));
+
+    // To prevent a cluster impacted by SERVER-63742 from crashing the server in benign scenarios
+    // (config.shards without any topologyTime), the ShardRegistry accepts the corrupted time.
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    reloadAndWait();
+
+    // Usually, a force reload without subsequent topologyTime changes should not cause a lookup.
+    // However, given that the forced lookup installs a timeInStore using the config.shards
+    // topologyTime, which is lesser than the corrupted time in the vector clock, subsequent
+    // ShardRegistry operation will cause a lookup.
+    auto future = launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+    expectCSRSLookup();
+    future.default_timed_get();
+}
+
 /////// ShardRegistry::Time
 
 TEST_F(ShardRegistryTest, ForceReloadTimeGreaterThanLatestKnown) {
