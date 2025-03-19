@@ -2,6 +2,7 @@
 
 import os.path
 import random
+import time
 
 import bson
 import bson.errors
@@ -106,6 +107,9 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                 try:
                     sync_node_conn.admin.command(cmd)
                     break
+                except pymongo.errors.AutoReconnect:
+                    self.logger.info("AutoReconnect exception thrown, retrying...")
+                    time.sleep(0.1)
                 except pymongo.errors.OperationFailure as err:
                     if err.code not in (
                         self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
@@ -264,6 +268,9 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
             try:
                 sync_node_conn.admin.command(cmd)
                 break
+            except pymongo.errors.AutoReconnect:
+                self.logger.info("AutoReconnect exception thrown, retrying...")
+                time.sleep(0.1)
             except pymongo.errors.OperationFailure as err:
                 if err.code not in (
                     self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,

@@ -216,6 +216,9 @@ def validate_database(
             while time.time() - start_time < timeout:
                 try:
                     return db.list_collection_names(filter=filter)
+                except pymongo.errors.AutoReconnect:
+                    self.logger.info("AutoReconnect exception thrown, retrying...")
+                    time.sleep(0.1)
                 except pymongo.errors.OperationFailure as ex:
                     # Error code 314 is 'ObjectIsBusy'
                     # https://www.mongodb.com/docs/manual/reference/error-codes/

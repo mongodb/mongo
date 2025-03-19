@@ -447,6 +447,9 @@ class _StepdownThread(threading.Thread):
                         break
                     else:
                         self._wait(0.2)
+                except pymongo.errors.AutoReconnect:
+                    self.logger.info("AutoReconnect exception thrown, retrying...")
+                    time.sleep(0.1)
                 except pymongo.errors.OperationFailure:
                     self._wait(0.2)
                 if time.time() - retry_start_time > retry_time_secs:

@@ -778,6 +778,9 @@ class _AddRemoveShardThread(threading.Thread):
                     msg = "Could not " + msg + " with last response: " + str(res)
                     self.logger.error(msg)
                     raise errors.ServerFailure(msg)
+            except pymongo.errors.AutoReconnect:
+                self.logger.info("AutoReconnect exception thrown, retrying...")
+                time.sleep(0.1)
             except pymongo.errors.OperationFailure as err:
                 # Some workloads add and remove shards so removing the config shard may fail transiently.
                 if err.code in [self._ILLEGAL_OPERATION] and "would remove the last shard" in str(
@@ -864,6 +867,9 @@ class _AddRemoveShardThread(threading.Thread):
                     self._client.admin.command({"addShard": shard_host, "name": shard_name})
                     self._shard_name_suffix = self._shard_name_suffix + 1
                 return
+            except pymongo.errors.AutoReconnect:
+                self.logger.info("AutoReconnect exception thrown, retrying...")
+                time.sleep(0.1)
             except pymongo.errors.OperationFailure as err:
                 # Some suites run with forced failovers, if transitioning fails with a retryable
                 # network error, we should retry.
