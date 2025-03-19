@@ -144,7 +144,8 @@ err:
  *     Check whether the destination directory contains a stop file for a given file.
  */
 static int
-__dest_has_stop_file(WTI_LIVE_RESTORE_FS *lr_fs, char *name, WT_SESSION_IMPL *session, bool *existp)
+__dest_has_stop_file(
+  WTI_LIVE_RESTORE_FS *lr_fs, const char *name, WT_SESSION_IMPL *session, bool *existp)
 {
     WT_DECL_RET;
     char *path_marker;
@@ -405,12 +406,39 @@ __live_restore_fs_directory_list_free(
 
 /*
  * __live_restore_fs_exist --
- *     Return if the file exists.
+ *     Return if the file exists. "Exists" means that the file is visible to the user of the live
+ *     restore file system. If the file is present in the source directory but the user has deleted
+ *     it in the destination then the file doesn't exist.
  */
 static int
 __live_restore_fs_exist(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, const char *name, bool *existp)
 {
-    return (__live_restore_fs_find_layer(fs, (WT_SESSION_IMPL *)wt_session, name, NULL, existp));
+    WTI_LIVE_RESTORE_FS_LAYER_TYPE layer;
+    WT_RET(__live_restore_fs_find_layer(fs, (WT_SESSION_IMPL *)wt_session, name, &layer, existp));
+
+    if (*existp && layer == WTI_LIVE_RESTORE_FS_LAYER_SOURCE) {
+        bool has_stop = false;
+        WT_RET(__dest_has_stop_file(
+          (WTI_LIVE_RESTORE_FS *)fs, name, (WT_SESSION_IMPL *)wt_session, &has_stop));
+
+        /*
+         * If the file is only in the source and there is a stop file in the destination then we've
+         * either moved or deleted the file in the destination, meaning it no longer exists for the
+         * user.
+         */
+        if (has_stop)
+            *existp = false;
+
+        /*
+         * If migration completes and the file isn't in the destination it must have been deleted or
+         * moved by the user. We can't depend on stop files here as post-migration clean up may have
+         * deleted the stop file already.
+         */
+        if (__wti_live_restore_migration_complete((WT_SESSION_IMPL *)wt_session))
+            *existp = false;
+    }
+
+    return (0);
 }
 
 /*
@@ -945,6 +973,7 @@ __wti_live_restore_fs_restore_file(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
               " seconds. Currently copying offset %" PRId64 " of file size %" PRId64,
               lr_fh->iface.name, time_diff_ms / WT_THOUSAND, read_offset, WTI_BITMAP_END(lr_fh));
             msg_count = time_diff_ms / (WT_THOUSAND * WT_PROGRESS_MSG_PERIOD);
+            __wt_tree_modify_set(session);
         }
 
         /*
@@ -960,6 +989,7 @@ __wti_live_restore_fs_restore_file(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
         __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
           "%s: Finished background restoration, closing source file", fh->name);
         WT_ERR(__live_restore_fh_close_source(session, lr_fh, true));
+        __wt_tree_modify_set(session);
     }
 err:
     __wt_free(session, buf);

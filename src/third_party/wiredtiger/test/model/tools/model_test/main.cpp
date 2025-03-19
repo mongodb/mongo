@@ -28,6 +28,7 @@
 
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/wait.h>
 
 #include <cstdint>
 #include <cstdio>
@@ -80,6 +81,17 @@ extern char *__wt_optarg;
  * less effort than we would have generated otherwise.
  */
 #define DEFAULT_TABLE_CONFIG "leaf_page_max=4KB"
+
+/*
+ * shared_verify_state --
+ *     The shared state of the child executor process, which is shared with the parent. Because of
+ *     the way this struct is used, only C types are allowed.
+ */
+struct shared_verify_state {
+    /* Execution failure handling. */
+    bool exception;              /* If there was an exception. */
+    char exception_message[256]; /* The exception message. */
+};
 
 /*
  * run_and_verify --
@@ -141,33 +153,91 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
         throw std::runtime_error("WiredTiger executed " + std::to_string(ret_wt.size()) +
           " operations, but " + std::to_string(ret_model.size()) + " was expected.");
 
-    /* Open the WiredTiger database to verify. */
-    WT_CONNECTION *conn;
-    std::string conn_config_verify = model::kv_workload_runner_wt::k_config_base;
-    if (conn_config_override != "")
-        conn_config_verify += "," + conn_config_override;
-    int ret =
-      wiredtiger_open(home.c_str(), nullptr /* event handler */, conn_config_verify.c_str(), &conn);
-    if (ret != 0)
-        throw std::runtime_error("Cannot open the database: " +
-          std::string(wiredtiger_strerror(ret)) + " (" + std::to_string(ret) + ")");
-    model::wiredtiger_connection_guard conn_guard(conn); /* Automatically close at the end. */
+    /*
+     * Verify the database in a separate process to protect against any crashes during verification,
+     * which would allow the counter-example reduction to run in this case.
+     */
 
-    /* Get the list of tables. */
-    std::vector<std::string> tables;
-    try {
-        tables = model::wt_list_tables(conn);
-    } catch (std::exception &e) {
-        throw std::runtime_error("Failed to list the tables: " + std::string(e.what()));
+    /* Initialize the shared memory to pass state from the verification process to the parent. */
+    model::shared_memory shm_state(sizeof(shared_verify_state));
+    shared_verify_state *verify_state = (shared_verify_state *)shm_state.data();
+
+    pid_t child = fork();
+    if (child < 0)
+        throw std::runtime_error(std::string("Could not fork the process: ") + strerror(errno) +
+          " (" + std::to_string(errno) + ")");
+
+    if (child == 0) {
+        int ret = 0;
+        try {
+            /* Subprocess. */
+
+            /* Open the WiredTiger database to verify. */
+            WT_CONNECTION *conn;
+            std::string conn_config_verify = model::kv_workload_runner_wt::k_config_base;
+            if (conn_config_override != "")
+                conn_config_verify += "," + conn_config_override;
+            int ret = wiredtiger_open(
+              home.c_str(), nullptr /* event handler */, conn_config_verify.c_str(), &conn);
+            if (ret != 0)
+                throw std::runtime_error("Cannot open the database: " +
+                  std::string(wiredtiger_strerror(ret)) + " (" + std::to_string(ret) + ")");
+            model::wiredtiger_connection_guard conn_guard(conn); /* Close automatically. */
+
+            /* Get the list of tables. */
+            std::vector<std::string> tables;
+            try {
+                tables = model::wt_list_tables(conn);
+            } catch (std::exception &e) {
+                throw std::runtime_error("Failed to list the tables: " + std::string(e.what()));
+            }
+
+            /* Verify the database. */
+            for (auto &t : tables)
+                try {
+                    database.table(t)->verify(conn);
+                } catch (std::exception &e) {
+                    throw std::runtime_error(
+                      "Verification failed for table " + t + ": " + e.what());
+                }
+        } catch (std::exception &e) {
+            verify_state->exception = true;
+            snprintf(verify_state->exception_message, sizeof(verify_state->exception_message), "%s",
+              e.what());
+            ret = 1;
+        }
+
+        exit(ret);
+        /* Not reached. */
     }
 
-    /* Verify the database. */
-    for (auto &t : tables)
-        try {
-            database.table(t)->verify(conn);
-        } catch (std::exception &e) {
-            throw std::runtime_error("Verification failed for table " + t + ": " + e.what());
-        }
+    /* Parent process. */
+    int pid_status;
+    int ret = waitpid(child, &pid_status, 0);
+    if (ret < 0)
+        throw std::runtime_error(std::string("Waiting for a child process failed: ") +
+          strerror(errno) + " (" + std::to_string(errno) + ")");
+
+    /* Handle unclean exit: Verification failure, or the verification process failure. */
+    if (!WIFEXITED(pid_status) || WEXITSTATUS(pid_status) != 0) {
+
+        if (verify_state->exception)
+            /* The child process died due to an exception. */
+            throw std::runtime_error(verify_state->exception_message);
+
+        if (WIFEXITED(pid_status))
+            /* The child process exited with an error code. */
+            throw std::runtime_error("The verification process exited with code " +
+              std::to_string(WEXITSTATUS(pid_status)));
+
+        if (WIFSIGNALED(pid_status))
+            /* The child process died due to a signal. */
+            throw std::runtime_error("The verification process was terminated with signal " +
+              std::to_string(WTERMSIG(pid_status)));
+
+        /* Otherwise the workload failed in some other way. */
+        throw std::runtime_error("The verification process terminated in an unexpected way.");
+    }
 }
 
 /*
