@@ -4948,9 +4948,9 @@ ExpressionEncStrStartsWith::ExpressionEncStrStartsWith(ExpressionContext* const 
     : ExpressionEncTextSearch(expCtx, std::move(input), std::move(prefix)) {}
 
 constexpr auto kEncStrStartsWith = "$encStrStartsWith"_sd;
-intrusive_ptr<Expression> ExpressionEncStrStartsWith::parse(ExpressionContext* const expCtx,
-                                                            BSONElement expr,
-                                                            const VariablesParseState& vps) {
+boost::intrusive_ptr<Expression> ExpressionEncStrStartsWith::parse(ExpressionContext* const expCtx,
+                                                                   BSONElement expr,
+                                                                   const VariablesParseState& vps) {
 
     IDLParserContext ctx(kEncStrStartsWith);
 
@@ -4977,7 +4977,53 @@ const char* ExpressionEncStrStartsWith::getOpName() const {
 
 Value ExpressionEncStrStartsWith::evaluate(const Document& root, Variables* variables) const {
     uassert(10111803,
-            "ExpressionEncTextSearch can't be evaluated without binary payload",
+            "ExpressionEncStrStartsWith can't be evaluated without binary payload",
+            canBeEvaluated());
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+/* --------------------------------- encStrEndsWith ------------------------------------------- */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrEndsWith,
+                                      ExpressionEncStrEndsWith::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      gFeatureFlagQETextSearchPreview);
+
+ExpressionEncStrEndsWith::ExpressionEncStrEndsWith(ExpressionContext* const expCtx,
+                                                   boost::intrusive_ptr<Expression> input,
+                                                   boost::intrusive_ptr<Expression> prefix)
+    : ExpressionEncTextSearch(expCtx, std::move(input), std::move(prefix)) {}
+
+constexpr auto kEncStrEndsWith = "$encStrEndsWith"_sd;
+boost::intrusive_ptr<Expression> ExpressionEncStrEndsWith::parse(ExpressionContext* const expCtx,
+                                                                 BSONElement expr,
+                                                                 const VariablesParseState& vps) {
+
+    IDLParserContext ctx(kEncStrEndsWith);
+
+    auto fleEncEndsWith = EncStrEndsWithStruct::parse(ctx, expr.Obj());
+
+    auto inputExpr = ExpressionFieldPath::parse(expCtx, fleEncEndsWith.getInput().toString(), vps);
+
+    auto suffixExpr =
+        Expression::parseOperand(expCtx, fleEncEndsWith.getSuffix().getElement(), vps);
+
+    return new ExpressionEncStrEndsWith(expCtx, std::move(inputExpr), std::move(suffixExpr));
+}
+
+Value ExpressionEncStrEndsWith::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kEncStrEndsWith,
+                           Document{{"input", _children[_kInput]->serialize(options)},
+                                    {"suffix", _children[_kTextOperand]->serialize(options)}}}});
+}
+
+const char* ExpressionEncStrEndsWith::getOpName() const {
+    return kEncStrEndsWith.rawData();
+}
+
+Value ExpressionEncStrEndsWith::evaluate(const Document& root, Variables* variables) const {
+    uassert(10120900,
+            "ExpressionEncStrEndsWith can't be evaluated without binary payload",
             canBeEvaluated());
     return exec::expression::evaluate(*this, root, variables);
 }

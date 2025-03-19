@@ -4943,6 +4943,29 @@ public:
     }
 };
 
+class ExpressionEncStrEndsWith final : public ExpressionEncTextSearch {
+public:
+    ExpressionEncStrEndsWith(ExpressionContext* expCtx,
+                             boost::intrusive_ptr<Expression> input,
+                             boost::intrusive_ptr<Expression> prefix);
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+};
+
 static boost::intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* expCtx,
                                                                 BSONElement expr,
                                                                 const VariablesParseState& vpsIn);

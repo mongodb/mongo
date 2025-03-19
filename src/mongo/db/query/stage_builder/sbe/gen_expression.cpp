@@ -326,6 +326,7 @@ public:
     void visit(const ExpressionInternalFLEBetween* expr) final {}
     void visit(const ExpressionInternalFLEEqual* expr) final {}
     void visit(const ExpressionEncStrStartsWith* expr) final {}
+    void visit(const ExpressionEncStrEndsWith* expr) final {}
     void visit(const ExpressionInternalRawSortKey* expr) final {}
     void visit(const ExpressionMap* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
@@ -507,6 +508,7 @@ public:
     void visit(const ExpressionInternalFLEBetween* expr) final {}
     void visit(const ExpressionInternalFLEEqual* expr) final {}
     void visit(const ExpressionEncStrStartsWith* expr) final {}
+    void visit(const ExpressionEncStrEndsWith* expr) final {}
     void visit(const ExpressionInternalRawSortKey* expr) final {}
     void visit(const ExpressionMap* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
@@ -2381,7 +2383,10 @@ public:
         unsupportedExpression("$_internalFleEq");
     }
     void visit(const ExpressionEncStrStartsWith* expr) final {
-        unsupportedExpression("$EncStrStartsWith");
+        unsupportedExpression("$encStrStartsWith");
+    }
+    void visit(const ExpressionEncStrEndsWith* expr) final {
+        unsupportedExpression("$encStrEndsWith");
     }
 
     void visit(const ExpressionInternalRawSortKey* expr) final {
