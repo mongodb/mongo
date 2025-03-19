@@ -690,7 +690,6 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeFailsBackwardScan) {
 
     ASSERT_THROWS_WITH_CHECK(constructCollectionScan(), DBException, [](const DBException& ex) {
         ASSERT_EQUALS(ex.code(), 6521003);
-        // TODO SERVER-101657: Do not decrement tassert count manually.
         assertionCount.tripwire.subtractAndFetch(1);
     });
 }
