@@ -88,6 +88,7 @@ export var ShardingStateTest = (function() {
         });
 
         replSet.awaitNodesAgreeOnPrimary(undefined /* timesout */, undefined /* nodes */, node);
+        assert.eq(node, replSet.getPrimary());  // Wait for node to be a writable primary.
     }
 
     /**
