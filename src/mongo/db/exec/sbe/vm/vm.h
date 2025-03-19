@@ -1310,7 +1310,7 @@ private:
     static constexpr size_t offsetVal = 2;
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    FastTuple<bool, value::TypeTags, value::Value> readTuple(uint8_t* ptr) {
+    FastTuple<bool, value::TypeTags, value::Value> readTuple(uint8_t* ptr) noexcept {
         auto owned = readFromMemory<bool>(ptr + offsetOwned);
         auto tag = readFromMemory<value::TypeTags>(ptr + offsetTag);
         auto val = readFromMemory<value::Value>(ptr + offsetVal);
@@ -1318,7 +1318,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    void writeTuple(uint8_t* ptr, bool owned, value::TypeTags tag, value::Value val) {
+    void writeTuple(uint8_t* ptr, bool owned, value::TypeTags tag, value::Value val) noexcept {
         writeToMemory(ptr + offsetOwned, owned);
         writeToMemory(ptr + offsetTag, tag);
         writeToMemory(ptr + offsetVal, val);
@@ -1336,7 +1336,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    FastTuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) {
+    FastTuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) noexcept {
         if (MONGO_likely(offset == 0)) {
             auto [owned, tag, val] = readTuple(_argStackTop);
             writeToMemory(_argStackTop + offsetOwned, false);
@@ -1360,7 +1360,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    void setTagToNothing(size_t offset) {
+    void setTagToNothing(size_t offset) noexcept {
         if (MONGO_likely(offset == 0)) {
             writeToMemory(_argStackTop + offsetTag, value::TypeTags::Nothing);
         } else {
@@ -1370,7 +1370,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    void setStack(size_t offset, bool owned, value::TypeTags tag, value::Value val) {
+    void setStack(size_t offset, bool owned, value::TypeTags tag, value::Value val) noexcept {
         if (MONGO_likely(offset == 0)) {
             topStack(owned, tag, val);
         } else {
@@ -1388,7 +1388,9 @@ private:
         writeTuple(localPtr, owned, tag, val);
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void topStack(bool owned, value::TypeTags tag, value::Value val) {
+    MONGO_COMPILER_ALWAYS_INLINE void topStack(bool owned,
+                                               value::TypeTags tag,
+                                               value::Value val) noexcept {
         writeTuple(_argStackTop, owned, tag, val);
     }
 
@@ -1397,7 +1399,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    void popAndReleaseStack() noexcept {
+    void popAndReleaseStack() {
         auto [owned, tag, val] = getFromStack(0);
         if (owned) {
             value::releaseValue(tag, val);
