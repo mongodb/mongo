@@ -45,6 +45,7 @@ class ContinuousAddRemoveShard(interface.Hook):
         transition_configsvr=False,
         add_remove_random_shards=False,
         move_primary_comment=None,
+        move_sessions_collection=False,
         transition_intervals=TRANSITION_INTERVALS,
     ):
         interface.Hook.__init__(self, hook_logger, fixture, ContinuousAddRemoveShard.DESCRIPTION)
@@ -55,6 +56,7 @@ class ContinuousAddRemoveShard(interface.Hook):
         self._transition_configsvr = transition_configsvr
         self._add_remove_random_shards = add_remove_random_shards
         self._move_primary_comment = move_primary_comment
+        self._move_sessions_collection = move_sessions_collection
         self._transition_intervals = transition_intervals
 
         # The action file names need to match the same construction as found in
@@ -104,6 +106,7 @@ class ContinuousAddRemoveShard(interface.Hook):
             self._transition_configsvr,
             self._add_remove_random_shards,
             self._move_primary_comment,
+            self._move_sessions_collection,
             self._transition_intervals,
         )
         self.logger.info("Starting the add/remove shard thread.")
@@ -145,6 +148,9 @@ class _AddRemoveShardThread(threading.Thread):
     _LOCK_BUSY = 46
     _FAILED_TO_SATISFY_READ_PREFERENCE = 133
 
+    _CONFIG_DATABASE_NAME = "config"
+    _LOGICAL_SESSIONS_COLLECTION_NAME = "system.sessions"
+    _LOGICAL_SESSIONS_NAMESPACE = _CONFIG_DATABASE_NAME + "." + _LOGICAL_SESSIONS_COLLECTION_NAME
     _UNMOVABLE_NAMESPACE_REGEXES = [
         r"\.system\.",
         r"enxcol_\..*\.esc",
@@ -162,6 +168,7 @@ class _AddRemoveShardThread(threading.Thread):
         transition_configsvr,
         add_remove_random_shards,
         move_primary_comment,
+        move_sessions_collection,
         transition_intervals,
     ):
         threading.Thread.__init__(self, name="AddRemoveShardThread")
@@ -173,6 +180,7 @@ class _AddRemoveShardThread(threading.Thread):
         self._transition_configsvr = transition_configsvr
         self._add_remove_random_shards = add_remove_random_shards
         self._move_primary_comment = move_primary_comment
+        self._move_sessions_collection = move_sessions_collection
         self._transition_intervals = transition_intervals
         self._client = fixture_interface.build_client(self._fixture, self._auth_options)
         self._current_config_mode = self._current_fixture_mode()
@@ -340,6 +348,20 @@ class _AddRemoveShardThread(threading.Thread):
 
         return False
 
+    def _is_expected_move_range_error(self, err):
+        if err.code == self._NAMESPACE_NOT_FOUND:
+            # A concurrent dropDatabase or dropCollection could have removed the database before we
+            # run moveRange.
+            return True
+        if err.code == self._RESHARD_COLLECTION_IN_PROGRESS:
+            # A concurrent reshardCollection or unshardCollection could have started before we
+            # run moveRange.
+            return True
+        if err.code == self._CONFLICTING_OPERATION_IN_PROGRESS:
+            # This error is expected when balancing is blocked, e.g. via 'setAllowMigrations'.
+            return True
+        return False
+
     def _is_expected_move_primary_error_code(self, code):
         if code == self._NAMESPACE_NOT_FOUND:
             # A concurrent dropDatabase could have removed the database before we run movePrimary.
@@ -501,7 +523,16 @@ class _AddRemoveShardThread(threading.Thread):
                     untracked_collections.append(collection)
         return untracked_collections
 
-    def _move_all_collections_from_shard(self, collections, source):
+    def _get_collection_uuid(self, db_name, coll_name):
+        collections = self._client[db_name].list_collections(filter={"name": coll_name})
+        collection_info = next(collections, None)
+        if collection_info and "info" in collection_info and "uuid" in collection_info["info"]:
+            return collection_info["info"]["uuid"]
+        msg = "Could not find the collection uuid for " + db_name + "." + coll_name
+        self.logger.error(msg)
+        raise errors.ServerFailure(msg)
+
+    def _move_all_unsharded_collections_from_shard(self, collections, source):
         for collection in collections:
             namespace = collection["_id"]
             destination = self._get_other_shard_id(source)
@@ -520,6 +551,49 @@ class _AddRemoveShardThread(threading.Thread):
                         + "operation in progress"
                     )
                     return
+
+    def _move_sessions_collection_from_shard(self, source):
+        namespace = self._LOGICAL_SESSIONS_NAMESPACE
+        collection_uuid = self._get_collection_uuid(
+            self._CONFIG_DATABASE_NAME, self._LOGICAL_SESSIONS_COLLECTION_NAME
+        )
+        chunks_on_source = [
+            doc
+            for doc in self._client["config"]["chunks"].find(
+                {"shard": source, "uuid": collection_uuid}
+            )
+        ]
+
+        for chunk in chunks_on_source:
+            destination = self._get_other_shard_id(source)
+            self.logger.info(
+                "Running moveRange for "
+                + namespace
+                + " to move the chunk "
+                + str(chunk)
+                + " to "
+                + destination
+            )
+            try:
+                self._client.admin.command(
+                    {
+                        "moveRange": namespace,
+                        "min": chunk["min"],
+                        "max": chunk["max"],
+                        "toShard": destination,
+                    }
+                )
+            except pymongo.errors.OperationFailure as err:
+                if not self._is_expected_move_range_error(err):
+                    raise err
+                self.logger.info(
+                    "Ignoring error when moving the chunk "
+                    + str(chunk)
+                    + " for the collection '"
+                    + namespace
+                    + "': "
+                    + str(err)
+                )
 
     def _move_all_primaries_from_shard(self, databases, source):
         for database in databases:
@@ -593,9 +667,11 @@ class _AddRemoveShardThread(threading.Thread):
         # still move collections half of the time.
         should_move = not self._random_balancer_on or random.random() < 0.5
         if should_move:
-            self._move_all_collections_from_shard(
+            self._move_all_unsharded_collections_from_shard(
                 tracked_unsharded_colls + untracked_unsharded_colls, source
             )
+        if self._move_sessions_collection:
+            self._move_sessions_collection_from_shard(source)
         self._move_all_primaries_from_shard(transition_result["dbsToMove"], source)
 
     def _get_balancer_status_on_shard_not_found(self, prev_round_interrupted, msg):

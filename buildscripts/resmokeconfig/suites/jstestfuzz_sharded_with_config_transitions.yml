@@ -29,6 +29,7 @@ executor:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
       move_primary_comment: *movePrimaryComment
+      move_sessions_collection: true
     - class: FuzzerRestoreSettings
     - class: RunQueryStats
       allow_feature_not_supported: true
