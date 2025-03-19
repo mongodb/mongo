@@ -1586,15 +1586,22 @@ def force_includes_hdr(package_name, name):
 
     return []
 
+# TODO(SERVER-102596): Stop including this flag when ASP is able to upgrade mongoc and mongocxx
+STREAMS_THIRD_PARTY_DIR = "src/mongo/db/modules/enterprise/src/streams/third_party"
+
 def package_specific_copt(package_name):
     if package_name.startswith("src/third_party"):
         return MONGO_COPTS_THIRD_PARTY
+    if package_name.startswith(STREAMS_THIRD_PARTY_DIR):
+        return UBSAN_OPTS_THIRD_PARTY
 
     return []
 
 def package_specific_linkflag(package_name):
     if package_name.startswith("src/third_party"):
         return MONGO_LINKFLAGS_THIRD_PARTY
+    if package_name.startswith(STREAMS_THIRD_PARTY_DIR):
+        return UBSAN_OPTS_THIRD_PARTY
 
     return []
 
