@@ -134,11 +134,8 @@ void MeasurementMap::insertOne(const std::vector<BSONElement>& oneMeasurementDat
 
         auto builderIt = _builders.find(key);
         if (builderIt == _builders.end()) {
-            BSONColumnBuilder<tracking::Allocator<void>> columnBuilder{
-                _trackingContext.get().makeAllocator<void>()};
-            for (size_t i = 0; i < _measurementCount; ++i) {
-                columnBuilder.skip();
-            }
+            BSONColumnBuilder<tracking::Allocator<void>> columnBuilder(
+                _measurementCount, _trackingContext.get().makeAllocator<void>());
             _insertNewKey(key, elem, std::move(columnBuilder));
         } else {
             builderIt->second.append(elem);
