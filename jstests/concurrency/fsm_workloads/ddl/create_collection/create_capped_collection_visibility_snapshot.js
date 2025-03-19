@@ -8,6 +8,9 @@
  *  requires_capped,
  *  # This test works on a capped collection, which do not support sharding.
  *  assumes_unsharded_collection,
+ *  # This test sets internalQueryExecYieldIterations to 1, which can cause other tests running
+ *  # concurrently in concurrency_simultaneous to take much longer to complete than expected.
+ *  incompatible_with_concurrency_simultaneous,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
