@@ -624,5 +624,49 @@ TEST(CurOpTest, KilledOperationReportsLatency) {
     ASSERT_EQ(killLatency, res.getIntField("interruptLatencyNanos"));
 }
 
+TEST(CurOpTest, SlowLogFinishesWithDuration) {
+    // Best effort test to try and verify that durationMillis is the last field reported by
+    // report(). This doesn't populate every possible fields but makes some attempt to ensure
+    // that there are a few.
+
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    // Create dummy command.
+    BSONObj command = BSON("a" << 3);
+    TenantId tid = TenantId(OID::gen());
+
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        curop->setGenericOpRequestDetails(
+            clientLock,
+            NamespaceString::createNamespaceString_forTest(tid, "testDb.coll"),
+            nullptr,
+            command,
+            NetworkOp::dbQuery);
+    }
+
+    const OpDebug& opDebug = curop->debug();
+    SingleThreadedLockStats lockStats;
+    ResourceConsumption::OperationMetrics opMetrics;
+    opMetrics.readMetrics.docsRead.observeOne(255);
+
+    SingleThreadedStorageMetrics storageStats;
+    storageStats.incrementPrepareReadConflicts(3);
+
+    curop->ensureStarted();
+    curop->done();
+    curop->calculateCpuTime();
+
+    auto pattrs = std::make_unique<logv2::DynamicAttributes>();
+    opDebug.report(opCtx.get(), &lockStats, &opMetrics, storageStats, pattrs.get());
+
+    logv2::TypeErasedAttributeStorage attrs{*pattrs};
+    ASSERT_GTE(attrs.size(), 1);
+    std::string lastName = (attrs.end() - 1)->name;
+    ASSERT_EQ("durationMillis", lastName);
+}
+
 }  // namespace
 }  // namespace mongo
