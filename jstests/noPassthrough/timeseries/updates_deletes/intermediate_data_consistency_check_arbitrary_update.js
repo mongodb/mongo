@@ -20,6 +20,19 @@ const coll = testDB.coll;
 const bucketsColl = testDB.system.buckets.coll;
 const time = ISODate("2024-01-16T20:48:39.448Z");
 
+// Check that smallArray is entirely contained by largeArray.
+// Returns false if a member of smallArray is not in largeArray.
+function arrayIsSubset(smallArray, largeArray) {
+    for (let i = 0; i < smallArray.length; ++i) {
+        if (!Array.contains(largeArray, smallArray[i])) {
+            jsTestLog("Could not find " + smallArray[i] + " in largeArray");
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function runIntermediateDataCheckTest(isOrdered) {
     jsTestLog("isOrdered: { " + isOrdered + " }");
     coll.drop();
@@ -27,12 +40,12 @@ function runIntermediateDataCheckTest(isOrdered) {
         testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 
     assert.commandWorked(coll.insertMany([
-        {t: time, m: 0, a: 1},  // Bucket 0
-        {t: time, m: 0, a: 2},  // Bucket 0
-        {t: time, m: 1, a: 1},  // Bucket 1
-        {t: time, m: 1, a: 2},  // Bucket 1
-        {t: time, m: 2, a: 1},  // Bucket 2
-        {t: time, m: 2, a: 2},  // Bucket 2
+        {t: time, m: 0, a: 1},                            // Bucket 0
+        {t: new Date(time.getTime() + 100), m: 0, a: 2},  // Bucket 0
+        {t: new Date(time.getTime() + 200), m: 1, a: 1},  // Bucket 1
+        {t: new Date(time.getTime() + 300), m: 1, a: 2},  // Bucket 1
+        {t: new Date(time.getTime() + 400), m: 2, a: 1},  // Bucket 2
+        {t: new Date(time.getTime() + 500), m: 2, a: 2},  // Bucket 2
     ]));
 
     // Ensure that we have 3 buckets.
@@ -82,43 +95,47 @@ function runIntermediateDataCheckTest(isOrdered) {
         // 8 Total Measurements Committed : The first 6 are from our initial inserts,
         // the next 2 are from writing the measurements from Bucket 0 to Bucket 3 as part of our
         // first update.
-        assert.eq(stats.numMeasurementsCommitted, 8);
-        assert.eq(stats.numBucketInserts, 4);
-        assert.eq(stats.numBucketUpdates, 0);
-        assert.eq(stats.numBucketsOpenedDueToMetadata, 4);
-        assert.eq(stats.numBucketFetchesFailed, 0);
-        assert.eq(stats.numBucketQueriesFailed, 3);
-        assert.eq(stats.numBucketReopeningsFailed, 0);
+        assert.eq(stats.numMeasurementsCommitted, 8, tojson(stats));
+        assert.eq(stats.numBucketInserts, 4, tojson(stats));
+        assert.eq(stats.numBucketUpdates, 0, tojson(stats));
+        assert.eq(stats.numBucketsOpenedDueToMetadata, 4, tojson(stats));
+        assert.eq(stats.numBucketFetchesFailed, 0, tojson(stats));
+        assert.eq(stats.numBucketQueriesFailed, 3, tojson(stats));
+        assert.eq(stats.numBucketReopeningsFailed, 0, tojson(stats));
         // One bucket frozen from the triggered failpoint.
-        assert.eq(stats.numBucketsFrozen, 1);
+        assert.eq(stats.numBucketsFrozen, 1, tojson(stats));
         // Check that we have 3 buckets and that two of them are the untouched Bucket 1
         // and Bucket 2, and that one is the newly created Bucket 3.
-        assert.eq(stats.bucketCount, 3);
-        assert.eq(buckets.length, 3);
-        assert.eq(buckets[0].meta, 1);
-        assert.eq(buckets[0].control.count, 2);
-        assert.eq(buckets[1].meta, 2);
-        assert.eq(buckets[1].control.count, 2);
-        assert.eq(buckets[2].meta, "A");
-        assert.eq(buckets[2].control.count, 2);
+        assert.eq(stats.bucketCount, 3, tojson(stats));
+        assert.eq(buckets.length, 3, tojson(buckets));
+        assert.eq(buckets[0].control.count, 2, tojson(buckets));
+        assert.eq(buckets[1].control.count, 2, tojson(buckets));
+        assert.eq(buckets[2].control.count, 2, tojson(buckets));
+
+        // We want to check that one of the meta values was replaced,
+        // but cannot guarantee which one.
+        let metasFound = [buckets[0].meta, buckets[1].meta, buckets[2].meta];
+        let metasExpected = [0, 1, 2, "A"];
+        assert(arrayIsSubset(metasFound, metasExpected), "meta values incorrect");
+        assert.contains("A", metasFound);
     } else {
         // 14 Total Measurements Committed : The first 6 are from our initial inserts,
         // the next 2 are from writing the measurements from Bucket 0 to Bucket 3 as part of our
         // first update, the next 6 are from writing the measurements from Bucket 1, Bucket 2, and
         // Bucket 3 to Bucket 4 as part of our second update.
-        assert.eq(stats.numMeasurementsCommitted, 14);
-        assert.eq(stats.numBucketInserts, 5);
-        assert.eq(stats.numBucketUpdates, 2);
-        assert.eq(stats.numBucketsOpenedDueToMetadata, 5);
-        assert.eq(stats.numBucketFetchesFailed, 0);
-        assert.eq(stats.numBucketQueriesFailed, 3);
-        assert.eq(stats.numBucketReopeningsFailed, 0);
+        assert.eq(stats.numMeasurementsCommitted, 14, tojson(stats));
+        assert.eq(stats.numBucketInserts, 5, tojson(stats));
+        assert.eq(stats.numBucketUpdates, 2, tojson(stats));
+        assert.eq(stats.numBucketsOpenedDueToMetadata, 5, tojson(stats));
+        assert.eq(stats.numBucketFetchesFailed, 0, tojson(stats));
+        assert.eq(stats.numBucketQueriesFailed, 3, tojson(stats));
+        assert.eq(stats.numBucketReopeningsFailed, 0, tojson(stats));
         // One bucket frozen from the triggered failpoint.
-        assert.eq(stats.numBucketsFrozen, 1);
-        assert.eq(stats.bucketCount, 1);
-        assert.eq(buckets.length, 1);
-        assert.eq(buckets[0].meta, "B");
-        assert.eq(buckets[0].control.count, 6);
+        assert.eq(stats.numBucketsFrozen, 1, tojson(stats));
+        assert.eq(stats.bucketCount, 1, tojson(stats));
+        assert.eq(buckets.length, 1, tojson(buckets));
+        assert.eq(buckets[0].meta, "B", tojson(buckets));
+        assert.eq(buckets[0].control.count, 6, tojson(buckets));
     }
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: 'timeseriesDataIntegrityCheckFailureUpdate', mode: "off"}));

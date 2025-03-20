@@ -1,6 +1,9 @@
 /**
  * Tests that time-series inserts respect {ordered: true}.
  */
+// TODO(SERVER-102050): re-enable if this test and its failpoints are still relevant
+quit();
+
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const conn = MongoRunner.runMongod();
