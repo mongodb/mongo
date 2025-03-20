@@ -5322,4 +5322,4 @@ oldcrypt = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "d0314a12da4a869d84cf94cb92db74b8ca11af77c6b401d383344aebb9f978f0"
+content-hash = "23c9dc6597d1892e81228331e5f4f2c2bf4a3eb54aabef54bdac9941953cfb10"
