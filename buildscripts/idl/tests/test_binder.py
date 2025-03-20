@@ -3111,6 +3111,33 @@ class TestBinder(testcase.IDLTestcase):
             """)
         )
 
+        # if shouldBeFCVGated is false, fcv_context_unaware is not allowed
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    shouldBeFCVGated: false
+                    fcv_context_unaware: true
+            """),
+            idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
+        )
+
+        # if shouldBeFCVGated: true, fcv_context_unaware is allowed
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+                    shouldBeFCVGated: true
+                    fcv_context_unaware: true
+            """)
+        )
+
         # incremental_rollout_phase must have a valid value
         self.assert_bind_fail(
             textwrap.dedent("""

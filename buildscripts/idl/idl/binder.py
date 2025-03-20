@@ -1692,7 +1692,9 @@ def _bind_feature_flag_cpp_vartype(ctxt, param, feature_flag_phase):
             ctxt.add_illegally_fcv_gated_feature_flag(param)
             return None
 
-        return "::mongo::LegacyContextUnawareFCVGatedFeatureFlag"
+        if param.fcv_context_unaware:
+            return "::mongo::LegacyContextUnawareFCVGatedFeatureFlag"
+        return "::mongo::FCVGatedFeatureFlag"
     elif feature_flag_phase == ast.FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT:
         # Non-FCV gated, non IFR flag.
         return "::mongo::BinaryCompatibleFeatureFlag"
@@ -1747,12 +1749,12 @@ def _bind_feature_flags(ctxt, param):
             if param.default.literal == "true" and not param.version:
                 ctxt.add_feature_flag_default_true_missing_version(param)
                 return None
-        elif param.version or param.enable_on_transitional_fcv:
-            # Feature flags that should not be FCV gated must not have a version.
-            ctxt.add_feature_flag_fcv_gated_false_has_unsupported_option(
-                param, "version" if param.version else "enable_on_transitional_fcv"
-            )
-            return None
+        else:
+            # Feature flags that should not be FCV gated must not have unsupported options.
+            for option_name in ("version", "enable_on_transitional_fcv", "fcv_context_unaware"):
+                if getattr(param, option_name):
+                    ctxt.add_feature_flag_fcv_gated_false_has_unsupported_option(param, option_name)
+                    return None
     else:
         # Non-IFR flags must specify a 'default' value.
         ctxt.add_feature_flag_without_default_value(param)

@@ -35,6 +35,7 @@ feature_flags:
       cpp_varname: gFeatureFlagServerlessChangeStreams
       default: false
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagSbeFull:
       description: "Feature flag for SBE behaviors, features, or extensions that are not yet enabled
@@ -49,6 +50,7 @@ feature_flags:
       default: true
       version: 7.2
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagQueryStatsDataBearingNodes:
       description: "Feature flag for enabling aggregation of queryStats from data bearing nodes."
@@ -56,6 +58,7 @@ feature_flags:
       default: true
       version: 8.0
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagAggOutTimeseries:
       description: "Feature flag for enabling support for $out to write to time-series collections"
@@ -69,6 +72,7 @@ feature_flags:
       default: true
       version: 8.0
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagVectorSearchPublicPreview:
       description: "Feature flag to enable vector search for public preview."
@@ -100,6 +104,7 @@ feature_flags:
       default: true
       version: 8.0
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagSearchBatchSizeTuning:
       description: "Feature flag to enable batchSize tuning for search queries."
@@ -113,6 +118,7 @@ feature_flags:
       default: true
       version: 8.1
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagBinDataConvertNumeric:
       description: "Feature flag to enable extended BinData support for int, double and long in $convert."
@@ -126,12 +132,14 @@ feature_flags:
       cpp_varname: gFeatureFlagAccuratePercentiles
       default: false
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagCursorBasedTop:
       description: "Feature flag to enable cursor-based top command."
       cpp_varname: gFeatureFlagCursorBasedTop
       default: false
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagSearchExplainExecutionStats:
       description: "Feature flag to enable executing search queries for explain."
@@ -158,6 +166,7 @@ feature_flags:
       default: true
       version: 8.1
       shouldBeFCVGated: true
+      fcv_context_unaware: true
     # TODO SERVER-95358 remove once 9.0 becomes last LTS
     featureFlagAggMongosToRouter:
       description: "Feature flag to switch from 'fromMongos' to 'fromRouter' field on aggregate commands."
@@ -187,6 +196,7 @@ feature_flags:
       default: true
       version: 8.1
       shouldBeFCVGated: true
+      fcv_context_unaware: true
 
     featureFlagSearchHybridScoringFull:
       description: "Feature flag to introduce $scoreFusion, the $minMaxScaler helper and finish up
@@ -194,6 +204,7 @@ feature_flags:
       cpp_varname: gFeatureFlagSearchHybridScoringFull
       default: false
       shouldBeFCVGated: true
+      fcv_context_unaware: true
     
     featureFlagQueryMemoryTracking:
       description: "Feature flag to enable current and high watermark memory usage tracking for 

@@ -1003,6 +1003,7 @@ def _parse_feature_flag(ctxt, spec, name, node):
             ),
             "enable_on_transitional_fcv": _RuleDesc("bool_scalar"),
             "incremental_rollout_phase": _RuleDesc("scalar"),
+            "fcv_context_unaware": _RuleDesc("bool_scalar"),
         },
     )
 

@@ -46,9 +46,11 @@ feature_flags:
         cpp_varname: gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi
         default: false
         shouldBeFCVGated: true
+        fcv_context_unaware: true
 
     featureFlagClusteredConfigTransactions:
         description: "Create config.transactions as a clustered collection"
         cpp_varname: gFeatureFlagClusteredConfigTransactions
         default: false
         shouldBeFCVGated: true
+        fcv_context_unaware: true

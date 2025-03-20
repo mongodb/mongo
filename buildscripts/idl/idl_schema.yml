@@ -921,6 +921,14 @@ properties:
               - in_development
               - rollout
               - released
+          fcv_context_unaware:
+            type: boolean
+            description: >
+              Legacy, optional. True for feature flags that have not yet been
+              adapted to the new feature flag API introduced in SERVER-99351.
+              Those feature flags are compiled to a C++ type that allows
+              checking them without considering Operation FCV. Do not set this
+              property on new flags.
         required:
           - description
           - shouldBeFCVGated

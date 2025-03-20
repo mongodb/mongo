@@ -1348,12 +1348,12 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster;"],
+            ["mongo::FCVGatedFeatureFlag gToaster;"],
         )
         self.assertStringsInFile(
             source,
             [
-                'mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster{false, ""_sd};',
+                'mongo::FCVGatedFeatureFlag gToaster{false, ""_sd};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
             ],
         )
@@ -1375,12 +1375,12 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster;"],
+            ["mongo::FCVGatedFeatureFlag gToaster;"],
         )
         self.assertStringsInFile(
             source,
             [
-                'mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster{true, "123"_sd};',
+                'mongo::FCVGatedFeatureFlag gToaster{true, "123"_sd};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
             ],
         )
@@ -1405,12 +1405,12 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster;"],
+            ["mongo::FCVGatedFeatureFlag gToaster;"],
         )
         self.assertStringsInFile(
             source,
             [
-                'mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster{true, "123"_sd, true};',
+                'mongo::FCVGatedFeatureFlag gToaster{true, "123"_sd, true};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
             ],
         )
@@ -1435,13 +1435,41 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster;"],
+            ["mongo::FCVGatedFeatureFlag gToaster;"],
         )
         self.assertStringsInFile(
             source,
             [
-                'mongo::LegacyContextUnawareFCVGatedFeatureFlag gToaster{true, "123"_sd};',
+                'mongo::FCVGatedFeatureFlag gToaster{true, "123"_sd};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
+            ],
+        )
+
+    def test_legacy_context_unaware_fcv_gated_feature_flag(self) -> None:
+        """Test generation of an FCV-gated feature flag that uses the legacy feature flag API"""
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            feature_flags:
+                featureFlagLegacyAPIToaster:
+                    description: "Make toast"
+                    cpp_varname: gLegacyAPIToaster
+                    default: true
+                    version: 123
+                    shouldBeFCVGated: true
+                    fcv_context_unaware: true
+            """
+            )
+        )
+        self.assertStringsInFile(
+            header,
+            ["mongo::LegacyContextUnawareFCVGatedFeatureFlag gLegacyAPIToaster;"],
+        )
+        self.assertStringsInFile(
+            source,
+            [
+                'mongo::LegacyContextUnawareFCVGatedFeatureFlag gLegacyAPIToaster{true, "123"_sd};',
+                '<FeatureFlagServerParameter>("featureFlagLegacyAPIToaster", gLegacyAPIToaster);',
             ],
         )
 

@@ -711,6 +711,11 @@ A feature flag has the following properties:
     one feature flag that is enabled during the transition phase, which would enable some aspects of
     the feature, along with a different feature flag that is enabled normally in fully upgraded
     state.
+- fcv_context_unaware: boolean
+  - Optional. Can only be specified for FCV-gated feature flags (`shouldBeFCVGated: true`). Default value is `false`.
+  - `true` for feature flags that have not yet been adapted to the new feature flag API introduced in SERVER-99351.
+    Those feature flags are compiled to a C++ type that allows checking them without considering Operation FCV.
+    Do not set this property on new flags.
 
 To turn on a feature flag for testing when starting up a server, we would use the following command
 line (for the Toaster feature):
