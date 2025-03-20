@@ -2071,6 +2071,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/document_source_visitor_docs_needed_bounds.cpp @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/s/**/shard_filtering_util* @10gen/query-execution-router-query-exec @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_server_status.cpp @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/s/**/*remove_shard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/**/*topology_change* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/balancer/OWNERS.yml
 /src/mongo/db/s/balancer/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot

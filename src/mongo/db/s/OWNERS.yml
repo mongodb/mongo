@@ -314,3 +314,9 @@ filters:
   - "sharding_server_status.cpp":
     approvers:
       - 10gen/query-integration-observability
+  - "*remove_shard*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*topology_change*":
+    approvers:
+      - 10gen/server-catalog-and-routing
