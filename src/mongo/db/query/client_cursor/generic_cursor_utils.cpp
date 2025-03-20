@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/client_cursor/allocate_cursor_id.h"
+#include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 
 #include <cstdlib>
 #include <limits>
 
+#include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::generic_cursor {
@@ -63,6 +64,24 @@ CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRando
 
     // We failed to generate a unique cursor id.
     fassertFailed(17360);
+}
+
+void validateKillInTransaction(OperationContext* opCtx,
+                               CursorId cursorId,
+                               boost::optional<LogicalSessionId> lsid,
+                               boost::optional<TxnNumber> txnNumber) {
+    if (opCtx->inMultiDocumentTransaction()) {
+        uassert(8912345,
+                str::stream() << "tried to kill a cursor " << cursorId << " belonging to session "
+                              << lsid << " while in txn " << txnNumber << " of session "
+                              << opCtx->getLogicalSessionId(),
+                lsid == opCtx->getLogicalSessionId());
+        uassert(8912321,
+                str::stream() << "tried to kill a cursor " << cursorId << " belonging to txn "
+                              << txnNumber << " while in txn " << opCtx->getTxnNumber()
+                              << " of session " << opCtx->getLogicalSessionId(),
+                txnNumber == opCtx->getTxnNumber());
+    }
 }
 
 }  // namespace mongo::generic_cursor

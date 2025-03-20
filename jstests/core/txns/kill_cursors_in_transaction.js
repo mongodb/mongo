@@ -17,7 +17,9 @@ const collName = "kill_cursors_in_transaction";
 const testDB = db.getSiblingDB(dbName);
 const adminDB = db.getSiblingDB("admin");
 const session = db.getMongo().startSession({causalConsistency: false});
+const session2 = db.getMongo().startSession({causalConsistency: false});
 const sessionDb = session.getDatabase(dbName);
+const sessionDb2 = session2.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
 
 sessionColl.drop({writeConcern: {w: "majority"}});
@@ -51,6 +53,76 @@ withRetryOnTransientTxnError(
         session.abortTransaction_forTesting();
     });
 
+jsTest.log(
+    "killcursors in session but not transaction can kill cursor in a transaction in another session");
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction();
+
+        // Open a cursor on the collection.
+        let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+
+        assert.commandWorked(
+            sessionDb2.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
+session.abortTransaction_forTesting();
+
+jsTest.log(
+    "killcursors in session1 in transaction should not be able to kill cursor in session2 since " +
+    "it's not from the same transaction");
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction();
+
+        // Open cursor in just so the killcursors isn't the first op in the transaction
+        assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+
+        // Open a cursor in the other session.
+        let res = assert.commandWorked(sessionDb2.runCommand({find: collName, batchSize: 2}));
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+
+        assert.commandFailedWithCode(
+            sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}), 8912345);
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
+session.abortTransaction_forTesting();
+
+jsTest.log("killcursors in transaction should not be able to kill cursor" +
+           "in another transaction in the same session");
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction();
+
+        // Open cursor in txn A
+        res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
+
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction_forTesting({}, {ignoreActiveTxn: true});
+
+        // Open cursor in just so the killcursors isn't the first op in the transaction
+        assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+
+        assert.commandFailedWithCode(
+            sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}), 8912321);
+    },
+    () => {
+        session.abortTransaction_forTesting();
+    });
+session.abortTransaction_forTesting();
+
 jsTest.log("killCursors must not block on locks held by the transaction in which it is run.");
 
 withRetryOnTransientTxnError(
@@ -58,7 +130,7 @@ withRetryOnTransientTxnError(
         session.startTransaction();
 
         // Open a cursor on the collection.
-        let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+        res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
         assert(res.hasOwnProperty("cursor"), tojson(res));
         assert(res.cursor.hasOwnProperty("id"), tojson(res));
     },

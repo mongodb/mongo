@@ -32,6 +32,8 @@
 #include <functional>
 
 #include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/db/query/client_cursor/generic_cursor_gen.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/platform/random.h"
 
 namespace mongo::generic_cursor {
@@ -44,5 +46,13 @@ namespace mongo::generic_cursor {
  * cursor is already allocated in 'pred' and the creation of new cursors.
  */
 CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random);
+
+/**
+ * Cursors in a session can kill other session's cursors. Cursors in a transaction can't.
+ */
+void validateKillInTransaction(OperationContext* opCtx,
+                               CursorId cursorId,
+                               boost::optional<LogicalSessionId> lsid,
+                               boost::optional<TxnNumber> txnNumber);
 
 }  // namespace mongo::generic_cursor

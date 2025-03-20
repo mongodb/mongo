@@ -84,12 +84,12 @@ idl_generator(
 mongo_cc_library(
     name = "generic_cursor",
     srcs = [
-        "allocate_cursor_id.cpp",
+        "generic_cursor_utils.cpp",
         ":generic_cursor_gen",
     ],
     hdrs = [
-        "allocate_cursor_id.h",
         "cursor_id.h",
+        "generic_cursor_utils.h",
     ],
     deps = [
         "//src/mongo/db:server_base",

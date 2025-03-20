@@ -50,8 +50,8 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/client_cursor/allocate_cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
+#include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
@@ -474,6 +474,9 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
         return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
     }
     auto cursor = it->second;
+
+    generic_cursor::validateKillInTransaction(
+        opCtx, id, cursor->getSessionId(), cursor->getTxnNumber());
 
     if (cursor->_operationUsingCursor) {
         // Rather than removing the cursor directly, kill the operation that's currently using the

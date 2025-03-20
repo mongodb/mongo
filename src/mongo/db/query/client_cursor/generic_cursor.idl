@@ -86,6 +86,9 @@ structs:
       lsid:
         type: LogicalSessionId
         optional: true
+      txnNumber:
+        type: TxnNumber
+        optional: true
       planSummary:
         description: The plan summary of this cursor's query.
         type: string

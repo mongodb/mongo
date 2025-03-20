@@ -161,7 +161,7 @@ var testOps = function(db, allowedActions) {
     });
 
     // Test for kill cursor
-    (function() {
+    const checkKillCursor = function(inTransaction) {
         var newConn = new Mongo(db.getMongo().host);
         var dbName = db.getName();
         var db2 = newConn.getDB(dbName);
@@ -173,7 +173,13 @@ var testOps = function(db, allowedActions) {
         }
 
         // Create cursor from db2.
-        var cmdRes = db2.runCommand({find: db2.kill_cursor.getName(), batchSize: 2});
+        var cmdRes = db2.runCommand({
+            find: db2.kill_cursor.getName(),
+            batchSize: 2,
+            ...(inTransaction
+                    ? {startTransaction: true, autocommit: false, txnNumber: NumberLong(0)}
+                    : {})
+        });
         assert.commandWorked(cmdRes);
         var cursorId = cmdRes.cursor.id;
         assert(!bsonBinaryEqual({cursorId: cursorId}, {cursorId: NumberLong(0)}),
@@ -208,7 +214,12 @@ var testOps = function(db, allowedActions) {
             assert(bsonBinaryEqual({cursorId: cmdRes.cursorsKilled}, {cursorId: [cursorId]}),
                    "unauthorized to kill cursor: " + tojson(cmdRes));
         });
-    })();
+        if (inTransaction) {
+            assert.commandWorked(db2.adminCommand(
+                {abortTransaction: 1, txnNumber: NumberLong(0), autocommit: false}));
+        }
+    };
+    checkKillCursor(false);
 
     var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
     // Note: fsyncUnlock is not supported in mongos.
@@ -221,6 +232,9 @@ var testOps = function(db, allowedActions) {
                 throw Error("unauthorized fsyncUnlock");
             }
         });
+    } else {
+        // Requires transactions and the non-sharded version is on standalone
+        checkKillCursor(true);
     }
 };
 

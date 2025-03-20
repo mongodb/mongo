@@ -265,6 +265,7 @@ public:
               _cursorLifetime(cursorLifetime),
               _lastActive(lastActive),
               _lsid(_cursor->getLsid()),
+              _txnNumber(_cursor->getTxnNumber()),
               _opKey(std::move(opKey)),
               _nss(std::move(nss)),
               _originatingClient(std::move(clientUUID)),
@@ -304,6 +305,9 @@ public:
 
         boost::optional<LogicalSessionId> getLsid() const {
             return _lsid;
+        }
+        boost::optional<TxnNumber> getTxnNumber() const {
+            return _txnNumber;
         }
 
         boost::optional<OperationKey> getOperationKey() const {
@@ -373,6 +377,7 @@ public:
         CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
         Date_t _lastActive;
         boost::optional<LogicalSessionId> _lsid;
+        boost::optional<TxnNumber> _txnNumber;
 
         /**
          * The client OperationKey from the OperationContext at the time of registering a cursor.

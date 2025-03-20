@@ -43,7 +43,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/query/client_cursor/allocate_cursor_id.h"
+#include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -138,6 +138,7 @@ GenericCursor ClusterCursorManager::PinnedCursor::toGenericCursor() const {
     gc.setCursorId(getCursorId());
     gc.setNs(_nss);
     gc.setLsid(_cursor->getLsid());
+    gc.setTxnNumber(_cursor->getTxnNumber());
     gc.setNDocsReturned(_cursor->getNumReturnedSoFar());
     gc.setTailable(_cursor->isTailable());
     gc.setAwaitData(_cursor->isTailableAndAwaitData());
@@ -373,6 +374,9 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursor
         return cursorNotFoundStatus(cursorId);
     }
 
+    generic_cursor::validateKillInTransaction(
+        opCtx, cursorId, entry->getLsid(), entry->getTxnNumber());
+
     // Interrupt any operation currently using the cursor, unless if it's the current operation.
     OperationContext* opUsingCursor = entry->getOperationUsingCursor();
     if (opUsingCursor) {
@@ -532,6 +536,7 @@ GenericCursor ClusterCursorManager::CursorEntry::cursorToGenericCursor(
     gc.setCreatedDate(_cursor->getCreatedDate());
     gc.setLastAccessDate(_cursor->getLastUseDate());
     gc.setLsid(_cursor->getLsid());
+    gc.setTxnNumber(_cursor->getTxnNumber());
     gc.setNDocsReturned(_cursor->getNumReturnedSoFar());
     gc.setTailable(_cursor->isTailable());
     gc.setAwaitData(_cursor->isTailableAndAwaitData());

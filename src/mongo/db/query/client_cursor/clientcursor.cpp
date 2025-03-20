@@ -210,6 +210,7 @@ GenericCursor ClientCursor::toGenericCursor() const {
     gc.setNoCursorTimeout(isNoTimeout());
     gc.setOriginatingCommand(getOriginatingCommandObj());
     gc.setLsid(getSessionId());
+    gc.setTxnNumber(_txnNumber);
     gc.setLastAccessDate(getLastUseDate());
     gc.setCreatedDate(getCreatedDate());
     gc.setNBatchesReturned(getNBatches());
