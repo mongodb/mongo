@@ -257,7 +257,7 @@ public:
             long long totalCloneTime =
                 ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load();
 
-            MigrationSourceManager migrationSourceManager(
+            auto&& migrationSourceManager = MigrationSourceManager::createMigrationSourceManager(
                 opCtx, std::move(request), std::move(writeConcern), donorConnStr, recipientHost);
 
             migrationSourceManager.startClone();

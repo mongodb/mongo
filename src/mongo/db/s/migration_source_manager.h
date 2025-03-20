@@ -110,11 +110,11 @@ public:
      *  - InvalidOptions if the operation context is missing shard version
      *  - StaleConfig if the expected placement version does not match the one known by this shard.
      */
-    MigrationSourceManager(OperationContext* opCtx,
-                           ShardsvrMoveRange&& request,
-                           WriteConcernOptions&& writeConcern,
-                           ConnectionString donorConnStr,
-                           HostAndPort recipientHost);
+    static MigrationSourceManager createMigrationSourceManager(OperationContext* opCtx,
+                                                               ShardsvrMoveRange&& request,
+                                                               WriteConcernOptions&& writeConcern,
+                                                               ConnectionString donorConnStr,
+                                                               HostAndPort recipientHost);
     ~MigrationSourceManager();
 
     /**
@@ -200,6 +200,13 @@ public:
     }
 
 private:
+    // Private constructor, use the buildMigrationSourceManager() factory method instead.
+    MigrationSourceManager(OperationContext* opCtx,
+                           ShardsvrMoveRange&& request,
+                           WriteConcernOptions&& writeConcern,
+                           ConnectionString donorConnStr,
+                           HostAndPort recipientHost);
+
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
     enum State {
@@ -230,15 +237,12 @@ private:
      */
     void _cleanupOnError() noexcept;
 
-    // Mutex to protect concurrent reads and writes to internal attributes
-    mutable stdx::mutex _mutex;
-
     // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
     // The caller must guarantee it outlives the MigrationSourceManager.
     OperationContext* const _opCtx;
 
     // The parameters to the moveRange command
-    ShardsvrMoveRange _args;
+    const ShardsvrMoveRange _args;
 
     // The write concern received for the moveRange command
     const WriteConcernOptions _writeConcern;
@@ -296,9 +300,8 @@ private:
     boost::optional<ChunkVersion> _chunkVersion;
 
     // The chunk cloner source. Only available if there is an active migration going on. To set and
-    // remove it, a collection lock and the CSRLock need to be acquired first in order to block all
-    // logOp calls and then the mutex. To access it, only the mutex is necessary. Available after
-    // cloning stage has completed.
+    // remove it, the CSRLock needs to be acquired in exclusive mode. To access it, the CSRlock has
+    // to be acquired at least in shared mode. Available after cloning stage has completed.
     std::shared_ptr<MigrationChunkClonerSource> _cloneDriver;
 
     // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
