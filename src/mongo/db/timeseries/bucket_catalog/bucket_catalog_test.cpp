@@ -602,7 +602,14 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
 
     auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog, collectionUUID, timeseriesOptions, batchOfMeasurements, errorsAndIndices);
+        *_bucketCatalog,
+        collectionUUID,
+        timeseriesOptions,
+        batchOfMeasurements,
+        /*startIndex=*/0,
+        /*numDocsToStage=*/batchOfMeasurements.size(),
+        /*docsToRetry=*/{},
+        errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     ASSERT_EQ(batchedInsertContexts.size(), numBatchedInsertContexts);
     size_t numMeasurements = 0;
@@ -2814,8 +2821,15 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
     auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
     std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog, _uuid1, timeseriesOptions, {measurement}, errorsAndIndices);
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2860,8 +2874,15 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
     auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
     std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog, _uuid1, timeseriesOptions, {measurement}, errorsAndIndices);
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];

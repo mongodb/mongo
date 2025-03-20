@@ -131,13 +131,17 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithMetaField
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
     auto tsOptions = _getTimeseriesOptions(_ns1);
 
-    auto batchedInsertContextVector = buildBatchedInsertContextsWithMetaField(*_bucketCatalog,
-                                                                              bucketsColl->uuid(),
-                                                                              tsOptions,
-                                                                              userMeasurementsBatch,
-                                                                              stats,
-                                                                              trackingContext,
-                                                                              errorsAndIndices);
+    auto batchedInsertContextVector =
+        buildBatchedInsertContextsWithMetaField(*_bucketCatalog,
+                                                bucketsColl->uuid(),
+                                                tsOptions,
+                                                userMeasurementsBatch,
+                                                /*startIndex=*/0,
+                                                /*numDocsToStage=*/userMeasurementsBatch.size(),
+                                                /*docsToRetry=*/{},
+                                                stats,
+                                                trackingContext,
+                                                errorsAndIndices);
 
     ASSERT_EQ(batchedInsertContextVector.size(), metaFieldMetadataToCorrectIndexOrderMap.size());
 
@@ -248,6 +252,9 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaFi
                                               bucketsColl->uuid(),
                                               bucketsColl->getTimeseriesOptions().get(),
                                               userMeasurementsBatch,
+                                              /*startIndex=*/0,
+                                              /*numDocsToStage=*/userMeasurementsBatch.size(),
+                                              /*docsToRetry=*/{},
                                               stats,
                                               trackingContext,
                                               errorsAndIndices);
@@ -368,7 +375,14 @@ void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
     std::vector<WriteStageErrorAndIndex> errorsAndIndices;
 
     auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog, collectionUUID, timeseriesOptions, batchOfMeasurements, errorsAndIndices);
+        *_bucketCatalog,
+        collectionUUID,
+        timeseriesOptions,
+        batchOfMeasurements,
+        /*startIndex=*/0,
+        /*numDocsToStage=*/batchOfMeasurements.size(),
+        /*docsToRetry=*/{},
+        errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     ASSERT_EQ(batchedInsertContexts.size(), numWriteBatches.size());
@@ -1107,6 +1121,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucke
                                                   /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/userBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
 
     ASSERT_TRUE(swWriteBatches.isOK());
@@ -1143,6 +1160,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsOne
                                                   /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/userBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
 
     ASSERT_TRUE(swWriteBatches.isOK());
@@ -1182,6 +1202,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsMul
                                                   /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/userBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
 
     ASSERT_TRUE(swWriteBatches.isOK());
@@ -1220,6 +1243,9 @@ TEST_F(TimeseriesWriteOpsInternalTest,
                                                   /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/userBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
 
     ASSERT_TRUE(swWriteBatches.isOK());
@@ -1256,6 +1282,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsAll) {
                                                   /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userMeasurementsBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/userMeasurementsBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
 
     ASSERT_FALSE(swWriteBatches.isOK());
@@ -1287,6 +1316,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsSome) {
                                                   /*earlyReturnOnError=*/true,
                                                   _compressBucket,
                                                   userMeasurementsBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/userMeasurementsBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
 
     ASSERT_FALSE(swWriteBatches.isOK());
@@ -1328,6 +1360,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
                                                   /*earlyReturnOnError=*/false,
                                                   _compressBucket,
                                                   filteredUserBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/filteredUserBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -1337,7 +1372,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
     mongo::write_ops::InsertCommandRequest request(_ns1);
     request.setWriteCommandRequestBase(base);
 
-    internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, 0, writeBatches, originalIndices);
+    internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, originalIndices, writeBatches);
 
     ASSERT_EQ(writeBatches.size(), 1);
     auto& batch = writeBatches.front();
@@ -1382,6 +1417,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
                                                   /*earlyReturnOnError=*/false,
                                                   _compressBucket,
                                                   filteredUserBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/filteredUserBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -1392,7 +1430,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
     mongo::write_ops::InsertCommandRequest request(_ns1);
     request.setWriteCommandRequestBase(base);
 
-    internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, 0, writeBatches, originalIndices);
+    internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, originalIndices, writeBatches);
 
     ASSERT_EQ(writeBatches.size(), 1);
     auto& batch = writeBatches.front();
@@ -1438,6 +1476,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
                                                   /*earlyReturnOnError=*/false,
                                                   _compressBucket,
                                                   filteredUserBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/filteredUserBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -1448,7 +1489,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
     mongo::write_ops::InsertCommandRequest request(_ns1);
     request.setWriteCommandRequestBase(base);
 
-    internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, 0, writeBatches, originalIndices);
+    internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, originalIndices, writeBatches);
 
     ASSERT_EQ(writeBatches.size(), 1);
     auto& batch = writeBatches.front();
@@ -1489,6 +1530,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErro
                                                   /*earlyReturnOnError=*/false,
                                                   _compressBucket,
                                                   filteredUserBatch,
+                                                  /*startIndex=*/0,
+                                                  /*numDocsToStage=*/filteredUserBatch.size(),
+                                                  /*docsToRetry=*/{},
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -1500,6 +1544,210 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErro
     ASSERT_EQ(errors.size(), 1);
     auto& error = errors.front();
     ASSERT_EQ(error.getIndex(), 2);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
+    auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    std::vector<BSONObj> originalUserBatch{
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:02:00.000Z"}})"), /*Sorted Order = 2*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:00:00.000Z"}})"), /*Sorted Order = 0*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:01:00.000Z"}})"), /*Sorted Order = 1*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:03:00.000Z"}})"), /*Sorted Order = 3*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:05:00.000Z"}})"), /*Sorted Order = 5*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:04:00.000Z"}})"), /*Sorted Order = 4*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:06:00.000Z"}})"), /*Sorted Order = 6*/
+    };
+
+    std::unordered_set<size_t> expectedIndices = {2, 3, 4, 5, 6};
+    size_t startIndex = 2;
+    size_t numDocsToStage = 5;
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl.get(),
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_nsNoMeta),
+                                                  _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/false,
+                                                  _compressBucket,
+                                                  originalUserBatch,
+                                                  /*startIndex=*/startIndex,
+                                                  /*numDocsToStage=*/numDocsToStage,
+                                                  /*docsToRetry=*/{},
+                                                  errorsAndIndices);
+    ASSERT_OK(swWriteBatches);
+    auto writeBatches = swWriteBatches.getValue();
+    ASSERT_EQ(writeBatches.size(), 1);
+
+    auto writeBatch = writeBatches.front();
+    ASSERT_EQ(writeBatch->measurements.size(), numDocsToStage);
+    ASSERT_EQ(std::unordered_set<size_t>(writeBatch->userBatchIndices.begin(),
+                                         writeBatch->userBatchIndices.end()),
+              expectedIndices);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
+    auto tsOptions = _getTimeseriesOptions(_ns1);
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    std::vector<BSONObj> originalUserBatch{
+        mongo::fromjson(
+            R"({"tag": "a", "time":{"$date":"2025-03-06T10:02:00.000Z"}})"), /*Sorted Order = 2*/
+        mongo::fromjson(
+            R"({"tag": "b", "time":{"$date":"2025-03-06T10:00:00.000Z"}})"), /*Sorted Order = 0*/
+        mongo::fromjson(
+            R"({"tag": "b", "time":{"$date":"2025-03-06T10:01:00.000Z"}})"), /*Sorted Order = 1*/
+        mongo::fromjson(
+            R"({"tag": "a", "time":{"$date":"2025-03-06T10:03:00.000Z"}})"), /*Sorted Order = 3*/
+        mongo::fromjson(
+            R"({"tag": "b", "time":{"$date":"2025-03-06T10:05:00.000Z"}})"), /*Sorted Order = 5*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:04:00.000Z"}})"), /*Sorted Order = 4*/
+        mongo::fromjson(
+            R"({"tag": "a", "time":{"$date":"2025-03-06T10:06:00.000Z"}})"), /*Sorted Order = 6*/
+    };
+
+    std::unordered_set<size_t> expectedIndices = {2, 3, 4, 5, 6};
+    size_t startIndex = 2;
+    size_t numDocsToStage = 5;
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl.get(),
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_nsNoMeta),
+                                                  _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/false,
+                                                  _compressBucket,
+                                                  originalUserBatch,
+                                                  /*startIndex=*/startIndex,
+                                                  /*numDocsToStage=*/numDocsToStage,
+                                                  /*docsToRetry=*/{},
+                                                  errorsAndIndices);
+    ASSERT_OK(swWriteBatches);
+    auto writeBatches = swWriteBatches.getValue();
+    ASSERT_EQ(writeBatches.size(), 3);
+
+    std::unordered_set<size_t> actualIndices;
+    for (auto& batch : writeBatches) {
+        for (auto index : batch->userBatchIndices) {
+            actualIndices.insert(index);
+        }
+    }
+
+    ASSERT_EQ(actualIndices, expectedIndices);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
+    auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    std::vector<BSONObj> originalUserBatch{
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:02:00.000Z"}})"), /*Sorted Order = 2*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:00:00.000Z"}})"), /*Sorted Order = 0*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:01:00.000Z"}})"), /*Sorted Order = 1*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:03:00.000Z"}})"), /*Sorted Order = 3*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:05:00.000Z"}})"), /*Sorted Order = 5*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:04:00.000Z"}})"), /*Sorted Order = 4*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:06:00.000Z"}})"), /*Sorted Order = 6*/
+    };
+
+    std::vector<size_t> docsToRetry = {0, 2, 4};
+
+    // These should be ignored when docsToRetry is specified.
+    size_t startIndex = 2;
+    size_t numDocsToStage = 5;
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl.get(),
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_nsNoMeta),
+                                                  _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/false,
+                                                  _compressBucket,
+                                                  originalUserBatch,
+                                                  /*startIndex=*/startIndex,
+                                                  /*numDocsToStage=*/numDocsToStage,
+                                                  /*docsToRetry=*/docsToRetry,
+                                                  errorsAndIndices);
+
+    ASSERT_OK(swWriteBatches);
+    auto writeBatches = swWriteBatches.getValue();
+    ASSERT_EQ(writeBatches.size(), 1);
+
+    auto writeBatch = writeBatches.front();
+    ASSERT_EQ(writeBatch->measurements.size(), docsToRetry.size());
+    ASSERT_EQ(std::unordered_set<size_t>(writeBatch->userBatchIndices.begin(),
+                                         writeBatch->userBatchIndices.end()),
+              std::unordered_set<size_t>(docsToRetry.begin(), docsToRetry.end()));
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
+    auto tsOptions = _getTimeseriesOptions(_ns1);
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    std::vector<BSONObj> originalUserBatch{
+        mongo::fromjson(
+            R"({"tag": "a", "time":{"$date":"2025-03-06T10:02:00.000Z"}})"), /*Sorted Order = 2*/
+        mongo::fromjson(
+            R"({"tag": "b", "time":{"$date":"2025-03-06T10:00:00.000Z"}})"), /*Sorted Order = 0*/
+        mongo::fromjson(
+            R"({"tag": "b", "time":{"$date":"2025-03-06T10:01:00.000Z"}})"), /*Sorted Order = 1*/
+        mongo::fromjson(
+            R"({"tag": "a", "time":{"$date":"2025-03-06T10:03:00.000Z"}})"), /*Sorted Order = 3*/
+        mongo::fromjson(
+            R"({"tag": "b", "time":{"$date":"2025-03-06T10:05:00.000Z"}})"), /*Sorted Order = 5*/
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:04:00.000Z"}})"), /*Sorted Order = 4*/
+        mongo::fromjson(
+            R"({"tag": "a", "time":{"$date":"2025-03-06T10:06:00.000Z"}})"), /*Sorted Order = 6*/
+    };
+
+    std::vector<size_t> docsToRetry = {0, 2, 4, 5};
+
+    // These should be ignored when docsToRetry is specified.
+    size_t startIndex = 2;
+    size_t numDocsToStage = 5;
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl.get(),
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_nsNoMeta),
+                                                  _getStorageCacheSizeBytes(),
+                                                  /*earlyReturnOnError=*/false,
+                                                  _compressBucket,
+                                                  originalUserBatch,
+                                                  /*startIndex=*/startIndex,
+                                                  /*numDocsToStage=*/numDocsToStage,
+                                                  /*docsToRetry=*/docsToRetry,
+                                                  errorsAndIndices);
+
+    ASSERT_OK(swWriteBatches);
+    auto writeBatches = swWriteBatches.getValue();
+    ASSERT_EQ(writeBatches.size(), 3);
+
+    std::unordered_set<size_t> actualIndices;
+    for (auto& batch : writeBatches) {
+        for (auto index : batch->userBatchIndices) {
+            actualIndices.insert(index);
+        }
+    }
+
+    ASSERT_EQ(actualIndices, std::unordered_set<size_t>(docsToRetry.begin(), docsToRetry.end()));
 }
 
 

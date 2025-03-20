@@ -140,13 +140,11 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 commit_result::Result commitTimeseriesBucketForBatch(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    size_t start,
+    const mongo::write_ops::InsertCommandRequest& request,
     std::vector<mongo::write_ops::WriteError>& errors,
     boost::optional<repl::OpTime>& opTime,
     boost::optional<OID>& electionId,
-    std::vector<size_t>& docsToRetry,
-    absl::flat_hash_map<int, int>& retryAttemptsForDup,
-    const mongo::write_ops::InsertCommandRequest& request);
+    absl::flat_hash_map<int, int>& retryAttemptsForDup);
 
 /**
  * Given a batch of user measurements for a collection that does not have a metaField value, returns
@@ -166,6 +164,9 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContextsNoMe
     const UUID& collectionUUID,
     const TimeseriesOptions& timeseriesOptions,
     const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocs,
+    const std::vector<size_t>& indices,
     bucket_catalog::ExecutionStatsController& stats,
     tracking::Context& trackingContext,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
@@ -185,6 +186,9 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContextsWith
     const UUID& collectionUUID,
     const TimeseriesOptions& timeseriesOptions,
     const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
     bucket_catalog::ExecutionStatsController& stats,
     tracking::Context& trackingContext,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
@@ -207,6 +211,9 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
     const UUID& collectionUUID,
     const TimeseriesOptions& timeseriesOptions,
     const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
 
 /**
@@ -244,6 +251,9 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
     bool earlyReturnOnError,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
 
 /**
@@ -254,9 +264,8 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
  */
 void rewriteIndicesForSubsetOfBatch(OperationContext* opCtx,
                                     const mongo::write_ops::InsertCommandRequest& request,
-                                    size_t startIndex,
-                                    TimeseriesWriteBatches& writeBatches,
-                                    std::vector<size_t>& originalIndices);
+                                    const std::vector<size_t>& originalIndices,
+                                    TimeseriesWriteBatches& writeBatches);
 /**
  * Processes the errors in `errorsAndIndices` and populates the `errors` vector with them, tying
  * each error to the index of the measurement that caused it in the original user batch of
