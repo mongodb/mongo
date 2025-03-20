@@ -7,8 +7,6 @@
  * shard-local catalog initially, as it will test how the DDL works before implementing the full
  * upgrade procedure.
  *
- * TODO (SERVER-101884): Remove or update this test once the upgrade procedure is completed.
- *
  * @tags: [
  *     featureFlagShardAuthoritativeDbMetadataCRUD,
  *     featureFlagShardAuthoritativeDbMetadataDDL,
