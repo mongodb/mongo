@@ -2,7 +2,7 @@
 
 ## Overview
 
-A query is first parsed into a [logical model](../query/README_logical_models.md), representing the query's semantics in a structured format. This logical model is then normalized, transformed, and optimized, making it more amenable to efficient execution. These rewrites are based on predefined rules, or heuristics. We call them **heuristic rewrites** because we don't know for sure whether the rewritten result will be better than the original - we just have a best guess. Once the logical model is optimized, the query planner [generates](TODO SERVER-100248) multiple candidate physical representations and [selects](TODO SERVER-100249) the most efficient plan for execution.
+A query is first parsed into a [logical model](../query/README_logical_models.md), representing the query's semantics in a structured format. This logical model is then normalized, transformed, and optimized, making it more amenable to efficient execution. These rewrites are based on predefined rules, or heuristics. We call them **heuristic rewrites** because we don't know for sure whether the rewritten result will be better than the original - we just have a best guess. Once the logical model is optimized, the query planner [generates](../query/plan_enumerator/README.md) multiple candidate physical representations and [selects](../query/classic_runtime_planner/README.md) the most efficient plan for execution.
 
 This README will cover rewrites on the `MatchExpression` component of a find query or `$match` stage. It does not cover subsequent stages such as query compilation (stage builders). To learn more about rewrites on aggregate pipelines, refer to the [Pipeline Rewrites README](../pipeline/README.md).
 
@@ -223,9 +223,9 @@ The entrypoint into Boolean simplification is the [`simplifyMatchExpression()`](
 
 - Once the bitset tree is in DNF, it can be further reduced to a minimal set of minterms, or sum of products.
 
-3. **Apply the [Quine McCluskey](../query/boolean_simplification/quine_mccluskey.h) reduction operation of DNF terms**: (x ∧ y) ∨ (x ∧ ~y) = x
+3. **Apply the [Quine McCluskey](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/query/boolean_simplification/quine_mccluskey.h) reduction operation of DNF terms**: (x ∧ y) ∨ (x ∧ ~y) = x
 4. **Apply [Absorption's Law](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/query/boolean_simplification/bitset_algebra.h#L117)**: x ∨ (x ∧ y) = x
-5. **Use [Petrick's method](../query/boolean_simplification/petrick.h) for further simplification**: This is used to find the minimal "coverage", or the smallest set of minterms such that the predicates evaluate to true.
+5. **Use [Petrick's method](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/query/boolean_simplification/petrick.h) for further simplification**: This is used to find the minimal "coverage", or the smallest set of minterms such that the predicates evaluate to true.
    - For example, given the input list of minterms `[[0, 1, 2], [2, 3], [0, 3]]`, we can derive two minimal coverages: `[0, 1]` and `[0, 2]`. The result is a vector of indices to the required minterms. We can "cover" the predicates 0, 1, 2, and 3 with either pairs of the original list of minterms.
 6. **Restore the original MatchExpression**: Finally, we [restore](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression_simplifier.cpp#L257) the `MatchExpression` tree from the bitset tree and a list of expressions representing bits in the bitset tree.
 
@@ -336,7 +336,7 @@ Finally, at the end of Boolean simplification, we restore the original `MatchExp
 
 ```
 
-For more information on the design of the Boolean simplifier, refer to the blog post: [Improving MongoDB Queries by Simplifying Boolean Expressions](https://www.mongodb.com/blog/post/improving-mongodb-queries-by-simplifying-boolean-expressions). Libraries can be found under the [boolean_simplification](../query/boolean_simplification/) folder.
+For more information on the design of the Boolean simplifier, refer to the blog post: [Improving MongoDB Queries by Simplifying Boolean Expressions](https://www.mongodb.com/blog/post/improving-mongodb-queries-by-simplifying-boolean-expressions). Libraries can be found in the [`boolean_simplification`](https://github.com/10gen/mongo/tree/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/query/boolean_simplification) directory.
 
 ```mermaid
 graph TD

@@ -138,7 +138,7 @@ These are the major classes of dependencies:
 - **Metadata**: additional information about a document that's not part of its core fields. This is often used in operations that rely on contextual information, such as text search scores, geographic proximity, or reserved fields.
   - _Example_: The stage `{$project: {score: {$meta: "textScore"}}}` has a dependency on the `textScore` metadata, which is not a document field.
 
-For implementation details about dependency tracking and validation, refer to the [`expression_algo`](../matcher/expression_algo.h), [`semantic_analysis`](semantic_analysis.h), and [`dependencies`](dependencies.h) files.
+For implementation details about dependency tracking and validation, refer to the [`expression_algo`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/matcher/expression_algo.h), [`semantic_analysis`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/pipeline/semantic_analysis.h), and [`dependencies`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/pipeline/dependencies.h) files.
 
 ## Stage-specific Optimization
 

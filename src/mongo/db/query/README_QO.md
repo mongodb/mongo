@@ -55,92 +55,65 @@ _Disclaimer_: This guide (SPM-2301) is a work in progress.
 ## High-Level Diagram
 
 ```mermaid
-graph TD
-  %% Client Section
-  subgraph Client
-    A1[mapReduce]
-    A2[aggregate]
-    A3[find]
-    A4[count]
-    A5[distinct]
-    A6[delete]
-    A7[update]
-    A8[findAndModify]
+---
+config:
+  themeVariables:
+    fontSize: 32px
+---
+flowchart TD
+ subgraph Client[" "]
+        mr["mapReduce"]
+        agg["aggregate"]
+        find["find"]
+        count["count"]
+        dist["distinct"]
+        del["delete"]
+        update["update"]
+        fam["findAndModify"]
   end
-  %% Parsing Section
-  subgraph Parsing
-    B1@{ shape: dbl-circ, label: Pipeline }
-    B2@{ shape: subproc, label: "DocumentSource parsing" }
-    B3@{ shape: dbl-circ, label: "CanonicalQuery" }
-    B4[ParsedUpdate/ParsedDelete]
-    B5@{ shape: dbl-circ, label: "MatchExpression" }
+ subgraph s1["Query Execution"]
+        D1["DocumentSourceExecution"]
+        D2["PlanExecutor"]
+        D3["Storage API"]
   end
-  %% Optimization Section
-  subgraph Optimization
-    C1@{ shape: subproc, label: "MatchExpression::optimize()" }
-    C2@{ shape: subproc, label: "Pipeline::optimize()" }
-    C3@{ shape: lin-rect, label: "Plan Enumerator" }
-    C4@{ shape: docs, label: "Classic Multiplanner" }
-    C5@{ shape: docs, label: "Classic Multiplanner for SBE" }
-    C6@{ shape: docs, label: "Cost Based Ranker" }
-    C7@{ shape: lean-r, label: "Cardinality Estimation" }
-    C8@{ shape: lean-r, label: "Cost Model" }
-    C11{Can pushdown to find?}
-    C12@{ shape: doc, label: "QuerySolution" }
-  end
-  %% Execution Section
-  subgraph Execution
-    D1@{ shape: subproc, label: "DocumentSourceExecution" }
-    D2@{ shape: lin-rect, label: "PlanExecutor" }
-    D3@{ shape: cyl, label: "Storage API" }
-  end
-  subgraph Legend
-    E13@{ shape: "rectangle", label: "Command"}
-    E14@{ shape: "dbl-circ", label: "Standard IR"}
-    E15@{ shape: subproc, label: "Process" }
-    E16@{ shape: docs, label: "Query Plans"}
-    E20@{ shape: doc, label: "Query Plan"}
-    E17@{ shape: cyl, label: "Database" }
-    E18{Decision}
-    E19@{ shape: lean-r, label: "Input" }
-  end
-  %% Client to Parsing Links
-  A1 -- Deprecated in 5.0 in favor of agg --> B1
-  A2 --> B1
-  A3 --> B3
-  A4 --> B3
-  A5 --> B3
-  A6 --> B4
-  A7 --> B4
-  A8 --> B4
-  %% Parsing Links
-  B1 --> B2
-  B4 --> B3
-  B3 -- Build from filter --> B5
-  %% Parsing to Optimization Links
-  B2 --> C2
-  B5 --> C1
-  %% Optimization Links
-  C1 --> C3
-  C3 --> C4
-  C3 --> C5
-  C3 --> C6
-  C7 --o C6
-  C8 --o C6
-  C4 --> C12
-  C5 --> C12
-  C6 --> C12
-  C2 --> C11
-  %% Optimization to Parsing Links
-  C11 -.-> |Yes| B3
-  %% Optimization to Execution Links
-  C12 --> D2
-  C11 --> |No| D1
-  %% Execution Links
-  D1 --> D2
-  D2 --> D3
-  %% Invisible Links for Formatting
-  B3 ~~~~ Execution
-  Execution ~~~~ Legend
-  D3 ~~~~ E13
+    find --> cq["CanonicalQuery"]
+    count --> cq
+    dist --> cq
+    cq -- filter --> me["MatchExpression"]
+    del -- filter --> cq
+    update -- filter --> cq
+    fam -- filter --> cq
+    me --> C1["MatchExpression::optimize()"]
+    C1 --> C3["Plan Enumerator"]
+    C3 --> C4["Classic Multiplanner"] & C5["Classic Multiplanner for SBE"] & C6["Cost Based Ranker"]
+    C7["Cardinality Estimation"] --o C6
+    C8["Cost Model"] --o C6
+    C4 --> C12["Winning QuerySolution"]
+    C5 --> C12
+    C6 --> C12
+    C11{"Can pushdown to find?"} -- Yes --> cq
+    C12 --> D2
+    C11 -- No --> D1
+    D1 --> D2
+    D2 --> D3
+    n1["Pipeline::optimize()"] --> C11
+    agg --> B1["Pipeline"]
+    mr -- "Deprecated in v5.0 in favor of agg" --> B1
+    cq -- "projection<br>sort" --> C3
+    B1 --> n1
+    D1@{ shape: subproc}
+    D2@{ shape: lin-rect}
+    D3@{ shape: cyl}
+    cq@{ shape: dbl-circ}
+    me@{ shape: dbl-circ}
+    B1@{ shape: dbl-circ}
+    C1@{ shape: subproc}
+    C3@{ shape: subproc}
+    C4@{ shape: procs}
+    C5@{ shape: procs}
+    C6@{ shape: procs}
+    C7@{ shape: lean-r}
+    C8@{ shape: lean-r}
+    C12@{ shape: dbl-circ}
+    n1@{ shape: subproc}
 ```

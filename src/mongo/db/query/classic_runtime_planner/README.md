@@ -2,7 +2,7 @@
 
 ## Overview
 
-The goal of the classic engine's runtime planner is to take a vector of `QuerySolution`s (returned from [plan enumeration](TODO: SERVER-100248)) as input and determine which query plan will most efficiently return the correct result set.
+The goal of the classic engine's runtime planner is to take a vector of `QuerySolution`s (returned from [plan enumeration](../plan_enumerator/README.md)) as input and determine which query plan will most efficiently return the correct result set.
 
 The classic engine makes this determination using a process called **multiplanning**. This involves _partially_ executing all query plans and evaluating, based on [limited execution](#end-conditions), which is most productive.
 

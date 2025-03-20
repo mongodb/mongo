@@ -9,7 +9,7 @@ Moreover, `explain` ignores the [plan cache](plan_cache/README.md) during query 
 This document will cover the following aspects of `explain`:
 
 1. [**Explain Usage**](#explain-usage) to provide insight into how a query can be dissected for its query planning, index usage, and execution stats. This is especially helpful when investigating a performance regression or understanding the plan space given a dataset, set of indexes, and query.
-1. [**Explain Implementation**](#explain-implementation) for a deep dive into how `explain` is implemented in the codebase. This section traces an `explain` command through parsing, query planning, and query execution. It also disusses how `explain` is implemented in a sharded cluster, as well as different plan explainers for `explain`.
+1. [**Explain Implementation**](#explain-implementation) for a deep dive into how `explain` is implemented in the codebase. This section traces an `explain` command through parsing, query planning, and query execution. It also discusses how `explain` is implemented in a sharded cluster, as well as different plan explainers for `explain`.
 
 ## Explain Usage
 
@@ -152,7 +152,7 @@ db.coll.explain(<verbosity>).find({a: 1, b: 1})
   > ```
 - **queryShapeHash**: a hex string that represents the hash of the [query shape](https://www.mongodb.com/docs/manual/core/query-shapes/#std-label-query-shapes).
 - **serverInfo**: For unsharded collections, the info is returned for the `mongod` instance. For sharded collections, the info is returned for each accessed shard; there is additionally a top-level `serverInfo` object for the `mongos`.
-- **serverParameters**: details about several internal [query parameters](query_knobs.idl).
+- **serverParameters**: details about several internal [query parameters](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/query/query_knobs.idl).
 
 #### `queryPlanner` Mode
 

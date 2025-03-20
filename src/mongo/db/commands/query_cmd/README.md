@@ -96,7 +96,7 @@ An [**`ExpressionContext`**](https://github.com/10gen/mongo/tree/57a6678467d3819
 
 #### Non-IDL Command Validation
 
-Occasionally, the IDL parsers will not be able to express certain command constraints. For example, the `findAndModify` command cannot specify `true` for both `remove` and `new`, but the [IDL parser](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/write_ops/write_ops.idl#L497) alone cannot restrict the user from doing this. In these cases, we add a [`validate`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_and_modify.cpp#L131) function to perform these final checks.
+Occasionally, the IDL parsers will not be able to express certain command constraints. For example, the `findAndModify` command cannot specify `true` for both `remove` and `new`, but the [IDL parser](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/write_ops/write_ops.idl#L497) alone cannot restrict the user from doing this. In these cases, we add a [`validate()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_and_modify.cpp#L131) function to perform these final checks.
 
 ## Query Language Parsing and Validation
 
@@ -104,9 +104,7 @@ Occasionally, the IDL parsers will not be able to express certain command constr
 
 #### Parsing Find
 
-As discussed above, the IDL handles creation of a `FindCommandRequest`. With this `FindCommandRequest` struct, we can now call [`parsed_find_command::parse()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_cmd.cpp#L194), passing in the `ExpressionContext` and a new struct of type `ParsedFindCommandParams`, which contains the `FindCommandRequest` as a member. A few function calls later, we reach [`MatchExpressionParser::parse()`](https://github.com/mongodb/mongo/blob/0a68308f0d39a928ed551f285ba72ca560c38576/src/mongo/db/query/parsed_find_command.cpp#L186) which recursively parses the `BSONObj` `filter` component of our `FindCommandRequest` by using the `parse()` function for each type of `MatchExpression` node. This AST structure assembles the `filter` in an easily optimizable format, as each subclass `MatchExpression` node knows which rewrites are possible given their place in the AST.
-
-> For more information on `MatchExpression`s, see [Logical Models](../../query/README_logical_models.md).
+As discussed above, the IDL handles creation of a `FindCommandRequest`. With this `FindCommandRequest` struct, we can now call [`parsed_find_command::parse()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/find_cmd.cpp#L194), passing in the `ExpressionContext` and a new struct of type `ParsedFindCommandParams`, which contains the `FindCommandRequest` as a member. A few function calls later, we reach [`MatchExpressionParser::parse()`](https://github.com/mongodb/mongo/blob/0a68308f0d39a928ed551f285ba72ca560c38576/src/mongo/db/query/parsed_find_command.cpp#L186) which recursively parses the `BSONObj` `filter` component of our `FindCommandRequest` by using the `parse()` function for each type of `MatchExpression` node. This AST structure assembles the `filter` in an easily optimizable format, as each subclass `MatchExpression` node knows which rewrites are possible given their place in the AST. For more information on `MatchExpression`s, see [Logical Models](../../query/README_logical_models.md).
 
 After parsing our `MatchExpression` into a tree of `MatchExpression`s , we pass the full `MatchExpression` AST to a `ParsedFindCommand`. Note that `ParsedFindCommand`s only primary components are the `filter`, `projection`, and `sort`; all other parameters (e.g. `limit`, `skip`, `batchSize`, etc.) are held as raw types in the `FindCommandRequest`.
 
@@ -121,8 +119,13 @@ Distinct queries are parsed by IDL into a `DistinctCommandRequest`, which is in 
 Count queries are parsed using `ParsedFindCommand`'s [`parseFromCount()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/parsed_find_command.cpp#L349) function, which converts a `CountCommandRequest` into a `FindCommandRequest` and uses the same logic as `find` thereafter.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 32px
+---
 flowchart LR
- subgraph s1["Basic Read Queries"]
+ subgraph s1[" "]
         n1["Find"]
         n2["Distinct"]
         n3["Count"]
@@ -158,11 +161,11 @@ After confirming that the `LiteParsedPipeline` satisfies all the necessary permi
 >
 > A `DocumentSource` represents one stage of an aggregation pipeline. Each `DocumentSource` lives in its own file with this form: [`src/mongo/db/pipeline/document_source_<stage>`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/), with a [`REGISTER_DOCUMENT_SOURCE`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source.h#L118) macro at the top. Each `DocumentSource` also features a `createFromBson()` function; this is the main parsing function for each `DocumentSource`. By registering each document source with its lite parsing and full parsing functions, we can recursively parse the entire pipeline, stage by stage.
 >
-> Important Note: Not all `DocumentSource`s get parsed into their own stages. Major stages like `$match` have a [`createFromBson()`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source_match.cpp#L603) that returns a `DocumentSourceMatch`, but some stages are aliases for other `DocumentSource`s.
+> Not all `DocumentSource`s get parsed into their own stages. Major stages like `$match` do have a [`createFromBson()`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source_match.cpp#L603) that returns a `DocumentSourceMatch`, but some stages are aliases for other `DocumentSource`s.
 >
 > - For example, [`DocumentSourceBucket::createFromBson()`](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/document_source_bucket.cpp#L74) returns two `DocumentSource`s: a `$group` stage and a `$sort` stage by calling on `DocumentSourceGroup` and `DocumentSourceSort`'s respective `createFromBson()` functions.
 
-The [result](https://github.com/10gen/mongo/tree/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/pipeline/pipeline.cpp#L240) of this parsing is a `Pipeline` object which contains a list of parsed `DocumentSource`s as a member. Our final goal, however, is to get a `CanonicalQuery`. This may or may not be possible depending on the type of aggregation. For example:
+The [result](https://github.com/10gen/mongo/blob/d1373d8f0290ea1db5b09e39f45f7efc350dcd46/src/mongo/db/pipeline/pipeline.cpp#L231) of this parsing is a [`Pipeline`](https://github.com/10gen/mongo/blob/d1373d8f0290ea1db5b09e39f45f7efc350dcd46/src/mongo/db/pipeline/pipeline.h#L106) object that contains a list of parsed `DocumentSource`s as a member. Our final goal, however, is to get a `CanonicalQuery`. This may or may not be possible depending on the type of aggregation. For example:
 
 > ```
 > // This query fully undergoes optimization as a CanonicalQuery.
@@ -178,8 +181,13 @@ If some component of the `Pipeline` can become a `CanonicalQuery` (i.e. it conta
 After parsing into a `MapReduceCommandRequest` via IDL, the `MapReduceCommandRequest` is [translated](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/map_reduce_agg.cpp#L175) into an equivalent pipeline using the same `DocumentSource<Stage>` parsing functions as aggregation.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 32px
+---
 flowchart LR
- subgraph s2["Aggregations"]
+ subgraph s2[" "]
         n4["Aggregate"]
         n5["MapReduce"]
   end
@@ -189,7 +197,7 @@ flowchart LR
     n22 --> n23["LiteParsedPipeline"]
     n23 -- Authorization Checks --> n22
     n28["Pipeline"] --> n32["Is some component of the Pipeline canonicalizable?"]
-    n32 -- No --> n33>"Bypass MatchExpression Optimization"]
+    n32 -- No --> n33>"DocumentSourceExecution"]
     n22 -- Pipeline::parseCommon()<br>DocumentSource::parse() --> n31["DocumentSources"]
     n30 --> n31
     n31 -- "DocumentSource&lt;Stage&gt;::createFromBson()" --> n28
@@ -204,15 +212,20 @@ flowchart LR
 
 Insert, Delete, Update, and FindAndModify are all parsed by IDL as described above and converted into a `BulkWriteCommandRequest`, `DeleteRequest`, `UpdateRequest`, `FindAndModifyCommandRequest`, respectively.
 
-Inserts are internally [represented](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/bulk_write.idl#L308) as a `BulkWriteCommandRequest` which contains an array of `BulkWriteInsertOp`s. No query optimization is needed for inserts beyond parsing, as insert is a write-only operation.
+Inserts are internally [represented](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/commands/query_cmd/bulk_write.idl#L308) as a `BulkWriteCommandRequest` which contains an array of `BulkWriteInsertOp`s. No query optimization is needed for inserts beyond parsing, since insert is a write-only operation.
 
 `DeleteRequest`s are passed into a `ParsedDelete` constructor and `UpdateRequest`s are passed to a `ParsedUpdate` constructor. Both of these constructors will in turn pass the request to [`parseWriteQueryToCQ()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/write_ops/parsed_writes_common.h#L84). This function parses the `filter` component of the write query as if it were a `FindCommandRequest`, and the result is a `CanonicalQuery`, just as it is with `find`.
 
 `FindAndModifyCommandRequest`s can contain both find and update/delete syntax. For this reason, the query portion is entirely delegated to the `find` query parser. The update or delete portion is translated into a `ParsedUpdate` or `ParsedDelete`, each of which uses the corresponding codepath henceforth.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 32px
+---
 flowchart LR
- subgraph s3["Write Queries"]
+ subgraph s3[" "]
         n6["Insert"]
         n7["Delete"]
         n8["Update"]
