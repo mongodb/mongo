@@ -69,42 +69,53 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 }
             }))
         .onError([](const Status& status) { return status; })
-        .then(_buildPhaseHandler(Phase::kCheckShardPreconditions,
-                                 [this, &token, _ = shared_from_this(), executor]() {
-                                     auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
+        .then(_buildPhaseHandler(
+            Phase::kCheckShardPreconditions,
+            [this, &token, _ = shared_from_this(), executor]() {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
 
-                                     auto& targeter = _getTargeter(opCtx);
+                auto& targeter = _getTargeter(opCtx);
 
-                                     try {
-                                         _runWithRetries(
-                                             [&]() {
-                                                 topology_change_helpers::validateHostAsShard(
-                                                     opCtx,
-                                                     targeter,
-                                                     _doc.getConnectionString(),
-                                                     _doc.getIsConfigShard(),
-                                                     **executor);
-                                             },
-                                             executor,
-                                             token);
-                                     } catch (const DBException&) {
-                                         // if we are not able to validate the host as a shard after
-                                         // multiple try, we don't want to continue, so we remove
-                                         // the replicaset monitor and give up.
-                                         topology_change_helpers::removeReplicaSetMonitor(
-                                             opCtx, _doc.getConnectionString());
-                                         _completeOnError = true;
-                                         throw;
-                                     }
+                try {
+                    _runWithRetries(
+                        [&]() {
+                            topology_change_helpers::validateHostAsShard(opCtx,
+                                                                         targeter,
+                                                                         _doc.getConnectionString(),
+                                                                         _doc.getIsConfigShard(),
+                                                                         **executor);
+                        },
+                        executor,
+                        token);
+                } catch (const DBException&) {
+                    // if we are not able to validate the host as a shard after
+                    // multiple try, we don't want to continue, so we remove
+                    // the replicaset monitor and give up.
+                    topology_change_helpers::removeReplicaSetMonitor(opCtx,
+                                                                     _doc.getConnectionString());
+                    _completeOnError = true;
+                    throw;
+                }
 
-                                     // TODO(SERVER-97997) Remove the check after promoting to
-                                     // sharded cluster is implemented correctly
-                                     if (!_isFirstShard(opCtx)) {
-                                         _blockUserWrites(opCtx, **executor);
-                                         _checkExistingDataOnShard(opCtx, targeter, **executor);
-                                     }
-                                 }))
+                // TODO(SERVER-97997) Remove the check after promoting to
+                // sharded cluster is implemented correctly
+                if (!_isFirstShard(opCtx)) {
+                    if (!_doc.getIsConfigShard()) {
+                        _blockUserWrites(opCtx, **executor);
+                    }
+                    _checkExistingDataOnShard(opCtx, targeter, **executor);
+                }
+
+                std::string shardName =
+                    topology_change_helpers::createShardName(opCtx,
+                                                             _getTargeter(opCtx),
+                                                             _doc.getIsConfigShard(),
+                                                             _doc.getProposedName(),
+                                                             **executor);
+
+                _doc.setChosenName(shardName);
+            }))
         .then(_buildPhaseHandler(
             Phase::kPrepareNewShard,
             [this, _ = shared_from_this()] { return !_doc.getIsConfigShard(); },
@@ -113,17 +124,6 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
 
                 auto& targeter = _getTargeter(opCtx);
-
-                std::string shardName;
-                try {
-                    shardName = topology_change_helpers::createShardName(opCtx,
-                                                                         targeter,
-                                                                         _doc.getIsConfigShard(),
-                                                                         _doc.getProposedName(),
-                                                                         **executor);
-                } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
-                    triggerCleanup(opCtx, ex.toStatus());
-                }
 
                 _dropSessionsCollection(opCtx, **executor);
 
@@ -135,10 +135,12 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     apiParameters = APIParameters::fromBSON(params.value());
                 }
 
-                topology_change_helpers::createShardIdentity(
-                    opCtx, targeter, shardName, apiParameters, _osiGenerator(), **executor);
-
-                _doc.setChosenName(shardName);
+                topology_change_helpers::createShardIdentity(opCtx,
+                                                             targeter,
+                                                             _doc.getChosenName()->toString(),
+                                                             apiParameters,
+                                                             _osiGenerator(),
+                                                             **executor);
 
                 _standardizeClusterParameters(opCtx, executor);
             }))
@@ -336,6 +338,35 @@ const std::string& AddShardCoordinator::getResult(OperationContext* opCtx) const
 
 bool AddShardCoordinator::canAlwaysStartWhenUserWritesAreDisabled() const {
     return true;
+}
+
+std::shared_ptr<AddShardCoordinator> AddShardCoordinator::create(
+    OperationContext* opCtx,
+    const mongo::ConnectionString& target,
+    boost::optional<std::string> name,
+    bool isConfigShard) {
+    auto coordinatorDoc = AddShardCoordinatorDocument();
+    coordinatorDoc.setConnectionString(target);
+    coordinatorDoc.setIsConfigShard(isConfigShard);
+    coordinatorDoc.setProposedName(name);
+    auto metadata = ShardingDDLCoordinatorMetadata(
+        {{NamespaceString::kConfigsvrShardsNamespace, DDLCoordinatorTypeEnum::kAddShard}});
+    auto fwdOpCtx = metadata.getForwardableOpMetadata();
+    if (!fwdOpCtx) {
+        fwdOpCtx = ForwardableOperationMetadata(opCtx);
+    }
+    fwdOpCtx->setMayBypassWriteBlocking(true);
+    metadata.setForwardableOpMetadata(fwdOpCtx);
+    coordinatorDoc.setShardingDDLCoordinatorMetadata(metadata);
+
+    const auto apiParameters = APIParameters::get(opCtx);
+    if (apiParameters.getParamsPassed()) {
+        coordinatorDoc.setApiParams(apiParameters.toBSON());
+    }
+
+    return checked_pointer_cast<AddShardCoordinator>(
+        ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
+            opCtx, coordinatorDoc.toBSON()));
 }
 
 bool AddShardCoordinator::_mustAlwaysMakeProgress() {

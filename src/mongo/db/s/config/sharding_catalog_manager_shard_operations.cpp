@@ -859,7 +859,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     }
 }
 
-void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
+std::pair<ConnectionString, std::string> ShardingCatalogManager::getConfigShardParameters(
+    OperationContext* opCtx) {
     // Set the operation context read concern level to local for reads into the config
     // database.
     repl::ReadConcernArgs::get(opCtx) =
@@ -871,6 +872,12 @@ void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
     uassert(7368500, "sharding state not enabled", shardingState->enabled());
 
     std::string shardName = shardingState->shardId().toString();
+
+    return std::make_pair(configConnString, shardName);
+}
+
+void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
+    const auto [configConnString, shardName] = getConfigShardParameters(opCtx);
     uassertStatusOK(addShard(opCtx, &shardName, configConnString, true));
 }
 

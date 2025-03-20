@@ -520,6 +520,10 @@ public:
                                      const ConnectionString& shardConnectionString,
                                      bool isConfigShard);
 
+    /**
+     * Gets the parameters to transition to a config shard
+     */
+    std::pair<ConnectionString, std::string> getConfigShardParameters(OperationContext* opCtx);
 
     /**
      *

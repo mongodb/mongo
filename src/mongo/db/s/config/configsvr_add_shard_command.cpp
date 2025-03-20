@@ -139,30 +139,7 @@ public:
                              const mongo::ConnectionString& target,
                              boost::optional<std::string> name) {
             const auto addShardCoordinator =
-                checked_pointer_cast<AddShardCoordinator>(std::invoke([&]() {
-                    auto coordinatorDoc = AddShardCoordinatorDocument();
-                    coordinatorDoc.setConnectionString(target);
-                    coordinatorDoc.setIsConfigShard(false);
-                    coordinatorDoc.setProposedName(name);
-                    auto metadata =
-                        ShardingDDLCoordinatorMetadata({{NamespaceString::kConfigsvrShardsNamespace,
-                                                         DDLCoordinatorTypeEnum::kAddShard}});
-                    auto fwdOpCtx = metadata.getForwardableOpMetadata();
-                    if (!fwdOpCtx) {
-                        fwdOpCtx = ForwardableOperationMetadata(opCtx);
-                    }
-                    fwdOpCtx->setMayBypassWriteBlocking(true);
-                    metadata.setForwardableOpMetadata(fwdOpCtx);
-                    coordinatorDoc.setShardingDDLCoordinatorMetadata(metadata);
-
-                    const auto apiParameters = APIParameters::get(opCtx);
-                    if (apiParameters.getParamsPassed()) {
-                        coordinatorDoc.setApiParams(apiParameters.toBSON());
-                    }
-
-                    return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
-                        opCtx, coordinatorDoc.toBSON());
-                }));
+                AddShardCoordinator::create(opCtx, target, name, /*isConfigShard*/ false);
 
             const auto finalName = addShardCoordinator->getResult(opCtx);
 

@@ -46,6 +46,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/add_shard_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_options.h"
@@ -53,6 +54,8 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/transition_from_dedicated_config_server_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -100,13 +103,30 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            ShardingCatalogManager::get(opCtx)->addConfigShard(opCtx);
+            if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                _runNewPath(opCtx);
+            } else {
+                _runOldPath(opCtx);
+            }
 
             ShardingStatistics::get(opCtx)
                 .countTransitionFromDedicatedConfigServerCompleted.addAndFetch(1);
         }
 
     private:
+        void _runOldPath(OperationContext* opCtx) {
+            ShardingCatalogManager::get(opCtx)->addConfigShard(opCtx);
+        }
+
+        void _runNewPath(OperationContext* opCtx) {
+            const auto [configConnString, shardName] =
+                ShardingCatalogManager::get(opCtx)->getConfigShardParameters(opCtx);
+            auto coordinator = AddShardCoordinator::create(
+                opCtx, configConnString, shardName, /*isConfigShard*/ true);
+            coordinator->getCompletionFuture().get();
+        }
+
         NamespaceString ns() const override {
             return {};
         }
