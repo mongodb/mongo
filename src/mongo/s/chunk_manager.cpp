@@ -64,6 +64,10 @@ namespace {
 ErrorCodes::Error metadataInconsistencyErrorCode() {
     if (gDistinguishMetadataInconsistencyFromConflictingOperation
             .isEnabledUseLastLTSFCVWhenUninitialized(
+                // The ChunkMetadataInconsistency error was introduced to make it more clear when
+                // inconsistent metadata is fetched. To keep things simple, we ignore the
+                // VersionContext and focus on the node's FCV.
+                kVersionContextIgnored,
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return ErrorCodes::ChunkMetadataInconsistency;
     }

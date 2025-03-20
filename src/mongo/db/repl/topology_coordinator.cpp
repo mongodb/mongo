@@ -2178,6 +2178,11 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     if (_rsConfig.getConfigServer_deprecated() ||
         (gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+             // The FeatureFlagAllMongodsAreSharded is currently fully disabled.
+             // Ignore the VersionContext for simplicity.
+             // TODO SERVER-102586: Revisit this decision in case the feature-flag
+             // gets re-enabled.
+             kVersionContextIgnored,
              serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
          serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
         response->append("configsvr", true);

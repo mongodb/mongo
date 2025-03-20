@@ -162,7 +162,8 @@ Status validateSingleNodeChange(const ReplSetConfig& oldConfig, const ReplSetCon
  * When "force" is true, skips config version check, since the version is guaranteed
  * to be valid either by "force" reconfig command or by internal use.
  */
-Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
+Status validateOldAndNewConfigsCompatible(const VersionContext& vCtx,
+                                          const ReplSetConfig& oldConfig,
                                           const ReplSetConfig& newConfig) {
     invariant(newConfig.isInitialized());
     invariant(oldConfig.isInitialized());
@@ -195,7 +196,7 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
 
     if (oldConfig.getConfigServer_deprecated() && !newConfig.getConfigServer_deprecated() &&
         !gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       str::stream()
                           << "Cannot remove \"" << ReplSetConfig::kConfigServer_deprecatedFieldName
@@ -481,7 +482,8 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
     return findSelfInConfigIfElectable(externalState, newConfig, ctx);
 }
 
-Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
+Status validateConfigForReconfig(const VersionContext& vCtx,
+                                 const ReplSetConfig& oldConfig,
                                  const ReplSetConfig& newConfig,
                                  bool force,
                                  bool allowSplitHorizonIP) {
@@ -498,7 +500,7 @@ Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
             "set a cluster-wide default writeConcern.",
             !newConfig.containsCustomizedGetLastErrorDefaults());
 
-    status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
+    status = validateOldAndNewConfigsCompatible(vCtx, oldConfig, newConfig);
     if (!status.isOK()) {
         return status;
     }

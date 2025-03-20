@@ -690,6 +690,7 @@ Collection* DatabaseImpl::_createCollection(
     if (generatedUUID && !nss.isOnInternalDb() && !optionsWithUUID.timeseries &&
         !optionsWithUUID.clusteredIndex && !optionsWithUUID.capped &&
         gFeatureFlagRecordIdsReplicated.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         overrideRecordIdsReplicatedDefault.shouldFail()) {
         LOGV2_DEBUG(8700501,

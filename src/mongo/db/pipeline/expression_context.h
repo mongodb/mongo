@@ -944,7 +944,7 @@ public:
     }
 
     bool isFeatureFlagStreamsEnabled() const {
-        return _featureFlagStreams.get();
+        return _featureFlagStreams.get(VersionContext::getDecoration(getOperationContext()));
     }
 
     bool isMapReduceCommand() const {
@@ -1190,7 +1190,7 @@ private:
 
     // Initialized in constructor to avoid including server_feature_flags_gen.h
     // in this header file.
-    Deferred<bool (*)()> _featureFlagStreams;
+    Deferred<bool (*)(const VersionContext&)> _featureFlagStreams;
 
     DeferredFn<boost::optional<NamespaceString>> _featureFlagGuardedMongotIndexedViewNs{
         [this]() -> boost::optional<NamespaceString> {

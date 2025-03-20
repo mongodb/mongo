@@ -1223,11 +1223,13 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         // TODO: SERVER-82965 Remove condition after v8.0 becomes last-lts.
         if (!serverGlobalParams.doAutoBootstrapSharding ||
-            gFeatureFlagAllMongodsAreSharded.isEnabled(fcvSnapshot)) {
+            gFeatureFlagAllMongodsAreSharded.isEnabled(VersionContext::getDecoration(opCtx),
+                                                       fcvSnapshot)) {
             ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(opCtx);
         }
 
-        if (gFeatureFlagAllMongodsAreSharded.isEnabled(fcvSnapshot)) {
+        if (gFeatureFlagAllMongodsAreSharded.isEnabled(VersionContext::getDecoration(opCtx),
+                                                       fcvSnapshot)) {
             ShardingReady::get(opCtx)->scheduleTransitionToConfigShard(opCtx);
         }
     }

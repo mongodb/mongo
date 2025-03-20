@@ -448,6 +448,9 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
         // fasserts (on startup or replication) if the shard identity document matches the server's
         // cluster role. For why this is correct and for more context see: SERVER-80249
         if (!gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+                // This code will be removed since master is 8.1 already (see SERVER-82024).
+                // Ignore the versionContext for simplicity.
+                kVersionContextIgnored,
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             return Status(ErrorCodes::BadValue,
                           "Nodes started with the --configsvr flag must have configsvr:true in "

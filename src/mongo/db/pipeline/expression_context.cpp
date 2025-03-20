@@ -454,9 +454,9 @@ ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
       _collator(std::move(_params.collator)),
       _documentComparator(_collator.getCollator()),
       _valueComparator(_collator.getCollator()),
-      _featureFlagStreams([] {
+      _featureFlagStreams([](const VersionContext& vCtx) {
           return gFeatureFlagStreams.isEnabledUseLastLTSFCVWhenUninitialized(
-              serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+              vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
       }) {
 
     _params.timeZoneDatabase = mongo::getTimeZoneDatabase(_params.opCtx);

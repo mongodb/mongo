@@ -1007,6 +1007,7 @@ Status createCollection(OperationContext* opCtx,
             "enabled",
             !options.recordIdsReplicated ||
                 gFeatureFlagRecordIdsReplicated.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     if (options.isView()) {

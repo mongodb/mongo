@@ -529,6 +529,7 @@ public:
                     ErrorCodes::InvalidOptions,
                     "Validation action 'errorAndLog' is not supported with current FCV",
                     gFeatureFlagErrorAndLogValidationAction.isEnabledUseLastLTSFCVWhenUninitialized(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             }
 

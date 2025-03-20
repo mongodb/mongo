@@ -10,6 +10,8 @@
 # its targeted tests should enable it.
 - featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
 - featureFlagUpdateDocumentShardKeyUsingTransactionApi
+# TODO SERVER-102586: Revisit propagation of the VersionContext to checks,
+# if featureFlagAllMongodsAreSharded is re-enabled.
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
 - featureFlagCreateCollectionInPreparedTransactions

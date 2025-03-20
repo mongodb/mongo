@@ -53,13 +53,11 @@ feature_flags:
         cpp_varname: gFeatureFlagRecordIdsReplicated
         default: false
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagStreams:
         description: "Enable support for streams"
         cpp_varname: gFeatureFlagStreams
         default: false
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagUseUnreplicatedTruncatesForDeletions:
         description: "Feature flag to enable pre-image collection and change collection maintenance
         using unreplicated truncates instead of normal document deletions replicated from the
@@ -78,7 +76,6 @@ feature_flags:
         cpp_varname: gFeatureFlagAllMongodsAreSharded
         default: false
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagBanEncryptionOptionsInCollectionCreation:
         description: "Feature flag that bans encryption options from being used in createCollection
         commands"
@@ -126,14 +123,12 @@ feature_flags:
         default: true
         version: 8.1
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagDistinguishMetadataInconsistencyFromConflictingOperation:
         description: "Feature flag to distinguish ChunkMetadataInconsistency from ConflictingOperationInProgress error"
         cpp_varname: gDistinguishMetadataInconsistencyFromConflictingOperation
         default: true
         version: 8.1
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagQETextSearchPreview:
         description: "Queryable Encryption text search"
         cpp_varname: gFeatureFlagQETextSearchPreview

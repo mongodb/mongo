@@ -111,7 +111,8 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
  *
  * Returns an indicative error on validation failure.
  */
-Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
+Status validateConfigForReconfig(const VersionContext& vCtx,
+                                 const ReplSetConfig& oldConfig,
                                  const ReplSetConfig& newConfig,
                                  bool force,
                                  bool allowSplitHorizonIP);

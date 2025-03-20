@@ -3716,8 +3716,8 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
     bool allowSplitHorizonIP = !opCtx->getClient()->hasRemote();
 
-    Status validateStatus =
-        validateConfigForReconfig(oldConfig, newConfig, force, allowSplitHorizonIP);
+    Status validateStatus = validateConfigForReconfig(
+        VersionContext::getDecoration(opCtx), oldConfig, newConfig, force, allowSplitHorizonIP);
     if (!validateStatus.isOK()) {
         LOGV2_ERROR(21420,
                     "replSetReconfig error while validating new config",
