@@ -3,7 +3,9 @@
  * on edge cases. It is aimed at testing the accumulators, not the $group stage itself. It compares
  * the results between SBE using $group block processing and Classic engine.
  */
-
+// TODO(SERVER-102640): Re-enable this test once implicit natural ordering assumption has been
+// addressed.
+quit();
 import {leafs} from "jstests/query_golden/libs/example_data.js";
 
 const classicConn =

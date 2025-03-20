@@ -2,6 +2,9 @@
  * Creates a regular collection and a time series collection with block processing enabled, and runs
  * queries that result in different BSON types to ensure the results are the same.
  */
+// TODO(SERVER-102640): Re-enable this test once implicit natural ordering assumption has been
+// addressed.
+quit();
 
 import {
     blockProcessingTestCases,

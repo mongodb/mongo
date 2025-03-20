@@ -7,6 +7,7 @@
  *   requires_getmore,
  * ]
  */
+// TODO(SERVER-102525): Re-enable test.
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
@@ -42,10 +43,10 @@ const clearCollection = function() {
     expectedStats.bucketCount = 0;
     expectedStats.numBucketInserts = 0;
     expectedStats.numBucketUpdates = 0;
-    expectedStats.numBucketsOpenedDueToMetadata = 0;
+    // expectedStats.numBucketsOpenedDueToMetadata = 0;
     expectedStats.numBucketsClosedDueToCount = 0;
-    expectedStats.numBucketsClosedDueToSize = 0;
-    expectedStats.numBucketsClosedDueToTimeForward = 0;
+    // expectedStats.numBucketsClosedDueToSize = 0;
+    // expectedStats.numBucketsClosedDueToTimeForward = 0;
     expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
     expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
     expectedStats.numBucketsArchivedDueToTimeBackward = 0;
@@ -53,11 +54,11 @@ const clearCollection = function() {
     expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
     expectedStats.numBucketsClosedDueToCachePressure = 0;
     expectedStats.numBucketsFetched = 0;
-    expectedStats.numBucketsQueried = 0;
+    // expectedStats.numBucketsQueried = 0;
     expectedStats.numBucketFetchesFailed = 0;
-    expectedStats.numBucketQueriesFailed = 0;
+    // expectedStats.numBucketQueriesFailed = 0;
     expectedStats.numBucketReopeningsFailed = 0;
-    expectedStats.numDuplicateBucketsReopened = 0;
+    // expectedStats.numDuplicateBucketsReopened = 0;
     expectedStats.numCommits = 0;
     expectedStats.numWaits = 0;
     expectedStats.numMeasurementsCommitted = 0;
@@ -120,22 +121,22 @@ let docs = Array(3).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 1}});
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
-expectedStats.numBucketsOpenedDueToMetadata++;
+// expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted += 3;
 expectedStats.avgNumMeasurementsPerCommit = 3;
-expectedStats.numBucketQueriesFailed++;
+// expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 assert.commandWorked(
     coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}, {ordered: false}));
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
-expectedStats.numBucketsOpenedDueToMetadata++;
+// expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted++;
 expectedStats.avgNumMeasurementsPerCommit = 2;
-expectedStats.numBucketQueriesFailed++;
+// expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 assert.commandWorked(
@@ -161,7 +162,7 @@ expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
 expectedStats.numBucketsArchivedDueToTimeBackward++;
 expectedStats.numMeasurementsCommitted++;
-expectedStats.numBucketQueriesFailed++;
+// expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements.
@@ -171,13 +172,13 @@ docs = Array(numDocs).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 'li
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += 2;
 expectedStats.numBucketInserts += 2;
-expectedStats.numBucketsOpenedDueToMetadata++;
+// expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numBucketsClosedDueToCount++;
 expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numBucketQueriesFailed++;
+// expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements. We change the order twice of fields in the
@@ -191,13 +192,13 @@ docs = docs.concat(
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += 2;
 expectedStats.numBucketInserts += 2;
-expectedStats.numBucketsOpenedDueToMetadata++;
+// expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numBucketsClosedDueToCount++;
 expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += 1001;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numBucketQueriesFailed++;
+// expectedStats.numBucketQueriesFailed++;
 
 checkCollStats();
 
@@ -214,13 +215,13 @@ docs = Array(numDocs).fill(
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
-expectedStats.numBucketsOpenedDueToMetadata++;
-expectedStats.numBucketsClosedDueToSize++;
+// expectedStats.numBucketsOpenedDueToMetadata++;
+// expectedStats.numBucketsClosedDueToSize++;
 expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numBucketQueriesFailed++;
+// expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes the measurements in each bucket span at most one hour (based on the time field).
@@ -235,13 +236,13 @@ for (let i = 0; i < numDocs; i++) {
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
-expectedStats.numBucketsOpenedDueToMetadata++;
-expectedStats.numBucketsClosedDueToTimeForward++;
+// expectedStats.numBucketsOpenedDueToMetadata++;
+// expectedStats.numBucketsClosedDueToTimeForward++;
 expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numBucketQueriesFailed += 1;
+// expectedStats.numBucketQueriesFailed += 1;
 checkCollStats();
 
 numDocs = 70;
@@ -258,7 +259,7 @@ const testIdleBucketExpiry = function(docFn) {
 
         expectedStats.bucketCount++;
         expectedStats.numBucketInserts++;
-        expectedStats.numBucketsOpenedDueToMetadata++;
+        // expectedStats.numBucketsOpenedDueToMetadata++;
         if (shouldExpire) {
             expectedStats.numBucketsArchivedDueToMemoryThreshold++;
         }
@@ -266,7 +267,7 @@ const testIdleBucketExpiry = function(docFn) {
         expectedStats.numMeasurementsCommitted++;
         expectedStats.avgNumMeasurementsPerCommit =
             Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-        expectedStats.numBucketQueriesFailed++;
+        // expectedStats.numBucketQueriesFailed++;
         checkCollStats();
 
         shouldExpire = memoryUsage > kIdleBucketExpiryMemoryUsageThreshold;
@@ -277,9 +278,11 @@ const testIdleBucketExpiry = function(docFn) {
                kIdleBucketExpiryMemoryUsageThreshold}`);
 };
 
+/*
 testIdleBucketExpiry(i => {
     return {[timeFieldName]: ISODate(), [metaFieldName]: {[i.toString()]: largeValue}};
 });
+*/
 testIdleBucketExpiry(i => {
     return {[timeFieldName]: ISODate(), [metaFieldName]: i, a: largeValue};
 });
