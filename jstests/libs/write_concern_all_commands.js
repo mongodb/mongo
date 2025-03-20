@@ -202,6 +202,7 @@ let wcCommandsTests = {
     _shardsvrConvertToCappedParticipant: {skip: "internal command"},
     _shardsvrParticipantBlock: {skip: "internal command"},
     _shardsvrUntrackUnsplittableCollection: {skip: "internal command"},
+    _shardsvrFetchCollMetadata: {skip: "internal command"},
     streams_startStreamProcessor: {skip: "internal command"},
     streams_startStreamSample: {skip: "internal command"},
     streams_stopStreamProcessor: {skip: "internal command"},

@@ -879,3 +879,13 @@ commands:
         namespace: ignored
         api_version: ""
         reply_type: OkReply
+
+    _shardsvrFetchCollMetadata:
+        command_name: _shardsvrFetchCollMetadata
+        cpp_name: ShardsvrFetchCollMetadata
+        description: "Internal command to fetch collection metadata from the config server and install it into shard local catalog."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        reply_type: OkReply

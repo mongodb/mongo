@@ -469,6 +469,10 @@ const internalCommandsMap = {
         testname: "_shardsvrCloneCatalogData",
         command: {_shardsvrCloneCatalogData: 'test', from: [], writeConcern: {w: "majority"}},
     },
+    _shardsvrFetchCollMetadata: {
+        testname: "_shardsvrFetchCollMetadata",
+        command: {_shardsvrFetchCollMetadata: 'test', from: [], writeConcern: {w: "majority"}},
+    },
     _shardsvrCompactStructuredEncryptionData: {
         testname: "_shardsvrCompactStructuredEncryptionData",
         command: {_shardsvrCompactStructuredEncryptionData: 'test', compactionTokens: {}},
