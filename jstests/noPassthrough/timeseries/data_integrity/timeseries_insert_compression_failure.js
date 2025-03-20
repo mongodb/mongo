@@ -87,7 +87,11 @@ const runTest = function(ordered) {
     assert.eq(0,
               TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
+    // TODO SERVER-100913: Re-enable this check with the new expected counter value.
+    // Once the new write path is connected, the expected numBucketsQueried value will change
+    // because we will (correctly) increment the counter upon querying and reopening a bucket that
+    // is compressed.
+    // assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
@@ -135,7 +139,8 @@ const runTest = function(ordered) {
     assert.eq(0,
               TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
+    // TODO SERVER-100913
+    // assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
@@ -167,7 +172,8 @@ const runTest = function(ordered) {
     assert.eq(0,
               TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
+    // TODO SERVER-100913
+    // assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
