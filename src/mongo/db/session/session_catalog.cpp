@@ -286,14 +286,15 @@ LogicalSessionIdSet SessionCatalog::scanSessionsForReap(
     }
 }
 
-SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& lsid) {
+SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& lsid,
+                                                      ErrorCodes::Error reason) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     auto sri = _getSessionRuntimeInfo(lg, lsid);
     uassert(ErrorCodes::NoSuchSession, "Session not found", sri);
     auto session = sri->getSession(lg, lsid);
     uassert(ErrorCodes::NoSuchSession, "Session not found", session);
-    return ObservableSession(lg, sri, session).kill();
+    return ObservableSession(lg, sri, session).kill(reason);
 }
 
 size_t SessionCatalog::size() const {

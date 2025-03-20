@@ -70,6 +70,7 @@
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/periodic_runner_cache_pressure_rollback.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"

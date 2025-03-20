@@ -112,5 +112,59 @@ TEST_F(KillSessionsTest, killAllExpiredTransactionsTimesOut) {
     ASSERT_EQ(1, numTimeOuts);
 }
 
+TEST_F(KillSessionsTest, killOldestTransaction) {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    createSession(lsid);
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+
+    {
+        // Checkout sessions in order to update transaction expiration.
+        OperationContextSession firstCheckOut(opCtx.get());
+        expireAllTransactions(opCtx.get());
+    }
+
+    auto client = getServiceContext()->getService()->makeClient("CheckOutForKillOldestTransaction");
+    AlternativeClientRegion acr(client);
+    auto sideOpCtx = cc().makeOperationContext();
+    sideOpCtx->setLogicalSessionId(lsid);
+
+    int64_t numKills = 0;
+    int64_t numTimeOuts = 0;
+
+    killOldestTransaction(sideOpCtx.get(), Milliseconds(100), &numKills, &numTimeOuts);
+
+    ASSERT_EQ(1, numKills);
+    ASSERT_EQ(0, numTimeOuts);
+}
+
+TEST_F(KillSessionsTest, killOldestTransactionTimesOut) {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    createSession(lsid);
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+
+    // Checkout sessions in order to update transaction expiration.  Session needs to stay checked
+    // out in order to block kill and timeout.
+    OperationContextSession firstCheckOut(opCtx.get());
+    expireAllTransactions(opCtx.get());
+
+    auto client =
+        getServiceContext()->getService()->makeClient("CheckOutForKillOldestTransactionTimeOut");
+    AlternativeClientRegion acr(client);
+    auto sideOpCtx = cc().makeOperationContext();
+    sideOpCtx->setLogicalSessionId(lsid);
+
+    int64_t numKills = 0;
+    int64_t numTimeOuts = 0;
+
+    killOldestTransaction(sideOpCtx.get(), Milliseconds(0), &numKills, &numTimeOuts);
+
+    ASSERT_EQ(0, numKills);
+    ASSERT_EQ(1, numTimeOuts);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -1362,6 +1362,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/mirror* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/wire_version* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/shutdown_in_progress_quiesce_info* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/db/**/periodic_runner_cache_pressure_rollback* @10gen/server-rss-sydney @svc-auto-approve-bot
 /src/mongo/db/**/startup_warnings_mongod_thp_test* @10gen/server-workload-scheduling @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/admission/OWNERS.yml

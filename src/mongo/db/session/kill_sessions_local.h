@@ -61,6 +61,15 @@ void killAllExpiredTransactions(OperationContext* opCtx,
                                 int64_t* numKills,
                                 int64_t* numTimeOuts);
 
+
+/**
+ * Aborts the oldest transaction when under cache pressure. We filter out prepared transactions.
+ */
+void killOldestTransaction(OperationContext* opCtx,
+                           Milliseconds timeout,
+                           int64_t* numKills,
+                           int64_t* numTimeOuts);
+
 /**
  * Run during shutdown to kill all in-progress transactions, including those in prepare.
  */

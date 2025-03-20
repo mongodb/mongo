@@ -59,6 +59,7 @@
 #include <cstddef>
 #include <exception>
 #include <iomanip>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -2899,6 +2900,24 @@ KeyFormat WiredTigerKVEngine::getKeyFormat(RecoveryUnit& ru, StringData ident) c
 
 size_t WiredTigerKVEngine::getCacheSizeMB() const {
     return _wtConfig.cacheSizeMB;
+}
+
+bool WiredTigerKVEngine::underCachePressure() {
+    // TODO: (SERVER-101817) Update the flag to use a production suitable statistic.
+    constexpr int32_t kWtEvictionCacheDirtyHard = 0x008u;
+
+    boost::optional<StatsCollectionPermit> permit = tryGetStatsCollectionPermit();
+    if (!permit) {
+        return false;
+    }
+
+    WiredTigerSession session(&getConnection(), *permit);
+
+    auto result = WiredTigerUtil::getStatisticsValue(
+        session, "statistics:", "statistics=(fast)", WT_STAT_CONN_EVICTION_STATE);
+    uassertStatusOK(result.getStatus());
+
+    return (result.getValue() & kWtEvictionCacheDirtyHard);
 }
 
 BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(

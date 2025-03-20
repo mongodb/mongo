@@ -3157,6 +3157,21 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "periodic_runner_cache_pressure_rollback",
+    srcs = [
+        "periodic_runner_cache_pressure_rollback.cpp",
+    ],
+    hdrs = [
+        "periodic_runner_cache_pressure_rollback.h",
+    ],
+    deps = [
+        "//src/mongo/db/session:kill_sessions_local",
+        "//src/mongo/db/transaction",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_library(
     name = "serverinit",
     srcs = [
         "initialize_server_global_state.cpp",
@@ -3400,6 +3415,7 @@ mongo_cc_library(
         "mirror_maestro",
         "mongod_options",
         "mongod_options_init",
+        "periodic_runner_cache_pressure_rollback",
         "periodic_runner_job_abort_expired_transactions",
         "//src/mongo/db/pipeline:aggregation",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",

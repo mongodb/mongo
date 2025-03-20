@@ -2365,12 +2365,19 @@ bool TransactionParticipant::Observer::expiredAsOf(Date_t when) const {
         o().transactionExpireDate < when;
 }
 
-void TransactionParticipant::Participant::abortTransaction(OperationContext* opCtx) {
+Microseconds TransactionParticipant::Observer::getDuration(TickSource* tickSource) const {
+    return o().transactionMetricsObserver.getSingleTransactionStats().getDuration(
+        tickSource, tickSource->getTicks());
+}
+
+void TransactionParticipant::Participant::abortTransaction(OperationContext* opCtx, Status status) {
     if (_isInternalSessionForRetryableWrite() && o().txnState.isCommitted()) {
         // An error occurred while retrying an committed retryable internal transaction should
         // not modify the state of the committed transaction.
         return;
     }
+
+    p().overwrittenStatus = status;
     // Normally, absence of a transaction resource stash indicates an inactive transaction.
     // However, in the case of a failed "unstash", an active transaction may exist without a stash
     // and be killed externally.  In that case, the opCtx will not have a transaction number.
@@ -2649,6 +2656,9 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
 void TransactionParticipant::Participant::_checkIsCommandValidWithTxnState(
     const TxnNumberAndRetryCounter& requestTxnNumberAndRetryCounter,
     const std::string& cmdName) const {
+    uassertStatusOK(
+        p().overwrittenStatus.withContext(requestTxnNumberAndRetryCounter.toBSON().toString()));
+
     uassert(ErrorCodes::NoSuchTransaction,
             str::stream() << "Transaction with " << requestTxnNumberAndRetryCounter.toBSON()
                           << " has been aborted.",

@@ -198,6 +198,10 @@ public:
         return true;
     }
 
+    bool underCachePressure() override {
+        return false;
+    }
+
     void dump() const override {}
 
     // This sets the results of the backup cursor for unit tests.

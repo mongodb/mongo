@@ -175,6 +175,10 @@ public:
         return true;
     }
 
+    bool underCachePressure() override {
+        return false;
+    }
+
     void dump() const override {}
 
     // List of ident names removed using dropIdent().

@@ -133,6 +133,7 @@
 #include "mongo/db/op_observer/operation_logger_transaction_proxy.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/periodic_runner_cache_pressure_rollback.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/profile_filter_impl.h"
@@ -1079,6 +1080,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     if (storageEngine->supportsReadConcernSnapshot()) {
         try {
             PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
+            PeriodicThreadToRollbackUnderCachePressure::get(serviceContext)->start();
         } catch (ExceptionFor<ErrorCodes::PeriodicJobIsStopped>&) {
             LOGV2_WARNING(4747501, "Not starting periodic jobs as shutdown is in progress");
             // Shutdown has already started before initialization is complete. Wait for the
@@ -1800,14 +1802,23 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     if (auto storageEngine = serviceContext->getStorageEngine()) {
         if (storageEngine->supportsReadConcernSnapshot()) {
-            TimeElapsedBuilderScopedTimer scopedTimer(
-                serviceContext->getFastClockSource(),
-                "Shut down the thread that aborts expired transactions",
-                &shutdownTimeElapsedBuilder);
-            LOGV2(4784908, "Shutting down the PeriodicThreadToAbortExpiredTransactions");
-            PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
+            {
+                TimeElapsedBuilderScopedTimer scopedTimer(
+                    serviceContext->getFastClockSource(),
+                    "Shut down the thread that aborts expired transactions",
+                    &shutdownTimeElapsedBuilder);
+                LOGV2(4784908, "Shutting down PeriodicThreadToAbortExpiredTransactions");
+                PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
+            }
+            {
+                TimeElapsedBuilderScopedTimer scopedTimer(
+                    serviceContext->getFastClockSource(),
+                    "Shut down the thread the thread to rollback under cache pressure",
+                    &shutdownTimeElapsedBuilder);
+                LOGV2(10036707, "Shutting down PeriodicThreadToRollbackUnderCachePressure");
+                PeriodicThreadToRollbackUnderCachePressure::get(serviceContext)->stop();
+            }
         }
-
         {
             stdx::lock_guard lg(*client);
             opCtx->setIsExecutingShutdown();

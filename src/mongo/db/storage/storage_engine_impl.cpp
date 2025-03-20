@@ -1535,4 +1535,8 @@ Status StorageEngineImpl::autoCompact(RecoveryUnit& ru, const AutoCompactOptions
     return _engine->autoCompact(ru, options);
 }
 
+bool StorageEngineImpl::underCachePressure() {
+    return _engine->underCachePressure();
+};
+
 }  // namespace mongo

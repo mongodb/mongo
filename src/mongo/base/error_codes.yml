@@ -623,7 +623,11 @@ error_codes:
 
   - {code: 363, name: RetryableTransactionInProgress}
 
-  - {code: 365, name: TemporarilyUnavailable}
+  - {
+      code: 365,
+      name: TemporarilyUnavailable,
+      categories: [SystemOverloadedError],
+    }
 
   - {code: 366, name: WouldChangeOwningShardDeletedNoDocument}
 

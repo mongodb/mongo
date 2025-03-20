@@ -83,6 +83,8 @@
 
 namespace mongo {
 
+class TickSource;
+
 /**
  * Reason a transaction was terminated.
  */
@@ -207,6 +209,8 @@ class TransactionParticipant {
 
 public:
     static inline MutableObserverRegistry<int32_t> observeTransactionLifetimeLimitSeconds;
+    static inline MutableObserverRegistry<int32_t> observeCachePressureQueryPeriodMilliseconds;
+
 
     TransactionParticipant();
 
@@ -341,6 +345,11 @@ public:
          * Returns whether the transaction has exceeded its expiration time.
          */
         bool expiredAsOf(Date_t when) const;
+
+        /**
+         * Returns the duration of the transaction.
+         */
+        Microseconds getDuration(TickSource* tickSource) const;
 
         /**
          * Returns if this TransactionParticipant instance can be reaped. Always true unless there
@@ -676,7 +685,7 @@ public:
         /*
          * Aborts the transaction, releasing transaction resources.
          */
-        void abortTransaction(OperationContext* opCtx);
+        void abortTransaction(OperationContext* opCtx, Status overwrittenStatus = Status::OK());
 
         /**
          * Adds a stored operation to the list of stored operations for the current multi-document
@@ -1265,6 +1274,9 @@ private:
         // operation context onto the transaction participant when the session is checked-in so that
         // locks can automatically get freed.
         bool inShutdown{false};
+
+        // Overrides the thrown status in '_checkIsCommandValidWithTxnState' if not-OK.
+        Status overwrittenStatus{Status::OK()};
 
         // Holds oplog data for operations which have been applied in the current multi-document
         // transaction.

@@ -176,6 +176,78 @@ void killAllExpiredTransactions(OperationContext* opCtx,
         numTimeOuts);
 }
 
+void killOldestTransaction(OperationContext* opCtx,
+                           Milliseconds timeout,
+                           int64_t* numKills,
+                           int64_t* numTimeOuts) {
+
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    boost::optional<LogicalSessionId> oldest;
+    Microseconds oldestDuration;
+    const auto sessionCatalog = SessionCatalog::get(opCtx);
+    sessionCatalog->scanSessions(matcher, [&](const ObservableSession& session) {
+        TransactionParticipant::Observer txnParticipant = TransactionParticipant::get(session);
+        // Filtering out prepared transactions as we are unable to abort a prepared transaction.
+        if (txnParticipant.transactionIsPrepared()) {
+            return;
+        }
+
+        // Transaction aborted, or we have a session without a transaction yet.
+        if (!txnParticipant.transactionIsInProgress() || txnParticipant.transactionIsAborted()) {
+            return;
+        }
+
+        auto currentDuration =
+            txnParticipant.getDuration(opCtx->getServiceContext()->getTickSource());
+
+        if (!oldest || currentDuration > oldestDuration) {
+            oldestDuration = currentDuration;
+            oldest = session.getSessionId();
+        }
+    });
+    if (!oldest) {
+        LOGV2_DEBUG(10036706, 1, "Oldest transaction was not found");
+        return;
+    }
+
+    try {
+        auto killToken =
+            SessionCatalog::get(opCtx)->killSession(*oldest, ErrorCodes::TemporarilyUnavailable);
+
+        auto session =
+            sessionCatalog->checkOutSessionForKill(opCtx, std::move(killToken), &timeout);
+
+        // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
+        // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill
+        const KillAllSessionsByPattern* pattern = matcher.match(session.getSessionId());
+        invariant(pattern);
+
+        ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
+        auto txnParticipant = TransactionParticipant::get(session);
+        if (txnParticipant.transactionIsInProgress() || txnParticipant.transactionIsAborted()) {
+            LOGV2(10036704,
+                  "Aborting oldest transaction",
+                  "sessionId"_attr = session.getSessionId().getId(),
+                  "txnNumberAndRetryCounter"_attr =
+                      txnParticipant.getActiveTxnNumberAndRetryCounter());
+            if (txnParticipant.transactionIsInProgress()) {
+                txnParticipant.abortTransaction(
+                    opCtx,
+                    Status(ErrorCodes::TemporarilyUnavailable,
+                           "Transaction aborted due to cache pressure."));
+                (*numKills)++;
+            }
+        }
+    } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+        // Failed to check out the session for kill.
+        if (numTimeOuts) {
+            (*numTimeOuts)++;
+        }
+    } catch (const ExceptionFor<ErrorCodes::NoSuchSession>&) {
+        LOGV2_DEBUG(10036708, 1, "Aborting session error - session not found.");
+    }
+}
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
@@ -215,9 +287,9 @@ void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
 void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
     // Create a new opCtx because we need an empty locker to refresh the locks.
     //
-    // When checking out sessions below, the opCtx can hold the global lock acquired by the prepared
-    // transaction, making it a target by the repl killOp thread. The input opCtx is already
-    // unkillable so we just mark this one also unkillable to avoid crash.
+    // When checking out sessions below, the opCtx can hold the global lock acquired by the
+    // prepared transaction, making it a target by the repl killOp thread. The input opCtx is
+    // already unkillable so we just mark this one also unkillable to avoid crash.
     auto newClient = opCtx->getServiceContext()
                          ->getService(ClusterRole::ShardServer)
                          ->makeClient("prepared-txns-yield-locks",

@@ -571,6 +571,8 @@ public:
 
     size_t getCacheSizeMB() const override;
 
+    bool underCachePressure() override;
+
     // TODO SERVER-81069: Remove this since it's intrinsically tied to encryption options only.
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const override;

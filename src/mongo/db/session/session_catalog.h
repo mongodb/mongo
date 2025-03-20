@@ -159,7 +159,8 @@ public:
      * Shortcut to invoke 'kill' on the specified session under the SessionCatalog mutex. Throws a
      * NoSuchSession exception if the session doesn't exist.
      */
-    KillToken killSession(const LogicalSessionId& lsid);
+    KillToken killSession(const LogicalSessionId& lsid,
+                          ErrorCodes::Error reason = ErrorCodes::Interrupted);
 
     /**
      * Returns the total number of entries currently cached on the session catalog.

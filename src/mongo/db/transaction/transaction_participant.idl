@@ -58,6 +58,18 @@ server_parameters:
         on_update: std::ref(TransactionParticipant::observeTransactionLifetimeLimitSeconds)
         default: 60
         redact: false
+    
+    cachePressureQueryPeriodMilliseconds:
+        description: >-
+            Period in which to run aborts on oldest transactions under cache pressure.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<decltype(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)::Argument>
+        cpp_varname: gCachePressureQueryPeriodMilliseconds
+        validator:
+            gte: 1
+        on_update: std::ref(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)
+        default: 1000
+        redact: false
 
     maxNumberOfTransactionOperationsInSingleOplogEntry:
         description: >-

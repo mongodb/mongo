@@ -796,6 +796,13 @@ public:
      * the files available and runs compaction if they are eligible.
      */
     virtual Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) = 0;
+
+    /**
+     * Return true if the storage engine indicates that it is under cache pressure.
+     */
+    virtual bool underCachePressure() {
+        return false;
+    };
 };
 
 }  // namespace mongo

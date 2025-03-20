@@ -1196,6 +1196,7 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:multitenancy",
+        "//src/mongo/db:periodic_runner_cache_pressure_rollback",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:vector_clock",
