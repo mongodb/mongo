@@ -186,8 +186,11 @@ BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(const BSONT
     switch (type) {
         case (Undefined):
             return BSON(_timeField << timeValue << _metaField << BSONUndefined);
-        case (Date):
-            return BSON(_timeField << timeValue << _metaField << DATENOW);
+        case (Date): {
+            StatusWith<Date_t> date = dateFromISOString("2022-06-06T15:34:00.000Z");
+            ASSERT(date.isOK());
+            return BSON(_timeField << timeValue << _metaField << date.getValue());
+        }
         case (MinKey):
             return BSON(_timeField << timeValue << _metaField << MINKEY);
         case (MaxKey):
