@@ -300,6 +300,34 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
         });
 }
 
+void AddShardCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
+    // Only one add shard can run at any time, so all the user supplied parameters must match.
+    const auto otherDoc = AddShardCoordinatorDocument::parse(
+        IDLParserContext("AddShardCoordinatorDocument"), stateDoc);
+
+    const auto optionsMatch = [&] {
+        stdx::lock_guard lk(_docMutex);
+        auto apiParamsMatch = [&]() -> bool {
+            // Either both initialized or neither
+            if (_doc.getApiParams().is_initialized() != otherDoc.getApiParams().is_initialized())
+                return false;
+            // If neither initialized, they match
+            if (!_doc.getApiParams().is_initialized())
+                return true;
+            // If both are initialized, check the actual params
+            return APIParameters::fromBSON(_doc.getApiParams().value()) ==
+                APIParameters::fromBSON(otherDoc.getApiParams().value());
+        };
+        return _doc.getConnectionString() == otherDoc.getConnectionString() &&
+            _doc.getProposedName() == otherDoc.getProposedName() && apiParamsMatch();
+    }();
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Another addShard with different arguments is already running with "
+                             "different options",
+            optionsMatch);
+}
+
 const std::string& AddShardCoordinator::getResult(OperationContext* opCtx) const {
     const_cast<AddShardCoordinator*>(this)->getCompletionFuture().get(opCtx);
     invariant(_result.is_initialized());

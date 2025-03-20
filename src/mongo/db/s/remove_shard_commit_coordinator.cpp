@@ -233,6 +233,10 @@ void RemoveShardCommitCoordinator::_resumeDDLOperations(OperationContext* opCtx)
 
 void RemoveShardCommitCoordinator::_updateClusterCardinalityParameterIfNeeded(
     OperationContext* opCtx) {
+    globalFailPointRegistry()
+        .find("hangRemoveShardBeforeUpdatingClusterCardinalityParameter")
+        ->pauseWhileSet();
+
     // Only update the parameter if the coordinator was started with
     // `shouldUpdateClusterCardinality` set to true.
     if (!_doc.getShouldUpdateClusterCardinality())
@@ -257,6 +261,23 @@ void RemoveShardCommitCoordinator::_finalizeShardRemoval(OperationContext* opCtx
                                            ShardingCatalogClient::kLocalWriteConcern,
                                            catalogManager->localConfigShard(),
                                            catalogManager->localCatalogClient());
+}
+
+void RemoveShardCommitCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
+    // Only one remove shard can run at any time, so all the user supplied parameters must match.
+    const auto otherDoc = RemoveShardCommitCoordinatorDocument::parse(
+        IDLParserContext("RemoveShardCommitCoordinatorDocument"), stateDoc);
+
+    const auto optionsMatch = [&] {
+        stdx::lock_guard lk(_docMutex);
+        return _doc.getShardId() == otherDoc.getShardId() &&
+            _doc.getReplicaSetName() == otherDoc.getReplicaSetName();
+    }();
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Another removeShard with different arguments is already running with "
+                             "different options",
+            optionsMatch);
 }
 
 RemoveShardProgress RemoveShardCommitCoordinator::getResult(OperationContext* opCtx) {

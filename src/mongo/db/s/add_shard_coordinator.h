@@ -47,7 +47,7 @@ public:
 
     ~AddShardCoordinator() override = default;
 
-    void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const override;
 
     const std::string& getResult(OperationContext* opCtx) const;
 

@@ -50,7 +50,7 @@ public:
 
     ~RemoveShardCommitCoordinator() override = default;
 
-    void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const override;
 
     RemoveShardProgress getResult(OperationContext* opCtx);
 
