@@ -188,33 +188,31 @@ err:
 
 /*
  * __live_restore_fs_find_layer --
- *     Find a layer for the given file. Return the type of the layer and whether the layer contains
- *     the file.
+ *     Return which layer a file exists in, or if it doesn't exist in any layer. If a file exists in
+ *     both the source and destination return it is in the destination.
  */
 static int
 __live_restore_fs_find_layer(WT_FILE_SYSTEM *fs, WT_SESSION_IMPL *session, const char *name,
-  WTI_LIVE_RESTORE_FS_LAYER_TYPE *whichp, bool *existp)
+  WTI_LIVE_RESTORE_FS_LAYER_TYPE *whichp)
 {
-    WTI_LIVE_RESTORE_FS *lr_fs;
+    WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
 
-    WT_ASSERT(session, existp != NULL);
+    WT_ASSERT(session, whichp != NULL);
 
-    *existp = false;
-    lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
+    *whichp = WTI_LIVE_RESTORE_FS_LAYER_NONE;
 
-    WT_RET(__live_restore_fs_has_file(lr_fs, &lr_fs->destination, session, name, existp));
-    if (*existp) {
+    bool exists = false;
+    WT_RET(__live_restore_fs_has_file(lr_fs, &lr_fs->destination, session, name, &exists));
+    if (exists) {
         /* The file exists in the destination we don't need to look any further. */
-        if (whichp != NULL)
-            *whichp = WTI_LIVE_RESTORE_FS_LAYER_DESTINATION;
+        *whichp = WTI_LIVE_RESTORE_FS_LAYER_DESTINATION;
         return (0);
     }
 
-    WT_RET(__live_restore_fs_has_file(lr_fs, &lr_fs->source, session, name, existp));
-    if (*existp) {
+    WT_RET(__live_restore_fs_has_file(lr_fs, &lr_fs->source, session, name, &exists));
+    if (exists) {
         /* The file exists in the source we don't need to look any further. */
-        if (whichp != NULL)
-            *whichp = WTI_LIVE_RESTORE_FS_LAYER_SOURCE;
+        *whichp = WTI_LIVE_RESTORE_FS_LAYER_SOURCE;
     }
 
     return (0);
@@ -414,18 +412,28 @@ static int
 __live_restore_fs_exist(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, const char *name, bool *existp)
 {
     WTI_LIVE_RESTORE_FS_LAYER_TYPE layer;
-    WT_RET(__live_restore_fs_find_layer(fs, (WT_SESSION_IMPL *)wt_session, name, &layer, existp));
+    WT_RET(__live_restore_fs_find_layer(fs, (WT_SESSION_IMPL *)wt_session, name, &layer));
 
-    if (*existp && layer == WTI_LIVE_RESTORE_FS_LAYER_SOURCE) {
-        bool has_stop = false;
-        WT_RET(__dest_has_stop_file(
-          (WTI_LIVE_RESTORE_FS *)fs, name, (WT_SESSION_IMPL *)wt_session, &has_stop));
+    switch (layer) {
+    case WTI_LIVE_RESTORE_FS_LAYER_NONE:
+        *existp = false;
+        break;
+
+    case WTI_LIVE_RESTORE_FS_LAYER_DESTINATION:
+        *existp = true;
+        break;
+
+    case WTI_LIVE_RESTORE_FS_LAYER_SOURCE:
+        *existp = true;
 
         /*
          * If the file is only in the source and there is a stop file in the destination then we've
          * either moved or deleted the file in the destination, meaning it no longer exists for the
          * user.
          */
+        bool has_stop = false;
+        WT_RET(__dest_has_stop_file(
+          (WTI_LIVE_RESTORE_FS *)fs, name, (WT_SESSION_IMPL *)wt_session, &has_stop));
         if (has_stop)
             *existp = false;
 
@@ -1030,7 +1038,6 @@ __wti_live_restore_cleanup_stop_files(WT_SESSION_IMPL *session)
     if (F_ISSET(&conn->log_mgr, WT_LOG_CONFIG_ENABLED)) {
         WT_ERR(__wt_scr_alloc(session, 1024, &buf));
 
-        WT_ERR(os_fs->fs_directory_list_free(os_fs, wt_session, files, count));
         /*
          * The log path is the only WiredTiger-owned subdirectory that can exist. Check its contents
          * explicitly.
@@ -1039,6 +1046,8 @@ __wti_live_restore_cleanup_stop_files(WT_SESSION_IMPL *session)
           (char *)conn->log_mgr.log_path, UINTMAX_MAX, UINT32_MAX, filepath));
         /* FIXME-WT-14047: Currently we do not support absolute log paths. */
         WT_ASSERT(session, !__wt_absolute_path((char *)conn->log_mgr.log_path));
+
+        WT_ERR(os_fs->fs_directory_list_free(os_fs, wt_session, files, count));
         WT_ERR(os_fs->fs_directory_list(
           os_fs, wt_session, (char *)filepath->data, NULL, &files, &count));
         for (uint32_t i = 0; i < count; i++) {
@@ -1808,16 +1817,14 @@ __live_restore_fs_remove(
     WTI_LIVE_RESTORE_FS_LAYER_TYPE layer;
     WT_SESSION_IMPL *session;
     char *path;
-    bool exist;
 
     session = (WT_SESSION_IMPL *)wt_session;
     lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
 
-    exist = false;
     path = NULL;
 
-    WT_RET(__live_restore_fs_find_layer(fs, session, name, &layer, &exist));
-    if (!exist)
+    WT_RET(__live_restore_fs_find_layer(fs, session, name, &layer));
+    if (layer == WTI_LIVE_RESTORE_FS_LAYER_NONE)
         return (0);
 
     /*
@@ -1855,12 +1862,10 @@ __live_restore_fs_rename(
     WTI_LIVE_RESTORE_FS_LAYER_TYPE which;
     WT_SESSION_IMPL *session;
     char *path_from, *path_to;
-    bool exist;
 
     session = (WT_SESSION_IMPL *)wt_session;
     lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
 
-    exist = false;
     path_from = NULL;
     path_to = NULL;
 
@@ -1871,8 +1876,8 @@ __live_restore_fs_rename(
     __wt_verbose_debug1(
       session, WT_VERB_LIVE_RESTORE, "LIVE_RESTORE: Renaming file from: %s to %s", from, to);
 
-    WT_RET(__live_restore_fs_find_layer(fs, session, from, &which, &exist));
-    if (!exist)
+    WT_RET(__live_restore_fs_find_layer(fs, session, from, &which));
+    if (which == WTI_LIVE_RESTORE_FS_LAYER_NONE)
         WT_RET_MSG(session, ENOENT, "Live restore cannot find: %s", from);
 
     /*
@@ -1912,19 +1917,18 @@ __live_restore_fs_size(
     WTI_LIVE_RESTORE_FS_LAYER_TYPE which;
     WT_SESSION_IMPL *session;
     char *path;
-    bool exist;
 
     session = (WT_SESSION_IMPL *)wt_session;
     lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
 
-    exist = false;
     path = NULL;
 
-    WT_RET(__live_restore_fs_find_layer(fs, session, name, &which, &exist));
-    if (!exist)
+    WT_RET(__live_restore_fs_find_layer(fs, session, name, &which));
+    if (which == WTI_LIVE_RESTORE_FS_LAYER_NONE)
         WT_RET_MSG(session, ENOENT, "Live restore cannot find: %s", name);
 
     /* Get the file size from the destination if possible, otherwise fallback to the source. */
+    /* FIXME-WT-14299: Cleanup backing file name so this if block goes away. */
     if (which == WTI_LIVE_RESTORE_FS_LAYER_DESTINATION)
         WT_RET(__live_restore_fs_backing_filename(
           &lr_fs->destination, session, lr_fs->destination.home, name, &path));

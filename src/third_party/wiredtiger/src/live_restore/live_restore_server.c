@@ -224,7 +224,7 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
      * schema operations like drop. If the file no longer exists we don't need to copy anything and
      * can return a success.
      */
-    WT_CURSOR *cursor;
+    WT_CURSOR *cursor = NULL;
     WT_SESSION *wt_session = (WT_SESSION *)session;
     ret = wt_session->open_cursor(wt_session, work_item->uri, NULL, NULL, &cursor);
     if (ret != 0)
