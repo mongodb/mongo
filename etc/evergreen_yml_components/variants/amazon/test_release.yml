@@ -489,6 +489,41 @@ buildvariants:
   - name: .development_critical
   - name: .release_critical
 
+- name: enterprise-amazon2-arm64-grav4
+  display_name: "Enterprise Amazon Linux 2 arm64 Graviton 4"
+  tags: []
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - amazon2-arm64-latest-small-m8g
+  expansions:
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    has_packages: false
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
+    multiversion_architecture: aarch64
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    compile_variant: enterprise-amazon2-arm64-grav4
+    core_analyzer_distro_name: amazon2-arm64-latest-xlarge-m8g
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - amazon2-arm64-latest-large-m8g
+  - name: .development_critical
+  - name: .release_critical !.publish !.publish_crypt
+
 - <<: *enterprise-amazon2023-arm64-template
   name: enterprise-amazon2023-arm64-fuzzers
   display_name: "Enterprise Amazon Linux 2023 arm64 Fuzzers"
