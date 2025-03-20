@@ -45,6 +45,8 @@
 namespace mongo::sbe::vm {
 using ColumnOpType = value::ColumnOpType;
 
+MONGO_FAIL_POINT_DEFINE(sleepBeforeCurrentDateEvaluationSBE);
+
 namespace {
 const size_t kTimezoneDBStackPosDefault = 0u;
 const size_t kTimezoneDBStackPosBlock = 2u;
@@ -1192,4 +1194,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateAd
                 value::bitcastFrom<value::ValueBlock*>(out.release())};
     }
 }
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCurrentDate(ArityType arity) {
+    if (MONGO_unlikely(sleepBeforeCurrentDateEvaluationSBE.shouldFail())) {
+        sleepBeforeCurrentDateEvaluationSBE.execute(
+            [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+    }
+
+    return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(Date_t::now().asInt64())};
+}
+
 }  // namespace mongo::sbe::vm

@@ -512,6 +512,11 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         return getTypeSignature(sbe::value::TypeTags::NumberInt64)
             .include(TypeSignature::kNothingType);
     }
+
+    if (arity == 0 && op.name() == "currentDate"s) {
+        return getTypeSignature(sbe::value::TypeTags::Date);
+    }
+
     return TypeSignature::kAnyScalarType;
 }
 

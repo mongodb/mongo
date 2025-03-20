@@ -1297,6 +1297,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_P(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellBlockGetFlatValuesBlock(
         ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCurrentDate(ArityType arity);
 
     /**
      * Dispatcher for calls to VM built-in C++ functions enumerated by enum class Builtin.

@@ -55,6 +55,12 @@ try {
         func: (db) => configureFailPoint(db, "sleepBeforeCurrentDateEvaluation", {ms: 2}),
         primaryNodeOnly: false,
     });
+    failPoints.push(...FixtureHelpers.mapOnEachShardNode({
+        db: db.getSiblingDB("admin"),
+        func: (db) => configureFailPoint(db, "sleepBeforeCurrentDateEvaluationSBE", {ms: 2}),
+        primaryNodeOnly: false,
+    }));
+
     basicTest();
 } finally {
     failPoints.forEach(failPoint => failPoint.off());

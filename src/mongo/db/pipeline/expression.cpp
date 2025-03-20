@@ -4200,9 +4200,8 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(currentDate,
                                       AllowedWithClientType::kAny,
                                       feature_flags::gFeatureFlagCurrentDate);
 
-ExpressionCurrentDate::ExpressionCurrentDate(ExpressionContext* const expCtx) : Expression(expCtx) {
-    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-}
+ExpressionCurrentDate::ExpressionCurrentDate(ExpressionContext* const expCtx)
+    : Expression(expCtx) {}
 
 intrusive_ptr<Expression> ExpressionCurrentDate::parse(ExpressionContext* const expCtx,
                                                        BSONElement exprElement,

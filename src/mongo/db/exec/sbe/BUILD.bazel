@@ -372,6 +372,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_concat_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_constant_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_covariance_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_current_date_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_add_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_diff_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_expression_accepting_timezone_test.cpp",

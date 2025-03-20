@@ -1065,6 +1065,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::cellFoldValues_P, false}},
     {"cellBlockGetFlatValuesBlock",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::cellBlockGetFlatValuesBlock, false}},
+    {"currentDate", BuiltinFn{[](size_t n) { return n == 0; }, vm::Builtin::currentDate, false}},
 };
 
 /**

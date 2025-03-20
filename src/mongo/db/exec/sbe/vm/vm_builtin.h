@@ -384,6 +384,8 @@ enum class Builtin : uint16_t {
     cellFoldValues_F,
     cellFoldValues_P,
     cellBlockGetFlatValuesBlock,
+
+    currentDate,
 };  // enum class Builtin
 
 std::string builtinToString(Builtin b);

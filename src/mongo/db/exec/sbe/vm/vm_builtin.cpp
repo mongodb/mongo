@@ -621,6 +621,8 @@ std::string builtinToString(Builtin b) {
             return "cellFoldValues_P";
         case Builtin::cellBlockGetFlatValuesBlock:
             return "cellBlockGetFlatValuesBlock";
+        case Builtin::currentDate:
+            return "currentDate";
         default:
             MONGO_UNREACHABLE;
     }
@@ -1215,6 +1217,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinCellFoldValues_P(arity);
         case Builtin::cellBlockGetFlatValuesBlock:
             return builtinCellBlockGetFlatValuesBlock(arity);
+        case Builtin::currentDate:
+            return builtinCurrentDate(arity);
     }
 
     MONGO_UNREACHABLE;

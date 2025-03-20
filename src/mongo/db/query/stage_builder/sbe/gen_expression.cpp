@@ -3586,8 +3586,11 @@ public:
     }
 
     void visit(const ExpressionCurrentDate* expr) final {
-        // TODO(SERVER-99405): Support $currentDate in SBE.
-        unsupportedExpression("$currentDate");
+        uassert(9940500,
+                "$currentDate does not currently accept arguments",
+                expr->getChildren().size() == 0);
+        auto expression = makeABTFunction("currentDate");
+        pushABT(std::move(expression));
     }
 
     void visit(const ExpressionToHashedIndexKey* expr) final {
