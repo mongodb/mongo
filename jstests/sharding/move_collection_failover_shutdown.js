@@ -3,12 +3,12 @@
  * restart during the operation.
  * Multiversion testing does not support tests that kill and restart nodes. So we had to add the
  * 'multiversion_incompatible' tag.
+ *
  * @tags: [
  *   uses_atclustertime,
  *   requires_persistence,
  *   requires_fcv_80,
  *   featureFlagMoveCollection,
- *   # TODO (SERVER-101835) Remove multiversion_incompatible tag
  *   multiversion_incompatible,
  * ]
  */
