@@ -836,7 +836,7 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     // Early exit before staging if any statements in the user's batch have been retried. Fallback
     // to unordered one-by-one to handle this.
     std::vector<StmtId> stmtIds;
-    bool containsRetry;
+    bool containsRetry = false;
     getStmtIdVectorFromRequest(opCtx, request, &containsRetry, stmtIds);
     if (containsRetry) {
         stageStatus = StageWritesStatus::kContainsRetry;
