@@ -709,7 +709,7 @@ if args.command == "branch":
             for binfile in bins_to_check:
                 p = subprocess.run(
                     [
-                        "/opt/mongodbtoolchain/v4/bin/gdb",
+                        "/opt/mongodbtoolchain/v5/bin/gdb",
                         "--batch",
                         "--nx",
                         "--command=gdb_commands.txt",

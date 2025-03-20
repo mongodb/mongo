@@ -44,8 +44,8 @@ from buildscripts.util.oauth import (
 )
 
 SYMBOLIZER_PATH_ENV = "MONGOSYMB_SYMBOLIZER_PATH"
-# since older versions may have issues with symbolizing, we are setting the toolchain version to v4
-DEFAULT_SYMBOLIZER_PATH = "/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+# since older versions may have issues with symbolizing, we are setting the toolchain version to v5
+DEFAULT_SYMBOLIZER_PATH = "/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
 
 
 class DbgFileResolver(ABC):

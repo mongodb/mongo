@@ -8,7 +8,8 @@ buildvariants:
   - name: enterprise-ubuntu1804-64
     display_name: Jepsen Tests on Enterprise Ubuntu 18.04
     tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    # TODO(SERVER-86538): Turn this back on for nightly builds when we can run it on a v5 toolchain-supported platform.
+    activate: false
     run_on:
       - ubuntu1804-small
     # TODO SERVER-86538 see if we can use --allocator=tcmalloc-google on
@@ -387,7 +388,7 @@ buildvariants:
           - ubuntu2004-arm64-large
       - name: test_packages
         distros:
-          - ubuntu1804-arm64-build
+          - ubuntu2204-arm64-small
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
@@ -437,7 +438,7 @@ buildvariants:
           - ubuntu2004-arm64-large
       - name: test_packages
         distros:
-          - ubuntu1804-arm64-build
+          - ubuntu2204-arm64-small
       - name: .development_critical !.requires_large_host !.incompatible_community
       - name: .development_critical .requires_large_host !.incompatible_community
         distros:

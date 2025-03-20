@@ -10,8 +10,10 @@ fun:_ZN5immer6detail3csl3get*
 fun:_ZN5immer6detail5hamts4node*make_inner_n*
 fun:_ZN5immer6detail5hamts4node*make_merged*
 fun:_ZN5immer6detail5hamts4node*ownee*
+src:src/third_party/immer/dist/immer/detail/hamts/node.hpp
 
 # TODO SERVER-100171 Remove these once UB detected by the v5 toolchain is addressed in wiredtiger.
+src:src/third_party/wiredtiger/src/conn/conn_api.c
 src:src/third_party/wiredtiger/src/include/modify_inline.h
 src:src/third_party/wiredtiger/src/support/modify.c
 
@@ -29,3 +31,6 @@ src:src/third_party/abseil-cpp/dist/absl/numeric/int128_have_intrinsic.inc
 # libunwind has some UB when doing stack unwinding
 [alignment]
 fun:access_mem
+
+# TODO SERVER-102630 warns of unaligned access on code whose purpose is to prevent unaligned access.
+src:src/third_party/gperftools/dist/src/base/basictypes.h

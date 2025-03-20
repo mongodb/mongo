@@ -84,12 +84,6 @@ include:
   - filename: etc/evergreen_yml_components/variants/ubuntu/test_dev_master_and_lts_branches_only.yml
   - filename: etc/evergreen_yml_components/variants/ubuntu/test_dev_master_branch_only.yml
 
-  - filename: etc/evergreen_yml_components/variants/debian/test_dev_master_branch_only.yml
-
-  - filename: etc/evergreen_yml_components/variants/suse/test_dev_master_branch_only.yml
-
-  - filename: etc/evergreen_yml_components/variants/ibm/test_dev_master_branch_only.yml
-
   - filename: etc/evergreen_yml_components/variants/windows/test_dev.yml
   - filename: etc/evergreen_yml_components/variants/windows/test_dev_master_and_lts_branches_only.yml
   - filename: etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml

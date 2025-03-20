@@ -35,7 +35,7 @@ from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
 from evergreen.task import Artifact, Task
 
 _DEBUG_FILE_BASE_NAMES = ["mongo", "mongod", "mongos"]
-TOOLCHAIN_ROOT = "/opt/mongodbtoolchain/v4"
+TOOLCHAIN_ROOT = "/opt/mongodbtoolchain/v5"
 TRACER = trace.get_tracer("resmoke")
 
 

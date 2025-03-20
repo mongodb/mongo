@@ -104,12 +104,12 @@ def main():
 
     ##############################
     else:
-        for toolchain in ["v4"]:
+        for toolchain in ["v4", "v5"]:
             # possibly we want to add clang to the mix here, so leaving as an easy drop in
             for compiler in ["gcc"]:
                 for link_model in ["dynamic", "static"]:
                     build_flags = (
-                        "BUILD_METRICS_BLOATY=/opt/mongodbtoolchain/v4/bin/bloaty "
+                        f"BUILD_METRICS_BLOATY=/opt/mongodbtoolchain/{toolchain}/bin/bloaty "
                         + f"--variables-files=etc/scons/mongodbtoolchain_{toolchain}_{compiler}.vars "
                         + f"--link-model={link_model}"
                         + (" --cache=nolinked" if link_model == "static" else " --cache=all")

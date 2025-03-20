@@ -181,7 +181,7 @@ buildvariants:
           - rhel8.8-arm64-large
       - name: test_packages
         distros:
-          - ubuntu1804-arm64-build
+          - ubuntu2204-arm64-small
       - name: .development_critical !.requires_large_host !.incompatible_community
       - name: .development_critical .requires_large_host !.incompatible_community
         distros:
@@ -233,7 +233,7 @@ buildvariants:
           - rhel8.8-arm64-large
       - name: test_packages
         distros:
-          - ubuntu1804-arm64-build
+          - ubuntu2204-arm64-small
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:

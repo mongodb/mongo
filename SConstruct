@@ -4259,14 +4259,23 @@ def doConfigure(myenv):
                         f"Error: --shared-libsan is not supported with {sanitizer} sanitizer"
                     )
                 arch = env["TARGET_ARCH"]
-                san_rt_name = f"libclang_rt.{sanitizer_lib}-{arch}.so"
-                p = subprocess.run(
-                    [env["CXX"], f"-print-file-name={san_rt_name}"], capture_output=True, text=True
+                san_rt_names = [
+                    f"libclang_rt.{sanitizer_lib}-{arch}.so",
+                    f"libclang_rt.{sanitizer_lib}.so",
+                ]
+                for san_rt_name in san_rt_names:
+                    p = subprocess.run(
+                        [env["CXX"], f"-print-file-name={san_rt_name}"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    clang_rt_path = p.stdout.strip()
+                    if os.path.isfile(clang_rt_path):
+                        return clang_rt_path
+                san_rt_names_string = ",".join(san_rt_names)
+                env.FatalError(
+                    f"Error: couldn't find sanitizer runtime library, one of {san_rt_names_string}"
                 )
-                clang_rt_path = p.stdout.strip()
-                if not os.path.isfile(clang_rt_path):
-                    env.FatalError(f"Error: couldn't find sanitizer runtime library {san_rt_name}")
-                return clang_rt_path
 
             env["SANITIZER_RUNTIME_LIBS"] = [
                 get_san_lib_path(sanitizer) for sanitizer in sanitizer_list
