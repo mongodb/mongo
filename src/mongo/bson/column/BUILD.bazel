@@ -52,6 +52,23 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "bsoncolumn_fuzzer_util",
+    srcs = [
+        "bsoncolumn_fuzzer_util.cpp",
+    ],
+    hdrs = [
+        "bsoncolumn_expressions.h",
+        "bsoncolumn_expressions_internal.h",
+        "bsoncolumn_fuzzer_util.h",
+    ],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_library(
     name = "bsoncolumn_test_util",
     srcs = [
         "bsoncolumn_test_util.cpp",
@@ -92,6 +109,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":bson_column_fuzzer_impl",
+        ":bsoncolumn_fuzzer_util",
         ":bsoncolumn_test_util",
         "//src/mongo/util:safe_num",
     ],
@@ -163,6 +181,7 @@ mongo_cc_fuzzer_test(
         "bsoncolumn_builder_fuzzer.cpp",
     ],
     deps = [
+        "bsoncolumn_fuzzer_util",
         "column",
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",

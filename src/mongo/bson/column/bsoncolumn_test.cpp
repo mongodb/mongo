@@ -48,6 +48,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/column/bsoncolumn_expressions.h"
+#include "mongo/bson/column/bsoncolumn_fuzzer_util.h"
 #include "mongo/bson/column/bsoncolumn_test_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/column/simple8b_builder.h"
@@ -1121,6 +1122,228 @@ protected:
 private:
     std::forward_list<BSONObj> _elementMemory;
 };
+
+TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {
+    // This test is a collection of binaries produced by the fuzzer that exposed bugs at some point
+    // and contains coverage missing from the tests defined above.
+    std::vector<StringData> binariesBase64 = {
+        // Ends with uncompressed literal. Last value in previous block needs to be set correctly
+        // for doubles.
+        "AQAACQgAAHMA7wkAQP/Q0CfU0NCACvX//////9AA"_sd,
+        // Contains zero deltas after uncompressed string starting with '\0' (unencodable). Ensures
+        // we have special handling for zero deltas that by-pass materialization.
+        "CAAAAgACAAAAAACAAgAAAAAAAAAA"_sd,
+        // Re-scaling double is not possible. Offset to last control byte needs to be cleared so a
+        // new control byte is written by the compressor.
+        "AQAAAAAAAAAAAJHCgLGRkf//DZGRCJEACAAAgDqRsZGRkZGRAA=="_sd,
+        // Re-scaling double is not possible. Offset to last control byte needs to be cleared so a
+        // new control byte is written by the compressor.
+        "CgABAP//////////gAIBAAD7///4AA=="_sd,
+        // Ends with value too large to be encodable in Simple8b block
+        "AQAAAAAjAAAAHAkALV3DRTINAACAd/ce/////xwJAC33Hv////+/AA=="_sd,
+        // Unencodable literal for 128bit types, prevEncoded128 needs to be set to none by
+        // compressor.
+        "DQAUAAAAAAgAAIDx///++AAAAAMAAAAIAACA8f///vj/AAAA"_sd,
+        // Merge of interleaved objects that results in repeated fieldname
+        "fwB/APEPAAAA/wD/////KwAGAAALAJ0qnZ0AAICx87tAc/+/fgQABwAAAP8AAICx88BEjAi/AICxAAIAACQAFgAA"_sd};
+
+    for (auto&& binaryBase64 : binariesBase64) {
+        auto binary = base64::decode(binaryBase64);
+
+        // Validate that our BSONColumnBuilder would construct this exact binary for the input data.
+        // This is required to be able to verify these binary blobs.
+        BSONColumnBuilder builder;
+        BSONColumn column(binary.data(), binary.size());
+        try {
+            for (auto&& elem : column) {
+                builder.append(elem);
+            }
+        } catch (const DBException& ex) {
+            ASSERT_NOT_OK(ex.toStatus());
+            continue;
+        }
+        BSONBinData finalized = builder.finalize();
+        ASSERT_EQ(binary.size(), finalized.length);
+        ASSERT(memcmp(binary.data(), finalized.data, binary.size()) == 0);
+
+        // Validate that reopening BSONColumnBuilder from this binary produces the same state as-if
+        // values were uncompressed and re-appended.
+        verifyColumnReopenFromBinary(binary.data(), binary.size());
+    }
+}
+
+TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
+    // This test is a collection of binaries produced by the decompression fuzzer that exposed bugs
+    // in the block-based or iterator API, and contains coverage missing from the tests defined
+    // above. This test validates that the iterator API and the block-based API must produce the
+    // same results.
+    std::vector<StringData> binariesBase64 = {
+        // Iterator API did not cast values to booleans before materializing (SERVER-87779).
+        "CAAAoJb//wD/3ylEAA=="_sd,
+        // Block-based API updated the 'lastValue' when appending EOO elements (SERVER-85860).
+        "CgAKAAoAEwAHAAoACgEAAABQUFBQUFBQUFAAAAAAAACoqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioUFBQUAAAAAAACgAKAAsAEwAKAAoACgAKAAoACgAKAAoACgAKAAoACgAA"_sd,
+        // Block-based API didn't validate the scale index for simple8b blocks (SERVER-87628 and
+        // SERVER-88738).
+        "QAEADP////+SAA=="_sd,
+        "fwBAAwAAAAAAAAAA"_sd,
+        "CgBh/wABemEUAAAAAAAAAAIBAAA="_sd,
+        "BQAvAAAAAABQslBQUFBQUFBQUFAAUFBQUFB5UP7///9QUFBQUFBQUFCBgYGBgYGBgYGBgYGBgYFQbFCpUFBQgVBQUFBQUFBQP1BQUFBQUAAA"_sd,
+        // Block-based Path API doesn't validate the scale index for non-double values
+        // (SERVER-89155).
+        "8AgAAAAIAAAA0Cz/AAAAAAdSAAA="_sd,
+        // The two APIs had different delta values, but both should fail (SERVER-85860 and
+        // SERVER-87873).
+        "BQADAAAAkP8AkJCR///+/4jIfdAmAAAAAAAAAJACAAAAAP8AAAA="_sd,
+        "fwDQYG9tfwAAAAAA"_sd,
+        "CAABwMABwMDAwMDAwH9DwMDAwMDAwMDAwMDAwMDAwMjAwMDAAAAAAA=="_sd,
+        "EwAAAGCvYK+vUgBSUlBQc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3NzFBQUFBQUc3PQ0NDQ0NDQ0NDQr1JSUlBQ0NDQ0NDQ0NDQ0NIYAAAA0NAXlaJ9//8AAA=="_sd,
+        // Block-based API using the table decoders should fail on bad selectors (SERVER-88062).
+        "CwBPpFpaWloAAKD3Af9dXQD/AAA="_sd,
+        // Block-based API had a stack overflow for BinData values (SERVER-88207).
+        "BQAXAAAAMcLCPso9PcJhJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmsMIYAAECAAIAAA=="_sd,
+        "BQAwAAAAAAcAAAAAAAEAAAAAAABAAAAAAAA7Ozs7Ozs7Ozs6Ozs7Ozs7Ozs7Ozs7Ozs7OwD+/4A7OzsA/v+A/wA="_sd,
+        // Block-based API didn't allow non-zero/missing deltas after EOO (SERVER-89150).
+        "8h4AAAD/p/+zSENBMoAB/0hDQzKAAP9IOjCAAP8AAACCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCggA="_sd,
+        // Blockbased API didn't update last to EOO when Iterative API did for interleaved data
+        // (SERVER-89612).
+        "8hQAAAAF+P//////FCgAAAAAAAAABgAIAACBKg7/+///////MP8V/3EAAACBeHFYDAAA/3RhZ3P//wEAAAA="_sd,
+        // Blockbased API doesn't fail an interleaved mode that has leftover data in some decoders
+        // while the iterative version does (SERVER-92150)
+        "8jIAAAAHVvkCAAEAAAAAAgABAAAAAAxTdGNydHVfaWQAAQAAAAABMg5faWQAAQAAAAAA/wD/AP8Aj4+Pj4+Pj4+Pj4+Pj4+Pj4//AP8A/wD/AP8A/wD/AP8A/wCPj4+Pj4+Pj4+PAAD/AP8A/wD/AP8A/wCPj4+Pj4+Pj49vj4+Pj4+Pj/8A/041j4+Pj4+Pj4+Pj48BAFXeV6t2AI+Pj4+Pj4+Pj4+Pj8SPj4+Pj4+Pj4//AP8A/wD/AP8A/wAA"_sd,
+        // Empty interleaved mode produces an assert in block-based API but not iterative
+        // (SERVER-92327)
+        "EAAAYTsB8gcAAAD/AAAAgsj//////////wEH//hB/7KyAP+AAP//AAA="_sd,
+    };
+
+    for (auto&& binaryBase64 : binariesBase64) {
+        auto binary = base64::decode(binaryBase64);
+
+        // Store the results for validation after decompression.
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
+        std::vector<BSONElement> iteratorElems, blockBasedElems;
+        bool blockBasedError = false;
+        bool iteratorError = false;
+
+        // Attempt to decompress using the block-based API.
+        bsoncolumn::BSONColumnBlockBased block(binary.data(), binary.size());
+        try {
+            block.decompress<bsoncolumn::BSONElementMaterializer, std::vector<BSONElement>>(
+                blockBasedElems, allocator);
+        } catch (...) {
+            blockBasedError = true;
+        }
+
+        // Attempt to decompress using the iterator API.
+        BSONColumn column(binary.data(), binary.size());
+        try {
+            for (auto&& elem : column) {
+                iteratorElems.push_back(elem);
+            };
+        } catch (...) {
+            iteratorError = true;
+        }
+
+        // If one API failed, then both APIs must fail.
+        if (iteratorError || blockBasedError) {
+            ASSERT(iteratorError && blockBasedError);
+            continue;
+        }
+
+        // If the APIs succeeded, the results must be the same.
+        ASSERT(iteratorElems.size() == blockBasedElems.size());
+        auto it = iteratorElems.begin();
+        for (auto&& elem : blockBasedElems) {
+            ASSERT(elem.binaryEqualValues(*it));
+            ++it;
+        }
+    }
+}
+
+TEST_F(BSONColumnTest, BuilderFuzzerGenerationDiscoveredEdgeCases) {
+    // This test is a collection of binaries produced by the builder fuzzer that exposed bugs
+    // in the bsoncolumn builder.  To investigate new fuzzer failures, find the base64 encoding
+    // of the fuzzer string in the logs (not to be confused with the column binary itself) and
+    // add it to the binaries vector
+    //
+    // This should look like
+    //
+    // Base64:
+    // <base64 string>
+    //
+    std::vector<StringData> binariesBase64 = {};
+
+    for (auto&& binaryBase64 : binariesBase64) {
+        auto binary = base64::decode(binaryBase64);
+
+        std::forward_list<BSONObj> elementMemory;
+        std::vector<BSONElement> generatedElements;
+
+        // Generate elements from input data
+        const char* ptr = binary.data();
+        const char* end = binary.data() + binary.size();
+        while (ptr < end) {
+            BSONElement element;
+            int repetition;
+            if (mongo::bsoncolumn::createFuzzedElement(
+                    ptr, end, elementMemory, repetition, element)) {
+                for (int i = 0; i < repetition; ++i)
+                    generatedElements.push_back(element);
+            } else {
+                generatedElements.clear();
+                break;
+            }
+        }
+        if (generatedElements.empty())
+            continue;
+
+        // Exercise the builder
+        BSONColumnBuilder builder;
+        for (auto element : generatedElements) {
+            builder.append(element);
+        }
+
+        // Verify decoding gives us original elements
+        auto diff = builder.intermediate();
+        BSONColumn col(diff.data(), diff.size());
+        auto it = col.begin();
+        for (auto elem : generatedElements) {
+            BSONElement other = *it;
+            ASSERT_TRUE(elem.binaryEqualValues(other));
+            ASSERT_TRUE(it.more());
+            ++it;
+        }
+        ASSERT_TRUE(!it.more());
+    }
+}
+
+TEST_F(BSONColumnTest, BuilderFuzzerReopenDiscoveredEdgeCases) {
+    // This test is a collection of binaries produced by the builder fuzzer that exposed bugs
+    // in the bsoncolumn builder outputs.  To investigate new fuzzer failures, find the base64
+    // encoding of the column binary in the logs (not to be confused with the fuzzer string) and add
+    // it to the binaries vector
+    //
+    // This should look like
+    //
+    // Column: <base64 string>
+    //
+    std::vector<StringData> binariesBase64 = {};
+
+    for (auto&& binaryBase64 : binariesBase64) {
+        auto binary = base64::decode(binaryBase64);
+
+        BSONColumnBuilder builder;
+        BSONColumn col(binary.data(), binary.size());
+        for (auto&& elem : col) {
+            builder.append(elem);
+        }
+
+        [[maybe_unused]] auto d = builder.intermediate();
+
+        // Verify binary reopen gives identical state as intermediate
+        BSONColumnBuilder reopen(binary.data(), binary.size());
+        ASSERT_TRUE(builder.isInternalStateIdentical(reopen));
+    }
+}
 
 TEST_F(BSONColumnTest, Empty) {
     BufBuilder expected;
@@ -9157,142 +9380,6 @@ TEST_F(BSONColumnTest, LegacyInterleavedPaths) {
 
     auto binData = cb.finalize();
     verifyDecompressPathFast(binData, elems, TestPath{{"b"}});
-}
-
-TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {
-    // This test is a collection of binaries produced by the fuzzer that exposed bugs at some point
-    // and contains coverage missing from the tests defined above.
-    std::vector<StringData> binariesBase64 = {
-        // Ends with uncompressed literal. Last value in previous block needs to be set correctly
-        // for doubles.
-        "AQAACQgAAHMA7wkAQP/Q0CfU0NCACvX//////9AA"_sd,
-        // Contains zero deltas after uncompressed string starting with '\0' (unencodable). Ensures
-        // we have special handling for zero deltas that by-pass materialization.
-        "CAAAAgACAAAAAACAAgAAAAAAAAAA"_sd,
-        // Re-scaling double is not possible. Offset to last control byte needs to be cleared so a
-        // new control byte is written by the compressor.
-        "AQAAAAAAAAAAAJHCgLGRkf//DZGRCJEACAAAgDqRsZGRkZGRAA=="_sd,
-        // Re-scaling double is not possible. Offset to last control byte needs to be cleared so a
-        // new control byte is written by the compressor.
-        "CgABAP//////////gAIBAAD7///4AA=="_sd,
-        // Ends with value too large to be encodable in Simple8b block
-        "AQAAAAAjAAAAHAkALV3DRTINAACAd/ce/////xwJAC33Hv////+/AA=="_sd,
-        // Unencodable literal for 128bit types, prevEncoded128 needs to be set to none by
-        // compressor.
-        "DQAUAAAAAAgAAIDx///++AAAAAMAAAAIAACA8f///vj/AAAA"_sd,
-        // Merge of interleaved objects that results in repeated fieldname
-        "fwB/APEPAAAA/wD/////KwAGAAALAJ0qnZ0AAICx87tAc/+/fgQABwAAAP8AAICx88BEjAi/AICxAAIAACQAFgAA"_sd};
-
-    for (auto&& binaryBase64 : binariesBase64) {
-        auto binary = base64::decode(binaryBase64);
-
-        // Validate that our BSONColumnBuilder would construct this exact binary for the input data.
-        // This is required to be able to verify these binary blobs.
-        BSONColumnBuilder builder;
-        BSONColumn column(binary.data(), binary.size());
-        try {
-            for (auto&& elem : column) {
-                builder.append(elem);
-            }
-        } catch (const DBException& ex) {
-            ASSERT_NOT_OK(ex.toStatus());
-            continue;
-        }
-        BSONBinData finalized = builder.finalize();
-        ASSERT_EQ(binary.size(), finalized.length);
-        ASSERT(memcmp(binary.data(), finalized.data, binary.size()) == 0);
-
-        // Validate that reopening BSONColumnBuilder from this binary produces the same state as-if
-        // values were uncompressed and re-appended.
-        verifyColumnReopenFromBinary(binary.data(), binary.size());
-    }
-}
-
-TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
-    // This test is a collection of binaries produced by the decompression fuzzer that exposed bugs
-    // in the block-based or iterator API, and contains coverage missing from the tests defined
-    // above. This test validates that the iterator API and the block-based API must produce the
-    // same results.
-    std::vector<StringData> binariesBase64 = {
-        // Iterator API did not cast values to booleans before materializing (SERVER-87779).
-        "CAAAoJb//wD/3ylEAA=="_sd,
-        // Block-based API updated the 'lastValue' when appending EOO elements (SERVER-85860).
-        "CgAKAAoAEwAHAAoACgEAAABQUFBQUFBQUFAAAAAAAACoqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioUFBQUAAAAAAACgAKAAsAEwAKAAoACgAKAAoACgAKAAoACgAKAAoACgAA"_sd,
-        // Block-based API didn't validate the scale index for simple8b blocks (SERVER-87628 and
-        // SERVER-88738).
-        "QAEADP////+SAA=="_sd,
-        "fwBAAwAAAAAAAAAA"_sd,
-        "CgBh/wABemEUAAAAAAAAAAIBAAA="_sd,
-        "BQAvAAAAAABQslBQUFBQUFBQUFAAUFBQUFB5UP7///9QUFBQUFBQUFCBgYGBgYGBgYGBgYGBgYFQbFCpUFBQgVBQUFBQUFBQP1BQUFBQUAAA"_sd,
-        // Block-based Path API doesn't validate the scale index for non-double values
-        // (SERVER-89155).
-        "8AgAAAAIAAAA0Cz/AAAAAAdSAAA="_sd,
-        // The two APIs had different delta values, but both should fail (SERVER-85860 and
-        // SERVER-87873).
-        "BQADAAAAkP8AkJCR///+/4jIfdAmAAAAAAAAAJACAAAAAP8AAAA="_sd,
-        "fwDQYG9tfwAAAAAA"_sd,
-        "CAABwMABwMDAwMDAwH9DwMDAwMDAwMDAwMDAwMDAwMjAwMDAAAAAAA=="_sd,
-        "EwAAAGCvYK+vUgBSUlBQc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3NzFBQUFBQUc3PQ0NDQ0NDQ0NDQr1JSUlBQ0NDQ0NDQ0NDQ0NIYAAAA0NAXlaJ9//8AAA=="_sd,
-        // Block-based API using the table decoders should fail on bad selectors (SERVER-88062).
-        "CwBPpFpaWloAAKD3Af9dXQD/AAA="_sd,
-        // Block-based API had a stack overflow for BinData values (SERVER-88207).
-        "BQAXAAAAMcLCPso9PcJhJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmsMIYAAECAAIAAA=="_sd,
-        "BQAwAAAAAAcAAAAAAAEAAAAAAABAAAAAAAA7Ozs7Ozs7Ozs6Ozs7Ozs7Ozs7Ozs7Ozs7OwD+/4A7OzsA/v+A/wA="_sd,
-        // Block-based API didn't allow non-zero/missing deltas after EOO (SERVER-89150).
-        "8h4AAAD/p/+zSENBMoAB/0hDQzKAAP9IOjCAAP8AAACCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCggA="_sd,
-        // Blockbased API didn't update last to EOO when Iterative API did for interleaved data
-        // (SERVER-89612).
-        "8hQAAAAF+P//////FCgAAAAAAAAABgAIAACBKg7/+///////MP8V/3EAAACBeHFYDAAA/3RhZ3P//wEAAAA="_sd,
-        // Blockbased API doesn't fail an interleaved mode that has leftover data in some decoders
-        // while the iterative version does (SERVER-92150)
-        "8jIAAAAHVvkCAAEAAAAAAgABAAAAAAxTdGNydHVfaWQAAQAAAAABMg5faWQAAQAAAAAA/wD/AP8Aj4+Pj4+Pj4+Pj4+Pj4+Pj4//AP8A/wD/AP8A/wD/AP8A/wCPj4+Pj4+Pj4+PAAD/AP8A/wD/AP8A/wCPj4+Pj4+Pj49vj4+Pj4+Pj/8A/041j4+Pj4+Pj4+Pj48BAFXeV6t2AI+Pj4+Pj4+Pj4+Pj8SPj4+Pj4+Pj4//AP8A/wD/AP8A/wAA"_sd,
-        // Empty interleaved mode produces an assert in block-based API but not iterative
-        // (SERVER-92327)
-        "EAAAYTsB8gcAAAD/AAAAgsj//////////wEH//hB/7KyAP+AAP//AAA="_sd,
-    };
-
-    for (auto&& binaryBase64 : binariesBase64) {
-        auto binary = base64::decode(binaryBase64);
-
-        // Store the results for validation after decompression.
-        boost::intrusive_ptr allocator{new BSONElementStorage()};
-        std::vector<BSONElement> iteratorElems, blockBasedElems;
-        bool blockBasedError = false;
-        bool iteratorError = false;
-
-        // Attempt to decompress using the block-based API.
-        bsoncolumn::BSONColumnBlockBased block(binary.data(), binary.size());
-        try {
-            block.decompress<bsoncolumn::BSONElementMaterializer, std::vector<BSONElement>>(
-                blockBasedElems, allocator);
-        } catch (...) {
-            blockBasedError = true;
-        }
-
-        // Attempt to decompress using the iterator API.
-        BSONColumn column(binary.data(), binary.size());
-        try {
-            for (auto&& elem : column) {
-                iteratorElems.push_back(elem);
-            };
-        } catch (...) {
-            iteratorError = true;
-        }
-
-        // If one API failed, then both APIs must fail.
-        if (iteratorError || blockBasedError) {
-            ASSERT(iteratorError && blockBasedError);
-            continue;
-        }
-
-        // If the APIs succeeded, the results must be the same.
-        ASSERT(iteratorElems.size() == blockBasedElems.size());
-        auto it = iteratorElems.begin();
-        for (auto&& elem : blockBasedElems) {
-            ASSERT(elem.binaryEqualValues(*it));
-            ++it;
-        }
-    }
 }
 
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
