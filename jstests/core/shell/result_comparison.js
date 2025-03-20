@@ -1,39 +1,67 @@
 /*
- * Tests `_resultSetsEqualUnordered`, which compares two sets of results (order of documents is
- * disregarded) for equality. Field order inside an object is ignored, but array ordering and
- * everything else is required for equality.
+ * Tests `_resultSetsEqualUnordered` and `_resultSetsEqualNormalized`, which compare two sets of
+ * results for equality. In `_resultSetsEqualUnordered`, field order inside an object is ignored,
+ * but array ordering and everything else is required for equality. In `_resultSetsEqualNormalized`,
+ * array ordering is also ignored, as well as some differences regarding numeric types and
+ * floating point closeness.
  */
 
 const currentDate = new Date();
 
-// We should throw for invalid input. This function expects both arguments to be a list of objects.
-assert.throwsWithCode(() => _resultSetsEqualUnordered({}, []), 9193201);
-assert.throwsWithCode(() => _resultSetsEqualUnordered([], 5), 9193201);
-assert.throwsWithCode(() => _resultSetsEqualUnordered([4, 1], []), 9193202);
-assert.throwsWithCode(() => _resultSetsEqualUnordered([], ["abc"]), 9193203);
-assert.throwsWithCode(() => _resultSetsEqualUnordered([[]], [{a: 1}]), 9193202);
-assert.throwsWithCode(() => _resultSetsEqualUnordered([], undefined), 9193201);
-assert.throwsWithCode(() => _resultSetsEqualUnordered([], null), 9193201);
-assert.throwsWithCode(() => _resultSetsEqualUnordered([null], []), 9193202);
+const comparisonFunctions = [_resultSetsEqualUnordered, _resultSetsEqualNormalized];
+
+// We should throw for invalid input. These functions expect both arguments to be a list of objects.
+comparisonFunctions.forEach(comparisonFn => {
+    assert.throwsWithCode(() => comparisonFn({}, []), 9193201);
+    assert.throwsWithCode(() => comparisonFn([], 5), 9193201);
+    assert.throwsWithCode(() => comparisonFn([4, 1], []), 9193202);
+    assert.throwsWithCode(() => comparisonFn([], ["abc"]), 9193203);
+    assert.throwsWithCode(() => comparisonFn([[]], [{a: 1}]), 9193202);
+    assert.throwsWithCode(() => comparisonFn([], undefined), 9193201);
+    assert.throwsWithCode(() => comparisonFn([], null), 9193201);
+    assert.throwsWithCode(() => comparisonFn([null], []), 9193202);
+});
 
 // Some base cases.
-assert(_resultSetsEqualUnordered([], []));
-assert(_resultSetsEqualUnordered([{a: 1}], [{a: 1}]));
-assert(_resultSetsEqualUnordered([{a: 1}, {a: 1}], [{a: 1}, {a: 1}]));
-assert(_resultSetsEqualUnordered([{a: 1}, {b: 1}], [{b: 1}, {a: 1}]));
-assert(_resultSetsEqualUnordered([{a: null}], [{a: null}]));
-assert(!_resultSetsEqualUnordered([], [{a: 1}]));
-assert(!_resultSetsEqualUnordered([{a: 1}], []));
-// Different types should fail the comparison.
-assert(!_resultSetsEqualUnordered([{a: 1}], [{a: '1'}]));
+comparisonFunctions.forEach(comparisonFn => {
+    assert(comparisonFn([], []));
+    assert(comparisonFn([{a: 1}], [{a: 1}]));
+    assert(comparisonFn([{a: 1}, {a: 1}], [{a: 1}, {a: 1}]));
+    assert(comparisonFn([{a: 1}, {b: 1}], [{b: 1}, {a: 1}]));
+    assert(comparisonFn([{a: null}], [{a: null}]));
+    assert(!comparisonFn([], [{a: 1}]));
+    assert(!comparisonFn([{a: 1}], []));
+});
+
+// Different non-numeric types should fail both comparisons.
+comparisonFunctions.forEach(comparisonFn => {
+    assert(!comparisonFn([{a: 1}], [{a: '1'}]));
+    assert(!comparisonFn([{a: null}], [{}]));
+    assert(!comparisonFn([{a: null}], [{b: null}]));
+    assert(!comparisonFn([{a: null}], [{a: undefined}]));
+    assert(!comparisonFn([{}], [{a: undefined}]));
+});
+
+// Different numeric types should fail the unordered comparison.
 assert(!_resultSetsEqualUnordered([{a: 1}], [{a: NumberLong(1)}]));
 assert(!_resultSetsEqualUnordered([{a: 1}], [{a: NumberDecimal(1)}]));
 assert(!_resultSetsEqualUnordered([{a: NumberInt(1)}], [{a: NumberDecimal(1)}]));
 assert(!_resultSetsEqualUnordered([{a: NumberInt(1)}], [{a: NumberLong(1)}]));
-assert(!_resultSetsEqualUnordered([{a: null}], [{}]));
-assert(!_resultSetsEqualUnordered([{a: null}], [{b: null}]));
-assert(!_resultSetsEqualUnordered([{a: null}], [{a: undefined}]));
-assert(!_resultSetsEqualUnordered([{}], [{a: undefined}]));
+// However, they should pass the normalized comparison.
+assert(_resultSetsEqualNormalized([{a: 1}], [{a: NumberLong(1)}]));
+assert(_resultSetsEqualNormalized([{a: 1}], [{a: NumberDecimal(1)}]));
+assert(_resultSetsEqualNormalized([{a: NumberInt(1)}], [{a: NumberDecimal(1)}]));
+assert(_resultSetsEqualNormalized([{a: NumberInt(1)}], [{a: NumberLong(1)}]));
+
+// Unordered comparison requires all values to be exactly equal.
+assert(!_resultSetsEqualUnordered([{a: 0.14285714285714285}], [{a: 0.14285714285714288}]));
+// Normalized comparison rounds doubles to 15 decimal places.
+assert(_resultSetsEqualNormalized([{a: 0.14285714285714285}], [{a: 0.14285714285714288}]));
+// Normalized comparison is sensitive to differences before the 15th decimal place.
+assert(!_resultSetsEqualNormalized([{a: 0.142857142856}], [{a: 0.142857142855}]));
+// Normalized comparison doesn't currently round decimals.
+assert(!_resultSetsEqualNormalized([{a: NumberDecimal('0.14285714285714285')}],
+                                   [{a: NumberDecimal('0.14285714285714288')}]));
 
 /*
  * Given two sets of results - `equalResults` and `differentResults`, we test that all pairs of
@@ -45,6 +73,9 @@ function assertExpectedOutputs(equalResults, differentResults) {
         for (const result2 of equalResults) {
             assert(_resultSetsEqualUnordered(result1, result2), {result1, result2});
             assert(_resultSetsEqualUnordered(result2, result1), {result1, result2});
+            // Additional normalizations shouldn't make the comparison more strict.
+            assert(_resultSetsEqualNormalized(result1, result2), {result1, result2});
+            assert(_resultSetsEqualNormalized(result2, result1), {result1, result2});
         }
     }
     for (const result1 of equalResults) {
