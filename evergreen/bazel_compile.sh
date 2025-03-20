@@ -107,9 +107,20 @@ fi
 
 BAZEL_BINARY=$(bazel_get_binary_path)
 
+# Timeout is set here to avoid the build hanging indefinitely, still allowing
+# for retries.
+TIMEOUT_CMD=""
+if [ -n "${build_timeout_seconds}" ]; then
+  TIMEOUT_CMD="timeout ${build_timeout_seconds}"
+fi
+
 for i in {1..5}; do
-  eval $BAZEL_BINARY build --verbose_failures $LOCAL_ARG ${args} ${targets} && RET=0 && break || RET=$? && sleep 1
-  echo "Bazel failed to execute, retrying..."
+  eval ${TIMEOUT_CMD} $BAZEL_BINARY build --verbose_failures $LOCAL_ARG ${args} ${targets} && RET=0 && break || RET=$? && sleep 1
+  if [ $RET -eq 124 ]; then
+    echo "Bazel timed out after ${build_timeout_seconds} seconds, retrying..."
+  else
+    echo "Bazel failed to execute, retrying..."
+  fi
 done
 
 exit $RET
