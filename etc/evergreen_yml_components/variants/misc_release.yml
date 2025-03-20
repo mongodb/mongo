@@ -690,7 +690,6 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
-  - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2023-arm64
@@ -894,7 +893,6 @@ buildvariants:
   - name: .crypt
     distros:
     - amazon2023-arm64-latest-large-m8g
-  - name: .publish_crypt
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
@@ -906,7 +904,6 @@ buildvariants:
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
-  - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian11
