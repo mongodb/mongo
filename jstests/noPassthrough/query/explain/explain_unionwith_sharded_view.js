@@ -79,6 +79,12 @@ function testPipeline(pipeline) {
 
     jsTestLog("Running explain('executionStats') on view:");
     checkExplainProperties(db[viewOnColl].explain("executionStats").aggregate(pipeline), true);
+
+    jsTestLog("Running explain('allPlansExecution') on collection:");
+    checkExplainProperties(coll.explain("allPlansExecution").aggregate(pipeline), true);
+
+    jsTestLog("Running explain('allPlansExecution') on view:");
+    checkExplainProperties(db[viewOnColl].explain("allPlansExecution").aggregate(pipeline), true);
 }
 
 const testViews = [

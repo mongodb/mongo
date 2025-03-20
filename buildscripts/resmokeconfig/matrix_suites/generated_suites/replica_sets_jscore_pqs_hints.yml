@@ -54,7 +54,6 @@ selector:
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
     - jstests/core/timeseries/write/timeseries_update_multi.js
     - jstests/core/query/distinct/distinct_semantics.js
-    - jstests/core/timeseries/query/timeseries_union_with.js
     - jstests/core/index/express.js
     - jstests/core/index/index_filter_commands.js
     - jstests/core/query/query_settings/**/*.js

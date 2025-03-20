@@ -87,7 +87,6 @@ selector:
     - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
     - jstests/core/query/distinct/distinct_semantics.js
-    - jstests/core/timeseries/query/timeseries_union_with.js
     - jstests/core/index/text/text_ignore_regex.js
     - jstests/core/timeseries/query/timeseries_merge.js
     - jstests/core/query/or_use_clustered_collection.js

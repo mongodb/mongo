@@ -8,8 +8,6 @@
     exclude_files:
       # Distinct explain fails with 'database not found' on sharded clusters
       - jstests/core/query/distinct/distinct_semantics.js
-      # SERVER-95208 Fix timeseries query failing in explain, but passing when running.
-      - jstests/core/timeseries/query/timeseries_union_with.js
       # Explain cannot target shards directly.
       - jstests/core/index/text/text_ignore_regex.js
       - jstests/core/timeseries/query/timeseries_merge.js

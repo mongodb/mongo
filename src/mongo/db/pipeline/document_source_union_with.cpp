@@ -122,11 +122,12 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
           buildPipelineFromViewDefinition(
               expCtx, expCtx->getResolvedNamespace(unionNss), pipeline, unionNss)) {
     // Save state regarding the resolved namespace in case we are running explain with
-    // 'executionStats' on a $unionWith with a view on a mongod. Otherwise we wouldn't be able to
-    // see details about the execution of the view pipeline in the explain result.
+    // 'executionStats' or 'allPlansExecution' on a $unionWith with a view on a mongod. Otherwise we
+    // wouldn't be able to see details about the execution of the view pipeline in the explain
+    // result.
     ResolvedNamespace resolvedNs = expCtx->getResolvedNamespace(unionNss);
     if (expCtx->getExplain() &&
-        expCtx->getExplain().value() == explain::VerbosityEnum::kExecStats &&
+        expCtx->getExplain().value() != explain::VerbosityEnum::kQueryPlanner &&
         !resolvedNs.pipeline.empty()) {
         _resolvedNsForView = resolvedNs;
     }
@@ -275,8 +276,8 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     }
 
     if (_executionState == ExecutionProgress::kStartingSubPipeline) {
-        // Since the subpipeline will be executed again for explain, we store the starting
-        // state of the variables to reset them later.
+        // Since the subpipeline will be executed again for explain, we store the starting state of
+        // the variables to reset them later.
         if (pExpCtx->getExplain()) {
             auto expCtx = _pipeline->getContext();
             _variables = expCtx->variables;

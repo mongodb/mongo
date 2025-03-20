@@ -3,8 +3,6 @@
     exclude_files:
       # Distinct explain fails with 'database not found' on sharded clusters
       - jstests/core/query/distinct/distinct_semantics.js
-      # SERVER-95208 Fix timeseries query failing in explain, but passing when running.
-      - jstests/core/timeseries/query/timeseries_union_with.js
       # Tests which already use query settings or index filters, which could be overridden by this suite.
       - jstests/core/index/express.js
       - jstests/core/index/index_filter_commands.js

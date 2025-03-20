@@ -56,7 +56,8 @@ function checkExplainProperties(explainRoot, hasExecutionStats) {
 
 const pipeline = [{$project: {y: 1}}];
 
-jsTestLog("Running explain on collection:");
+// The default verbosity for explain is 'queryPlanner'.
+jsTestLog("Running explain('queryPlanner') on collection:");
 checkExplainProperties(
     coll.explain().aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]));
 
@@ -65,12 +66,24 @@ checkExplainProperties(
     coll.explain("executionStats").aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
     true);
 
-jsTestLog("Running explain on view:");
+jsTestLog("Running explain('allPlansExecution') on collection:");
+checkExplainProperties(coll.explain("allPlansExecution").aggregate([
+    {$unionWith: {coll: viewName, pipeline: pipeline}}
+]),
+                       true);
+
+jsTestLog("Running explain('queryPlanner') on view:");
 checkExplainProperties(
     db[viewName].explain().aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]));
 
 jsTestLog("Running explain('executionStats') on view:");
 checkExplainProperties(db[viewName].explain("executionStats").aggregate([
+    {$unionWith: {coll: viewName, pipeline: pipeline}}
+]),
+                       true);
+
+jsTestLog("Running explain('allPlansExecution') on view:");
+checkExplainProperties(db[viewName].explain("allPlansExecution").aggregate([
     {$unionWith: {coll: viewName, pipeline: pipeline}}
 ]),
                        true);
