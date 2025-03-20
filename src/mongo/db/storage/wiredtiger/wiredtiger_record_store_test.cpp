@@ -769,7 +769,6 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
                                                     NamespaceStringUtil::serializeForCatalog(nss),
-                                                    "",
                                                     CollectionOptions(),
                                                     wtTableConfig);
     ASSERT_TRUE(result.isOK());

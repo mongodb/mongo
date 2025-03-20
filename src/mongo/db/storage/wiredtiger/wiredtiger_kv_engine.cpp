@@ -1445,7 +1445,6 @@ Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
     StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(_canonicalName,
                                                     NamespaceStringUtil::serializeForCatalog(nss),
-                                                    ident,
                                                     options,
                                                     wtTableConfig,
                                                     nss.isOplog());
@@ -1784,7 +1783,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     wtTableConfig.extraCreateOptions = _rsOptions;
 
     StatusWith<std::string> swConfig = WiredTigerRecordStore::generateCreateString(
-        _canonicalName, {} /* internal table */, ident, CollectionOptions(), wtTableConfig);
+        _canonicalName, {} /* internal table */, CollectionOptions(), wtTableConfig);
     uassertStatusOK(swConfig.getStatus());
 
     std::string config = swConfig.getValue();

@@ -109,7 +109,7 @@ public:
                                                    const std::string& ns) final {
         std::string ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
+        std::string uri = WiredTigerKVEngine::kTableUriPrefix + ident;
         WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
             getWiredTigerTableConfigFromStartupOptions();
         wtTableConfig.keyFormat = KeyFormat::Long;
@@ -117,7 +117,6 @@ public:
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
             std::string{kWiredTigerEngineName},
             NamespaceStringUtil::serializeForCatalog(nss),
-            ident,
             CollectionOptions(),
             wtTableConfig,
             nss.isOplog());

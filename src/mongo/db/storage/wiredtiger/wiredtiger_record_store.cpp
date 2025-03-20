@@ -298,7 +298,6 @@ private:
 StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     const std::string& engineName,
     StringData tableName,
-    StringData ident,
     const CollectionOptions& options,
     const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
     bool isOplog) {

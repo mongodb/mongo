@@ -101,7 +101,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
                                                     NamespaceStringUtil::serializeForCatalog(nss),
-                                                    ident,
                                                     collOptions,
                                                     wtTableConfig,
                                                     nss.isOplog());
@@ -161,7 +160,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
         std::string{kWiredTigerEngineName},
         NamespaceStringUtil::serializeForCatalog(oplogNss),
-        ident,
         options,
         wtTableConfig,
         true);
