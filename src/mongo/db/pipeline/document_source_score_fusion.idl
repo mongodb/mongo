@@ -48,9 +48,14 @@ structs:
         type: object_owned
         optional: true
       method:
-        description: Logic to combine all scores together
+        description: Logic to combine all scores together.
         type: ScoreFusionCombinationMethod
         optional: true
+      expression:
+        description: Expression to customize score aggregation (how scores are combined together).
+        type: IDLAnyTypeOwned
+        optional: true
+
   # The ScoreFusionSpec needs to be in a separate file because use of the 
   # validation callback will otherwise create a circular dependency.
   ScoreFusionSpec:

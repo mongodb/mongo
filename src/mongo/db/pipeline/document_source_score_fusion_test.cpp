@@ -2560,5 +2560,1046 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedAvgMethod) {
         })",
         asOneObj);
 }
+
+// This test should error since combination.method is expression but no combination.expression was
+// specified.
+TEST_F(DocumentSourceScoreFusionTest,
+       ErrorsIfCombinationMethodExpressionButCombinationExpressionNotSpecified) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "expression"
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10017300);
+}
+
+// This test should error since combination.method is not expression but combination.expression was
+// specified.
+TEST_F(DocumentSourceScoreFusionTest,
+       ErrorsIfCombinationMethodNotExpressionButCombinationExpressionSpecified) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "sum",
+                expression: {$sum: ["$$name1", 5.0]}
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10017300);
+}
+
+// This test should error since combination.weights and combination.expression are specified at the
+// same time.
+TEST_F(DocumentSourceScoreFusionTest,
+       ErrorsIfInvalidCombinationMethodExpressionButCombinationWeightsAndExpressionSpecified) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    name1: 5
+                },
+                method: "expression",
+                expression: {$sum: ["$$name1", 5.0]}
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10017301);
+}
+
+// This test specifies an expression that references the only pipeline.
+TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNoneMethodExpression) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "expression",
+                expression: {$sum: ["$$name1", 5.0]}
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+        "expectedStages": [
+            {
+                "$vectorSearch": {
+                    "queryVector": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "path": "plot_embedding",
+                    "numCandidates": 300,
+                    "index": "vector_index",
+                    "limit": 10
+                }
+            },
+            {
+                "$replaceRoot": {
+                    "newRoot": {
+                        "docs": "$$ROOT"
+                    }
+                }
+            },
+            {
+                "$addFields": {
+                    "name1_score": {
+                        "$multiply": [
+                            {
+                                "$meta": "score"
+                            },
+                            {
+                                "$const": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$docs._id",
+                    "docs": {
+                        "$first": "$docs"
+                    },
+                    "name1_score": {
+                        "$max": {
+                            "$ifNull": [
+                                "$name1_score",
+                                {
+                                    "$const": 0
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                "$setMetadata": {
+                    "score": {
+                        "$let": {
+                            "vars": {
+                                "name1": "$name1_score"
+                            },
+                            "in": {
+                                "$sum": [
+                                    "$$name1",
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "$sort": {
+                    "$computed0": {
+                        "$meta": "score"
+                    },
+                    "_id": 1
+                }
+            },
+            {
+                "$replaceRoot": {
+                    "newRoot": "$docs"
+                }
+            }
+        ]
+    })",
+        asOneObj);
+}
+
+// This test specifies an expression that that doesn't reference any of the pipelines.
+TEST_F(DocumentSourceScoreFusionTest,
+       CheckOnePipelineAllowedNormalizationNoneMethodConstExpression) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "expression",
+                expression: {$const: 1.0}
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+        "expectedStages": [
+            {
+                "$vectorSearch": {
+                    "queryVector": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "path": "plot_embedding",
+                    "numCandidates": 300,
+                    "index": "vector_index",
+                    "limit": 10
+                }
+            },
+            {
+                "$replaceRoot": {
+                    "newRoot": {
+                        "docs": "$$ROOT"
+                    }
+                }
+            },
+            {
+                "$addFields": {
+                    "name1_score": {
+                        "$multiply": [
+                            {
+                                "$meta": "score"
+                            },
+                            {
+                                "$const": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$docs._id",
+                    "docs": {
+                        "$first": "$docs"
+                    },
+                    "name1_score": {
+                        "$max": {
+                            "$ifNull": [
+                                "$name1_score",
+                                {
+                                    "$const": 0
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                "$setMetadata": {
+                    "score": {
+                        "$let": {
+                            "vars": {
+                                "name1": "$name1_score"
+                            },
+                            "in": {
+                                "$const": 1
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "$sort": {
+                    "$computed0": {
+                        "$meta": "score"
+                    },
+                    "_id": 1
+                }
+            },
+            {
+                "$replaceRoot": {
+                    "newRoot": "$docs"
+                }
+            }
+        ]
+    })",
+        asOneObj);
+}
+
+// This test specifies an expression that references both pipelines.
+TEST_F(DocumentSourceScoreFusionTest,
+       CheckMultiplePipelinesAllowedNormalizationNoneMethodExpression) {
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ],
+                    name2: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "expression",
+                expression: {$sum: ["$$name1", "$$name2", 5.0]}
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+        "expectedStages": [
+            {
+                "$search": {
+                    "index": "search_index",
+                    "text": {
+                        "query": "mystery",
+                        "path": "genres"
+                    }
+                }
+            },
+            {
+                "$replaceRoot": {
+                    "newRoot": {
+                        "docs": "$$ROOT"
+                    }
+                }
+            },
+            {
+                "$addFields": {
+                    "name1_score": {
+                        "$multiply": [
+                            {
+                                "$meta": "score"
+                            },
+                            {
+                                "$const": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "$unionWith": {
+                    "coll": "pipeline_test",
+                    "pipeline": [
+                        {
+                            "$vectorSearch": {
+                                "queryVector": [
+                                    1,
+                                    2,
+                                    3
+                                ],
+                                "path": "plot_embedding",
+                                "numCandidates": 300,
+                                "index": "vector_index",
+                                "limit": 10
+                            }
+                        },
+                        {
+                            "$replaceRoot": {
+                                "newRoot": {
+                                    "docs": "$$ROOT"
+                                }
+                            }
+                        },
+                        {
+                            "$addFields": {
+                                "name2_score": {
+                                    "$multiply": [
+                                        {
+                                            "$meta": "score"
+                                        },
+                                        {
+                                            "$const": 1
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$docs._id",
+                    "docs": {
+                        "$first": "$docs"
+                    },
+                    "name1_score": {
+                        "$max": {
+                            "$ifNull": [
+                                "$name1_score",
+                                {
+                                    "$const": 0
+                                }
+                            ]
+                        }
+                    },
+                    "name2_score": {
+                        "$max": {
+                            "$ifNull": [
+                                "$name2_score",
+                                {
+                                    "$const": 0
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                "$setMetadata": {
+                    "score": {
+                        "$let": {
+                            "vars": {
+                                "name1": "$name1_score",
+                                "name2": "$name2_score"
+                            },
+                            "in": {
+                                "$sum": [
+                                    "$$name1",
+                                    "$$name2",
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "$sort": {
+                    "$computed0": {
+                        "$meta": "score"
+                    },
+                    "_id": 1
+                }
+            },
+            {
+                "$replaceRoot": {
+                    "newRoot": "$docs"
+                }
+            }
+        ]
+    })",
+        asOneObj);
+}
+
+// This test specifies only one of the two pipeline names. This should still desugar correctly.
+TEST_F(DocumentSourceScoreFusionTest,
+       CheckMultiplePipelinesAllowedNormalizationNoneMethodExpressionNotAllPipelineVarsSpecified) {
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ],
+                    name2: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "expression",
+                expression: {$sum: ["$$name1", 5.0]}
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+        "expectedStages": [
+            {
+                "$search": {
+                    "index": "search_index",
+                    "text": {
+                        "query": "mystery",
+                        "path": "genres"
+                    }
+                }
+            },
+            {
+                "$replaceRoot": {
+                    "newRoot": {
+                        "docs": "$$ROOT"
+                    }
+                }
+            },
+            {
+                "$addFields": {
+                    "name1_score": {
+                        "$multiply": [
+                            {
+                                "$meta": "score"
+                            },
+                            {
+                                "$const": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "$unionWith": {
+                    "coll": "pipeline_test",
+                    "pipeline": [
+                        {
+                            "$vectorSearch": {
+                                "queryVector": [
+                                    1,
+                                    2,
+                                    3
+                                ],
+                                "path": "plot_embedding",
+                                "numCandidates": 300,
+                                "index": "vector_index",
+                                "limit": 10
+                            }
+                        },
+                        {
+                            "$replaceRoot": {
+                                "newRoot": {
+                                    "docs": "$$ROOT"
+                                }
+                            }
+                        },
+                        {
+                            "$addFields": {
+                                "name2_score": {
+                                    "$multiply": [
+                                        {
+                                            "$meta": "score"
+                                        },
+                                        {
+                                            "$const": 1
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$docs._id",
+                    "docs": {
+                        "$first": "$docs"
+                    },
+                    "name1_score": {
+                        "$max": {
+                            "$ifNull": [
+                                "$name1_score",
+                                {
+                                    "$const": 0
+                                }
+                            ]
+                        }
+                    },
+                    "name2_score": {
+                        "$max": {
+                            "$ifNull": [
+                                "$name2_score",
+                                {
+                                    "$const": 0
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                "$setMetadata": {
+                    "score": {
+                        "$let": {
+                            "vars": {
+                                "name1": "$name1_score",
+                                "name2": "$name2_score"
+                            },
+                            "in": {
+                                "$sum": [
+                                    "$$name1",
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "$sort": {
+                    "$computed0": {
+                        "$meta": "score"
+                    },
+                    "_id": 1
+                }
+            },
+            {
+                "$replaceRoot": {
+                    "newRoot": "$docs"
+                }
+            }
+        ]
+    })",
+        asOneObj);
+}
+
+// This test specifies "name3" instead of the pipeline called "name2." This should error because
+// "name3" is an undefined variable so the $let expression cannot be parsed.
+TEST_F(DocumentSourceScoreFusionTest,
+       ErrorsIfMultiplePipelinesAllowedNormalizationNoneMethodExpressionSpecifiesWrongPipeline) {
+    // This is needed because the $unionWith stage still gets constructed and getResolvedNamespace
+    // is called.
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ],
+                    name2: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "expression",
+                expression: {$sum: ["$$name1", "$$name3", 5.0]}
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       17276);
+}
+
+// This test specifies an expression that doesn't evaluate to a numerical value. Note that this will
+// still desugar properly but a run-time error will be thrown when the desugared output is
+// evaluated. See score_fusion_score_combination_test.js for the corresponding testcase that
+// verifies an error is thrown when combination.expression evaluates to a nonnumerical value.
+TEST_F(DocumentSourceScoreFusionTest,
+       CheckOnePipelineAllowedNormalizationNoneMethodNonNumericalExpression) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "expression",
+                expression: {$toString: 2.5}
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$name1_score"
+                                },
+                                "in": {
+                                    "$convert": {
+                                        "input": {
+                                            "$const": 2.5
+                                        },
+                                        "to": {
+                                            "$const": "string"
+                                        },
+                                        "format": {
+                                            "$const": "auto"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+// This test specifies a $let expression which means the resulting desugared combination.expression
+// winds up becoming a nested $let expression.
+TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNoneMethodLetExpression) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "expression",
+                expression: {$let: {vars: {name1: "$name1_score"}, 
+                in: {$sum: ["$$name1", {$const: 5}]}}}
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$name1_score"
+                                },
+                                "in": {
+                                    "$let": {
+                                        "vars": {
+                                            "name1": "$name1_score"
+                                        },
+                                        "in": {
+                                            "$sum": [
+                                                "$$name1",
+                                                {
+                                                    "$const": 5
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
 }  // namespace
 }  // namespace mongo
