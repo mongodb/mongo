@@ -406,6 +406,8 @@ last-continuous:
       ticket: SERVER-98664
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_limit.js
       ticket: SERVER-100299
+    - test_file: jstests/core_sharding/ddl/shard_collection_outside_db_primary_index_compatibility.js
+      ticket: SERVER-100844
   suites: null
 last-lts:
   all:
@@ -861,4 +863,6 @@ last-lts:
       ticket: SERVER-98664
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_limit.js
       ticket: SERVER-100299
+    - test_file: jstests/core_sharding/ddl/shard_collection_outside_db_primary_index_compatibility.js
+      ticket: SERVER-100844
   suites: null
