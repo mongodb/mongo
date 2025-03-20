@@ -60,7 +60,7 @@ extern JS_PUBLIC_API bool CallMethodIfWrapped(JSContext* cx,
 // its interface is the same as that of JSNative.
 //
 //   static bool
-//   answer_getAnswer_impl(JSContext* cx, JS::CallArgs args)
+//   answer_getAnswer_impl(JSContext* cx, const JS::CallArgs& args)
 //   {
 //       args.rval().setInt32(42);
 //       return true;

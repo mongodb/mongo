@@ -16,6 +16,7 @@
 
 #include "vm/Compartment-inl.h"
 #include "vm/JSObject-inl.h"
+#include "vm/NativeObject-inl.h"
 #include "vm/Realm-inl.h"
 #include "vm/Shape-inl.h"
 
@@ -100,6 +101,30 @@ static void InvalidateMegamorphicCache(JSContext* cx,
   cx->caches().megamorphicSetPropCache->bumpGeneration();
 }
 
+void MaybePopReturnFuses(JSContext* cx, Handle<NativeObject*> nobj) {
+  GlobalObject* global = &nobj->global();
+  JSObject* objectProto = &global->getObjectPrototype();
+  if (nobj == objectProto) {
+    nobj->realm()->realmFuses.objectPrototypeHasNoReturnProperty.popFuse(
+        cx, nobj->realm()->realmFuses);
+    return;
+  }
+
+  JSObject* iteratorProto = global->maybeGetIteratorPrototype();
+  if (nobj == iteratorProto) {
+    nobj->realm()->realmFuses.iteratorPrototypeHasNoReturnProperty.popFuse(
+        cx, nobj->realm()->realmFuses);
+    return;
+  }
+
+  JSObject* arrayIterProto = global->maybeGetArrayIteratorPrototype();
+  if (nobj == arrayIterProto) {
+    nobj->realm()->realmFuses.arrayIteratorPrototypeHasNoReturnProperty.popFuse(
+        cx, nobj->realm()->realmFuses);
+    return;
+  }
+}
+
 // static
 bool Watchtower::watchPropertyAddSlow(JSContext* cx, Handle<NativeObject*> obj,
                                       HandleId id) {
@@ -111,6 +136,10 @@ bool Watchtower::watchPropertyAddSlow(JSContext* cx, Handle<NativeObject*> obj,
     }
     if (!id.isInt()) {
       InvalidateMegamorphicCache(cx, obj);
+    }
+
+    if (id == NameToId(cx->names().return_)) {
+      MaybePopReturnFuses(cx, obj);
     }
   }
 
@@ -178,7 +207,19 @@ static bool WatchProtoChangeImpl(JSContext* cx, HandleObject obj) {
   }
   if (obj->is<NativeObject>()) {
     InvalidateMegamorphicCache(cx, obj.as<NativeObject>());
+
+    NativeObject* nobj = &obj->as<NativeObject>();
+    if (nobj == nobj->global().maybeGetArrayIteratorPrototype()) {
+      nobj->realm()->realmFuses.arrayIteratorPrototypeHasIteratorProto.popFuse(
+          cx, nobj->realm()->realmFuses);
+    }
+
+    if (nobj == nobj->global().maybeGetIteratorPrototype()) {
+      nobj->realm()->realmFuses.iteratorPrototypeHasObjectProto.popFuse(
+          cx, nobj->realm()->realmFuses);
+    }
   }
+
   return true;
 }
 
@@ -200,6 +241,53 @@ bool Watchtower::watchProtoChangeSlow(JSContext* cx, HandleObject obj) {
   return true;
 }
 
+static void MaybePopArrayIteratorFuse(JSContext* cx, NativeObject* obj,
+                                      jsid id) {
+  if (!id.isWellKnownSymbol(JS::SymbolCode::iterator)) {
+    return;
+  }
+
+  JSObject* originalArrayPrototype = obj->global().maybeGetArrayPrototype();
+  if (!originalArrayPrototype) {
+    return;
+  }
+
+  if (obj != originalArrayPrototype) {
+    return;
+  }
+
+  obj->realm()->realmFuses.arrayPrototypeIteratorFuse.popFuse(
+      cx, obj->realm()->realmFuses);
+}
+
+static void MaybePopArrayIteratorPrototypeNextFuse(JSContext* cx,
+                                                   NativeObject* obj, jsid id) {
+  JSObject* originalArrayIteratorPrototoype =
+      obj->global().maybeGetArrayIteratorPrototype();
+  if (!originalArrayIteratorPrototoype) {
+    return;
+  }
+
+  if (obj != originalArrayIteratorPrototoype) {
+    return;
+  }
+
+  PropertyKey nextId = NameToId(cx->names().next);
+  if (id != nextId) {
+    return;
+  }
+
+  obj->realm()->realmFuses.arrayPrototypeIteratorNextFuse.popFuse(
+      cx, obj->realm()->realmFuses);
+}
+
+static void MaybePopFuses(JSContext* cx, NativeObject* obj, jsid id) {
+  // Handle a write to Array.prototype[@@iterator]
+  MaybePopArrayIteratorFuse(cx, obj, id);
+  // Handle a write to Array.prototype[@@iterator].next
+  MaybePopArrayIteratorPrototypeNextFuse(cx, obj, id);
+}
+
 // static
 bool Watchtower::watchPropertyRemoveSlow(JSContext* cx,
                                          Handle<NativeObject*> obj,
@@ -212,6 +300,10 @@ bool Watchtower::watchPropertyRemoveSlow(JSContext* cx,
 
   if (obj->isGenerationCountedGlobal()) {
     obj->as<GlobalObject>().bumpGenerationCount();
+  }
+
+  if (MOZ_UNLIKELY(obj->hasFuseProperty())) {
+    MaybePopFuses(cx, obj, id);
   }
 
   if (MOZ_UNLIKELY(obj->useWatchtowerTestingLog())) {
@@ -249,6 +341,12 @@ bool Watchtower::watchPropertyChangeSlow(JSContext* cx,
     }
   }
 
+  // Property fuses should also be popped on property changes, as value can
+  // change via this path.
+  if (MOZ_UNLIKELY(obj->hasFuseProperty())) {
+    MaybePopFuses(cx, obj, id);
+  }
+
   if (MOZ_UNLIKELY(obj->useWatchtowerTestingLog())) {
     RootedValue val(cx, IdToValue(id));
     if (!AddToWatchtowerLog(cx, "change-prop", obj, val)) {
@@ -258,6 +356,40 @@ bool Watchtower::watchPropertyChangeSlow(JSContext* cx,
 
   return true;
 }
+
+// static
+template <AllowGC allowGC>
+bool Watchtower::watchPropertyModificationSlow(
+    JSContext* cx, typename MaybeRooted<NativeObject*, allowGC>::HandleType obj,
+    typename MaybeRooted<PropertyKey, allowGC>::HandleType id) {
+  MOZ_ASSERT(watchesPropertyModification(obj));
+
+  if (MOZ_UNLIKELY(obj->hasFuseProperty())) {
+    MaybePopFuses(cx, obj, id);
+  }
+
+  // If we cannot GC, we can't manipulate the log, but we need to be able to
+  // call this in places we cannot GC.
+  if constexpr (allowGC == AllowGC::CanGC) {
+    if (MOZ_UNLIKELY(obj->useWatchtowerTestingLog())) {
+      RootedValue val(cx, IdToValue(id));
+      if (!AddToWatchtowerLog(cx, "modify-prop", obj, val)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+template bool Watchtower::watchPropertyModificationSlow<AllowGC::CanGC>(
+    JSContext* cx,
+    typename MaybeRooted<NativeObject*, AllowGC::CanGC>::HandleType obj,
+    typename MaybeRooted<PropertyKey, AllowGC::CanGC>::HandleType id);
+template bool Watchtower::watchPropertyModificationSlow<AllowGC::NoGC>(
+    JSContext* cx,
+    typename MaybeRooted<NativeObject*, AllowGC::NoGC>::HandleType obj,
+    typename MaybeRooted<PropertyKey, AllowGC::NoGC>::HandleType id);
 
 // static
 bool Watchtower::watchFreezeOrSealSlow(JSContext* cx,

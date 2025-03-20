@@ -109,7 +109,9 @@ class BaselineFrame {
   bool isConstructing() const {
     return CalleeTokenIsConstructing(calleeToken());
   }
-  JSScript* script() const { return ScriptFromCalleeToken(calleeToken()); }
+  JSScript* script() const {
+    return MaybeForwardedScriptFromCalleeToken(calleeToken());
+  }
   JSFunction* callee() const { return CalleeTokenToFunction(calleeToken()); }
   Value calleev() const { return ObjectValue(*callee()); }
 
@@ -123,12 +125,36 @@ class BaselineFrame {
     return frameSize / sizeof(Value);
   }
 
+  Value newTarget() const {
+    MOZ_ASSERT(isFunctionFrame());
+    MOZ_ASSERT(!callee()->isArrow());
+
+    if (isConstructing()) {
+      unsigned pushedArgs = std::max(numFormalArgs(), numActualArgs());
+      return argv()[pushedArgs];
+    }
+    return UndefinedValue();
+  }
+
 #ifdef DEBUG
   size_t debugNumValueSlots() const { return numValueSlots(debugFrameSize()); }
 #endif
 
   Value* valueSlot(size_t slot) const {
+#ifndef ENABLE_PORTABLE_BASELINE_INTERP
+    // Assert that we're within the frame, but only if the "debug
+    // frame size" has been set. Ordinarily if we are in C++ code
+    // looking upward at a baseline frame, it will be, because it is
+    // set for the *previous* frame when we push an exit frame and
+    // call back into C++ from generated baseline code. However, the
+    // portable baseline interpreter uses accessors on BaselineFrame
+    // directly within the active frame and so the "debug frame size"
+    // hasn't been set (and it would be expensive to constantly update
+    // it). Because this is only used for assertions, and is not
+    // needed for correctness, we can disable this check below when
+    // PBL is enabled.
     MOZ_ASSERT(slot < debugNumValueSlots());
+#endif
     return (Value*)this - (slot + 1);
   }
 
@@ -225,6 +251,19 @@ class BaselineFrame {
     MOZ_ASSERT(runningInInterpreter());
     return interpreterPC_;
   }
+  jsbytecode*& interpreterPC() {
+    MOZ_ASSERT(runningInInterpreter());
+    return interpreterPC_;
+  }
+
+  ICEntry* interpreterICEntry() const {
+    MOZ_ASSERT(runningInInterpreter());
+    return interpreterICEntry_;
+  }
+  ICEntry*& interpreterICEntry() {
+    MOZ_ASSERT(runningInInterpreter());
+    return interpreterICEntry_;
+  }
 
   void setInterpreterFields(JSScript* script, jsbytecode* pc);
 
@@ -261,12 +300,17 @@ class BaselineFrame {
 
   inline CallObject& callObj() const;
 
+  void setFlag(uint32_t flag) { flags_ |= flag; }
   void setFlags(uint32_t flags) { flags_ = flags; }
 
   [[nodiscard]] inline bool pushLexicalEnvironment(JSContext* cx,
                                                    Handle<LexicalScope*> scope);
-  [[nodiscard]] inline bool freshenLexicalEnvironment(JSContext* cx);
-  [[nodiscard]] inline bool recreateLexicalEnvironment(JSContext* cx);
+  template <bool IsDebuggee>
+  [[nodiscard]] inline bool freshenLexicalEnvironment(
+      JSContext* cx, const jsbytecode* pc = nullptr);
+  template <bool IsDebuggee>
+  [[nodiscard]] inline bool recreateLexicalEnvironment(
+      JSContext* cx, const jsbytecode* pc = nullptr);
 
   [[nodiscard]] bool initFunctionEnvironmentObjects(JSContext* cx);
   [[nodiscard]] bool pushClassBodyEnvironment(JSContext* cx,

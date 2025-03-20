@@ -40,7 +40,6 @@
 #include "vm/SelfHosting.h"
 #include "vm/Stack.h"
 #include "vm/StringType.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
@@ -79,7 +78,7 @@ static const JSFunctionSpec displayNames_methods[] = {
     JS_SELF_HOSTED_FN("of", "Intl_DisplayNames_of", 1, 0),
     JS_SELF_HOSTED_FN("resolvedOptions", "Intl_DisplayNames_resolvedOptions", 0,
                       0),
-    JS_FN(js_toSource_str, displayNames_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", displayNames_toSource, 0, 0), JS_FS_END};
 
 static const JSPropertySpec displayNames_properties[] = {
     JS_STRING_SYM_PS(toStringTag, "Intl.DisplayNames", JSPROP_READONLY),

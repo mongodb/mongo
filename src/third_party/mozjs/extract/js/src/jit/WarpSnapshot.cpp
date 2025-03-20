@@ -46,8 +46,7 @@ WarpScriptSnapshot::WarpScriptSnapshot(JSScript* script,
       environment_(env),
       opSnapshots_(std::move(opSnapshots)),
       moduleObject_(moduleObject),
-      isArrowFunction_(script->isFunction() && script->function()->isArrow()),
-      isMonomorphicInlined_(false) {}
+      isArrowFunction_(script->isFunction() && script->function()->isArrow()) {}
 
 #ifdef JS_JITSPEW
 void WarpSnapshot::dump() const {
@@ -79,7 +78,7 @@ void WarpScriptSnapshot::dump(GenericPrinter& out) const {
   out.printf("WarpScriptSnapshot (0x%p)\n", this);
   out.printf("------------------------------\n");
   out.printf("Script: %s:%u:%u (0x%p)\n", script_->filename(),
-             script_->lineno(), script_->column(),
+             script_->lineno(), script_->column().oneOriginValue(),
              static_cast<JSScript*>(script_));
   out.printf("  moduleObject: 0x%p\n", moduleObject());
   out.printf("  isArrowFunction: %u\n", isArrowFunction());
@@ -335,18 +334,23 @@ void WarpCacheIR::traceData(JSTracer* trc) {
         case StubField::Type::RawInt64:
         case StubField::Type::Double:
           break;
-        case StubField::Type::Shape: {
+        case StubField::Type::Shape:
+        case StubField::Type::WeakShape: {
+          // WeakShape pointers are traced strongly in this context.
           uintptr_t word = stubInfo_->getStubRawWord(stubData_, offset);
           TraceWarpStubPtr<Shape>(trc, word, "warp-cacheir-shape");
           break;
         }
-        case StubField::Type::GetterSetter: {
+        case StubField::Type::WeakGetterSetter: {
+          // WeakGetterSetter pointers are traced strongly in this context.
           uintptr_t word = stubInfo_->getStubRawWord(stubData_, offset);
           TraceWarpStubPtr<GetterSetter>(trc, word,
                                          "warp-cacheir-getter-setter");
           break;
         }
-        case StubField::Type::JSObject: {
+        case StubField::Type::JSObject:
+        case StubField::Type::WeakObject: {
+          // WeakObject pointers are traced strongly in this context.
           uintptr_t word = stubInfo_->getStubRawWord(stubData_, offset);
           WarpObjectField field = WarpObjectField::fromData(word);
           if (!field.isNurseryIndex()) {
@@ -364,7 +368,8 @@ void WarpCacheIR::traceData(JSTracer* trc) {
           TraceWarpStubPtr<JSString>(trc, word, "warp-cacheir-string");
           break;
         }
-        case StubField::Type::BaseScript: {
+        case StubField::Type::WeakBaseScript: {
+          // WeakBaseScript pointers are traced strongly in this context.
           uintptr_t word = stubInfo_->getStubRawWord(stubData_, offset);
           TraceWarpStubPtr<BaseScript>(trc, word, "warp-cacheir-script");
           break;

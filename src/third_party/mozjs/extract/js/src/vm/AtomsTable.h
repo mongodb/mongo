@@ -35,6 +35,82 @@ struct AtomHasher {
   }
 };
 
+struct js::AtomHasher::Lookup {
+  union {
+    const JS::Latin1Char* latin1Chars;
+    const char16_t* twoByteChars;
+    const char* utf8Bytes;
+  };
+  enum { TwoByteChar, Latin1, UTF8 } type;
+  size_t length;
+  size_t byteLength;
+  const JSAtom* atom; /* Optional. */
+  JS::AutoCheckCannotGC nogc;
+
+  HashNumber hash;
+
+  MOZ_ALWAYS_INLINE Lookup(const char* utf8Bytes, size_t byteLen, size_t length,
+                           HashNumber hash)
+      : utf8Bytes(utf8Bytes),
+        type(UTF8),
+        length(length),
+        byteLength(byteLen),
+        atom(nullptr),
+        hash(hash) {}
+
+  MOZ_ALWAYS_INLINE Lookup(const char16_t* chars, size_t length)
+      : twoByteChars(chars),
+        type(TwoByteChar),
+        length(length),
+        atom(nullptr),
+        hash(mozilla::HashString(chars, length)) {}
+
+  MOZ_ALWAYS_INLINE Lookup(const JS::Latin1Char* chars, size_t length)
+      : latin1Chars(chars),
+        type(Latin1),
+        length(length),
+        atom(nullptr),
+        hash(mozilla::HashString(chars, length)) {}
+
+  MOZ_ALWAYS_INLINE Lookup(HashNumber hash, const char16_t* chars,
+                           size_t length)
+      : twoByteChars(chars),
+        type(TwoByteChar),
+        length(length),
+        atom(nullptr),
+        hash(hash) {
+    MOZ_ASSERT(hash == mozilla::HashString(chars, length));
+  }
+
+  MOZ_ALWAYS_INLINE Lookup(HashNumber hash, const JS::Latin1Char* chars,
+                           size_t length)
+      : latin1Chars(chars),
+        type(Latin1),
+        length(length),
+        atom(nullptr),
+        hash(hash) {
+    MOZ_ASSERT(hash == mozilla::HashString(chars, length));
+  }
+
+  inline explicit Lookup(const JSAtom* atom)
+      : type(atom->hasLatin1Chars() ? Latin1 : TwoByteChar),
+        length(atom->length()),
+        atom(atom),
+        hash(atom->hash()) {
+    if (type == Latin1) {
+      latin1Chars = atom->latin1Chars(nogc);
+      MOZ_ASSERT(mozilla::HashString(latin1Chars, length) == hash);
+    } else {
+      MOZ_ASSERT(type == TwoByteChar);
+      twoByteChars = atom->twoByteChars(nogc);
+      MOZ_ASSERT(mozilla::HashString(twoByteChars, length) == hash);
+    }
+  }
+
+  // Return: true iff the string in |atom| matches the string in this Lookup.
+  bool StringsMatch(const JSAtom& atom) const;
+};
+
 // Note: Use a 'class' here to make forward declarations easier to use.
 class AtomSet : public JS::GCHashSet<WeakHeapPtr<JSAtom*>, AtomHasher,
                                      SystemAllocPolicy> {

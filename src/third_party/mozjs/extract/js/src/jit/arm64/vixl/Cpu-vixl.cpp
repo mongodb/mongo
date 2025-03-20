@@ -214,7 +214,7 @@ CPUFeatures CPU::InferCPUFeaturesFromOS(
   for (size_t i = 0; i < kFeatureBitCount; i++) {
     if (auxv & (1UL << i)) features.Combine(kFeatureBits[i]);
   }
-#elif defined(XP_MACOSX)
+#elif defined(XP_DARWIN)
   // Apple processors have kJSCVT, kDotProduct, and kAtomics features.
   features.Combine(CPUFeatures::kJSCVT, CPUFeatures::kDotProduct,
                    CPUFeatures::kAtomics);

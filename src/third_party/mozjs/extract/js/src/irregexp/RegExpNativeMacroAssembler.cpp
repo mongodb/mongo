@@ -111,7 +111,7 @@ void SMRegExpMacroAssembler::Backtrack() {
   // bailing out if we have simulating interrupt flag set
   masm_.bind(&bailOut);
 #endif
-  masm_.movePtr(ImmWord(js::RegExpRunStatus_Error), temp0_);
+  masm_.movePtr(ImmWord(int32_t(js::RegExpRunStatus::Error)), temp0_);
   masm_.jump(&exit_label_);
   masm_.bind(&noInterrupt);
 
@@ -247,8 +247,8 @@ void SMRegExpMacroAssembler::CheckCharacterNotInRange(base::uc16 from,
 bool SMRegExpMacroAssembler::IsCharacterInRangeArray(uint32_t c,
                                                      ByteArrayData* ranges) {
   js::AutoUnsafeCallWithABI unsafe;
-  MOZ_ASSERT(ranges->length % sizeof(uint16_t) == 0);
-  uint32_t length = ranges->length / sizeof(uint16_t);
+  MOZ_ASSERT(ranges->length() % sizeof(uint16_t) == 0);
+  uint32_t length = ranges->length() / sizeof(uint16_t);
   MOZ_ASSERT(length > 0);
 
   // Fast paths.
@@ -748,7 +748,8 @@ bool SMRegExpMacroAssembler::CheckSpecialCharacterClass(
 }
 
 void SMRegExpMacroAssembler::Fail() {
-  masm_.movePtr(ImmWord(js::RegExpRunStatus_Success_NotFound), temp0_);
+  masm_.movePtr(ImmWord(int32_t(js::RegExpRunStatus::Success_NotFound)),
+                temp0_);
   masm_.jump(&exit_label_);
 }
 
@@ -968,7 +969,7 @@ static Handle<HeapObject> DummyCode() {
 // Finalize code. This is called last, so that we know how many
 // registers we need.
 Handle<HeapObject> SMRegExpMacroAssembler::GetCode(Handle<String> source) {
-  if (!cx_->realm()->ensureJitRealmExists(cx_)) {
+  if (!cx_->zone()->ensureJitZoneExists(cx_)) {
     return DummyCode();
   }
 
@@ -1071,7 +1072,7 @@ void SMRegExpMacroAssembler::createStackFrame() {
   masm_.branchStackPtrRhs(Assembler::Below, limit_addr, &stack_ok);
 
   // There is not enough space on the stack. Exit with an exception.
-  masm_.movePtr(ImmWord(js::RegExpRunStatus_Error), temp0_);
+  masm_.movePtr(ImmWord(int32_t(js::RegExpRunStatus::Error)), temp0_);
   masm_.jump(&exit_label_);
 
   masm_.bind(&stack_ok);
@@ -1206,7 +1207,7 @@ void SMRegExpMacroAssembler::successHandler() {
     masm_.store32(temp0_, Address(matchesReg, i * sizeof(int32_t)));
   }
 
-  masm_.movePtr(ImmWord(js::RegExpRunStatus_Success), temp0_);
+  masm_.movePtr(ImmWord(int32_t(js::RegExpRunStatus::Success)), temp0_);
   // This falls through to the exit handler.
 }
 
@@ -1249,7 +1250,7 @@ void SMRegExpMacroAssembler::exitHandler() {
     masm_.bind(&exit_with_exception_label_);
 
     // Exit with an error result to signal thrown exception
-    masm_.movePtr(ImmWord(js::RegExpRunStatus_Error), temp0_);
+    masm_.movePtr(ImmWord(int32_t(js::RegExpRunStatus::Error)), temp0_);
     masm_.jump(&exit_label_);
   }
 }

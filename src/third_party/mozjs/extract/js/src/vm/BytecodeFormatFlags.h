@@ -41,10 +41,7 @@ enum {
   JOF_STRING = 26,      /* uint32_t constant index */
   JOF_TYPEMASK = 0xFF,  /* mask for above immediate types */
 
-  JOF_NAME = 1 << 8,        /* name operation */
-  JOF_PROP = 2 << 8,        /* obj.prop operation */
-  JOF_ELEM = 3 << 8,        /* obj[index] operation */
-  JOF_MODEMASK = 0xFF << 8, /* mask for above addressing modes */
+  /* Bits 0xFF00 are available for future usage */
 
   JOF_PROPSET = 1 << 16,     /* property/element/name set operation */
   JOF_PROPINIT = 1 << 17,    /* property/element/name init operation */

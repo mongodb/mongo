@@ -96,6 +96,14 @@ extern JS_PUBLIC_API uint8_t* GetArrayBufferMaybeSharedData(
  */
 extern JS_PUBLIC_API bool IsLargeArrayBufferMaybeShared(JSObject* obj);
 
+/**
+ * Returns whether the passed array buffer is resizable or growable for shared
+ * array buffers.
+ *
+ * |obj| must pass a JS::IsArrayBufferObjectMaybeShared test.
+ */
+extern JS_PUBLIC_API bool IsResizableArrayBufferMaybeShared(JSObject* obj);
+
 }  // namespace JS
 
 #endif /* js_ArrayBufferMaybeShared_h */

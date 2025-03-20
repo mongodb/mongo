@@ -159,6 +159,7 @@ class ExceptionBailoutInfo {
   size_t numExprSlots_;
   bool isFinally_ = false;
   RootedValue finallyException_;
+  RootedValue finallyExceptionStack_;
   bool forcedReturn_;
 
  public:
@@ -168,6 +169,7 @@ class ExceptionBailoutInfo {
         resumePC_(resumePC),
         numExprSlots_(numExprSlots),
         finallyException_(cx),
+        finallyExceptionStack_(cx),
         forcedReturn_(cx->isPropagatingForcedReturn()) {}
 
   explicit ExceptionBailoutInfo(JSContext* cx)
@@ -175,6 +177,7 @@ class ExceptionBailoutInfo {
         resumePC_(nullptr),
         numExprSlots_(0),
         finallyException_(cx),
+        finallyExceptionStack_(cx),
         forcedReturn_(cx->isPropagatingForcedReturn()) {}
 
   bool catchingException() const { return !!resumePC_; }
@@ -194,14 +197,20 @@ class ExceptionBailoutInfo {
   }
 
   bool isFinally() const { return isFinally_; }
-  void setFinallyException(JS::Value& exception) {
+  void setFinallyException(const JS::Value& exception,
+                           const JS::Value& exceptionStack) {
     MOZ_ASSERT(!isFinally());
     isFinally_ = true;
     finallyException_ = exception;
+    finallyExceptionStack_ = exceptionStack;
   }
   HandleValue finallyException() const {
     MOZ_ASSERT(isFinally());
     return finallyException_;
+  }
+  HandleValue finallyExceptionStack() const {
+    MOZ_ASSERT(isFinally());
+    return finallyExceptionStack_;
   }
 
   bool forcedReturn() const { return forcedReturn_; }

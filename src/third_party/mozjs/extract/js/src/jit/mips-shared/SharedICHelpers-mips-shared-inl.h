@@ -33,12 +33,14 @@ inline void EmitBaselineTailCallVM(TrampolinePtr target, MacroAssembler& masm,
 #endif
 
   // Push frame descriptor and perform the tail call.
-  // ICTailCallReg (ra) already contains the return address (as we
-  // keep it there through the stub calls), but the VMWrapper code being
-  // called expects the return address to also be pushed on the stack.
-  MOZ_ASSERT(ICTailCallReg == ra);
   masm.pushFrameDescriptor(FrameType::BaselineJS);
-  masm.push(ra);
+
+  // The return address will be pushed by the VM wrapper, for compatibility
+  // with direct calls. Refer to the top of generateVMWrapper().
+  // ICTailCallReg (lr) already contains the return address (as we keep
+  // it there through the stub calls).
+  MOZ_ASSERT(ICTailCallReg == ra);
+
   masm.jump(target);
 }
 

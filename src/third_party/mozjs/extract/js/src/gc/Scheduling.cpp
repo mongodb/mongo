@@ -28,7 +28,6 @@ using mozilla::Maybe;
 using mozilla::Nothing;
 using mozilla::Some;
 using mozilla::TimeDuration;
-using mozilla::TimeStamp;
 
 /*
  * We may start to collect a zone before its trigger threshold is reached if
@@ -226,6 +225,9 @@ void GCSchedulingTunables::resetParameter(JSGCParamKey key) {
 }
 
 void GCSchedulingTunables::maintainInvariantsAfterUpdate(JSGCParamKey updated) {
+  // Check whether a change to parameter |updated| has broken an invariant in
+  // relation to another parameter. If it has, adjust that other parameter to
+  // restore the invariant.
   switch (updated) {
     case JSGC_MIN_NURSERY_BYTES:
       if (gcMaxNurseryBytes_ < gcMinNurseryBytes_) {
@@ -257,6 +259,16 @@ void GCSchedulingTunables::maintainInvariantsAfterUpdate(JSGCParamKey updated) {
         highFrequencySmallHeapGrowth_ = highFrequencyLargeHeapGrowth_;
       }
       break;
+    case JSGC_SMALL_HEAP_INCREMENTAL_LIMIT:
+      if (smallHeapIncrementalLimit_ < largeHeapIncrementalLimit_) {
+        largeHeapIncrementalLimit_ = smallHeapIncrementalLimit_;
+      }
+      break;
+    case JSGC_LARGE_HEAP_INCREMENTAL_LIMIT:
+      if (largeHeapIncrementalLimit_ > smallHeapIncrementalLimit_) {
+        smallHeapIncrementalLimit_ = largeHeapIncrementalLimit_;
+      }
+      break;
     default:
       break;
   }
@@ -279,6 +291,8 @@ void GCSchedulingTunables::checkInvariants() {
   MOZ_ASSERT(highFrequencyLargeHeapGrowth_ <= highFrequencySmallHeapGrowth_);
   MOZ_ASSERT(highFrequencyLargeHeapGrowth_ >= MinHeapGrowthFactor);
   MOZ_ASSERT(highFrequencySmallHeapGrowth_ <= MaxHeapGrowthFactor);
+
+  MOZ_ASSERT(smallHeapIncrementalLimit_ >= largeHeapIncrementalLimit_);
 }
 
 void GCSchedulingState::updateHighFrequencyMode(
@@ -380,10 +394,11 @@ void HeapThreshold::setIncrementalLimitFromStartBytes(
   MOZ_ASSERT(tunables.smallHeapIncrementalLimit() >=
              tunables.largeHeapIncrementalLimit());
 
-  double factor = LinearInterpolate(
-      retainedBytes, tunables.smallHeapSizeMaxBytes(),
-      tunables.smallHeapIncrementalLimit(), tunables.largeHeapSizeMinBytes(),
-      tunables.largeHeapIncrementalLimit());
+  double factor = LinearInterpolate(double(retainedBytes),
+                                    double(tunables.smallHeapSizeMaxBytes()),
+                                    tunables.smallHeapIncrementalLimit(),
+                                    double(tunables.largeHeapSizeMinBytes()),
+                                    tunables.largeHeapIncrementalLimit());
 
   uint64_t bytes =
       std::max(uint64_t(double(startBytes_) * factor),
@@ -398,11 +413,11 @@ void HeapThreshold::setIncrementalLimitFromStartBytes(
   }
 }
 
-double HeapThreshold::eagerAllocTrigger(bool highFrequencyGC) const {
+size_t HeapThreshold::eagerAllocTrigger(bool highFrequencyGC) const {
   double eagerTriggerFactor = highFrequencyGC
                                   ? HighFrequencyEagerAllocTriggerFactor
                                   : LowFrequencyEagerAllocTriggerFactor;
-  return eagerTriggerFactor * startBytes();
+  return size_t(eagerTriggerFactor * double(startBytes()));
 }
 
 void HeapThreshold::setSliceThreshold(ZoneAllocator* zone,
@@ -474,9 +489,10 @@ double HeapThreshold::computeZoneHeapGrowthFactorForHeapSize(
   MOZ_ASSERT(tunables.highFrequencyLargeHeapGrowth() <=
              tunables.highFrequencySmallHeapGrowth());
 
-  return LinearInterpolate(lastBytes, tunables.smallHeapSizeMaxBytes(),
+  return LinearInterpolate(double(lastBytes),
+                           double(tunables.smallHeapSizeMaxBytes()),
                            tunables.highFrequencySmallHeapGrowth(),
-                           tunables.largeHeapSizeMinBytes(),
+                           double(tunables.largeHeapSizeMinBytes()),
                            tunables.highFrequencyLargeHeapGrowth());
 }
 
@@ -488,7 +504,7 @@ size_t GCHeapThreshold::computeZoneTriggerBytes(
   double trigger = double(base) * growthFactor;
   double triggerMax =
       double(tunables.gcMaxBytes()) / tunables.largeHeapIncrementalLimit();
-  return ToClampedSize(std::min(triggerMax, trigger));
+  return ToClampedSize(uint64_t(std::min(triggerMax, trigger)));
 }
 
 // Parameters for balanced heap limits computation.
@@ -562,7 +578,8 @@ void GCHeapThreshold::updateStartThreshold(
 size_t MallocHeapThreshold::computeZoneTriggerBytes(double growthFactor,
                                                     size_t lastBytes,
                                                     size_t baseBytes) {
-  return ToClampedSize(double(std::max(lastBytes, baseBytes)) * growthFactor);
+  return ToClampedSize(
+      uint64_t(double(std::max(lastBytes, baseBytes)) * growthFactor));
 }
 
 void MallocHeapThreshold::updateStartThreshold(

@@ -461,21 +461,18 @@ class LJSCallInstructionHelper
 
 // Generates a polymorphic callsite, wherein the function being called is
 // unknown and anticipated to vary.
-class LCallGeneric : public LJSCallInstructionHelper<BOX_PIECES, 1, 2> {
+class LCallGeneric : public LJSCallInstructionHelper<BOX_PIECES, 1, 1> {
  public:
   LIR_HEADER(CallGeneric)
 
-  LCallGeneric(const LAllocation& func, const LDefinition& nargsreg,
-               const LDefinition& tmpobjreg)
+  LCallGeneric(const LAllocation& callee, const LDefinition& argc)
       : LJSCallInstructionHelper(classOpcode) {
-    setOperand(0, func);
-    setTemp(0, nargsreg);
-    setTemp(1, tmpobjreg);
+    setOperand(0, callee);
+    setTemp(0, argc);
   }
 
-  const LAllocation* getFunction() { return getOperand(0); }
-  const LDefinition* getNargsReg() { return getTemp(0); }
-  const LDefinition* getTempObject() { return getTemp(1); }
+  const LAllocation* getCallee() { return getOperand(0); }
+  const LDefinition* getArgc() { return getTemp(0); }
 };
 
 // Generates a hardcoded callsite for a known, non-native target.
@@ -652,14 +649,14 @@ class LApplyArgsGeneric
   LIR_HEADER(ApplyArgsGeneric)
 
   LApplyArgsGeneric(const LAllocation& func, const LAllocation& argc,
-                    const LBoxAllocation& thisv, const LDefinition& tmpobjreg,
-                    const LDefinition& tmpcopy)
+                    const LBoxAllocation& thisv, const LDefinition& tmpObjReg,
+                    const LDefinition& tmpCopy)
       : LCallInstructionHelper(classOpcode) {
     setOperand(0, func);
     setOperand(1, argc);
     setBoxOperand(ThisIndex, thisv);
-    setTemp(0, tmpobjreg);
-    setTemp(1, tmpcopy);
+    setTemp(0, tmpObjReg);
+    setTemp(1, tmpCopy);
   }
 
   MApplyArgs* mir() const { return mir_->toApplyArgs(); }
@@ -715,14 +712,14 @@ class LApplyArrayGeneric
   LIR_HEADER(ApplyArrayGeneric)
 
   LApplyArrayGeneric(const LAllocation& func, const LAllocation& elements,
-                     const LBoxAllocation& thisv, const LDefinition& tmpobjreg,
-                     const LDefinition& tmpcopy)
+                     const LBoxAllocation& thisv, const LDefinition& tmpObjReg,
+                     const LDefinition& tmpCopy)
       : LCallInstructionHelper(classOpcode) {
     setOperand(0, func);
     setOperand(1, elements);
     setBoxOperand(ThisIndex, thisv);
-    setTemp(0, tmpobjreg);
-    setTemp(1, tmpcopy);
+    setTemp(0, tmpObjReg);
+    setTemp(1, tmpCopy);
   }
 
   MApplyArray* mir() const { return mir_->toApplyArray(); }
@@ -749,13 +746,13 @@ class LConstructArgsGeneric
   LConstructArgsGeneric(const LAllocation& func, const LAllocation& argc,
                         const LAllocation& newTarget,
                         const LBoxAllocation& thisv,
-                        const LDefinition& tmpobjreg)
+                        const LDefinition& tmpObjReg)
       : LCallInstructionHelper(classOpcode) {
     setOperand(0, func);
     setOperand(1, argc);
     setOperand(2, newTarget);
     setBoxOperand(ThisIndex, thisv);
-    setTemp(0, tmpobjreg);
+    setTemp(0, tmpObjReg);
   }
 
   MConstructArgs* mir() const { return mir_->toConstructArgs(); }
@@ -787,13 +784,13 @@ class LConstructArrayGeneric
   LConstructArrayGeneric(const LAllocation& func, const LAllocation& elements,
                          const LAllocation& newTarget,
                          const LBoxAllocation& thisv,
-                         const LDefinition& tmpobjreg)
+                         const LDefinition& tmpObjReg)
       : LCallInstructionHelper(classOpcode) {
     setOperand(0, func);
     setOperand(1, elements);
     setOperand(2, newTarget);
     setBoxOperand(ThisIndex, thisv);
-    setTemp(0, tmpobjreg);
+    setTemp(0, tmpObjReg);
   }
 
   MConstructArray* mir() const { return mir_->toConstructArray(); }
@@ -817,6 +814,164 @@ class LConstructArrayGeneric
   // tempForArgCopy becomes live as newTarget is dying, all registers are
   // calltemps.
   const LAllocation* getTempForArgCopy() { return getOperand(2); }
+};
+
+class LApplyArgsNative
+    : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES + 1, 3> {
+ public:
+  LIR_HEADER(ApplyArgsNative)
+
+  LApplyArgsNative(const LAllocation& argc, const LBoxAllocation& thisv,
+                   const LDefinition& tmpObjReg, const LDefinition& tmpCopy,
+                   const LDefinition& tmpExtra)
+      : LCallInstructionHelper(classOpcode) {
+    setOperand(0, argc);
+    setBoxOperand(ThisIndex, thisv);
+    setTemp(0, tmpObjReg);
+    setTemp(1, tmpCopy);
+    setTemp(2, tmpExtra);
+  }
+
+  static constexpr bool isConstructing() { return false; }
+
+  MApplyArgs* mir() const { return mir_->toApplyArgs(); }
+
+  uint32_t numExtraFormals() const { return mir()->numExtraFormals(); }
+
+  const LAllocation* getArgc() { return getOperand(0); }
+
+  static const size_t ThisIndex = 1;
+
+  const LDefinition* getTempObject() { return getTemp(0); }
+  const LDefinition* getTempForArgCopy() { return getTemp(1); }
+  const LDefinition* getTempExtra() { return getTemp(2); }
+};
+
+class LApplyArgsObjNative
+    : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES + 1, 3> {
+ public:
+  LIR_HEADER(ApplyArgsObjNative)
+
+  LApplyArgsObjNative(const LAllocation& argsObj, const LBoxAllocation& thisv,
+                      const LDefinition& tmpObjReg, const LDefinition& tmpCopy,
+                      const LDefinition& tmpExtra)
+      : LCallInstructionHelper(classOpcode) {
+    setOperand(0, argsObj);
+    setBoxOperand(ThisIndex, thisv);
+    setTemp(0, tmpObjReg);
+    setTemp(1, tmpCopy);
+    setTemp(2, tmpExtra);
+  }
+
+  static constexpr bool isConstructing() { return false; }
+
+  MApplyArgsObj* mir() const { return mir_->toApplyArgsObj(); }
+
+  const LAllocation* getArgsObj() { return getOperand(0); }
+
+  static const size_t ThisIndex = 1;
+
+  const LDefinition* getTempObject() { return getTemp(0); }
+  const LDefinition* getTempForArgCopy() { return getTemp(1); }
+  const LDefinition* getTempExtra() { return getTemp(2); }
+
+  // argc is mapped to the same register as argsObj: argc becomes live as
+  // argsObj is dying, all registers are calltemps.
+  const LAllocation* getArgc() { return getOperand(0); }
+};
+
+class LApplyArrayNative
+    : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES + 1, 3> {
+ public:
+  LIR_HEADER(ApplyArrayNative)
+
+  LApplyArrayNative(const LAllocation& elements, const LBoxAllocation& thisv,
+                    const LDefinition& tmpObjReg, const LDefinition& tmpCopy,
+                    const LDefinition& tmpExtra)
+      : LCallInstructionHelper(classOpcode) {
+    setOperand(0, elements);
+    setBoxOperand(ThisIndex, thisv);
+    setTemp(0, tmpObjReg);
+    setTemp(1, tmpCopy);
+    setTemp(2, tmpExtra);
+  }
+
+  static constexpr bool isConstructing() { return false; }
+
+  MApplyArray* mir() const { return mir_->toApplyArray(); }
+
+  const LAllocation* getElements() { return getOperand(0); }
+
+  static const size_t ThisIndex = 1;
+
+  const LDefinition* getTempObject() { return getTemp(0); }
+  const LDefinition* getTempForArgCopy() { return getTemp(1); }
+  const LDefinition* getTempExtra() { return getTemp(2); }
+
+  // argc is mapped to the same register as elements: argc becomes live as
+  // elements is dying, all registers are calltemps.
+  const LAllocation* getArgc() { return getOperand(0); }
+};
+
+class LConstructArgsNative : public LCallInstructionHelper<BOX_PIECES, 2, 3> {
+ public:
+  LIR_HEADER(ConstructArgsNative)
+
+  LConstructArgsNative(const LAllocation& argc, const LAllocation& newTarget,
+                       const LDefinition& tmpObjReg, const LDefinition& tmpCopy,
+                       const LDefinition& tmpExtra)
+      : LCallInstructionHelper(classOpcode) {
+    setOperand(0, argc);
+    setOperand(1, newTarget);
+    setTemp(0, tmpObjReg);
+    setTemp(1, tmpCopy);
+    setTemp(2, tmpExtra);
+  }
+
+  static constexpr bool isConstructing() { return true; }
+
+  MConstructArgs* mir() const { return mir_->toConstructArgs(); }
+
+  uint32_t numExtraFormals() const { return mir()->numExtraFormals(); }
+
+  const LAllocation* getArgc() { return getOperand(0); }
+  const LAllocation* getNewTarget() { return getOperand(1); }
+
+  const LDefinition* getTempObject() { return getTemp(0); }
+  const LDefinition* getTempForArgCopy() { return getTemp(1); }
+  const LDefinition* getTempExtra() { return getTemp(2); }
+};
+
+class LConstructArrayNative : public LCallInstructionHelper<BOX_PIECES, 2, 3> {
+ public:
+  LIR_HEADER(ConstructArrayNative)
+
+  LConstructArrayNative(const LAllocation& elements,
+                        const LAllocation& newTarget,
+                        const LDefinition& tmpObjReg,
+                        const LDefinition& tmpCopy, const LDefinition& tmpExtra)
+      : LCallInstructionHelper(classOpcode) {
+    setOperand(0, elements);
+    setOperand(1, newTarget);
+    setTemp(0, tmpObjReg);
+    setTemp(1, tmpCopy);
+    setTemp(2, tmpExtra);
+  }
+
+  static constexpr bool isConstructing() { return true; }
+
+  MConstructArray* mir() const { return mir_->toConstructArray(); }
+
+  const LAllocation* getElements() { return getOperand(0); }
+  const LAllocation* getNewTarget() { return getOperand(1); }
+
+  const LDefinition* getTempObject() { return getTemp(0); }
+  const LDefinition* getTempForArgCopy() { return getTemp(1); }
+  const LDefinition* getTempExtra() { return getTemp(2); }
+
+  // argc is mapped to the same register as elements: argc becomes live as
+  // elements is dying, all registers are calltemps.
+  const LAllocation* getArgc() { return getOperand(0); }
 };
 
 // Takes in either an integer or boolean input and tests it for truthiness.
@@ -2188,25 +2343,28 @@ class LLoadDataViewElement : public LInstructionHelper<1, 3, 1 + INT64_PIECES> {
 };
 
 class LLoadTypedArrayElementHoleBigInt
-    : public LInstructionHelper<BOX_PIECES, 2, 1 + INT64_PIECES> {
+    : public LInstructionHelper<BOX_PIECES, 3, 1 + INT64_PIECES> {
  public:
   LIR_HEADER(LoadTypedArrayElementHoleBigInt)
 
-  LLoadTypedArrayElementHoleBigInt(const LAllocation& object,
+  LLoadTypedArrayElementHoleBigInt(const LAllocation& elements,
                                    const LAllocation& index,
+                                   const LAllocation& length,
                                    const LDefinition& temp,
                                    const LInt64Definition& temp64)
       : LInstructionHelper(classOpcode) {
-    setOperand(0, object);
+    setOperand(0, elements);
     setOperand(1, index);
+    setOperand(2, length);
     setTemp(0, temp);
     setInt64Temp(1, temp64);
   }
   const MLoadTypedArrayElementHole* mir() const {
     return mir_->toLoadTypedArrayElementHole();
   }
-  const LAllocation* object() { return getOperand(0); }
+  const LAllocation* elements() { return getOperand(0); }
   const LAllocation* index() { return getOperand(1); }
+  const LAllocation* length() { return getOperand(2); }
   const LDefinition* temp() { return getTemp(0); }
   const LInt64Definition temp64() { return getInt64Temp(1); }
 };
@@ -3046,15 +3204,17 @@ class LWasmLoad : public details::LWasmLoadBase<1, 1> {
   LIR_HEADER(WasmLoad);
 };
 
-class LWasmLoadI64 : public details::LWasmLoadBase<INT64_PIECES, 1> {
+class LWasmLoadI64 : public details::LWasmLoadBase<INT64_PIECES, 2> {
  public:
   explicit LWasmLoadI64(const LAllocation& ptr,
                         const LAllocation& memoryBase = LAllocation())
       : LWasmLoadBase(classOpcode, ptr, memoryBase) {
     setTemp(0, LDefinition::BogusTemp());
+    setTemp(1, LDefinition::BogusTemp());
   }
 
   const LDefinition* ptrCopy() { return Base::getTemp(0); }
+  const LDefinition* memoryBaseCopy() { return Base::getTemp(1); }
 
   LIR_HEADER(WasmLoadI64);
 };
@@ -3120,17 +3280,18 @@ class LWasmCompareExchangeHeap : public LInstructionHelper<1, 4, 4> {
     setOperand(3, memoryBase);
     setTemp(0, LDefinition::BogusTemp());
   }
-  // MIPS32, MIPS64
+  // MIPS32, MIPS64, LoongArch64
   LWasmCompareExchangeHeap(const LAllocation& ptr, const LAllocation& oldValue,
                            const LAllocation& newValue,
                            const LDefinition& valueTemp,
                            const LDefinition& offsetTemp,
-                           const LDefinition& maskTemp)
+                           const LDefinition& maskTemp,
+                           const LAllocation& memoryBase = LAllocation())
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setOperand(1, oldValue);
     setOperand(2, newValue);
-    setOperand(3, LAllocation());
+    setOperand(3, memoryBase);
     setTemp(0, LDefinition::BogusTemp());
     setTemp(1, valueTemp);
     setTemp(2, offsetTemp);
@@ -3168,15 +3329,16 @@ class LWasmAtomicExchangeHeap : public LInstructionHelper<1, 3, 4> {
     setOperand(2, memoryBase);
     setTemp(0, LDefinition::BogusTemp());
   }
-  // MIPS32, MIPS64
+  // MIPS32, MIPS64, LoongArch64
   LWasmAtomicExchangeHeap(const LAllocation& ptr, const LAllocation& value,
                           const LDefinition& valueTemp,
                           const LDefinition& offsetTemp,
-                          const LDefinition& maskTemp)
+                          const LDefinition& maskTemp,
+                          const LAllocation& memoryBase = LAllocation())
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setOperand(1, value);
-    setOperand(2, LAllocation());
+    setOperand(2, memoryBase);
     setTemp(0, LDefinition::BogusTemp());
     setTemp(1, valueTemp);
     setTemp(2, offsetTemp);
@@ -3219,15 +3381,16 @@ class LWasmAtomicBinopHeap : public LInstructionHelper<1, 3, 6> {
     setTemp(1, LDefinition::BogusTemp());
     setTemp(2, flagTemp);
   }
-  // MIPS32, MIPS64
+  // MIPS32, MIPS64, LoongArch64
   LWasmAtomicBinopHeap(const LAllocation& ptr, const LAllocation& value,
                        const LDefinition& valueTemp,
                        const LDefinition& offsetTemp,
-                       const LDefinition& maskTemp)
+                       const LDefinition& maskTemp,
+                       const LAllocation& memoryBase = LAllocation())
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setOperand(1, value);
-    setOperand(2, LAllocation());
+    setOperand(2, memoryBase);
     setTemp(0, LDefinition::BogusTemp());
     setTemp(1, LDefinition::BogusTemp());
     setTemp(2, LDefinition::BogusTemp());
@@ -3273,16 +3436,17 @@ class LWasmAtomicBinopHeapForEffect : public LInstructionHelper<0, 3, 5> {
     setTemp(0, LDefinition::BogusTemp());
     setTemp(1, flagTemp);
   }
-  // MIPS32, MIPS64
+  // MIPS32, MIPS64, LoongArch64
   LWasmAtomicBinopHeapForEffect(const LAllocation& ptr,
                                 const LAllocation& value,
                                 const LDefinition& valueTemp,
                                 const LDefinition& offsetTemp,
-                                const LDefinition& maskTemp)
+                                const LDefinition& maskTemp,
+                                const LAllocation& memoryBase = LAllocation())
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setOperand(1, value);
-    setOperand(2, LAllocation());
+    setOperand(2, memoryBase);
     setTemp(0, LDefinition::BogusTemp());
     setTemp(1, LDefinition::BogusTemp());
     setTemp(2, valueTemp);
@@ -3350,7 +3514,10 @@ class LWasmCallIndirectAdjunctSafepoint : public LInstructionHelper<0, 0, 0> {
   LWasmCallIndirectAdjunctSafepoint()
       : LInstructionHelper(classOpcode),
         offs_(0),
-        framePushedAtStackMapBase_(0) {}
+        framePushedAtStackMapBase_(0) {
+    // Ensure that the safepoint does not get live registers associated with it.
+    setIsCall();
+  }
 
   CodeOffset safepointLocation() const {
     MOZ_ASSERT(offs_.offset() != 0);
@@ -3390,18 +3557,23 @@ class LWasmCall : public LVariadicInstruction<0, 0> {
   }
 
   MWasmCallBase* callBase() const {
-    if (isCatchable()) {
+    if (isCatchable() && !isReturnCall()) {
       return static_cast<MWasmCallBase*>(mirCatchable());
+    }
+    if (isReturnCall()) {
+      return static_cast<MWasmReturnCall*>(mirReturnCall());
     }
     return static_cast<MWasmCallBase*>(mirUncatchable());
   }
   bool isCatchable() const { return mir_->isWasmCallCatchable(); }
+  bool isReturnCall() const { return mir_->isWasmReturnCall(); }
   MWasmCallCatchable* mirCatchable() const {
     return mir_->toWasmCallCatchable();
   }
   MWasmCallUncatchable* mirUncatchable() const {
     return mir_->toWasmCallUncatchable();
   }
+  MWasmReturnCall* mirReturnCall() const { return mir_->toWasmReturnCall(); }
 
   static bool isCallPreserved(AnyRegister reg) {
     // All MWasmCalls preserve the TLS register:
@@ -3472,7 +3644,7 @@ inline LAllocation LStackArea::ResultIterator::alloc() const {
   MWasmStackResultArea* area = alloc_.ins()->toWasmStackResultArea()->mir();
   return LStackSlot(area->base() - area->result(idx_).offset());
 }
-inline bool LStackArea::ResultIterator::isGcPointer() const {
+inline bool LStackArea::ResultIterator::isWasmAnyRef() const {
   MOZ_ASSERT(!done());
   MWasmStackResultArea* area = alloc_.ins()->toWasmStackResultArea()->mir();
   MIRType type = area->result(idx_).type();
@@ -3483,7 +3655,7 @@ inline bool LStackArea::ResultIterator::isGcPointer() const {
     return false;
   }
 #endif
-  return LDefinition::TypeFrom(type) == LDefinition::OBJECT;
+  return LDefinition::TypeFrom(type) == LDefinition::WASM_ANYREF;
 }
 
 class LWasmStackResult : public LInstructionHelper<1, 1, 0> {
@@ -3748,28 +3920,25 @@ class LIonToWasmCallI64 : public LIonToWasmCallBase<INT64_PIECES> {
       : LIonToWasmCallBase<INT64_PIECES>(classOpcode, numOperands, temp) {}
 };
 
-class LWasmGcObjectIsSubtypeOfAbstractAndBranch
+class LWasmRefIsSubtypeOfAbstractAndBranch
     : public LControlInstructionHelper<2, 2, 2> {
   wasm::RefType sourceType_;
   wasm::RefType destType_;
 
  public:
-  LIR_HEADER(WasmGcObjectIsSubtypeOfAbstractAndBranch)
+  LIR_HEADER(WasmRefIsSubtypeOfAbstractAndBranch)
 
-  static constexpr uint32_t Object = 0;
+  static constexpr uint32_t Ref = 0;
 
-  LWasmGcObjectIsSubtypeOfAbstractAndBranch(MBasicBlock* ifTrue,
-                                            MBasicBlock* ifFalse,
-                                            wasm::RefType sourceType,
-                                            wasm::RefType destType,
-                                            const LAllocation& object,
-                                            const LDefinition& temp0)
+  LWasmRefIsSubtypeOfAbstractAndBranch(
+      MBasicBlock* ifTrue, MBasicBlock* ifFalse, wasm::RefType sourceType,
+      wasm::RefType destType, const LAllocation& ref, const LDefinition& temp0)
       : LControlInstructionHelper(classOpcode),
         sourceType_(sourceType),
         destType_(destType) {
     setSuccessor(0, ifTrue);
     setSuccessor(1, ifFalse);
-    setOperand(Object, object);
+    setOperand(Ref, ref);
     setTemp(0, temp0);
   }
 
@@ -3779,33 +3948,33 @@ class LWasmGcObjectIsSubtypeOfAbstractAndBranch
   MBasicBlock* ifTrue() const { return getSuccessor(0); }
   MBasicBlock* ifFalse() const { return getSuccessor(1); }
 
-  const LAllocation* object() { return getOperand(Object); }
+  const LAllocation* ref() { return getOperand(Ref); }
   const LDefinition* temp0() { return getTemp(0); }
 };
 
-class LWasmGcObjectIsSubtypeOfConcreteAndBranch
+class LWasmRefIsSubtypeOfConcreteAndBranch
     : public LControlInstructionHelper<2, 2, 2> {
   wasm::RefType sourceType_;
   wasm::RefType destType_;
 
  public:
-  LIR_HEADER(WasmGcObjectIsSubtypeOfConcreteAndBranch)
+  LIR_HEADER(WasmRefIsSubtypeOfConcreteAndBranch)
 
-  static constexpr uint32_t Object = 0;
-  static constexpr uint32_t SuperSuperTypeVector = 1;
+  static constexpr uint32_t Ref = 0;
+  static constexpr uint32_t SuperSTV = 1;
 
-  LWasmGcObjectIsSubtypeOfConcreteAndBranch(
+  LWasmRefIsSubtypeOfConcreteAndBranch(
       MBasicBlock* ifTrue, MBasicBlock* ifFalse, wasm::RefType sourceType,
-      wasm::RefType destType, const LAllocation& object,
-      const LAllocation& superSuperTypeVector, const LDefinition& temp0,
+      wasm::RefType destType, const LAllocation& ref,
+      const LAllocation& superSTV, const LDefinition& temp0,
       const LDefinition& temp1)
       : LControlInstructionHelper(classOpcode),
         sourceType_(sourceType),
         destType_(destType) {
     setSuccessor(0, ifTrue);
     setSuccessor(1, ifFalse);
-    setOperand(Object, object);
-    setOperand(SuperSuperTypeVector, superSuperTypeVector);
+    setOperand(Ref, ref);
+    setOperand(SuperSTV, superSTV);
     setTemp(0, temp0);
     setTemp(1, temp1);
   }
@@ -3816,10 +3985,8 @@ class LWasmGcObjectIsSubtypeOfConcreteAndBranch
   MBasicBlock* ifTrue() const { return getSuccessor(0); }
   MBasicBlock* ifFalse() const { return getSuccessor(1); }
 
-  const LAllocation* object() { return getOperand(Object); }
-  const LAllocation* superSuperTypeVector() {
-    return getOperand(SuperSuperTypeVector);
-  }
+  const LAllocation* ref() { return getOperand(Ref); }
+  const LAllocation* superSTV() { return getOperand(SuperSTV); }
   const LDefinition* temp0() { return getTemp(0); }
   const LDefinition* temp1() { return getTemp(1); }
 };

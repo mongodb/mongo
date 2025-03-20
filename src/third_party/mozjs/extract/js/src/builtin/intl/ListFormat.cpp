@@ -20,7 +20,6 @@
 #include "vm/JSContext.h"
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/StringType.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
@@ -65,7 +64,7 @@ static const JSFunctionSpec listFormat_methods[] = {
                       0),
     JS_SELF_HOSTED_FN("format", "Intl_ListFormat_format", 1, 0),
     JS_SELF_HOSTED_FN("formatToParts", "Intl_ListFormat_formatToParts", 1, 0),
-    JS_FN(js_toSource_str, listFormat_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", listFormat_toSource, 0, 0), JS_FS_END};
 
 static const JSPropertySpec listFormat_properties[] = {
     JS_STRING_SYM_PS(toStringTag, "Intl.ListFormat", JSPROP_READONLY),

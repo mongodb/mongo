@@ -15,7 +15,6 @@
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "gc/GCContext-inl.h"
 #include "vm/JSObject-inl.h"
@@ -223,9 +222,8 @@ const ClassSpec FinalizationRegistryObject::classSpec_ = {
     properties_};
 
 const JSFunctionSpec FinalizationRegistryObject::methods_[] = {
-    JS_FN(js_register_str, register_, 2, 0),
-    JS_FN(js_unregister_str, unregister, 1, 0),
-    JS_FN(js_cleanupSome_str, cleanupSome, 0, 0), JS_FS_END};
+    JS_FN("register", register_, 2, 0), JS_FN("unregister", unregister, 1, 0),
+    JS_FN("cleanupSome", cleanupSome, 0, 0), JS_FS_END};
 
 const JSPropertySpec FinalizationRegistryObject::properties_[] = {
     JS_STRING_SYM_PS(toStringTag, "FinalizationRegistry", JSPROP_READONLY),
@@ -664,7 +662,7 @@ FinalizationQueueObject* FinalizationQueueObject::create(
     return nullptr;
   }
 
-  Handle<PropertyName*> funName = cx->names().empty;
+  Handle<PropertyName*> funName = cx->names().empty_;
   RootedFunction doCleanupFunction(
       cx, NewNativeFunction(cx, doCleanup, 0, funName,
                             gc::AllocKind::FUNCTION_EXTENDED));

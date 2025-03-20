@@ -34,9 +34,9 @@ struct String {
   static constexpr uint32_t ATOM_BIT = js::Bit(3);
   static constexpr uint32_t LINEAR_BIT = js::Bit(4);
   static constexpr uint32_t INLINE_CHARS_BIT = js::Bit(6);
-  static constexpr uint32_t LATIN1_CHARS_BIT = js::Bit(9);
+  static constexpr uint32_t LATIN1_CHARS_BIT = js::Bit(10);
   static constexpr uint32_t EXTERNAL_FLAGS = LINEAR_BIT | js::Bit(8);
-  static constexpr uint32_t TYPE_FLAGS_MASK = js::BitMask(9) - js::BitMask(3);
+  static constexpr uint32_t TYPE_FLAGS_MASK = js::BitMask(10) - js::BitMask(3);
   static constexpr uint32_t PERMANENT_ATOM_MASK = ATOM_BIT | js::Bit(8);
 
   uintptr_t flags_;

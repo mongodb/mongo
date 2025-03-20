@@ -32,7 +32,9 @@
 #include "mozilla/FloatingPoint.h"  // mozilla::{IsFinite,}, mozilla::UnspecifiedNaN
 #include "mozilla/MathAlgorithms.h"  // mozilla::Abs
 
-#include "js/Conversions.h"  // JS::ToInteger
+#include "js/CharacterEncoding.h"  // JS::Latin1Chars
+#include "js/Conversions.h"        // JS::ToInteger
+#include "js/RealmOptions.h"       // JS::RTPCallerTypeToken
 #include "js/TypeDecls.h"
 #include "js/Value.h"  // JS::CanonicalizeNaN, JS::DoubleValue, JS::Value
 
@@ -187,21 +189,33 @@ JS_PUBLIC_API double DayFromYear(double year);
 JS_PUBLIC_API double DayWithinYear(double time, double year);
 
 // The callback will be a wrapper function that accepts a double (the time
-// to clamp and jitter) as well as a bool indicating if we should be resisting
-// fingerprinting. Inside the JS Engine, other parameters that may be
-// needed are all constant, so they are handled inside the wrapper function
-using ReduceMicrosecondTimePrecisionCallback = double (*)(double, bool,
-                                                          JSContext*);
+// to clamp and jitter) and a JS::RTPCallerTypeToken (a wrapper for
+// mozilla::RTPCallerType) that can be used to decide the proper clamping
+// behavior to use. Inside the JS Engine, other parameters that may be needed
+// are all constant, so they are handled inside the wrapper function
+using ReduceMicrosecondTimePrecisionCallback =
+    double (*)(double, JS::RTPCallerTypeToken, JSContext*);
 
 // Set a callback into the toolkit/components/resistfingerprinting function that
 // will centralize time resolution and jitter into one place.
+// Defining such a callback requires all Realms that are created afterwards
+// to have a set JS::RTPCallerTypeToken, via RealmBehaviors or
+// JS::SetRealmReduceTimerPrecisionCallerType.
 JS_PUBLIC_API void SetReduceMicrosecondTimePrecisionCallback(
     ReduceMicrosecondTimePrecisionCallback callback);
+
+// Get the previously set ReduceMicrosecondTimePrecisionCallback callback or
+// nullptr.
+JS_PUBLIC_API ReduceMicrosecondTimePrecisionCallback
+GetReduceMicrosecondTimePrecisionCallback();
 
 // Sets the time resolution for fingerprinting protection, and whether jitter
 // should occur. If resolution is set to zero, then no rounding or jitter will
 // occur. This is used if the callback above is not specified.
 JS_PUBLIC_API void SetTimeResolutionUsec(uint32_t resolution, bool jitter);
+
+// Returns whether a given string follows the Date Time String Format.
+JS_PUBLIC_API bool IsISOStyleDate(JSContext* cx, const JS::Latin1Chars& str);
 
 }  // namespace JS
 

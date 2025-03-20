@@ -32,6 +32,9 @@
  */
 namespace js {
 
+class GenericPrinter;
+class JSONPrinter;
+
 extern RegExpObject* RegExpAlloc(JSContext* cx, NewObjectKind newKind,
                                  HandleObject proto = nullptr);
 
@@ -51,6 +54,9 @@ class RegExpObject : public NativeObject {
  public:
   static const unsigned SHARED_SLOT = 3;
   static const unsigned RESERVED_SLOTS = 4;
+
+  // This must match RESERVED_SLOTS. See assertions in CloneRegExpObject.
+  static constexpr gc::AllocKind AllocKind = gc::AllocKind::OBJECT4_BACKGROUND;
 
   static const JSClass class_;
   static const JSClass protoClass_;
@@ -128,6 +134,10 @@ class RegExpObject : public NativeObject {
     return getFixedSlotOffset(flagsSlot());
   }
 
+  static constexpr size_t offsetOfShared() {
+    return getFixedSlotOffset(SHARED_SLOT);
+  }
+
   JS::RegExpFlags getFlags() const {
     return JS::RegExpFlags(getFixedSlot(FLAGS_SLOT).toInt32());
   }
@@ -141,6 +151,7 @@ class RegExpObject : public NativeObject {
   bool multiline() const { return getFlags().multiline(); }
   bool dotAll() const { return getFlags().dotAll(); }
   bool unicode() const { return getFlags().unicode(); }
+  bool unicodeSets() const { return getFlags().unicodeSets(); }
   bool sticky() const { return getFlags().sticky(); }
 
   bool isGlobalOrSticky() const {
@@ -173,10 +184,9 @@ class RegExpObject : public NativeObject {
   void initAndZeroLastIndex(JSAtom* source, JS::RegExpFlags flags,
                             JSContext* cx);
 
-#ifdef DEBUG
-  [[nodiscard]] static bool dumpBytecode(JSContext* cx,
-                                         Handle<RegExpObject*> regexp,
-                                         Handle<JSLinearString*> input);
+#if defined(DEBUG) || defined(JS_JITSPEW)
+  void dumpOwnFields(js::JSONPrinter& json) const;
+  void dumpOwnStringContent(js::GenericPrinter& out) const;
 #endif
 
  private:

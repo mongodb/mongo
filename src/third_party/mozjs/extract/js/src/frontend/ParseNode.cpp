@@ -7,6 +7,7 @@
 #include "frontend/ParseNode.h"
 
 #include "mozilla/FloatingPoint.h"
+#include "mozilla/Try.h"  // MOZ_TRY*
 
 #include "jsnum.h"
 
@@ -56,10 +57,10 @@ void* ParseNodeAllocator::allocNode(size_t size) {
   return p;
 }
 
-ParseNode* ParseNode::appendOrCreateList(ParseNodeKind kind, ParseNode* left,
-                                         ParseNode* right,
-                                         FullParseHandler* handler,
-                                         ParseContext* pc) {
+ParseNodeResult ParseNode::appendOrCreateList(ParseNodeKind kind,
+                                              ParseNode* left, ParseNode* right,
+                                              FullParseHandler* handler,
+                                              ParseContext* pc) {
   // The asm.js specification is written in ECMAScript grammar terms that
   // specify *only* a binary tree.  It's a royal pain to implement the asm.js
   // spec to act upon n-ary lists as created below.  So for asm.js, form a
@@ -90,10 +91,8 @@ ParseNode* ParseNode::appendOrCreateList(ParseNodeKind kind, ParseNode* left,
     }
   }
 
-  ListNode* list = handler->new_<ListNode>(kind, left);
-  if (!list) {
-    return nullptr;
-  }
+  ListNode* list;
+  MOZ_TRY_VAR(list, handler->newResult<ListNode>(kind, left));
 
   list->append(right);
   return list;
@@ -395,6 +394,44 @@ void BaseScopeNode<Kind, ScopeType>::dumpImpl(
   ::DumpParseTree(parserAtoms, scopeBody(), out, indent);
   out.printf(")");
 }
+
+#  ifdef ENABLE_DECORATORS
+void ClassMethod::dumpImpl(const ParserAtomsTable* parserAtoms,
+                           GenericPrinter& out, int indent) {
+  if (decorators_) {
+    decorators_->dumpImpl(parserAtoms, out, indent);
+  }
+  Base::dumpImpl(parserAtoms, out, indent);
+}
+
+void ClassField::dumpImpl(const ParserAtomsTable* parserAtoms,
+                          GenericPrinter& out, int indent) {
+  if (decorators_) {
+    decorators_->dumpImpl(parserAtoms, out, indent);
+    out.putChar(' ');
+  }
+  Base::dumpImpl(parserAtoms, out, indent);
+  IndentNewLine(out, indent + 2);
+  if (accessorGetterNode_) {
+    out.printf("getter: ");
+    accessorGetterNode_->dumpImpl(parserAtoms, out, indent);
+  }
+  IndentNewLine(out, indent + 2);
+  if (accessorSetterNode_) {
+    out.printf("setter: ");
+    accessorSetterNode_->dumpImpl(parserAtoms, out, indent);
+  }
+}
+
+void ClassNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                         GenericPrinter& out, int indent) {
+  if (decorators_) {
+    decorators_->dumpImpl(parserAtoms, out, indent);
+  }
+  Base::dumpImpl(parserAtoms, out, indent);
+}
+#  endif
+
 #endif
 
 TaggedParserAtomIndex NumericLiteral::toAtom(

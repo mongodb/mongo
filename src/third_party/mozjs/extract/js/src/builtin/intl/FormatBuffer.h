@@ -14,7 +14,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "gc/Allocator.h"
 #include "js/AllocPolicy.h"
 #include "js/CharacterEncoding.h"
 #include "js/TypeDecls.h"

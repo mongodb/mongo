@@ -31,6 +31,7 @@
 #include "gc/Marking-inl.h"
 #include "gc/StableCellHasher-inl.h"
 #include "vm/BytecodeIterator-inl.h"
+#include "vm/List-inl.h"
 #include "vm/NativeObject-inl.h"
 #include "vm/Stack-inl.h"
 
@@ -72,7 +73,7 @@ PropertyName* js::EnvironmentCoordinateNameSlow(JSScript* script,
 
   /* Beware nameless destructuring formal. */
   if (!id.isAtom()) {
-    return script->runtimeFromAnyThread()->commonNames->empty;
+    return script->runtimeFromAnyThread()->commonNames->empty_;
   }
   return id.toAtom()->asPropertyName();
 }
@@ -90,12 +91,7 @@ static T* CreateEnvironmentObject(JSContext* cx, Handle<SharedShape*> shape,
   MOZ_ASSERT(CanChangeToBackgroundAllocKind(allocKind, &T::class_));
   allocKind = gc::ForegroundToBackgroundAllocKind(allocKind);
 
-  JSObject* obj = NativeObject::create(cx, allocKind, heap, shape);
-  if (!obj) {
-    return nullptr;
-  }
-
-  return &obj->as<T>();
+  return NativeObject::create<T>(cx, allocKind, heap, shape);
 }
 
 // Helper function for simple environment objects that don't need the overloads
@@ -418,6 +414,81 @@ ModuleEnvironmentObject* ModuleEnvironmentObject::create(
   MOZ_ASSERT(!env->inDictionaryMode());
 #endif
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  env->initSlot(ModuleEnvironmentObject::DISPOSABLE_OBJECTS_SLOT,
+                UndefinedValue());
+#endif
+
+  return env;
+}
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+// TODO: at the time of unflagging ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+// consider having a common base class for LexicalEnvironmentObject and
+// ModuleEnvironmentObject containing all the common code.
+static bool addDisposableObjectHelper(JS::Handle<EnvironmentObject*> env,
+                                      uint32_t slot, JSContext* cx,
+                                      JS::Handle<JS::Value> val) {
+  Value slotData = env->getReservedSlot(slot);
+  ListObject* disposablesList = nullptr;
+  if (slotData.isUndefined()) {
+    disposablesList = ListObject::create(cx);
+    if (!disposablesList) {
+      return false;
+    }
+    env->setReservedSlot(slot, ObjectValue(*disposablesList));
+  } else {
+    disposablesList = &slotData.toObject().as<ListObject>();
+  }
+  return disposablesList->append(cx, val);
+}
+
+bool ModuleEnvironmentObject::addDisposableObject(JSContext* cx,
+                                                  JS::Handle<JS::Value> val) {
+  Rooted<ModuleEnvironmentObject*> env(cx, this);
+  return addDisposableObjectHelper(env, DISPOSABLE_OBJECTS_SLOT, cx, val);
+}
+
+Value ModuleEnvironmentObject::getDisposables() {
+  return getReservedSlot(DISPOSABLE_OBJECTS_SLOT);
+}
+
+void ModuleEnvironmentObject::clearDisposables() {
+  setReservedSlot(DISPOSABLE_OBJECTS_SLOT, UndefinedValue());
+}
+#endif
+
+/* static */
+ModuleEnvironmentObject* ModuleEnvironmentObject::createSynthetic(
+    JSContext* cx, Handle<ModuleObject*> module) {
+  Rooted<SharedShape*> shape(cx,
+                             CreateEnvironmentShapeForSyntheticModule(
+                                 cx, &class_, JSSLOT_FREE(&class_), module));
+  MOZ_ASSERT(shape->getObjectClass() == &class_);
+
+  Rooted<ModuleEnvironmentObject*> env(
+      cx, CreateEnvironmentObject<ModuleEnvironmentObject>(cx, shape,
+                                                           TenuredObject));
+  if (!env) {
+    return nullptr;
+  }
+
+  env->initReservedSlot(MODULE_SLOT, ObjectValue(*module));
+
+  // Initialize this early so that we can manipulate the env object without
+  // causing assertions.
+  env->initEnclosingEnvironment(&cx->global()->lexicalEnvironment());
+
+  // It is not be possible to add or remove bindings from a module environment
+  // after this point as module code is always strict.
+#ifdef DEBUG
+  for (ShapePropertyIter<NoGC> iter(env->shape()); !iter.done(); iter++) {
+    MOZ_ASSERT(!iter->configurable());
+  }
+  MOZ_ASSERT(env->hasFlag(ObjectFlag::NotExtensible));
+  MOZ_ASSERT(!env->inDictionaryMode());
+#endif
+
   return env;
 }
 
@@ -661,20 +732,21 @@ WithEnvironmentObject* WithEnvironmentObject::createNonSyntactic(
 }
 
 static inline bool IsUnscopableDotName(JSContext* cx, HandleId id) {
-  return id.isAtom(cx->names().dotThis) || id.isAtom(cx->names().dotNewTarget);
+  return id.isAtom(cx->names().dot_this_) ||
+         id.isAtom(cx->names().dot_newTarget_);
 }
 
 #ifdef DEBUG
 static bool IsInternalDotName(JSContext* cx, HandleId id) {
-  return id.isAtom(cx->names().dotThis) ||
-         id.isAtom(cx->names().dotGenerator) ||
-         id.isAtom(cx->names().dotInitializers) ||
-         id.isAtom(cx->names().dotFieldKeys) ||
-         id.isAtom(cx->names().dotStaticInitializers) ||
-         id.isAtom(cx->names().dotStaticFieldKeys) ||
-         id.isAtom(cx->names().dotArgs) ||
-         id.isAtom(cx->names().dotNewTarget) ||
-         id.isAtom(cx->names().starNamespaceStar);
+  return id.isAtom(cx->names().dot_this_) ||
+         id.isAtom(cx->names().dot_generator_) ||
+         id.isAtom(cx->names().dot_initializers_) ||
+         id.isAtom(cx->names().dot_fieldKeys_) ||
+         id.isAtom(cx->names().dot_staticInitializers_) ||
+         id.isAtom(cx->names().dot_staticFieldKeys_) ||
+         id.isAtom(cx->names().dot_args_) ||
+         id.isAtom(cx->names().dot_newTarget_) ||
+         id.isAtom(cx->names().star_namespace_star_);
 }
 #endif
 
@@ -911,12 +983,33 @@ LexicalEnvironmentObject* LexicalEnvironmentObject::create(
     env->initEnclosingEnvironment(enclosing);
   }
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  env->initSlot(LexicalEnvironmentObject::DISPOSABLE_OBJECTS_SLOT,
+                UndefinedValue());
+#endif
+
   return env;
 }
 
 bool LexicalEnvironmentObject::isExtensible() const {
   return NativeObject::isExtensible();
 }
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+bool LexicalEnvironmentObject::addDisposableObject(JSContext* cx,
+                                                   JS::Handle<JS::Value> val) {
+  Rooted<LexicalEnvironmentObject*> env(cx, this);
+  return addDisposableObjectHelper(env, DISPOSABLE_OBJECTS_SLOT, cx, val);
+}
+
+Value LexicalEnvironmentObject::getDisposables() {
+  return getReservedSlot(DISPOSABLE_OBJECTS_SLOT);
+}
+
+void LexicalEnvironmentObject::clearDisposables() {
+  setReservedSlot(DISPOSABLE_OBJECTS_SLOT, UndefinedValue());
+}
+#endif
 
 /* static */
 BlockLexicalEnvironmentObject* BlockLexicalEnvironmentObject::create(
@@ -1016,7 +1109,6 @@ BlockLexicalEnvironmentObject* BlockLexicalEnvironmentObject::clone(
   }
 
   MOZ_ASSERT(env->shape() == copy->shape());
-
   for (uint32_t i = JSSLOT_FREE(&class_); i < copy->slotSpan(); i++) {
     copy->setSlot(i, env->getSlot(i));
   }
@@ -1654,12 +1746,12 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler {
      */
     if (env->is<LexicalEnvironmentObject>() ||
         env->is<VarEnvironmentObject>()) {
-      // Currently consider all global and non-syntactic top-level lexical
-      // bindings to be aliased.
+      // Currently consider all non-syntactic top-level lexical bindings to be
+      // aliased.
       if (env->is<LexicalEnvironmentObject>() &&
+          !env->is<GlobalLexicalEnvironmentObject>() &&
           env->as<LexicalEnvironmentObject>().isExtensible()) {
-        MOZ_ASSERT(IsGlobalLexicalEnvironment(env) ||
-                   !IsSyntacticEnvironment(env));
+        MOZ_ASSERT(!IsSyntacticEnvironment(env));
         return true;
       }
 
@@ -1704,10 +1796,18 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler {
         AbstractFramePtr frame = maybeLiveEnv->frame();
         uint32_t local = loc.slot();
         MOZ_ASSERT(local < frame.script()->nfixed());
+        Value& localVal = frame.unaliasedLocal(local);
         if (action == GET) {
-          vp.set(frame.unaliasedLocal(local));
+          vp.set(localVal);
         } else {
-          frame.unaliasedLocal(local) = vp;
+          // Note: localVal could also be JS_OPTIMIZED_OUT.
+          if (localVal.isMagic() &&
+              localVal.whyMagic() == JS_UNINITIALIZED_LEXICAL) {
+            ReportRuntimeLexicalError(cx, JSMSG_UNINITIALIZED_LEXICAL, id);
+            return false;
+          }
+
+          localVal = vp;
         }
       } else if (AbstractGeneratorObject* genObj =
                      GetGeneratorObjectForEnvironment(cx, debugEnv);
@@ -1806,9 +1906,8 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler {
       if (action == GET) {
         if (instanceScope->memoriesStart() <= index &&
             index < instanceScope->globalsStart()) {
-          MOZ_ASSERT(instanceScope->memoriesStart() + 1 ==
-                     instanceScope->globalsStart());
-          vp.set(ObjectValue(*instance.memory()));
+          vp.set(ObjectValue(
+              *instance.memory(index - instanceScope->memoriesStart())));
         }
         if (instanceScope->globalsStart() <= index) {
           MOZ_ASSERT(index < instanceScope->namesCount());
@@ -1835,7 +1934,7 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler {
     return id == NameToId(cx->names().arguments);
   }
   static bool isThis(JSContext* cx, jsid id) {
-    return id == NameToId(cx->names().dotThis);
+    return id == NameToId(cx->names().dot_this_);
   }
 
   static bool isFunctionEnvironment(const JSObject& env) {
@@ -1866,6 +1965,11 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler {
     }
     if (env.is<WasmFunctionCallObject>()) {
       return &env.as<WasmFunctionCallObject>().scope();
+    }
+    if (env.is<GlobalLexicalEnvironmentObject>()) {
+      return &env.as<GlobalLexicalEnvironmentObject>()
+                  .global()
+                  .emptyGlobalScope();
     }
     return nullptr;
   }
@@ -2253,6 +2357,18 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler {
         return result.succeed();
       case ACCESS_GENERIC: {
         RootedValue envVal(cx, ObjectValue(*env));
+        RootedValue initialVal(cx);
+        if (!GetProperty(cx, env, env, id, &initialVal)) {
+          return false;
+        }
+        // Note: initialVal could be JS_OPTIMIZED_OUT, which is why we don't use
+        // .whyMagic(JS_UNINITALIZED_LEXICAL).
+        if (initialVal.isMagic() &&
+            initialVal.whyMagic() == JS_UNINITIALIZED_LEXICAL) {
+          ReportRuntimeLexicalErrorId(cx, JSMSG_UNINITIALIZED_LEXICAL, id);
+          return false;
+        }
+
         return SetProperty(cx, env, id, v, envVal, result);
       }
       default:
@@ -2288,7 +2404,7 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler {
       }
     }
     if (isMissingThisBinding(*env)) {
-      if (!props.append(NameToId(cx->names().dotThis))) {
+      if (!props.append(NameToId(cx->names().dot_this_))) {
         return false;
       }
     }
@@ -2560,18 +2676,20 @@ void DebugEnvironments::checkHashTablesAfterMovingGC() {
    * This is called at the end of StoreBuffer::mark() to check that our
    * postbarriers have worked and that no hashtable keys (or values) are left
    * pointing into the nursery.
+   *
+   * |proxiedEnvs| is checked automatically because it is a WeakMap.
    */
-  proxiedEnvs.checkAfterMovingGC();
-  for (MissingEnvironmentMap::Range r = missingEnvs.all(); !r.empty();
-       r.popFront()) {
-    CheckGCThingAfterMovingGC(r.front().key().scope());
+  CheckTableAfterMovingGC(missingEnvs, [this](const auto& entry) {
+    CheckGCThingAfterMovingGC(entry.key().scope(), zone());
     // Use unbarrieredGet() to prevent triggering read barrier while collecting.
-    CheckGCThingAfterMovingGC(r.front().value().unbarrieredGet());
-  }
-  for (LiveEnvironmentMap::Range r = liveEnvs.all(); !r.empty(); r.popFront()) {
-    CheckGCThingAfterMovingGC(r.front().key());
-    CheckGCThingAfterMovingGC(r.front().value().scope_.get());
-  }
+    CheckGCThingAfterMovingGC(entry.value().unbarrieredGet(), zone());
+    return entry.key();
+  });
+  CheckTableAfterMovingGC(liveEnvs, [this](const auto& entry) {
+    CheckGCThingAfterMovingGC(entry.key(), zone());
+    CheckGCThingAfterMovingGC(entry.value().scope_.get(), zone());
+    return entry.key().unbarrieredGet();
+  });
 }
 #endif
 
@@ -3341,12 +3459,7 @@ WithScope& WithEnvironmentObject::scope() const {
 }
 
 ModuleEnvironmentObject* js::GetModuleEnvironmentForScript(JSScript* script) {
-  ModuleObject* module = GetModuleObjectForScript(script);
-  if (!module) {
-    return nullptr;
-  }
-
-  return module->environment();
+  return GetModuleObjectForScript(script)->environment();
 }
 
 ModuleObject* js::GetModuleObjectForScript(JSScript* script) {
@@ -3355,7 +3468,8 @@ ModuleObject* js::GetModuleObjectForScript(JSScript* script) {
       return si.scope()->as<ModuleScope>().module();
     }
   }
-  return nullptr;
+
+  MOZ_CRASH("No module scope found for script");
 }
 
 static bool GetThisValueForDebuggerEnvironmentIterMaybeOptimizedOut(
@@ -3420,7 +3534,7 @@ static bool GetThisValueForDebuggerEnvironmentIterMaybeOptimizedOut(
     }
 
     for (Rooted<BindingIter> bi(cx, BindingIter(script)); bi; bi++) {
-      if (bi.name() != cx->names().dotThis) {
+      if (bi.name() != cx->names().dot_this_) {
         continue;
       }
 
@@ -3690,7 +3804,7 @@ static bool InitHoistedFunctionDeclarations(JSContext* cx, HandleScript script,
     }
 
     RootedFunction fun(cx, &thing.as<JSObject>().as<JSFunction>());
-    Rooted<PropertyName*> name(cx, fun->explicitName()->asPropertyName());
+    Rooted<PropertyName*> name(cx, fun->fullExplicitName()->asPropertyName());
 
     // Clone the function before exposing to script as a binding.
     JSObject* clone = Lambda(cx, fun, envChain);
@@ -4137,16 +4251,16 @@ static bool AnalyzeEntrainedVariablesInScript(JSContext* cx,
 
     buf.printf("Script ");
 
-    if (JSAtom* name = script->function()->displayAtom()) {
-      buf.putString(name);
+    if (JSAtom* name = script->function()->fullDisplayAtom()) {
+      buf.putString(cx, name);
       buf.printf(" ");
     }
 
     buf.printf("(%s:%u) has variables entrained by ", script->filename(),
                script->lineno());
 
-    if (JSAtom* name = innerScript->function()->displayAtom()) {
-      buf.putString(name);
+    if (JSAtom* name = innerScript->function()->fullDisplayAtom()) {
+      buf.putString(cx, name);
       buf.printf(" ");
     }
 
@@ -4155,10 +4269,14 @@ static bool AnalyzeEntrainedVariablesInScript(JSContext* cx,
     for (PropertyNameSet::Range r = remainingNames.all(); !r.empty();
          r.popFront()) {
       buf.printf(" ");
-      buf.putString(r.front());
+      buf.putString(cx, r.front());
     }
 
-    printf("%s\n", buf.string());
+    JS::UniqueChars str = buf.release();
+    if (!str) {
+      return false;
+    }
+    printf("%s\n", str.get());
   }
 
   RootedFunction fun(cx);

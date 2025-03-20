@@ -1,0 +1,55 @@
+#define MOZ_UNIFIED_BUILD
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-dotprinter.cc"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-dotprinter.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-dotprinter.cc defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-interpreter.cc"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-interpreter.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-interpreter.cc defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-macro-assembler-tracer.cc"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-macro-assembler-tracer.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-macro-assembler-tracer.cc defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-macro-assembler.cc"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-macro-assembler.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-macro-assembler.cc defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-parser.cc"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-parser.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-parser.cc defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-stack.cc"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-stack.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/irregexp/imported/regexp-stack.cc defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif

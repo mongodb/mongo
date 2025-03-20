@@ -37,6 +37,7 @@
 #include "jstypes.h"
 
 #include "gc/Memory.h"
+#include "jit/ProcessExecutableMemory.h"
 #include "js/AllocPolicy.h"
 #include "js/UniquePtr.h"
 #include "js/Utility.h"
@@ -44,6 +45,7 @@
 #include "threading/ExclusiveData.h"
 #include "util/Memory.h"
 #include "vm/MutexIDs.h"
+#include "wasm/WasmBuiltinModule.h"
 #include "wasm/WasmBuiltins.h"
 #include "wasm/WasmCodegenConstants.h"
 #include "wasm/WasmCodegenTypes.h"
@@ -115,8 +117,8 @@ struct LinkData : LinkDataCacheablePod {
   };
   using InternalLinkVector = Vector<InternalLink, 0, SystemAllocPolicy>;
 
-  struct SymbolicLinkArray
-      : EnumeratedArray<SymbolicAddress, SymbolicAddress::Limit, Uint32Vector> {
+  struct SymbolicLinkArray : EnumeratedArray<SymbolicAddress, Uint32Vector,
+                                             size_t(SymbolicAddress::Limit)> {
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
   };
 
@@ -242,7 +244,9 @@ class ModuleSegment : public CodeSegment {
   WASM_DECLARE_FRIEND_SERIALIZE(ModuleSegment);
 };
 
-extern UniqueCodeBytes AllocateCodeBytes(uint32_t codeLength);
+extern UniqueCodeBytes AllocateCodeBytes(
+    mozilla::Maybe<jit::AutoMarkJitCodeWritableForThread>& writable,
+    uint32_t codeLength);
 extern bool StaticallyLink(const ModuleSegment& ms, const LinkData& linkData);
 extern void StaticallyUnlink(uint8_t* base, const LinkData& linkData);
 
@@ -354,28 +358,33 @@ using FuncImportVector = Vector<FuncImport, 0, SystemAllocPolicy>;
 
 struct MetadataCacheablePod {
   ModuleKind kind;
-  Maybe<MemoryDesc> memory;
   uint32_t instanceDataLength;
   Maybe<uint32_t> startFuncIndex;
   Maybe<uint32_t> nameCustomSectionIndex;
+  BuiltinModuleIds builtinModules;
+  FeatureUsage featureUsage;
   bool filenameIsURL;
-  bool omitsBoundsChecks;
+  bool parsedBranchHints;
   uint32_t typeDefsOffsetStart;
+  uint32_t memoriesOffsetStart;
   uint32_t tablesOffsetStart;
   uint32_t tagsOffsetStart;
   uint32_t padding;
 
-  WASM_CHECK_CACHEABLE_POD(kind, memory, instanceDataLength, startFuncIndex,
-                           nameCustomSectionIndex, filenameIsURL,
-                           omitsBoundsChecks, typeDefsOffsetStart,
+  WASM_CHECK_CACHEABLE_POD(kind, instanceDataLength, startFuncIndex,
+                           nameCustomSectionIndex, builtinModules, featureUsage,
+                           filenameIsURL, parsedBranchHints,
+                           typeDefsOffsetStart, memoriesOffsetStart,
                            tablesOffsetStart, tagsOffsetStart)
 
   explicit MetadataCacheablePod(ModuleKind kind)
       : kind(kind),
         instanceDataLength(0),
+        featureUsage(FeatureUsage::None),
         filenameIsURL(false),
-        omitsBoundsChecks(false),
+        parsedBranchHints(false),
         typeDefsOffsetStart(UINT32_MAX),
+        memoriesOffsetStart(UINT32_MAX),
         tablesOffsetStart(UINT32_MAX),
         tagsOffsetStart(UINT32_MAX),
         padding(0) {}
@@ -389,6 +398,7 @@ using ModuleHash = uint8_t[8];
 
 struct Metadata : public ShareableBase<Metadata>, public MetadataCacheablePod {
   SharedTypeContext types;
+  MemoryDescVector memories;
   GlobalDescVector globals;
   TableDescVector tables;
   TagDescVector tags;
@@ -414,13 +424,14 @@ struct Metadata : public ShareableBase<Metadata>, public MetadataCacheablePod {
   MetadataCacheablePod& pod() { return *this; }
   const MetadataCacheablePod& pod() const { return *this; }
 
-  bool usesMemory() const { return memory.isSome(); }
-  bool usesSharedMemory() const {
-    return memory.isSome() && memory->isShared();
+  const TypeDef& getFuncImportTypeDef(const FuncImport& funcImport) const {
+    return types->type(funcImport.typeIndex());
   }
-
   const FuncType& getFuncImportType(const FuncImport& funcImport) const {
     return types->type(funcImport.typeIndex()).funcType();
+  }
+  const TypeDef& getFuncExportTypeDef(const FuncExport& funcExport) const {
+    return types->type(funcExport.typeIndex());
   }
   const FuncType& getFuncExportType(const FuncExport& funcExport) const {
     return types->type(funcExport.typeIndex()).funcType();
@@ -484,6 +495,7 @@ struct MetadataTier {
   FuncExportVector funcExports;
   StackMaps stackMaps;
   TryNoteVector tryNotes;
+  CodeRangeUnwindInfoVector codeRangeUnwindInfos;
 
   // Debug information, not serialized.
   uint32_t debugTrapOffset;
@@ -751,6 +763,8 @@ class JumpTables {
 
 using SharedCode = RefPtr<const Code>;
 using MutableCode = RefPtr<Code>;
+using MetadataAnalysisHashMap =
+    HashMap<const char*, uint32_t, mozilla::CStringHasher, SystemAllocPolicy>;
 
 class Code : public ShareableBase<Code> {
   UniqueCodeTier tier1_;
@@ -836,6 +850,8 @@ class Code : public ShareableBase<Code> {
   const TryNote* lookupTryNote(void* pc, Tier* tier) const;
   bool containsCodePC(const void* pc) const;
   bool lookupTrap(void* pc, Trap* trap, BytecodeOffset* bytecode) const;
+  const CodeRangeUnwindInfo* lookupUnwindInfo(void* pc) const;
+  bool lookupFunctionTier(const CodeRange* codeRange, Tier* tier) const;
 
   // To save memory, profilingLabels_ are generated lazily when profiling mode
   // is enabled.
@@ -847,6 +863,9 @@ class Code : public ShareableBase<Code> {
 
   void disassemble(JSContext* cx, Tier tier, int kindSelection,
                    PrintCallback printString) const;
+
+  // Wasm metadata size analysis
+  MetadataAnalysisHashMap metadataAnalysis(JSContext* cx) const;
 
   // about:memory reporting:
 

@@ -5,8 +5,6 @@
 # This script generates jit/MIROpsGenerated.h (list of MIR instructions)
 # from MIROps.yaml, as well as MIR op definitions.
 
-from collections import OrderedDict
-
 import buildconfig
 import six
 import yaml
@@ -47,20 +45,7 @@ def load_yaml(yaml_path):
     pp.do_filter("substitution")
     pp.do_include(yaml_path)
     contents = pp.out.getvalue()
-
-    # Load into an OrderedDict to ensure order is preserved. Note: Python 3.7+
-    # also preserves ordering for normal dictionaries.
-    # Code based on https://stackoverflow.com/a/21912744.
-    class OrderedLoader(yaml.Loader):
-        pass
-
-    def construct_mapping(loader, node):
-        loader.flatten_mapping(node)
-        return OrderedDict(loader.construct_pairs(node))
-
-    tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
-    OrderedLoader.add_constructor(tag, construct_mapping)
-    return yaml.load(contents, OrderedLoader)
+    return yaml.safe_load(contents)
 
 
 type_policies = {
@@ -135,6 +120,7 @@ def gen_mir_class(
     compute_range,
     can_recover,
     clone,
+    can_consume_float32,
 ):
     """Generates class definition for a single MIR opcode."""
 
@@ -268,6 +254,10 @@ def gen_mir_class(
             code += "  bool canRecoverOnBailout() const override { return true; }\\\n"
     if clone:
         code += "  ALLOW_CLONE(" + class_name + ")\\\n"
+    if can_consume_float32:
+        code += (
+            "  bool canConsumeFloat32(MUse* use) const override { return true; }\\\n"
+        )
     code += "};\\\n"
     return code
 
@@ -317,50 +307,49 @@ def generate_mir_header(c_out, yaml_path):
 
         if gen_boilerplate:
             operands = op.get("operands", None)
-            assert operands is None or isinstance(operands, OrderedDict)
+            assert operands is None or isinstance(operands, dict)
 
             arguments = op.get("arguments", None)
-            assert arguments is None or isinstance(arguments, OrderedDict)
+            assert arguments is None or isinstance(arguments, dict)
 
             no_type_policy = op.get("type_policy", None)
-            assert no_type_policy is None or no_type_policy == "none"
+            assert no_type_policy in (None, "none")
 
             result = op.get("result_type", None)
             assert result is None or isinstance(result, str)
 
             guard = op.get("guard", None)
-            assert guard is None or True
+            assert guard in (None, True, False)
 
             movable = op.get("movable", None)
-            assert movable is None or True
+            assert movable in (None, True, False)
 
             folds_to = op.get("folds_to", None)
-            assert folds_to is None or folds_to == "custom"
+            assert folds_to in (None, "custom")
 
             congruent_to = op.get("congruent_to", None)
-            assert (
-                congruent_to is None
-                or congruent_to == "if_operands_equal"
-                or congruent_to == "custom"
-            )
+            assert congruent_to in (None, "if_operands_equal", "custom")
 
             alias_set = op.get("alias_set", None)
-            assert alias_set is None or True or isinstance(alias_set, str)
+            assert alias_set in (None, "none", "custom")
 
             might_alias = op.get("might_alias", None)
-            assert might_alias is None or might_alias == "custom"
+            assert might_alias in (None, "custom")
 
             possibly_calls = op.get("possibly_calls", None)
-            assert possibly_calls is None or True or possibly_calls == "custom"
+            assert possibly_calls in (None, True, "custom")
 
             compute_range = op.get("compute_range", None)
-            assert compute_range is None or compute_range == "custom"
+            assert compute_range in (None, "custom")
 
             can_recover = op.get("can_recover", None)
-            assert can_recover is None or True or can_recover == "custom"
+            assert can_recover in (None, True, False, "custom")
 
             clone = op.get("clone", None)
-            assert clone is None or True
+            assert clone in (None, True, False)
+
+            can_consume_float32 = op.get("can_consume_float32", None)
+            assert can_consume_float32 in (None, True, False)
 
             code = gen_mir_class(
                 name,
@@ -378,6 +367,7 @@ def generate_mir_header(c_out, yaml_path):
                 compute_range,
                 can_recover,
                 clone,
+                can_consume_float32,
             )
             mir_op_classes.append(code)
 

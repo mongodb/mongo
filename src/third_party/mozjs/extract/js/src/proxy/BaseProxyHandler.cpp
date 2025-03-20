@@ -13,7 +13,6 @@
 #include "proxy/DeadObjectProxy.h"
 #include "vm/Interpreter.h"
 #include "vm/ProxyObject.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 #include "vm/WrapperObject.h"
 
 #include "vm/JSContext-inl.h"
@@ -317,8 +316,8 @@ JSString* BaseProxyHandler::fun_toString(JSContext* cx, HandleObject proxy,
   }
 
   JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                            JSMSG_INCOMPATIBLE_PROTO, js_Function_str,
-                            js_toString_str, "object");
+                            JSMSG_INCOMPATIBLE_PROTO, "Function", "toString",
+                            "object");
   return nullptr;
 }
 

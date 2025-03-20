@@ -368,9 +368,7 @@ size_t js::PutEscapedStringImpl(char* buffer, size_t bufferSize,
         buffer = nullptr;
       }
     } else if (out) {
-      if (!out->put(&c, 1)) {
-        return size_t(-1);
-      }
+      out->put(&c, 1);
     }
     n++;
   }
@@ -416,8 +414,8 @@ template size_t js::PutEscapedString(char* buffer, size_t bufferSize,
                                      const char16_t* chars, size_t length,
                                      uint32_t quote);
 
-size_t js::unicode::CountCodePoints(const Utf8Unit* begin,
-                                    const Utf8Unit* end) {
+size_t js::unicode::CountUTF16CodeUnits(const Utf8Unit* begin,
+                                        const Utf8Unit* end) {
   MOZ_ASSERT(begin <= end);
 
   size_t count = 0;
@@ -430,36 +428,14 @@ size_t js::unicode::CountCodePoints(const Utf8Unit* begin,
       continue;
     }
 
-#ifdef DEBUG
-    Maybe<char32_t> cp =
-#endif
-        DecodeOneUtf8CodePoint(lead, &ptr, end);
+    Maybe<char32_t> cp = DecodeOneUtf8CodePoint(lead, &ptr, end);
     MOZ_ASSERT(cp.isSome());
+    if (*cp > unicode::UTF16Max) {
+      // This uses surrogate pair.
+      count++;
+    }
   }
   MOZ_ASSERT(ptr == end, "bad code unit count in line?");
-
-  return count;
-}
-
-size_t js::unicode::CountCodePoints(const char16_t* begin,
-                                    const char16_t* end) {
-  MOZ_ASSERT(begin <= end);
-
-  size_t count = 0;
-
-  const char16_t* ptr = begin;
-  while (ptr < end) {
-    count++;
-
-    if (!IsLeadSurrogate(*ptr++)) {
-      continue;
-    }
-
-    if (ptr < end && IsTrailSurrogate(*ptr)) {
-      ptr++;
-    }
-  }
-  MOZ_ASSERT(ptr == end, "should have consumed the full range");
 
   return count;
 }

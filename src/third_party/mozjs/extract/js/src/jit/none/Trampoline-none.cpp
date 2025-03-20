@@ -37,7 +37,7 @@ void JitRuntime::generateBailoutTailStub(MacroAssembler&, Label*) {
   MOZ_CRASH();
 }
 
-bool JitRuntime::generateVMWrapper(JSContext*, MacroAssembler&,
+bool JitRuntime::generateVMWrapper(JSContext*, MacroAssembler&, VMFunctionId,
                                    const VMFunctionData&, DynFn, uint32_t*) {
   MOZ_CRASH();
 }

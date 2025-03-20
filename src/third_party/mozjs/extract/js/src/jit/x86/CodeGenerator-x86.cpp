@@ -456,18 +456,12 @@ void CodeGenerator::visitWasmUint32ToFloat32(LWasmUint32ToFloat32* lir) {
   masm.convertUInt32ToFloat32(temp, output);
 }
 
-void CodeGenerator::visitWasmHeapBase(LWasmHeapBase* ins) {
-  masm.loadPtr(Address(ToRegister(ins->instance()),
-                       wasm::Instance::offsetOfMemoryBase()),
-               ToRegister(ins->output()));
-}
-
 template <typename T>
 void CodeGeneratorX86::emitWasmLoad(T* ins) {
   const MWasmLoad* mir = ins->mir();
 
+  mir->access().assertOffsetInGuardPages();
   uint32_t offset = mir->access().offset();
-  MOZ_ASSERT(offset < masm.wasmMaxOffsetGuardLimit());
 
   const LAllocation* ptr = ins->ptr();
   const LAllocation* memoryBase = ins->memoryBase();
@@ -498,8 +492,8 @@ template <typename T>
 void CodeGeneratorX86::emitWasmStore(T* ins) {
   const MWasmStore* mir = ins->mir();
 
+  mir->access().assertOffsetInGuardPages();
   uint32_t offset = mir->access().offset();
-  MOZ_ASSERT(offset < masm.wasmMaxOffsetGuardLimit());
 
   const LAllocation* ptr = ins->ptr();
   const LAllocation* memoryBase = ins->memoryBase();
@@ -613,8 +607,8 @@ void CodeGenerator::visitWasmAtomicBinopHeapForEffect(
 }
 
 void CodeGenerator::visitWasmAtomicLoadI64(LWasmAtomicLoadI64* ins) {
+  ins->mir()->access().assertOffsetInGuardPages();
   uint32_t offset = ins->mir()->access().offset();
-  MOZ_ASSERT(offset < masm.wasmMaxOffsetGuardLimit());
 
   const LAllocation* memoryBase = ins->memoryBase();
   const LAllocation* ptr = ins->ptr();
@@ -630,8 +624,8 @@ void CodeGenerator::visitWasmAtomicLoadI64(LWasmAtomicLoadI64* ins) {
 }
 
 void CodeGenerator::visitWasmCompareExchangeI64(LWasmCompareExchangeI64* ins) {
+  ins->mir()->access().assertOffsetInGuardPages();
   uint32_t offset = ins->mir()->access().offset();
-  MOZ_ASSERT(offset < masm.wasmMaxOffsetGuardLimit());
 
   const LAllocation* memoryBase = ins->memoryBase();
   const LAllocation* ptr = ins->ptr();
@@ -644,15 +638,15 @@ void CodeGenerator::visitWasmCompareExchangeI64(LWasmCompareExchangeI64* ins) {
   MOZ_ASSERT(ToOutRegister64(ins).low == eax);
   MOZ_ASSERT(ToOutRegister64(ins).high == edx);
 
-  masm.append(ins->mir()->access(), masm.size());
+  masm.append(ins->mir()->access(), wasm::TrapMachineInsn::Atomic,
+              FaultingCodeOffset(masm.currentOffset()));
   masm.lock_cmpxchg8b(edx, eax, ecx, ebx, srcAddr);
 }
 
 template <typename T>
 void CodeGeneratorX86::emitWasmStoreOrExchangeAtomicI64(
     T* ins, const wasm::MemoryAccessDesc& access) {
-  MOZ_ASSERT(access.offset() < masm.wasmMaxOffsetGuardLimit());
-
+  access.assertOffsetInGuardPages();
   const LAllocation* memoryBase = ins->memoryBase();
   const LAllocation* ptr = ins->ptr();
   Operand srcAddr(ToRegister(memoryBase), ToRegister(ptr), TimesOne,
@@ -670,7 +664,8 @@ void CodeGeneratorX86::emitWasmStoreOrExchangeAtomicI64(
 
   Label again;
   masm.bind(&again);
-  masm.append(access, masm.size());
+  masm.append(access, wasm::TrapMachineInsn::Atomic,
+              FaultingCodeOffset(masm.currentOffset()));
   masm.lock_cmpxchg8b(edx, eax, ecx, ebx, srcAddr);
   masm.j(Assembler::Condition::NonZero, &again);
 }
@@ -690,8 +685,8 @@ void CodeGenerator::visitWasmAtomicExchangeI64(LWasmAtomicExchangeI64* ins) {
 }
 
 void CodeGenerator::visitWasmAtomicBinopI64(LWasmAtomicBinopI64* ins) {
+  ins->access().assertOffsetInGuardPages();
   uint32_t offset = ins->access().offset();
-  MOZ_ASSERT(offset < masm.wasmMaxOffsetGuardLimit());
 
   const LAllocation* memoryBase = ins->memoryBase();
   const LAllocation* ptr = ins->ptr();
@@ -902,7 +897,7 @@ void CodeGeneratorX86::visitOutOfLineTruncate(OutOfLineTruncate* ool) {
 
     if (gen->compilingWasm()) {
       masm.setupWasmABICall();
-      masm.passABIArg(input, MoveOp::DOUBLE);
+      masm.passABIArg(input, ABIType::Float64);
 
       int32_t instanceOffset = masm.framePushed() - framePushedAfterInstance;
       masm.callWithABI(ool->bytecodeOffset(), wasm::SymbolicAddress::ToInt32,
@@ -910,8 +905,8 @@ void CodeGeneratorX86::visitOutOfLineTruncate(OutOfLineTruncate* ool) {
     } else {
       using Fn = int32_t (*)(double);
       masm.setupUnalignedABICall(output);
-      masm.passABIArg(input, MoveOp::DOUBLE);
-      masm.callWithABI<Fn, JS::ToInt32>(MoveOp::GENERAL,
+      masm.passABIArg(input, ABIType::Float64);
+      masm.callWithABI<Fn, JS::ToInt32>(ABIType::General,
                                         CheckUnsafeCallWithABI::DontCheckOther);
     }
     masm.storeCallInt32Result(output);
@@ -1010,7 +1005,7 @@ void CodeGeneratorX86::visitOutOfLineTruncateFloat32(
     }
 
     masm.vcvtss2sd(input, input, input);
-    masm.passABIArg(input.asDouble(), MoveOp::DOUBLE);
+    masm.passABIArg(input.asDouble(), ABIType::Float64);
 
     if (gen->compilingWasm()) {
       int32_t instanceOffset = masm.framePushed() - framePushedAfterInstance;
@@ -1018,7 +1013,7 @@ void CodeGeneratorX86::visitOutOfLineTruncateFloat32(
                        mozilla::Some(instanceOffset));
     } else {
       using Fn = int32_t (*)(double);
-      masm.callWithABI<Fn, JS::ToInt32>(MoveOp::GENERAL,
+      masm.callWithABI<Fn, JS::ToInt32>(ABIType::General,
                                         CheckUnsafeCallWithABI::DontCheckOther);
     }
 

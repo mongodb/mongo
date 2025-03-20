@@ -82,6 +82,18 @@ class Handle;
 #define CHECK_GE(lhs, rhs) MOZ_RELEASE_ASSERT((lhs) >= (rhs))
 #define CONSTEXPR_DCHECK MOZ_ASSERT
 
+// These assertions are necessary to preserve the soundness of the V8
+// sandbox. In V8, they are debug-only if the sandbox is off, but release
+// asserts if the sandbox is turned on. We don't have an equivalent sandbox,
+// so they can be debug checks for now.
+#define SBXCHECK MOZ_ASSERT
+#define SBXCHECK_EQ(lhs, rhs) MOZ_ASSERT((lhs) == (rhs))
+#define SBXCHECK_NE(lhs, rhs) MOZ_ASSERT((lhs) != (rhs))
+#define SBXCHECK_GT(lhs, rhs) MOZ_ASSERT((lhs) > (rhs))
+#define SBXCHECK_GE(lhs, rhs) MOZ_ASSERT((lhs) >= (rhs))
+#define SBXCHECK_LT(lhs, rhs) MOZ_ASSERT((lhs) < (rhs))
+#define SBXCHECK_LE(lhs, rhs) MOZ_ASSERT((lhs) <= (rhs))
+
 #define MemCopy memcpy
 
 // Origin:
@@ -125,7 +137,6 @@ constexpr inline bool IsAligned(T value, U alignment) {
   return (value & (alignment - 1)) == 0;
 }
 
-using byte = uint8_t;
 using Address = uintptr_t;
 static const Address kNullAddress = 0;
 
@@ -247,6 +258,9 @@ class Optional {
 
   bool has_value() const { return inner_.isSome(); }
   const T& value() const { return inner_.ref(); }
+
+  T* operator->() { return &inner_.ref(); }
+  T& operator*() { return inner_.ref(); }
 };
 
 namespace bits {
@@ -591,15 +605,6 @@ class Object {
   // IsCharacterInRangeArray in regexp-macro-assembler.cc.
   Object(uintptr_t raw) : asBits_(raw) { MOZ_CRASH("unused"); }
 
-  // Used in regexp-interpreter.cc to check the return value of
-  // isolate->stack_guard()->HandleInterrupts(). We want to handle
-  // interrupts in the caller, so we always return false from
-  // HandleInterrupts and true here.
-  inline bool IsException(Isolate*) const {
-    MOZ_ASSERT(!value().toBoolean());
-    return true;
-  }
-
   JS::Value value() const { return JS::Value::fromRawBits(asBits_); }
 
   inline static Object cast(Object object) { return object; }
@@ -608,6 +613,14 @@ class Object {
   void setValue(const JS::Value& val) { asBits_ = val.asRawBits(); }
   uint64_t asBits_;
 } JS_HAZ_GC_POINTER;
+
+// Used in regexp-interpreter.cc to check the return value of
+// isolate->stack_guard()->HandleInterrupts(). We want to handle
+// interrupts in the caller, so we return a magic value from
+// HandleInterrupts and check for it here.
+inline bool IsException(Object obj, Isolate*) {
+  return obj.value().isMagic(JS_INTERRUPT_REGEXP);
+}
 
 class Smi : public Object {
  public:
@@ -629,6 +642,27 @@ class HeapObject : public Object {
     h.setValue(object.value());
     return h;
   }
+};
+
+// V8's values use low-bit tagging. If the LSB is 0, it's a small
+// integer. If the LSB is 1, it's a pointer to some GC thing. In V8,
+// this wrapper class is used to represent a pointer that has the low
+// bit set, or a small integer that has been shifted left by one
+// bit. We don't use the same tagging system, so all we need is a
+// transparent wrapper that automatically converts to/from the wrapped
+// type.
+template <typename T>
+class Tagged {
+ public:
+  Tagged() {}
+  MOZ_IMPLICIT Tagged(const T& value) : value_(value) {}
+  MOZ_IMPLICIT Tagged(T&& value) : value_(std::move(value)) {}
+
+  T* operator->() { return &value_; }
+  constexpr operator T() const { return value_; }
+
+ private:
+  T value_;
 };
 
 // A fixed-size array with Objects (aka Values) as element types.
@@ -673,13 +707,13 @@ T* ByteArrayData::typedData() {
 
 template <typename T>
 T ByteArrayData::getTyped(uint32_t index) {
-  MOZ_ASSERT(index < length / sizeof(T));
+  MOZ_ASSERT(index < length() / sizeof(T));
   return typedData<T>()[index];
 }
 
 template <typename T>
 void ByteArrayData::setTyped(uint32_t index, T value) {
-  MOZ_ASSERT(index < length / sizeof(T));
+  MOZ_ASSERT(index < length() / sizeof(T));
   typedData<T>()[index] = value;
 }
 
@@ -689,16 +723,17 @@ class ByteArray : public HeapObject {
   ByteArrayData* inner() const {
     return static_cast<ByteArrayData*>(value().toPrivate());
   }
+  friend bool IsByteArray(Object obj);
 
  public:
   PseudoHandle<ByteArrayData> takeOwnership(Isolate* isolate);
   PseudoHandle<ByteArrayData> maybeTakeOwnership(Isolate* isolate);
 
-  byte get(uint32_t index) { return inner()->get(index); }
-  void set(uint32_t index, byte val) { inner()->set(index, val); }
+  uint8_t get(uint32_t index) { return inner()->get(index); }
+  void set(uint32_t index, uint8_t val) { inner()->set(index, val); }
 
-  uint32_t length() const { return inner()->length; }
-  byte* GetDataStartAddress() { return inner()->data(); }
+  uint32_t length() const { return inner()->length(); }
+  uint8_t* begin() { return inner()->data(); }
 
   static ByteArray cast(Object object) {
     ByteArray b;
@@ -706,10 +741,16 @@ class ByteArray : public HeapObject {
     return b;
   }
 
-  bool IsByteArray() const { return true; }
-
   friend class SMRegExpMacroAssembler;
 };
+
+// This is only used in assertions. In debug builds, we put a magic value
+// in the header of each ByteArrayData, and assert here that it matches.
+inline bool IsByteArray(Object obj) {
+  MOZ_ASSERT(ByteArray::cast(obj).inner()->magic() ==
+             ByteArrayData::ExpectedMagic);
+  return true;
+}
 
 // This is a convenience class used in V8 for treating a ByteArray as an array
 // of fixed-size integers. This version supports integral types up to 32 bits.
@@ -1035,6 +1076,7 @@ class JSRegExp : public HeapObject {
 };
 
 using RegExpFlags = JS::RegExpFlags;
+using RegExpFlag = JS::RegExpFlags::Flag;
 
 inline bool IsUnicode(RegExpFlags flags) { return flags.unicode(); }
 inline bool IsGlobal(RegExpFlags flags) { return flags.global(); }
@@ -1042,10 +1084,26 @@ inline bool IsIgnoreCase(RegExpFlags flags) { return flags.ignoreCase(); }
 inline bool IsMultiline(RegExpFlags flags) { return flags.multiline(); }
 inline bool IsDotAll(RegExpFlags flags) { return flags.dotAll(); }
 inline bool IsSticky(RegExpFlags flags) { return flags.sticky(); }
+inline bool IsUnicodeSets(RegExpFlags flags) { return flags.unicodeSets(); }
+inline bool IsEitherUnicode(RegExpFlags flags) {
+  return flags.unicode() || flags.unicodeSets();
+}
 
-// TODO: Support /v flag (bug 1713657)
-inline bool IsUnicodeSets(RegExpFlags flags) { return false; }
-inline bool IsEitherUnicode(RegExpFlags flags) { return flags.unicode(); }
+inline base::Optional<RegExpFlag> TryRegExpFlagFromChar(char c) {
+  RegExpFlag flag;
+
+  // The parser only calls this after verifying that it's a supported flag.
+  MOZ_ALWAYS_TRUE(JS::MaybeParseRegExpFlag(c, &flag));
+
+  return base::Optional(flag);
+}
+
+inline bool operator==(const RegExpFlags& lhs, const int& rhs) {
+  return lhs.value() == rhs;
+}
+inline bool operator!=(const RegExpFlags& lhs, const int& rhs) {
+  return !(lhs == rhs);
+}
 
 class Histogram {
  public:
@@ -1131,9 +1189,11 @@ class Isolate {
 
   // This is called from inside no-GC code. V8 runs the interrupt
   // inside the no-GC code and then "manually relocates unhandlified
-  // references" afterwards. We just return false and let the caller
-  // handle interrupts.
-  Object HandleInterrupts() { return Object(JS::BooleanValue(false)); }
+  // references" afterwards. We just return a magic value and let the
+  // caller handle interrupts.
+  Object HandleInterrupts() {
+    return Object(JS::MagicValue(JS_INTERRUPT_REGEXP));
+  }
 
   JSContext* cx() const { return cx_; }
 
@@ -1272,10 +1332,11 @@ class Label {
 // For more information, read the comment in
 // https://github.com/mongodb-forks/spidermonkey/commit/880a295fe2b219b5488529ce7ac01364678f6a4b.
 #ifndef NO_COMPUTED_GOTO
-#  define V8_USE_COMPUTED_GOTO 1
+  #define V8_USE_COMPUTED_GOTO 1
 #else
-#  define V8_USE_COMPUTED_GOTO 0
+  #define V8_USE_COMPUTED_GOTO 0
 #endif
+
 #define COMPILING_IRREGEXP_FOR_EXTERNAL_EMBEDDER
 
 }  // namespace internal

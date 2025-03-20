@@ -210,8 +210,9 @@ class LWasmUnalignedLoadBase : public details::LWasmLoadBase<NumDefs, 2> {
   typedef LWasmLoadBase<NumDefs, 2> Base;
 
   explicit LWasmUnalignedLoadBase(LNode::Opcode opcode, const LAllocation& ptr,
+                                  const LAllocation& memoryBase,
                                   const LDefinition& valueHelper)
-      : Base(opcode, ptr, LAllocation()) {
+      : Base(opcode, ptr, memoryBase) {
     Base::setTemp(0, LDefinition::BogusTemp());
     Base::setTemp(1, valueHelper);
   }
@@ -227,8 +228,9 @@ class LWasmUnalignedLoad : public details::LWasmUnalignedLoadBase<1> {
   LIR_HEADER(WasmUnalignedLoad);
 
   explicit LWasmUnalignedLoad(const LAllocation& ptr,
+                              const LAllocation& memoryBase,
                               const LDefinition& valueHelper)
-      : LWasmUnalignedLoadBase(classOpcode, ptr, valueHelper) {}
+      : LWasmUnalignedLoadBase(classOpcode, ptr, memoryBase, valueHelper) {}
 };
 
 class LWasmUnalignedLoadI64
@@ -237,8 +239,9 @@ class LWasmUnalignedLoadI64
   LIR_HEADER(WasmUnalignedLoadI64);
 
   explicit LWasmUnalignedLoadI64(const LAllocation& ptr,
+                                 const LAllocation& memoryBase,
                                  const LDefinition& valueHelper)
-      : LWasmUnalignedLoadBase(classOpcode, ptr, valueHelper) {}
+      : LWasmUnalignedLoadBase(classOpcode, ptr, memoryBase, valueHelper) {}
 };
 
 namespace details {
@@ -267,45 +270,55 @@ class LWasmUnalignedStoreBase : public LInstructionHelper<0, NumOps, 2> {
 
 }  // namespace details
 
-class LWasmUnalignedStore : public details::LWasmUnalignedStoreBase<2> {
+class LWasmUnalignedStore : public details::LWasmUnalignedStoreBase<3> {
  public:
   LIR_HEADER(WasmUnalignedStore);
 
   LWasmUnalignedStore(const LAllocation& ptr, const LAllocation& value,
+                      const LAllocation& memoryBase,
                       const LDefinition& valueHelper)
       : LWasmUnalignedStoreBase(classOpcode, ptr, valueHelper) {
     setOperand(1, value);
+    setOperand(2, memoryBase);
   }
 
   const LAllocation* value() { return Base::getOperand(ValueIndex); }
+  const LAllocation* memoryBase() { return Base::getOperand(ValueIndex + 1); }
 };
 
 class LWasmUnalignedStoreI64
-    : public details::LWasmUnalignedStoreBase<1 + INT64_PIECES> {
+    : public details::LWasmUnalignedStoreBase<2 + INT64_PIECES> {
  public:
   LIR_HEADER(WasmUnalignedStoreI64);
   LWasmUnalignedStoreI64(const LAllocation& ptr, const LInt64Allocation& value,
+                         const LAllocation& memoryBase,
                          const LDefinition& valueHelper)
       : LWasmUnalignedStoreBase(classOpcode, ptr, valueHelper) {
     setInt64Operand(1, value);
+    setOperand(1 + INT64_PIECES, memoryBase);
   }
 
   const LInt64Allocation value() { return getInt64Operand(ValueIndex); }
+  const LAllocation* memoryBase() {
+    return Base::getOperand(ValueIndex + INT64_PIECES);
+  }
 };
 
 class LWasmCompareExchangeI64
-    : public LInstructionHelper<INT64_PIECES, 1 + INT64_PIECES + INT64_PIECES,
+    : public LInstructionHelper<INT64_PIECES, 2 + INT64_PIECES + INT64_PIECES,
                                 0> {
  public:
   LIR_HEADER(WasmCompareExchangeI64);
 
   LWasmCompareExchangeI64(const LAllocation& ptr,
                           const LInt64Allocation& oldValue,
-                          const LInt64Allocation& newValue)
+                          const LInt64Allocation& newValue,
+                          const LAllocation& memoryBase)
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setInt64Operand(1, oldValue);
     setInt64Operand(1 + INT64_PIECES, newValue);
+    setOperand(1 + 2 * INT64_PIECES, memoryBase);
   }
 
   const LAllocation* ptr() { return getOperand(0); }
@@ -313,42 +326,49 @@ class LWasmCompareExchangeI64
   const LInt64Allocation newValue() {
     return getInt64Operand(1 + INT64_PIECES);
   }
+  const LAllocation* memoryBase() { return getOperand(1 + 2 * INT64_PIECES); }
   const MWasmCompareExchangeHeap* mir() const {
     return mir_->toWasmCompareExchangeHeap();
   }
 };
 
 class LWasmAtomicExchangeI64
-    : public LInstructionHelper<INT64_PIECES, 1 + INT64_PIECES, 0> {
+    : public LInstructionHelper<INT64_PIECES, 2 + INT64_PIECES, 0> {
  public:
   LIR_HEADER(WasmAtomicExchangeI64);
 
-  LWasmAtomicExchangeI64(const LAllocation& ptr, const LInt64Allocation& value)
+  LWasmAtomicExchangeI64(const LAllocation& ptr, const LInt64Allocation& value,
+                         const LAllocation& memoryBase)
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setInt64Operand(1, value);
+    setOperand(1 + INT64_PIECES, memoryBase);
   }
 
   const LAllocation* ptr() { return getOperand(0); }
   const LInt64Allocation value() { return getInt64Operand(1); }
+  const LAllocation* memoryBase() { return getOperand(1 + INT64_PIECES); }
   const MWasmAtomicExchangeHeap* mir() const {
     return mir_->toWasmAtomicExchangeHeap();
   }
 };
 
 class LWasmAtomicBinopI64
-    : public LInstructionHelper<INT64_PIECES, 1 + INT64_PIECES, 2> {
+    : public LInstructionHelper<INT64_PIECES, 2 + INT64_PIECES, 2> {
  public:
   LIR_HEADER(WasmAtomicBinopI64);
 
-  LWasmAtomicBinopI64(const LAllocation& ptr, const LInt64Allocation& value)
+  LWasmAtomicBinopI64(const LAllocation& ptr, const LInt64Allocation& value,
+                      const LAllocation& memoryBase)
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setInt64Operand(1, value);
+    setOperand(1 + INT64_PIECES, memoryBase);
   }
 
   const LAllocation* ptr() { return getOperand(0); }
   const LInt64Allocation value() { return getInt64Operand(1); }
+  const LAllocation* memoryBase() { return getOperand(1 + INT64_PIECES); }
   const MWasmAtomicBinopHeap* mir() const {
     return mir_->toWasmAtomicBinopHeap();
   }

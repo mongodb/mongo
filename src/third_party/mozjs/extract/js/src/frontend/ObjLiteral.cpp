@@ -17,7 +17,7 @@
 #include "frontend/ParserAtom.h"                   // frontend::ParserAtomTable
 #include "frontend/TaggedParserAtomIndexHasher.h"  // TaggedParserAtomIndexHasher
 #include "gc/AllocKind.h"                          // gc::AllocKind
-#include "js/Id.h"                                 // INT_TO_JSID
+#include "js/Id.h"                                 // JS::PropertyKey
 #include "js/Printer.h"                            // js::Fprinter
 #include "js/RootingAPI.h"                         // Rooted
 #include "js/TypeDecls.h"                          // RootedId, RootedValue
@@ -27,7 +27,7 @@
 #include "vm/PlainObject.h"                        // PlainObject
 
 #include "gc/ObjectKind-inl.h"    // gc::GetGCObjectKind
-#include "vm/JSAtom-inl.h"        // AtomToId
+#include "vm/JSAtomUtils-inl.h"   // AtomToId
 #include "vm/JSObject-inl.h"      // NewBuiltinClassInstance
 #include "vm/NativeObject-inl.h"  // AddDataPropertyNonDelegate
 

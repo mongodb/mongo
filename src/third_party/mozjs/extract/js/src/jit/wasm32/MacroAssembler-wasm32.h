@@ -436,6 +436,13 @@ class MacroAssemblerWasm32 : public Assembler {
   }
 
   template <typename T>
+  void unboxWasmAnyRefGCThingForGCBarrier(const T&, Register) {
+    MOZ_CRASH();
+  }
+
+  void getWasmAnyRefGCThingChunk(Register, Register) { MOZ_CRASH(); }
+
+  template <typename T>
   void unboxObjectOrNull(const T& src, Register dest) {
     MOZ_CRASH();
   }

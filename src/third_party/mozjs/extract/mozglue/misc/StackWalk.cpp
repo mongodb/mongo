@@ -7,6 +7,7 @@
 /* API for getting a stack trace of the C/C++ stack on the current thread */
 
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/StackWalk.h"
 #ifdef XP_WIN
@@ -32,7 +33,7 @@ using namespace mozilla;
 #  define _GNU_SOURCE
 #endif
 
-#if defined(HAVE_DLOPEN) || defined(XP_DARWIN)
+#if defined(HAVE_DLFCN_H) || defined(XP_DARWIN)
 #  include <dlfcn.h>
 #endif
 
@@ -43,18 +44,19 @@ using namespace mozilla;
 #  define MOZ_STACKWALK_SUPPORTS_MACOSX 0
 #endif
 
-#if (defined(linux) &&                                            \
-     ((defined(__GNUC__) && (defined(__i386) || defined(PPC))) || \
-      defined(HAVE__UNWIND_BACKTRACE)))
-#  define MOZ_STACKWALK_SUPPORTS_LINUX 1
-#else
-#  define MOZ_STACKWALK_SUPPORTS_LINUX 0
-#endif
-
 #if __GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1)
 #  define HAVE___LIBC_STACK_END 1
 #else
 #  define HAVE___LIBC_STACK_END 0
+#endif
+
+#if (defined(linux) &&                                            \
+     ((defined(__GNUC__) && (defined(__i386) || defined(PPC))) || \
+      defined(HAVE__UNWIND_BACKTRACE)) &&                         \
+     (HAVE___LIBC_STACK_END || ANDROID))
+#  define MOZ_STACKWALK_SUPPORTS_LINUX 1
+#else
+#  define MOZ_STACKWALK_SUPPORTS_LINUX 0
 #endif
 
 #if HAVE___LIBC_STACK_END
@@ -69,22 +71,31 @@ extern MOZ_EXPORT void* __libc_stack_end;  // from ld-linux.so
 
 class FrameSkipper {
  public:
-  constexpr FrameSkipper() : mPc(0) {}
+  constexpr FrameSkipper() : mSkipUntilAddr(0) {}
+  static uintptr_t AddressFromPC(const void* aPC) {
+#ifdef __arm__
+    // On 32-bit ARM, mask off the thumb bit to get the instruction address.
+    return uintptr_t(aPC) & ~1;
+#else
+    return uintptr_t(aPC);
+#endif
+  }
   bool ShouldSkipPC(void* aPC) {
     // Skip frames until we encounter the one we were initialized with,
     // and then never skip again.
-    if (mPc != 0) {
-      if (mPc != uintptr_t(aPC)) {
+    uintptr_t instructionAddress = AddressFromPC(aPC);
+    if (mSkipUntilAddr != 0) {
+      if (mSkipUntilAddr != instructionAddress) {
         return true;
       }
-      mPc = 0;
+      mSkipUntilAddr = 0;
     }
     return false;
   }
-  explicit FrameSkipper(const void* aPc) : mPc(uintptr_t(aPc)) {}
+  explicit FrameSkipper(const void* aPC) : mSkipUntilAddr(AddressFromPC(aPC)) {}
 
  private:
-  uintptr_t mPc;
+  uintptr_t mSkipUntilAddr;
 };
 
 #ifdef XP_WIN
@@ -106,6 +117,9 @@ class FrameSkipper {
 #    error Too old imagehlp.h
 #  endif
 
+// DbgHelp functions are not thread-safe and should therefore be protected by
+// using this critical section. Only use the critical section after a
+// successful call to InitializeDbgHelp().
 CRITICAL_SECTION gDbgHelpCS;
 
 #  if defined(_M_AMD64) || defined(_M_ARM64)
@@ -128,7 +142,12 @@ static Atomic<size_t> sStackWalkSuppressions;
 
 void SuppressStackWalking() { ++sStackWalkSuppressions; }
 
-void DesuppressStackWalking() { --sStackWalkSuppressions; }
+void DesuppressStackWalking() {
+  auto previousValue = sStackWalkSuppressions--;
+  // We should never desuppress from 0. See bug 1687510 comment 10 for an
+  // example in which this occured.
+  MOZ_RELEASE_ASSERT(previousValue);
+}
 
 MFBT_API
 AutoSuppressStackWalking::AutoSuppressStackWalking() { SuppressStackWalking(); }
@@ -177,13 +196,78 @@ static void PrintError(const char* aPrefix) {
   LocalFree(lpMsgBuf);
 }
 
-static void InitializeDbgHelpCriticalSection() {
-  static bool initialized = false;
-  if (initialized) {
-    return;
+enum class DbgHelpInitFlags : bool {
+  BasicInit,
+  WithSymbolSupport,
+};
+
+// This function ensures that DbgHelp.dll is loaded in the current process,
+// and initializes the gDbgHelpCS critical section that we use to protect calls
+// to DbgHelp functions. If DbgHelpInitFlags::WithSymbolSupport is set, we
+// additionally call the symbol initialization functions from DbgHelp so that
+// symbol-related functions can be used.
+//
+// This function is thread-safe and reentrancy-safe. In debug and fuzzing
+// builds, MOZ_ASSERT and MOZ_CRASH walk the stack to print it before actually
+// crashing. Hence *any* MOZ_ASSERT or MOZ_CRASH failure reached from
+// InitializeDbgHelp() leads to rentrancy (see bug 1869997 for an example).
+// Such failures can occur indirectly when we load dbghelp.dll, because we
+// override various Microsoft-internal functions that are called upon DLL
+// loading.
+[[nodiscard]] static bool InitializeDbgHelp(
+    DbgHelpInitFlags aInitFlags = DbgHelpInitFlags::BasicInit) {
+  // In the code below, it is only safe to reach MOZ_ASSERT or MOZ_CRASH while
+  // sInitializationThreadId is set to the current thread id.
+  static Atomic<DWORD> sInitializationThreadId{0};
+  DWORD currentThreadId = ::GetCurrentThreadId();
+
+  // This code relies on Windows never giving us a current thread ID of zero.
+  // We make this assumption explicit, by failing if that should ever occur.
+  if (!currentThreadId) {
+    return false;
   }
-  ::InitializeCriticalSection(&gDbgHelpCS);
-  initialized = true;
+
+  if (sInitializationThreadId == currentThreadId) {
+    // This is a reentrant call and we must abort here.
+    return false;
+  }
+
+  static const bool sHasInitializedDbgHelp = [currentThreadId]() {
+    sInitializationThreadId = currentThreadId;
+
+    ::InitializeCriticalSection(&gDbgHelpCS);
+    bool dbgHelpLoaded = static_cast<bool>(::LoadLibraryW(L"dbghelp.dll"));
+
+    MOZ_ASSERT(dbgHelpLoaded);
+    sInitializationThreadId = 0;
+    return dbgHelpLoaded;
+  }();
+
+  // If we don't need symbol initialization, we are done. If we need it, we
+  // can only proceed if DbgHelp initialization was successful.
+  if (aInitFlags == DbgHelpInitFlags::BasicInit || !sHasInitializedDbgHelp) {
+    return sHasInitializedDbgHelp;
+  }
+
+  static const bool sHasInitializedSymbols = [currentThreadId]() {
+    sInitializationThreadId = currentThreadId;
+
+    EnterCriticalSection(&gDbgHelpCS);
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
+    bool symbolsInitialized = SymInitialize(GetCurrentProcess(), nullptr, TRUE);
+    /* XXX At some point we need to arrange to call SymCleanup */
+    LeaveCriticalSection(&gDbgHelpCS);
+
+    if (!symbolsInitialized) {
+      PrintError("SymInitialize");
+    }
+
+    MOZ_ASSERT(symbolsInitialized);
+    sInitializationThreadId = 0;
+    return symbolsInitialized;
+  }();
+
+  return sHasInitializedSymbols;
 }
 
 // Wrapper around a reference to a CONTEXT, to simplify access to main
@@ -247,7 +331,11 @@ static void DoMozStackWalkThread(MozWalkStackCallback aCallback,
                                  const void* aFirstFramePC, uint32_t aMaxFrames,
                                  void* aClosure, HANDLE aThread,
                                  CONTEXT* aContext) {
-  InitializeDbgHelpCriticalSection();
+#  if defined(_M_IX86)
+  if (!InitializeDbgHelp()) {
+    return;
+  }
+#  endif
 
   HANDLE targetThread = aThread;
   bool walkCallingThread;
@@ -300,9 +388,7 @@ static void DoMozStackWalkThread(MozWalkStackCallback aCallback,
   if (sStackWalkSuppressions) {
     return;
   }
-#  endif
 
-#  if defined(_M_AMD64) || defined(_M_ARM64)
   bool firstFrame = true;
 #  endif
 
@@ -319,15 +405,12 @@ static void DoMozStackWalkThread(MozWalkStackCallback aCallback,
     // 32-bit frame unwinding.
     // Debug routines are not threadsafe, so grab the lock.
     EnterCriticalSection(&gDbgHelpCS);
-    BOOL ok = StackWalk64(
-#    if defined _M_IX86
-        IMAGE_FILE_MACHINE_I386,
-#    endif
-        ::GetCurrentProcess(), targetThread, &frame64, context.CONTEXTPtr(),
-        nullptr,
-        SymFunctionTableAccess64,  // function table access routine
-        SymGetModuleBase64,        // module base routine
-        0);
+    BOOL ok =
+        StackWalk64(IMAGE_FILE_MACHINE_I386, ::GetCurrentProcess(),
+                    targetThread, &frame64, context.CONTEXTPtr(), nullptr,
+                    SymFunctionTableAccess64,  // function table access routine
+                    SymGetModuleBase64,        // module base routine
+                    0);
     LeaveCriticalSection(&gDbgHelpCS);
 
     if (ok) {
@@ -545,28 +628,6 @@ BOOL SymGetModuleInfoEspecial64(HANDLE aProcess, DWORD64 aAddr,
   return retval;
 }
 
-static bool EnsureSymInitialized() {
-  static bool gInitialized = false;
-  bool retStat;
-
-  if (gInitialized) {
-    return gInitialized;
-  }
-
-  InitializeDbgHelpCriticalSection();
-
-  SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
-  retStat = SymInitialize(GetCurrentProcess(), nullptr, TRUE);
-  if (!retStat) {
-    PrintError("SymInitialize");
-  }
-
-  gInitialized = retStat;
-  /* XXX At some point we need to arrange to call SymCleanup */
-
-  return retStat;
-}
-
 MFBT_API bool MozDescribeCodeAddress(void* aPC,
                                      MozCodeAddressDetails* aDetails) {
   aDetails->library[0] = '\0';
@@ -576,7 +637,7 @@ MFBT_API bool MozDescribeCodeAddress(void* aPC,
   aDetails->function[0] = '\0';
   aDetails->foffset = 0;
 
-  if (!EnsureSymInitialized()) {
+  if (!InitializeDbgHelp(DbgHelpInitFlags::WithSymbolSupport)) {
     return false;
   }
 
@@ -632,6 +693,9 @@ MFBT_API bool MozDescribeCodeAddress(void* aPC,
 }
 
 // i386 or PPC Linux stackwalking code
+//
+// Changes to to OS/Architecture support here should be reflected in
+// build/moz.configure/memory.configure
 #elif HAVE_DLADDR &&                                           \
     (HAVE__UNWIND_BACKTRACE || MOZ_STACKWALK_SUPPORTS_LINUX || \
      MOZ_STACKWALK_SUPPORTS_MACOSX)
@@ -673,6 +737,9 @@ void DemangleSymbol(const char* aSymbol, char* aBuffer, int aBufLen) {
 }  // namespace mozilla
 
 // {x86, ppc} x {Linux, Mac} stackwalking code.
+//
+// Changes to to OS/Architecture support here should be reflected in
+// build/moz.configure/memory.configure
 #  if ((defined(__i386) || defined(PPC) || defined(__ppc__)) && \
        (MOZ_STACKWALK_SUPPORTS_MACOSX || MOZ_STACKWALK_SUPPORTS_LINUX))
 

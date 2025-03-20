@@ -4205,6 +4205,16 @@ class BaseAssembler : public GenericAssembler {
                     base, index, scale, invalid_xmm, dst);
   }
 
+  void vpmovzxbd_rr(XMMRegisterID src, XMMRegisterID dst) {
+    threeByteOpSimd("vpmovzxbd", VEX_PD, OP3_PMOVZXBD_VdqWdq, ESCAPE_38, src,
+                    invalid_xmm, dst);
+  }
+
+  void vpmovzxbq_rr(XMMRegisterID src, XMMRegisterID dst) {
+    threeByteOpSimd("vpmovzxbq", VEX_PD, OP3_PMOVZXBQ_VdqWdq, ESCAPE_38, src,
+                    invalid_xmm, dst);
+  }
+
   void vpmovsxwd_rr(XMMRegisterID src, XMMRegisterID dst) {
     threeByteOpSimd("vpmovsxwd", VEX_PD, OP3_PMOVSXWD_VdqWdq, ESCAPE_38, src,
                     invalid_xmm, dst);
@@ -4231,6 +4241,11 @@ class BaseAssembler : public GenericAssembler {
                     int32_t scale, XMMRegisterID dst) {
     threeByteOpSimd("vpmovzxwd", VEX_PD, OP3_PMOVZXWD_VdqWdq, ESCAPE_38, offset,
                     base, index, scale, invalid_xmm, dst);
+  }
+
+  void vpmovzxwq_rr(XMMRegisterID src, XMMRegisterID dst) {
+    threeByteOpSimd("vpmovzxwq", VEX_PD, OP3_PMOVZXWQ_VdqWdq, ESCAPE_38, src,
+                    invalid_xmm, dst);
   }
 
   void vpmovsxdq_rr(XMMRegisterID src, XMMRegisterID dst) {

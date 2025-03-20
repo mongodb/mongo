@@ -7,17 +7,19 @@
 #ifndef jit_AtomicOp_h
 #define jit_AtomicOp_h
 
+#include <stdint.h>
+
 namespace js {
 namespace jit {
 
 // Types of atomic operation, shared by MIR and LIR.
 
-enum AtomicOp {
-  AtomicFetchAddOp,
-  AtomicFetchSubOp,
-  AtomicFetchAndOp,
-  AtomicFetchOrOp,
-  AtomicFetchXorOp
+enum class AtomicOp {
+  Add,
+  Sub,
+  And,
+  Or,
+  Xor,
 };
 
 // Memory barrier types, shared by MIR and LIR.
@@ -26,7 +28,7 @@ enum AtomicOp {
 // distinction (DSB vs DMB on ARM, SYNC vs parameterized SYNC on MIPS)
 // but there's been no reason to use it yet.
 
-enum MemoryBarrierBits {
+enum MemoryBarrierBits : uint8_t {
   MembarLoadLoad = 1,
   MembarLoadStore = 2,
   MembarStoreStore = 4,
@@ -41,16 +43,16 @@ enum MemoryBarrierBits {
 
 static inline constexpr MemoryBarrierBits operator|(MemoryBarrierBits a,
                                                     MemoryBarrierBits b) {
-  return MemoryBarrierBits(int(a) | int(b));
+  return MemoryBarrierBits(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
 
 static inline constexpr MemoryBarrierBits operator&(MemoryBarrierBits a,
                                                     MemoryBarrierBits b) {
-  return MemoryBarrierBits(int(a) & int(b));
+  return MemoryBarrierBits(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
 }
 
 static inline constexpr MemoryBarrierBits operator~(MemoryBarrierBits a) {
-  return MemoryBarrierBits(~int(a));
+  return MemoryBarrierBits(~static_cast<uint8_t>(a));
 }
 
 // Standard barrier bits for a full barrier.

@@ -91,7 +91,7 @@ struct StackMapHeader {
   // Add 16 words to account for the size of FrameWithInstances including any
   // shadow stack (at worst 8 words total), and then a little headroom in case
   // the argument area had to be aligned.
-  static_assert(FrameWithInstances::sizeOf() / sizeof(void*) <= 8);
+  static_assert(sizeof(FrameWithInstances) / sizeof(void*) <= 8);
   static_assert(maxFrameOffsetFromTop >=
                     (MaxParams * MaxParamSize / sizeof(void*)) + 16,
                 "limited size of the offset field");
@@ -103,22 +103,21 @@ WASM_DECLARE_CACHEABLE_POD(StackMapHeader);
 static_assert(sizeof(StackMapHeader) == 8,
               "wasm::StackMapHeader has unexpected size");
 
-// A StackMap is a bit-array containing numMappedWords bits, one bit per
-// word of stack.  Bit index zero is for the lowest addressed word in the
-// range.
+// A StackMap is a bit-array containing numMappedWords*2 bits, two bits per
+// word of stack. Index zero is for the lowest addressed word in the range.
 //
 // This is a variable-length structure whose size must be known at creation
 // time.
 //
 // Users of the map will know the address of the wasm::Frame that is covered
-// by this map.  In order that they can calculate the exact address range
+// by this map. In order that they can calculate the exact address range
 // covered by the map, the map also stores the offset, from the highest
-// addressed word of the map, of the embedded wasm::Frame.  This is an offset
+// addressed word of the map, of the embedded wasm::Frame. This is an offset
 // down from the highest address, rather than up from the lowest, so as to
 // limit its range to FrameOffsetBits bits.
 //
 // The stackmap may also cover a DebugFrame (all DebugFrames which may
-// potentially contain live pointers into the JS heap get a map).  If so that
+// potentially contain live pointers into the JS heap get a map). If so, that
 // can be noted, since users of the map need to trace pointers in a
 // DebugFrame.
 //
@@ -131,16 +130,27 @@ struct StackMap final {
   // bitmap that follows.
   StackMapHeader header;
 
+  enum Kind : uint32_t {
+    POD = 0,
+    AnyRef = 1,
+
+    // The data pointer for a WasmArrayObject, which may be an interior pointer
+    // to the object itself. See WasmArrayObject::inlineStorage.
+    ArrayDataPointer = 2,
+
+    Limit,
+  };
+
  private:
   // The variable-sized bitmap.
   uint32_t bitmap[1];
 
   explicit StackMap(uint32_t numMappedWords) : header(numMappedWords) {
-    const uint32_t nBitmap = calcNBitmap(header.numMappedWords);
+    const uint32_t nBitmap = calcBitmapNumElems(header.numMappedWords);
     memset(bitmap, 0, nBitmap * sizeof(bitmap[0]));
   }
   explicit StackMap(const StackMapHeader& header) : header(header) {
-    const uint32_t nBitmap = calcNBitmap(header.numMappedWords);
+    const uint32_t nBitmap = calcBitmapNumElems(header.numMappedWords);
     memset(bitmap, 0, nBitmap * sizeof(bitmap[0]));
   }
 
@@ -166,7 +176,7 @@ struct StackMap final {
 
   // Returns the size of a `StackMap` allocated with `numMappedWords`.
   static size_t allocationSizeInBytes(uint32_t numMappedWords) {
-    uint32_t nBitmap = calcNBitmap(numMappedWords);
+    uint32_t nBitmap = calcBitmapNumElems(numMappedWords);
     return sizeof(StackMap) + (nBitmap - 1) * sizeof(bitmap[0]);
   }
 
@@ -200,33 +210,39 @@ struct StackMap final {
     header.hasDebugFrameWithLiveRefs = 1;
   }
 
-  inline void setBit(uint32_t bitIndex) {
-    MOZ_ASSERT(bitIndex < header.numMappedWords);
-    uint32_t wordIndex = bitIndex / wordsPerBitmapElem;
-    uint32_t wordOffset = bitIndex % wordsPerBitmapElem;
-    bitmap[wordIndex] |= (1 << wordOffset);
+  inline void set(uint32_t index, Kind kind) {
+    MOZ_ASSERT(index < header.numMappedWords);
+    MOZ_ASSERT(kind < Kind::Limit);
+    uint32_t wordIndex = index / mappedWordsPerBitmapElem;
+    uint32_t wordOffset = index % mappedWordsPerBitmapElem * bitsPerMappedWord;
+    bitmap[wordIndex] |= (kind << wordOffset);
   }
 
-  inline uint32_t getBit(uint32_t bitIndex) const {
-    MOZ_ASSERT(bitIndex < header.numMappedWords);
-    uint32_t wordIndex = bitIndex / wordsPerBitmapElem;
-    uint32_t wordOffset = bitIndex % wordsPerBitmapElem;
-    return (bitmap[wordIndex] >> wordOffset) & 1;
+  inline Kind get(uint32_t index) const {
+    MOZ_ASSERT(index < header.numMappedWords);
+    uint32_t wordIndex = index / mappedWordsPerBitmapElem;
+    uint32_t wordOffset = index % mappedWordsPerBitmapElem * bitsPerMappedWord;
+    Kind result = Kind((bitmap[wordIndex] >> wordOffset) & valueMask);
+    return result;
   }
 
   inline uint8_t* rawBitmap() { return (uint8_t*)&bitmap; }
   inline const uint8_t* rawBitmap() const { return (const uint8_t*)&bitmap; }
   inline size_t rawBitmapLengthInBytes() const {
-    return calcNBitmap(header.numMappedWords) * sizeof(uint32_t);
+    return calcBitmapNumElems(header.numMappedWords) * sizeof(bitmap[0]);
   }
 
  private:
-  static constexpr uint32_t wordsPerBitmapElem = sizeof(bitmap[0]) * 8;
+  static constexpr uint32_t bitsPerMappedWord = 2;
+  static constexpr uint32_t mappedWordsPerBitmapElem =
+      sizeof(bitmap[0]) * CHAR_BIT / bitsPerMappedWord;
+  static constexpr uint32_t valueMask = js::BitMask(bitsPerMappedWord);
+  static_assert(8 % bitsPerMappedWord == 0);
+  static_assert(Kind::Limit - 1 <= valueMask);
 
-  static uint32_t calcNBitmap(uint32_t numMappedWords) {
+  static uint32_t calcBitmapNumElems(uint32_t numMappedWords) {
     MOZ_RELEASE_ASSERT(numMappedWords <= StackMapHeader::maxMappedWords);
-    uint32_t nBitmap =
-        (numMappedWords + wordsPerBitmapElem - 1) / wordsPerBitmapElem;
+    uint32_t nBitmap = js::HowMany(numMappedWords, mappedWordsPerBitmapElem);
     return nBitmap == 0 ? 1 : nBitmap;
   }
 };
@@ -324,6 +340,10 @@ class StackMaps {
 
     return nullptr;
   }
+
+  size_t sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
+    return mapping_.sizeOfExcludingThis(mallocSizeOf);
+  }
 };
 
 // Supporting code for creation of stackmaps.
@@ -379,14 +399,6 @@ static inline size_t StackArgAreaSizeUnaligned(
 static inline size_t AlignStackArgAreaSize(size_t unalignedSize) {
   return AlignBytes(unalignedSize, jit::WasmStackAlignment);
 }
-
-// A stackmap creation helper.  Create a stackmap from a vector of booleans.
-// The caller owns the resulting stackmap.
-
-using StackMapBoolVector = Vector<bool, 128, SystemAllocPolicy>;
-
-wasm::StackMap* ConvertStackMapBoolVectorToStackMap(
-    const StackMapBoolVector& vec, bool hasRefs);
 
 // Generate a stackmap for a function's stack-overflow-at-entry trap, with
 // the structure:
@@ -452,10 +464,9 @@ wasm::StackMap* ConvertStackMapBoolVectorToStackMap(
 // a null pointer exception will be emitted. This will only catch a null access
 // due to an incremental GC being in progress, the write that follows this
 // pre-barrier guard must also be guarded against null.
-
+template <class Addr>
 void EmitWasmPreBarrierGuard(jit::MacroAssembler& masm, Register instance,
-                             Register scratch, Register valueAddr,
-                             size_t valueOffset, Label* skipBarrier,
+                             Register scratch, Addr addr, Label* skipBarrier,
                              BytecodeOffset* trapOffset);
 
 // Before storing a GC pointer value in memory, call out-of-line prebarrier
@@ -465,10 +476,16 @@ void EmitWasmPreBarrierGuard(jit::MacroAssembler& masm, Register instance,
 // `scratch`.
 //
 // It is OK for `instance` and `scratch` to be the same register.
-
-void EmitWasmPreBarrierCall(jit::MacroAssembler& masm, Register instance,
-                            Register scratch, Register valueAddr,
-                            size_t valueOffset);
+void EmitWasmPreBarrierCallImmediate(jit::MacroAssembler& masm,
+                                     Register instance, Register scratch,
+                                     Register valueAddr, size_t valueOffset);
+// The equivalent of EmitWasmPreBarrierCallImmediate, but for a jit::BaseIndex.
+// Will clobber `scratch1` and `scratch2`.
+//
+// It is OK for `instance` and `scratch1` to be the same register.
+void EmitWasmPreBarrierCallIndex(jit::MacroAssembler& masm, Register instance,
+                                 Register scratch1, Register scratch2,
+                                 jit::BaseIndex addr);
 
 // After storing a GC pointer value in memory, skip to `skipBarrier` if a
 // postbarrier is not needed.  If the location being set is in an heap-allocated
@@ -484,9 +501,14 @@ void EmitWasmPostBarrierGuard(jit::MacroAssembler& masm,
                               Label* skipBarrier);
 
 #ifdef DEBUG
-// Check whether |nextPC| is a valid code address for a stackmap created by
-// this compiler.
-bool IsValidStackMapKey(bool debugEnabled, const uint8_t* nextPC);
+// Check (approximately) whether `nextPC` is a valid code address for a
+// stackmap created by this compiler.  This is done by examining the
+// instruction at `nextPC`.  The matching is inexact, so it may err on the
+// side of returning `true` if it doesn't know.  Doing so reduces the
+// effectiveness of the MOZ_ASSERTs that use this function, so at least for
+// the four primary platforms we should keep it as exact as possible.
+
+bool IsPlausibleStackMapKey(const uint8_t* nextPC);
 #endif
 
 }  // namespace wasm

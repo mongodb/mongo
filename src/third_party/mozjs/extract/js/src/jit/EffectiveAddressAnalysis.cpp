@@ -205,7 +205,7 @@ void EffectiveAddressAnalysis::analyzeAsmJSHeapAccess(AsmJSMemoryAccess* ins) {
     int32_t imm = base->toConstant()->toInt32();
     if (imm >= 0) {
       int32_t end = (uint32_t)imm + ins->byteSize();
-      if (end >= imm && (uint32_t)end <= mir_->minWasmHeapLength()) {
+      if (end >= imm && (uint32_t)end <= mir_->minWasmMemory0Length()) {
         ins->removeBoundsCheck();
       }
     }

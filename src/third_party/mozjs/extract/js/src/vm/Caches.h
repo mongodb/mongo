@@ -20,31 +20,10 @@
 #include "js/TypeDecls.h"
 #include "vm/JSScript.h"
 #include "vm/Shape.h"
-#include "vm/StencilCache.h"  // js::StencilCache
+#include "vm/StencilCache.h"  // js::DelazificationCache
 #include "vm/StringType.h"
 
 namespace js {
-
-class SrcNote;
-
-/*
- * GetSrcNote cache to avoid O(n^2) growth in finding a source note for a
- * given pc in a script. We use the script->code pointer to tag the cache,
- * instead of the script address itself, so that source notes are always found
- * by offset from the bytecode with which they were generated.
- */
-struct GSNCache {
-  typedef HashMap<jsbytecode*, const SrcNote*, PointerHasher<jsbytecode*>,
-                  SystemAllocPolicy>
-      Map;
-
-  jsbytecode* code;
-  Map map;
-
-  GSNCache() : code(nullptr) {}
-
-  void purge();
-};
 
 struct EvalCacheEntry {
   JSLinearString* str;
@@ -64,10 +43,15 @@ struct EvalCacheEntry {
 };
 
 struct EvalCacheLookup {
-  explicit EvalCacheLookup(JSContext* cx) : str(cx), callerScript(cx) {}
-  Rooted<JSLinearString*> str;
-  RootedScript callerScript;
-  MOZ_INIT_OUTSIDE_CTOR jsbytecode* pc;
+  JSLinearString* str = nullptr;
+  JSScript* callerScript = nullptr;
+  MOZ_INIT_OUTSIDE_CTOR jsbytecode* pc = nullptr;
+
+  EvalCacheLookup() = default;
+  EvalCacheLookup(JSLinearString* str, JSScript* callerScript, jsbytecode* pc)
+      : str(str), callerScript(callerScript), pc(pc) {}
+
+  void trace(JSTracer* trc);
 };
 
 struct EvalCacheHashPolicy {
@@ -516,7 +500,6 @@ class RuntimeCaches {
  public:
   MegamorphicCache megamorphicCache;
   UniquePtr<MegamorphicSetPropCache> megamorphicSetPropCache;
-  GSNCache gsnCache;
   UncompressedSourceCache uncompressedSourceCache;
   EvalCache evalCache;
   StringToAtomCache stringToAtomCache;
@@ -525,15 +508,6 @@ class RuntimeCaches {
   // delazification to quickly resolve NameLocation of bindings without linearly
   // iterating over the list of bindings.
   frontend::RuntimeScopeBindingCache scopeCache;
-
-  // This cache is used to store the result of delazification compilations which
-  // might be happening off-thread. The main-thread will concurrently read the
-  // content of this cache to avoid delazification, or fallback on running the
-  // delazification on the main-thread.
-  //
-  // Main-thread results are not stored in the StencilCache as there is no other
-  // consumer.
-  StencilCache delazificationCache;
 
   void sweepAfterMinorGC(JSTracer* trc) { evalCache.traceWeak(trc); }
 #ifdef JSGC_HASH_TABLE_CHECKS
@@ -553,11 +527,13 @@ class RuntimeCaches {
     scopeCache.purge();
   }
 
-  void purgeStencils() { delazificationCache.clearAndDisable(); }
+  void purgeStencils() {
+    DelazificationCache& cache = DelazificationCache::getSingleton();
+    cache.clearAndDisable();
+  }
 
   void purge() {
     purgeForCompaction();
-    gsnCache.purge();
     uncompressedSourceCache.purge();
     purgeStencils();
   }

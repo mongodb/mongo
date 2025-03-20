@@ -19,7 +19,6 @@
 #include "vm/GlobalObject.h"
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/BooleanObject-inl.h"
 
@@ -101,9 +100,9 @@ static bool bool_valueOf(JSContext* cx, unsigned argc, Value* vp) {
 }
 
 static const JSFunctionSpec boolean_methods[] = {
-    JS_FN(js_toSource_str, bool_toSource, 0, 0),
-    JS_FN(js_toString_str, bool_toString, 0, 0),
-    JS_FN(js_valueOf_str, bool_valueOf, 0, 0), JS_FS_END};
+    JS_FN("toSource", bool_toSource, 0, 0),
+    JS_FN("toString", bool_toString, 0, 0),
+    JS_FN("valueOf", bool_valueOf, 0, 0), JS_FS_END};
 
 // ES2020 draft rev ecb4178012d6b4d9abc13fcbd45f5c6394b832ce
 // 19.3.1.1 Boolean ( value )

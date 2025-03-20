@@ -81,99 +81,6 @@ namespace wasm {
 
 struct ImportValues;
 
-// Return whether WebAssembly can in principle be compiled on this platform (ie
-// combination of hardware and OS), assuming at least one of the compilers that
-// supports the platform is not disabled by other settings.
-//
-// This predicate must be checked and must be true to call any of the top-level
-// wasm eval/compile methods.
-
-bool HasPlatformSupport(JSContext* cx);
-
-// Return whether WebAssembly is supported on this platform. This determines
-// whether the WebAssembly object is exposed to JS in this context / realm and
-//
-// It does *not* guarantee that a compiler is actually available; that has to be
-// checked separately, as it is sometimes run-time variant, depending on whether
-// a debugger has been created or not.
-
-bool HasSupport(JSContext* cx);
-
-// Predicates for compiler availability.
-//
-// These three predicates together select zero or one baseline compiler and zero
-// or one optimizing compiler, based on: what's compiled into the executable,
-// what's supported on the current platform, what's selected by options, and the
-// current run-time environment.  As it is possible for the computed values to
-// change (when a value changes in about:config or the debugger pane is shown or
-// hidden), it is inadvisable to cache these values in such a way that they
-// could become invalid.  Generally it is cheap always to recompute them.
-
-bool BaselineAvailable(JSContext* cx);
-bool IonAvailable(JSContext* cx);
-
-// Test all three.
-
-bool AnyCompilerAvailable(JSContext* cx);
-
-// Asm.JS is translated to wasm and then compiled using the wasm optimizing
-// compiler; test whether this compiler is available.
-
-bool WasmCompilerForAsmJSAvailable(JSContext* cx);
-
-// Predicates for white-box compiler disablement testing.
-//
-// These predicates determine whether the optimizing compilers were disabled by
-// features that are enabled at compile-time or run-time.  They do not consider
-// the hardware platform on whether other compilers are enabled.
-//
-// If `reason` is not null then it is populated with a string that describes
-// the specific features that disable the compiler.
-//
-// Returns false on OOM (which happens only when a reason is requested),
-// otherwise true, with the result in `*isDisabled` and optionally the reason in
-// `*reason`.
-
-bool BaselineDisabledByFeatures(JSContext* cx, bool* isDisabled,
-                                JSStringBuilder* reason = nullptr);
-bool IonDisabledByFeatures(JSContext* cx, bool* isDisabled,
-                           JSStringBuilder* reason = nullptr);
-
-// Predicates for feature availability.
-//
-// The following predicates check whether particular wasm features are enabled,
-// and for each, whether at least one compiler is (currently) available that
-// supports the feature.
-
-// Streaming compilation.
-bool StreamingCompilationAvailable(JSContext* cx);
-
-// Caching of optimized code.  Implies both streaming compilation and an
-// optimizing compiler tier.
-bool CodeCachingAvailable(JSContext* cx);
-
-// Shared memory and atomics.
-bool ThreadsAvailable(JSContext* cx);
-
-#define WASM_FEATURE(NAME, ...) bool NAME##Available(JSContext* cx);
-JS_FOR_WASM_FEATURES(WASM_FEATURE, WASM_FEATURE, WASM_FEATURE)
-#undef WASM_FEATURE
-
-// SIMD operations.
-bool SimdAvailable(JSContext* cx);
-
-// Privileged content that can access experimental intrinsics
-bool IsSimdPrivilegedContext(JSContext* cx);
-
-#if defined(ENABLE_WASM_SIMD) && defined(DEBUG)
-// Report the result of a Simd simplification to the testing infrastructure.
-void ReportSimdAnalysis(const char* data);
-#endif
-
-// Returns true if WebAssembly as configured by compile-time flags and run-time
-// options can support try/catch, throw, rethrow, and branch_on_exn (evolving).
-bool ExceptionsAvailable(JSContext* cx);
-
 // Compiles the given binary wasm module given the ArrayBufferObject
 // and links the module's imports with the given import object.
 
@@ -253,10 +160,6 @@ class WasmModuleObject : public NativeObject {
 // module exports a global twice, the two exported WasmGlobalObjects are the
 // same.
 
-// TODO/AnyRef-boxing: With boxed immediates and strings, JSObject* is no longer
-// the most appropriate representation for Cell::anyref.
-STATIC_ASSERT_ANYREF_IS_JSOBJECT;
-
 class WasmGlobalObject : public NativeObject {
   static const unsigned MUTABLE_SLOT = 0;
   static const unsigned VAL_SLOT = 1;
@@ -274,6 +177,8 @@ class WasmGlobalObject : public NativeObject {
   static bool valueSetterImpl(JSContext* cx, const CallArgs& args);
   static bool valueSetter(JSContext* cx, unsigned argc, Value* vp);
 
+  wasm::GCPtrVal& mutableVal();
+
  public:
   static const unsigned RESERVED_SLOTS = 2;
   static const JSClass class_;
@@ -289,7 +194,9 @@ class WasmGlobalObject : public NativeObject {
 
   bool isMutable() const;
   wasm::ValType type() const;
-  wasm::GCPtrVal& val() const;
+  const wasm::GCPtrVal& val() const;
+  void setVal(wasm::HandleVal value);
+  void* addressOfCell() const;
 };
 
 // The class of WebAssembly.Instance. Each WasmInstanceObject owns a
@@ -336,8 +243,8 @@ class WasmInstanceObject : public NativeObject {
   static WasmInstanceObject* create(
       JSContext* cx, const RefPtr<const wasm::Code>& code,
       const wasm::DataSegmentVector& dataSegments,
-      const wasm::ElemSegmentVector& elemSegments, uint32_t instanceDataLength,
-      Handle<WasmMemoryObject*> memory,
+      const wasm::ModuleElemSegmentVector& elemSegments,
+      uint32_t instanceDataLength, Handle<WasmMemoryObjectVector> memories,
       Vector<RefPtr<wasm::Table>, 0, SystemAllocPolicy>&& tables,
       const JSObjectVector& funcImports, const wasm::GlobalDescVector& globals,
       const wasm::ValVector& globalImportValues,
@@ -546,10 +453,13 @@ class WasmExceptionObject : public NativeObject {
   static bool getStack_impl(JSContext* cx, const CallArgs& args);
 
   uint8_t* typedMem() const;
-  [[nodiscard]] bool loadValue(JSContext* cx, size_t offset, wasm::ValType type,
-                               MutableHandleValue vp);
-  [[nodiscard]] bool initValue(JSContext* cx, size_t offset, wasm::ValType type,
-                               HandleValue value);
+  [[nodiscard]] bool loadArg(JSContext* cx, size_t offset, wasm::ValType type,
+                             MutableHandleValue vp) const;
+  [[nodiscard]] bool initArg(JSContext* cx, size_t offset, wasm::ValType type,
+                             HandleValue value);
+
+  void initRefArg(size_t offset, wasm::AnyRef ref);
+  wasm::AnyRef loadRefArg(size_t offset) const;
 
  public:
   static const unsigned RESERVED_SLOTS = 4;
@@ -562,11 +472,15 @@ class WasmExceptionObject : public NativeObject {
 
   static WasmExceptionObject* create(JSContext* cx, Handle<WasmTagObject*> tag,
                                      HandleObject stack, HandleObject proto);
+  static WasmExceptionObject* wrapJSValue(JSContext* cx, HandleValue value);
   bool isNewborn() const;
 
   JSObject* stack() const;
   const wasm::TagType* tagType() const;
   WasmTagObject& tag() const;
+
+  bool isWrappedJSValue() const;
+  Value wrappedJSValue() const;
 
   static size_t offsetOfData() {
     return NativeObject::getFixedSlotOffset(DATA_SLOT);
@@ -578,12 +492,49 @@ class WasmExceptionObject : public NativeObject {
 class WasmNamespaceObject : public NativeObject {
  public:
   static const JSClass class_;
+  static const unsigned JS_VALUE_TAG_SLOT = 0;
+  static const unsigned RESERVED_SLOTS = 1;
+
+  WasmTagObject* wrappedJSValueTag() const {
+    return &getReservedSlot(JS_VALUE_TAG_SLOT)
+                .toObjectOrNull()
+                ->as<WasmTagObject>();
+  }
+  void setWrappedJSValueTag(WasmTagObject* tag) {
+    return setReservedSlot(JS_VALUE_TAG_SLOT, ObjectValue(*tag));
+  }
+
+  static WasmNamespaceObject* getOrCreate(JSContext* cx);
 
  private:
   static const ClassSpec classSpec_;
 };
 
 extern const JSClass WasmFunctionClass;
+
+bool IsWasmSuspendingObject(JSObject* obj);
+
+#ifdef ENABLE_WASM_JSPI
+
+class WasmSuspendingObject : public NativeObject {
+ public:
+  static const ClassSpec classSpec_;
+  static const JSClass class_;
+  static const JSClass& protoClass_;
+  static const unsigned WRAPPED_FN_SLOT = 0;
+  static const unsigned RESERVED_SLOTS = 1;
+  static bool construct(JSContext*, unsigned, Value*);
+
+  JSObject* wrappedFunction() const {
+    return getReservedSlot(WRAPPED_FN_SLOT).toObjectOrNull();
+  }
+  void setWrappedFunction(HandleObject fn) {
+    return setReservedSlot(WRAPPED_FN_SLOT, ObjectValue(*fn));
+  }
+};
+
+JSObject* MaybeUnwrapSuspendingObject(JSObject* wrapper);
+#endif
 
 }  // namespace js
 

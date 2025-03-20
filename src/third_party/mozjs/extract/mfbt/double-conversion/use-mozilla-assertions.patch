@@ -1,6 +1,6 @@
-diff --git a/mfbt/double-conversion/double-conversion/utils.h b/mfbt/double-conversion/double-conversion/utils.h
---- a/mfbt/double-conversion/double-conversion/utils.h
-+++ b/mfbt/double-conversion/double-conversion/utils.h
+diff --git a/double-conversion/utils.h b/double-conversion/utils.h
+--- a/double-conversion/utils.h
++++ b/double-conversion/utils.h
 @@ -36,27 +36,29 @@
  
  // For pre-C++11 compatibility

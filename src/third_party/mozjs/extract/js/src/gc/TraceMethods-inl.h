@@ -30,6 +30,9 @@
 #include "vm/SymbolType.h"
 #include "wasm/WasmJS.h"
 
+#include "gc/Marking-inl.h"
+#include "vm/StringType-inl.h"
+
 inline void js::BaseScript::traceChildren(JSTracer* trc) {
   TraceNullableEdge(trc, &function_, "function");
   TraceEdge(trc, &sourceObject_, "sourceObject");
@@ -76,6 +79,20 @@ inline void JSString::traceChildren(JSTracer* trc) {
     asRope().traceChildren(trc);
   }
 }
+inline void JSString::traceBaseFromStoreBuffer(JSTracer* trc) {
+  MOZ_ASSERT(!d.s.u3.base->isTenured());
+
+  // Contract the base chain so that this tenured dependent string points
+  // directly at the root base that owns its chars.
+  JSLinearString* root = asDependent().rootBaseDuringMinorGC();
+  d.s.u3.base = root;
+  if (!root->isTenured()) {
+    js::TraceManuallyBarrieredEdge(trc, &root, "base");
+    // Do not update the actual base to the tenured string yet. This string will
+    // need to be swept in order to update its chars ptr to be relative to the
+    // root, and that update requires information from the overlay.
+  }
+}
 template <uint32_t opts>
 void js::GCMarker::eagerlyMarkChildren(JSString* str) {
   if (str->isLinear()) {
@@ -108,7 +125,6 @@ void js::GCMarker::eagerlyMarkChildren(JSLinearString* linearStr) {
     }
 
     MOZ_ASSERT(linearStr->JSString::isLinear());
-    MOZ_ASSERT(!linearStr->isPermanentAtom());
     gc::AssertShouldMarkInZone(this, linearStr);
     if (!mark<opts>(static_cast<JSString*>(linearStr))) {
       break;

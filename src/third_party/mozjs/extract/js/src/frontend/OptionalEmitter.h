@@ -127,7 +127,7 @@ struct BytecodeEmitter;
 //
 //   `(a?b)();`
 //     OptionalEmitter oe(this);
-//     CallOrNewEmitter cone(this, JSOP_CALL,
+//     CallOrNewEmitter cone(this, JSOp::Call,
 //                           CallOrNewEmitter::ArgumentsKind::Other,
 //                           ValueUsage::WantValue);
 //     cone.prepareForFunctionCallee();

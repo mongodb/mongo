@@ -52,7 +52,7 @@ class IonIC;
 // Note: These are arranged in order of descending alignment requirements to
 // avoid the need for padding. The `runtimeData` uses uint64_t alignement due to
 // its use of mozilla::AlignedStorage2.
-class alignas(8) IonScript final : public TrailingArray {
+class alignas(8) IonScript final : public TrailingArray<IonScript> {
  private:
   // Offset (in bytes) from `this` to the start of each trailing array. Each
   // array ends where following one begins. There is no implicit padding (except
@@ -105,6 +105,11 @@ class alignas(8) IonScript final : public TrailingArray {
 
   // Flag set if IonScript was compiled with profiling enabled.
   bool hasProfilingInstrumentation_ = false;
+
+  // If true, this IonScript was active on the stack when we discarded JIT code
+  // and inactive ICScripts. This means we should use the generic ICScripts for
+  // inlined functions when we bail out.
+  bool purgedICScripts_ = false;
 
   // Number of bytes this function reserves on the stack for slots spilled by
   // the register allocator.
@@ -276,6 +281,7 @@ class alignas(8) IonScript final : public TrailingArray {
   static void Destroy(JS::GCContext* gcx, IonScript* script);
 
   void trace(JSTracer* trc);
+  void traceWeak(JSTracer* trc);
 
   static inline size_t offsetOfInvalidationCount() {
     return offsetof(IonScript, invalidationCount_);
@@ -321,6 +327,8 @@ class alignas(8) IonScript final : public TrailingArray {
     return invalidateEpilogueDataOffset_;
   }
 
+  uint32_t numFixableBailouts() const { return numFixableBailouts_; }
+
   void incNumFixableBailouts() { numFixableBailouts_++; }
   void resetNumFixableBailouts() { numFixableBailouts_ = 0; }
   void incNumUnfixableBailouts() { numUnfixableBailouts_++; }
@@ -351,6 +359,9 @@ class alignas(8) IonScript final : public TrailingArray {
   bool hasProfilingInstrumentation() const {
     return hasProfilingInstrumentation_;
   }
+
+  bool purgedICScripts() const { return purgedICScripts_; }
+  void notePurgedICScripts() { purgedICScripts_ = true; }
 
   size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
     return mallocSizeOf(this);

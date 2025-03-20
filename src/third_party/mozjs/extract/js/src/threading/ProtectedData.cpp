@@ -19,8 +19,7 @@ namespace js {
 template <AllowedHelperThread Helper>
 static inline bool OnHelperThread() {
   if (Helper == AllowedHelperThread::IonCompile ||
-      Helper == AllowedHelperThread::GCTaskOrIonCompile ||
-      Helper == AllowedHelperThread::ParseTaskOrIonCompile) {
+      Helper == AllowedHelperThread::GCTaskOrIonCompile) {
     if (CurrentThreadIsIonCompiling()) {
       return true;
     }
@@ -33,21 +32,13 @@ static inline bool OnHelperThread() {
     }
   }
 
-  if (Helper == AllowedHelperThread::ParseTask ||
-      Helper == AllowedHelperThread::ParseTaskOrIonCompile) {
-    if (CurrentThreadIsParseThread()) {
-      return true;
-    }
-  }
-
   return false;
 }
 
 void CheckThreadLocal::check() const {
   JSContext* cx = TlsContext.get();
   MOZ_ASSERT(cx);
-  MOZ_ASSERT_IF(cx->isMainThreadContext(),
-                CurrentThreadCanAccessRuntime(cx->runtime()));
+  MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
   MOZ_ASSERT(id == ThreadId::ThisThreadId());
 }
 
@@ -58,8 +49,7 @@ void CheckContextLocal::check() const {
 
   JSContext* cx = TlsContext.get();
   MOZ_ASSERT(cx);
-  MOZ_ASSERT_IF(cx->isMainThreadContext(),
-                CurrentThreadCanAccessRuntime(cx->runtime()));
+  MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
   MOZ_ASSERT(cx_ == cx);
 }
 
@@ -75,9 +65,8 @@ void CheckMainThread<Helper>::check() const {
 
 template class CheckMainThread<AllowedHelperThread::None>;
 template class CheckMainThread<AllowedHelperThread::GCTask>;
-template class CheckMainThread<AllowedHelperThread::ParseTask>;
 template class CheckMainThread<AllowedHelperThread::IonCompile>;
-template class CheckMainThread<AllowedHelperThread::ParseTaskOrIonCompile>;
+template class CheckMainThread<AllowedHelperThread::GCTaskOrIonCompile>;
 
 template <GlobalLock Lock, AllowedHelperThread Helper>
 void CheckGlobalLock<Lock, Helper>::check() const {

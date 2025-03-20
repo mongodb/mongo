@@ -23,6 +23,7 @@
 #include <stdint.h>
 
 #include "jit/AtomicOperationsGenerated.h"
+#include "vm/Float16.h"
 #include "vm/Uint8Clamped.h"
 
 namespace js {
@@ -405,6 +406,14 @@ inline uint8_clamped js::jit::AtomicOperations::loadSafeWhenRacy(
   return uint8_clamped(loadSafeWhenRacy((uint8_t*)addr));
 }
 
+// Clang requires a specialization for float16.
+template <>
+inline float16 js::jit::AtomicOperations::loadSafeWhenRacy(float16* addr) {
+  float16 f16;
+  f16.val = loadSafeWhenRacy((uint16_t*)addr);
+  return f16;
+}
+
 }  // namespace jit
 }  // namespace js
 
@@ -462,6 +471,13 @@ template <>
 inline void js::jit::AtomicOperations::storeSafeWhenRacy(uint8_clamped* addr,
                                                          uint8_clamped val) {
   storeSafeWhenRacy((uint8_t*)addr, (uint8_t)val);
+}
+
+// Clang requires a specialization for float16.
+template <>
+inline void js::jit::AtomicOperations::storeSafeWhenRacy(float16* addr,
+                                                         float16 val) {
+  storeSafeWhenRacy((uint16_t*)addr, val.val);
 }
 
 }  // namespace jit

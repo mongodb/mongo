@@ -1,0 +1,55 @@
+#define MOZ_UNIFIED_BUILD
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmMemory.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmMemory.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmMemory.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmModule.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmModule.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmModule.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmModuleTypes.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmModuleTypes.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmModuleTypes.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmOpIter.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmOpIter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmOpIter.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmPI.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmPI.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmPI.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmProcess.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmProcess.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/wasm/WasmProcess.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif

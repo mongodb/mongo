@@ -162,8 +162,26 @@ class SparseBitmap {
   void bitwiseOrWith(const SparseBitmap& other);
   void bitwiseOrInto(DenseBitmap& other) const;
 
-  // Currently, this API only supports a range of words that is in a single bit
-  // block.
+  // Currently, the following APIs only supports a range of words that is in a
+  // single bit block.
+
+  template <typename T>
+  typename std::enable_if_t<std::is_convertible_v<T, uintptr_t>, void>
+  bitwiseAndRangeWith(size_t wordStart, size_t numWords, T* source) {
+    size_t blockWord = blockStartWord(wordStart);
+
+    // We only support using a single bit block in this API.
+    MOZ_ASSERT(numWords &&
+               (blockWord == blockStartWord(wordStart + numWords - 1)));
+
+    BitBlock* block = getBlock(blockWord / WordsInBlock);
+    if (block) {
+      for (size_t i = 0; i < numWords; i++) {
+        (*block)[wordStart - blockWord + i] &= source[i];
+      }
+    }
+  }
+
   template <typename T>
   typename std::enable_if_t<std::is_convertible_v<T, uintptr_t>, void>
   bitwiseOrRangeInto(size_t wordStart, size_t numWords, T* target) const {

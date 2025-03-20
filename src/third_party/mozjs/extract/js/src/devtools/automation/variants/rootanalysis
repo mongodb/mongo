@@ -4,6 +4,7 @@
     "debug": true,
     "env": {
         "JS_GC_ZEAL": "GenerationalGC",
-        "JSTESTS_EXTRA_ARGS": "--jitflags=debug"
+        "JITTEST_EXTRA_ARGS": "--args='--gc-param=semispaceNurseryEnabled=1'",
+        "JSTESTS_EXTRA_ARGS": "--jitflags=debug --args='--gc-param=semispaceNurseryEnabled=1'"
     }
 }

@@ -1,0 +1,55 @@
+#define MOZ_UNIFIED_BUILD
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/EmitterScope.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/EmitterScope.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/EmitterScope.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ExpressionStatementEmitter.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ExpressionStatementEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ExpressionStatementEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/FoldConstants.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/FoldConstants.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/FoldConstants.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForInEmitter.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForInEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForInEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForOfEmitter.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForOfEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForOfEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForOfLoopControl.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForOfLoopControl.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/frontend/ForOfLoopControl.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif

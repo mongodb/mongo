@@ -447,23 +447,26 @@
     NoCheck, 16 * 1024 * 1024)                                                 \
                                                                                \
   /*                                                                           \
-   * JSGC_NURSERY_FREE_THRESHOLD_FOR_IDLE_COLLECTION                           \
-   * JSGC_NURSERY_FREE_THRESHOLD_FOR_IDLE_COLLECTION_FRACTION                  \
-   * JSGC_NURSERY_TIMEOUT_FOR_IDLE_COLLECTION_MS                               \
+   * JSGC_NURSERY_EAGER_COLLECTION_THRESHOLD_KB                                \
+   * JSGC_NURSERY_EAGER_COLLECTION_THRESHOLD_PERCENT                           \
+   * JSGC_NURSERY_EAGER_COLLECTION_TIMEOUT_MS                                  \
    *                                                                           \
-   * Attempt to run a minor GC in the idle time if the free space falls below  \
-   * this threshold or if it hasn't been collected for too long. The absolute  \
-   * threshold is used when the nursery is large and the percentage when it is \
-   * small. See Nursery::shouldCollect().                                      \
+   * JS::MaybeRunNurseryCollection will run a minor GC if the free space falls \
+   * below a threshold or if it hasn't been collected for too long.            \
+   *                                                                           \
+   * To avoid making this too eager, two thresholds must be met. The free      \
+   * space must fall below a size threshold and the fraction of free space     \
+   * remaining must also fall below a threshold.                               \
+   *                                                                           \
+   * See Nursery::wantEagerCollection() for more details.                      \
    */                                                                          \
-  _(JSGC_NURSERY_FREE_THRESHOLD_FOR_IDLE_COLLECTION, size_t,                   \
-    nurseryFreeThresholdForIdleCollection, ConvertSize, NoCheck,               \
-    ChunkSize / 4)                                                             \
-  _(JSGC_NURSERY_FREE_THRESHOLD_FOR_IDLE_COLLECTION_PERCENT, double,           \
-    nurseryFreeThresholdForIdleCollectionFraction, ConvertTimes100,            \
+  _(JSGC_NURSERY_EAGER_COLLECTION_THRESHOLD_KB, size_t,                        \
+    nurseryEagerCollectionThresholdBytes, ConvertKB, NoCheck, ChunkSize / 4)   \
+  _(JSGC_NURSERY_EAGER_COLLECTION_THRESHOLD_PERCENT, double,                   \
+    nurseryEagerCollectionThresholdPercent, ConvertTimes100,                   \
     CheckNonZeroUnitRange, 0.25)                                               \
-  _(JSGC_NURSERY_TIMEOUT_FOR_IDLE_COLLECTION_MS, mozilla::TimeDuration,        \
-    nurseryTimeoutForIdleCollection, ConvertMillis, NoCheck,                   \
+  _(JSGC_NURSERY_EAGER_COLLECTION_TIMEOUT_MS, mozilla::TimeDuration,           \
+    nurseryEagerCollectionTimeout, ConvertMillis, NoCheck,                     \
     mozilla::TimeDuration::FromSeconds(5))                                     \
                                                                                \
   /*                                                                           \
@@ -476,36 +479,6 @@
     50.0)                                                                      \
                                                                                \
   /*                                                                           \
-   * JSGC_PRETENURE_THRESHOLD                                                  \
-   *                                                                           \
-   * Fraction of objects tenured to trigger pretenuring (between 0 and 1). If  \
-   * this fraction is met, the GC proceeds to calculate which objects will be  \
-   * tenured. If this is 1.0f (actually if it is not < 1.0f) then pretenuring  \
-   * is disabled.                                                              \
-   */                                                                          \
-  _(JSGC_PRETENURE_THRESHOLD, double, pretenureThreshold, ConvertTimes100,     \
-    CheckNonZeroUnitRange, 0.6)                                                \
-                                                                               \
-  /*                                                                           \
-   * JSGC_PRETENURE_STRING_THRESHOLD                                           \
-   *                                                                           \
-   * If the percentage of the tenured strings exceeds this threshold, string   \
-   * will be allocated in tenured heap instead. (Default is allocated in       \
-   * nursery.)                                                                 \
-   */                                                                          \
-  _(JSGC_PRETENURE_STRING_THRESHOLD, double, pretenureStringThreshold,         \
-    ConvertTimes100, CheckNonZeroUnitRange, 0.55)                              \
-                                                                               \
-  /*                                                                           \
-   * JSGC_STOP_PRETENURE_STRING_THRESHOLD                                      \
-   *                                                                           \
-   * If the finalization rate of the tenured strings exceeds this threshold,   \
-   * string will be allocated in nursery.                                      \
-   */                                                                          \
-  _(JSGC_STOP_PRETENURE_STRING_THRESHOLD, double,                              \
-    stopPretenureStringThreshold, ConvertTimes100, CheckNonZeroUnitRange, 0.9) \
-                                                                               \
-  /*                                                                           \
    * JSGC_MIN_LAST_DITCH_GC_PERIOD                                             \
    *                                                                           \
    * Last ditch GC is skipped if allocation failure occurs less than this many \
@@ -516,10 +489,16 @@
     TimeDuration::FromSeconds(60))                                             \
                                                                                \
   /*                                                                           \
-   * JSGC_PARALLEL_MARKING_THRESHOLD_KB                                        \
+   * JSGC_PARALLEL_MARKING_THRESHOLD_MB                                        \
    */                                                                          \
-  _(JSGC_PARALLEL_MARKING_THRESHOLD_KB, size_t, parallelMarkingThresholdBytes, \
-    ConvertKB, NoCheck, 10 * 1024 * 1024)
+  _(JSGC_PARALLEL_MARKING_THRESHOLD_MB, size_t, parallelMarkingThresholdBytes, \
+    ConvertMB, NoCheck, 4 * 1024 * 1024)                                       \
+                                                                               \
+  /*                                                                           \
+   * JSGC_GENERATE_MISSING_ALLOC_SITES                                         \
+   */                                                                          \
+  _(JSGC_GENERATE_MISSING_ALLOC_SITES, bool, generateMissingAllocSites,        \
+    ConvertBool, NoCheck, false)
 
 namespace js {
 
@@ -563,11 +542,17 @@ static const bool ParallelMarkingEnabled = false;
 /* JSGC_INCREMENTAL_WEAKMAP_ENABLED */
 static const bool IncrementalWeakMapMarkingEnabled = true;
 
+/* JSGC_SEMISPACE_NURSERY_ENABLED */
+static const bool SemispaceNurseryEnabled = false;
+
 /* JSGC_HELPER_THREAD_RATIO */
 static const double HelperThreadRatio = 0.5;
 
 /* JSGC_MAX_HELPER_THREADS */
 static const size_t MaxHelperThreads = 8;
+
+/* JSGC_MAX_MARKING_THREADS */
+static const size_t MaxMarkingThreads = 2;
 
 }  // namespace TuningDefaults
 
@@ -588,8 +573,6 @@ class GCSchedulingTunables {
   type name() const { return name##_; }
   FOR_EACH_GC_TUNABLE(DEFINE_TUNABLE_ACCESSOR)
 #undef DEFINE_TUNABLE_ACCESSOR
-
-  bool attemptPretenuring() const { return pretenureThreshold_ < 1.0; }
 
   uint32_t getParameter(JSGCParamKey key);
   [[nodiscard]] bool setParameter(JSGCParamKey key, uint32_t value);
@@ -760,7 +743,7 @@ class HeapThreshold {
   size_t startBytes() const { return startBytes_; }
   size_t sliceBytes() const { return sliceBytes_; }
   size_t incrementalLimitBytes() const { return incrementalLimitBytes_; }
-  double eagerAllocTrigger(bool highFrequencyGC) const;
+  size_t eagerAllocTrigger(bool highFrequencyGC) const;
   size_t incrementalBytesRemaining(const HeapSize& heapSize) const;
 
   void setSliceThreshold(ZoneAllocator* zone, const HeapSize& heapSize,
@@ -841,11 +824,11 @@ class MemoryTracker {
   void swapGCMemory(Cell* a, Cell* b, MemoryUse use);
 
   // Track memory by associated non-GC thing pointer.
-  void registerNonGCMemory(void* ptr, MemoryUse use);
-  void unregisterNonGCMemory(void* ptr, MemoryUse use);
+  void registerNonGCMemory(void* mem, MemoryUse use);
+  void unregisterNonGCMemory(void* mem, MemoryUse use);
   void moveNonGCMemory(void* dst, void* src, MemoryUse use);
-  void incNonGCMemory(void* ptr, size_t nbytes, MemoryUse use);
-  void decNonGCMemory(void* ptr, size_t nbytes, MemoryUse use);
+  void incNonGCMemory(void* mem, size_t nbytes, MemoryUse use);
+  void decNonGCMemory(void* mem, size_t nbytes, MemoryUse use);
 
  private:
   template <typename Ptr>

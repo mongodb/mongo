@@ -6,7 +6,9 @@ import re
 import sys
 
 
-def read_reserved_word_list(filename, enable_decorators):
+def read_reserved_word_list(
+    filename, enable_decorators, enable_explicit_resource_management
+):
     macro_pat = re.compile(r"MACRO\(([^,]+), *[^,]+, *[^\)]+\)\s*\\?")
 
     reserved_word_list = []
@@ -17,6 +19,8 @@ def read_reserved_word_list(filename, enable_decorators):
             if m:
                 reserved_word = m.group(1)
                 if reserved_word == "accessor" and not enable_decorators:
+                    continue
+                if reserved_word == "using" and not enable_explicit_resource_management:
                     continue
                 reserved_word_list.append((index, reserved_word))
                 index += 1
@@ -216,8 +220,20 @@ def generate_switch(opt, reserved_word_list):
     line(opt, "JSRW_NO_MATCH()")
 
 
-def main(output, reserved_words_h, enable_decorators=False):
-    reserved_word_list = read_reserved_word_list(reserved_words_h, enable_decorators)
+def main(output, reserved_words_h, *args):
+    enable_decorators = False
+    enable_explicit_resource_management = False
+    for arg in args:
+        if arg == "--enable-decorators":
+            enable_decorators = True
+        elif arg == "--enable-explicit-resource-management":
+            enable_explicit_resource_management = True
+        else:
+            raise ValueError("Unknown argument: " + arg)
+
+    reserved_word_list = read_reserved_word_list(
+        reserved_words_h, enable_decorators, enable_explicit_resource_management
+    )
 
     opt = {
         "indent_level": 1,

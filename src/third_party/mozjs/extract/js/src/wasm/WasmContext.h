@@ -19,23 +19,61 @@
 #ifndef wasm_context_h
 #define wasm_context_h
 
-namespace js {
-namespace wasm {
+#include "mozilla/DoublyLinkedList.h"
+
+namespace js::wasm {
+
+#ifdef ENABLE_WASM_JSPI
+
+class SuspenderObject;
+class SuspenderObjectData;
+
+class SuspenderContext {
+ private:
+  HeapPtr<SuspenderObject*> activeSuspender_;
+  // Using double-linked list to avoid allocation in the JIT code.
+  mozilla::DoublyLinkedList<SuspenderObjectData> suspendedStacks_;
+
+ public:
+  SuspenderContext();
+  ~SuspenderContext();
+  SuspenderObject* activeSuspender();
+  void setActiveSuspender(SuspenderObject* obj);
+  void trace(JSTracer* trc);
+  void traceRoots(JSTracer* trc);
+
+  friend class SuspenderObject;
+};
+#endif  // ENABLE_WASM_JSPI
 
 // wasm::Context lives in JSContext and contains the wasm-related per-context
 // state.
 
 class Context {
  public:
-  Context() : triedToInstallSignalHandlers(false), haveSignalHandlers(false) {}
+  Context()
+      : triedToInstallSignalHandlers(false),
+        haveSignalHandlers(false)
+#ifdef ENABLE_WASM_JSPI
+        ,
+        suspendableStackLimit(JS::NativeStackLimitMin),
+        suspendableStacksCount(0)
+#endif
+  {
+  }
 
   // Used by wasm::EnsureThreadSignalHandlers(cx) to install thread signal
   // handlers once per JSContext/thread.
   bool triedToInstallSignalHandlers;
   bool haveSignalHandlers;
+
+#ifdef ENABLE_WASM_JSPI
+  JS::NativeStackLimit suspendableStackLimit;
+  mozilla::Atomic<uint32_t> suspendableStacksCount;
+  SuspenderContext promiseIntegration;
+#endif
 };
 
-}  // namespace wasm
-}  // namespace js
+}  // namespace js::wasm
 
 #endif  // wasm_context_h

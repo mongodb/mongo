@@ -13,12 +13,6 @@
 
 static_assert(sizeof(PROCESS_MITIGATION_DYNAMIC_CODE_POLICY) == 4);
 
-#if (_WIN32_WINNT < 0x0602)
-BOOL WINAPI GetProcessMitigationPolicy(
-    HANDLE hProcess, PROCESS_MITIGATION_POLICY MitigationPolicy, PVOID lpBuffer,
-    SIZE_T dwLength);
-#endif  // (_WIN32_WINNT < 0x0602)
-
 namespace mozilla {
 
 static decltype(&::GetProcessMitigationPolicy)
@@ -86,6 +80,22 @@ MFBT_API bool IsEafPlusEnabled() {
   }
 
   return polInfo.EnableExportAddressFilterPlus;
+}
+
+MFBT_API bool IsUserShadowStackEnabled() {
+  auto pGetProcessMitigationPolicy = FetchGetProcessMitigationPolicyFunc();
+  if (!pGetProcessMitigationPolicy) {
+    return false;
+  }
+
+  PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY polInfo;
+  if (!pGetProcessMitigationPolicy(::GetCurrentProcess(),
+                                   ProcessUserShadowStackPolicy, &polInfo,
+                                   sizeof(polInfo))) {
+    return false;
+  }
+
+  return polInfo.EnableUserShadowStack;
 }
 
 }  // namespace mozilla

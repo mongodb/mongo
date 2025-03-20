@@ -19,6 +19,7 @@ class DenseBitmap;
 namespace gc {
 
 class Arena;
+class GCRuntime;
 
 // This class manages state used for marking atoms during GCs.
 // See AtomMarking.cpp for details.
@@ -42,19 +43,25 @@ class AtomMarkingRuntime {
   // Mark an arena as no longer holding things in the atoms zone.
   void unregisterArena(Arena* arena, const AutoLockGC& lock);
 
+  // Update the atom marking bitmaps in all collected zones according to the
+  // atoms zone mark bits.
+  void refineZoneBitmapsForCollectedZones(GCRuntime* gc, size_t collectedZones);
+
+  // Set any bits in the chunk mark bitmaps for atoms which are marked in any
+  // uncollected zone in the runtime.
+  void markAtomsUsedByUncollectedZones(GCRuntime* gc, size_t uncollectedZones);
+
+ private:
   // Fill |bitmap| with an atom marking bitmap based on the things that are
   // currently marked in the chunks used by atoms zone arenas. This returns
   // false on an allocation failure (but does not report an exception).
-  bool computeBitmapFromChunkMarkBits(JSRuntime* runtime, DenseBitmap& bitmap);
+  bool computeBitmapFromChunkMarkBits(GCRuntime* gc, DenseBitmap& bitmap);
 
   // Update the atom marking bitmap in |zone| according to another
   // overapproximation of the reachable atoms in |bitmap|.
   void refineZoneBitmapForCollectedZone(Zone* zone, const DenseBitmap& bitmap);
 
-  // Set any bits in the chunk mark bitmaps for atoms which are marked in any
-  // uncollected zone in the runtime.
-  void markAtomsUsedByUncollectedZones(JSRuntime* runtime);
-
+ public:
   // Mark an atom or id as being newly reachable by the context's zone.
   template <typename T>
   void markAtom(JSContext* cx, T* thing);

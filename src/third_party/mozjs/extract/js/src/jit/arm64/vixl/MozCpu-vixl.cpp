@@ -68,13 +68,16 @@ void CPU::SetUp() {
 
 
 uint32_t CPU::GetCacheType() {
-#if defined(__aarch64__) && (defined(__linux__) || defined(__android__))
+#if defined(__aarch64__) && !defined(_MSC_VER) && !defined(XP_DARWIN) && !defined(__OpenBSD__)
   uint64_t cache_type_register;
   // Copy the content of the cache type register to a core register.
   __asm__ __volatile__ ("mrs %[ctr], ctr_el0"  // NOLINT
                         : [ctr] "=r" (cache_type_register));
-  VIXL_ASSERT(IsUint32(cache_type_register));
-  return static_cast<uint32_t>(cache_type_register);
+  // The top bits are reserved, or report information about MTE which currently
+  // we discard. This will likely need to be changed to just return
+  // cache_type_register when we update VIXL next.
+  uint64_t mask = 0xffffffffull;
+  return static_cast<uint32_t>(cache_type_register & mask);
 #else
   // This will lead to a cache with 1 byte long lines, which is fine since
   // neither EnsureIAndDCacheCoherency nor the simulator will need this
@@ -110,7 +113,7 @@ void CPU::EnsureIAndDCacheCoherency(void* address, size_t length) {
   FlushInstructionCache(GetCurrentProcess(), address, length);
 #elif defined(XP_DARWIN)
   sys_icache_invalidate(address, length);
-#elif defined(__aarch64__) && (defined(__linux__) || defined(__android__))
+#elif defined(__aarch64__) && (defined(__linux__) || defined(__android__) || defined(__FreeBSD__))
   // Implement the cache synchronisation for all targets where AArch64 is the
   // host, even if we're building the simulator for an AAarch64 host. This
   // allows for cases where the user wants to simulate code as well as run it
@@ -199,6 +202,9 @@ void CPU::EnsureIAndDCacheCoherency(void* address, size_t length) {
       :
       :
       : "memory");
+#elif defined(__aarch64__) && !defined(__OpenBSD__)
+# error Please check/implement the cache invalidation code for your OS
+
 #else
   // If the host isn't AArch64, we must be using the simulator, so this function
   // doesn't have to do anything.

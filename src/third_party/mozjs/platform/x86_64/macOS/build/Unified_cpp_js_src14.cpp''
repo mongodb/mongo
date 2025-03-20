@@ -1,0 +1,55 @@
+#define MOZ_UNIFIED_BUILD
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Initialization.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Initialization.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Initialization.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/InternalThreadPool.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/InternalThreadPool.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/InternalThreadPool.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/InvalidatingFuse.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/InvalidatingFuse.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/InvalidatingFuse.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Iteration.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Iteration.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Iteration.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Iterator.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Iterator.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/Iterator.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/JSAtomUtils.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/JSAtomUtils.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "/Users/ben.shteinfeld/Documents/mongo/src/third_party/mozjs/mozilla-release/js/src/vm/JSAtomUtils.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif

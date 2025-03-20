@@ -17,7 +17,6 @@
 
 using namespace js;
 
-using mozilla::RoundUpPow2;
 using mozilla::tl::BitSize;
 
 namespace js {

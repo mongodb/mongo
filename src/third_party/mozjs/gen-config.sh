@@ -107,7 +107,9 @@ CFLAGS="$CFLAGS -D__STDC_FORMAT_MACROS" \
     --without-intl-api \
     --enable-optimize \
     --disable-js-shell \
-    --disable-tests "$_CONFIG_OPTS"
+    --disable-tests \
+    --disable-wasm-moz-intgemm \
+    "$_CONFIG_OPTS"
 
 make recurse_export
 

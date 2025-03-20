@@ -29,6 +29,6 @@ void DesuppressStackWalking();
 MFBT_API void RegisterJitCodeRegion(uint8_t* aStart, size_t size);
 
 MFBT_API void UnregisterJitCodeRegion(uint8_t* aStart, size_t size);
-#endif  // _M_AMD64
+#endif  // _M_AMD64 || _M_ARM64
 
 #endif  // mozilla_StackWalk_windows_h

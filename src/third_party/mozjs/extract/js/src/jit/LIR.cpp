@@ -26,8 +26,7 @@ const char* const js::jit::LIROpNames[] = {
 };
 
 LIRGraph::LIRGraph(MIRGraph* mir)
-    : blocks_(),
-      constantPool_(mir->alloc()),
+    : constantPool_(mir->alloc()),
       constantPoolMap_(mir->alloc()),
       safepoints_(mir->alloc()),
       nonCallSafepoints_(mir->alloc()),
@@ -72,7 +71,7 @@ void LIRGraph::dump() {
 #endif
 
 LBlock::LBlock(MBasicBlock* from)
-    : block_(from), phis_(), entryMoveGroup_(nullptr), exitMoveGroup_(nullptr) {
+    : block_(from), entryMoveGroup_(nullptr), exitMoveGroup_(nullptr) {
   from->assignLir(this);
 }
 
@@ -250,6 +249,9 @@ bool LRecoverInfo::appendDefinition(MDefinition* def) {
 
 bool LRecoverInfo::appendResumePoint(MResumePoint* rp) {
   // Stores should be recovered first.
+  if (!rp->storesEmpty()) {
+    hasSideEffects_ = true;
+  }
   for (auto iter(rp->storesBegin()), end(rp->storesEnd()); iter != end;
        ++iter) {
     if (!appendDefinition(iter->operand)) {
@@ -363,6 +365,8 @@ static const char* DefTypeName(LDefinition::Type type) {
       return "o";
     case LDefinition::SLOTS:
       return "s";
+    case LDefinition::WASM_ANYREF:
+      return "wr";
     case LDefinition::FLOAT32:
       return "f";
     case LDefinition::DOUBLE:
@@ -452,12 +456,12 @@ UniqueChars LAllocation::toString() const {
             break;
           case MIRType::String:
             // If a JSContext is a available, output the actual string
-            if (JSContext* maybeCx = TlsContext.get()) {
-              Sprinter spr(maybeCx);
+            if (JSContext* cx = TlsContext.get()) {
+              Sprinter spr(cx);
               if (!spr.init()) {
                 oomUnsafe.crash("LAllocation::toString()");
               }
-              spr.putString(c->toString());
+              spr.putString(cx, c->toString());
               buf = spr.release();
             } else {
               buf = JS_smprintf("string");

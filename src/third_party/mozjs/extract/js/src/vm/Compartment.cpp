@@ -52,14 +52,10 @@ Compartment::Compartment(Zone* zone, bool invisibleToDebugger)
 
 void Compartment::checkObjectWrappersAfterMovingGC() {
   for (ObjectWrapperEnum e(this); !e.empty(); e.popFront()) {
-    // Assert that the postbarriers have worked and that nothing is left in the
-    // wrapper map that points into the nursery, and that the hash table entries
-    // are discoverable.
     auto key = e.front().key();
-    CheckGCThingAfterMovingGC(key.get());
-
-    auto ptr = crossCompartmentObjectWrappers.lookup(key);
-    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &e.front());
+    CheckGCThingAfterMovingGC(key.get());  // Keys may be in a different zone.
+    CheckGCThingAfterMovingGC(e.front().value().unbarrieredGet(), zone());
+    CheckTableEntryAfterMovingGC(crossCompartmentObjectWrappers, e, key);
   }
 }
 
@@ -300,6 +296,12 @@ bool Compartment::getOrCreateWrapper(JSContext* cx, HandleObject existing,
   // Ensure that the wrappee is exposed in case we are creating a new wrapper
   // for a gray object.
   ExposeObjectToActiveJS(obj);
+
+  // If we're wrapping an object which emulates undefined then the runtime fuse
+  // should already have been popped.
+  MOZ_ASSERT_IF(
+      obj->getClass()->emulatesUndefined(),
+      !cx->runtime()->hasSeenObjectEmulateUndefinedFuse.ref().intact());
 
   // Create a new wrapper for the object.
   auto wrap = cx->runtime()->wrapObjectCallbacks->wrap;

@@ -17,7 +17,6 @@
 #include "util/BitArray.h"
 #include "vm/GlobalObject.h"
 #include "vm/Stack.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "gc/Nursery-inl.h"
 #include "vm/FrameIter-inl.h"  // js::FrameIter::unaliasedForEachActual
@@ -37,7 +36,7 @@ RareArgumentsData* RareArgumentsData::create(JSContext* cx,
                                              ArgumentsObject* obj) {
   size_t bytes = RareArgumentsData::bytesRequired(obj->initialLength());
 
-  uint8_t* data = AllocateObjectBuffer<uint8_t>(cx, obj, bytes);
+  uint8_t* data = AllocateCellBuffer<uint8_t>(cx, obj, bytes);
   if (!data) {
     return nullptr;
   }
@@ -47,6 +46,12 @@ RareArgumentsData* RareArgumentsData::create(JSContext* cx,
   AddCellMemory(obj, bytes, MemoryUse::RareArgumentsData);
 
   return new (data) RareArgumentsData();
+}
+
+ArgumentsData::ArgumentsData(uint32_t numArgs) : args(numArgs) {
+  // |args| must be the last field.
+  static_assert(offsetof(ArgumentsData, args) + sizeof(args) ==
+                sizeof(ArgumentsData));
 }
 
 bool ArgumentsObject::createRareData(JSContext* cx) {
@@ -81,7 +86,8 @@ void ArgumentsObject::MaybeForwardToCallObject(AbstractFramePtr frame,
     obj->initFixedSlot(MAYBE_CALL_SLOT, ObjectValue(frame.callObj()));
     for (PositionalFormalParameterIter fi(script); fi; fi++) {
       if (fi.closedOver()) {
-        data->args[fi.argumentSlot()] = MagicEnvSlotValue(fi.location().slot());
+        data->args.setElement(obj, fi.argumentSlot(),
+                              MagicEnvSlotValue(fi.location().slot()));
         obj->markArgumentForwarded();
       }
     }
@@ -99,7 +105,8 @@ void ArgumentsObject::MaybeForwardToCallObject(JSFunction* callee,
     obj->initFixedSlot(MAYBE_CALL_SLOT, ObjectValue(*callObj));
     for (PositionalFormalParameterIter fi(script); fi; fi++) {
       if (fi.closedOver()) {
-        data->args[fi.argumentSlot()] = MagicEnvSlotValue(fi.location().slot());
+        data->args.setElement(obj, fi.argumentSlot(),
+                              MagicEnvSlotValue(fi.location().slot()));
         obj->markArgumentForwarded();
       }
     }
@@ -111,16 +118,20 @@ struct CopyFrameArgs {
 
   explicit CopyFrameArgs(AbstractFramePtr frame) : frame_(frame) {}
 
-  void copyActualArgs(GCPtr<Value>* dst, unsigned numActuals) const {
+  void copyActualArgs(ArgumentsObject* owner, GCOwnedArray<Value>& args,
+                      unsigned numActuals) const {
     MOZ_ASSERT_IF(frame_.isInterpreterFrame(),
                   !frame_.asInterpreterFrame()->runningInJit());
 
     // Copy arguments.
     Value* src = frame_.argv();
     Value* end = src + numActuals;
-    while (src != end) {
-      (dst++)->init(*src++);
-    }
+    args.withOwner(owner, [&](auto& args) {
+      auto* dst = args.begin();
+      while (src != end) {
+        (dst++)->init(*src++);
+      }
+    });
   }
 
   /*
@@ -139,14 +150,18 @@ struct CopyJitFrameArgs {
   CopyJitFrameArgs(jit::JitFrameLayout* frame, HandleObject callObj)
       : frame_(frame), callObj_(callObj) {}
 
-  void copyActualArgs(GCPtr<Value>* dst, unsigned numActuals) const {
+  void copyActualArgs(ArgumentsObject* owner, GCOwnedArray<Value>& args,
+                      unsigned numActuals) const {
     MOZ_ASSERT(frame_->numActualArgs() == numActuals);
 
     Value* src = frame_->actualArgs();
     Value* end = src + numActuals;
-    while (src != end) {
-      (dst++)->init(*src++);
-    }
+    args.withOwner(owner, [&](auto& args) {
+      auto* dst = args.begin();
+      while (src != end) {
+        (dst++)->init(*src++);
+      }
+    });
   }
 
   /*
@@ -181,12 +196,16 @@ struct CopyScriptFrameIterArgs {
     return true;
   }
 
-  void copyActualArgs(GCPtr<Value>* dst, unsigned numActuals) const {
+  void copyActualArgs(ArgumentsObject* owner, GCOwnedArray<Value>& args,
+                      unsigned numActuals) const {
     MOZ_ASSERT(actualArgs_.length() == numActuals);
 
-    for (Value v : actualArgs_) {
-      (dst++)->init(v);
-    }
+    args.withOwner(owner, [&](auto& args) {
+      auto* dst = args.begin();
+      for (Value v : actualArgs_) {
+        (dst++)->init(v);
+      }
+    });
   }
 
   /*
@@ -210,12 +229,16 @@ struct CopyInlinedArgs {
                   HandleFunction callee)
       : args_(args), callObj_(callObj), callee_(callee) {}
 
-  void copyActualArgs(GCPtr<Value>* dst, unsigned numActuals) const {
+  void copyActualArgs(ArgumentsObject* owner, GCOwnedArray<Value>& args,
+                      unsigned numActuals) const {
     MOZ_ASSERT(numActuals <= args_.length());
 
-    for (uint32_t i = 0; i < numActuals; i++) {
-      (dst++)->init(args_[i]);
-    }
+    args.withOwner(owner, [&](auto& args) {
+      auto* dst = args.begin();
+      for (uint32_t i = 0; i < numActuals; i++) {
+        (dst++)->init(args_[i]);
+      }
+    });
   }
 
   /*
@@ -243,13 +266,12 @@ ArgumentsObject* ArgumentsObject::createTemplateObject(JSContext* cx,
   }
 
   AutoSetNewObjectMetadata metadata(cx);
-  JSObject* base =
-      NativeObject::create(cx, FINALIZE_KIND, gc::Heap::Tenured, shape);
-  if (!base) {
+  auto* obj = NativeObject::create<ArgumentsObject>(cx, FINALIZE_KIND,
+                                                    gc::Heap::Tenured, shape);
+  if (!obj) {
     return nullptr;
   }
 
-  ArgumentsObject* obj = &base->as<js::ArgumentsObject>();
   obj->initFixedSlot(ArgumentsObject::DATA_SLOT, PrivateValue(nullptr));
   return obj;
 }
@@ -302,23 +324,21 @@ ArgumentsObject* ArgumentsObject::create(JSContext* cx, HandleFunction callee,
   unsigned numBytes = ArgumentsData::bytesRequired(numArgs);
 
   AutoSetNewObjectMetadata metadata(cx);
-  JSObject* base =
-      NativeObject::create(cx, FINALIZE_KIND, gc::Heap::Default, shape);
-  if (!base) {
+  auto* obj = NativeObject::create<ArgumentsObject>(cx, FINALIZE_KIND,
+                                                    gc::Heap::Default, shape);
+  if (!obj) {
     return nullptr;
   }
-  ArgumentsObject* obj = &base->as<ArgumentsObject>();
 
   ArgumentsData* data = reinterpret_cast<ArgumentsData*>(
-      AllocateObjectBuffer<uint8_t>(cx, obj, numBytes));
+      AllocateCellBuffer<uint8_t>(cx, obj, numBytes));
   if (!data) {
     // Make the object safe for GC.
     obj->initFixedSlot(DATA_SLOT, PrivateValue(nullptr));
     return nullptr;
   }
 
-  data->numArgs = numArgs;
-  data->rareData = nullptr;
+  new (data) ArgumentsData(numArgs);
 
   InitReservedSlot(obj, DATA_SLOT, data, numBytes, MemoryUse::ArgumentsData);
   obj->initFixedSlot(CALLEE_SLOT, ObjectValue(*callee));
@@ -326,13 +346,14 @@ ArgumentsObject* ArgumentsObject::create(JSContext* cx, HandleFunction callee,
                      Int32Value(numActuals << PACKED_BITS_COUNT));
 
   // Copy [0, numActuals) into data->args.
-  GCPtr<Value>* args = data->args;
-  copy.copyActualArgs(args, numActuals);
+  copy.copyActualArgs(obj, data->args, numActuals);
 
   // Fill in missing arguments with |undefined|.
-  for (size_t i = numActuals; i < numArgs; i++) {
-    args[i].init(UndefinedValue());
-  }
+  data->args.withOwner(obj, [&](auto& args) {
+    for (size_t i = numActuals; i < numArgs; i++) {
+      args[i].init(UndefinedValue());
+    }
+  });
 
   copy.maybeForwardToCallObject(obj, data);
 
@@ -418,7 +439,7 @@ ArgumentsObject* ArgumentsObject::finishPure(
   unsigned numBytes = ArgumentsData::bytesRequired(numArgs);
 
   ArgumentsData* data = reinterpret_cast<ArgumentsData*>(
-      AllocateObjectBuffer<uint8_t>(cx, obj, numBytes));
+      AllocateCellBuffer<uint8_t>(cx, obj, numBytes));
   if (!data) {
     // Make the object safe for GC. Don't report OOM, the slow path will
     // retry the allocation.
@@ -427,8 +448,7 @@ ArgumentsObject* ArgumentsObject::finishPure(
     return nullptr;
   }
 
-  data->numArgs = numArgs;
-  data->rareData = nullptr;
+  new (data) ArgumentsData(numArgs);
 
   obj->initFixedSlot(INITIAL_LENGTH_SLOT,
                      Int32Value(numActuals << PACKED_BITS_COUNT));
@@ -437,13 +457,14 @@ ArgumentsObject* ArgumentsObject::finishPure(
   obj->initFixedSlot(MAYBE_CALL_SLOT, UndefinedValue());
   obj->initFixedSlot(CALLEE_SLOT, ObjectValue(*callee));
 
-  GCPtr<Value>* args = data->args;
-  copy.copyActualArgs(args, numActuals);
+  copy.copyActualArgs(obj, data->args, numActuals);
 
   // Fill in missing arguments with |undefined|.
-  for (size_t i = numActuals; i < numArgs; i++) {
-    args[i].init(UndefinedValue());
-  }
+  data->args.withOwner(obj, [&](auto& args) {
+    for (size_t i = numActuals; i < numArgs; i++) {
+      args[i].init(UndefinedValue());
+    }
+  });
 
   if (callObj && callee->needsCallObject()) {
     copy.maybeForwardToCallObject(obj, data);
@@ -592,7 +613,7 @@ bool js::MappedArgSetter(JSContext* cx, HandleObject obj, HandleId id,
 /* static */
 bool ArgumentsObject::getArgumentsIterator(JSContext* cx,
                                            MutableHandleValue val) {
-  Handle<PropertyName*> shName = cx->names().ArrayValues;
+  Handle<PropertyName*> shName = cx->names().dollar_ArrayValues_;
   Rooted<JSAtom*> name(cx, cx->names().values);
   return GlobalObject::getSelfHostedFunction(cx, cx->global(), shName, name, 0,
                                              val);
@@ -1036,16 +1057,16 @@ void ArgumentsObject::finalize(JS::GCContext* gcx, JSObject* obj) {
                RareArgumentsData::bytesRequired(argsobj.initialLength()),
                MemoryUse::RareArgumentsData);
     gcx->free_(&argsobj, argsobj.data(),
-               ArgumentsData::bytesRequired(argsobj.data()->numArgs),
+               ArgumentsData::bytesRequired(argsobj.data()->numArgs()),
                MemoryUse::ArgumentsData);
   }
 }
 
 void ArgumentsObject::trace(JSTracer* trc, JSObject* obj) {
   ArgumentsObject& argsobj = obj->as<ArgumentsObject>();
-  if (ArgumentsData* data =
-          argsobj.data()) {  // Template objects have no ArgumentsData.
-    TraceRange(trc, data->numArgs, data->begin(), js_arguments_str);
+  // Template objects have no ArgumentsData.
+  if (ArgumentsData* data = argsobj.data()) {
+    data->args.trace(trc);
   }
 }
 
@@ -1062,44 +1083,25 @@ size_t ArgumentsObject::objectMoved(JSObject* dst, JSObject* src) {
   Nursery& nursery = dst->runtimeFromMainThread()->gc.nursery();
 
   size_t nbytesTotal = 0;
-  uint32_t nDataBytes = ArgumentsData::bytesRequired(nsrc->data()->numArgs);
-  if (!nursery.isInside(nsrc->data())) {
-    nursery.removeMallocedBufferDuringMinorGC(nsrc->data());
-  } else {
-    AutoEnterOOMUnsafeRegion oomUnsafe;
-    uint8_t* data = nsrc->zone()->pod_malloc<uint8_t>(nDataBytes);
-    if (!data) {
-      oomUnsafe.crash(
-          "Failed to allocate ArgumentsObject data while tenuring.");
-    }
-    ndst->initFixedSlot(DATA_SLOT, PrivateValue(data));
 
-    mozilla::PodCopy(data, reinterpret_cast<uint8_t*>(nsrc->data()),
-                     nDataBytes);
+  ArgumentsData* data = nsrc->data();
+  uint32_t nDataBytes = ArgumentsData::bytesRequired(nsrc->data()->numArgs());
+  Nursery::WasBufferMoved result = nursery.maybeMoveBufferOnPromotion(
+      &data, dst, nDataBytes, MemoryUse::ArgumentsData);
+  if (result == Nursery::BufferMoved) {
+    ndst->initFixedSlot(DATA_SLOT, PrivateValue(data));
     nbytesTotal += nDataBytes;
   }
 
-  AddCellMemory(ndst, nDataBytes, MemoryUse::ArgumentsData);
-
-  if (RareArgumentsData* srcRareData = nsrc->maybeRareData()) {
-    uint32_t nbytes = RareArgumentsData::bytesRequired(nsrc->initialLength());
-    if (!nursery.isInside(srcRareData)) {
-      nursery.removeMallocedBufferDuringMinorGC(srcRareData);
-    } else {
-      AutoEnterOOMUnsafeRegion oomUnsafe;
-      uint8_t* dstRareData = nsrc->zone()->pod_malloc<uint8_t>(nbytes);
-      if (!dstRareData) {
-        oomUnsafe.crash(
-            "Failed to allocate RareArgumentsData data while tenuring.");
-      }
-      ndst->data()->rareData = (RareArgumentsData*)dstRareData;
-
-      mozilla::PodCopy(dstRareData, reinterpret_cast<uint8_t*>(srcRareData),
-                       nbytes);
-      nbytesTotal += nbytes;
+  if (RareArgumentsData* rareData = nsrc->maybeRareData()) {
+    uint32_t nRareBytes =
+        RareArgumentsData::bytesRequired(nsrc->initialLength());
+    Nursery::WasBufferMoved result = nursery.maybeMoveBufferOnPromotion(
+        &rareData, dst, nRareBytes, MemoryUse::RareArgumentsData);
+    if (result == Nursery::BufferMoved) {
+      ndst->data()->rareData = rareData;
+      nbytesTotal += nRareBytes;
     }
-
-    AddCellMemory(ndst, nbytes, MemoryUse::RareArgumentsData);
   }
 
   return nbytesTotal;

@@ -36,7 +36,6 @@
 #include "vm/JSContext.h"
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/Runtime.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/GeckoProfiler-inl.h"
 #include "vm/JSObject-inl.h"
@@ -94,7 +93,7 @@ static const JSFunctionSpec dateTimeFormat_methods[] = {
     JS_SELF_HOSTED_FN("formatRange", "Intl_DateTimeFormat_formatRange", 2, 0),
     JS_SELF_HOSTED_FN("formatRangeToParts",
                       "Intl_DateTimeFormat_formatRangeToParts", 2, 0),
-    JS_FN(js_toSource_str, dateTimeFormat_toSource, 0, 0),
+    JS_FN("toSource", dateTimeFormat_toSource, 0, 0),
     JS_FS_END};
 
 static const JSPropertySpec dateTimeFormat_properties[] = {
@@ -120,6 +119,7 @@ const ClassSpec DateTimeFormatObject::classSpec_ = {
  * ES2017 Intl draft rev 94045d234762ad107a3d09bb6f7381a65f1a2f9b
  */
 static bool DateTimeFormat(JSContext* cx, const CallArgs& args, bool construct,
+                           HandleString required, HandleString defaults,
                            DateTimeFormatOptions dtfOptions) {
   AutoJSConstructorProfilerEntry pseudoFrame(cx, "Intl.DateTimeFormat");
 
@@ -146,14 +146,17 @@ static bool DateTimeFormat(JSContext* cx, const CallArgs& args, bool construct,
   HandleValue options = args.get(1);
 
   // Step 3.
-  return intl::LegacyInitializeObject(
-      cx, dateTimeFormat, cx->names().InitializeDateTimeFormat, thisValue,
-      locales, options, dtfOptions, args.rval());
+  return intl::InitializeDateTimeFormatObject(
+      cx, dateTimeFormat, thisValue, locales, options, required, defaults,
+      dtfOptions, args.rval());
 }
 
 static bool DateTimeFormat(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
-  return DateTimeFormat(cx, args, args.isConstructing(),
+
+  Handle<PropertyName*> required = cx->names().any;
+  Handle<PropertyName*> defaults = cx->names().date;
+  return DateTimeFormat(cx, args, args.isConstructing(), required, defaults,
                         DateTimeFormatOptions::Standard);
 }
 
@@ -167,18 +170,24 @@ static bool MozDateTimeFormat(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-  return DateTimeFormat(cx, args, true,
+  Handle<PropertyName*> required = cx->names().any;
+  Handle<PropertyName*> defaults = cx->names().date;
+  return DateTimeFormat(cx, args, true, required, defaults,
                         DateTimeFormatOptions::EnableMozExtensions);
 }
 
-bool js::intl_DateTimeFormat(JSContext* cx, unsigned argc, Value* vp) {
+bool js::intl_CreateDateTimeFormat(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
-  MOZ_ASSERT(args.length() == 2);
+  MOZ_ASSERT(args.length() == 4);
   MOZ_ASSERT(!args.isConstructing());
-  // intl_DateTimeFormat is an intrinsic for self-hosted JavaScript, so it
-  // cannot be used with "new", but it still has to be treated as a
-  // constructor.
-  return DateTimeFormat(cx, args, true, DateTimeFormatOptions::Standard);
+
+  RootedString required(cx, args[2].toString());
+  RootedString defaults(cx, args[3].toString());
+
+  // intl_CreateDateTimeFormat is an intrinsic for self-hosted JavaScript, so it
+  // cannot be used with "new", but it still has to be treated as a constructor.
+  return DateTimeFormat(cx, args, true, required, defaults,
+                        DateTimeFormatOptions::Standard);
 }
 
 void js::DateTimeFormatObject::finalize(JS::GCContext* gcx, JSObject* obj) {
@@ -404,7 +413,7 @@ bool js::intl_defaultTimeZone(JSContext* cx, unsigned argc, Value* vp) {
 
   FormatBuffer<char16_t, intl::INITIAL_CHAR_BUFFER_SIZE> timeZone(cx);
   auto result =
-      DateTimeInfo::timeZoneId(DateTimeInfo::shouldRFP(cx->realm()), timeZone);
+      DateTimeInfo::timeZoneId(DateTimeInfo::forceUTC(cx->realm()), timeZone);
   if (result.isErr()) {
     intl::ReportInternalError(cx, result.unwrapErr());
     return false;
@@ -424,7 +433,7 @@ bool js::intl_defaultTimeZoneOffset(JSContext* cx, unsigned argc, Value* vp) {
   MOZ_ASSERT(args.length() == 0);
 
   auto offset =
-      DateTimeInfo::getRawOffsetMs(DateTimeInfo::shouldRFP(cx->realm()));
+      DateTimeInfo::getRawOffsetMs(DateTimeInfo::forceUTC(cx->realm()));
   if (offset.isErr()) {
     intl::ReportInternalError(cx, offset.unwrapErr());
     return false;
@@ -448,7 +457,7 @@ bool js::intl_isDefaultTimeZone(JSContext* cx, unsigned argc, Value* vp) {
 
   FormatBuffer<char16_t, intl::INITIAL_CHAR_BUFFER_SIZE> chars(cx);
   auto result =
-      DateTimeInfo::timeZoneId(DateTimeInfo::shouldRFP(cx->realm()), chars);
+      DateTimeInfo::timeZoneId(DateTimeInfo::forceUTC(cx->realm()), chars);
   if (result.isErr()) {
     intl::ReportInternalError(cx, result.unwrapErr());
     return false;
@@ -785,6 +794,83 @@ static bool AssignDateTimeLength(
   return true;
 }
 
+class TimeZoneOffsetString {
+  static constexpr std::u16string_view GMT = u"GMT";
+
+  // Time zone offset string format is "±hh:mm".
+  static constexpr size_t offsetLength = 6;
+
+  // ICU custom time zones are in the format "GMT±hh:mm".
+  char16_t timeZone_[GMT.size() + offsetLength] = {};
+
+  TimeZoneOffsetString() = default;
+
+ public:
+  TimeZoneOffsetString(const TimeZoneOffsetString& other) { *this = other; }
+
+  TimeZoneOffsetString& operator=(const TimeZoneOffsetString& other) {
+    std::copy_n(other.timeZone_, std::size(timeZone_), timeZone_);
+    return *this;
+  }
+
+  operator mozilla::Span<const char16_t>() const {
+    return mozilla::Span(timeZone_);
+  }
+
+  /**
+   * |timeZone| is either a canonical IANA time zone identifier or a normalized
+   * time zone offset string.
+   */
+  static mozilla::Maybe<TimeZoneOffsetString> from(
+      const JSLinearString* timeZone) {
+    MOZ_RELEASE_ASSERT(!timeZone->empty(), "time zone is a non-empty string");
+
+    // If the time zone string starts with either "+" or "-", it is a normalized
+    // time zone offset string, because (canonical) IANA time zone identifiers
+    // can't start with "+" or "-".
+    char16_t timeZoneSign = timeZone->latin1OrTwoByteChar(0);
+    MOZ_ASSERT(timeZoneSign != 0x2212,
+               "Minus sign is normalized to Ascii minus");
+    if (timeZoneSign != '+' && timeZoneSign != '-') {
+      return mozilla::Nothing();
+    }
+
+    // Release assert because we don't want CopyChars to write out-of-bounds.
+    MOZ_RELEASE_ASSERT(timeZone->length() == offsetLength);
+
+    // Self-hosted code has normalized offset strings to the format "±hh:mm".
+    MOZ_ASSERT(mozilla::IsAsciiDigit(timeZone->latin1OrTwoByteChar(1)));
+    MOZ_ASSERT(mozilla::IsAsciiDigit(timeZone->latin1OrTwoByteChar(2)));
+    MOZ_ASSERT(timeZone->latin1OrTwoByteChar(3) == ':');
+    MOZ_ASSERT(mozilla::IsAsciiDigit(timeZone->latin1OrTwoByteChar(4)));
+    MOZ_ASSERT(mozilla::IsAsciiDigit(timeZone->latin1OrTwoByteChar(5)));
+
+    // Self-hosted code has verified the offset is at most ±23:59.
+#ifdef DEBUG
+    auto twoDigit = [&](size_t offset) {
+      auto c1 = timeZone->latin1OrTwoByteChar(offset);
+      auto c2 = timeZone->latin1OrTwoByteChar(offset + 1);
+      return mozilla::AsciiAlphanumericToNumber(c1) * 10 +
+             mozilla::AsciiAlphanumericToNumber(c2);
+    };
+
+    int32_t hours = twoDigit(1);
+    MOZ_ASSERT(0 <= hours && hours <= 23);
+
+    int32_t minutes = twoDigit(4);
+    MOZ_ASSERT(0 <= minutes && minutes <= 59);
+#endif
+
+    TimeZoneOffsetString result{};
+
+    // Copy the string "GMT" followed by the offset string.
+    size_t copied = GMT.copy(result.timeZone_, GMT.size());
+    CopyChars(result.timeZone_ + copied, *timeZone);
+
+    return mozilla::Some(result);
+  }
+};
+
 /**
  * Returns a new mozilla::intl::DateTimeFormat with the locale and date-time
  * formatting options of the given DateTimeFormat.
@@ -807,12 +893,24 @@ static mozilla::intl::DateTimeFormat* NewDateTimeFormat(
     return nullptr;
   }
 
-  AutoStableStringChars timeZone(cx);
-  if (!timeZone.initTwoByte(cx, value.toString())) {
+  Rooted<JSLinearString*> timeZoneString(cx,
+                                         value.toString()->ensureLinear(cx));
+  if (!timeZoneString) {
     return nullptr;
   }
 
-  mozilla::Range<const char16_t> timeZoneChars = timeZone.twoByteRange();
+  AutoStableStringChars timeZone(cx);
+  mozilla::Span<const char16_t> timeZoneChars{};
+
+  auto timeZoneOffset = TimeZoneOffsetString::from(timeZoneString);
+  if (timeZoneOffset) {
+    timeZoneChars = *timeZoneOffset;
+  } else {
+    if (!timeZone.initTwoByte(cx, timeZoneString)) {
+      return nullptr;
+    }
+    timeZoneChars = timeZone.twoByteRange();
+  }
 
   if (!GetProperty(cx, internals, internals, cx->names().pattern, &value)) {
     return nullptr;
@@ -1334,11 +1432,24 @@ static mozilla::intl::DateIntervalFormat* NewDateIntervalFormat(
     return nullptr;
   }
 
-  AutoStableStringChars timeZone(cx);
-  if (!timeZone.initTwoByte(cx, value.toString())) {
+  Rooted<JSLinearString*> timeZoneString(cx,
+                                         value.toString()->ensureLinear(cx));
+  if (!timeZoneString) {
     return nullptr;
   }
-  mozilla::Span<const char16_t> timeZoneChars = timeZone.twoByteRange();
+
+  AutoStableStringChars timeZone(cx);
+  mozilla::Span<const char16_t> timeZoneChars{};
+
+  auto timeZoneOffset = TimeZoneOffsetString::from(timeZoneString);
+  if (timeZoneOffset) {
+    timeZoneChars = *timeZoneOffset;
+  } else {
+    if (!timeZone.initTwoByte(cx, timeZoneString)) {
+      return nullptr;
+    }
+    timeZoneChars = timeZone.twoByteRange();
+  }
 
   FormatBuffer<char16_t, intl::INITIAL_CHAR_BUFFER_SIZE> skeleton(cx);
   auto skelResult = mozDtf.GetOriginalSkeleton(skeleton);

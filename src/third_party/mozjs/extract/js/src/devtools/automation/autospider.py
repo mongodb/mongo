@@ -217,23 +217,40 @@ def ensure_dir_exists(
 with open(os.path.join(DIR.scripts, "variants", args.variant)) as fh:
     variant = json.load(fh)
 
-if args.variant == "nonunified":
-    # Rewrite js/src/**/moz.build to replace UNIFIED_SOURCES to SOURCES.
-    # Note that this modifies the current checkout.
-    for dirpath, dirnames, filenames in os.walk(DIR.js_src):
-        if "moz.build" in filenames:
-            in_place = ["-i"]
-            if platform.system() == "Darwin":
-                in_place.append("")
-            subprocess.check_call(
-                ["sed"]
-                + in_place
-                + ["s/UNIFIED_SOURCES/SOURCES/", os.path.join(dirpath, "moz.build")]
-            )
+# Some of the variants request a particular word size (eg ARM simulators).
+word_bits = variant.get("bits")
+
+# On Linux and Windows, we build 32- and 64-bit versions on a 64 bit
+# host, so the caller has to specify what is desired.
+if word_bits is None and args.platform:
+    platform_arch = args.platform.split("-")[0]
+    if platform_arch in ("win32", "linux"):
+        word_bits = 32
+    elif platform_arch in ("win64", "linux64"):
+        word_bits = 64
+
+# Fall back to the word size of the host.
+if word_bits is None:
+    word_bits = 64 if platform.architecture()[0] == "64bit" else 32
+
+# Need a platform name to use as a key in variant files.
+if args.platform:
+    variant_platform = args.platform.split("-")[0]
+elif platform.system() == "Windows":
+    variant_platform = "win64" if word_bits == 64 else "win32"
+elif platform.system() == "Linux":
+    variant_platform = "linux64" if word_bits == 64 else "linux"
+elif platform.system() == "Darwin":
+    variant_platform = "macosx64"
+else:
+    variant_platform = "other"
 
 CONFIGURE_ARGS = variant["configure-args"]
 
-compiler = variant.get("compiler")
+if variant_platform in ("win32", "win64"):
+    compiler = "clang-cl"
+else:
+    compiler = variant.get("compiler")
 if compiler != "gcc" and "clang-plugin" not in CONFIGURE_ARGS:
     CONFIGURE_ARGS += " --enable-clang-plugin"
 
@@ -267,34 +284,6 @@ if opt is not None:
 opt = variant.get("nspr")
 if opt is None or opt:
     CONFIGURE_ARGS += " --enable-nspr-build"
-
-# Some of the variants request a particular word size (eg ARM simulators).
-word_bits = variant.get("bits")
-
-# On Linux and Windows, we build 32- and 64-bit versions on a 64 bit
-# host, so the caller has to specify what is desired.
-if word_bits is None and args.platform:
-    platform_arch = args.platform.split("-")[0]
-    if platform_arch in ("win32", "linux"):
-        word_bits = 32
-    elif platform_arch in ("win64", "linux64"):
-        word_bits = 64
-
-# Fall back to the word size of the host.
-if word_bits is None:
-    word_bits = 64 if platform.architecture()[0] == "64bit" else 32
-
-# Need a platform name to use as a key in variant files.
-if args.platform:
-    variant_platform = args.platform.split("-")[0]
-elif platform.system() == "Windows":
-    variant_platform = "win64" if word_bits == 64 else "win32"
-elif platform.system() == "Linux":
-    variant_platform = "linux64" if word_bits == 64 else "linux"
-elif platform.system() == "Darwin":
-    variant_platform = "macosx64"
-else:
-    variant_platform = "other"
 
 env["LD_LIBRARY_PATH"] = ":".join(
     d
@@ -451,7 +440,7 @@ CONFIGURE_ARGS += " --prefix={OBJDIR}/dist".format(OBJDIR=quote(OBJDIR))
 # Generate a mozconfig.
 with open(mozconfig, "wt") as fh:
     if AUTOMATION and platform.system() == "Windows":
-        fh.write('. "$topsrcdir/build/%s/mozconfig.vs-latest"\n' % variant_platform)
+        fh.write('. "$topsrcdir/build/mozconfig.clang-cl"\n')
     fh.write("ac_add_options --enable-project=js\n")
     fh.write("ac_add_options " + CONFIGURE_ARGS + "\n")
     fh.write("mk_add_options MOZ_OBJDIR=" + quote(OBJDIR) + "\n")
@@ -581,6 +570,10 @@ if use_minidump:
     for v in ("JSTESTS_EXTRA_ARGS", "JITTEST_EXTRA_ARGS"):
         env[v] = "--args='--dll %s' %s" % (injector_lib, env.get(v, ""))
 
+# Report longest running jit-tests in automation.
+env["JITTEST_EXTRA_ARGS"] = "--show-slow " + env.get("JITTEST_EXTRA_ARGS", "")
+env["JSTESTS_EXTRA_ARGS"] = "--show-slow " + env.get("JSTESTS_EXTRA_ARGS", "")
+
 # Always run all enabled tests, even if earlier ones failed. But return the
 # first failed status.
 results = [("(make-nonempty)", 0)]
@@ -675,10 +668,11 @@ if args.variant == "wasi":
 
 # Generate stacks from minidumps.
 if use_minidump:
-    venv_python = os.path.join(OBJDIR, "_virtualenvs", "build", "bin", "python3")
     run_command(
         [
-            venv_python,
+            mach,
+            "python",
+            "--virtualenv=build",
             os.path.join(DIR.source, "testing/mozbase/mozcrash/mozcrash/mozcrash.py"),
             os.getenv("TMPDIR", "/tmp"),
             os.path.join(OBJDIR, "dist/crashreporter-symbols"),

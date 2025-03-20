@@ -1,4 +1,13 @@
 #define MOZ_UNIFIED_BUILD
+#include "jit/Ion.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "jit/Ion.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "jit/Ion.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "jit/IonAnalysis.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "jit/IonAnalysis.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -42,14 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "jit/IonOptimizationLevels.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "jit/JSJitFrameIter.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JSJitFrameIter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "jit/JSJitFrameIter.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

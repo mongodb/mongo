@@ -5,6 +5,6 @@ authors = ["Christian Holler"]
 license = "MPL-2.0"
 
 [dependencies]
-wasm-smith = "0.12.5"
+wasm-smith = "0.205.0"
 arbitrary = { version = "1.0.0", features = ["derive"] }
 libc = "0.2"

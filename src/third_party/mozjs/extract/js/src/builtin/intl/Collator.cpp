@@ -27,7 +27,6 @@
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/Runtime.h"
 #include "vm/StringType.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/GeckoProfiler-inl.h"
 #include "vm/JSObject-inl.h"
@@ -74,7 +73,7 @@ static const JSFunctionSpec collator_static_methods[] = {
 
 static const JSFunctionSpec collator_methods[] = {
     JS_SELF_HOSTED_FN("resolvedOptions", "Intl_Collator_resolvedOptions", 0, 0),
-    JS_FN(js_toSource_str, collator_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", collator_toSource, 0, 0), JS_FS_END};
 
 static const JSPropertySpec collator_properties[] = {
     JS_SELF_HOSTED_GET("compare", "$Intl_Collator_compare_get", 0),
@@ -468,5 +467,22 @@ bool js::intl_isUpperCaseFirst(JSContext* cx, unsigned argc, Value* vp) {
   }
 
   args.rval().setBoolean(isUpperFirst);
+  return true;
+}
+
+bool js::intl_isIgnorePunctuation(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  MOZ_ASSERT(args.length() == 1);
+  MOZ_ASSERT(args[0].isString());
+
+  SharedIntlData& sharedIntlData = cx->runtime()->sharedIntlData.ref();
+
+  RootedString locale(cx, args[0].toString());
+  bool isIgnorePunctuation;
+  if (!sharedIntlData.isIgnorePunctuation(cx, locale, &isIgnorePunctuation)) {
+    return false;
+  }
+
+  args.rval().setBoolean(isIgnorePunctuation);
   return true;
 }

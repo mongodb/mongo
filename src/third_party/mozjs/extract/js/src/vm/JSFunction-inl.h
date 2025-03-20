@@ -9,11 +9,10 @@
 
 #include "vm/JSFunction.h"
 
-#include "gc/Allocator.h"
 #include "gc/GCProbes.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "gc/ObjectKind-inl.h"
+#include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
 
@@ -21,11 +20,22 @@ namespace js {
 
 inline const char* GetFunctionNameBytes(JSContext* cx, JSFunction* fun,
                                         UniqueChars* bytes) {
-  if (JSAtom* name = fun->explicitName()) {
+  if (fun->isAccessorWithLazyName()) {
+    JSAtom* name = fun->getAccessorNameForLazy(cx);
+    if (!name) {
+      return nullptr;
+    }
+
     *bytes = StringToNewUTF8CharsZ(cx, *name);
     return bytes->get();
   }
-  return js_anonymous_str;
+
+  if (JSAtom* name = fun->fullExplicitName()) {
+    *bytes = StringToNewUTF8CharsZ(cx, *name);
+    return bytes->get();
+  }
+
+  return "anonymous";
 }
 
 } /* namespace js */
@@ -110,15 +120,24 @@ inline bool JSFunction::getUnresolvedLength(JSContext* cx,
   return JSFunction::getLength(cx, fun, length);
 }
 
+inline JSAtom* JSFunction::getUnresolvedName(JSContext* cx) {
+  if (isAccessorWithLazyName()) {
+    return getAccessorNameForLazy(cx);
+  }
+
+  return infallibleGetUnresolvedName(cx);
+}
+
 inline JSAtom* JSFunction::infallibleGetUnresolvedName(JSContext* cx) {
   MOZ_ASSERT(!IsInternalFunctionObject(*this));
+  MOZ_ASSERT(!isAccessorWithLazyName());
   MOZ_ASSERT(!hasResolvedName());
 
-  if (JSAtom* name = explicitOrInferredName()) {
+  if (JSAtom* name = fullExplicitOrInferredName()) {
     return name;
   }
 
-  return cx->names().empty;
+  return cx->names().empty_;
 }
 
 /* static */ inline bool JSFunction::getAllocKindForThis(

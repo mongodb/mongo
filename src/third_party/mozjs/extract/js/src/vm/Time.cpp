@@ -8,9 +8,6 @@
 
 #include "vm/Time.h"
 
-#include "mozilla/DebugOnly.h"
-#include "mozilla/MathAlgorithms.h"
-
 #ifdef SOLARIS
 #  define _REENTRANT 1
 #endif
@@ -22,9 +19,8 @@
 #ifdef XP_WIN
 #  include <windef.h>
 #  include <winbase.h>
-#  include <crtdbg.h>   /* for _CrtSetReportMode */
-#  include <mmsystem.h> /* for timeBegin/EndPeriod */
-#  include <stdlib.h>   /* for _set_invalid_parameter_handler */
+#  include <crtdbg.h> /* for _CrtSetReportMode */
+#  include <stdlib.h> /* for _set_invalid_parameter_handler */
 #endif
 
 #ifdef XP_UNIX
@@ -36,8 +32,6 @@ extern int gettimeofday(struct timeval* tv);
 #  include <sys/time.h>
 
 #endif /* XP_UNIX */
-
-using mozilla::DebugOnly;
 
 #if defined(XP_UNIX)
 int64_t PRMJ_Now() {
@@ -55,7 +49,7 @@ int64_t PRMJ_Now() {
 #else
 
 // Returns the number of microseconds since the Unix epoch.
-static double FileTimeToUnixMicroseconds(const FILETIME& ft) {
+static int64_t FileTimeToUnixMicroseconds(const FILETIME& ft) {
   // Get the time in 100ns intervals.
   int64_t t = (int64_t(ft.dwHighDateTime) << 32) | int64_t(ft.dwLowDateTime);
 
@@ -65,170 +59,13 @@ static double FileTimeToUnixMicroseconds(const FILETIME& ft) {
   t -= TimeToEpochIn100ns;
 
   // Divide by 10 to convert to microseconds.
-  return double(t) * 0.1;
+  return t / 10;
 }
 
-struct CalibrationData {
-  double freq;         /* The performance counter frequency */
-  double offset;       /* The low res 'epoch' */
-  double timer_offset; /* The high res 'epoch' */
-
-  bool calibrated;
-
-  CRITICAL_SECTION data_lock;
-};
-
-static CalibrationData calibration = {0};
-
-static void NowCalibrate() {
-  MOZ_ASSERT(calibration.freq > 0);
-
-  // By wrapping a timeBegin/EndPeriod pair of calls around this loop,
-  // the loop seems to take much less time (1 ms vs 15ms) on Vista.
-  timeBeginPeriod(1);
-  FILETIME ft, ftStart;
-  GetSystemTimeAsFileTime(&ftStart);
-  do {
-    GetSystemTimeAsFileTime(&ft);
-  } while (memcmp(&ftStart, &ft, sizeof(ft)) == 0);
-  timeEndPeriod(1);
-
-  LARGE_INTEGER now;
-  QueryPerformanceCounter(&now);
-
-  calibration.offset = FileTimeToUnixMicroseconds(ft);
-  calibration.timer_offset = double(now.QuadPart);
-  calibration.calibrated = true;
-}
-
-static const unsigned DataLockSpinCount = 4096;
-
-static void(WINAPI* pGetSystemTimePreciseAsFileTime)(LPFILETIME) = nullptr;
-
-void PRMJ_NowInit() {
-  memset(&calibration, 0, sizeof(calibration));
-
-  // According to the documentation, QueryPerformanceFrequency will never
-  // return false or return a non-zero frequency on systems that run
-  // Windows XP or later. Also, the frequency is fixed so we only have to
-  // query it once.
-  LARGE_INTEGER liFreq;
-  DebugOnly<BOOL> res = QueryPerformanceFrequency(&liFreq);
-  MOZ_ASSERT(res);
-  calibration.freq = double(liFreq.QuadPart);
-  MOZ_ASSERT(calibration.freq > 0.0);
-
-  InitializeCriticalSectionAndSpinCount(&calibration.data_lock,
-                                        DataLockSpinCount);
-
-  // Windows 8 has a new API function we can use.
-  if (HMODULE h = GetModuleHandleA("kernel32.dll")) {
-    pGetSystemTimePreciseAsFileTime = (void(WINAPI*)(LPFILETIME))GetProcAddress(
-        h, "GetSystemTimePreciseAsFileTime");
-  }
-}
-
-void PRMJ_NowShutdown() { DeleteCriticalSection(&calibration.data_lock); }
-
-#  define MUTEX_LOCK(m) EnterCriticalSection(m)
-#  define MUTEX_UNLOCK(m) LeaveCriticalSection(m)
-#  define MUTEX_SETSPINCOUNT(m, c) SetCriticalSectionSpinCount((m), (c))
-
-// Please see bug 363258 for why the win32 timing code is so complex.
 int64_t PRMJ_Now() {
-  if (pGetSystemTimePreciseAsFileTime) {
-    // Windows 8 has a new API function that does all the work.
-    FILETIME ft;
-    pGetSystemTimePreciseAsFileTime(&ft);
-    return int64_t(FileTimeToUnixMicroseconds(ft));
-  }
-
-  bool calibrated = false;
-  bool needsCalibration = !calibration.calibrated;
-  double cachedOffset = 0.0;
-  while (true) {
-    if (needsCalibration) {
-      MUTEX_LOCK(&calibration.data_lock);
-
-      // Recalibrate only if no one else did before us.
-      if (calibration.offset == cachedOffset) {
-        // Since calibration can take a while, make any other
-        // threads immediately wait.
-        MUTEX_SETSPINCOUNT(&calibration.data_lock, 0);
-
-        NowCalibrate();
-
-        calibrated = true;
-
-        // Restore spin count.
-        MUTEX_SETSPINCOUNT(&calibration.data_lock, DataLockSpinCount);
-      }
-
-      MUTEX_UNLOCK(&calibration.data_lock);
-    }
-
-    // Calculate a low resolution time.
-    FILETIME ft;
-    GetSystemTimeAsFileTime(&ft);
-    double lowresTime = FileTimeToUnixMicroseconds(ft);
-
-    // Grab high resolution time.
-    LARGE_INTEGER now;
-    QueryPerformanceCounter(&now);
-    double highresTimerValue = double(now.QuadPart);
-
-    MUTEX_LOCK(&calibration.data_lock);
-    double highresTime = calibration.offset +
-                         PRMJ_USEC_PER_SEC *
-                             (highresTimerValue - calibration.timer_offset) /
-                             calibration.freq;
-    cachedOffset = calibration.offset;
-    MUTEX_UNLOCK(&calibration.data_lock);
-
-    // Assume the NT kernel ticks every 15.6 ms. Unfortunately there's no
-    // good way to determine this (NtQueryTimerResolution is an undocumented
-    // API), but 15.6 ms seems to be the max possible value. Hardcoding 15.6
-    // means we'll recalibrate if the highres and lowres timers diverge by
-    // more than 30 ms.
-    static const double KernelTickInMicroseconds = 15625.25;
-
-    // Check for clock skew.
-    double diff = lowresTime - highresTime;
-
-    // For some reason that I have not determined, the skew can be
-    // up to twice a kernel tick. This does not seem to happen by
-    // itself, but I have only seen it triggered by another program
-    // doing some kind of file I/O. The symptoms are a negative diff
-    // followed by an equally large positive diff.
-    if (mozilla::Abs(diff) <= 2 * KernelTickInMicroseconds) {
-      // No detectable clock skew.
-      return int64_t(highresTime);
-    }
-
-    if (calibrated) {
-      // If we already calibrated once this instance, and the
-      // clock is still skewed, then either the processor(s) are
-      // wildly changing clockspeed or the system is so busy that
-      // we get switched out for long periods of time. In either
-      // case, it would be infeasible to make use of high
-      // resolution results for anything, so let's resort to old
-      // behavior for this call. It's possible that in the
-      // future, the user will want the high resolution timer, so
-      // we don't disable it entirely.
-      return int64_t(lowresTime);
-    }
-
-    // It is possible that when we recalibrate, we will return a
-    // value less than what we have returned before; this is
-    // unavoidable. We cannot tell the different between a
-    // faulty QueryPerformanceCounter implementation and user
-    // changes to the operating system time. Since we must
-    // respect user changes to the operating system time, we
-    // cannot maintain the invariant that Date.now() never
-    // decreases; the old implementation has this behavior as
-    // well.
-    needsCalibration = true;
-  }
+  FILETIME ft;
+  GetSystemTimePreciseAsFileTime(&ft);
+  return FileTimeToUnixMicroseconds(ft);
 }
 #endif
 

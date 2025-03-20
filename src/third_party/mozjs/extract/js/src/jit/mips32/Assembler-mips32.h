@@ -87,6 +87,11 @@ static constexpr Register WasmCallRefCallScratchReg0 = ABINonArgReg0;
 static constexpr Register WasmCallRefCallScratchReg1 = ABINonArgReg1;
 static constexpr Register WasmCallRefReg = ABINonArgReg3;
 
+// Registers used for wasm tail calls operations.
+static constexpr Register WasmTailCallInstanceScratchReg = ABINonArgReg1;
+static constexpr Register WasmTailCallRAScratchReg = ra;
+static constexpr Register WasmTailCallFPScratchReg = ABINonArgReg3;
+
 // Register used as a scratch along the return path in the fast js -> wasm stub
 // code. This must not overlap ReturnReg, JSReturnOperand, or InstanceReg.
 // It must be a volatile register.

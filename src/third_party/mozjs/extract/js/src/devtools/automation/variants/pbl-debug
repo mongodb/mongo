@@ -1,0 +1,7 @@
+{
+    "configure-args": "--enable-portable-baseline-interp --enable-portable-baseline-interp-force",
+    "debug": true,
+    "env": {
+        "JSTESTS_EXTRA_ARGS": "--jitflags=debug"
+    }
+}

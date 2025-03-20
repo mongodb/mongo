@@ -19,6 +19,7 @@
 #ifndef wasm_debug_h
 #define wasm_debug_h
 
+#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin
 #include "js/HashTable.h"
 #include "wasm/WasmCode.h"
 #include "wasm/WasmCodegenTypes.h"
@@ -106,8 +107,9 @@ class DebugState {
 
   [[nodiscard]] bool getLineOffsets(size_t lineno, Vector<uint32_t>* offsets);
   [[nodiscard]] bool getAllColumnOffsets(Vector<ExprLoc>* offsets);
-  [[nodiscard]] bool getOffsetLocation(uint32_t offset, size_t* lineno,
-                                       size_t* column);
+  [[nodiscard]] bool getOffsetLocation(
+      uint32_t offset, uint32_t* lineno,
+      JS::LimitedColumnNumberOneOrigin* column);
 
   // The Code can track enter/leave frame events. Any such event triggers
   // debug trap. The enter/leave frame events enabled or disabled across

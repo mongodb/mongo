@@ -218,7 +218,29 @@ static ImmediateType EncodeImmediateFuncType(const FuncType& funcType) {
 //=========================================================================
 // FuncType
 
-void FuncType::initImmediateTypeId() {
+void FuncType::initImmediateTypeId(bool gcEnabled, bool isFinal,
+                                   const TypeDef* superTypeDef,
+                                   uint32_t recGroupLength) {
+  // To improve the performance of the structural type check in
+  // the call_indirect function prologue, we attempt to encode the
+  // entire function type into an immediate such that bitwise equality
+  // implies structural equality. With the GC proposal, we don't
+  // want to generalize the immediate form for the new type system, so
+  // we don't use it when a type is non-final (i.e. may have sub types), or
+  // has super types, or is in a recursion group with other types.
+  //
+  // If non-final types are allowed, then the type can have subtypes, and we
+  // should therefore do a full subtype check on call_indirect, which
+  // doesn't work well with immediates. If the type has a super type, the
+  // same reason applies. And finally, types in recursion groups of
+  // size > 1 may not be considered equivalent even if they are
+  // structurally equivalent in every respect.
+  if (gcEnabled && (!isFinal || superTypeDef || recGroupLength != 1)) {
+    immediateTypeId_ = NO_IMMEDIATE_TYPE_ID;
+    return;
+  }
+
+  // Otherwise, try to encode this function type into an immediate.
   if (!IsImmediateFuncType(*this)) {
     immediateTypeId_ = NO_IMMEDIATE_TYPE_ID;
     return;
@@ -261,7 +283,7 @@ static inline CheckedInt32 RoundUpToAlignment(CheckedInt32 address,
   return ((address + (align - 1)) / align) * align;
 }
 
-CheckedInt32 StructLayout::addField(FieldType type) {
+CheckedInt32 StructLayout::addField(StorageType type) {
   uint32_t fieldSize = type.size();
   uint32_t fieldAlignment = type.alignmentInStruct();
 
@@ -293,24 +315,36 @@ CheckedInt32 StructLayout::addField(FieldType type) {
 }
 
 CheckedInt32 StructLayout::close() {
-  return RoundUpToAlignment(sizeSoFar, structAlignment);
+  CheckedInt32 size = RoundUpToAlignment(sizeSoFar, structAlignment);
+  // What we are computing into `size` is the size of
+  // WasmGcObject::inlineData_, or the size of the outline data area.  Either
+  // way, it is helpful if the area size is an integral number of machine
+  // words, since this would make any initialisation loop for inline
+  // allocation able to operate on machine word sized units, should we decide
+  // to do inline allocation.
+  if (structAlignment < sizeof(uintptr_t)) {
+    size = RoundUpToAlignment(size, sizeof(uintptr_t));
+  }
+  return size;
 }
 
 bool StructType::init() {
   StructLayout layout;
-  for (StructField& field : fields_) {
+  for (FieldType& field : fields_) {
     CheckedInt32 offset = layout.addField(field.type);
     if (!offset.isValid()) {
       return false;
     }
-    field.offset = offset.value();
+    if (!fieldOffsets_.append(offset.value())) {
+      return false;
+    }
     if (!field.type.isRefRepr()) {
       continue;
     }
 
     bool isOutline;
     uint32_t adjustedOffset;
-    WasmStructObject::fieldOffsetToAreaAndOffset(field.type, field.offset,
+    WasmStructObject::fieldOffsetToAreaAndOffset(field.type, offset.value(),
                                                  &isOutline, &adjustedOffset);
     if (isOutline) {
       if (!outlineTraceOffsets_.append(adjustedOffset)) {
@@ -330,6 +364,21 @@ bool StructType::init() {
   size_ = size.value();
 
   return true;
+}
+
+/* static */
+bool StructType::createImmutable(const ValTypeVector& types,
+                                 StructType* struct_) {
+  FieldTypeVector fields;
+  if (!fields.resize(types.length())) {
+    return false;
+  }
+  for (size_t i = 0; i < types.length(); i++) {
+    fields[i].type = StorageType(types[i].packed());
+    fields[i].isMutable = false;
+  }
+  *struct_ = StructType(std::move(fields));
+  return struct_->init();
 }
 
 size_t StructType::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
@@ -365,8 +414,8 @@ size_t TypeDef::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
 // SuperTypeVector
 
 /* static */
-size_t SuperTypeVector::offsetOfTypeDefInVector(uint32_t typeDefDepth) {
-  return offsetof(SuperTypeVector, types_) + sizeof(void*) * typeDefDepth;
+size_t SuperTypeVector::offsetOfSTVInVector(uint32_t subTypingDepth) {
+  return offsetof(SuperTypeVector, types_) + sizeof(void*) * subTypingDepth;
 }
 
 /* static */
@@ -415,10 +464,11 @@ const SuperTypeVector* SuperTypeVector::createMultipleForRecGroup(
 
     // Make the typedef and the vector point at each other.
     typeDef.setSuperTypeVector(currentVector);
-    currentVector->setTypeDef(&typeDef);
+    currentVector->typeDef_ = &typeDef;
+    currentVector->subTypingDepth_ = typeDef.subTypingDepth();
 
     // Every vector stores all ancestor types and itself.
-    currentVector->setLength(SuperTypeVector::lengthForTypeDef(typeDef));
+    currentVector->length_ = SuperTypeVector::lengthForTypeDef(typeDef);
 
     // Initialize the entries in the vector
     const TypeDef* currentTypeDef = &typeDef;
@@ -428,7 +478,7 @@ const SuperTypeVector* SuperTypeVector::createMultipleForRecGroup(
       // If this entry is required just to hit the minimum size, then
       // initialize it to null.
       if (reverseIndex > typeDef.subTypingDepth()) {
-        currentVector->setType(reverseIndex, nullptr);
+        currentVector->types_[reverseIndex] = nullptr;
         continue;
       }
 
@@ -436,7 +486,7 @@ const SuperTypeVector* SuperTypeVector::createMultipleForRecGroup(
       // currentTypeDef.
       MOZ_ASSERT(reverseIndex == currentTypeDef->subTypingDepth());
 
-      currentVector->setType(reverseIndex, currentTypeDef->superTypeVector());
+      currentVector->types_[reverseIndex] = currentTypeDef->superTypeVector();
       currentTypeDef = currentTypeDef->superTypeDef();
     }
 

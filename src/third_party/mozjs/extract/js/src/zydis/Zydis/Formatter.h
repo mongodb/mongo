@@ -176,16 +176,16 @@ typedef enum ZydisFormatterProperty_
     /**
      * Controls the padding of absolute address values.
      *
-     * Pass `ZYDIS_PADDING_DISABLED` to disable padding, `ZYDIS_PADDING_AUTO` to padd all
-     * addresses to the current stack width (hexadecimal only), or any other integer value for
+     * Pass `ZYDIS_PADDING_DISABLED` to disable padding, `ZYDIS_PADDING_AUTO` to pad all
+     * addresses to the current address width (hexadecimal only), or any other integer value for
      * custom padding.
      */
     ZYDIS_FORMATTER_PROP_ADDR_PADDING_ABSOLUTE,
     /**
      * Controls the padding of relative address values.
      *
-     * Pass `ZYDIS_PADDING_DISABLED` to disable padding, `ZYDIS_PADDING_AUTO` to padd all
-     * addresses to the current stack width (hexadecimal only), or any other integer value for
+     * Pass `ZYDIS_PADDING_DISABLED` to disable padding, `ZYDIS_PADDING_AUTO` to pad all
+     * addresses to the current address width (hexadecimal only), or any other integer value for
      * custom padding.
      */
     ZYDIS_FORMATTER_PROP_ADDR_PADDING_RELATIVE,
@@ -262,6 +262,8 @@ typedef enum ZydisFormatterProperty_
      * Controls the letter-case for decorators.
      *
      * Pass `ZYAN_TRUE` as value to format in uppercase or `ZYAN_FALSE` to format in lowercase.
+     *
+     * WARNING: this is currently not implemented (ignored).
      */
     ZYDIS_FORMATTER_PROP_UPPERCASE_DECORATORS,
 
@@ -798,75 +800,75 @@ struct ZydisFormatter_
      */
     ZyanBool print_branch_size;
     /**
-     * The `ZYDIS_FORMATTER_DETAILED_PREFIXES` property.
+     * The `ZYDIS_FORMATTER_PROP_DETAILED_PREFIXES` property.
      */
     ZyanBool detailed_prefixes;
     /**
-     * The `ZYDIS_FORMATTER_ADDR_BASE` property.
+     * The `ZYDIS_FORMATTER_PROP_ADDR_BASE` property.
      */
     ZydisNumericBase addr_base;
     /**
-     * The `ZYDIS_FORMATTER_ADDR_SIGNEDNESS` property.
+     * The `ZYDIS_FORMATTER_PROP_ADDR_SIGNEDNESS` property.
      */
     ZydisSignedness addr_signedness;
     /**
-     * The `ZYDIS_FORMATTER_ADDR_PADDING_ABSOLUTE` property.
+     * The `ZYDIS_FORMATTER_PROP_ADDR_PADDING_ABSOLUTE` property.
      */
     ZydisPadding addr_padding_absolute;
     /**
-     * The `ZYDIS_FORMATTER_ADDR_PADDING_RELATIVE` property.
+     * The `ZYDIS_FORMATTER_PROP_ADDR_PADDING_RELATIVE` property.
      */
     ZydisPadding addr_padding_relative;
     /**
-     * The `ZYDIS_FORMATTER_DISP_BASE` property.
+     * The `ZYDIS_FORMATTER_PROP_DISP_BASE` property.
      */
     ZydisNumericBase disp_base;
     /**
-     * The `ZYDIS_FORMATTER_DISP_SIGNEDNESS` property.
+     * The `ZYDIS_FORMATTER_PROP_DISP_SIGNEDNESS` property.
      */
     ZydisSignedness disp_signedness;
     /**
-     * The `ZYDIS_FORMATTER_DISP_PADDING` property.
+     * The `ZYDIS_FORMATTER_PROP_DISP_PADDING` property.
      */
     ZydisPadding disp_padding;
     /**
-     * The `ZYDIS_FORMATTER_IMM_BASE` property.
+     * The `ZYDIS_FORMATTER_PROP_IMM_BASE` property.
      */
     ZydisNumericBase imm_base;
     /**
-     * The `ZYDIS_FORMATTER_IMM_SIGNEDNESS` property.
+     * The `ZYDIS_FORMATTER_PROP_IMM_SIGNEDNESS` property.
      */
     ZydisSignedness imm_signedness;
     /**
-     * The `ZYDIS_FORMATTER_IMM_PADDING` property.
+     * The `ZYDIS_FORMATTER_PROP_IMM_PADDING` property.
      */
     ZydisPadding imm_padding;
     /**
-     * The `ZYDIS_FORMATTER_UPPERCASE_PREFIXES` property.
+     * The `ZYDIS_FORMATTER_PROP_UPPERCASE_PREFIXES` property.
      */
     ZyanI32 case_prefixes;
     /**
-     * The `ZYDIS_FORMATTER_UPPERCASE_MNEMONIC` property.
+     * The `ZYDIS_FORMATTER_PROP_UPPERCASE_MNEMONIC` property.
      */
     ZyanI32 case_mnemonic;
     /**
-     * The `ZYDIS_FORMATTER_UPPERCASE_REGISTERS` property.
+     * The `ZYDIS_FORMATTER_PROP_UPPERCASE_REGISTERS` property.
      */
     ZyanI32 case_registers;
     /**
-     * The `ZYDIS_FORMATTER_UPPERCASE_TYPECASTS` property.
+     * The `ZYDIS_FORMATTER_PROP_UPPERCASE_TYPECASTS` property.
      */
     ZyanI32 case_typecasts;
     /**
-     * The `ZYDIS_FORMATTER_UPPERCASE_DECORATORS` property.
+     * The `ZYDIS_FORMATTER_PROP_UPPERCASE_DECORATORS` property.
      */
     ZyanI32 case_decorators;
     /**
-     * The `ZYDIS_FORMATTER_HEX_UPPERCASE` property.
+     * The `ZYDIS_FORMATTER_PROP_HEX_UPPERCASE` property.
      */
     ZyanBool hex_uppercase;
     /**
-     * The `ZYDIS_FORMATTER_HEX_FORCE_LEADING_NUMBER` property.
+     * The `ZYDIS_FORMATTER_PROP_HEX_FORCE_LEADING_NUMBER` property.
      */
     ZyanBool hex_force_leading_number;
     /**

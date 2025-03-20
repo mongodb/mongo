@@ -34,6 +34,13 @@ PlainObject* ObjectCreateWithTemplate(JSContext* cx,
 
 [[nodiscard]] bool obj_create(JSContext* cx, unsigned argc, JS::Value* vp);
 
+[[nodiscard]] bool obj_keys(JSContext* cx, unsigned argc, JS::Value* vp);
+
+// Similar to calling obj_keys followed by asking the length property, except
+// that we do not materialize the keys array.
+[[nodiscard]] bool obj_keys_length(JSContext* cx, HandleObject obj,
+                                   int32_t& length);
+
 [[nodiscard]] bool obj_is(JSContext* cx, unsigned argc, JS::Value* vp);
 
 [[nodiscard]] bool obj_toString(JSContext* cx, unsigned argc, JS::Value* vp);

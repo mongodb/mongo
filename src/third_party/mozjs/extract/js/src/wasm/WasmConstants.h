@@ -21,7 +21,8 @@
 
 #include <stdint.h>
 
-#include "wasm/WasmIntrinsicGenerated.h"
+#include "wasm/WasmBuiltinModuleGenerated.h"
+#include "wasm/WasmSerialize.h"
 
 namespace js {
 namespace wasm {
@@ -63,8 +64,8 @@ enum class TypeCode {
   F64 = 0x7c,   // SLEB128(-0x04)
   V128 = 0x7b,  // SLEB128(-0x05)
 
-  I8 = 0x7a,   // SLEB128(-0x06)
-  I16 = 0x79,  // SLEB128(-0x07)
+  I8 = 0x78,   // SLEB128(-0x08)
+  I16 = 0x77,  // SLEB128(-0x09)
 
   // A function pointer with any signature
   FuncRef = 0x70,  // SLEB128(-0x10)
@@ -79,25 +80,34 @@ enum class TypeCode {
   EqRef = 0x6d,  // SLEB128(-0x13)
 
   // Type constructor for nullable reference types.
-  NullableRef = 0x6c,  // SLEB128(-0x14)
+  NullableRef = 0x63,  // SLEB128(-0x1D)
 
   // Type constructor for non-nullable reference types.
-  Ref = 0x6b,  // SLEB128(-0x15)
+  Ref = 0x64,  // SLEB128(-0x1C)
+
+  // A reference to an unboxed 31-bit integer.
+  I31Ref = 0x6c,  // SLEB128(-0x14)
 
   // A null reference in the extern hierarchy.
-  NullExternRef = 0x69,  // SLEB128(-0x17)
+  NullExternRef = 0x72,  // SLEB128(-0x0E)
 
   // A null reference in the func hierarchy.
-  NullFuncRef = 0x68,  // SLEB128(-0x18)
+  NullFuncRef = 0x73,  // SLEB128(-0x0D)
+
+  // A null reference in the exn hierarchy.
+  NullExnRef = 0x74,  // SLEB128(-0x0C)
 
   // A reference to any struct value.
-  StructRef = 0x67,  // SLEB128(-0x19)
+  StructRef = 0x6b,  // SLEB128(-0x15)
 
   // A reference to any array value.
-  ArrayRef = 0x66,  // SLEB128(-0x1A)
+  ArrayRef = 0x6a,  // SLEB128(-0x16)
+
+  // A reference to an exception value.
+  ExnRef = 0x69,  // SLEB128(-0x17)
 
   // A null reference in the any hierarchy.
-  NullAnyRef = 0x65,  // SLEB128(-0x1B)
+  NullAnyRef = 0x71,  // SLEB128(-0x0F)
 
   // Type constructor for function types
   Func = 0x60,  // SLEB128(-0x20)
@@ -115,13 +125,13 @@ enum class TypeCode {
   BlockVoid = 0x40,  // SLEB128(-0x40)
 
   // Type constructor for recursion groups - gc proposal
-  RecGroup = 0x4f,
-
-  // TODO: update wasm-tools to use the correct prefix
-  RecGroupOld = 0x45,
+  RecGroup = 0x4e,  // SLEB128(-0x31)
 
   // Type prefix for parent types - gc proposal
-  SubType = 0x50,
+  SubNoFinalType = 0x50,  // SLEB128(-0x30)
+
+  // Type prefix for final types - gc proposal
+  SubFinalType = 0x4f,  // SLEB128(-0x32)
 
   Limit = 0x80
 };
@@ -142,11 +152,26 @@ static constexpr TypeCode AbstractReferenceTypeCode = TypeCode::ExternRef;
 
 static constexpr TypeCode AbstractTypeRefCode = TypeCode::Ref;
 
-// A wasm::Trap represents a wasm-defined trap that can occur during execution
-// which triggers a WebAssembly.RuntimeError. Generated code may jump to a Trap
-// symbolically, passing the bytecode offset to report as the trap offset. The
-// generated jump will be bound to a tiny stub which fills the offset and
+// wasm traps are machine instructions that can fail to execute for reasons
+// that have to do with some condition in the wasm that they were compiled
+// from.  The failure manifests as a (machine-level) exception of some sort,
+// which leads execution to a signal handler, and is eventually reported as a
+// WebAssembly.RuntimeError.  Generated code may also jump to a Trap
+// symbolically, passing the bytecode offset to report as the trap offset.
+// The generated jump will be bound to a tiny stub which fills the offset and
 // then jumps to a per-Trap shared stub at the end of the module.
+//
+// Traps are described by a value from Trap and, in debug builds only, a value
+// from TrapInsn.
+//
+// * A Trap indicates why the trap has happened and is used to construct the
+//   WebAssembly.Runtime message.
+//
+// * A TrapMachineInsn (not defined in this file) describes roughly what kind
+//   of machine instruction has caused the trap.  This is used only for
+//   validation of trap placement in debug builds, in
+//   ModuleGenerator::finishMetadataTier, and is not necessary for execution
+//   of wasm code.
 
 enum class Trap {
   // The Unreachable opcode has been executed.
@@ -184,10 +209,6 @@ enum class Trap {
 
   Limit
 };
-
-// The representation of a null reference value throughout the compiler.
-
-static const intptr_t NULLREF_VALUE = intptr_t((void*)nullptr);
 
 enum class DefinitionKind {
   Function = 0x00,
@@ -230,8 +251,8 @@ enum class ElemSegmentKind : uint32_t {
 };
 
 enum class ElemSegmentPayload : uint32_t {
-  ExternIndex = 0x0,
-  ElemExpression = 0x4,
+  Indices = 0x0,
+  Expressions = 0x4,
 };
 
 enum class TagKind {
@@ -250,6 +271,7 @@ enum class Op {
   Catch = 0x07,
   Throw = 0x08,
   Rethrow = 0x09,
+  ThrowRef = 0x0a,
   End = 0x0b,
   Br = 0x0c,
   BrIf = 0x0d,
@@ -259,7 +281,10 @@ enum class Op {
   // Call operators
   Call = 0x10,
   CallIndirect = 0x11,
+  ReturnCall = 0x12,
+  ReturnCallIndirect = 0x13,
   CallRef = 0x14,
+  ReturnCallRef = 0x15,
 
   // Additional exception operators
   Delegate = 0x18,
@@ -269,6 +294,9 @@ enum class Op {
   Drop = 0x1a,
   SelectNumeric = 0x1b,
   SelectTyped = 0x1c,
+
+  // Additional exception operators
+  TryTable = 0x1f,
 
   // Variable access
   LocalGet = 0x20,
@@ -456,11 +484,11 @@ enum class Op {
   RefFunc = 0xd2,
 
   // Function references
-  RefAsNonNull = 0xd3,
-  BrOnNull = 0xd4,
+  RefAsNonNull = 0xd4,
+  BrOnNull = 0xd5,
 
   // GC (experimental)
-  RefEq = 0xd5,
+  RefEq = 0xd3,
 
   // Function references
   BrOnNonNull = 0xd6,
@@ -480,52 +508,45 @@ inline bool IsPrefixByte(uint8_t b) { return b >= uint8_t(Op::FirstPrefix); }
 // Opcodes in the GC opcode space.
 enum class GcOp {
   // Structure operations
-  StructNew = 0x7,
-  StructNewDefault = 0x8,
-  StructGet = 0x03,
-  StructGetS = 0x04,
-  StructGetU = 0x05,
-  StructSet = 0x06,
+  StructNew = 0x0,
+  StructNewDefault = 0x1,
+  StructGet = 0x02,
+  StructGetS = 0x03,
+  StructGetU = 0x04,
+  StructSet = 0x05,
 
   // Array operations
-  ArrayNew = 0x1b,
-  ArrayNewFixed = 0x1a,
-  ArrayNewDefault = 0x1c,
-  ArrayNewData = 0x1d,
-  // array.init_from_elem_static in V5 became array.new_elem in V6, changing
-  // opcodes in the process
-  ArrayInitFromElemStaticV5 = 0x10,
-  ArrayNewElem = 0x1f,
-  ArrayGet = 0x13,
-  ArrayGetS = 0x14,
-  ArrayGetU = 0x15,
-  ArraySet = 0x16,
-  ArrayLenWithTypeIndex = 0x17,
-  ArrayCopy = 0x18,
-  ArrayLen = 0x19,
+  ArrayNew = 0x6,
+  ArrayNewDefault = 0x7,
+  ArrayNewFixed = 0x8,
+  ArrayNewData = 0x9,
+  ArrayNewElem = 0xa,
+  ArrayGet = 0xb,
+  ArrayGetS = 0xc,
+  ArrayGetU = 0xd,
+  ArraySet = 0xe,
+  ArrayLen = 0xf,
+  ArrayFill = 0x10,
+  ArrayCopy = 0x11,
+  ArrayInitData = 0x12,
+  ArrayInitElem = 0x13,
 
   // Ref operations
-  RefTestV5 = 0x44,
-  RefCastV5 = 0x45,
-  BrOnCastV5 = 0x46,
-  BrOnCastHeapV5 = 0x42,
-  BrOnCastHeapNullV5 = 0x4a,
-  BrOnCastFailV5 = 0x47,
-  BrOnCastFailHeapV5 = 0x43,
-  BrOnCastFailHeapNullV5 = 0x4b,
-  RefTest = 0x40,
-  RefCast = 0x41,
-  RefTestNull = 0x48,
-  RefCastNull = 0x49,
-  BrOnCast = 0x4f,
-
-  // Dart compatibility instruction
-  RefAsStructV5 = 0x59,
-  BrOnNonStructV5 = 0x64,
+  RefTest = 0x14,
+  RefTestNull = 0x15,
+  RefCast = 0x16,
+  RefCastNull = 0x17,
+  BrOnCast = 0x18,
+  BrOnCastFail = 0x19,
 
   // Extern/any coercion operations
-  ExternInternalize = 0x70,
-  ExternExternalize = 0x71,
+  AnyConvertExtern = 0x1a,
+  ExternConvertAny = 0x1b,
+
+  // I31 operations
+  RefI31 = 0x1c,
+  I31GetS = 0x1d,
+  I31GetU = 0x1e,
 
   Limit
 };
@@ -798,10 +819,10 @@ enum class SimdOp {
   I32x4RelaxedTruncF32x4U = 0x102,
   I32x4RelaxedTruncF64x2SZero = 0x103,
   I32x4RelaxedTruncF64x2UZero = 0x104,
-  F32x4RelaxedFma = 0x105,
-  F32x4RelaxedFnma = 0x106,
-  F64x2RelaxedFma = 0x107,
-  F64x2RelaxedFnma = 0x108,
+  F32x4RelaxedMadd = 0x105,
+  F32x4RelaxedNmadd = 0x106,
+  F64x2RelaxedMadd = 0x107,
+  F64x2RelaxedNmadd = 0x108,
   I8x16RelaxedLaneSelect = 0x109,
   I16x8RelaxedLaneSelect = 0x10a,
   I32x4RelaxedLaneSelect = 0x10b,
@@ -940,19 +961,53 @@ enum class ThreadOp {
   Limit
 };
 
-enum class IntrinsicId {
+enum class BuiltinModuleFuncId {
 // ------------------------------------------------------------------------
-// These are part/suffix of the MozOp::Intrinsic operators that are emitted
-// internally when compiling intrinsic modules and are rejected by wasm
+// These are part/suffix of the MozOp::CallBuiltinModuleFunc operators that are
+// emitted internally when compiling intrinsic modules and are rejected by wasm
 // validation.
-// See wasm/WasmIntrinsic.yaml for the list.
-#define DECL_INTRINSIC_OP(op, export, sa_name, abitype, entry, idx) \
+// See wasm/WasmBuiltinModule.yaml for the list.
+#define VISIT_BUILTIN_FUNC(op, export, sa_name, abitype, entry, has_memory, \
+                           idx)                                             \
   op = idx,  // NOLINT
-  FOR_EACH_INTRINSIC(DECL_INTRINSIC_OP)
-#undef DECL_INTRINSIC_OP
+  FOR_EACH_BUILTIN_MODULE_FUNC(VISIT_BUILTIN_FUNC)
+#undef VISIT_BUILTIN_FUNC
 
   // Op limit.
   Limit
+};
+
+enum class BuiltinModuleId {
+  SelfTest = 0,
+  IntGemm,
+  JSString,
+};
+
+struct BuiltinModuleIds {
+  BuiltinModuleIds() = default;
+
+  bool selfTest = false;
+  bool intGemm = false;
+  bool jsString = false;
+
+  bool hasNone() const { return !selfTest && !intGemm && !jsString; }
+
+  WASM_CHECK_CACHEABLE_POD(selfTest, intGemm, jsString)
+};
+
+WASM_DECLARE_CACHEABLE_POD(BuiltinModuleIds)
+
+enum class StackSwitchKind {
+  SwitchToSuspendable,
+  SwitchToMain,
+  ContinueOnSuspendable,
+};
+
+enum class UpdateSuspenderStateAction {
+  Enter,
+  Suspend,
+  Resume,
+  Leave,
 };
 
 enum class MozOp {
@@ -998,9 +1053,11 @@ enum class MozOp {
   OldCallDirect,
   OldCallIndirect,
 
-  // Intrinsic modules operations. The operator has argument leb u32 to specify
-  // particular operation id. See IntrinsicId above.
-  Intrinsic,
+  // Call a builtin module funcs. The operator has argument leb u32 to specify
+  // particular operation id. See BuiltinModuleFuncId above.
+  CallBuiltinModuleFunc,
+
+  StackSwitch,
 
   Limit
 };
@@ -1053,6 +1110,7 @@ struct OpBytes {
 
 static const char NameSectionName[] = "name";
 static const char SourceMappingURLSectionName[] = "sourceMappingURL";
+static const char BranchHintingSectionName[] = "metadata.code.branch_hint";
 
 enum class NameType { Module = 0, Function = 1, Local = 2 };
 
@@ -1071,9 +1129,13 @@ static const unsigned PageMask = ((1u << PageBits) - 1);
 
 // These limits are agreed upon with other engines for consistency.
 
+static const unsigned MaxRecGroups = 1000000;
 static const unsigned MaxTypes = 1000000;
+static const unsigned MaxSubTypingDepth = 63;
+static const unsigned MaxTags = 1000000;
 static const unsigned MaxFuncs = 1000000;
 static const unsigned MaxTables = 100000;
+static const unsigned MaxMemories = 100000;
 static const unsigned MaxImports = 100000;
 static const unsigned MaxExports = 100000;
 static const unsigned MaxGlobals = 1000000;
@@ -1086,19 +1148,13 @@ static const unsigned MaxTableLength = 10000000;
 static const unsigned MaxLocals = 50000;
 static const unsigned MaxParams = 1000;
 static const unsigned MaxResults = 1000;
-static const unsigned MaxStructFields = 2000;
+static const unsigned MaxStructFields = 10000;
 static const uint64_t MaxMemory32LimitField = uint64_t(1) << 16;
 static const uint64_t MaxMemory64LimitField = uint64_t(1) << 48;
 static const unsigned MaxStringBytes = 100000;
 static const unsigned MaxModuleBytes = 1024 * 1024 * 1024;
 static const unsigned MaxFunctionBytes = 7654321;
-
-// These limits pertain to our WebAssembly implementation only, but may make
-// sense to get into the shared limits spec eventually.
-
-static const unsigned MaxRecGroups = 1000000;
-static const unsigned MaxSubTypingDepth = 31;
-static const unsigned MaxTags = 1000000;
+static const unsigned MaxArrayNewFixedElements = 10000;
 
 // Maximum payload size, in bytes, of a gc-proposal Array.  Puts it fairly
 // close to 2^31 without exposing us to potential danger at the signed-i32
@@ -1111,8 +1167,10 @@ static_assert(uint64_t(MaxArrayPayloadBytes) <
 
 // These limits pertain to our WebAssembly implementation only.
 
+static const unsigned MaxTryTableCatches = 10000;
 static const unsigned MaxBrTableElems = 1000000;
 static const unsigned MaxCodeSectionBytes = MaxModuleBytes;
+static const unsigned MaxBranchHintValue = 2;
 
 // 512KiB should be enough, considering how Rabaldr uses the stack and
 // what the standard limits are:
@@ -1124,6 +1182,21 @@ static const unsigned MaxCodeSectionBytes = MaxModuleBytes;
 // At sizeof(int64) bytes per slot this works out to about 480KiB.
 
 static const unsigned MaxFrameSize = 512 * 1024;
+
+// Limit for the amount of stacks present in the runtime.
+static const size_t SuspendableStacksMaxCount = 100;
+
+// Max size of an allocated stack.
+static const size_t SuspendableStackSize = 0x100000;
+
+// Size of additional space at the top of a suspendable stack.
+// The space is allocated to C++ handlers such as error/trap handlers,
+// or stack snapshots utilities.
+static const size_t SuspendableRedZoneSize = 0x6000;
+
+// Total size of a suspendable stack to be reserved.
+static constexpr size_t SuspendableStackPlusRedZoneSize =
+    SuspendableStackSize + SuspendableRedZoneSize;
 
 // Asserted by Decoder::readVarU32.
 

@@ -286,20 +286,17 @@ static ZydisEncodableEncoding ZydisGetEncodableEncoding(ZydisInstructionEncoding
  */
 static ZyanU8 ZydisGetMachineModeWidth(ZydisMachineMode machine_mode)
 {
-    switch (machine_mode)
+    ZYAN_ASSERT((ZyanUSize)machine_mode <= ZYDIS_MACHINE_MODE_MAX_VALUE);
+    static const ZyanU8 lookup[6] =
     {
-    case ZYDIS_MACHINE_MODE_REAL_16:
-    case ZYDIS_MACHINE_MODE_LEGACY_16:
-    case ZYDIS_MACHINE_MODE_LONG_COMPAT_16:
-        return 16;
-    case ZYDIS_MACHINE_MODE_LEGACY_32:
-    case ZYDIS_MACHINE_MODE_LONG_COMPAT_32:
-        return 32;
-    case ZYDIS_MACHINE_MODE_LONG_64:
-        return 64;
-    default:
-        ZYAN_UNREACHABLE;
-    }
+        /* ZYDIS_MACHINE_MODE_LONG_64 */            64,
+        /* ZYDIS_MACHINE_MODE_LONG_COMPAT_32 */     32,
+        /* ZYDIS_MACHINE_MODE_LONG_COMPAT_16 */     16,
+        /* ZYDIS_MACHINE_MODE_LEGACY_32 */          32,
+        /* ZYDIS_MACHINE_MODE_LEGACY_16 */          16,
+        /* ZYDIS_MACHINE_MODE_REAL_16 */            16,
+    };
+    return lookup[machine_mode];
 }
 
 /**
@@ -328,6 +325,23 @@ static ZyanU8 ZydisGetOszFromHint(ZydisOperandSizeHint hint)
     ZYAN_ASSERT((ZyanUSize)hint <= ZYDIS_OPERAND_SIZE_HINT_MAX_VALUE);
     static const ZyanU8 lookup[ZYDIS_OPERAND_SIZE_HINT_MAX_VALUE + 1] = { 0, 8, 16, 32, 64 };
     return lookup[hint];
+}
+
+/**
+ * Calculates maximum size of absolute address value based on address size hint.
+ *
+ * @param   request A pointer to `ZydisEncoderRequest` struct.
+ *
+ * @return  Maximum address size in bits.
+ */
+static ZyanU8 ZydisGetMaxAddressSize(const ZydisEncoderRequest *request)
+{
+    ZyanU8 addr_size = ZydisGetAszFromHint(request->address_size_hint);
+    if (addr_size == 0)
+    {
+        addr_size = ZydisGetMachineModeWidth(request->machine_mode);
+    }
+    return addr_size;
 }
 
 /**
@@ -491,7 +505,6 @@ static ZyanBool ZydisIsImmSigned(ZydisOperandEncoding encoding)
     case ZYDIS_OPERAND_ENCODING_JIMM16_32_64:
     case ZYDIS_OPERAND_ENCODING_JIMM32_32_64:
     case ZYDIS_OPERAND_ENCODING_JIMM16_32_32:
-        return ZYAN_TRUE;
     case ZYDIS_OPERAND_ENCODING_DISP8:
     case ZYDIS_OPERAND_ENCODING_DISP16:
     case ZYDIS_OPERAND_ENCODING_DISP32:
@@ -499,6 +512,7 @@ static ZyanBool ZydisIsImmSigned(ZydisOperandEncoding encoding)
     case ZYDIS_OPERAND_ENCODING_DISP16_32_64:
     case ZYDIS_OPERAND_ENCODING_DISP32_32_64:
     case ZYDIS_OPERAND_ENCODING_DISP16_32_32:
+        return ZYAN_TRUE;
     case ZYDIS_OPERAND_ENCODING_UIMM8:
     case ZYDIS_OPERAND_ENCODING_UIMM16:
     case ZYDIS_OPERAND_ENCODING_UIMM32:
@@ -571,17 +585,21 @@ static ZyanU8 ZydisGetEffectiveImmSize(ZydisEncoderInstructionMatch *match, Zyan
         return ZydisGetScaledImmSize(match, simm16_32_32_sizes, min_size);
     }
     case ZYDIS_OPERAND_ENCODING_DISP16_32_64:
+    {
         ZYAN_ASSERT(match->easz == 0);
+        const ZyanU8 addr_size = ZydisGetMaxAddressSize(match->request);
+        const ZyanU64 uimm = imm & (~(0xFFFFFFFFFFFFFFFFULL << (addr_size - 1) << 1));
+        if (min_size < addr_size && ZydisGetUnsignedImmSize(uimm) > min_size)
+        {
+            min_size = addr_size;
+        }
         if (match->request->machine_mode == ZYDIS_MACHINE_MODE_LONG_64)
         {
             if (min_size < 32)
             {
                 min_size = 32;
             }
-            if (min_size == 32 || min_size == 64)
-            {
-                match->easz = eisz = min_size;
-            }
+            match->easz = eisz = min_size;
         }
         else
         {
@@ -595,6 +613,7 @@ static ZyanU8 ZydisGetEffectiveImmSize(ZydisEncoderInstructionMatch *match, Zyan
             }
         }
         break;
+    }
     case ZYDIS_OPERAND_ENCODING_JIMM8:
     case ZYDIS_OPERAND_ENCODING_JIMM16:
     case ZYDIS_OPERAND_ENCODING_JIMM32:
@@ -1569,7 +1588,7 @@ static ZyanBool ZydisIsMemoryOperandCompatible(ZydisEncoderInstructionMatch *mat
         {
             return ZYAN_FALSE;
         }
-        ZyanI64 displacement = user_op->mem.displacement;
+        const ZyanI64 displacement = user_op->mem.displacement;
         ZyanU8 disp_size = 0;
         if (displacement)
         {
@@ -1578,17 +1597,6 @@ static ZyanBool ZydisIsMemoryOperandCompatible(ZydisEncoderInstructionMatch *mat
             {
                 return ZYAN_FALSE;
             }
-            if (ZydisGetMachineModeWidth(match->request->machine_mode) == 16)
-            {
-                if ((ZyanI16)displacement == 0)
-                {
-                    disp_size = 0;
-                }
-                else
-                {
-                    disp_size = ZydisGetSignedImmSize((ZyanI16)displacement);
-                }
-            }
 
             match->cd8_scale = ZydisGetCompDispScale(match);
             if (match->cd8_scale)
@@ -1596,7 +1604,10 @@ static ZyanBool ZydisIsMemoryOperandCompatible(ZydisEncoderInstructionMatch *mat
                 const ZyanI64 mask = (1 << match->cd8_scale) - 1;
                 if (!(displacement & mask))
                 {
-                    disp_size = ZydisGetSignedImmSize(displacement >> match->cd8_scale);
+                    if (ZydisGetSignedImmSize(displacement >> match->cd8_scale) == 8)
+                    {
+                        disp_size = 8;
+                    }
                 }
                 else if (disp_size == 8)
                 {
@@ -1941,28 +1952,40 @@ static ZyanBool ZydisIsMemoryOperandCompatible(ZydisEncoderInstructionMatch *mat
                     reg_index_class);
             }
         }
-        else
+        else if (disp_size != 8 || !match->cd8_scale)
         {
+            const ZyanU8 addr_size = ZydisGetMaxAddressSize(match->request);
+            if (disp_size > addr_size)
+            {
+                return ZYAN_FALSE;
+            }
             ZyanU8 min_disp_size = match->easz ? match->easz : 16;
             if (((min_disp_size == 16) && !(match->definition->address_sizes & ZYDIS_WIDTH_16)) ||
-                 (min_disp_size == 64))
+                 (min_disp_size == 64) ||
+                 (match->request->machine_mode == ZYDIS_MACHINE_MODE_LONG_64))
             {
                 min_disp_size = 32;
-            }
-            if (ZydisGetUnsignedImmSize(displacement) == 16)
-            {
-                disp_size = 16;
             }
             if (disp_size < min_disp_size)
             {
                 disp_size = min_disp_size;
             }
+            const ZyanI64 disp = user_op->mem.displacement;
             if (match->request->machine_mode == ZYDIS_MACHINE_MODE_LONG_64)
             {
-                candidate_easz = match->easz == 32 ? 32 : 64;
+                candidate_easz = addr_size;
+                if (addr_size == 32 && disp >= 0 && match->easz != 32)
+                {
+                    candidate_easz = 64;
+                }
             }
             else
             {
+                const ZyanU64 uimm = disp & (~(0xFFFFFFFFFFFFFFFFULL << (addr_size - 1) << 1));
+                if (disp_size < addr_size && ZydisGetUnsignedImmSize(uimm) > disp_size)
+                {
+                    disp_size = addr_size;
+                }
                 candidate_easz = disp_size;
             }
             disp_only = ZYAN_TRUE;
@@ -2014,9 +2037,15 @@ static ZyanBool ZydisIsMemoryOperandCompatible(ZydisEncoderInstructionMatch *mat
         break;
     }
     case ZYDIS_SEMANTIC_OPTYPE_MOFFS:
+    {
         if (user_op->mem.base != ZYDIS_REGISTER_NONE ||
             user_op->mem.index != ZYDIS_REGISTER_NONE ||
             user_op->mem.scale != 0)
+        {
+            return ZYAN_FALSE;
+        }
+        const ZyanU8 min_disp_size = ZydisGetSignedImmSize(user_op->mem.displacement);
+        if (min_disp_size > ZydisGetMaxAddressSize(match->request))
         {
             return ZYAN_FALSE;
         }
@@ -2042,23 +2071,15 @@ static ZyanBool ZydisIsMemoryOperandCompatible(ZydisEncoderInstructionMatch *mat
         {
             return ZYAN_FALSE;
         }
-        // This is not a standard rejection. It's a special case for `mov` instructions (only ones
-        // to use `moffs` operands). Size of `moffs` is tied to address size attribute, so its
-        // signedness doesn't matter. However if displacement can be represented as a signed
-        // integer of smaller size we reject `moffs` variant because it's guaranteed that better
-        // alternative exists (in terms of size).
-        ZyanU8 alternative_size = ZydisGetSignedImmSize(user_op->mem.displacement);
-        const ZyanU8 min_disp_size =
-            (match->request->machine_mode == ZYDIS_MACHINE_MODE_LONG_64) ? 32 : 16;
-        if (alternative_size < min_disp_size)
-        {
-            alternative_size = min_disp_size;
-        }
-        if (alternative_size < match->disp_size)
+        // This is not a standard rejection. It's a special case for `mov` instructions (`moffs`
+        // variants only). In 64-bit mode it's possible to get a shorter encoding for addresses
+        // that can fit into 32-bit displacements.
+        if (match->disp_size == 64 && min_disp_size < match->disp_size)
         {
             return ZYAN_FALSE;
         }
         break;
+    }
     default:
         ZYAN_UNREACHABLE;
     }
@@ -3652,7 +3673,7 @@ static ZyanStatus ZydisEmitInstruction(ZydisEncoderInstruction *instruction,
  * @param   def_op      Decoder's operand definition from instruction definition.
  * @param   instruction A pointer to `ZydisEncoderInstruction` struct.
  */
-void ZydisBuildRegisterOperand(const ZydisEncoderOperand *user_op,
+static void ZydisBuildRegisterOperand(const ZydisEncoderOperand *user_op,
     const ZydisOperandDefinition *def_op, ZydisEncoderInstruction *instruction)
 {
     if (def_op->type == ZYDIS_SEMANTIC_OPTYPE_IMPLICIT_REG)
@@ -4375,7 +4396,18 @@ ZYDIS_EXPORT ZyanStatus ZydisEncoderEncodeInstructionAbsolute(ZydisEncoderReques
                         (request->prefixes & (ZYDIS_ATTRIB_HAS_BRANCH_NOT_TAKEN |
                                               ZYDIS_ATTRIB_HAS_BRANCH_TAKEN)))
                     {
-                        extra_length = 1;
+                        extra_length += 1;
+                    }
+                    if ((rel_info->accepts_bound) && (request->prefixes & ZYDIS_ATTRIB_HAS_BND))
+                    {
+                        extra_length += 1;
+                        // `BND` prefix is not accepted for short `JMP` (Intel SDM Vol. 1)
+                        if ((request->mnemonic == ZYDIS_MNEMONIC_JMP) &&
+                            (request->branch_type == ZYDIS_BRANCH_TYPE_NONE) &&
+                            (request->branch_width == ZYDIS_BRANCH_WIDTH_NONE))
+                        {
+                            start_offset = 1;
+                        }
                     }
                     if (request->branch_width == ZYDIS_BRANCH_WIDTH_NONE)
                     {
@@ -4438,6 +4470,22 @@ ZYDIS_EXPORT ZyanStatus ZydisEncoderEncodeInstructionAbsolute(ZydisEncoderReques
                     }
                     op->imm.s = rel;
                     adjusted_rel = ZYAN_TRUE;
+                    if (rel_info->accepts_scaling_hints == ZYDIS_SIZE_HINT_NONE)
+                    {
+                        if (request->branch_width == ZYDIS_BRANCH_WIDTH_NONE)
+                        {
+                            request->branch_width =
+                                (ZydisBranchWidth)(ZYDIS_BRANCH_WIDTH_8 + size_index);
+                        }
+                    }
+                    else
+                    {
+                        if (request->operand_size_hint == ZYDIS_OPERAND_SIZE_HINT_NONE)
+                        {
+                            request->operand_size_hint =
+                                (ZydisOperandSizeHint)(ZYDIS_OPERAND_SIZE_HINT_8 + size_index);
+                        }
+                    }
                     break;
                 }
                 break;
@@ -4516,6 +4564,10 @@ ZYDIS_EXPORT ZyanStatus ZydisEncoderEncodeInstructionAbsolute(ZydisEncoderReques
         }
         ZYAN_ASSERT(instruction.disp_size != 0);
         ZyanU8 disp_offset = (instruction.disp_size >> 3) + (instruction.imm_size >> 3);
+        if (instruction.encoding == ZYDIS_INSTRUCTION_ENCODING_3DNOW)
+        {
+            disp_offset += 1;
+        }
         ZYAN_ASSERT(instruction_size > disp_offset);
         ZYAN_MEMCPY((ZyanU8 *)buffer + instruction_size - disp_offset, &rip_rel, sizeof(ZyanI32));
         op_rip_rel->mem.displacement = rip_rel;
@@ -4657,15 +4709,9 @@ ZYDIS_EXPORT ZyanStatus ZydisEncoderDecodedInstructionToEncoderRequest(
             enc_op->mem.base = dec_op->mem.base;
             enc_op->mem.index = dec_op->mem.index;
             enc_op->mem.scale = dec_op->mem.type != ZYDIS_MEMOP_TYPE_MIB ? dec_op->mem.scale : 0;
-            if (dec_op->encoding == ZYDIS_OPERAND_ENCODING_DISP16_32_64)
+            if (dec_op->mem.disp.has_displacement)
             {
-                ZydisCalcAbsoluteAddress(instruction, dec_op, 0,
-                    (ZyanU64 *)&enc_op->mem.displacement);
-            }
-            else
-            {
-                enc_op->mem.displacement = dec_op->mem.disp.has_displacement ?
-                    dec_op->mem.disp.value : 0;
+                enc_op->mem.displacement = dec_op->mem.disp.value;
             }
             enc_op->mem.size = dec_op->size / 8;
             break;

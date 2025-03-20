@@ -32,6 +32,11 @@ inline JSString* BytecodeLocation::getString(const JSScript* script) const {
   return script->getString(this->rawBytecode_);
 }
 
+inline bool BytecodeLocation::atomizeString(JSContext* cx, JSScript* script) {
+  MOZ_ASSERT(this->isValid());
+  return script->atomizeString(cx, this->rawBytecode_);
+}
+
 inline PropertyName* BytecodeLocation::getPropertyName(
     const JSScript* script) const {
   MOZ_ASSERT(this->isValid());

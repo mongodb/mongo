@@ -7,13 +7,14 @@
 #ifndef frontend_ScopeBindingCache_h
 #define frontend_ScopeBindingCache_h
 
+#include "mozilla/Assertions.h"  // mozilla::MakeCompilerAssumeUnreachableFakeValue
 #include "mozilla/Attributes.h"  // MOZ_STACK_CLASS
 #include "mozilla/HashTable.h"   // mozilla::HashMap
 
 #include "jstypes.h"  // JS_PUBLIC_API
 
 #include "frontend/NameAnalysisTypes.h"  // NameLocation
-#include "frontend/ParserAtom.h"  // TaggedPArserAtomIndex, ParserAtomsTable
+#include "frontend/ParserAtom.h"  // TaggedParserAtomIndex, ParserAtomsTable
 
 #include "js/Utility.h"  // AutoEnterOOMUnsafeRegion
 
@@ -26,6 +27,7 @@ namespace frontend {
 struct CompilationAtomCache;
 struct CompilationStencil;
 struct ScopeStencilRef;
+struct FakeStencilGlobalScope;
 struct CompilationStencilMerger;
 
 // Generic atom wrapper which provides a way to interpret any Atom given
@@ -81,6 +83,10 @@ struct GenericAtom {
   // already compiled script.
   GenericAtom(const CompilationStencil& context, TaggedParserAtomIndex index);
   GenericAtom(ScopeStencilRef& scope, TaggedParserAtomIndex index);
+  GenericAtom(const FakeStencilGlobalScope& scope, TaggedParserAtomIndex index)
+      : ref((JSAtom*)nullptr) {
+    MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE();
+  }
 
   // Constructor for atoms managed by the Garbage Collector, while providing
   // contextual scope information when delazifying functions on the main thread.
@@ -105,6 +111,12 @@ struct BindingHasher<TaggedParserAtomIndex> {
     GenericAtom other;
 
     Lookup(ScopeStencilRef& scope_ref, const GenericAtom& other);
+    Lookup(const FakeStencilGlobalScope& scope_ref, const GenericAtom& other)
+        : keyStencil(mozilla::MakeCompilerAssumeUnreachableFakeValue<
+                     const CompilationStencil&>()),
+          other(other) {
+      MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE();
+    }
   };
 
   static HashNumber hash(const Lookup& aLookup) { return aLookup.other.hash; }
@@ -182,12 +194,15 @@ class ScopeBindingCache {
   // of scope given as arguments.
   virtual bool canCacheFor(Scope* ptr);
   virtual bool canCacheFor(ScopeStencilRef ref);
+  virtual bool canCacheFor(const FakeStencilGlobalScope& ref);
 
   // Create a new BindingMap cache for a given scope. This cache should then be
   // filled with all names which might be looked up.
   virtual BindingMap<JSAtom*>* createCacheFor(Scope* ptr);
   virtual BindingMap<TaggedParserAtomIndex>* createCacheFor(
       ScopeStencilRef ref);
+  virtual BindingMap<TaggedParserAtomIndex>* createCacheFor(
+      const FakeStencilGlobalScope& ref);
 
   // Return the BindingMap created for the associated scope, unless the
   // generation value does not match the one stored internally, in which case a
@@ -195,6 +210,8 @@ class ScopeBindingCache {
   virtual BindingMap<JSAtom*>* lookupScope(Scope* ptr, CacheGeneration gen);
   virtual BindingMap<TaggedParserAtomIndex>* lookupScope(ScopeStencilRef ref,
                                                          CacheGeneration gen);
+  virtual BindingMap<TaggedParserAtomIndex>* lookupScope(
+      const FakeStencilGlobalScope& ref, CacheGeneration gen);
 };
 
 // NoScopeBindingCache is a no-op which does not implement a ScopeBindingCache.
@@ -207,6 +224,7 @@ class NoScopeBindingCache final : public ScopeBindingCache {
 
   bool canCacheFor(Scope* ptr) override;
   bool canCacheFor(ScopeStencilRef ref) override;
+  bool canCacheFor(const FakeStencilGlobalScope& ref) override;
 };
 
 // StencilScopeBindingCache provides an interface to cache the bindings provided
@@ -238,10 +256,17 @@ class MOZ_STACK_CLASS StencilScopeBindingCache final
   CacheGeneration getCurrentGeneration() const override { return 1; }
 
   bool canCacheFor(ScopeStencilRef ref) override;
+  bool canCacheFor(const FakeStencilGlobalScope& ref) override;
+
   BindingMap<TaggedParserAtomIndex>* createCacheFor(
       ScopeStencilRef ref) override;
+  BindingMap<TaggedParserAtomIndex>* createCacheFor(
+      const FakeStencilGlobalScope& ref) override;
+
   BindingMap<TaggedParserAtomIndex>* lookupScope(ScopeStencilRef ref,
                                                  CacheGeneration gen) override;
+  BindingMap<TaggedParserAtomIndex>* lookupScope(
+      const FakeStencilGlobalScope& ref, CacheGeneration gen) override;
 };
 
 // RuntimeScopeBindingCache is used to hold the binding map for each scope which

@@ -57,7 +57,9 @@ namespace jit {
 
 // List of all VM functions to be used with callVM. Each entry stores the name
 // (must be unique, used for the VMFunctionId enum and profiling) and the C++
-// function to be called. This list must be sorted on the name field.
+// function to be called.  If a third argument is specified, it is the number of
+// non-argument Values the VM wrapper should pop from the stack. This is used
+// for tail calls for Baseline ICs. This list must be sorted on the name field.
 #define VMFUNCTION_LIST(_)                                                     \
   _(AddOrUpdateSparseElementHelper, js::AddOrUpdateSparseElementHelper)        \
   _(AddSlotAndCallAddPropHook, js::AddSlotAndCallAddPropHook)                  \
@@ -70,6 +72,7 @@ namespace jit {
   _(ArrayJoin, js::jit::ArrayJoin)                                             \
   _(ArraySliceDense, js::ArraySliceDense)                                      \
   _(AsyncFunctionAwait, js::AsyncFunctionAwait)                                \
+  _(AsyncFunctionReject, js::AsyncFunctionReject)                              \
   _(AsyncFunctionResolve, js::AsyncFunctionResolve)                            \
   _(AtomicsAdd64, js::jit::AtomicsAdd64)                                       \
   _(AtomicsAnd64, js::jit::AtomicsAnd64)                                       \
@@ -109,7 +112,7 @@ namespace jit {
   _(BindVarOperation, js::BindVarOperation)                                    \
   _(BlockLexicalEnvironmentObjectCreateWithoutEnclosing,                       \
     js::BlockLexicalEnvironmentObject::createWithoutEnclosing)                 \
-  _(BoxBoxableValue, js::wasm::BoxBoxableValue)                                \
+  _(BoxBoxableValue, js::wasm::AnyRef::boxValue)                               \
   _(BoxNonStrictThis, js::BoxNonStrictThis)                                    \
   _(BuiltinObjectOperation, js::BuiltinObjectOperation)                        \
   _(CallDOMGetter, js::jit::CallDOMGetter)                                     \
@@ -119,14 +122,18 @@ namespace jit {
   _(CallObjectCreateWithShape, js::CallObject::createWithShape)                \
   _(CanSkipAwait, js::CanSkipAwait)                                            \
   _(CharCodeAt, js::jit::CharCodeAt)                                           \
+  _(CharCodeToLowerCase, js::jit::CharCodeToLowerCase)                         \
+  _(CharCodeToUpperCase, js::jit::CharCodeToUpperCase)                         \
   _(CheckClassHeritageOperation, js::CheckClassHeritageOperation)              \
   _(CheckOverRecursed, js::jit::CheckOverRecursed)                             \
   _(CheckOverRecursedBaseline, js::jit::CheckOverRecursedBaseline)             \
   _(CheckPrivateFieldOperation, js::CheckPrivateFieldOperation)                \
+  _(CheckProxyGetByValueResult, js::jit::CheckProxyGetByValueResult)           \
   _(ClassBodyLexicalEnvironmentObjectCreateWithoutEnclosing,                   \
     js::ClassBodyLexicalEnvironmentObject::createWithoutEnclosing)             \
   _(CloneRegExpObject, js::CloneRegExpObject)                                  \
   _(CloseIterOperation, js::CloseIterOperation)                                \
+  _(CodePointAt, js::jit::CodePointAt)                                         \
   _(ConcatStrings, js::ConcatStrings<CanGC>)                                   \
   _(CreateAsyncFromSyncIterator, js::CreateAsyncFromSyncIterator)              \
   _(CreateBigIntFromInt64, js::jit::CreateBigIntFromInt64)                     \
@@ -138,21 +145,47 @@ namespace jit {
   _(DebugAfterYield, js::jit::DebugAfterYield)                                 \
   _(DebugEpilogueOnBaselineReturn, js::jit::DebugEpilogueOnBaselineReturn)     \
   _(DebugLeaveLexicalEnv, js::jit::DebugLeaveLexicalEnv)                       \
-  _(DebugLeaveThenFreshenLexicalEnv, js::jit::DebugLeaveThenFreshenLexicalEnv) \
   _(DebugLeaveThenPopLexicalEnv, js::jit::DebugLeaveThenPopLexicalEnv)         \
-  _(DebugLeaveThenRecreateLexicalEnv,                                          \
-    js::jit::DebugLeaveThenRecreateLexicalEnv)                                 \
   _(Debug_CheckSelfHosted, js::Debug_CheckSelfHosted)                          \
+  _(DebuggeeFreshenLexicalEnv, js::jit::DebuggeeFreshenLexicalEnv)             \
+  _(DebuggeeRecreateLexicalEnv, js::jit::DebuggeeRecreateLexicalEnv)           \
   _(DelElemOperationNonStrict, js::DelElemOperation<false>)                    \
   _(DelElemOperationStrict, js::DelElemOperation<true>)                        \
   _(DelPropOperationNonStrict, js::DelPropOperation<false>)                    \
   _(DelPropOperationStrict, js::DelPropOperation<true>)                        \
   _(DeleteNameOperation, js::DeleteNameOperation)                              \
+  _(DoBinaryArithFallback, js::jit::DoBinaryArithFallback, 2)                  \
+  _(DoBindNameFallback, js::jit::DoBindNameFallback)                           \
   _(DoCallFallback, js::jit::DoCallFallback)                                   \
+  _(DoCheckPrivateFieldFallback, js::jit::DoCheckPrivateFieldFallback, 2)      \
+  _(DoCloseIterFallback, js::jit::DoCloseIterFallback)                         \
+  _(DoCompareFallback, js::jit::DoCompareFallback, 2)                          \
   _(DoConcatStringObject, js::jit::DoConcatStringObject)                       \
+  _(DoGetElemFallback, js::jit::DoGetElemFallback, 2)                          \
+  _(DoGetElemSuperFallback, js::jit::DoGetElemSuperFallback, 3)                \
+  _(DoGetIntrinsicFallback, js::jit::DoGetIntrinsicFallback)                   \
+  _(DoGetIteratorFallback, js::jit::DoGetIteratorFallback, 1)                  \
+  _(DoGetNameFallback, js::jit::DoGetNameFallback)                             \
+  _(DoGetPropFallback, js::jit::DoGetPropFallback, 1)                          \
+  _(DoGetPropSuperFallback, js::jit::DoGetPropSuperFallback)                   \
+  _(DoHasOwnFallback, js::jit::DoHasOwnFallback, 2)                            \
+  _(DoInFallback, js::jit::DoInFallback, 2)                                    \
+  _(DoInstanceOfFallback, js::jit::DoInstanceOfFallback, 2)                    \
+  _(DoNewArrayFallback, js::jit::DoNewArrayFallback)                           \
+  _(DoNewObjectFallback, js::jit::DoNewObjectFallback)                         \
+  _(DoOptimizeGetIteratorFallback, js::jit::DoOptimizeGetIteratorFallback)     \
+  _(DoOptimizeSpreadCallFallback, js::jit::DoOptimizeSpreadCallFallback)       \
+  _(DoRestFallback, js::jit::DoRestFallback)                                   \
+  _(DoSetElemFallback, js::jit::DoSetElemFallback, 2)                          \
+  _(DoSetPropFallback, js::jit::DoSetPropFallback, 1)                          \
   _(DoSpreadCallFallback, js::jit::DoSpreadCallFallback)                       \
   _(DoStringToInt64, js::jit::DoStringToInt64)                                 \
+  _(DoToBoolFallback, js::jit::DoToBoolFallback)                               \
+  _(DoToPropertyKeyFallback, js::jit::DoToPropertyKeyFallback)                 \
   _(DoTrialInlining, js::jit::DoTrialInlining)                                 \
+  _(DoTypeOfEqFallback, js::jit::DoTypeOfEqFallback)                           \
+  _(DoTypeOfFallback, js::jit::DoTypeOfFallback)                               \
+  _(DoUnaryArithFallback, js::jit::DoUnaryArithFallback, 1)                    \
   _(EnterWith, js::jit::EnterWith)                                             \
   _(ExtractAwaitValue, js::ExtractAwaitValue)                                  \
   _(FinalSuspend, js::jit::FinalSuspend)                                       \
@@ -172,6 +205,7 @@ namespace jit {
   _(GetIteratorWithIndices, js::GetIteratorWithIndices)                        \
   _(GetNonSyntacticGlobalThis, js::GetNonSyntacticGlobalThis)                  \
   _(GetOrCreateModuleMetaObject, js::GetOrCreateModuleMetaObject)              \
+  _(GetPendingExceptionStack, js::GetPendingExceptionStack)                    \
   _(GetPrototypeOf, js::jit::GetPrototypeOf)                                   \
   _(GetSparseElementHelper, js::GetSparseElementHelper)                        \
   _(GlobalDeclInstantiationFromIon, js::jit::GlobalDeclInstantiationFromIon)   \
@@ -203,6 +237,7 @@ namespace jit {
   _(IonHasOwnICUpdate, js::jit::IonHasOwnIC::update)                           \
   _(IonInICUpdate, js::jit::IonInIC::update)                                   \
   _(IonInstanceOfICUpdate, js::jit::IonInstanceOfIC::update)                   \
+  _(IonOptimizeGetIteratorICUpdate, js::jit::IonOptimizeGetIteratorIC::update) \
   _(IonOptimizeSpreadCallICUpdate, js::jit::IonOptimizeSpreadCallIC::update)   \
   _(IonSetPropertyICUpdate, js::jit::IonSetPropertyIC::update)                 \
   _(IonToPropertyKeyICUpdate, js::jit::IonToPropertyKeyIC::update)             \
@@ -244,6 +279,8 @@ namespace jit {
   _(NumberParseInt, js::NumberParseInt)                                        \
   _(NumberToString, js::NumberToString<CanGC>)                                 \
   _(ObjectCreateWithTemplate, js::ObjectCreateWithTemplate)                    \
+  _(ObjectKeys, js::jit::ObjectKeys)                                           \
+  _(ObjectKeysLength, js::jit::ObjectKeysLength)                               \
   _(ObjectWithProtoOperation, js::ObjectWithProtoOperation)                    \
   _(OnDebuggerStatement, js::jit::OnDebuggerStatement)                         \
   _(ProxyGetProperty, js::ProxyGetProperty)                                    \
@@ -258,6 +295,7 @@ namespace jit {
   _(RecreateLexicalEnv, js::jit::RecreateLexicalEnv)                           \
   _(RegExpBuiltinExecMatchFromJit, js::RegExpBuiltinExecMatchFromJit)          \
   _(RegExpBuiltinExecTestFromJit, js::RegExpBuiltinExecTestFromJit)            \
+  _(RegExpHasCaptureGroups, js::RegExpHasCaptureGroups)                        \
   _(RegExpMatcherRaw, js::RegExpMatcherRaw)                                    \
   _(RegExpSearcherRaw, js::RegExpSearcherRaw)                                  \
   _(SameValue, js::SameValue)                                                  \
@@ -277,15 +315,20 @@ namespace jit {
     _(StringBigIntLessThan, js::jit::InstantiatedStringBigIntLessThan)           \
   _(StringEndsWith, js::StringEndsWith)                                        \
   _(StringFlatReplaceString, js::StringFlatReplaceString)                      \
-  _(StringFromCharCode, js::jit::StringFromCharCode)                           \
-  _(StringFromCodePoint, js::jit::StringFromCodePoint)                         \
+  _(StringFromCharCode, js::StringFromCharCode)                                \
+  _(StringFromCodePoint, js::StringFromCodePoint)                              \
+  _(StringIncludes, js::StringIncludes)                                        \
   _(StringIndexOf, js::StringIndexOf)                                          \
+  _(StringLastIndexOf, js::StringLastIndexOf)                                  \
   _(StringReplace, js::jit::StringReplace)                                     \
   _(StringSplitString, js::StringSplitString)                                  \
   _(StringStartsWith, js::StringStartsWith)                                    \
   _(StringToLowerCase, js::StringToLowerCase)                                  \
   _(StringToNumber, js::StringToNumber)                                        \
   _(StringToUpperCase, js::StringToUpperCase)                                  \
+  _(StringTrim, js::StringTrim)                                                \
+  _(StringTrimEnd, js::StringTrimEnd)                                          \
+  _(StringTrimStart, js::StringTrimStart)                                      \
   _(StringsCompareGreaterThanOrEquals,                                         \
     js::jit::StringsCompare<ComparisonKind::GreaterThanOrEqual>)               \
   _(StringsCompareLessThan, js::jit::StringsCompare<ComparisonKind::LessThan>) \
@@ -301,47 +344,15 @@ namespace jit {
   _(ThrowOperation, js::ThrowOperation)                                        \
   _(ThrowRuntimeLexicalError, js::jit::ThrowRuntimeLexicalError)               \
   _(ThrowUninitializedThis, js::ThrowUninitializedThis)                        \
+  _(ThrowWithStackOperation, js::ThrowWithStackOperation)                      \
   _(ToBigInt, js::ToBigInt)                                                    \
   _(ToStringSlow, js::ToStringSlowForVM<CanGC>)                                     \
   _(ValueToIterator, js::ValueToIterator)                                      \
   _(VarEnvironmentObjectCreateWithoutEnclosing,                                \
     js::VarEnvironmentObject::createWithoutEnclosing)
 
-// The list below is for tail calls. The third argument specifies the number of
-// non-argument Values the VM wrapper should pop from the stack. This is used
-// for Baseline ICs.
-//
-// This list is required to be alphabetized.
-#define TAIL_CALL_VMFUNCTION_LIST(_)                                        \
-  _(DoBinaryArithFallback, js::jit::DoBinaryArithFallback, 2)               \
-  _(DoBindNameFallback, js::jit::DoBindNameFallback, 0)                     \
-  _(DoCheckPrivateFieldFallback, js::jit::DoCheckPrivateFieldFallback, 2)   \
-  _(DoCloseIterFallback, js::jit::DoCloseIterFallback, 0)                   \
-  _(DoCompareFallback, js::jit::DoCompareFallback, 2)                       \
-  _(DoGetElemFallback, js::jit::DoGetElemFallback, 2)                       \
-  _(DoGetElemSuperFallback, js::jit::DoGetElemSuperFallback, 3)             \
-  _(DoGetIntrinsicFallback, js::jit::DoGetIntrinsicFallback, 0)             \
-  _(DoGetIteratorFallback, js::jit::DoGetIteratorFallback, 1)               \
-  _(DoGetNameFallback, js::jit::DoGetNameFallback, 0)                       \
-  _(DoGetPropFallback, js::jit::DoGetPropFallback, 1)                       \
-  _(DoGetPropSuperFallback, js::jit::DoGetPropSuperFallback, 0)             \
-  _(DoHasOwnFallback, js::jit::DoHasOwnFallback, 2)                         \
-  _(DoInFallback, js::jit::DoInFallback, 2)                                 \
-  _(DoInstanceOfFallback, js::jit::DoInstanceOfFallback, 2)                 \
-  _(DoNewArrayFallback, js::jit::DoNewArrayFallback, 0)                     \
-  _(DoNewObjectFallback, js::jit::DoNewObjectFallback, 0)                   \
-  _(DoOptimizeSpreadCallFallback, js::jit::DoOptimizeSpreadCallFallback, 0) \
-  _(DoRestFallback, js::jit::DoRestFallback, 0)                             \
-  _(DoSetElemFallback, js::jit::DoSetElemFallback, 2)                       \
-  _(DoSetPropFallback, js::jit::DoSetPropFallback, 1)                       \
-  _(DoToBoolFallback, js::jit::DoToBoolFallback, 0)                         \
-  _(DoToPropertyKeyFallback, js::jit::DoToPropertyKeyFallback, 0)           \
-  _(DoTypeOfFallback, js::jit::DoTypeOfFallback, 0)                         \
-  _(DoUnaryArithFallback, js::jit::DoUnaryArithFallback, 1)
-
 #define DEF_ID(name, ...) name,
 enum class VMFunctionId { VMFUNCTION_LIST(DEF_ID) Count };
-enum class TailCallVMFunctionId { TAIL_CALL_VMFUNCTION_LIST(DEF_ID) Count };
 #undef DEF_ID
 
 // Define the VMFunctionToId template to map from signature + function to
@@ -349,9 +360,6 @@ enum class TailCallVMFunctionId { TAIL_CALL_VMFUNCTION_LIST(DEF_ID) Count };
 // the C++ signature.
 template <typename Function, Function fun>
 struct VMFunctionToId;  // Error here? Update VMFUNCTION_LIST?
-
-template <typename Function, Function fun>
-struct TailCallVMFunctionToId;  // Error here? Update TAIL_CALL_VMFUNCTION_LIST?
 
 // GCC warns when the signature does not have matching attributes (for example
 // [[nodiscard]]). Squelch this warning to avoid a GCC-only footgun.
@@ -362,20 +370,12 @@ struct TailCallVMFunctionToId;  // Error here? Update TAIL_CALL_VMFUNCTION_LIST?
 
 // Note: the use of ::fp instead of fp is intentional to enforce use of
 // fully-qualified names in the list above.
-#define DEF_TEMPLATE(name, fp)                             \
+#define DEF_TEMPLATE(name, fp, ...)                        \
   template <>                                              \
   struct VMFunctionToId<decltype(&(::fp)), ::fp> {         \
     static constexpr VMFunctionId id = VMFunctionId::name; \
   };
 VMFUNCTION_LIST(DEF_TEMPLATE)
-#undef DEF_TEMPLATE
-
-#define DEF_TEMPLATE(name, fp, valuesToPop)                                \
-  template <>                                                              \
-  struct TailCallVMFunctionToId<decltype(&(::fp)), ::fp> {                 \
-    static constexpr TailCallVMFunctionId id = TailCallVMFunctionId::name; \
-  };
-TAIL_CALL_VMFUNCTION_LIST(DEF_TEMPLATE)
 #undef DEF_TEMPLATE
 
 #if MOZ_IS_GCC

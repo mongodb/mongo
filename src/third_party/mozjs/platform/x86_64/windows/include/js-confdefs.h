@@ -9,9 +9,11 @@
 // Expands to all the defines from configure.
 #define CROSS_COMPILE 
 #define ENABLE_SHARED_MEMORY 1
-#define ENABLE_WASM_EXTENDED_CONST 1
+#define ENABLE_WASM_GC 1
+#define ENABLE_WASM_JS_STRING_BUILTINS 1
+#define ENABLE_WASM_MULTI_MEMORY 1
+#define ENABLE_WASM_TAIL_CALLS 1
 #define HAVE_64BIT_BUILD 1
-#define HAVE_ALIGNED_MALLOC 1
 #define HAVE_CPUID_H 1
 #define HAVE_FORCEINLINE 1
 #define HAVE_INTTYPES_H 1
@@ -28,16 +30,17 @@
 #define JS_STANDALONE 1
 #define JS_WITHOUT_NSPR 1
 #define MALLOC_H <malloc.h>
-#define MALLOC_USABLE_SIZE_CONST_PTR const
-#define MOZILLA_UAVERSION "115.0"
-#define MOZILLA_VERSION "115.21.0"
-#define MOZILLA_VERSION_U 115.21.0
-#define MOZJS_MAJOR_VERSION 115
-#define MOZJS_MINOR_VERSION 21
+#define MALLOC_USABLE_SIZE_CONST_PTR 
+#define MOZILLA_UAVERSION "128.0"
+#define MOZILLA_VERSION "128.9.0"
+#define MOZILLA_VERSION_U 128.9.0
+#define MOZJS_MAJOR_VERSION 128
+#define MOZJS_MINOR_VERSION 9
 #define MOZ_AARCH64_JSCVT 0
 #define MOZ_BUILD_APP js
 #define MOZ_DLL_PREFIX ""
 #define MOZ_DLL_SUFFIX ".dll"
+#define MOZ_ICU4X 1
 #define MOZ_UPDATE_CHANNEL default
 #define NOMINMAX 1
 #define NO_NSPR_10_SUPPORT 1
@@ -57,13 +60,13 @@
 #define WIN32 1
 #endif
 #if !defined(WINVER)
-#define WINVER 0x601
+#define WINVER 0x0A00
 #endif
 #if !defined(_WIN32_IE)
-#define _WIN32_IE 0x0800
+#define _WIN32_IE 0x0A00
 #endif
 #if !defined(_WIN32_WINNT)
-#define _WIN32_WINNT 0x601
+#define _WIN32_WINNT 0x0A00
 #endif
 
 #endif /* js_confdefs_h */

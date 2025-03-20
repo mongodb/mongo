@@ -89,7 +89,7 @@ void BaseCompiler::loadMemRef(const Stk& src, RegRef dest) {
 }
 
 void BaseCompiler::loadLocalRef(const Stk& src, RegRef dest) {
-  fr.loadLocalRef(localFromSlot(src.slot(), MIRType::RefOrNull), dest);
+  fr.loadLocalRef(localFromSlot(src.slot(), MIRType::WasmAnyRef), dest);
 }
 
 void BaseCompiler::loadRegisterRef(const Stk& src, RegRef dest) {
@@ -1198,6 +1198,22 @@ RegI32 BaseCompiler::popI32ToSpecific(RegI32 specific) {
 RegI64 BaseCompiler::popI64ToSpecific(RegI64 specific) {
   freeI64(specific);
   return popI64(specific);
+}
+
+RegI64 BaseCompiler::popIndexToInt64(IndexType indexType) {
+  if (indexType == IndexType::I64) {
+    return popI64();
+  }
+
+  MOZ_ASSERT(indexType == IndexType::I32);
+#ifdef JS_64BIT
+  return RegI64(Register64(popI32()));
+#else
+  RegI32 lowPart = popI32();
+  RegI32 highPart = needI32();
+  masm.xor32(highPart, highPart);
+  return RegI64(Register64(highPart, lowPart));
+#endif
 }
 
 #ifdef JS_CODEGEN_ARM

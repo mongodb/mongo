@@ -87,10 +87,10 @@ constexpr CastableTypedEnumResult<E> operator~(
   return CastableTypedEnumResult<E>(~(E(aR)));
 }
 
-#define MOZ_CASTABLETYPEDENUMRESULT_COMPOUND_ASSIGN_OP(Op)        \
-  template <typename E>                                           \
-  E& operator Op(E& aR1, const CastableTypedEnumResult<E>& aR2) { \
-    return aR1 Op E(aR2);                                         \
+#define MOZ_CASTABLETYPEDENUMRESULT_COMPOUND_ASSIGN_OP(Op)         \
+  template <typename E>                                            \
+  E& operator Op(E & aR1, const CastableTypedEnumResult<E>& aR2) { \
+    return aR1 Op E(aR2);                                          \
   }
 
 MOZ_CASTABLETYPEDENUMRESULT_COMPOUND_ASSIGN_OP(&=)
@@ -116,7 +116,7 @@ struct UnsignedIntegerTypeForEnum : UnsignedStdintTypeForSize<sizeof(E)> {};
     return Result(Name(U(a) Op U(b)));                                 \
   }                                                                    \
                                                                        \
-  inline Name& operator Op##=(Name& a, Name b) { return a = a Op b; }
+  inline Name& operator Op##=(Name & a, Name b) { return a = a Op b; }
 
 /**
  * MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS generates standard bitwise operators

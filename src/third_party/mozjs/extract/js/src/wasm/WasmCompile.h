@@ -93,6 +93,19 @@ SharedModule CompileStreaming(const CompileArgs& args, const Bytes& envBytes,
                               const Atomic<bool>& cancelled, UniqueChars* error,
                               UniqueCharsVector* warnings);
 
+// What to print out from dumping a function from Ion.
+enum class IonDumpContents {
+  UnoptimizedMIR,
+  OptimizedMIR,
+  LIR,
+
+  Default = UnoptimizedMIR,
+};
+
+bool DumpIonFunctionInModule(const ShareableBytes& bytecode,
+                             uint32_t targetFuncIndex, IonDumpContents contents,
+                             GenericPrinter& out, UniqueChars* error);
+
 }  // namespace wasm
 }  // namespace js
 

@@ -166,7 +166,7 @@ if __name__ == "__main__":
     test_list = find_tests(test_dir)
 
     if not test_list:
-        print >>sys.stderr, "No tests found matching command line arguments."
+        print >> sys.stderr, "No tests found matching command line arguments."
         sys.exit(0)
 
     test_list = [Test.from_file(tst, name, OPTIONS) for tst, name in test_list]
@@ -178,7 +178,7 @@ if __name__ == "__main__":
 
     except OSError:
         if not os.path.exists(JS):
-            print >>sys.stderr, "JS shell argument: file does not exist: '%s'" % JS
+            print >> sys.stderr, "JS shell argument: file does not exist: '%s'" % JS
             sys.exit(1)
         else:
             raise

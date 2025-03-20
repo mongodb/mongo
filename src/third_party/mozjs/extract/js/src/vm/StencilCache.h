@@ -176,6 +176,22 @@ class StencilCache {
   void clearAndDisable();
 };
 
+// This cache is used to store the result of delazification compilations which
+// might be happening off-thread. The main-thread will concurrently read the
+// content of this cache to avoid delazification, or fallback on running the
+// delazification on the main-thread.
+//
+// Main-thread results are not stored in the DelazificationCache as there is no
+// other consumer.
+class DelazificationCache : public StencilCache {
+  static DelazificationCache singleton;
+
+ public:
+  DelazificationCache() = default;
+
+  static DelazificationCache& getSingleton() { return singleton; }
+};
+
 } /* namespace js */
 
 #endif /* vm_StencilCache_h */

@@ -23,6 +23,10 @@ namespace js {
 class FrontendContext;
 class ScriptSource;
 
+namespace frontend {
+struct CompilationStencil;
+}  // namespace frontend
+
 // Populate `options` fields from `opt` object.
 //
 // `opts` can have the following properties:
@@ -58,6 +62,17 @@ JSObject* CreateScriptPrivate(JSContext* cx,
     JSContext* cx, JS::Handle<JSObject*> opts,
     JS::MutableHandle<JS::Value> privateValue,
     JS::MutableHandle<JSString*> elementAttributeName);
+
+[[nodiscard]] JS::UniqueChars StringToLocale(JSContext* cx,
+                                             JS::Handle<JSObject*> callee,
+                                             JS::Handle<JSString*> str_);
+
+// Validate the option for lazy-parsing agrees between the current global and
+// the stencil.
+bool ValidateLazinessOfStencilAndGlobal(
+    JSContext* cx, const frontend::CompilationStencil& stencil);
+
+bool ValidateModuleCompileOptions(JSContext* cx, JS::CompileOptions& options);
 
 } /* namespace js */
 

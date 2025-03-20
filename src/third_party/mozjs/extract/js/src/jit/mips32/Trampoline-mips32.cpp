@@ -262,14 +262,14 @@ void JitRuntime::generateEnterJIT(JSContext* cx, MacroAssembler& masm) {
                   Address(StackPointer, sizeof(uintptr_t)));  // BaselineFrame
     masm.storePtr(reg_code, Address(StackPointer, 0));        // jitcode
 
-    using Fn = bool (*)(BaselineFrame * frame, InterpreterFrame * interpFrame,
+    using Fn = bool (*)(BaselineFrame* frame, InterpreterFrame* interpFrame,
                         uint32_t numStackValues);
     masm.setupUnalignedABICall(scratch);
     masm.passABIArg(FramePointer);  // BaselineFrame
     masm.passABIArg(OsrFrameReg);   // InterpreterFrame
     masm.passABIArg(numStackValues);
     masm.callWithABI<Fn, jit::InitBaselineFrameForOsr>(
-        MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
+        ABIType::General, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
     regs.add(OsrFrameReg);
     regs.take(JSReturnOperand);
@@ -394,14 +394,14 @@ void JitRuntime::generateInvalidator(MacroAssembler& masm, Label* bailoutTail) {
   // Pass pointer to BailoutInfo
   masm.movePtr(StackPointer, a2);
 
-  using Fn = bool (*)(InvalidationBailoutStack * sp, size_t * frameSizeOut,
-                      BaselineBailoutInfo * *info);
+  using Fn = bool (*)(InvalidationBailoutStack* sp, size_t* frameSizeOut,
+                      BaselineBailoutInfo** info);
   masm.setupAlignedABICall();
   masm.passABIArg(a0);
   masm.passABIArg(a1);
   masm.passABIArg(a2);
   masm.callWithABI<Fn, InvalidationBailout>(
-      MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckOther);
+      ABIType::General, CheckUnsafeCallWithABI::DontCheckOther);
 
   masm.loadPtr(Address(StackPointer, 0), a2);
   masm.loadPtr(Address(StackPointer, sizeof(uintptr_t)), a1);
@@ -625,11 +625,11 @@ static void GenerateBailoutThunk(MacroAssembler& masm, Label* bailoutTail) {
   masm.storePtr(ImmPtr(nullptr), Address(StackPointer, 0));
   masm.movePtr(StackPointer, a1);
 
-  using Fn = bool (*)(BailoutStack * sp, BaselineBailoutInfo * *info);
+  using Fn = bool (*)(BailoutStack* sp, BaselineBailoutInfo** info);
   masm.setupAlignedABICall();
   masm.passABIArg(a0);
   masm.passABIArg(a1);
-  masm.callWithABI<Fn, Bailout>(MoveOp::GENERAL,
+  masm.callWithABI<Fn, Bailout>(ABIType::General,
                                 CheckUnsafeCallWithABI::DontCheckOther);
 
   // Get BailoutInfo pointer
@@ -681,8 +681,8 @@ void JitRuntime::generateBailoutHandler(MacroAssembler& masm,
 }
 
 bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
-                                   const VMFunctionData& f, DynFn nativeFun,
-                                   uint32_t* wrapperOffset) {
+                                   VMFunctionId id, const VMFunctionData& f,
+                                   DynFn nativeFun, uint32_t* wrapperOffset) {
   *wrapperOffset = startTrampolineCode(masm);
 
   // Avoid conflicts with argument registers while discarding the result after
@@ -697,14 +697,15 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
   Register cxreg = a0;
   regs.take(cxreg);
 
-  // If it isn't a tail call, then the return address needs to be saved
-  if (f.expectTailCall == NonTailCall) {
-    masm.pushReturnAddress();
-  }
+  // On link-register platforms, it is the responsibility of the VM *callee* to
+  // push the return address, while the caller must ensure that the address
+  // is stored in ra on entry. This allows the VM wrapper to work with both
+  // direct calls and tail calls.
+  masm.pushReturnAddress();
 
   // We're aligned to an exit frame, so link it up.
   masm.loadJSContext(cxreg);
-  masm.enterExitFrame(cxreg, regs.getAny(), &f);
+  masm.enterExitFrame(cxreg, regs.getAny(), id);
 
   // Save the base of the argument set stored on the stack.
   Register argsBase = InvalidReg;
@@ -774,20 +775,20 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
   for (uint32_t explicitArg = 0; explicitArg < f.explicitArgs; explicitArg++) {
     switch (f.argProperties(explicitArg)) {
       case VMFunctionData::WordByValue:
-        masm.passABIArg(MoveOperand(argsBase, argDisp), MoveOp::GENERAL);
+        masm.passABIArg(MoveOperand(argsBase, argDisp), ABIType::General);
         argDisp += sizeof(uint32_t);
         break;
       case VMFunctionData::DoubleByValue:
         // Values should be passed by reference, not by value, so we
         // assert that the argument is a double-precision float.
         MOZ_ASSERT(f.argPassedInFloatReg(explicitArg));
-        masm.passABIArg(MoveOperand(argsBase, argDisp), MoveOp::DOUBLE);
+        masm.passABIArg(MoveOperand(argsBase, argDisp), ABIType::Float64);
         argDisp += sizeof(double);
         break;
       case VMFunctionData::WordByRef:
         masm.passABIArg(
             MoveOperand(argsBase, argDisp, MoveOperand::Kind::EffectiveAddress),
-            MoveOp::GENERAL);
+            ABIType::General);
         argDisp += sizeof(uint32_t);
         break;
       case VMFunctionData::DoubleByRef:
@@ -796,7 +797,7 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
         masm.as_sdc1(ScratchDoubleReg, doubleArgs, doubleArgDisp);
         masm.passABIArg(MoveOperand(doubleArgs, doubleArgDisp,
                                     MoveOperand::Kind::EffectiveAddress),
-                        MoveOp::GENERAL);
+                        ABIType::General);
         doubleArgDisp += sizeof(double);
         argDisp += sizeof(double);
         break;
@@ -810,10 +811,10 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
   if (f.outParam != Type_Void) {
     masm.passABIArg(MoveOperand(doubleArgs, outParamOffset,
                                 MoveOperand::Kind::EffectiveAddress),
-                    MoveOp::GENERAL);
+                    ABIType::General);
   }
 
-  masm.callWithABI(nativeFun, MoveOp::GENERAL,
+  masm.callWithABI(nativeFun, ABIType::General,
                    CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
   // Test for failure.

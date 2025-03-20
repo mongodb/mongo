@@ -48,6 +48,7 @@ enum class PackingStrategy {
   NullIsOk,
   LowBitTagIsError,
   PackedVariant,
+  ZeroIsEmptyError,
 };
 
 template <typename T>
@@ -182,6 +183,42 @@ class ResultImplementationNullIsOk<V, E, false>
     if (this->isOk()) {
       this->mValue.first().addr()->~V();
     }
+  }
+};
+
+/**
+ * Specialization for when the success type is one of integral, pointer, or
+ * enum, where 0 is unused, and the error type is an empty struct.
+ */
+template <typename V, typename E>
+class ResultImplementation<V, E, PackingStrategy::ZeroIsEmptyError> {
+  static_assert(std::is_integral_v<V> || std::is_pointer_v<V> ||
+                std::is_enum_v<V>);
+  static_assert(std::is_empty_v<E>);
+
+  V mValue;
+
+ public:
+  static constexpr PackingStrategy Strategy = PackingStrategy::ZeroIsEmptyError;
+
+  explicit constexpr ResultImplementation(V aValue) : mValue(aValue) {}
+  explicit constexpr ResultImplementation(E aErrorValue) : mValue(V(0)) {}
+
+  constexpr bool isOk() const { return mValue != V(0); }
+
+  constexpr V inspect() const { return mValue; }
+  constexpr V unwrap() { return inspect(); }
+
+  constexpr E inspectErr() const { return E(); }
+  constexpr E unwrapErr() { return inspectErr(); }
+
+  constexpr void updateAfterTracing(V&& aValue) {
+    this->~ResultImplementation();
+    new (this) ResultImplementation(std::move(aValue));
+  }
+  constexpr void updateErrorAfterTracing(E&& aErrorValue) {
+    this->~ResultImplementation();
+    new (this) ResultImplementation(std::move(aErrorValue));
   }
 };
 
@@ -407,7 +444,9 @@ struct HasFreeLSB<T*> {
 template <typename V, typename E>
 struct SelectResultImpl {
   static const PackingStrategy value =
-      (HasFreeLSB<V>::value && HasFreeLSB<E>::value)
+      (UnusedZero<V>::value && std::is_empty_v<E>)
+          ? PackingStrategy::ZeroIsEmptyError
+      : (HasFreeLSB<V>::value && HasFreeLSB<E>::value)
           ? PackingStrategy::LowBitTagIsError
       : (UnusedZero<E>::value && sizeof(E) <= sizeof(uintptr_t))
           ? PackingStrategy::NullIsOk
@@ -522,11 +561,13 @@ class [[nodiscard]] Result final {
   }
 
   /**
-   * Create a (success/error) result from another (success/error) result with a
-   * different but convertible error type. */
-  template <typename E2,
-            typename = std::enable_if_t<std::is_convertible_v<E2, E>>>
-  MOZ_IMPLICIT constexpr Result(Result<V, E2>&& aOther)
+   * Create a (success/error) result from another (success/error) result with
+   * different but convertible value and error types.
+   */
+  template <typename V2, typename E2,
+            typename = std::enable_if_t<std::is_convertible_v<V2, V> &&
+                                        std::is_convertible_v<E2, E>>>
+  MOZ_IMPLICIT constexpr Result(Result<V2, E2>&& aOther)
       : mImpl(aOther.isOk() ? Impl{aOther.unwrap()}
                             : Impl{aOther.unwrapErr()}) {}
 
@@ -793,6 +834,15 @@ class [[nodiscard]] Result final {
   constexpr auto andThen(F f) -> std::invoke_result_t<F, V&&> {
     return MOZ_LIKELY(isOk()) ? f(unwrap()) : propagateErr();
   }
+
+  bool operator==(const Result<V, E>& aOther) const {
+    return (isOk() && aOther.isOk() && inspect() == aOther.inspect()) ||
+           (isErr() && aOther.isErr() && inspectErr() == aOther.inspectErr());
+  }
+
+  bool operator!=(const Result<V, E>& aOther) const {
+    return !(*this == aOther);
+  }
 };
 
 /**
@@ -828,34 +878,5 @@ inline constexpr auto Err(E&& aErrorValue) {
 }
 
 }  // namespace mozilla
-
-/**
- * MOZ_TRY(expr) is the C++ equivalent of Rust's `try!(expr);`. First, it
- * evaluates expr, which must produce a Result value. On success, it
- * discards the result altogether. On error, it immediately returns an error
- * Result from the enclosing function.
- */
-#define MOZ_TRY(expr)                                   \
-  do {                                                  \
-    auto mozTryTempResult_ = ::mozilla::ToResult(expr); \
-    if (MOZ_UNLIKELY(mozTryTempResult_.isErr())) {      \
-      return mozTryTempResult_.propagateErr();          \
-    }                                                   \
-  } while (0)
-
-/**
- * MOZ_TRY_VAR(target, expr) is the C++ equivalent of Rust's `target =
- * try!(expr);`. First, it evaluates expr, which must produce a Result value. On
- * success, the result's success value is assigned to target. On error,
- * immediately returns the error result. |target| must be an lvalue.
- */
-#define MOZ_TRY_VAR(target, expr)                     \
-  do {                                                \
-    auto mozTryVarTempResult_ = (expr);               \
-    if (MOZ_UNLIKELY(mozTryVarTempResult_.isErr())) { \
-      return mozTryVarTempResult_.propagateErr();     \
-    }                                                 \
-    (target) = mozTryVarTempResult_.unwrap();         \
-  } while (0)
 
 #endif  // mozilla_Result_h

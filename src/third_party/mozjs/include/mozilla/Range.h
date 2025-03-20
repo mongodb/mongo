@@ -32,8 +32,8 @@ class Range {
       : mStart(aPtr, aPtr, aPtr + aLength),
         mEnd(aPtr + aLength, aPtr, aPtr + aLength) {
     if (!aPtr) {
-      MOZ_ASSERT(!aLength,
-                 "Range does not support nullptr with non-zero length.");
+      MOZ_ASSERT_DEBUG_OR_FUZZING(
+          !aLength, "Range does not support nullptr with non-zero length.");
       // ...because merely having a pointer to `nullptr + 1` is undefined
       // behavior. UBSAN catches this as of clang-10.
     }
@@ -43,7 +43,7 @@ class Range {
         mEnd(aEnd.get(), aStart.get(), aEnd.get()) {
     // Only accept two RangedPtrs within the same range.
     aStart.checkIdenticalRange(aEnd);
-    MOZ_ASSERT(aStart <= aEnd);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(aStart <= aEnd);
   }
 
   template <typename U, class = std::enable_if_t<

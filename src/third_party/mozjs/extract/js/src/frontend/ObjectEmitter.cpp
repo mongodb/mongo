@@ -18,8 +18,6 @@
 using namespace js;
 using namespace js::frontend;
 
-using mozilla::Maybe;
-
 PropertyEmitter::PropertyEmitter(BytecodeEmitter* bce) : bce_(bce) {}
 
 bool PropertyEmitter::prepareForProtoValue(uint32_t keyPos) {
@@ -624,7 +622,6 @@ bool ClassEmitter::emitDerivedClass(TaggedParserAtomIndex name,
 }
 
 bool ClassEmitter::emitInitConstructor(bool needsHomeObject) {
-  MOZ_ASSERT(propertyState_ == PropertyState::Start);
   MOZ_ASSERT(classState_ == ClassState::Class ||
              classState_ == ClassState::InstanceMemberInitializersEnd);
 
@@ -698,8 +695,8 @@ bool ClassEmitter::prepareForMemberInitializers(size_t numInitializers,
   // code (the initializer) for each field. Upon an object's construction,
   // these lambdas will be called, defining the values.
   auto initializers =
-      isStatic ? TaggedParserAtomIndex::WellKnown::dotStaticInitializers()
-               : TaggedParserAtomIndex::WellKnown::dotInitializers();
+      isStatic ? TaggedParserAtomIndex::WellKnown::dot_staticInitializers_()
+               : TaggedParserAtomIndex::WellKnown::dot_initializers_();
   initializersAssignment_.emplace(bce_, initializers,
                                   NameOpEmitter::Kind::Initialize);
   if (!initializersAssignment_->prepareForRhs()) {
@@ -811,6 +808,37 @@ bool ClassEmitter::emitMemberInitializersEnd() {
   return true;
 }
 
+#ifdef ENABLE_DECORATORS
+bool ClassEmitter::prepareForExtraInitializers(
+    TaggedParserAtomIndex initializers) {
+  // TODO: Add support for static and class extra initializers, see bug 1868220
+  // and bug 1868221.
+  MOZ_ASSERT(
+      initializers ==
+      TaggedParserAtomIndex::WellKnown::dot_instanceExtraInitializers_());
+
+  NameOpEmitter noe(bce_, initializers, NameOpEmitter::Kind::Initialize);
+  if (!noe.prepareForRhs()) {
+    return false;
+  }
+
+  // Because the initializers are created while executing decorators, we don't
+  // know beforehand how many there will be.
+  if (!bce_->emitUint32Operand(JSOp::NewArray, 0)) {
+    //              [stack] ARRAY
+    return false;
+  }
+
+  if (!noe.emitAssignment()) {
+    //              [stack] ARRAY
+    return false;
+  }
+
+  return bce_->emit1(JSOp::Pop);
+  //                [stack]
+}
+#endif
+
 bool ClassEmitter::emitBinding() {
   MOZ_ASSERT(propertyState_ == PropertyState::Start ||
              propertyState_ == PropertyState::Init);
@@ -841,10 +869,11 @@ bool ClassEmitter::emitBinding() {
   return true;
 }
 
-bool ClassEmitter::emitEnd(Kind kind) {
-  MOZ_ASSERT(classState_ == ClassState::BoundName);
-  //                [stack] CTOR
+#ifdef ENABLE_DECORATORS
+bool ClassEmitter::prepareForDecorators() { return leaveBodyAndInnerScope(); }
+#endif
 
+bool ClassEmitter::leaveBodyAndInnerScope() {
   if (bodyScope_.isSome()) {
     MOZ_ASSERT(bodyTdzCache_.isSome());
 
@@ -864,9 +893,21 @@ bool ClassEmitter::emitEnd(Kind kind) {
     innerScope_.reset();
     tdzCache_.reset();
   } else {
-    MOZ_ASSERT(kind == Kind::Expression);
     MOZ_ASSERT(tdzCache_.isNothing());
   }
+
+  return true;
+}
+
+bool ClassEmitter::emitEnd(Kind kind) {
+  MOZ_ASSERT(classState_ == ClassState::BoundName);
+  //                [stack] CTOR
+
+#ifndef ENABLE_DECORATORS
+  if (!leaveBodyAndInnerScope()) {
+    return false;
+  }
+#endif
 
   if (kind == Kind::Declaration) {
     MOZ_ASSERT(name_);

@@ -136,7 +136,7 @@ class TaggedParserAtomIndex {
     MOZ_ASSERT(uint32_t(index) < SmallIndexLimit);
 
     // Length1Static/Length2Static string shouldn't use WellKnownAtomId.
-#define CHECK_(_, NAME, _2) MOZ_ASSERT(index != WellKnownAtomId::NAME);
+#define CHECK_(NAME, _) MOZ_ASSERT(index != WellKnownAtomId::NAME);
     FOR_EACH_NON_EMPTY_TINY_PROPERTYNAME(CHECK_)
 #undef CHECK_
   }
@@ -149,7 +149,7 @@ class TaggedParserAtomIndex {
 
   class WellKnown {
    public:
-#define METHOD_(_, NAME, _2)                             \
+#define METHOD_(NAME, _)                                 \
   static constexpr TaggedParserAtomIndex NAME() {        \
     return TaggedParserAtomIndex(WellKnownAtomId::NAME); \
   }
@@ -170,14 +170,14 @@ class TaggedParserAtomIndex {
     JS_FOR_EACH_WELL_KNOWN_SYMBOL(METHOD_)
 #undef METHOD_
 
-#define METHOD_(_, NAME, STR)                                          \
+#define METHOD_(NAME, STR)                                             \
   static constexpr TaggedParserAtomIndex NAME() {                      \
     return TaggedParserAtomIndex(Length1StaticParserString((STR)[0])); \
   }
     FOR_EACH_LENGTH1_PROPERTYNAME(METHOD_)
 #undef METHOD_
 
-#define METHOD_(_, NAME, STR)                                         \
+#define METHOD_(NAME, STR)                                            \
   static constexpr TaggedParserAtomIndex NAME() {                     \
     return TaggedParserAtomIndex(Length2StaticParserString(           \
         (StaticStrings::getLength2IndexStatic((STR)[0], (STR)[1])))); \
@@ -186,7 +186,7 @@ class TaggedParserAtomIndex {
 #undef METHOD_
 
     static constexpr TaggedParserAtomIndex empty() {
-      return TaggedParserAtomIndex(WellKnownAtomId::empty);
+      return TaggedParserAtomIndex(WellKnownAtomId::empty_);
     }
   };
 
@@ -194,7 +194,7 @@ class TaggedParserAtomIndex {
   // For using in switch-case.
   class WellKnownRawData {
    public:
-#define METHOD_(_, NAME, _2)                                                 \
+#define METHOD_(NAME, _)                                                     \
   static constexpr uint32_t NAME() {                                         \
     return uint32_t(WellKnownAtomId::NAME) | WellKnownTag | WellKnownSubTag; \
   }
@@ -215,14 +215,14 @@ class TaggedParserAtomIndex {
     JS_FOR_EACH_WELL_KNOWN_SYMBOL(METHOD_)
 #undef METHOD_
 
-#define METHOD_(_, NAME, STR)                                       \
+#define METHOD_(NAME, STR)                                          \
   static constexpr uint32_t NAME() {                                \
     return uint32_t((STR)[0]) | WellKnownTag | Length1StaticSubTag; \
   }
     FOR_EACH_LENGTH1_PROPERTYNAME(METHOD_)
 #undef METHOD_
 
-#define METHOD_(_, NAME, STR)                                              \
+#define METHOD_(NAME, STR)                                                 \
   static constexpr uint32_t NAME() {                                       \
     return uint32_t(                                                       \
                StaticStrings::getLength2IndexStatic((STR)[0], (STR)[1])) | \
@@ -232,7 +232,7 @@ class TaggedParserAtomIndex {
 #undef METHOD_
 
     static constexpr uint32_t empty() {
-      return uint32_t(WellKnownAtomId::empty) | WellKnownTag | WellKnownSubTag;
+      return uint32_t(WellKnownAtomId::empty_) | WellKnownTag | WellKnownSubTag;
     }
   };
 

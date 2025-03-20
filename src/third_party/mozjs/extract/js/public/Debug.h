@@ -348,6 +348,36 @@ class MOZ_STACK_CLASS JS_PUBLIC_API AutoEntryMonitor {
   virtual void Exit(JSContext* cx) {}
 };
 
+// Returns true if there's any debugger attached to the given context where
+// the debugger's "shouldAvoidSideEffects" property is true.
+//
+// This is supposed to be used by native code that performs side-effectful
+// operations where the debugger cannot hook it.
+//
+// If this function returns true, the native function should throw an
+// uncatchable exception by returning `false` without setting any pending
+// exception. The debugger will handle this exception by aborting the eager
+// evaluation.
+//
+// The native code can opt into this behavior to help the debugger performing
+// the side-effect-free evaluation.
+//
+// Expected consumers of this API include JSClassOps.resolve hooks which have
+// any side-effect other than just resolving the property.
+//
+// Example:
+//   static bool ResolveHook(JSContext* cx, HandleObject obj, HandleId id,
+//                           bool* resolvedp) {
+//     *resolvedp = false;
+//     if (JS::dbg::ShouldAvoidSideEffects()) {
+//       return false;
+//     }
+//     // Resolve the property with the side-effect.
+//     ...
+//     return true;
+//   }
+bool ShouldAvoidSideEffects(JSContext* cx);
+
 }  // namespace dbg
 }  // namespace JS
 

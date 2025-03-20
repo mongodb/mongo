@@ -10,6 +10,7 @@ loadRelativeToScript('utility.js');
 loadRelativeToScript('annotations.js');
 
 var options = parse_options([
+    { name: '--verbose', type: 'bool' },
     { name: "gcTypes", default: "gcTypes.txt" },
     { name: "typeInfo", default: "typeInfo.txt" }
 ]);
@@ -316,7 +317,7 @@ if (os.getenv("HAZARD_RUN_INTERNAL_TESTS")) {
 var inheritors = Object.keys(typeInfo.InheritFromTemplateArgs).sort((a, b) => a.length - b.length);
 for (const csu of inheritors) {
     const [templateName, templateArgs] = parseTemplateType(csu);
-    for (const param of templateArgs) {
+    for (const param of (templateArgs || [])) {
         const pos = param.search(/\**$/);
         const ptrdness = param.length - pos;
         const core_type = param.substr(0, pos);
@@ -328,24 +329,41 @@ for (const csu of inheritors) {
     }
 }
 
+function Ptr(level) {
+    if (level < 0)
+        return Array(-level).fill("&").join("");
+    else
+        return Array(level).fill("*").join("");
+}
+
 // "typeName is a (pointer to a)^'typePtrLevel' GC type because it contains a field
-// named 'child' of type 'why' (or pointer to 'why' if fieldPtrLevel == 1), which is
-// itself a GCThing or GCPointer."
-function markGCType(typeName, child, why, typePtrLevel, fieldPtrLevel, indent)
-{
+// named 'child' of type 'childType' (or pointer to 'childType' if fieldPtrLevel == 1),
+// which is itself a GCThing or GCPointer."
+function markGCType(typeName, child, childType, typePtrLevel, fieldPtrLevel, indent = "") {
     // Some types, like UniquePtr, do not mark/trace/relocate their contained
     // pointers and so should not hold them live across a GC. UniquePtr in
     // particular should be the only thing pointing to a structure containing a
     // GCPointer, so nothing else can possibly trace it and it'll die when the
     // UniquePtr goes out of scope. So we say that memory pointed to by a
     // UniquePtr is just as unsafe as the stack for storing GC pointers.
-    if (!fieldPtrLevel && isUnsafeStorage(typeName)) {
-        // The UniquePtr itself is on the stack but when you dereference the
-        // contained pointer, you get to the unsafe memory that we are treating
-        // as if it were the stack (aka ptrLevel 0). Note that
-        // UniquePtr<UniquePtr<JSObject*>> is fine, so we don't want to just
-        // hardcode the ptrLevel.
-        fieldPtrLevel = -1;
+    if (isUnsafeStorage(typeName)) {
+        // If a UniquePtr<T> itself is on the stack, then there's a problem if
+        // T contains a Cell*. But the UniquePtr itself stores a T*, not a T,
+        // so set fieldPtrLevel=-1 to "undo" the pointer. When the type T is
+        // scanned for pointers and a Cell* is found, then when unwrapping the
+        // types, UniquePtr<T> will be seen as a T*=Cell** that should be
+        // treated as a Cell*.
+        //
+        // However, that creates the possibility of an infinite loop, if you
+        // have a type T that contains a UniquePtr<T> (which is allowed, because
+        // it's storing a T* not a T.)
+        const ptrLevel = typePtrLevel + fieldPtrLevel - 1;
+        if (options.verbose) {
+            printErr(`.${child} : (${childType} : "Cell${Ptr(typePtrLevel)}")${Ptr(fieldPtrLevel)} is-field-of ${typeName} : "Cell${Ptr(ptrLevel)}" [unsafe]`);
+        }
+        markGCTypeImpl(typeName, child, childType, ptrLevel, indent);
+
+        // Also treat UniquePtr<T> as if it were any other struct.
     }
 
     // Example: with:
@@ -356,8 +374,14 @@ function markGCType(typeName, child, why, typePtrLevel, fieldPtrLevel, indent)
     // for a final ptrLevel of 5, used to later call:
     //    child='foo' typePtrLevel=5 fieldPtrLevel=1
     //
-    var ptrLevel = typePtrLevel + fieldPtrLevel;
+    const ptrLevel = typePtrLevel + fieldPtrLevel;
+    if (options.verbose) {
+        printErr(`.${child} : (${childType} : "Cell${Ptr(typePtrLevel)}")${Ptr(fieldPtrLevel)} is-field-of ${typeName} : "Cell${Ptr(ptrLevel)}"`);
+    }
+    markGCTypeImpl(typeName, child, childType, ptrLevel, indent);
+}
 
+function markGCTypeImpl(typeName, child, childType, ptrLevel, indent) {
     // ...except when > 2 levels of pointers away from an actual GC thing, stop
     // searching the graph. (This would just be > 1, except that a UniquePtr
     // field might still have a GC pointer.)
@@ -377,19 +401,29 @@ function markGCType(typeName, child, why, typePtrLevel, fieldPtrLevel, indent)
             return;
         if (!(typeName in gcTypes))
             gcTypes[typeName] = new Set();
-        gcTypes[typeName].add(why);
+        gcTypes[typeName].add(childType);
     } else if (ptrLevel == 1) {
         if (typeName in typeInfo.NonGCPointers)
             return;
         if (!(typeName in gcPointers))
             gcPointers[typeName] = new Set();
-        gcPointers[typeName].add(why);
+        gcPointers[typeName].add(childType);
     }
 
     if (ptrLevel < 2) {
         if (!gcFields.has(typeName))
             gcFields.set(typeName, new Map());
-        gcFields.get(typeName).set(child, [ why, fieldPtrLevel ]);
+        const fields = gcFields.get(typeName);
+        if (fields.has(child)) {
+            const [orig_childType, orig_ptrLevel] = fields.get(child);
+            if (ptrLevel >= orig_ptrLevel) {
+                // Do not recurse for things more levels of pointers away from Cell.
+                // This will prevent infinite loops when types are defined recursively
+                // (eg a struct containing a UniquePtr of itself).
+                return;
+            }
+        }
+        fields.set(child, [childType, ptrLevel]);
     }
 
     if (typeName in structureParents) {
@@ -406,7 +440,7 @@ function markGCType(typeName, child, why, typePtrLevel, fieldPtrLevel, indent)
     }
 }
 
-function addGCType(typeName, child, why, depth, fieldPtrLevel)
+function addGCType(typeName)
 {
     pendingGCTypes.push([typeName, '<annotation>', '(annotation)', 0, 0]);
 }

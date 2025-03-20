@@ -142,7 +142,9 @@ def preprocess(cxx, preprocessorOption, source, args=[]):
 
     with open(tmpIn, "wb") as input:
         input.write(source.encode("utf-8"))
-    print(" ".join(cxx + outputArg + args + [tmpIn]))
+
+    if os.environ.get("BUILD_VERBOSE_LOG"):
+        print("Executing:", " ".join(cxx + outputArg + args + [tmpIn]))
     result = subprocess.Popen(cxx + outputArg + args + [tmpIn]).wait()
     if result != 0:
         sys.exit(result)
@@ -156,7 +158,7 @@ def preprocess(cxx, preprocessorOption, source, args=[]):
 def messages(jsmsg):
     defines = []
     for line in open(jsmsg):
-        match = re.match("MSG_DEF\((JSMSG_(\w+))", line)
+        match = re.match(r"MSG_DEF\((JSMSG_(\w+))", line)
         if match:
             defines.append("#define %s %i" % (match.group(1), len(defines)))
             continue

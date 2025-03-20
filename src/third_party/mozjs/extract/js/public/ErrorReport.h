@@ -31,6 +31,7 @@
 
 #include "js/AllocPolicy.h"
 #include "js/CharacterEncoding.h"  // JS::ConstUTF8CharsZ
+#include "js/ColumnNumber.h"       // JS::ColumnNumberOneOrigin
 #include "js/RootingAPI.h"         // JS::HandleObject, JS::RootedObject
 #include "js/UniquePtr.h"          // js::UniquePtr
 #include "js/Value.h"              // JS::Value
@@ -111,17 +112,17 @@ class JSErrorBase {
   JS::ConstUTF8CharsZ message_;
 
  public:
-  // The UTF-8 encoded source file name, URL, etc., or null.
-  const char* filename;
+  // Source file name, URL, etc., or null.
+  JS::ConstUTF8CharsZ filename;
 
   // Unique identifier for the script source.
   unsigned sourceId;
 
-  // Source line number.
-  unsigned lineno;
+  // Source line number (1-origin).
+  uint32_t lineno;
 
-  // Zero-based column index in line.
-  unsigned column;
+  // Column number in line in UTF-16 code units.
+  JS::ColumnNumberOneOrigin column;
 
   // the error number, e.g. see js/public/friend/ErrorNumbers.msg.
   unsigned errorNumber;
@@ -138,7 +139,6 @@ class JSErrorBase {
       : filename(nullptr),
         sourceId(0),
         lineno(0),
-        column(0),
         errorNumber(0),
         errorMessageName(nullptr),
         ownsMessage_(false) {}
@@ -188,7 +188,8 @@ class JSErrorNotes {
   js::Vector<js::UniquePtr<Note>, 1, js::SystemAllocPolicy> notes_;
 
   bool addNoteVA(js::FrontendContext* fc, const char* filename,
-                 unsigned sourceId, unsigned lineno, unsigned column,
+                 unsigned sourceId, uint32_t lineno,
+                 JS::ColumnNumberOneOrigin column,
                  JSErrorCallback errorCallback, void* userRef,
                  const unsigned errorNumber,
                  js::ErrorArgumentsType argumentsType, va_list ap);
@@ -197,29 +198,32 @@ class JSErrorNotes {
   JSErrorNotes();
   ~JSErrorNotes();
 
-  // Add an note to the given position.
+  // Add a note to the given position.
   bool addNoteASCII(JSContext* cx, const char* filename, unsigned sourceId,
-                    unsigned lineno, unsigned column,
+                    uint32_t lineno, JS::ColumnNumberOneOrigin column,
                     JSErrorCallback errorCallback, void* userRef,
                     const unsigned errorNumber, ...);
   bool addNoteASCII(js::FrontendContext* fc, const char* filename,
-                    unsigned sourceId, unsigned lineno, unsigned column,
+                    unsigned sourceId, uint32_t lineno,
+                    JS::ColumnNumberOneOrigin column,
                     JSErrorCallback errorCallback, void* userRef,
                     const unsigned errorNumber, ...);
   bool addNoteLatin1(JSContext* cx, const char* filename, unsigned sourceId,
-                     unsigned lineno, unsigned column,
+                     uint32_t lineno, JS::ColumnNumberOneOrigin column,
                      JSErrorCallback errorCallback, void* userRef,
                      const unsigned errorNumber, ...);
   bool addNoteLatin1(js::FrontendContext* fc, const char* filename,
-                     unsigned sourceId, unsigned lineno, unsigned column,
+                     unsigned sourceId, uint32_t lineno,
+                     JS::ColumnNumberOneOrigin column,
                      JSErrorCallback errorCallback, void* userRef,
                      const unsigned errorNumber, ...);
   bool addNoteUTF8(JSContext* cx, const char* filename, unsigned sourceId,
-                   unsigned lineno, unsigned column,
+                   uint32_t lineno, JS::ColumnNumberOneOrigin column,
                    JSErrorCallback errorCallback, void* userRef,
                    const unsigned errorNumber, ...);
   bool addNoteUTF8(js::FrontendContext* fc, const char* filename,
-                   unsigned sourceId, unsigned lineno, unsigned column,
+                   unsigned sourceId, uint32_t lineno,
+                   JS::ColumnNumberOneOrigin column,
                    JSErrorCallback errorCallback, void* userRef,
                    const unsigned errorNumber, ...);
 
@@ -532,9 +536,9 @@ namespace JS {
 
 extern JS_PUBLIC_API bool CreateError(
     JSContext* cx, JSExnType type, HandleObject stack, HandleString fileName,
-    uint32_t lineNumber, uint32_t columnNumber, JSErrorReport* report,
-    HandleString message, Handle<mozilla::Maybe<Value>> cause,
-    MutableHandleValue rval);
+    uint32_t lineNumber, JS::ColumnNumberOneOrigin column,
+    JSErrorReport* report, HandleString message,
+    Handle<mozilla::Maybe<Value>> cause, MutableHandleValue rval);
 
 } /* namespace JS */
 
