@@ -1563,6 +1563,34 @@ tasks:
             GITHUB_REPO: ${github_repo}
             GITHUB_TOKEN: ${github_token}
 
+  - name: check_for_noexcept
+    allowed_requesters: ["github_pr"]
+    tags:
+      [
+        "assigned_to_jira_team_server_programmability",
+        "auxiliary",
+        "commit_check",
+      ]
+    exec_timeout_secs: 600
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script.sh"
+            - "buildscripts/check_for_noexcept.py"
+            - "--base=${revision}"
+
   - name: version_burn_in_gen
     run_on: ubuntu2004-medium
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
