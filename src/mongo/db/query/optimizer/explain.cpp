@@ -30,34 +30,23 @@
 #include "mongo/db/query/optimizer/explain.h"
 
 #include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <boost/core/demangle.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <compare>
 #include <functional>
 #include <iterator>
 #include <map>
-#include <memory>
-#include <ostream>
-#include <set>
 #include <sstream>
 #include <tuple>
-#include <type_traits>
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"

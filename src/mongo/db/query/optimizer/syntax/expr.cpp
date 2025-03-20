@@ -29,12 +29,9 @@
 
 #include "mongo/db/query/optimizer/syntax/expr.h"
 
-#include <absl/container/flat_hash_map.h>
-
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo::optimizer {

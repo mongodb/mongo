@@ -31,8 +31,6 @@
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include <limits>
-
 
 namespace mongo::optimizer {
 

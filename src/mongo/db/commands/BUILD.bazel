@@ -740,8 +740,6 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:cursor_response_gen",
         "//src/mongo/db/query/client_cursor:generic_cursor_gen",
         "//src/mongo/db/query/collation:collator_factory_interface.h",
-        "//src/mongo/db/query/optimizer/algebra:operator.h",
-        "//src/mongo/db/query/optimizer/algebra:polyvalue.h",
         "//src/mongo/db/query/plan_cache:classic_plan_cache.h",
         "//src/mongo/db/query/plan_cache:plan_cache.h",
         "//src/mongo/db/query/plan_cache:plan_cache_callbacks.h",
@@ -849,6 +847,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:profile_settings",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query/optimizer/algebra",
         "//src/mongo/db/storage/key_string",
     ],
 )

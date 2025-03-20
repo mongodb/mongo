@@ -10,32 +10,38 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "defs",
+    srcs = [
+        "defs.cpp",
+    ],
+    hdrs = [
+        "containers.h",
+        "defs.h",
+        "strong_alias.h",
+        "//src/mongo/db/query/optimizer/syntax:syntax_fwd_declare.h",
+    ],
+    deps = [
+        "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",  # needed to register extended type destruction for MakeObjSpec :(
+        "//src/mongo/stdx",
+    ],
+)
+
 # Core definitions: ABT, Logical and physical properties, Metadata, and core
 # utilities.
 mongo_cc_library(
     name = "optimizer_base",
     srcs = [
-        "defs.cpp",
         "explain.cpp",
         "reference_tracker.cpp",
-        "//src/mongo/db/query/optimizer/syntax:expr.cpp",
     ],
     hdrs = [
-        "defs.h",
         "explain.h",
         "reference_tracker.h",
-        "strong_alias.h",
-        "//src/mongo/db/query/optimizer:comparison_op.h",
-        "//src/mongo/db/query/optimizer:containers.h",
-        "//src/mongo/db/query/optimizer/syntax:expr.h",
-        "//src/mongo/db/query/optimizer/syntax:syntax.h",
-        "//src/mongo/db/query/optimizer/syntax:syntax_fwd_declare.h",
     ],
     deps = [
-        # We should only depend on SBE for value representation and basic
-        # arithmetic for constant folding.
-        "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",
-        "//src/mongo/db:sbe_values",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db/query/optimizer/syntax:syntax_expr",
     ],
 )
 
@@ -47,7 +53,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":optimizer_base",
-        "//src/mongo/db/exec/sbe:query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
+        "//src/mongo/db:sbe_values",
     ],
 )
 

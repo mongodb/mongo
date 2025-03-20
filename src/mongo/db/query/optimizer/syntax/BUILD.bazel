@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,22 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_library(
+    name = "syntax_expr",
+    srcs = [
+        "expr.cpp",
+    ],
+    hdrs = [
+        "expr.h",
+        "syntax.h",
+        "//src/mongo/db/query/optimizer:comparison_op.h",
+    ],
+    header_deps = [
+        "//src/mongo/db:sbe_values",
+    ],
+    deps = [
+        "//src/mongo/db/query/optimizer:defs",
+    ],
 )
