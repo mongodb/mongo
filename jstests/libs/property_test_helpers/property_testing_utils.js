@@ -41,9 +41,12 @@ function createColl(coll, isTS = false) {
     const args = isTS ? {timeseries: {timeField: 't', metaField: 'm'}} : {};
     assert.commandWorked(db.createCollection(coll.getName(), args));
 }
-
-// Error codes from creating an index that are acceptable. We could change our model or add filters
-// to the model to remove these cases, but that would cause them to become overcomplicated.
+/*
+ * Acceptable error codes from creating an index. We could change our model or add filters
+ * to the model to remove these cases, but that would cause them to become overcomplicated.
+ * In pbt_self_test.js, we assert that the number of indexes created is high enough, to avoid our
+ * tests silently erroring too much on index creation.
+ */
 const okIndexCreationErrorCodes = [
     // Index already exists.
     85,
@@ -118,11 +121,11 @@ function reporter(propertyFn, namespaces) {
         if (runDetails.failed) {
             // Print the fast-check failure summary, the counterexample, and additional details
             // about the property failure.
+            jsTestLog('Failed property: ' + propertyFn.name);
             jsTestLog(runDetails);
             const {collSpec, queries} = runDetails.counterexample[0];
             jsTestLog({collSpec, queries});
             jsTestLog(runProperty(propertyFn, namespaces, collSpec, queries));
-            jsTestLog('Failed property: ' + propertyFn.name);
             assert(false);
         }
     };
@@ -136,18 +139,38 @@ function reporter(propertyFn, namespaces) {
  */
 export function testProperty(
     propertyFn, namespaces, {collModel, aggModel}, {numRuns, numQueriesPerRun}) {
+    const seed = 4;
+    jsTestLog('Running property `' + propertyFn.name + '` from test file `' + jsTestName() +
+              '`, seed = ' + seed);
+    // PBTs can throw (and then catch) exceptions for a few reasons. For example it's hard to model
+    // indexes exactly, so we end up trying to create some invalid indexes which throw exceptions.
+    // These exceptions make the logs hard to read and can be ignored, so we turn off
+    // traceExceptions. These failures are still logged on a single line with the message
+    // "Assertion while executing command"
+    // True PBT failures (uncaught) are still readable and have stack traces.
+    TestData.traceExceptions = false;
+
     const nPipelinesModel =
         fc.array(aggModel, {minLength: numQueriesPerRun, maxLength: numQueriesPerRun});
     const scenarioArb = fc.record({collSpec: collModel, queries: nPipelinesModel});
 
-    fc.assert(fc.property(scenarioArb,
-                          ({collSpec, queries}) => {
-                              // Only return if the property passed or not. On failure,
-                              // `runProperty` is called again and more details are exposed.
-                              return runProperty(propertyFn, namespaces, collSpec, queries).passed;
-                          }),
-              // TODO SERVER-91404 randomize in waterfall.
-              {seed: 4, numRuns, reporter: reporter(propertyFn, namespaces)});
+    let alwaysPassed = true;
+    fc.assert(fc.property(scenarioArb, ({collSpec, queries}) => {
+        // Only return if the property passed or not. On failure,
+        // `runProperty` is called again and more details are exposed.
+        const result = runProperty(propertyFn, namespaces, collSpec, queries);
+        // If it failed for the first time, print that out so we have the first failure available
+        // in case shrinking fails.
+        if (!result.passed && alwaysPassed) {
+            jsTestLog('The property ' + propertyFn.name + ' from ' + jsTestName() + ' failed');
+            jsTestLog('Initial inputs **before minimization**');
+            jsTestLog({collSpec, queries});
+            jsTestLog('Initial failure details **before minimization**');
+            jsTestLog(result);
+            alwaysPassed = false;
+        }
+        return result.passed;
+    }), {seed, numRuns, reporter: reporter(propertyFn, namespaces)});
 }
 
 function isCollTS(collName) {
