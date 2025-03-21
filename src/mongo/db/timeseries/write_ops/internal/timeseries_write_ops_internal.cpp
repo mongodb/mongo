@@ -265,39 +265,32 @@ CollectionAcquisition acquireBucketsCollection(OperationContext* opCtx,
 
     boost::optional<CollectionOrViewAcquisition> acq =
         acquireCollectionOrView(opCtx, acquisitionReq, mode);
+
+    boost::optional<NamespaceString> translatedBucketsNs;
     if (acq->isView()) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 fmt::format("Namespace {} is a view, not a collection",
                             acq->nss().toStringForErrorMsg()),
                 acq->getView().getViewDefinition().timeseries());
 
-        // modify acquistion request to target the buckets collection
-        acquisitionReq.viewMode = AcquisitionPrerequisites::ViewMode::kMustBeCollection;
-        acquisitionReq.nssOrUUID = acq->getView().getViewDefinition().viewOn();
+        translatedBucketsNs = acq->getView().getViewDefinition().viewOn();
+    } else if (!acq->collectionExists() && !originNss.isTimeseriesBucketsCollection()) {
+        // Even if the timeseries view does not exist we look directly for the legacy system buckets
+        // collection. This is to support writes when the timeseries view does not exists. For
+        // instance for direct writes on shards other than the DB primary shard.
+        translatedBucketsNs = originNss.makeTimeseriesBucketsNamespace();
+    }
 
+    if (translatedBucketsNs) {
         // Release the main acquisition before attempting acquisition on buckets collection.
         // This is necessary to avoid deadlock with other code that perform acquisition in opposide
         // order (e.g. dropCollection)
         acq.reset();
-        auto bucketsAcq = acquireCollection(opCtx, acquisitionReq, mode);
-        uassert(ErrorCodes::NamespaceNotFound,
-                fmt::format("timeseries buckets collection does not exist {}",
-                            acquisitionReq.nssOrUUID.toStringForErrorMsg()),
-                bucketsAcq.exists());
-        return bucketsAcq;
-    }
 
-
-    // Even if the timeseries view does not exist we look directly for the legacy system buckets
-    // collection. This is to support writes when the timeseries view does not exists. For
-    // instance for direct writes on shards other than the DB primary shard.
-    if (!acq->collectionExists() && !originNss.isTimeseriesBucketsCollection()) {
+        // modify acquistion request to target the buckets collection
         acquisitionReq.viewMode = AcquisitionPrerequisites::ViewMode::kMustBeCollection;
-        acquisitionReq.nssOrUUID = originNss.makeTimeseriesBucketsNamespace();
-        auto bucketsAcq = acquireCollection(opCtx, acquisitionReq, mode);
-        if (bucketsAcq.exists()) {
-            return bucketsAcq;
-        }
+        acquisitionReq.nssOrUUID = *translatedBucketsNs;
+        return acquireCollection(opCtx, acquisitionReq, mode);
     }
 
     return CollectionAcquisition(std::move(*acq));
