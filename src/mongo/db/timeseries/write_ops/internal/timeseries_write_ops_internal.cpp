@@ -827,7 +827,6 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     stageStatus = StageWritesStatus::kSuccess;
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-    auto bucketsNs = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
     auto& measurementDocs = request.getDocuments();
 
     // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
@@ -843,16 +842,19 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
         // the timeseriesOptions. However, the associated collection must be acquired before
         // we check for the presence of buckets collection. This ensures that a potential
         // ShardVersion mismatch can be detected, before checking for other errors.
-        const auto coll = acquireCollection(opCtx,
-                                            CollectionAcquisitionRequest::fromOpCtx(
-                                                opCtx, bucketsNs, AcquisitionPrerequisites::kRead),
-                                            MODE_IS);
-        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
+        const auto bucketsAcq = acquireAndValidateBucketsCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsAcq.nss());
         // Check for the presence of the buckets collection
+        // TODO SERVER-101456 remove this check once we stop doing the lookup
+        // in addition to the acquireAndValidateBucketsCollection function.
         timeseries::assertTimeseriesBucketsCollection(bucketsColl);
         // Process timeseriesOptions
-        timeseriesOptions = *bucketsColl->getTimeseriesOptions();
-        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsNs, timeseriesOptions);
+        timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
+        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsAcq.nss(), timeseriesOptions);
     } catch (const DBException& ex) {
         if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
             throw;
@@ -950,7 +952,6 @@ TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
     hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-    auto bucketsNs = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
 
     auto catalog = CollectionCatalog::get(opCtx);
     const Collection* bucketsColl = nullptr;
@@ -961,17 +962,20 @@ TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
         // the timeseriesOptions. However, the associated collection must be acquired before
         // we check for the presence of buckets collection. This ensures that a potential
         // ShardVersion mismatch can be detected, before checking for other errors.
-        const auto coll = acquireCollection(opCtx,
-                                            CollectionAcquisitionRequest::fromOpCtx(
-                                                opCtx, bucketsNs, AcquisitionPrerequisites::kRead),
-                                            MODE_IS);
-        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
+        const auto bucketsAcq = acquireAndValidateBucketsCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsAcq.nss());
         // Check for the presence of the buckets collection
+        // TODO SERVER-101456 remove this check once we stop doing the lookup
+        // in addition to the acquireAndValidateBucketsCollection function.
         timeseries::assertTimeseriesBucketsCollection(bucketsColl);
         optUuid = bucketsColl->uuid();
         // Process timeseriesOptions
-        timeseriesOptions = *bucketsColl->getTimeseriesOptions();
-        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsNs, timeseriesOptions);
+        timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
+        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsAcq.nss(), timeseriesOptions);
     } catch (const DBException& ex) {
         if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
             throw;
@@ -1060,7 +1064,6 @@ TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogWithRetries(
     hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-    auto bucketsNs = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
 
     auto catalog = CollectionCatalog::get(opCtx);
     const Collection* bucketsColl = nullptr;
@@ -1071,17 +1074,20 @@ TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogWithRetries(
         // the timeseriesOptions. However, the associated collection must be acquired before
         // we check for the presence of buckets collection. This ensures that a potential
         // ShardVersion mismatch can be detected, before checking for other errors.
-        const auto coll = acquireCollection(opCtx,
-                                            CollectionAcquisitionRequest::fromOpCtx(
-                                                opCtx, bucketsNs, AcquisitionPrerequisites::kRead),
-                                            MODE_IS);
-        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
+        const auto bucketsAcq = acquireAndValidateBucketsCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsAcq.nss());
         // Check for the presence of the buckets collection
+        // TODO SERVER-101456 remove this check once we stop doing the lookup
+        // in addition to the acquireAndValidateBucketsCollection function.
         timeseries::assertTimeseriesBucketsCollection(bucketsColl);
         optUuid = bucketsColl->uuid();
         // Process timeseriesOptions
-        timeseriesOptions = *bucketsColl->getTimeseriesOptions();
-        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsNs, timeseriesOptions);
+        timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
+        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsAcq.nss(), timeseriesOptions);
     } catch (const DBException& ex) {
         if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
             throw;
@@ -1576,26 +1582,26 @@ commit_result::Result commitTimeseriesBucketForBatch(
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
-    auto nss = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
 
     // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
     // Collection instances remain valid, and the collator is not invalidated.
     auto catalog = CollectionCatalog::get(opCtx);
     const CollatorInterface* collator = nullptr;
+    NamespaceString nss;
 
     try {
         // The associated collection must be acquired before we check for the presence of
         // buckets collection. This ensures that a potential ShardVersion mismatch can be
-        // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()'
-        // might block waiting for other batches to complete, limiting the scope of the
+        // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()' might
+        // block waiting for other batches to complete, limiting the scope of the
         // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
-        const auto acquisition = acquireCollection(
+        const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
-        auto bucketsColl = acquisition.getCollectionPtr().get();
-        assertTimeseriesBucketsCollection(bucketsColl);
-        collator = bucketsColl->getDefaultCollator();
+        nss = bucketsAcq.nss();
+        collator = bucketsAcq.getCollectionPtr()->getDefaultCollator();
     } catch (const DBException& ex) {
         if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
             throw;
