@@ -27,7 +27,16 @@
  *    it in the license file.
  */
 
-#raw
+// clang-format off
+/*
+## Change Cheetah tokens to be more C++-compatible.
+#compiler-settings
+directiveStartToken = //#
+directiveEndToken = //#
+commentStartToken = //##
+#end compiler-settings
+*/
+
 #pragma once
 
 #include <array>
@@ -37,55 +46,55 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
-#end raw
-##
-##
-#from bisect import bisect_left, bisect_right
-#import itertools
-#import re
-#import yaml
-#from packaging.version import Version
-##
-## `args[0]` : the path to a `releases.yml` file.
-## `args[1]` : the mongo version
-##
-#set releases_yml_path = $args[0]
-#set mongo_version = $args[1]
-##
-#set mvc_file = open(releases_yml_path, 'r')
-#set mvc_doc = yaml.safe_load(mvc_file)
-#set mvc_fcvs = mvc_doc['featureCompatibilityVersions']
-#set mvc_majors = mvc_doc['longTermSupportReleases']
-#set mvc_lower_bound_override = mvc_doc.get('generateFCVLowerBoundOverride')
-##
-## Transform strings to versions.
-#set global fcvs = list(map(Version, mvc_fcvs))
-#set majors = list(map(Version, mvc_majors))
-#set global lower_bound_override = None
-#if mvc_lower_bound_override is not None:
-  #set global lower_bound_override = Version(mvc_lower_bound_override)
-#end if
 
-#set global latest = Version(re.match(r'^[0-9]+\.[0-9]+', $mongo_version).group(0))
-## Highest release less than latest.
-#set global last_continuous = $fcvs[bisect_left($fcvs, $latest) - 1]
-## Highest LTS release less than latest.
-#set global last_lts = majors[bisect_left(majors, $latest) - 1]
-##
-#set global generic_fcvs = {'LastLTS': $last_lts, 'LastContinuous': $last_continuous, 'Latest': $latest}
-##
-## Format a Version as `{major}_{minor}`.
-#def underscores(v): ${'{}_{}'.format(v.major, v.minor)}
-#def dotted(v): ${'{}.{}'.format(v.major, v.minor)}
+//##
+//##
+//#from bisect import bisect_left, bisect_right
+//#import itertools
+//#import re
+//#import yaml
+//#from packaging.version import Version
+//##
+//## `args[0]` : the path to a `releases.yml` file.
+//## `args[1]` : the mongo version
+//##
+//#set releases_yml_path = $args[0]
+//#set mongo_version = $args[1]
+//##
+//#set mvc_file = open(releases_yml_path, 'r')
+//#set mvc_doc = yaml.safe_load(mvc_file)
+//#set mvc_fcvs = mvc_doc['featureCompatibilityVersions']
+//#set mvc_majors = mvc_doc['longTermSupportReleases']
+//#set mvc_lower_bound_override = mvc_doc.get('generateFCVLowerBoundOverride')
+//##
+//## Transform strings to versions.
+//#set global fcvs = list(map(Version, mvc_fcvs))
+//#set majors = list(map(Version, mvc_majors))
+//#set global lower_bound_override = None
+//#if mvc_lower_bound_override is not None:
+  //#set global lower_bound_override = Version(mvc_lower_bound_override)
+//#end if
 
-#def fcv_cpp_name(v): ${'kVersion_{}'.format($underscores(v))}
-##
-#def transition_enum_name(transition, first, second):
-k$(transition)_$(underscores(first))_To_$(underscores(second))#slurp
-#end def
+//#set global latest = Version(re.match(r'^[0-9]+\.[0-9]+', $mongo_version).group(0))
+//## Highest release less than latest.
+//#set global last_continuous = $fcvs[bisect_left($fcvs, $latest) - 1]
+//## Highest LTS release less than latest.
+//#set global last_lts = majors[bisect_left(majors, $latest) - 1]
+//##
+//#set global generic_fcvs = {'LastLTS': $last_lts, 'LastContinuous': $last_continuous, 'Latest': $latest}
+//##
+//## Format a Version as `{major}_{minor}`.
+//#def underscores(v): ${'{}_{}'.format(v.major, v.minor)}
+//#def dotted(v): ${'{}.{}'.format(v.major, v.minor)}
+
+//#def fcv_cpp_name(v): ${'kVersion_{}'.format($underscores(v))}
+//##
+//#def transition_enum_name(transition, first, second):
+k$(transition)_$(underscores(first))_To_$(underscores(second))//#slurp
+//#end def
 
 namespace mongo::multiversion {
-<%
+/* <%
 fcvs = self.getVar('fcvs')
 last_lts, last_continuous, latest = self.getVar('last_lts'), self.getVar('last_continuous'), self.getVar('latest')
 generic_fcvs = self.getVar('generic_fcvs')
@@ -131,9 +140,9 @@ for fcv_x in fcvs[bisect_left(fcvs, lts_cutoff):bisect_right(fcvs, latest)]:
         # The downgrading transitions need to appear first when generating enums.
         fcv_list.extend(down_transitions + up_transitions)
         transition_fcvs.extend(down_transitions + up_transitions)
-%>
-##
-##
+%> */
+//##
+//##
 /**
  * The combination of the fields (version, targetVersion, previousVersion) in the
  * featureCompatibilityVersion document in the server configuration collection
@@ -170,12 +179,12 @@ enum class FeatureCompatibilityVersion {
     kInvalid,
     kUnsetDefaultLastLTSBehavior,
 
-#for fcv, _ in fcv_list:
+//#for fcv, _ in fcv_list:
     $fcv,
-#end for
+//#end for
 };
 
-## Calculate number of versions since v4.0.
+// Calculate number of versions since v4.0.
 inline constexpr size_t kSince_$underscores(Version('4.0')) = ${bisect_left(fcvs, latest)};
 
 // Last LTS was "$last_lts".
@@ -184,20 +193,20 @@ inline constexpr size_t kSinceLastLTS = ${bisect_left(fcvs, latest) - bisect_lef
 inline constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
 
 class GenericFCV {
-#def define_fcv_alias(id, v):
-static constexpr auto $id = FeatureCompatibilityVersion::$fcv_cpp_name(v);#slurp
-#end def
-##
-#def define_generic_transition_alias(transition, first, second):
-static constexpr auto k$transition$(first)To$(second) = #slurp
-FeatureCompatibilityVersion::$transition_enum_name(transition, $generic_fcvs[first], $generic_fcvs[second]);#slurp
-#end def
-##
-#def define_generic_invalid_alias(transition, first, second):
-static constexpr auto k$transition$(first)To$(second) = FeatureCompatibilityVersion::kInvalid;#slurp
-#end def
-##
-<%
+//#def define_fcv_alias(id, v):
+static constexpr auto $id = FeatureCompatibilityVersion::$fcv_cpp_name(v);//#slurp
+//#end def
+//##
+//#def define_generic_transition_alias(transition, first, second):
+static constexpr auto k$transition$(first)To$(second) = //#slurp
+FeatureCompatibilityVersion::$transition_enum_name(transition, $generic_fcvs[first], $generic_fcvs[second]);//#slurp
+//#end def
+//##
+//#def define_generic_invalid_alias(transition, first, second):
+static constexpr auto k$transition$(first)To$(second) = FeatureCompatibilityVersion::kInvalid;//#slurp
+//#end def
+//##
+/* <%
 lts = 'LastLTS'
 cont = 'LastContinuous'
 lat = 'Latest'
@@ -212,15 +221,15 @@ generic_transitions = [
     self.define_generic_transition_alias(up, lts, cont) if generic_fcvs[lts] != generic_fcvs[cont]
         else self.define_generic_invalid_alias(up, lts, cont)
 ]
-%>
+%> */
 public:
     $define_fcv_alias('kLatest', latest)
     $define_fcv_alias('kLastContinuous', last_continuous)
     $define_fcv_alias('kLastLTS', last_lts)
 
-#for fcv in generic_transitions:
+//#for fcv in generic_transitions:
     $fcv
-#end for
+//#end for
 };
 
 /**
@@ -232,9 +241,9 @@ inline constexpr std::array extendedFCVTable {
     // The table's entries must appear in the same order in which the enums were defined.
     std::pair{FeatureCompatibilityVersion::kInvalid, "invalid"_sd},
     std::pair{FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior, "unset"_sd},
-#for fcv, fcv_string in fcv_list:
+//#for fcv, fcv_string in fcv_list:
     std::pair{FeatureCompatibilityVersion::$fcv, "$fcv_string"_sd},
-#end for
+//#end for
 };
 
 constexpr decltype(auto) findExtended(FeatureCompatibilityVersion v) {
@@ -268,9 +277,9 @@ inline int minorVersion(FeatureCompatibilityVersion v) {
  * Other FCV enum members, such as those representing transitions, are excluded.
  */
 inline constexpr std::array standardFCVTable {
-#for fcv, _ in filter(lambda p: p not in transition_fcvs, fcv_list):
+//#for fcv, _ in filter(lambda p: p not in transition_fcvs, fcv_list):
     &findExtended(FeatureCompatibilityVersion::$fcv),
-#end for
+//#end for
 };
 
 /**
@@ -280,11 +289,11 @@ struct TransitionFCVInfo {
     FeatureCompatibilityVersion transitional, from, to;
 };
 inline constexpr std::array transitionFCVInfoTable {
-#for tup in transition_lookup_fcvs:
+//#for tup in transition_lookup_fcvs:
     TransitionFCVInfo{FeatureCompatibilityVersion::$tup[0],
                       FeatureCompatibilityVersion::$tup[1],
                       FeatureCompatibilityVersion::$tup[2]},
-#end for
+//#end for
 };
 
 constexpr TransitionFCVInfo getTransitionFCVInfo(FeatureCompatibilityVersion v) {
@@ -335,5 +344,6 @@ constexpr bool isStandardFCV(FeatureCompatibilityVersion v) {
 }
 
 }  // namespace mongo::multiversion
+// clang-format on
 
 /* vim: set filetype=cpp: */

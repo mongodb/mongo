@@ -6,7 +6,7 @@ package(default_visibility = ["//visibility:public"])
 render_template(
     name = "releases_header",
     srcs = [
-        "releases.h.tpl",
+        "releases.tpl.h",
         "releases.yml",
         "//buildscripts:cheetah_source_generator.py",
     ],
@@ -14,7 +14,7 @@ render_template(
         "$(location //buildscripts:cheetah_source_generator.py)",
         "-o",
         "$(location releases.h)",
-        "$(location releases.h.tpl)",
+        "$(location releases.tpl.h)",
         "$(location releases.yml)",
         "$(MONGO_VERSION)",
     ],
