@@ -417,6 +417,14 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 #endif  // _WIN32
 
+#ifdef __APPLE__
+    if (serverGlobalParams.doFork) {
+        return Status(ErrorCodes::BadValue,
+                      "Server fork+exec via `--fork` or `processManagement.fork` "
+                      "is incompatible with macOS");
+    }
+#endif  // Apple
+
     if (serverGlobalParams.doFork && serverGlobalParams.logpath.empty() &&
         !serverGlobalParams.logWithSyslog) {
         return Status(ErrorCodes::BadValue, "--fork has to be used with --logpath or --syslog");
