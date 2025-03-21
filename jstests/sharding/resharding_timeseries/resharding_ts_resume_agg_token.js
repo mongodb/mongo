@@ -35,21 +35,30 @@ const kBucketCollName = "system.buckets.foo";
 
 const doc1 = {
     data: 1,
-    time: new Date(),
+    time: new Date("2025-01-01T01:00:00Z"),
     meta: {x: 1, y: 5}
 };
 const doc2 = {
     data: 3,
-    time: new Date(),
+    time: new Date("2025-01-01T01:00:01Z"),
     meta: {x: 2, y: 3}
 };
+const doc3 = {
+    data: 3,
+    time: new Date("2025-01-01T01:00:02Z"),
+    meta: {x: 3, y: 2}
+};
+const doc4 = {
+    data: 1,
+    time: new Date("2025-01-01T01:00:03Z"),
+    meta: {x: 4, y: 1}
+};
+
 // Insert some docs
-assert.commandWorked(sDB.getCollection(kCollName).insert([
-    doc1,
-    doc2,
-    {data: 3, time: new Date(), meta: {x: 3, y: 2}},
-    {data: 1, time: new Date(), meta: {x: 4, y: 1}}
-]));
+assert.commandWorked(sDB.getCollection(kCollName).insertOne(doc1));
+assert.commandWorked(sDB.getCollection(kCollName).insertOne(doc2));
+assert.commandWorked(sDB.getCollection(kCollName).insertOne(doc3));
+assert.commandWorked(sDB.getCollection(kCollName).insertOne(doc4));
 
 const db = st.rs0.getPrimary().getDB(kDbName);
 jsTest.log(
@@ -64,6 +73,7 @@ let res = assert.commandWorked(db.runCommand({
 assert.hasFields(res.cursor, ["postBatchResumeToken"]);
 assert.hasFields(res.cursor.postBatchResumeToken, ["$recordId"]);
 assert.hasFields(res.cursor.postBatchResumeToken, ["$initialSyncId"]);
+
 assert.eq(res.cursor.firstBatch[0].meta, doc1.meta);
 const resumeToken = res.cursor.postBatchResumeToken;
 
@@ -75,6 +85,7 @@ res = assert.commandWorked(db.runCommand({
     $_resumeAfter: resumeToken,
     cursor: {batchSize: 1}
 }));
+
 assert.eq(res.cursor.firstBatch[0].meta, doc2.meta);
 
 st.stop();
