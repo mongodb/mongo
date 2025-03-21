@@ -48,6 +48,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/vector_clock.h"
@@ -71,19 +72,26 @@ BSONObj makeEmptyMetadata() {
     return BSONObj();
 }
 
-void readRequestMetadata(OperationContext* opCtx,
-                         const GenericArguments& requestArgs,
-                         bool cmdRequiresAuth,
-                         boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard) {
-    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-    auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
+namespace {
+void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArguments& requestArgs) {
+    // If we are in direct client, privileged metadata should already be set by the initial request.
+    if (opCtx->getClient()->isInDirectClient()) {
+        tassert(9955802,
+                "Unexpected clientOperationKey in direct client",
+                !requestArgs.getClientOperationKey());
+        return;
+    }
+
+    // Check for authorization lazily, to optimize for the common case with no arguments present.
+    Deferred hasInternalAuthorization{[&] {
+        auto authSession = AuthorizationSession::get(opCtx->getClient());
+        return authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(authSession->getUserTenantId()),
+            ActionType::internal);
+    }};
 
     if (requestArgs.getClientOperationKey() &&
-        (TestingProctor::instance().isEnabled() ||
-         authSession->isAuthorizedForActionsOnResource(
-             ResourcePattern::forClusterResource(
-                 validatedTenancyScope.map([](auto scope) { return scope.tenantId(); })),
-             ActionType::internal))) {
+        (TestingProctor::instance().isEnabled() || hasInternalAuthorization())) {
         {
             // We must obtain the client lock to set the OperationKey on the operation context as
             // it may be concurrently read by CurrentOp.
@@ -97,6 +105,28 @@ void readRequestMetadata(OperationContext* opCtx,
                         opCtx->getOperationKey()->toBSON()["uuid"].String());
         });
     }
+
+    uassert(6317500,
+            "Client is not properly authorized to propagate mayBypassWriteBlocking",
+            !requestArgs.getMayBypassWriteBlocking() || hasInternalAuthorization());
+    // setFromMetadata must still be called to set the default value if it's not set in the request
+    WriteBlockBypass::get(opCtx).setFromMetadata(opCtx, requestArgs.getMayBypassWriteBlocking());
+
+    uassert(9955800,
+            "Client is not properly authorized to propagate versionContext",
+            !requestArgs.getVersionContext() || hasInternalAuthorization());
+    if (requestArgs.getVersionContext()) {
+        ClientLock lg(opCtx->getClient());
+        VersionContext::setFromMetadata(lg, opCtx, *requestArgs.getVersionContext());
+    }
+}
+}  // namespace
+
+void readRequestMetadata(OperationContext* opCtx,
+                         const GenericArguments& requestArgs,
+                         bool cmdRequiresAuth,
+                         boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard) {
+    readPrivilegedRequestMetadata(opCtx, requestArgs);
 
     if (auto& rp = requestArgs.getReadPreference()) {
         ReadPreferenceSetting::get(opCtx) = *rp;
@@ -128,8 +158,6 @@ void readRequestMetadata(OperationContext* opCtx,
     components.setDollarTopologyTime(requestArgs.getDollarTopologyTime());
     components.setDollarClusterTime(requestArgs.getDollarClusterTime());
     VectorClock::get(opCtx)->gossipIn(opCtx, components, !cmdRequiresAuth);
-
-    WriteBlockBypass::get(opCtx).setFromMetadata(opCtx, requestArgs.getMayBypassWriteBlocking());
 
     isRawDataOperation(opCtx) = requestArgs.getRawData();
 }

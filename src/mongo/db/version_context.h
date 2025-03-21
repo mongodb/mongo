@@ -59,6 +59,7 @@ public:
      * The Client lock must be taken to serialize with concurrent readers, such as $currentOp.
      */
     static void setDecoration(ClientLock&, OperationContext* opCtx, const VersionContext& vCtx);
+    static void setFromMetadata(ClientLock&, OperationContext* opCtx, const VersionContext& vCtx);
 
     constexpr VersionContext() : _metadataOrTag(OperationWithoutOFCVTag{}) {}
     explicit constexpr VersionContext(OutsideOperationTag tag) : _metadataOrTag(tag) {}

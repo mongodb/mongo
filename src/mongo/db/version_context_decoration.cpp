@@ -45,4 +45,11 @@ void VersionContext::setDecoration(ClientLock&,
     getVersionContext(opCtx) = vCtx;
 }
 
+void VersionContext::setFromMetadata(ClientLock&,
+                                     OperationContext* opCtx,
+                                     const VersionContext& vCtx) {
+    tassert(9955801, "Expected incoming versionContext to be initialized", vCtx.isInitialized());
+    getVersionContext(opCtx) = vCtx;
+}
+
 }  // namespace mongo

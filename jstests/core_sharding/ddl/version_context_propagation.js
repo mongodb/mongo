@@ -83,6 +83,7 @@ try {
     assert.eq(1, participantOp.length, tojson(participantOp));
     assert.docEq(
         expectedVersionContext, participantOp[0].command.versionContext, tojson(participantOp[0]));
+    assert.docEq(expectedVersionContext, participantOp[0].versionContext, tojson(coordinatorOp[0]));
 } finally {
     fpDrop.off();
     dropThread.join();
