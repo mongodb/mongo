@@ -44,7 +44,7 @@
 namespace mongo::stage_builder {
 using namespace std::string_literals;
 void ExpressionConstEval::optimize(optimizer::ABT& n) {
-    invariant(_letRefs.empty());
+    invariant(_varRefs.empty());
     invariant(_singleRef.empty());
     invariant(!_inRefBlock);
     invariant(_inCostlyCtx == 0);
@@ -57,7 +57,7 @@ void ExpressionConstEval::optimize(optimizer::ABT& n) {
     // transport functions. The reference serves as a conceptual 'this' pointer allowing the
     // transport function to change the node itself.
     optimizer::algebra::transport<true>(n, *this);
-    invariant(_letRefs.empty());
+    invariant(_varRefs.empty());
 
     while (_changed) {
         if (_singleRef.empty()) {
@@ -95,20 +95,28 @@ void ExpressionConstEval::transport(optimizer::ABT& n, const optimizer::Variable
                 swapAndUpdate(n, def.definition.copy());
             } else if (auto variable = def.definition.cast<optimizer::Variable>();
                        variable && !_inRefBlock) {
+                // This is an alias for another variable, replace it with a reference to the
+                // original one and update its counter (if it is tracked, it could be a reference to
+                // a slot).
+                auto itLet = _varRefs.find(variable->name());
+                if (itLet != _varRefs.end()) {
+                    itLet->second++;
+                }
                 swapAndUpdate(n, def.definition.copy());
-            } else if (_singleRef.erase(&var)) {
+            } else if (_singleRef.erase(var.name())) {
                 swapAndUpdate(n, def.definition.copy());
             } else if (auto let = def.definedBy.cast<optimizer::Let>(); let) {
-                auto itLet = _letRefs.find(let);
-                invariant(itLet != _letRefs.end());
-                itLet->second.emplace_back(&var);
+                auto itLet = _varRefs.find(let->varName());
+                tassert(10252300, "Found reference to undefined variable", itLet != _varRefs.end());
+                itLet->second++;
             }
         }
     }
 }
 
 void ExpressionConstEval::prepare(optimizer::ABT& n, const optimizer::Let& let) {
-    _letRefs[&let] = {};
+    tassert(
+        10252301, "Found duplicate variable definition", _varRefs.emplace(let.varName(), 0).second);
     _variableDefinitions.emplace(let.varName(), optimizer::Definition{n.ref(), let.bind().ref()});
 }
 
@@ -116,8 +124,8 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
                                     const optimizer::Let& let,
                                     optimizer::ABT& bind,
                                     optimizer::ABT& in) {
-    auto itLet = _letRefs.find(&let);
-    if (itLet->second.size() == 0) {
+    auto itLet = _varRefs.find(let.varName());
+    if (itLet->second == 0) {
         // The bind expressions has not been referenced so it is dead code and the whole let
         // expression can be removed; i.e. we implement a following rewrite:
         //
@@ -136,12 +144,12 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
 
         // Swap the current node (n) for the result.
         swapAndUpdate(n, std::move(result));
-    } else if (itLet->second.size() == 1) {
+    } else if (itLet->second == 1) {
         // The bind expression has been referenced exactly once so schedule it for inlining.
-        _singleRef.emplace(itLet->second.front());
+        _singleRef.emplace(let.varName());
         _changed = true;
     }
-    _letRefs.erase(itLet);
+    _varRefs.erase(itLet);
     _variableDefinitions.erase(let.varName());
 }
 
@@ -461,7 +469,7 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
                       std::exchange(condNot->get<0>(), optimizer::make<optimizer::Blackhole>()));
         std::swap(thenBranch, elseBranch);
     } else if (auto funct = cond.cast<optimizer::FunctionCall>(); funct &&
-               funct->name() == "exists" && funct->nodes().size() == 1 &&
+               funct->name() == "exists"s && funct->nodes().size() == 1 &&
                funct->nodes()[0] == thenBranch && elseBranch.is<optimizer::Constant>()) {
         // If the condition is an "exists" on an expression, the thenBranch is the same
         // expression and the elseBranch is a constant, the node is actually a FillEmpty. Note

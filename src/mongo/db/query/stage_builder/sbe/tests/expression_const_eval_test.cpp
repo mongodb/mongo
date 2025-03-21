@@ -42,6 +42,7 @@
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
+#include "mongo/db/query/stage_builder/sbe/type_checker.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -477,6 +478,226 @@ TEST(Optimizer, ConstFoldSwitch6) {
         "BinaryOp [Eq]\n"
         "|   Const [\"A\"]\n"
         "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldSwitchAnd) {
+    // Complex query that stresses the constant folder (__l4.0 and __l10.0 are single-use variables,
+    // lots of isString and isArray on constants)
+    auto tree =
+        _binary(
+            "FillEmpty",
+            _switch(
+                _binary(
+                    "FillEmpty",
+                    _fn("coerceToBool",
+                        _binary(
+                            "And",
+                            _binary(
+                                "FillEmpty",
+                                _fn("coerceToBool",
+                                    _let(
+                                        "__l6_0",
+                                        _let(
+                                            "__l4_0",
+                                            _let(
+                                                "__l1_0",
+                                                "action-items mobile"_cstr,
+                                                _let(
+                                                    "__l2_0",
+                                                    "M(?:assachusett|etric)s|Fresh|Shoes"_cstr,
+                                                    _if(_binary(
+                                                            "FillEmpty",
+                                                            _fn("typeMatch",
+                                                                "__l1_0"_var,
+                                                                "1088"_cint32),
+                                                            _cbool(true)),
+                                                        _cbool(false),
+                                                        _if(_unary(
+                                                                "Not",
+                                                                _fn("isString", "__l1_0"_var)),
+                                                            _fn("fail",
+                                                                "5073401"_cint32,
+                                                                "$regexMatch: input must be of type string"_cstr),
+                                                            _let(
+                                                                "__l3_0",
+                                                                _fn("regexMatch",
+                                                                    "M(?:assachusett|etric)s|Fresh|Shoes"_cstr,
+                                                                    "__l1_0"_var),
+                                                                _if(_fn("exists", "__l3_0"_var),
+                                                                    "__l3_0"_var,
+                                                                    _fn("fail",
+                                                                        "5073403"_cint32,
+                                                                        "$regexMatch: error occurred while executing the regular expression"_cstr))))))),
+                                            _let(
+                                                "__l5_0",
+                                                _carray(),
+                                                _if(_binary("FillEmpty",
+                                                            _fn("isArray", "__l5_0"_var),
+                                                            _cbool(false)),
+                                                    _fn("isMember", "__l4_0"_var, "__l5_0"_var),
+                                                    _fn("fail",
+                                                        "5153700"_cint32,
+                                                        "$in requires an array as a second argument"_cstr)))),
+                                        _let("__l6_1",
+                                             _cbool(false),
+                                             _binary(
+                                                 "FillEmpty",
+                                                 _binary(
+                                                     "Gte",
+                                                     _binary("Cmp3w", "__l6_0"_var, "__l6_1"_var),
+                                                     "0"_cint32),
+                                                 _binary("Gte",
+                                                         _binary("And",
+                                                                 _fn("exists", "__l6_0"_var),
+                                                                 _fn("typeMatch",
+                                                                     "__l6_0"_var,
+                                                                     "-65"_cint32)),
+                                                         _binary("And",
+                                                                 _fn("exists", "__l6_1"_var),
+                                                                 _fn("typeMatch",
+                                                                     "__l6_1"_var,
+                                                                     "-65"_cint32))))))),
+                                _cbool(true)),
+                            _binary(
+                                "FillEmpty",
+                                _fn("coerceToBool",
+                                    _let(
+                                        "__l12_0",
+                                        _let(
+                                            "__l10_0",
+                                            _let(
+                                                "__l7_0",
+                                                "action-items mobile"_cstr,
+                                                _let(
+                                                    "__l8_0",
+                                                    "M(?:assachusett|etric)s|Fresh|Shoes"_cstr,
+                                                    _if(_binary(
+                                                            "FillEmpty",
+                                                            _fn("typeMatch",
+                                                                "__l7_0"_var,
+                                                                "1088"_cint32),
+                                                            _cbool(true)),
+                                                        _cbool(false),
+                                                        _if(_unary(
+                                                                "Not",
+                                                                _fn("isString", "__l7_0"_var)),
+                                                            _fn("fail",
+                                                                "5073401"_cint32,
+                                                                "$regexMatch: input must be of type string"_cstr),
+                                                            _let(
+                                                                "__l9_0",
+                                                                _fn("regexMatch",
+                                                                    "M(?:assachusett|etric)s|Fresh|Shoes"_cstr,
+                                                                    "__l7_0"_var),
+                                                                _if(_fn("exists", "__l9_0"_var),
+                                                                    "__l9_0"_var,
+                                                                    _fn("fail",
+                                                                        "5073403"_cint32,
+                                                                        "$regexMatch: error occurred while executing the regular expression"_cstr))))))),
+                                            _let(
+                                                "__l11_0",
+                                                _carray(),
+                                                _if(_binary("FillEmpty",
+                                                            _fn("isArray", "__l11_0"_var),
+                                                            _cbool(false)),
+                                                    _fn("isMember", "__l10_0"_var, "__l11_0"_var),
+                                                    _fn("fail",
+                                                        "5153700"_cint32,
+                                                        "$in requires an array as a second argument"_cstr)))),
+                                        _let("__l12_1",
+                                             _cbool(true),
+                                             _binary(
+                                                 "FillEmpty",
+                                                 _binary(
+                                                     "Lt",
+                                                     _binary("Cmp3w", "__l12_0"_var, "__l12_1"_var),
+                                                     "0"_cint32),
+                                                 _binary("Lt",
+                                                         _binary("And",
+                                                                 _fn("exists", "__l12_0"_var),
+                                                                 _fn("typeMatch",
+                                                                     "__l12_0"_var,
+                                                                     "-65"_cint32)),
+                                                         _binary("And",
+                                                                 _fn("exists", "__l12_1"_var),
+                                                                 _fn("typeMatch",
+                                                                     "__l12_1"_var,
+                                                                     "-65"_cint32))))))),
+                                _cbool(false)))),
+                    _cbool(false)),
+                _cbool(false),
+                "157036"_cint32),
+            _cnull())
+
+            ._n;
+
+    TypeChecker{}.typeCheck(tree);
+    ExpressionConstEval{nullptr}.optimize(tree);
+
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "If []\n"
+        "|   |   Const [157036]\n"
+        "|   Const [false]\n"
+        "BinaryOp [And]\n"
+        "|   Let [__l12_0]\n"
+        "|   |   BinaryOp [FillEmpty]\n"
+        "|   |   |   BinaryOp [Lt]\n"
+        "|   |   |   |   Const [true]\n"
+        "|   |   |   BinaryOp [And]\n"
+        "|   |   |   |   FunctionCall [typeMatch]\n"
+        "|   |   |   |   |   Const [-65]\n"
+        "|   |   |   |   Variable [__l12_0]\n"
+        "|   |   |   FunctionCall [exists]\n"
+        "|   |   |   Variable [__l12_0]\n"
+        "|   |   BinaryOp [Lt]\n"
+        "|   |   |   Const [0]\n"
+        "|   |   BinaryOp [Cmp3w]\n"
+        "|   |   |   Const [true]\n"
+        "|   |   Variable [__l12_0]\n"
+        "|   FunctionCall [isMember]\n"
+        "|   |   Const [[]]\n"
+        "|   Let [__l9_0]\n"
+        "|   |   If []\n"
+        "|   |   |   |   FunctionCall [fail]\n"
+        "|   |   |   |   |   Const [\"$regexMatch: error occurred while executing the regular "
+        "expression\"]\n"
+        "|   |   |   |   Const [5073403]\n"
+        "|   |   |   Variable [__l9_0]\n"
+        "|   |   FunctionCall [exists]\n"
+        "|   |   Variable [__l9_0]\n"
+        "|   FunctionCall [regexMatch]\n"
+        "|   |   Const [\"action-items mobile\"]\n"
+        "|   Const [\"M(?:assachusett|etric)s|Fresh|Shoes\"]\n"
+        "Let [__l6_0]\n"
+        "|   BinaryOp [FillEmpty]\n"
+        "|   |   BinaryOp [Gte]\n"
+        "|   |   |   Const [true]\n"
+        "|   |   BinaryOp [And]\n"
+        "|   |   |   FunctionCall [typeMatch]\n"
+        "|   |   |   |   Const [-65]\n"
+        "|   |   |   Variable [__l6_0]\n"
+        "|   |   FunctionCall [exists]\n"
+        "|   |   Variable [__l6_0]\n"
+        "|   BinaryOp [Gte]\n"
+        "|   |   Const [0]\n"
+        "|   BinaryOp [Cmp3w]\n"
+        "|   |   Const [false]\n"
+        "|   Variable [__l6_0]\n"
+        "FunctionCall [isMember]\n"
+        "|   Const [[]]\n"
+        "Let [__l3_0]\n"
+        "|   If []\n"
+        "|   |   |   FunctionCall [fail]\n"
+        "|   |   |   |   Const [\"$regexMatch: error occurred while executing the regular "
+        "expression\"]\n"
+        "|   |   |   Const [5073403]\n"
+        "|   |   Variable [__l3_0]\n"
+        "|   FunctionCall [exists]\n"
+        "|   Variable [__l3_0]\n"
+        "FunctionCall [regexMatch]\n"
+        "|   Const [\"action-items mobile\"]\n"
+        "Const [\"M(?:assachusett|etric)s|Fresh|Shoes\"]\n",
         tree);
 }
 

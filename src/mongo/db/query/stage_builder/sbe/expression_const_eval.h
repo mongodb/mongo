@@ -108,9 +108,10 @@ private:
     optimizer::DefinitionsMap _variableDefinitions;
     const CollatorInterface* _collator;
 
-    optimizer::opt::unordered_set<const optimizer::Variable*> _singleRef;
-    optimizer::opt::unordered_map<const optimizer::Let*, std::vector<const optimizer::Variable*>>
-        _letRefs;
+    optimizer::ProjectionNameSet _singleRef;
+    optimizer::opt::
+        unordered_map<optimizer::ProjectionName, size_t, optimizer::ProjectionName::Hasher>
+            _varRefs;
     optimizer::opt::
         unordered_map<optimizer::ABT::reference_type, optimizer::ABT::reference_type, RefHash>
             _staleDefs;

@@ -434,6 +434,16 @@ public:
                 auto [mosTag, mosVal] =
                     sbe::value::makeNewString(sbe::value::getMakeObjSpecView(v.second)->toString());
                 addValue(mosTag, mosVal);
+            } else if (v.first == sbe::value::TypeTags::pcreRegex) {
+                // We want to append the pattern of the regular expression to explain here.
+                auto [regexTag, regexVal] =
+                    sbe::value::makeNewString(sbe::value::getPcreRegexView(v.second)->pattern());
+                addValue(regexTag, regexVal);
+            } else if (v.first == sbe::value::TypeTags::timeZone) {
+                // We want to append the name of the timezone expression to explain here.
+                auto [tzTag, tzVal] =
+                    sbe::value::makeNewString(sbe::value::getTimeZoneView(v.second)->toString());
+                addValue(tzTag, tzVal);
             } else {
                 // Extended types need to implement their own explain, since we can't directly
                 // convert them to bson.
