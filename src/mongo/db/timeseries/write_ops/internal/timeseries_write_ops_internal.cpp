@@ -915,13 +915,6 @@ TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
 
     if (!swWriteBatches.isOK()) {
         invariant(!errorsAndIndices.empty());
-
-        auto firstErrorAndIndex =
-            std::min_element(errorsAndIndices.begin(),
-                             errorsAndIndices.end(),
-                             [](auto& lhs, auto& rhs) { return lhs.index < rhs.index; });
-        auto& [firstErrorStatus, firstIndex] = *firstErrorAndIndex;
-        populateError(opCtx, firstIndex, firstErrorStatus, errors);
         stageStatus = StageWritesStatus::kStagingError;
         return {};
     }
