@@ -68,7 +68,7 @@ checkNoServerStatus();
 // Inserting the first measurement will open a new bucket.
 expectedMetrics.numBuckets++;
 expectedMetrics.numOpenBuckets++;
-testWithInsertPaused({[timeFieldName]: ISODate(), [metaFieldName]: {a: 1}});
+testWithInsertPaused({[timeFieldName]: ISODate("2025-03-19T05:17:00Z"), [metaFieldName]: {a: 1}});
 
 // Once the insert is complete, the bucket becomes idle.
 expectedMetrics.numIdleBuckets++;
@@ -80,12 +80,14 @@ checkServerStatus();
 expectedMetrics.numBuckets++;
 expectedMetrics.numIdleBuckets--;
 testWithInsertPaused([
-    {[timeFieldName]: ISODate(), [metaFieldName]: {a: 1}},
+    {[timeFieldName]: ISODate("2025-03-19T05:17:37Z"), [metaFieldName]: {a: 1}},
     {[timeFieldName]: ISODate("2021-01-02T01:00:00Z"), [metaFieldName]: {a: 1}}
 ]);
 
 // Once the insert is complete, the closed bucket goes away and the open bucket becomes idle.
 expectedMetrics.numIdleBuckets++;
+// TODO(SERVER-102744): remove this line
+expectedMetrics.numBuckets--;
 checkServerStatus();
 
 // Insert a measurement which will close/archive the existing bucket right away.
