@@ -66,9 +66,8 @@ const assertExplain = function(explain, commandRun) {
            `Expected to find no unpack stage but got ${tojson(explain)}`);
 };
 
-// TODO SERVER-102016: Support explain with raw data for aggregate command
-// assertExplain(coll.explain().aggregate([{$match: {"control.count": 2}}], {rawData: true}),
-//               "aggregate");
+assertExplain(coll.explain().aggregate([{$match: {"control.count": 2}}], {rawData: true}),
+              "aggregate");
 assertExplain(coll.explain().count({"control.count": 2}, {rawData: true}), "count");
 assertExplain(coll.explain().distinct("control.count", {}, {rawData: true}), "distinct");
 assertExplain(coll.explain().find({"control.count": 2}).rawData().finish(), "find");

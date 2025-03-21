@@ -840,7 +840,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             if (targeter.policy !=
                 cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly) {
                 explain_common::appendIfRoom(
-                    serializeForPassthrough(expCtx, request, namespaces.executionNss).toBson(),
+                    serializeForPassthrough(expCtx, request, namespaces.requestedNss).toBson(),
                     "command",
                     result);
             }
