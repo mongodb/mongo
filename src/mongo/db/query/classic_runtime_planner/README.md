@@ -57,9 +57,11 @@ Multiplanning continues until at least one candidate plan does one of the follow
 
 1. Returns one full default `batchsize` of results.
    - Currently, a default `batchsize` of results is 101 documents.
+     - This value can be modified using the [`internalQueryPlanEvaluationMaxResults`](https://github.com/10gen/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L156-L165) query knob.
 1. Hits "EOF", meaning the `QuerySolution` has finished execution during the trial period and returned all its results.
 1. Makes the maximum number of [`work()`](#aside-works) calls.
-   - Currently, the maximum number of `work()` calls is around 10,000.
+   - Currently, the maximum number of `work()` calls is [calculated](https://github.com/10gen/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/exec/trial_period_utils.cpp#L44-L55) as `max(10K, 0.3 * collection_size)`.
+     - These values can be modified using the [`internalQueryPlanEvaluationWorks`](https://github.com/10gen/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L101-L112) and [`internalQueryPlanEvaluationCollFraction`](https://github.com/10gen/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L129-L139) query knobs.
 
 Consider this setup, where `a` and `b` are random integers evenly distributed between 0 and 100:
 
@@ -151,7 +153,7 @@ flowchart TD
    subgraph s1["End Conditions"]
        n6["&gt;101 results?"]
        n9["EOF?"]
-       n10["&gt;10K works?"]
+       n10["&gt;maxWorks?"]
    end
    n11@{ shape: lean-r}
    n2@{ shape: lean-r}
