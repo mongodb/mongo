@@ -330,6 +330,35 @@ TEST_F(SpoolStageTest, spillStringRecordId) {
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 }
 
+TEST_F(SpoolStageTest, forceSpill) {
+    auto mock = std::make_unique<MockStage>(expCtx(), &ws);
+    mock->enqueueAdvanced(makeRecord(1));
+    mock->enqueueAdvanced(makeRecord("this is a short string"));
+    mock->enqueueAdvanced(makeRecord(2));
+    mock->enqueueAdvanced(makeRecord("this is a longer string........."));
+    mock->enqueueAdvanced(makeRecord("the last string"));
+
+    const uint64_t maxAllowedMemoryUsageBytes = 100 * 1024 * 1024;
+    auto spool =
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+
+    workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
+    workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, "this is a short string");
+    spool.doForceSpill();
+    workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 2);
+    workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, "this is a longer string.........");
+    workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, "the last string");
+    assertEofState(spool);
+
+    // Validate the spilling stats. We should have spilled every other record.
+    auto stats = static_cast<const SpoolStats*>(spool.getSpecificStats());
+    ASSERT_EQUALS(stats->spillingStats.getSpills(), 1);
+    ASSERT_EQUALS(stats->spillingStats.getSpilledRecords(), 3);
+    ASSERT_GREATER_THAN(stats->spillingStats.getSpilledBytes(), 0);
+    ASSERT_GREATER_THAN(stats->spillingStats.getSpilledDataStorageSize(), 0);
+    ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
+}
+
 TEST_F(SpoolStageTest, spillingDisabled) {
     auto mock = std::make_unique<MockStage>(expCtx(), &ws);
     mock->enqueueAdvanced(makeRecord(1));

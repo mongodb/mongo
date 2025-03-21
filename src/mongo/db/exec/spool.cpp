@@ -70,7 +70,7 @@ SpoolStage::SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_pt
 }
 
 bool SpoolStage::isEOF() const {
-    return _spillFileIters.empty() && _nextIndex == static_cast<int>(_buffer.size());
+    return allInputConsumed && _spillFileIters.empty() && _buffer.empty();
 }
 
 std::unique_ptr<PlanStageStats> SpoolStage::getStats() {
@@ -102,16 +102,18 @@ void SpoolStage::spill() {
     opts.FileStats(_spillStats.get());
 
     SortedFileWriter<RecordId, NullValue> writer(opts, _file);
-    for (size_t i = 0; i < _buffer.size(); ++i) {
+    // Do not spill the records that have been already consumed
+    for (size_t i = _nextIndex + 1; i < _buffer.size(); ++i) {
         writer.addAlreadySorted(_buffer[i], NullValue());
     }
     _spillFileIters.emplace_back(writer.done());
 
     _specificStats.spillingStats.updateSpillingStats(1 /* spills */,
                                                      _memTracker.currentMemoryBytes(),
-                                                     _buffer.size(),
+                                                     _buffer.size() - (_nextIndex + 1),
                                                      _spillStats->bytesSpilled());
-    _buffer.clear();
+    std::vector<RecordId>().swap(_buffer);
+    _nextIndex = -1;
     _memTracker.resetCurrent();
 }
 
@@ -120,7 +122,7 @@ PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    if (_nextIndex < 0) {
+    if (!allInputConsumed) {
         // We have not yet received EOF from our child yet. Eagerly consume and cache results as
         // long as the child keeps advancing (we'll propagate yields and NEED_TIME).
         WorkingSetID id = WorkingSet::INVALID_ID;
@@ -156,6 +158,7 @@ PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
 
         // The child has returned all of its results. Fall through and begin consuming the results
         // from our buffer.
+        allInputConsumed = true;
     }
 
     // First, return results from any spills we may have.
@@ -171,8 +174,14 @@ PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
     // Increment to the next element in our buffer. Note that we increment the index *first* so that
     // we will return EOF in a call to doWork() before isEOF() returns true.
     if (++_nextIndex == static_cast<int>(_buffer.size())) {
+        std::vector<RecordId>().swap(_buffer);
+        _nextIndex = 0;
         return PlanStage::IS_EOF;
     }
+
+    tassert(9918000,
+            "Unexpected _nextIndex value. It points outside the buffer.",
+            _nextIndex < static_cast<int>(_buffer.size()));
 
     return allocateResultAndAdvance(_ws, out, std::move(_buffer[_nextIndex]));
 }

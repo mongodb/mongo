@@ -76,6 +76,10 @@ public:
         return &_specificStats;
     }
 
+    void doForceSpill() final {
+        spill();
+    }
+
 protected:
     PlanStage::StageState doWork(WorkingSetID* id) override;
 
@@ -86,8 +90,9 @@ private:
 
     SpoolStats _specificStats;
 
-    // Next index to consume from the buffer. If < 0, the buffer is not yet fully populated from the
-    // child.
+    // If false, the buffer is not yet fully populated from the child.
+    bool allInputConsumed = false;
+    // Last index that was consumed from buffer.
     int _nextIndex = -1;
 
     // Buffer caching spooled results in-memory.
