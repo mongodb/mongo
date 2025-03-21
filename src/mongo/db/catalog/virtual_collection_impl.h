@@ -297,6 +297,10 @@ public:
         unimplementedTasserted();
     }
 
+    void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) final {
+        unimplementedTasserted();
+    }
+
     bool getRequiresTimeseriesExtendedRangeSupport() const final {
         // A virtual collection is never a time-series collection, so it never requires
         // extended-range support.

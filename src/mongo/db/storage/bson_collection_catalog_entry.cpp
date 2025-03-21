@@ -61,7 +61,8 @@ const size_t kMaxKeyPatternPathLength = 2048;
 const std::string kTimeseriesBucketsMayHaveMixedSchemaDataFieldName =
     "timeseriesBucketsMayHaveMixedSchemaData";
 
-const std::string kTimeseriesBucketingParametersHaveChanged =
+// TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
+const std::string kTimeseriesBucketingParametersHaveChanged_DO_NOT_USE =
     "timeseriesBucketingParametersHaveChanged";
 
 /**
@@ -274,9 +275,9 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
                  *timeseriesBucketsMayHaveMixedSchemaData);
     }
 
-    if (timeseriesBucketingParametersHaveChanged) {
-        b.append(kTimeseriesBucketingParametersHaveChanged,
-                 *timeseriesBucketingParametersHaveChanged);
+    if (timeseriesBucketingParametersHaveChanged_DO_NOT_USE) {
+        b.append(kTimeseriesBucketingParametersHaveChanged_DO_NOT_USE,
+                 *timeseriesBucketingParametersHaveChanged_DO_NOT_USE);
     }
 
     return b.obj();
@@ -325,9 +326,11 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
         timeseriesBucketsMayHaveMixedSchemaData = timeseriesMixedSchemaElem.Bool();
     }
 
-    BSONElement tsBucketingParametersChangedElem = obj[kTimeseriesBucketingParametersHaveChanged];
+    BSONElement tsBucketingParametersChangedElem =
+        obj[kTimeseriesBucketingParametersHaveChanged_DO_NOT_USE];
     if (!tsBucketingParametersChangedElem.eoo() && tsBucketingParametersChangedElem.isBoolean()) {
-        timeseriesBucketingParametersHaveChanged = tsBucketingParametersChangedElem.Bool();
+        timeseriesBucketingParametersHaveChanged_DO_NOT_USE =
+            tsBucketingParametersChangedElem.Bool();
     }
 }
 }  // namespace mongo

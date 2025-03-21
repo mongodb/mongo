@@ -323,6 +323,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) override {
+        MONGO_UNREACHABLE;
+    }
+
     bool areTimeseriesBucketsFixed() const override {
         const auto tsOptions = getTimeseriesOptions();
         // Assume parameters have changed unless otherwise specified.

@@ -34,6 +34,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -198,6 +199,9 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModViewTranslationInvalidMod) {
 
 // Check that timeseries options are correctly translated to a new CollMod.
 TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTSBucketingParametersUnchanged", true);
+
     auto collModTimeseries = CollModTimeseries();
     auto opCtx = makeOpCtx();
     // Create a command that requires timeseries translation.
@@ -238,6 +242,9 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
 
 // If timeseries translation and view translation are both required, both should be executed.
 TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndView) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTSBucketingParametersUnchanged", true);
+
     auto collModTimeseries = CollModTimeseries();
     auto opCtx = makeOpCtx();
     // Create a command that requires timeseries translation.

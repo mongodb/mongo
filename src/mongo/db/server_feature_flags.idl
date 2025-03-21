@@ -112,6 +112,13 @@ feature_flags:
         shouldBeFCVGated: true
         version: 8.0
         fcv_context_unaware: true
+    # TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
+    featureFlagRemoveLegacyTimeseriesBucketingParametersHaveChanged:
+        description: "Remove the legacy 'md.timeseriesBucketingParametersHaveChanged' flag from the collection metadata"
+        cpp_varname: feature_flags::gRemoveLegacyTimeseriesBucketingParametersHaveChanged
+        default: true
+        version: 8.2
+        shouldBeFCVGated: true
     featureFlagPrefetch:
         description: "Feature flag to make pre-fetching available"
         cpp_varname: gFeatureFlagPrefetch

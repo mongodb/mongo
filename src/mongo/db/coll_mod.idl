@@ -177,6 +177,14 @@ structs:
                 optional: true
                 type: safeBool
                 stability: unstable
+            # TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
+            _removeLegacyTimeseriesBucketingParametersHaveChanged:
+                description: >-
+                    Internal option used to remove the legacy md.timeseriesBucketingParametersHaveChanged
+                    flag from the collection catalog during FCV upgrade.
+                optional: true
+                type: safeBool
+                stability: unstable
             dryRun:
                 description: "Runs the requested modification without modifying any database state.
                               This can be used to determine in advance if a particular collMod

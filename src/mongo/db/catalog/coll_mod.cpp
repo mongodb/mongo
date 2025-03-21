@@ -130,6 +130,8 @@ struct ParsedCollModRequest {
     boost::optional<long long> cappedSize;
     boost::optional<long long> cappedMax;
     boost::optional<bool> timeseriesBucketsMayHaveMixedSchemaData;
+    // TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
+    boost::optional<bool> _removeLegacyTimeseriesBucketingParametersHaveChanged;
     boost::optional<bool> recordIdsReplicated;
 };
 
@@ -616,6 +618,24 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
                                  *mixedSchema);
     }
 
+    if (auto removeLegacyTSBucketingParametersHaveChanged =
+            cmr.get_removeLegacyTimeseriesBucketingParametersHaveChanged()) {
+        tassert(9123100,
+                "_removeLegacyTimeseriesBucketingParametersHaveChanged should only be set to true",
+                *removeLegacyTSBucketingParametersHaveChanged);
+
+        tassert(
+            9123101,
+            "_removeLegacyTimeseriesBucketingParametersHaveChanged needs a time-series collection",
+            isTimeseries);
+
+        parsed._removeLegacyTimeseriesBucketingParametersHaveChanged =
+            removeLegacyTSBucketingParametersHaveChanged;
+        oplogEntryBuilder.append(
+            CollMod::k_removeLegacyTimeseriesBucketingParametersHaveChangedFieldName,
+            *removeLegacyTSBucketingParametersHaveChanged);
+    }
+
     if (auto recordIdsReplicated = cmr.getRecordIdsReplicated()) {
         if (*recordIdsReplicated) {
             return {ErrorCodes::InvalidOptions, "Cannot set recordIdsReplicated to true"};
@@ -958,6 +978,10 @@ Status _collModInternal(OperationContext* opCtx,
 
         if (auto mixedSchema = cmrNew.timeseriesBucketsMayHaveMixedSchemaData) {
             writableColl->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx, mixedSchema);
+        }
+
+        if (cmrNew._removeLegacyTimeseriesBucketingParametersHaveChanged.has_value()) {
+            writableColl->removeLegacyTimeseriesBucketingParametersHaveChanged(opCtx);
         }
 
         if (auto recordIdsReplicated = cmrNew.recordIdsReplicated) {

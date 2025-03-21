@@ -310,11 +310,6 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
             // to false by default as mixed-schema data is only possible in versions 5.1 and
             // earlier.
             md.timeseriesBucketsMayHaveMixedSchemaData = false;
-            if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                md.timeseriesBucketingParametersHaveChanged = false;
-            }
         }
         b.append("md", md.toBSON());
         obj = b.obj();

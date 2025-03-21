@@ -418,6 +418,13 @@ public:
                                                          boost::optional<bool> value) = 0;
 
     /**
+     * Used to remove the legacy `md.timeseriesBucketingParametersHaveChanged` catalog field
+     * during FCV upgrade.
+     */
+    // TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
+    virtual void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) = 0;
+
+    /**
      * Returns true if the passed in time-series bucket document contains mixed-schema data. Returns
      * a non-OK status if the bucket's min/max is malformed.
      */

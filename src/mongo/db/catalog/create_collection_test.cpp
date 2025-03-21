@@ -362,8 +362,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
     ASSERT_EQUALS(uuid1, getCollectionUuid(opCtx.get(), bucketsColl));
 }
 
-// TODO SERVER-92265 consider removing TimeseriesBucketingParametersChangedFlagAlwaysTrue
-TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagAlwaysTrue) {
+TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagNotSetIfFeatureDisabled) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", false);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
@@ -378,8 +377,7 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagAlwaysTrue)
 
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
     AutoGetCollectionForRead collForRead(opCtx.get(), bucketsColl);
-    ASSERT_TRUE(collForRead->timeseriesBucketingParametersHaveChanged());
-    ASSERT_TRUE(*collForRead->timeseriesBucketingParametersHaveChanged());
+    ASSERT_FALSE(collForRead->timeseriesBucketingParametersHaveChanged());
 }
 
 TEST_F(CreateCollectionTest,
@@ -412,8 +410,8 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
 
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
     AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
-    ASSERT_TRUE(bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
-    ASSERT_FALSE(*bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
+    // TODO(SERVER-101611): Set *timeseriesBucketingParametersHaveChanged to false on create
+    ASSERT_FALSE(bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {

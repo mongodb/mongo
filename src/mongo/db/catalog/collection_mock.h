@@ -226,6 +226,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) final {
+        MONGO_UNREACHABLE;
+    }
+
     StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
         const BSONObj& bucketsDoc) const override {
         MONGO_UNREACHABLE;

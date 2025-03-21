@@ -738,6 +738,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/multiVersion/genericSetFCVUsage/OWNERS.yml
 /jstests/multiVersion/genericSetFCVUsage/**/rsm* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/bit_update_mixed_fcv.js @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/fcv_upgrade_removes_legacy_timeseries_bucketing_parameters_flag.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/view_definition_feature_compatibility_version.js @10gen/query-optimization-views @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/1_test_launching_replset.js @10gen/server-replication @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/3_upgrade_replset.js @10gen/server-replication @svc-auto-approve-bot

@@ -886,7 +886,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossS
         // Ignore inconsistencies in the legacy timeseries flags. Due to SERVER-91195, those flags
         // have been deprecated and will be removed. At the same time, they can become inconsistent
         // in various scenarios, such as movePrimary or FCV downgrades.
-        // TODO (SERVER-91231): Remove tsBucketingParametersHaveChanged field once it's removed.
+        // TODO (SERVER-101423): Remove tsBucketingParametersHaveChanged once 9.0 becomes last LTS.
         // TODO (SERVER-96831): Remove tsBucketsMayHaveMixedSchemaData field once it's removed.
         pipeline.emplace_back(fromjson(R"(
             {$project: {

@@ -531,14 +531,9 @@ void CollectionImpl::_setMetadata(
 
         // If present, reuse storageEngine options to work around the issue described in
         // SERVER-91193
-        boost::optional<bool> optBackwardsCompatibleParametersHaveChangedFlag =
-            getFlagFromStorageEngineBson(
-                metadata->options.storageEngine,
-                backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
-        if (optBackwardsCompatibleParametersHaveChangedFlag.has_value()) {
-            metadata->timeseriesBucketingParametersHaveChanged =
-                *optBackwardsCompatibleParametersHaveChangedFlag;
-        }
+        _shared->_durableTimeseriesBucketingParametersHaveChanged = getFlagFromStorageEngineBson(
+            metadata->options.storageEngine,
+            backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
     }
     _metadata = std::move(metadata);
 }
@@ -903,17 +898,7 @@ boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged()
         return true;
     }
 
-    // TODO(SERVER-96831): Remove this feature flag check, never fall back to the legacy parameter.
-    if (!feature_flags::gTSBucketingParametersUnchanged.isEnabled(
-            kVersionContextIgnored, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // Pessimistically return true because v7.1+ versions may have missed cloning this catalog
-        // option upon chunk migrations, movePrimary, resharding, initial sync or backup/restore
-        // (SERVER-91193).
-        return true;
-    }
-
-    // Else, fallback to legacy parameter.
-    return _metadata->timeseriesBucketingParametersHaveChanged;
+    return _shared->_durableTimeseriesBucketingParametersHaveChanged;
 }
 
 void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
@@ -923,16 +908,17 @@ void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* o
     // TODO SERVER-92265 properly set this catalog option
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         // Reuse storageEngine options to work around the issue described in SERVER-91193
-        if (value.has_value()) {
-            md.options.storageEngine = setFlagToStorageEngineBson(
-                md.options.storageEngine,
-                backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged,
-                *value);
-        }
+        _shared->_durableTimeseriesBucketingParametersHaveChanged = value;
+        md.options.storageEngine = setFlagToStorageEngineBson(
+            md.options.storageEngine,
+            backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged,
+            value);
+    });
+}
 
-        // Also update legacy parameter for compatibility when downgrading to older sub-versions
-        // only relying on this option (best-effort because it may be lost due to SERVER-91193)
-        md.timeseriesBucketingParametersHaveChanged = value;
+void CollectionImpl::removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) {
+    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.timeseriesBucketingParametersHaveChanged_DO_NOT_USE.reset();
     });
 }
 

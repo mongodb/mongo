@@ -547,6 +547,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "authorization_checks.h",
+        "//src/mongo/db:coll_mod_gen",
     ],
     deps = [
         ":auth",

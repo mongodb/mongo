@@ -586,6 +586,11 @@ Status _createTimeseries(OperationContext* opCtx,
         CollectionOptions bucketsOptions = options;
         bucketsOptions.validator = validatorObj;
 
+        // TODO(SERVER-101611): Initialize timeseriesBucketingParametersHaveChanged to false
+        // when TSBucketingParametersUnchanged is enabled. Currently, this is not done because the
+        // flag is stored in the WiredTiger config string (SERVER-91195), so doing it changes the
+        // output of listCollections and breaks creation idempotency with no straightforward fixes
+
         // Cluster time-series buckets collections by _id.
         auto expireAfterSeconds = options.expireAfterSeconds;
         if (expireAfterSeconds) {

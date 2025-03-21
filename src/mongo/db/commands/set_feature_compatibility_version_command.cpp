@@ -727,7 +727,35 @@ private:
     // to happen during the upgrade. It is required that the code in this helper function is
     // idempotent and could be done after _runDowngrade even if it failed at any point in the middle
     // of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
-    void _userCollectionsWorkForUpgrade() {}
+    void _userCollectionsWorkForUpgrade(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+        const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
+
+        if (feature_flags::gRemoveLegacyTimeseriesBucketingParametersHaveChanged
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                catalog::forEachCollectionFromDb(
+                    opCtx,
+                    dbName,
+                    MODE_X,
+                    [&](const Collection* collection) {
+                        CollMod collModCmd{collection->ns()};
+                        collModCmd.set_removeLegacyTimeseriesBucketingParametersHaveChanged(true);
+
+                        BSONObjBuilder responseBuilder;
+                        uassertStatusOK(processCollModCommand(
+                            opCtx, collection->ns(), collModCmd, nullptr, &responseBuilder));
+                        return true;
+                    },
+                    [&](const Collection* collection) {
+                        return collection->getTimeseriesOptions() != boost::none;
+                    });
+            }
+        }
+    }
 
     // This helper function is for updating server metadata to make sure the new features in the
     // upgraded version work for sharded and non-sharded clusters. It is required that the code
@@ -827,7 +855,8 @@ private:
         // is idempotent and could be done after _runDowngrade even if it failed at any point in the
         // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
         if (!role || role->has(ClusterRole::None) || role->has(ClusterRole::ShardServer)) {
-            _userCollectionsWorkForUpgrade();
+            const auto requestedVersion = request.getCommandParameter();
+            _userCollectionsWorkForUpgrade(opCtx, requestedVersion);
         }
 
         uassert(ErrorCodes::Error(549180),
