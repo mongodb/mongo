@@ -175,25 +175,6 @@ public:
     }
 
     /**
-     * If saveState() or restoreState() throw an exception, this method is automatically invoked
-     * to perform any cleanup that may be necessary.
-     *
-     * discardState() leaves the PlanStage tree in a state where execution cannot continue, so it
-     * should only be called in cases where there is no intent to continue executing (like when an
-     * exception has been thrown).
-     */
-    void discardState() {
-        auto stage = static_cast<T*>(this);
-
-        stage->doDiscardState();
-
-        auto& children = stage->_children;
-        for (auto& child : children) {
-            child->discardState();
-        }
-    }
-
-    /**
      * Notifies the stage that the underlying data source may change.
      *
      * It is illegal to call work() or isEOF() when a stage is in the "saved" state. May be called
@@ -211,14 +192,6 @@ public:
      * TODO SERVER-59620: Remove the 'relinquishCursor' parameter once all callers pass 'false'.
      */
     void saveState(bool relinquishCursor, bool disableSlotAccess = false) {
-        // If there's an exception, call discardState() to perform any cleanup that is needed.
-        bool finished = false;
-        ON_BLOCK_EXIT([&]() {
-            if (!finished) {
-                discardState();
-            }
-        });
-
         auto stage = static_cast<T*>(this);
         stage->_commonStats.yields++;
 
@@ -238,8 +211,6 @@ public:
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
         _saveState = relinquishCursor ? SaveState::kSavedFull : SaveState::kSavedNotFull;
 #endif
-
-        finished = true;
     }
 
     /**
@@ -258,14 +229,6 @@ public:
      * value for 'relinquishCursor' as was passed in the previous call to saveState().
      */
     void restoreState(bool relinquishCursor) {
-        // If there's an exception, call discardState() to perform any cleanup that is needed.
-        bool finished = false;
-        ON_BLOCK_EXIT([&]() {
-            if (!finished) {
-                discardState();
-            }
-        });
-
         auto stage = static_cast<T*>(this);
         stage->_commonStats.unyields++;
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
@@ -284,8 +247,6 @@ public:
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
         stage->_saveState = SaveState::kNotSaved;
 #endif
-
-        finished = true;
     }
 
 protected:
@@ -843,7 +804,6 @@ protected:
     // Derived classes can optionally override these methods.
     virtual void doSaveState(bool relinquishCursor) {}
     virtual void doRestoreState(bool relinquishCursor) {}
-    virtual void doDiscardState() {}
     virtual void doDetachFromOperationContext() {}
     virtual void doAttachToOperationContext(OperationContext* opCtx) {}
 

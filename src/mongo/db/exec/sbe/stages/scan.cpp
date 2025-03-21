@@ -327,14 +327,6 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
 #endif
 }
 
-void ScanStage::doDiscardState() {
-    // If saveState() or restoreState() threw an exception, we need to discard any storage engine
-    // resources eagerly to satisfy invariants in the event that the snapshot is abandoned later.
-    _cursor.reset();
-    _randomCursor.reset();
-    _coll.reset();
-}
-
 void ScanStage::doDetachFromOperationContext() {
     if (auto cursor = getActiveCursor()) {
         cursor->detachFromOperationContext();
@@ -430,6 +422,8 @@ void ScanStage::open(bool reOpen) {
         // We need to re-acquire '_coll' in this case and make some validity checks (the collection
         // has not been dropped, renamed, etc).
         _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
+
+        tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStage", _coll);
     }
 
     if (_state->scanCallbacks.scanOpenCallback) {
@@ -1012,13 +1006,6 @@ void ParallelScanStage::doRestoreState(bool relinquishCursor) {
                 std::memcmp(&_lastReturned[0], raw, size) == 0);
     }
 #endif
-}
-
-void ParallelScanStage::doDiscardState() {
-    // If saveState() or restoreState() threw an exception, we need to discard any storage engine
-    // resources eagerly to satisfy invariants in the event that the snapshot is abandoned later.
-    _cursor.reset();
-    _coll.reset();
 }
 
 void ParallelScanStage::doDetachFromOperationContext() {

@@ -233,13 +233,6 @@ void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
     }
 }
 
-void IndexScanStageBase::doDiscardState() {
-    // If saveState() or restoreState() threw an exception, we need to discard any storage engine
-    // resources eagerly to satisfy invariants in the event that the snapshot is abandoned later.
-    _cursor.reset();
-    _coll.reset();
-}
-
 void IndexScanStageBase::doDetachFromOperationContext() {
     if (_cursor) {
         _cursor->detachFromOperationContext();
