@@ -766,6 +766,42 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
     ASSERT_EQ(ru1->getTimestampReadSource(), WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, StorageStatsSubsequentTransactions) {
+    auto opCtx = clientAndCtx1.second.get();
+
+    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.storage_stats"));
+    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+
+    // Insert a record.
+    StorageWriteTransaction txn1(*ru1);
+    StatusWith<RecordId> s = rs->insertRecord(opCtx, "rec1", 4, Timestamp());
+    ASSERT_TRUE(s.isOK());
+    ASSERT_EQUALS(1, rs->numRecords());
+
+    // Checking the storage stats
+    auto storageStats = ru1->computeOperationStatisticsSinceLastCall();
+    WiredTigerStats* wtStats = dynamic_cast<WiredTigerStats*>(storageStats.get());
+    ASSERT_TRUE(wtStats != nullptr);
+
+    // txnDirtyBytes should be greater than zero since there is uncommitted data on the transaction
+    ASSERT_GT(wtStats->txnBytesDirty(), 0);
+
+    txn1.commit();
+
+    // A new transaction will reset stats
+    StorageWriteTransaction txn2(*ru1);
+    // The transaction won't actually start until the session is accessed
+    ru1->getSession();
+
+    storageStats = ru1->computeOperationStatisticsSinceLastCall();
+    wtStats = dynamic_cast<WiredTigerStats*>(storageStats.get());
+    ASSERT_TRUE(wtStats != nullptr);
+
+    // txnDirtyBytes should be zero since transaction was just restarted
+    ASSERT_EQUALS(wtStats->txnBytesDirty(), 0);
+    txn2.abort();
+}
+
 TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     auto opCtx = clientAndCtx1.second.get();
 

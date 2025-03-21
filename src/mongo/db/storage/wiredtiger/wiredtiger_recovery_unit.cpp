@@ -492,6 +492,11 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     ensureSnapshot();
     _ensureSession();
 
+    // WiredTiger's transaction stats are reset after a transaction is completed either by commit or
+    // abort, so we need to reset the base value in case this recovery unit is used for more than
+    // one transaction to be able to compute the difference correctly.
+    _sessionStatsAfterLastOperation = WiredTigerStats();
+
     // Only start a timer for transaction's lifetime if we're going to log it.
     if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, kSlowTransactionSeverity)) {
         _timer.reset(new Timer());

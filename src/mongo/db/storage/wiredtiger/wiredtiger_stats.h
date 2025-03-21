@@ -53,6 +53,8 @@ public:
     uint64_t bytesRead() const final;
     Microseconds readingTime() const final;
 
+    int64_t txnBytesDirty() const;
+
     std::unique_ptr<StorageStats> clone() const final;
 
     StorageStats& operator+=(const StorageStats&) final;
