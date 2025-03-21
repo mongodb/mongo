@@ -50,6 +50,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
@@ -257,6 +258,9 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
             "rawData is not enabled",
             !innerInvocation->getGenericArguments().getRawData() ||
                 gFeatureFlagRawDataCrudOperations.isEnabled());
+    if (innerInvocation->getGenericArguments().getRawData()) {
+        isRawDataOperation(opCtx) = true;
+    }
 
     return std::make_unique<Invocation>(
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));

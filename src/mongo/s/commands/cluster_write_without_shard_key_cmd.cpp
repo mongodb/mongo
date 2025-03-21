@@ -68,6 +68,7 @@
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/update/update_driver.h"
@@ -84,6 +85,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
@@ -154,14 +156,14 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
 
     // Parse into OpMsgRequest to append the $db field, which is required for command
     // parsing.
-    const auto opMsgRequest =
+    auto opMsgRequest =
         OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
                                     dbName,
                                     CommandHelpers::filterCommandRequestForPassthrough(writeCmd));
 
     DatabaseName requestDbName = dbName;
     boost::optional<BulkWriteCommandRequest> bulkWriteRequest;
-    const NamespaceString nss = [&] {
+    auto nss = [&] {
         if (commandName == BulkWriteCommandRequest::kCommandName) {
             bulkWriteRequest = BulkWriteCommandRequest::parse(
                 IDLParserContext("_clusterWriteWithoutShardKeyForBulkWrite"), opMsgRequest.body);
@@ -182,6 +184,11 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
             return CommandHelpers::parseNsCollectionRequired(dbName, writeCmd);
         }
     }();
+
+    if (isRawDataOperation(opCtx) &&
+        CollectionRoutingInfoTargeter{opCtx, nss}.timeseriesNamespaceNeedsRewrite(nss)) {
+        nss = nss.makeTimeseriesBucketsNamespace();
+    }
 
     const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
     uassert(ErrorCodes::NamespaceNotSharded,
@@ -264,6 +271,11 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
 
             return bulkWriteRequest->toBSON();
         } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
+            if (isRawDataOperation(opCtx) && nss.isTimeseriesBucketsCollection()) {
+                opMsgRequest.body =
+                    rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(
+                        opMsgRequest.body, nss.coll());
+            }
             auto updateRequest = write_ops::UpdateCommandRequest::parse(
                 IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), opMsgRequest.body);
 

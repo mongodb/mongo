@@ -86,6 +86,7 @@ selector:
     - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
     - jstests/core/query/explain/explain_uuid.js
     - jstests/core/query/explain/explain_includes_command.js
+    - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
     - jstests/core/txns/transactions_profiling.js
     - jstests/core/txns/currentop_blocked_operations.js
     - jstests/core/txns/transactions_profiling_with_drops.js

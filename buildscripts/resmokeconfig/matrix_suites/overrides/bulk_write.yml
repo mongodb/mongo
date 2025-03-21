@@ -33,6 +33,9 @@
       # Checks for specific name in the command that was executed that we override.
       - jstests/core/query/explain/explain_includes_command.js
 
+      # TODO: Remove this exclusion when SERVER-100924 is completed.
+      - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
+
 - name: single_op_txns_excluded_files
   value:
     exclude_files:

@@ -194,6 +194,7 @@ selector:
     - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
     - jstests/core/query/explain/explain_uuid.js
     - jstests/core/query/explain/explain_includes_command.js
+    - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
     - jstests/libs/txns/txn_passthrough_runner_selftest.js
   exclude_with_any_tags:
     - assumes_standalone_mongod

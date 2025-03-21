@@ -159,7 +159,9 @@ void readRequestMetadata(OperationContext* opCtx,
     components.setDollarClusterTime(requestArgs.getDollarClusterTime());
     VectorClock::get(opCtx)->gossipIn(opCtx, components, !cmdRequiresAuth);
 
-    isRawDataOperation(opCtx) = requestArgs.getRawData();
+    if (requestArgs.getRawData()) {
+        isRawDataOperation(opCtx) = true;
+    }
 }
 
 namespace {
