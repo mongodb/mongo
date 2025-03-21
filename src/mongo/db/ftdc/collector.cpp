@@ -130,6 +130,10 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
     ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
         opCtx.get(), AdmissionContext::Priority::kExempt);
 
+    // Set a secondaryOk=true read preference because some collections run commands such as
+    // aggregation which are AllowedOnSecondary::kOptIn.
+    ReadPreferenceSetting::get(opCtx.get()) = ReadPreferenceSetting{ReadPreference::Nearest};
+
     for (auto&& role : roles) {
         if (empty(role.first)) {
             continue;
@@ -222,6 +226,11 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
 
                     ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
                         opCtx, AdmissionContext::Priority::kExempt);
+
+                    // Set a secondaryOk=true read preference because some collections run commands
+                    // such as aggregation which are AllowedOnSecondary::kOptIn.
+                    ReadPreferenceSetting::get(opCtx) =
+                        ReadPreferenceSetting{ReadPreference::Nearest};
 
                     // If we are running router collectors, we need to make sure that the opCtx
                     // points to the router service.
