@@ -88,6 +88,7 @@ executor:
     shell_options:
       eval: >-
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
       global_vars:
         TestData:
           runningWithConfigStepdowns: true
