@@ -176,7 +176,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     release_buid: true
-    compile_flags: --ssl MONGO_DISTMOD=rhel83 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel83 -j16 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 2
     has_packages: true
@@ -191,6 +191,7 @@ buildvariants:
     multiversion_platform: rhel83
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+    exec_timeout_secs: 86400 # 24 hours exec timeout
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_s390x,requires_increased_memlock_limits,requires_latch_analyzer
   tasks:
