@@ -319,7 +319,7 @@ buildvariants:
     distros:
     - amazon2023-arm64-latest-large-m8g
   - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community !.publish
 
 - &enterprise-amazon2023-arm64-template
   name: enterprise-amazon2023-arm64
@@ -390,7 +390,7 @@ buildvariants:
     distros:
     - amazon2023-arm64-latest-large-m8g
   - name: .development_critical
-  - name: .release_critical
+  - name: .release_critical !.publish !.publish_crypt
 
   # TODO(SERVER-85904): Enable when Bazel supports --link-model=object.
   # This variant is a special variant to test Link Time Optimization (LTO).
