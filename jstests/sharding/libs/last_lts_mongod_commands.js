@@ -5,6 +5,7 @@
 export const commandsRemovedFromMongodSinceLastLTS = [
     "_getAuditConfigGeneration",  // Removed in 8.1
     "_configsvrRefineCollectionShardKey",
+    "_shardsvrCommitToShardLocalCatalog",  // Removed in 8.2
     "stageDebug",
 ];
 
