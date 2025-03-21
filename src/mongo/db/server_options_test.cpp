@@ -814,7 +814,7 @@ TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__APPLE__)
 class ForkTestSpec {
 public:
     enum Value {
