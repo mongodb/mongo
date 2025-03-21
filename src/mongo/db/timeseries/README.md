@@ -207,6 +207,11 @@ expect, as object equality is field-order sensitive. Due to this field-order sen
 equality filters are generally not recommended, and doubly-so for time series `metaField` data.
 Queries should instead match on specific nested fields.
 
+### CRUD Operations
+
+CRUD operations can interact directly with the bucketed data format by setting the `rawData` command
+parameter.
+
 ## Indexes
 
 In order to support queries on the time-series collection that could benefit from indexed access
