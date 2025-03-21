@@ -133,15 +133,15 @@ cp $_BuiltPathPrefix/frontend/*.h $_Path/include/frontend
 
 cp $_BuiltPathPrefix/js-config.h $_Path/include
 
-SEDOPTION="-i"
+SEDOPTION=(-i)
 if [[ "$OSTYPE" == "darwin"* ]]; then
-  SEDOPTION="-i ''"
+  SEDOPTION=(-i "")
 fi
 
 find "$_Path/build" -name '*.cpp' |
     while read unified_file ; do
         echo "Processing $unified_file"
-        sed $SEDOPTION \
+        sed "${SEDOPTION[@]}" \
             -e 's|#include ".*/js/src/|#include "|' \
             -e 's|#error ".*/js/src/|#error "|' \
             "$unified_file"
