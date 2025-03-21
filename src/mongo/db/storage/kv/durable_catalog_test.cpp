@@ -779,10 +779,6 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
 }
 
 TEST_F(ImportCollectionTest, ImportCollection) {
-    // Set a new rand so that it does not collide upon import.
-    auto rand = std::to_string(std::stoull(getCatalog()->getRand_forTest()) + 1);
-    getCatalog()->setRand_forTest(rand);
-
     // Import should fail with empty metadata.
     ASSERT_THROWS_CODE(
         importCollectionTest(nss, {}, storageMetadata), AssertionException, ErrorCodes::BadValue);
@@ -835,9 +831,6 @@ TEST_F(ImportCollectionTest, ImportCollection) {
     ASSERT_BSONOBJ_EQ(getCatalog()->getCatalogEntry(operationContext(), importResult.catalogId),
                       BSON("md" << md->toBSON() << "idxIdent" << idxIdentObj << "ns"
                                 << nss.ns_forTest() << "ident" << ident));
-
-    // Since there was not a collision, the rand should not have changed.
-    ASSERT_EQ(rand, getCatalog()->getRand_forTest());
 }
 
 TEST_F(ImportCollectionTest, ImportCollectionNamespaceExists) {
@@ -847,46 +840,6 @@ TEST_F(ImportCollectionTest, ImportCollectionNamespaceExists) {
     ASSERT_THROWS_CODE(importCollectionTest(ns(), {}, storageMetadata),
                        AssertionException,
                        ErrorCodes::NamespaceExists);
-}
-
-TEST_F(DurableCatalogTest, IdentSuffixUsesRand) {
-    const std::string rand = "0000000000000000000";
-    getCatalog()->setRand_forTest(rand);
-
-    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
-
-    auto uuid = (createCollection(nss, CollectionOptions())).uuid;
-    auto collection = CollectionCatalog::get(operationContext())
-                          ->lookupCollectionByUUID(operationContext(), uuid);
-    RecordId catalogId = collection->getCatalogId();
-    ASSERT(StringData(getCatalog()->getEntry(catalogId).ident).endsWith(rand));
-    ASSERT_EQUALS(getCatalog()->getRand_forTest(), rand);
-}
-
-TEST_F(ImportCollectionTest, ImportCollectionRandConflict) {
-    const std::string rand = getCatalog()->getRand_forTest();
-
-    {
-        auto swImportResult =
-            importCollectionTest(nss,
-                                 BSON("md" << md->toBSON() << "idxIdent"
-                                           << BSON(IndexConstants::kIdIndexName << idxIdent) << "ns"
-                                           << nss.ns_forTest() << "ident" << ident),
-                                 storageMetadata);
-        ASSERT_OK(swImportResult.getStatus());
-    }
-
-    ASSERT_NOT_EQUALS(getCatalog()->getRand_forTest(), rand);
-
-    {
-        // Check that a newly created collection doesn't use 'rand' as the suffix in the ident.
-        const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
-        auto catalogId = (createCollection(nss, CollectionOptions())).catalogId;
-
-        ASSERT(!StringData(getCatalog()->getEntry(catalogId).ident).endsWith(rand));
-    }
-
-    ASSERT_NOT_EQUALS(getCatalog()->getRand_forTest(), rand);
 }
 
 TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLatest) {

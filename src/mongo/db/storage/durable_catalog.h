@@ -297,16 +297,6 @@ public:
                          StringData indexName,
                          MultikeyPaths* multikeyPaths) const;
 
-    void setRand_forTest(const std::string& rand) {
-        stdx::lock_guard<stdx::mutex> lk(_randLock);
-        _rand = rand;
-    }
-
-    std::string getRand_forTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_randLock);
-        return _rand;
-    }
-
 private:
     class AddIdentChange;
 
@@ -333,21 +323,9 @@ private:
 
     std::string _newInternalIdent(StringData identStem);
 
-    std::string _newRand();
-
-    /**
-     * The '_randLock' must be passed in.
-     */
-    bool _hasEntryCollidingWithRand(WithLock) const;
-
     RecordStore* _rs;  // not owned
     const bool _directoryPerDb;
     const bool _directoryForIndexes;
-
-    // Protects '_rand' and '_next'.
-    mutable stdx::mutex _randLock;
-    std::string _rand;
-    unsigned long long _next;
 
     absl::flat_hash_map<RecordId, EntryIdentifier, RecordId::Hasher> _catalogIdToEntryMap;
     mutable stdx::mutex _catalogIdToEntryMapLock;

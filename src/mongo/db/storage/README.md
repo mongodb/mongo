@@ -252,16 +252,22 @@ An ident is a unique identifier given to a storage engine resource. Collections 
 application-layer names to storage engine idents. In WiredTiger, idents are implemented as tables
 and, each with a `.wt` file extension.
 
-Examples in the WiredTiger storage engine:
+Format of idents in the WiredTiger storage engine:
 
-- collection idents: `collection-<counter>-<random number>`
-- index idents: `index-<counter>-<random number>`
+- collection idents: `collection-<unique identifier>`
+- index idents: `index-<unique identifier>`
+- (v8.2+) the `<unique identifier>` is created by generating a new `UUID`.
+
+  - `collection-d3575067-0cd9-4239-a9e8-f6af884fc6fe`
+  - `index-a22eca47-c9e1-4df4-a043-d10e4cd45b40`
+
+Idents created in earlier versions of the server (pre v8.2) use a `<counter> + <random number>` combination as the `<unique identifier>` (e.g: `index-62-2245557986372974053`). Future versions of the server must continue to recognize both formats.
 
 Server flags that alter the form of idents (this applies to indexes as well):
 
-- `--directoryperdb`: `<db name>/collection-<counter>-<random number>`
-- `--wiredTigerDirectoryForIndexes`: `collection/<counter>-<random number>`
-- (both of the above): `<db name>/collection/<counter-<random number>`
+- `--directoryperdb`: `<db name>/collection-<unique identifier>`
+- `--wiredTigerDirectoryForIndexes`: `collection/<unique identifier>`
+- (both of the above): `<db name>/collection/<unique identifier>`
 
 # Startup Recovery
 

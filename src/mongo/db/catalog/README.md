@@ -31,9 +31,9 @@ Starting in v7.1, catalog entries for time-series collections have a new flag ca
 index build on `{lastName: 1}`:
 
 ```
- {'ident': 'collection-0--2147780727179663754',
-  'idxIdent': {'_id_': 'index-1--2147780727179663754',
-               'lastName_1': 'index-2--2147780727179663754'},
+ {'ident': 'collection-8a3a1418-4f05-44d6-aca7-59a2f7b30248',
+  'idxIdent': {'_id_': 'index-831b659d-59bd-42b8-b541-2fa42cbabfcb',
+               'lastName_1': 'index-b5640da1-34c2-417f-9471-825f764b7bc1'},
   'md': {'indexes': [{'multikey': False,
                       'multikeyPaths': {'_id': Binary('\x00', 0)},
                       'ready': True,
@@ -97,10 +97,10 @@ Collection-less $listCatalog: [
             ]
         },
         "idxIdent" : {
-            "_id_" : "index-6-2245557986372974053"
+            "_id_" : "index-41d46f11-b871-466a-9442-af463940ae8e"
         },
         "ns" : "test.system.views",
-        "ident" : "collection-5-2245557986372974053"
+        "ident" : "collection-8a3a1418-4f05-44d6-aca7-59a2f7b30248"
     },
     {
         "db" : "list_catalog",
@@ -143,11 +143,11 @@ Collection-less $listCatalog: [
             ]
         },
         "idxIdent" : {
-            "_id_" : "index-62-2245557986372974053",
-            "a_1" : "index-63-2245557986372974053"
+            "_id_" : "index-43bc2c01-b105-4442-82ef-d97f8a4de095",
+            "a_1" : "index-a22eca47-c9e1-4df4-a043-d10e4cd45b40"
         },
         "ns" : "list_catalog.simple",
-        "ident" : "collection-61-2245557986372974053"
+        "ident" : "collection-d3575067-0cd9-4239-a9e8-f6af884fc6fe"
     },
     {
         "db" : "list_catalog",
@@ -176,10 +176,10 @@ Collection-less $listCatalog: [
             ]
         },
         "idxIdent" : {
-            "_id_" : "index-65-2245557986372974053"
+            "_id_" : "index-96bb151f-3f1b-496c-bd03-9dd83aad2704"
         },
         "ns" : "list_catalog.system.views",
-        "ident" : "collection-64-2245557986372974053"
+        "ident" : "collection-fe44e5fc-262c-4ef9-b023-5524ac743962"
     },
     {
         "db" : "list_catalog",
@@ -274,10 +274,10 @@ of the `$indexStats` operator. The following is a sample test output from
             ]
         },
         "idxIdent" : {
-            "_id_" : "index-56--2997668048670645427"
+            "_id_" : "index-d07644c2-5242-4c91-b006-5714ba378bd0"
         },
         "ns" : "list_catalog.coll",
-        "ident" : "collection-55--2997668048670645427"
+        "ident" : "collection-1e587b45-8c55-46a3-a74f-c7bc8a8bf937"
     },
     {
         "db" : "list_catalog",
@@ -307,10 +307,10 @@ of the `$indexStats` operator. The following is a sample test output from
             ]
         },
         "idxIdent" : {
-            "_id_" : "index-55--2220352983339007214"
+            "_id_" : "index-b7c92cfe-24bd-4be5-a9c7-aa71fc6bda31"
         },
         "ns" : "list_catalog.coll",
-        "ident" : "collection-53--2220352983339007214"
+        "ident" : "collection-80216433-9978-43c6-8dbf-d925345c2c13"
     }
 ]
 

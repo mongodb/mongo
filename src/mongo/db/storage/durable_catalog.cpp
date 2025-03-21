@@ -151,30 +151,14 @@ DurableCatalog::DurableCatalog(RecordStore* rs,
     : _rs(rs),
       _directoryPerDb(directoryPerDb),
       _directoryForIndexes(directoryForIndexes),
-      _rand(_newRand()),
-      _next(0),
       _engine(engine) {}
 
-bool DurableCatalog::_hasEntryCollidingWithRand(WithLock) const {
-    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
-    for (auto it = _catalogIdToEntryMap.begin(); it != _catalogIdToEntryMap.end(); ++it) {
-        if (StringData(it->second.ident).endsWith(_rand))
-            return true;
-    }
-    return false;
-}
-
 std::string DurableCatalog::_newInternalIdent(StringData identStem) {
-    stdx::lock_guard<stdx::mutex> lk(_randLock);
     StringBuilder buf;
     buf << ident::getInternalIdentPrefix();
     buf << identStem;
-    buf << _next++ << '-' << _rand;
+    buf << UUID::gen();
     return buf.str();
-}
-
-std::string DurableCatalog::_newRand() {
-    return str::stream() << SecureRandom().nextUInt64();
 }
 
 std::string DurableCatalog::getFilesystemPathForDb(const DatabaseName& dbName) const {
@@ -186,15 +170,20 @@ std::string DurableCatalog::getFilesystemPathForDb(const DatabaseName& dbName) c
 }
 
 std::string DurableCatalog::generateUniqueIdent(NamespaceString nss, const char* kind) {
-    // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
-    stdx::lock_guard<stdx::mutex> lk(_randLock);
     StringBuilder buf;
     if (_directoryPerDb) {
         buf << escapeDbName(nss.dbName()) << '/';
     }
     buf << kind;
     buf << (_directoryForIndexes ? '/' : '-');
-    buf << _next++ << '-' << _rand;
+    // The suffix of an ident serves as a unique identifier.
+    //
+    // (v8.2+) Suffix new idents with a unique UUID.
+    //
+    // Idents created before v8.2 are suffixed with a <counter> + <random
+    // number> combination. Future versions of the server must support both
+    // formats.
+    buf << UUID::gen();
     return buf.str();
 }
 
@@ -214,12 +203,6 @@ void DurableCatalog::init(OperationContext* opCtx) {
         auto nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
             obj["ns"].String());
         _catalogIdToEntryMap[record->id] = EntryIdentifier(record->id, ident, nss);
-    }
-
-    // In the unlikely event that we have used this _rand before generate a new one.
-    stdx::lock_guard<stdx::mutex> lk(_randLock);
-    while (_hasEntryCollidingWithRand(lk)) {
-        _rand = _newRand();
     }
 }
 
@@ -667,35 +650,10 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
         return metadata;
     }();
 
-    // Before importing the idents belonging to the collection and indexes, change '_rand' if there
-    // will be a conflict.
     std::set<std::string> indexIdents;
-    {
-        const std::string collectionIdent = catalogEntry["ident"].String();
-
-        if (!catalogEntry["idxIdent"].eoo()) {
-            for (const auto& indexIdent : catalogEntry["idxIdent"].Obj()) {
-                indexIdents.insert(indexIdent.String());
-            }
-        }
-
-        auto identsToImportConflict = [&](WithLock) -> bool {
-            if (StringData(collectionIdent).endsWith(_rand)) {
-                return true;
-            }
-
-            for (const std::string& ident : indexIdents) {
-                if (StringData(ident).endsWith(_rand)) {
-                    return true;
-                }
-            }
-            return false;
-        };
-
-        stdx::lock_guard<stdx::mutex> lk(_randLock);
-        while (!skipIdentCollisionCheck &&
-               (_hasEntryCollidingWithRand(lk) || identsToImportConflict(lk))) {
-            _rand = _newRand();
+    if (auto&& idxIdent = catalogEntry["idxIdent"]) {
+        for (auto&& indexIdent : idxIdent.Obj()) {
+            indexIdents.insert(indexIdent.String());
         }
     }
 
@@ -721,7 +679,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
     if (!status.isOK())
         return status;
 
-    for (const std::string& indexIdent : indexIdents) {
+    for (const auto& indexIdent : indexIdents) {
         status = kvEngine->importSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
                                                      indexIdent,
                                                      storageMetadata,
