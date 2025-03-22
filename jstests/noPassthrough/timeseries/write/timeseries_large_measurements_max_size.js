@@ -41,8 +41,7 @@ const checkBucketSize = (() => {
     assert.eq(numMeasurements - 1, bucketDocs[1].control.min._id);
     assert.eq(numMeasurements - 1, bucketDocs[1].control.max._id);
 
-    // TODO(SERVER-102744): re-enable check
-    // assert.eq(1, timeseriesStats.numBucketsClosedDueToSize);
+    assert.eq(1, timeseriesStats.numBucketsClosedDueToSize);
     assert.eq(1, timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
 });
 
