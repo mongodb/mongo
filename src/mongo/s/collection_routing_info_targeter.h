@@ -85,9 +85,6 @@ public:
      * If 'expectedEpoch' is specified, the targeter will throws 'StaleEpoch' exception if the epoch
      * for 'nss' ever becomes different from 'expectedEpoch'. Otherwise, the targeter will continue
      * targeting even if the collection gets dropped and recreated.
-     *
-     * If 'rawData' is true, the targeter will target the namespace of the underlying raw data
-     * format, as if it were the one originally supplied to the targeter.
      */
     CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                   const NamespaceString& nss,
