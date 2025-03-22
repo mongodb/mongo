@@ -1181,6 +1181,19 @@ long long CollectionImpl::dataSize(OperationContext* opCtx) const {
     return _shared->_recordStore->dataSize();
 }
 
+int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,
+                                   const StorageEngine& storageEngine) const {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
+    int64_t size = getRecordStore()->storageSize(ru);
+    auto it = getIndexCatalog()->getIndexIterator(
+        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+    while (it->more()) {
+        size += storageEngine.getIdentSize(ru, it->next()->getIdent());
+    }
+    return size;
+}
+
 bool CollectionImpl::isEmpty(OperationContext* opCtx) const {
     auto cursor = getCursor(opCtx, true /* forward */);
 

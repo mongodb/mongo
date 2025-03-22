@@ -139,7 +139,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage:storage_repair_observer",
-        "//src/mongo/db/storage:storage_util",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/util:fail_point",
         "//src/mongo/util:progress_meter",

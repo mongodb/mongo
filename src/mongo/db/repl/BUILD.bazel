@@ -1200,6 +1200,7 @@ mongo_cc_library(
         "//src/mongo/db:query_exec",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:vector_clock",
+        "//src/mongo/db/catalog:catalog_control",
         "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/catalog:database_holder",
         "//src/mongo/db/catalog:local_oplog_info",
@@ -1210,6 +1211,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:oplog_truncation",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_util",
     ],
 )
 
@@ -1425,6 +1427,7 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/storage:journal_flusher",
+        "//src/mongo/db/storage:storage_util",
     ],
 )
 

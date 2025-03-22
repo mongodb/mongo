@@ -115,8 +115,8 @@ public:
         return _nss;
     }
 
-    DurableCatalog* getCatalog() {
-        return operationContext()->getServiceContext()->getStorageEngine()->getCatalog();
+    DurableCatalog* getDurableCatalog() {
+        return operationContext()->getServiceContext()->getStorageEngine()->getDurableCatalog();
     }
 
     CollectionPtr getCollection() {
@@ -143,7 +143,7 @@ public:
 
         options.uuid = UUID::gen();
 
-        auto swColl = getCatalog()->createCollection(operationContext(), nss, options);
+        auto swColl = getDurableCatalog()->createCollection(operationContext(), nss, options);
         ASSERT_OK(swColl.getStatus());
 
         std::pair<RecordId, std::unique_ptr<RecordStore>> coll = std::move(swColl.getValue());
@@ -153,7 +153,7 @@ public:
             operationContext(),
             nss,
             catalogId,
-            getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata,
+            getDurableCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata,
             std::move(coll.second));
 
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
@@ -252,8 +252,9 @@ protected:
         WriteUnitOfWork wuow{operationContext()};
 
         auto catalogId =
-            unittest::assertGet(getCatalog()->createCollection(operationContext(), nss, {})).first;
-        ident = getCatalog()->getEntry(catalogId).ident;
+            unittest::assertGet(getDurableCatalog()->createCollection(operationContext(), nss, {}))
+                .first;
+        ident = getDurableCatalog()->getEntry(catalogId).ident;
 
         IndexDescriptor descriptor{"",
                                    BSON(IndexDescriptor::kKeyPatternFieldName
@@ -265,13 +266,14 @@ protected:
         imd.spec = descriptor.infoObj();
         imd.ready = true;
 
-        md = getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata;
+        md = getDurableCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata;
         md->insertIndex(std::move(imd));
-        getCatalog()->putMetaData(operationContext(), catalogId, *md);
+        getDurableCatalog()->putMetaData(operationContext(), catalogId, *md);
 
-        ASSERT_OK(getCatalog()->createIndex(operationContext(), catalogId, nss, {}, &descriptor));
-        idxIdent =
-            getCatalog()->getIndexIdent(operationContext(), catalogId, descriptor.indexName());
+        ASSERT_OK(
+            getDurableCatalog()->createIndex(operationContext(), catalogId, nss, {}, &descriptor));
+        idxIdent = getDurableCatalog()->getIndexIdent(
+            operationContext(), catalogId, descriptor.indexName());
 
         wuow.commit();
 
@@ -301,11 +303,11 @@ protected:
                      ->lookupCollectionByNamespace(operationContext(), nss));
 
         WriteUnitOfWork wuow(operationContext());
-        auto res = getCatalog()->importCollection(operationContext(),
-                                                  nss,
-                                                  metadata,
-                                                  storageMetadata,
-                                                  /*generateNewUUID= */ true);
+        auto res = getDurableCatalog()->importCollection(operationContext(),
+                                                         nss,
+                                                         metadata,
+                                                         storageMetadata,
+                                                         /*generateNewUUID= */ true);
         if (res.isOK()) {
             wuow.commit();
         }
@@ -701,7 +703,7 @@ public:
 
         // Verify that the durable catalog has 'expected' as multikey paths for this index
         Lock::GlobalLock globalLock{operationContext(), MODE_IS};
-        auto md = getCatalog()
+        auto md = getDurableCatalog()
                       ->getParsedCatalogEntry(operationContext(), collection->getCatalogId())
                       ->metadata;
 
@@ -816,10 +818,10 @@ TEST_F(ImportCollectionTest, ImportCollection) {
     Lock::GlobalLock globalLock{operationContext(), MODE_IS};
 
     // Validate the catalog entry for the imported collection.
-    auto entry = getCatalog()->getEntry(importResult.catalogId);
+    auto entry = getDurableCatalog()->getEntry(importResult.catalogId);
     ASSERT_EQ(entry.nss, nss);
     ASSERT_EQ(entry.ident, ident);
-    ASSERT_EQ(getCatalog()->getIndexIdent(
+    ASSERT_EQ(getDurableCatalog()->getIndexIdent(
                   operationContext(), importResult.catalogId, IndexConstants::kIdIndexName),
               idxIdent);
 
@@ -828,9 +830,10 @@ TEST_F(ImportCollectionTest, ImportCollection) {
     // Substitute in the generated UUID and check that the rest of fields in the catalog entry
     // match.
     md->options.uuid = importResult.uuid;
-    ASSERT_BSONOBJ_EQ(getCatalog()->getCatalogEntry(operationContext(), importResult.catalogId),
-                      BSON("md" << md->toBSON() << "idxIdent" << idxIdentObj << "ns"
-                                << nss.ns_forTest() << "ident" << ident));
+    ASSERT_BSONOBJ_EQ(
+        getDurableCatalog()->getCatalogEntry(operationContext(), importResult.catalogId),
+        BSON("md" << md->toBSON() << "idxIdent" << idxIdentObj << "ns" << nss.ns_forTest()
+                  << "ident" << ident));
 }
 
 TEST_F(ImportCollectionTest, ImportCollectionNamespaceExists) {
@@ -855,7 +858,7 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
         auto collection = CollectionCatalog::get(operationContext())
                               ->lookupCollectionByNamespace(operationContext(), regularNss);
         RecordId catalogId = collection->getCatalogId();
-        ASSERT(!getCatalog()
+        ASSERT(!getDurableCatalog()
                     ->getParsedCatalogEntry(operationContext(), catalogId)
                     ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
     }
@@ -871,10 +874,10 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
         auto collection = CollectionCatalog::get(operationContext())
                               ->lookupCollectionByNamespace(operationContext(), bucketsNss);
         RecordId catalogId = collection->getCatalogId();
-        ASSERT(getCatalog()
+        ASSERT(getDurableCatalog()
                    ->getParsedCatalogEntry(operationContext(), catalogId)
                    ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
-        ASSERT_FALSE(*getCatalog()
+        ASSERT_FALSE(*getDurableCatalog()
                           ->getParsedCatalogEntry(operationContext(), catalogId)
                           ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
     }
@@ -891,18 +894,19 @@ TEST_F(DurableCatalogTest, CreateCollectionCatalogEntryHasCorrectTenantNamespace
     auto collection = CollectionCatalog::get(operationContext())
                           ->lookupCollectionByNamespace(operationContext(), nss);
     RecordId catalogId = collection->getCatalogId();
-    ASSERT_EQ(getCatalog()->getEntry(catalogId).nss.tenantId(), nss.tenantId());
-    ASSERT_EQ(getCatalog()->getEntry(catalogId).nss, nss);
+    ASSERT_EQ(getDurableCatalog()->getEntry(catalogId).nss.tenantId(), nss.tenantId());
+    ASSERT_EQ(getDurableCatalog()->getEntry(catalogId).nss, nss);
 
     Lock::GlobalLock globalLock{operationContext(), MODE_IS};
-    ASSERT_EQ(getCatalog()
+    ASSERT_EQ(getDurableCatalog()
                   ->getParsedCatalogEntry(operationContext(), catalogId)
                   ->metadata->nss.tenantId(),
               nss.tenantId());
-    ASSERT_EQ(getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata->nss,
-              nss);
+    ASSERT_EQ(
+        getDurableCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata->nss,
+        nss);
 
-    auto catalogEntry = getCatalog()->scanForCatalogEntryByNss(operationContext(), nss);
+    auto catalogEntry = getDurableCatalog()->scanForCatalogEntryByNss(operationContext(), nss);
 
     gMultitenancySupport = false;
 }
@@ -937,39 +941,42 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     // Need a read lock for DurableCatalog::getMetaData() calls.
     Lock::GlobalLock globalLock{operationContext(), MODE_IS};
 
-    auto catalogEntryThird = getCatalog()->scanForCatalogEntryByNss(operationContext(), nssThird);
+    auto catalogEntryThird =
+        getDurableCatalog()->scanForCatalogEntryByNss(operationContext(), nssThird);
     ASSERT(catalogEntryThird != boost::none);
     ASSERT_EQ(nssThird, catalogEntryThird->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDThird.uuid, catalogEntryThird->metadata->options.uuid);
-    ASSERT_EQ(getCatalog()
+    ASSERT_EQ(getDurableCatalog()
                   ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDThird.catalogId)
                   ->metadata->nss,
               nssThird);
-    ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDThird.catalogId).nss, nssThird);
+    ASSERT_EQ(getDurableCatalog()->getEntry(catalogIdAndUUIDThird.catalogId).nss, nssThird);
 
-    auto catalogEntrySecond = getCatalog()->scanForCatalogEntryByNss(operationContext(), nssSecond);
+    auto catalogEntrySecond =
+        getDurableCatalog()->scanForCatalogEntryByNss(operationContext(), nssSecond);
     ASSERT(catalogEntrySecond != boost::none);
     ASSERT_EQ(nssSecond, catalogEntrySecond->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDSecond.uuid, catalogEntrySecond->metadata->options.uuid);
     ASSERT(catalogEntrySecond->metadata->options.timeseries);
-    ASSERT_EQ(getCatalog()
+    ASSERT_EQ(getDurableCatalog()
                   ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDSecond.catalogId)
                   ->metadata->nss,
               nssSecond);
-    ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDSecond.catalogId).nss, nssSecond);
+    ASSERT_EQ(getDurableCatalog()->getEntry(catalogIdAndUUIDSecond.catalogId).nss, nssSecond);
 
-    auto catalogEntryFirst = getCatalog()->scanForCatalogEntryByNss(operationContext(), nssFirst);
+    auto catalogEntryFirst =
+        getDurableCatalog()->scanForCatalogEntryByNss(operationContext(), nssFirst);
     ASSERT(catalogEntryFirst != boost::none);
     ASSERT_EQ(nssFirst, catalogEntryFirst->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDFirst.uuid, catalogEntryFirst->metadata->options.uuid);
     ASSERT_EQ(nssFirst.tenantId(), catalogEntryFirst->metadata->nss.tenantId());
-    ASSERT_EQ(getCatalog()
+    ASSERT_EQ(getDurableCatalog()
                   ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDFirst.catalogId)
                   ->metadata->nss,
               nssFirst);
-    ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDFirst.catalogId).nss, nssFirst);
+    ASSERT_EQ(getDurableCatalog()->getEntry(catalogIdAndUUIDFirst.catalogId).nss, nssFirst);
 
-    auto catalogEntryDoesNotExist = getCatalog()->scanForCatalogEntryByNss(
+    auto catalogEntryDoesNotExist = getDurableCatalog()->scanForCatalogEntryByNss(
         operationContext(), NamespaceString::createNamespaceString_forTest("foo", "bar"));
     ASSERT(catalogEntryDoesNotExist == boost::none);
 }

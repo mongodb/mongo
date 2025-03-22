@@ -43,11 +43,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/validate/collection_validation.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index_builds/rebuild_indexes.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -57,7 +59,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -197,7 +198,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
     auto databaseHolder = DatabaseHolder::get(opCtx);
     databaseHolder->close(opCtx, dbName);
 
-    // Sucessfully re-opening the db is necessary for repairCollections.
+    // Successfully re-opening the db is necessary for repairCollections.
     openDbAndRepairIndexSpec(opCtx, dbName);
 
     auto status = repairCollections(opCtx, engine, dbName);
@@ -229,14 +230,31 @@ Status repairCollection(OperationContext* opCtx,
     LOGV2(21027, "Repairing collection", logAttrs(nss));
 
     Status status = Status::OK();
+    RecordId catalogId;
     {
         auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-        status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
+        catalogId = collection->getCatalogId();
+        status = engine->repairRecordStore(opCtx, catalogId, nss);
+    }
+
+    bool dataModified = status.code() == ErrorCodes::DataModifiedByRepair;
+    if (status.isOK() || dataModified) {
+        // When in repair mode, initCollectionObject() constructed the Collection object with null
+        // RecordStore. After repairing, re-initialize the collection with a valid RecordStore.
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            auto uuid = catalog.lookupUUIDByNSS(opCtx, nss).value();
+            catalog.deregisterCollection(
+                opCtx, uuid, /*isDropPending=*/false, /*commitTime*/ boost::none);
+        });
+
+        // When repairing a record store, keep the existing behavior of not installing a minimum
+        // visible timestamp.
+        catalog::initCollectionObject(opCtx, engine, catalogId, nss, false, Timestamp::min());
     }
 
     // If data was modified during repairRecordStore, we know to rebuild indexes without needing
     // to run an expensive collection validation.
-    if (status.code() == ErrorCodes::DataModifiedByRepair) {
+    if (dataModified) {
         invariant(StorageRepairObserver::get(opCtx->getServiceContext())->isDataInvalidated(),
                   fmt::format("Collection '{}' ({})",
                               toStringForLogging(nss),
@@ -298,7 +316,7 @@ Status repairCollection(OperationContext* opCtx,
         return status;
     }
 
-    // Serialize valdiate result for logging in which tenant prefix is expected.
+    // Serialize validate result for logging in which tenant prefix is expected.
     const SerializationContext serializationCtx(SerializationContext::Source::Command,
                                                 SerializationContext::CallerType::Reply,
                                                 SerializationContext::Prefix::IncludePrefix);

@@ -50,6 +50,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -90,9 +91,6 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -181,17 +179,10 @@ public:
         // Disable fast shutdown so that WT can free memory.
         globalFailPointRegistry().find("WTDisableFastShutDown")->setMode(FailPoint::alwaysOn);
 
-        {
-            auto initializeStorageEngineOpCtx = _svcCtx->makeOperationContext(&cc());
-            shard_role_details::setRecoveryUnit(
-                initializeStorageEngineOpCtx.get(),
-                std::make_unique<RecoveryUnitNoop>(),
-                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-            initializeStorageEngine(initializeStorageEngineOpCtx.get(),
-                                    StorageEngineInitFlags::kAllowNoLockFile |
-                                        StorageEngineInitFlags::kSkipMetadataFile);
-        }
+        catalog::startUpStorageEngineAndCollectionCatalog(
+            _svcCtx,
+            &cc(),
+            StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile);
 
         DatabaseHolder::set(_svcCtx, std::make_unique<DatabaseHolderImpl>());
         repl::StorageInterface::set(_svcCtx, std::make_unique<repl::StorageInterfaceImpl>());
@@ -257,7 +248,7 @@ public:
         databaseHolder->closeAll(opCtx);
 
         // Shut down storage engine.
-        shutdownGlobalStorageEngineCleanly(_svcCtx);
+        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_svcCtx);
     }
 
     // Shut down the storage engine, clear the dbpath, and restart the storage engine with empty
@@ -273,15 +264,11 @@ public:
         storageGlobalParams.dbpath = _tempDir->path();
         storageGlobalParams.inMemory = false;
 
-        auto initializeStorageEngineOpCtx = _svcCtx->makeOperationContext(&cc());
-        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
-                                            std::make_unique<RecoveryUnitNoop>(),
-                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-        initializeStorageEngine(initializeStorageEngineOpCtx.get(),
-                                StorageEngineInitFlags::kAllowNoLockFile |
-                                    StorageEngineInitFlags::kSkipMetadataFile |
-                                    StorageEngineInitFlags::kForRestart);
+        catalog::startUpStorageEngineAndCollectionCatalog(
+            _svcCtx,
+            &cc(),
+            StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile |
+                StorageEngineInitFlags::kForRestart);
     }
 
     ServiceContext* getSvcCtx() {

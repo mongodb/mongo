@@ -61,11 +61,9 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/periodic_runner.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -81,7 +79,7 @@ struct StorageEngineOptions {
     bool lockFileCreatedByUncleanShutdown = false;
 };
 
-class StorageEngineImpl final : public StorageEngineInterface, public StorageEngine {
+class StorageEngineImpl final : public StorageEngine {
 public:
     StorageEngineImpl(OperationContext* opCtx,
                       std::unique_ptr<KVEngine> engine,
@@ -95,17 +93,9 @@ public:
 
     RecoveryUnit* newRecoveryUnit() override;
 
-    std::vector<DatabaseName> listDatabases(
-        boost::optional<TenantId> tenantId = boost::none) const override;
-
     bool supportsCappedCollections() const override {
         return _supportsCappedCollections;
     }
-
-    Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
-    Status dropCollectionsWithPrefix(OperationContext* opCtx,
-                                     const DatabaseName& dbName,
-                                     const std::string& collectionNamePrefix) override;
 
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
@@ -184,141 +174,6 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
-    /**
-     * A TimestampMonitor is used to listen for any changes in the timestamps implemented by the
-     * storage engine and to notify any registered listeners upon changes to these timestamps.
-     *
-     * The monitor follows the same lifecycle as the storage engine, started when the storage
-     * engine starts and stopped when the storage engine stops.
-     *
-     * The PeriodicRunner must be started before the Storage Engine is started, and the Storage
-     * Engine must be shutdown after the PeriodicRunner is shutdown.
-     */
-    class TimestampMonitor {
-    public:
-        /**
-         * Timestamps that can be listened to for changes.
-         */
-        enum class TimestampType { kCheckpoint, kOldest, kStable, kMinOfCheckpointAndOldest };
-
-        /**
-         * A TimestampListener is used to listen for changes in a given timestamp and to execute the
-         * user-provided callback to the change with a custom user-provided callback.
-         *
-         * The TimestampListener must be registered in the TimestampMonitor in order to be notified
-         * of timestamp changes and react to changes for the duration it's part of the monitor.
-         *
-         * Listeners expected to run in standalone mode should handle Timestamp::min() notifications
-         * appropriately.
-         */
-        class TimestampListener {
-        public:
-            // Caller must ensure that the lifetime of the variables used in the callback are valid.
-            using Callback = std::function<void(OperationContext* opCtx, Timestamp timestamp)>;
-
-            /**
-             * A TimestampListener saves a 'callback' that will be executed whenever the specified
-             * 'type' timestamp changes. The 'callback' function will be passed the new 'type'
-             * timestamp.
-             */
-            TimestampListener(TimestampType type, Callback callback)
-                : _type(type), _callback(std::move(callback)) {}
-
-            /**
-             * Executes the appropriate function with the callback of the listener with the new
-             * timestamp.
-             */
-            void notify(OperationContext* opCtx, Timestamp newTimestamp) {
-                if (_type == TimestampType::kCheckpoint)
-                    _onCheckpointTimestampChanged(opCtx, newTimestamp);
-                else if (_type == TimestampType::kOldest)
-                    _onOldestTimestampChanged(opCtx, newTimestamp);
-                else if (_type == TimestampType::kStable)
-                    _onStableTimestampChanged(opCtx, newTimestamp);
-                else if (_type == TimestampType::kMinOfCheckpointAndOldest)
-                    _onMinOfCheckpointAndOldestTimestampChanged(opCtx, newTimestamp);
-            }
-
-            TimestampType getType() const {
-                return _type;
-            }
-
-        private:
-            void _onCheckpointTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
-                _callback(opCtx, newTimestamp);
-            }
-
-            void _onOldestTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
-                _callback(opCtx, newTimestamp);
-            }
-
-            void _onStableTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
-                _callback(opCtx, newTimestamp);
-            }
-
-            void _onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
-                                                             Timestamp newTimestamp) {
-                _callback(opCtx, newTimestamp);
-            }
-
-            // Timestamp type this listener monitors.
-            TimestampType _type;
-
-            // Function to execute when the timestamp changes.
-            Callback _callback;
-        };
-
-        /**
-         * Starts monitoring timestamp changes in the background with an initial listener.
-         */
-        TimestampMonitor(KVEngine* engine, PeriodicRunner* runner);
-
-        ~TimestampMonitor();
-
-        /**
-         * Adds a new listener to the monitor if it isn't already registered. A listener can only be
-         * bound to one type of timestamp at a time.
-         */
-        void addListener(TimestampListener* listener);
-
-        /**
-         * Remove a listener.
-         */
-        void removeListener(TimestampListener* listener);
-
-        bool isRunning_forTestOnly() const {
-            return _running;
-        }
-
-    private:
-        /**
-         * Monitor changes in timestamps and to notify the listeners on change. Notifies all
-         * listeners on Timestamp::min() in order to support standalone mode that is untimestamped.
-         */
-        void _startup();
-
-        KVEngine* _engine;
-        bool _running = false;
-        bool _shuttingDown = false;
-
-        // Periodic runner that the timestamp monitor schedules its job on.
-        PeriodicRunner* _periodicRunner;
-
-        // Protects access to _listeners below.
-        stdx::mutex _monitorMutex;
-        std::vector<TimestampListener*> _listeners;
-
-        // This should remain as the last member variable so that its destructor gets executed first
-        // when the class instance is being deconstructed. This causes the PeriodicJobAnchor to stop
-        // the PeriodicJob, preventing us from accessing any destructed variables if this were to
-        // run during the destruction of this class instance.
-        PeriodicJobAnchor _job;
-    };
-
-    StorageEngine* getStorageEngine() override {
-        return this;
-    }
-
     KVEngine* getEngine() override {
         return _engine.get();
     }
@@ -332,11 +187,10 @@ public:
         std::shared_ptr<Ident> ident,
         DropIdentCallback&& onDrop) override;
 
-    void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) override;
-
     std::shared_ptr<Ident> markIdentInUse(StringData ident) override;
 
-    void startTimestampMonitor() override;
+    void startTimestampMonitor(
+        std::initializer_list<TimestampMonitor::TimestampListener*> listeners) override;
 
     void checkpoint() override;
 
@@ -350,22 +204,24 @@ public:
 
     std::string getFilesystemPathForDb(const DatabaseName& dbName) const override;
 
-    DurableCatalog* getCatalog() override;
+    DurableCatalog* getDurableCatalog() override;
 
-    const DurableCatalog* getCatalog() const override;
+    const DurableCatalog* getDurableCatalog() const override;
 
     /**
      * When loading after an unclean shutdown, this performs cleanup on the DurableCatalog.
      */
-    void loadCatalog(OperationContext* opCtx,
-                     boost::optional<Timestamp> stableTs,
-                     LastShutdownState lastShutdownState) final;
+    void loadDurableCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final;
 
-    void closeCatalog(OperationContext* opCtx) final;
+    void closeDurableCatalog(OperationContext* opCtx) final;
 
     TimestampMonitor* getTimestampMonitor() const {
         return _timestampMonitor.get();
     }
+
+    void stopTimestampMonitor() override;
+
+    void restartTimestampMonitor() override;
 
     std::set<std::string> getDropPendingIdents() const override {
         return _dropPendingIdentReaper.getAllIdentNames();
@@ -375,14 +231,16 @@ public:
         return _dropPendingIdentReaper.getNumIdents();
     }
 
-    int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) override;
-
     bool isUsingDirectoryPerDb() const override {
         return _options.directoryPerDB;
     }
 
     bool isUsingDirectoryForIndexes() const override {
         return _options.directoryForIndexes;
+    }
+
+    int64_t getIdentSize(RecoveryUnit& ru, StringData ident) const final {
+        return _engine->getIdentSize(ru, ident);
     }
 
     StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
@@ -417,16 +275,6 @@ public:
 
 private:
     using CollIter = std::list<std::string>::iterator;
-
-    void _initCollection(OperationContext* opCtx,
-                         RecordId catalogId,
-                         const NamespaceString& nss,
-                         bool forRepair,
-                         Timestamp minValidTs);
-
-    Status _dropCollections(OperationContext* opCtx,
-                            const std::vector<UUID>& toDrop,
-                            const std::string& collectionNamePrefix = "");
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection
@@ -484,9 +332,6 @@ private:
     // Listener for min of checkpoint and oldest timestamp changes.
     TimestampMonitor::TimestampListener _minOfCheckpointAndOldestTimestampListener;
 
-    // Listener for cleanup of CollectionCatalog when oldest timestamp advances.
-    TimestampMonitor::TimestampListener _collectionCatalogCleanupTimestampListener;
-
     const bool _supportsCappedCollections;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
@@ -496,5 +341,8 @@ private:
     bool _inBackupMode = false;
 
     std::unique_ptr<TimestampMonitor> _timestampMonitor;
+
+    // Stores a copy of the TimestampMonitor's listeners when temporarily stopping the monitor.
+    std::vector<TimestampMonitor::TimestampListener*> _listeners;
 };
 }  // namespace mongo

@@ -49,6 +49,7 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/local_oplog_info.h"
@@ -1298,9 +1299,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
     // lock upgrade when removing the temporary collections.
     Lock::GlobalLock lk(opCtx, MODE_IX);
 
-    StorageEngine* storageEngine = _service->getStorageEngine();
-    std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
-
+    std::vector<DatabaseName> dbNames = catalog::listDatabases();
     for (const auto& dbName : dbNames) {
         // The local db is special because it isn't replicated. It is cleared at startup even on
         // replica set members.

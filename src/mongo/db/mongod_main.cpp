@@ -71,8 +71,10 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
+#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
@@ -211,9 +213,7 @@
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -631,22 +631,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     admission::initializeExecutionControl(serviceContext);
 
-    // Creating the operation context before initializing the storage engine allows the storage
-    // engine initialization to make use of the lock manager. As the storage engine is not yet
-    // initialized, a noop recovery unit is used until the initialization is complete.
-    auto lastShutdownState = [&] {
-        auto initializeStorageEngineOpCtx = serviceContext->makeOperationContext(&cc());
-        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
-                                            std::make_unique<RecoveryUnitNoop>(),
-                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-        auto lastShutdownState = initializeStorageEngine(initializeStorageEngineOpCtx.get(),
-                                                         StorageEngineInitFlags{},
-                                                         &startupTimeElapsedBuilder);
-
-        StorageControl::startStorageControls(serviceContext);
-        return lastShutdownState;
-    }();
+    auto lastShutdownState = catalog::startUpStorageEngineAndCollectionCatalog(
+        serviceContext, &cc(), StorageEngineInitFlags{}, &startupTimeElapsedBuilder);
+    StorageControl::startStorageControls(serviceContext);
 
     ScopeGuard logStartupStats([serviceContext,
                                 beginInitAndListen,
@@ -1047,7 +1034,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
             serverGlobalParams.validateFeaturesAsPrimary.store(false);
         }
 
-        storageEngine->startTimestampMonitor();
+        storageEngine->startTimestampMonitor(
+            {&catalog_helper::kCollectionCatalogCleanupTimestampListener});
 
         startFLECrud(serviceContext);
 
@@ -2033,7 +2021,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                                   "Shut down the storage engine",
                                                   &shutdownTimeElapsedBuilder);
         LOGV2(4784930, "Shutting down the storage engine");
-        shutdownGlobalStorageEngineCleanly(serviceContext);
+        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext);
     }
 
     // We drop the scope cache because leak sanitizer can't see across the

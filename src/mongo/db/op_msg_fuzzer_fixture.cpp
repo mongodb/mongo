@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
@@ -60,9 +61,7 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/rpc/message.h"
@@ -129,18 +128,11 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     // (Generic FCV reference): Initialize FCV.
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
-    {
-        auto initializeStorageEngineOpCtx =
-            _serviceContext->makeOperationContext(clientGuard.get());
-        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
-                                            std::make_unique<RecoveryUnitNoop>(),
-                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-        initializeStorageEngine(initializeStorageEngineOpCtx.get(),
-                                StorageEngineInitFlags::kAllowNoLockFile |
-                                    StorageEngineInitFlags::kSkipMetadataFile);
-        StorageControl::startStorageControls(_serviceContext, true /*forTestOnly*/);
-    }
+    catalog::startUpStorageEngineAndCollectionCatalog(
+        _serviceContext,
+        clientGuard.get(),
+        StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile);
+    StorageControl::startStorageControls(_serviceContext, true /*forTestOnly*/);
 
     ShardingState::create(_serviceContext);
     CollectionShardingStateFactory::set(
@@ -167,7 +159,7 @@ OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
         databaseHolder->closeAll(opCtx.get());
     }
 
-    shutdownGlobalStorageEngineCleanly(_serviceContext);
+    catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_serviceContext);
 }
 
 ClientStrand* OpMsgFuzzerFixture::_getStrand(ClusterRole role) {

@@ -195,62 +195,47 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     }
 
     for (auto& timestampAndIdentInfo : toDrop) {
-        // Guards against catalog changes while dropping idents using KVEngine::dropIdent(). Yields
-        // after dropping each ident.
-        writeConflictRetry(opCtx, "dropIdentsOlderThan", NamespaceString::kEmpty, [&] {
-            // No need to hold the RSTL lock nor acquire a flow control ticket. This doesn't care
-            // about the replica state of the node and the operations aren't replicated.
-            Lock::GlobalLock globalLock(
-                opCtx,
-                MODE_IX,
-                Date_t::max(),
-                Lock::InterruptBehavior::kThrow,
-                Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true});
+        const auto& dropTimestamp = timestampAndIdentInfo.first;
+        auto& identInfo = timestampAndIdentInfo.second;
+        const auto& identName = identInfo->identName;
+        LOGV2_PROD_ONLY(22237,
+                        "Completing drop for ident",
+                        "ident"_attr = identName,
+                        "dropTimestamp"_attr = dropTimestamp);
+        // Ident drops are non-transactional and cannot be rolled back. So this does not
+        // need to be in a WriteUnitOfWork.
+        auto status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
+                                         identName,
+                                         ident::isCollectionIdent(identName),
+                                         identInfo->onDrop);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::ObjectIsBusy) {
+                LOGV2_PROD_ONLY(6936300,
+                                "Drop-pending ident is still in use",
+                                "ident"_attr = identName,
+                                "dropTimestamp"_attr = dropTimestamp,
+                                "error"_attr = status);
 
-            const auto& dropTimestamp = timestampAndIdentInfo.first;
-            auto& identInfo = timestampAndIdentInfo.second;
-            const auto& identName = identInfo->identName;
-            LOGV2_PROD_ONLY(22237,
-                            "Completing drop for ident",
-                            "ident"_attr = identName,
-                            "dropTimestamp"_attr = dropTimestamp);
-            WriteUnitOfWork wuow(opCtx);
-            auto status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
-                                             identName,
-                                             ident::isCollectionIdent(identName),
-                                             identInfo->onDrop);
-            if (!status.isOK()) {
-                if (status == ErrorCodes::ObjectIsBusy) {
-                    LOGV2_PROD_ONLY(6936300,
-                                    "Drop-pending ident is still in use",
-                                    "ident"_attr = identName,
-                                    "dropTimestamp"_attr = dropTimestamp,
-                                    "error"_attr = status);
-
-                    stdx::lock_guard<stdx::mutex> lock(_mutex);
-                    identInfo->identState = IdentInfo::State::kNotDropped;
-                    return;
-                }
-                LOGV2_FATAL_NOTRACE(51022,
-                                    "Failed to remove drop-pending ident",
-                                    "ident"_attr = identName,
-                                    "dropTimestamp"_attr = dropTimestamp,
-                                    "error"_attr = status);
-            }
-
-            {
-                // Ident drops are non-transactional and cannot be rolled back. So this does not
-                // need to be in an onCommit handler.
                 stdx::lock_guard<stdx::mutex> lock(_mutex);
-                identInfo->identState = IdentInfo::State::kDropped;
+                identInfo->identState = IdentInfo::State::kNotDropped;
+                continue;
             }
+            LOGV2_FATAL_NOTRACE(51022,
+                                "Failed to remove drop-pending ident",
+                                "ident"_attr = identName,
+                                "dropTimestamp"_attr = dropTimestamp,
+                                "error"_attr = status);
+        }
 
-            wuow.commit();
-            LOGV2(6776600,
-                  "The ident was successfully dropped",
-                  "ident"_attr = identName,
-                  "dropTimestamp"_attr = dropTimestamp);
-        });
+        {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            identInfo->identState = IdentInfo::State::kDropped;
+        }
+
+        LOGV2(6776600,
+              "The ident was successfully dropped",
+              "ident"_attr = identName,
+              "dropTimestamp"_attr = dropTimestamp);
     }
 
     {

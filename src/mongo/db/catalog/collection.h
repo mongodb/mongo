@@ -693,6 +693,12 @@ public:
     virtual long long dataSize(OperationContext* opCtx) const = 0;
 
     /**
+     * Return the size on disk in bytes
+     */
+    virtual int64_t sizeOnDisk(OperationContext* opCtx,
+                               const StorageEngine& storageEngine) const = 0;
+
+    /**
      * Returns true if the collection does not contain any records.
      */
     virtual bool isEmpty(OperationContext* opCtx) const = 0;

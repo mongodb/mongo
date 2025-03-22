@@ -514,8 +514,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 }
 
 bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* opCtx) {
-    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-    std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
+    std::vector<DatabaseName> dbNames = catalog::listDatabases();
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& dbName : dbNames) {
         Lock::DBLock dbLock(opCtx, dbName, MODE_S);
@@ -631,8 +630,7 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
 
     auto fcvDocument = findFeatureCompatibilityVersionDocument(opCtx);
 
-    auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto dbNames = storageEngine->listDatabases();
+    auto dbNames = catalog::listDatabases();
     bool nonLocalDatabases = std::any_of(
         dbNames.begin(), dbNames.end(), [](auto dbName) { return dbName != DatabaseName::kLocal; });
 

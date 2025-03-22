@@ -44,6 +44,16 @@
 namespace mongo::catalog_helper {
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 
+StorageEngine::TimestampMonitor::TimestampListener kCollectionCatalogCleanupTimestampListener(
+    StorageEngine::TimestampMonitor::TimestampType::kOldest,
+    [](OperationContext* opCtx, Timestamp timestamp) {
+        if (CollectionCatalog::latest(opCtx)->catalogIdTracker().dirty(timestamp)) {
+            CollectionCatalog::write(opCtx, [timestamp](CollectionCatalog& catalog) {
+                catalog.catalogIdTracker().cleanup(timestamp);
+            });
+        }
+    });
+
 namespace {
 /**
  * Defines sorting order for NamespaceStrings based on what their ResourceId would be for locking.

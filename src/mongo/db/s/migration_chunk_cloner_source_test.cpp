@@ -530,6 +530,10 @@ public:
         return _coll->dataSize(opCtx);
     }
 
+    int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const override {
+        return _coll->sizeOnDisk(opCtx, storageEngine);
+    }
+
     bool isEmpty(OperationContext* opCtx) const override {
         return _coll->isEmpty(opCtx);
     }

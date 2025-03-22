@@ -59,6 +59,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -757,8 +758,7 @@ namespace {
  * Used to set the hasData field on replset heartbeat command response.
  */
 bool replHasDatabases(OperationContext* opCtx) {
-    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-    std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
+    std::vector<DatabaseName> dbNames = catalog::listDatabases();
 
     if (dbNames.size() >= 2)
         return true;

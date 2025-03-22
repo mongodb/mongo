@@ -318,11 +318,11 @@ Status ensureCollectionProperties(OperationContext* opCtx,
  * Opens each database and provides a callback on each one.
  */
 template <typename Func>
-void openDatabases(OperationContext* opCtx, const StorageEngine* storageEngine, Func&& onDatabase) {
+void openDatabases(OperationContext* opCtx, Func&& onDatabase) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto dbNames = storageEngine->listDatabases();
+    auto dbNames = catalog::listDatabases();
     for (const auto& dbName : dbNames) {
         LOGV2_DEBUG(21010, 1, "    Opening database: {dbName}", "dbName"_attr = dbName);
         auto db = databaseHolder->openDb(opCtx, dbName);
@@ -697,7 +697,7 @@ void startupRepair(OperationContext* opCtx,
     // The local database should be repaired before any other replicated collections so we know
     // whether not to rebuild unfinished two-phase index builds if this is a replica set node
     // running in standalone mode.
-    auto dbNames = storageEngine->listDatabases();
+    auto dbNames = catalog::listDatabases();
     if (auto it = std::find(dbNames.begin(), dbNames.end(), DatabaseName::kLocal);
         it != dbNames.end()) {
         auto scopedTimer = createTimeElapsedBuilderScopedTimer(
@@ -719,7 +719,7 @@ void startupRepair(OperationContext* opCtx,
         }
     }
 
-    openDatabases(opCtx, storageEngine, [&](auto dbName) {
+    openDatabases(opCtx, [&](auto dbName) {
         // Ensures all collections meet requirements such as having _id indexes, and corrects them
         // if needed.
         uassertStatusOK(
@@ -838,7 +838,7 @@ void startupRecovery(OperationContext* opCtx,
     const bool shouldClearNonLocalTmpCollections =
         !(hasReplSetConfigDoc(opCtx) || usingReplication);
 
-    openDatabases(opCtx, storageEngine, [&](const DatabaseName& dbName) {
+    openDatabases(opCtx, [&](const DatabaseName& dbName) {
         // Ensures all collections meet requirements such as having _id indexes, and corrects them
         // if needed.
         uassertStatusOK(

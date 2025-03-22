@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <vector>
@@ -42,6 +43,7 @@
 #include "mongo/db/index_builds/index_builds.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -209,14 +211,6 @@ public:
     virtual RecoveryUnit* newRecoveryUnit() = 0;
 
     /**
-     * List the databases stored in this storage engine.
-     * This function doesn't return databases whose creation has committed durably but hasn't been
-     * published yet in the CollectionCatalog.
-     */
-    virtual std::vector<DatabaseName> listDatabases(
-        boost::optional<TenantId> tenantId = boost::none) const = 0;
-
-    /**
      * Returns whether the storage engine supports capped collections.
      */
     virtual bool supportsCappedCollections() const = 0;
@@ -242,23 +236,9 @@ public:
      * caller. For example, on starting from a previous unclean shutdown, we may try to recover
      * orphaned idents, which are known to the storage engine but not referenced in the catalog.
      */
-    virtual void loadCatalog(OperationContext* opCtx,
-                             boost::optional<Timestamp> stableTs,
-                             LastShutdownState lastShutdownState) = 0;
-    virtual void closeCatalog(OperationContext* opCtx) = 0;
-
-    /**
-     * Deletes all data and metadata for a database.
-     */
-    virtual Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) = 0;
-
-    /**
-     * Delete all collections with a name starting with collectionNamePrefix in a database.
-     * To drop all collections regardless of prefix, use an empty string.
-     */
-    virtual Status dropCollectionsWithPrefix(OperationContext* opCtx,
-                                             const DatabaseName& dbName,
-                                             const std::string& collectionNamePrefix) = 0;
+    virtual void loadDurableCatalog(OperationContext* opCtx,
+                                    LastShutdownState lastShutdownState) = 0;
+    virtual void closeDurableCatalog(OperationContext* opCtx) = 0;
 
     /**
      * Checkpoints the data to disk.
@@ -356,6 +336,142 @@ public:
     virtual StatusWith<std::unique_ptr<StreamingCursor>> beginNonBlockingBackup(
         const BackupOptions& options) = 0;
 
+    /**
+     * A TimestampMonitor is used to listen for any changes in the timestamps implemented by the
+     * storage engine and to notify any registered listeners upon changes to these timestamps.
+     *
+     * The monitor follows the same lifecycle as the storage engine, started when the storage
+     * engine starts and stopped when the storage engine stops.
+     *
+     * The PeriodicRunner must be started before the Storage Engine is started, and the Storage
+     * Engine must be shutdown after the PeriodicRunner is shutdown.
+     */
+    class TimestampMonitor {
+    public:
+        /**
+         * Timestamps that can be listened to for changes.
+         */
+        enum class TimestampType { kCheckpoint, kOldest, kStable, kMinOfCheckpointAndOldest };
+
+        /**
+         * A TimestampListener is used to listen for changes in a given timestamp and to execute the
+         * user-provided callback to the change with a custom user-provided callback.
+         *
+         * The TimestampListener must be registered in the TimestampMonitor in order to be notified
+         * of timestamp changes and react to changes for the duration it's part of the monitor.
+         *
+         * Listeners expected to run in standalone mode should handle Timestamp::min() notifications
+         * appropriately.
+         */
+        class TimestampListener {
+        public:
+            // Caller must ensure that the lifetime of the variables used in the callback are valid.
+            using Callback = std::function<void(OperationContext* opCtx, Timestamp timestamp)>;
+
+            /**
+             * A TimestampListener saves a 'callback' that will be executed whenever the specified
+             * 'type' timestamp changes. The 'callback' function will be passed the new 'type'
+             * timestamp.
+             */
+            TimestampListener(TimestampType type, Callback callback)
+                : _type(type), _callback(std::move(callback)) {}
+
+            /**
+             * Executes the appropriate function with the callback of the listener with the new
+             * timestamp.
+             */
+            void notify(OperationContext* opCtx, Timestamp newTimestamp) {
+                if (_type == TimestampType::kCheckpoint)
+                    _onCheckpointTimestampChanged(opCtx, newTimestamp);
+                else if (_type == TimestampType::kOldest)
+                    _onOldestTimestampChanged(opCtx, newTimestamp);
+                else if (_type == TimestampType::kStable)
+                    _onStableTimestampChanged(opCtx, newTimestamp);
+                else if (_type == TimestampType::kMinOfCheckpointAndOldest)
+                    _onMinOfCheckpointAndOldestTimestampChanged(opCtx, newTimestamp);
+            }
+
+            TimestampType getType() const {
+                return _type;
+            }
+
+        private:
+            void _onCheckpointTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
+                _callback(opCtx, newTimestamp);
+            }
+
+            void _onOldestTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
+                _callback(opCtx, newTimestamp);
+            }
+
+            void _onStableTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
+                _callback(opCtx, newTimestamp);
+            }
+
+            void _onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
+                                                             Timestamp newTimestamp) {
+                _callback(opCtx, newTimestamp);
+            }
+
+            // Timestamp type this listener monitors.
+            TimestampType _type;
+
+            // Function to execute when the timestamp changes.
+            Callback _callback;
+        };
+
+        /**
+         * Starts monitoring timestamp changes in the background with an initial listener.
+         */
+        TimestampMonitor(KVEngine* engine, PeriodicRunner* runner);
+
+        ~TimestampMonitor();
+
+        /**
+         * Adds a new listener to the monitor if it isn't already registered. A listener can only be
+         * bound to one type of timestamp at a time.
+         */
+        void addListener(TimestampListener* listener);
+
+        /**
+         * Remove a listener.
+         */
+        void removeListener(TimestampListener* listener);
+
+        /**
+         * Returns registered listeners.
+         */
+        std::vector<TimestampListener*> getListeners();
+
+        bool isRunning_forTestOnly() const {
+            return _running;
+        }
+
+    private:
+        /**
+         * Monitor changes in timestamps and to notify the listeners on change. Notifies all
+         * listeners on Timestamp::min() in order to support standalone mode that is untimestamped.
+         */
+        void _startup();
+
+        KVEngine* _engine;
+        bool _running = false;
+        bool _shuttingDown = false;
+
+        // Periodic runner that the timestamp monitor schedules its job on.
+        PeriodicRunner* _periodicRunner;
+
+        // Protects access to _listeners below.
+        stdx::mutex _monitorMutex;
+        std::vector<TimestampListener*> _listeners;
+
+        // This should remain as the last member variable so that its destructor gets executed first
+        // when the class instance is being deconstructed. This causes the PeriodicJobAnchor to stop
+        // the PeriodicJob, preventing us from accessing any destructed variables if this were to
+        // run during the destruction of this class instance.
+        PeriodicJobAnchor _job;
+    };
+
     virtual void endNonBlockingBackup() = 0;
 
     virtual StatusWith<std::deque<std::string>> extendBackupCursor() = 0;
@@ -364,8 +480,8 @@ public:
      * Recover as much data as possible from a potentially corrupt RecordStore.
      * This only recovers the record data, not indexes or anything else.
      *
-     * The Collection object for on this namespace will be destructed and invalidated. A new
-     * Collection object will be created and it should be retrieved from the CollectionCatalog.
+     * The Collection object for this namespace should be destructed and recreated after the call,
+     * because the old object has no associated RecordStore when started in repair mode.
      */
     virtual Status repairRecordStore(OperationContext* opCtx,
                                      RecordId catalogId,
@@ -477,12 +593,6 @@ public:
                                      DropIdentCallback&& onDrop = nullptr) = 0;
 
     /**
-     * Drops all unreferenced drop-pending idents with drop timestamps before 'ts', as well as all
-     * unreferenced idents with Timestamp::min() drop timestamps (untimestamped on standalones).
-     */
-    virtual void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) = 0;
-
-    /**
      * Marks the ident as in use and prevents the reaper from dropping the ident.
      *
      * Returns nullptr if the ident is not known to the reaper, is already being dropped, or is
@@ -494,7 +604,15 @@ public:
      * Starts the timestamp monitor. This periodically drops idents queued by addDropPendingIdent,
      * and removes historical ident entries no longer necessary.
      */
-    virtual void startTimestampMonitor() = 0;
+    virtual void startTimestampMonitor(
+        std::initializer_list<TimestampMonitor::TimestampListener*> listeners) = 0;
+
+    /**
+     * Used by recoverToStableTimestamp() to prevent the TimestampMonitor from accessing the catalog
+     * concurrently during rollback.
+     */
+    virtual void stopTimestampMonitor() = 0;
+    virtual void restartTimestampMonitor() = 0;
 
     /**
      * Called when the checkpoint thread instructs the storage engine to take a checkpoint. The
@@ -686,16 +804,16 @@ public:
      */
     virtual std::string getFilesystemPathForDb(const DatabaseName& dbName) const = 0;
 
-    virtual int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) = 0;
-
     virtual bool isUsingDirectoryPerDb() const = 0;
 
     virtual bool isUsingDirectoryForIndexes() const = 0;
 
+    virtual int64_t getIdentSize(RecoveryUnit&, StringData ident) const = 0;
+
     virtual KVEngine* getEngine() = 0;
     virtual const KVEngine* getEngine() const = 0;
-    virtual DurableCatalog* getCatalog() = 0;
-    virtual const DurableCatalog* getCatalog() const = 0;
+    virtual DurableCatalog* getDurableCatalog() = 0;
+    virtual const DurableCatalog* getDurableCatalog() const = 0;
 
     /**
      * A service that would like to pin the oldest timestamp registers its request here. If the

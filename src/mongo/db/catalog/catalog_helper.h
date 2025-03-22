@@ -62,6 +62,9 @@ void acquireCollectionLocksInResourceIdOrder(
 
 extern FailPoint setAutoGetCollectionWait;
 
+extern StorageEngine::TimestampMonitor::TimestampListener
+    kCollectionCatalogCleanupTimestampListener;
+
 /**
  * Executes the provided callback on the 'setAutoGetCollectionWait' FailPoint.
  */

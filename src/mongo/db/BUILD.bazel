@@ -3345,7 +3345,6 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage:storage_repair_observer",
-        "//src/mongo/db/storage:storage_util",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/index_builds:multi_index_block",
         # "//src/mongo/db/index_builds:rebuild_indexes",

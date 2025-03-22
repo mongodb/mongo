@@ -41,9 +41,6 @@ public:
     RecoveryUnit* newRecoveryUnit() final {
         return nullptr;
     }
-    std::vector<DatabaseName> listDatabases(boost::optional<TenantId> tenantId) const final {
-        return {};
-    }
     bool supportsCappedCollections() const final {
         return true;
     }
@@ -53,19 +50,8 @@ public:
     bool isEphemeral() const override {
         return true;
     }
-    void loadCatalog(OperationContext* opCtx,
-                     boost::optional<Timestamp> stableTs,
-                     LastShutdownState lastShutdownState) final {}
-    void closeCatalog(OperationContext* opCtx) final {}
-    Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final {
-        return Status::OK();
-    }
-    Status dropCollectionsWithPrefix(OperationContext* opCtx,
-                                     const DatabaseName& dbName,
-                                     const std::string& collectionNamePrefix) final {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine doesn't support dropCollections");
-    }
+    void loadDurableCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
+    void closeDurableCatalog(OperationContext* opCtx) final {}
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
     Status beginBackup() final {
         return Status(ErrorCodes::CommandNotSupported,
@@ -172,11 +158,13 @@ public:
         const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
         std::shared_ptr<Ident> ident,
         DropIdentCallback&& onDrop) final {}
-    void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) final {}
     std::shared_ptr<Ident> markIdentInUse(StringData ident) final {
         return nullptr;
     }
-    void startTimestampMonitor() final {}
+    void startTimestampMonitor(
+        std::initializer_list<TimestampMonitor::TimestampListener*> listeners) final {}
+    void stopTimestampMonitor() final {}
+    void restartTimestampMonitor() final {}
 
     void checkpoint() final {}
 
@@ -189,14 +177,14 @@ public:
         return false;
     }
 
-    int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) final {
-        return 0;
-    }
     bool isUsingDirectoryPerDb() const final {
         return false;
     }
     bool isUsingDirectoryForIndexes() const final {
         return false;
+    }
+    int64_t getIdentSize(RecoveryUnit& ru, StringData ident) const final {
+        return 0;
     }
     KVEngine* getEngine() final {
         return nullptr;
@@ -204,10 +192,10 @@ public:
     const KVEngine* getEngine() const final {
         return nullptr;
     }
-    DurableCatalog* getCatalog() final {
+    DurableCatalog* getDurableCatalog() final {
         return nullptr;
     }
-    const DurableCatalog* getCatalog() const final {
+    const DurableCatalog* getDurableCatalog() const final {
         return nullptr;
     }
 

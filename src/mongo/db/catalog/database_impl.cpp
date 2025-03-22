@@ -86,7 +86,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/transaction_resources.h"
@@ -741,8 +740,8 @@ Collection* DatabaseImpl::_createCollection(
 
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
-                uassertStatusOK(
-                    storageEngine->getCatalog()->createCollection(opCtx, nss, optionsWithUUID));
+                uassertStatusOK(storageEngine->getDurableCatalog()->createCollection(
+                    opCtx, nss, optionsWithUUID));
             auto& catalogId = catalogIdRecordStorePair.first;
 
             auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);

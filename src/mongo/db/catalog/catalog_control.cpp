@@ -85,7 +85,7 @@ public:
         // Open all databases and repopulate the CollectionCatalog.
         LOGV2(20276, "openCatalog: reopening all databases");
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        std::vector<DatabaseName> databasesToOpen = storageEngine->listDatabases();
+        std::vector<DatabaseName> databasesToOpen = catalog::listDatabases();
         for (auto&& dbName : databasesToOpen) {
             LOGV2_FOR_RECOVERY(
                 23992, 1, "openCatalog: dbholder reopening database", logAttrs(dbName));
@@ -107,7 +107,7 @@ public:
                     // After rolling back to a stable timestamp T, the minimum valid timestamp for
                     // each collection must be reset to (at least) its value at T. When the min
                     // valid timestamp is clamped to the stable timestamp we may end up with a
-                    // pessimistic minimum valid timestamp set where the last DDL operation occured
+                    // pessimistic minimum valid timestamp set where the last DDL operation occurred
                     // earlier. This is fine as this is just an optimization when to avoid reading
                     // the catalog from WT.
                     auto minValid = std::min(stableTimestamp, it->second);
@@ -155,8 +155,7 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgress();
 
     PreviousCatalogState previousCatalogState;
-    std::vector<DatabaseName> allDbs =
-        opCtx->getServiceContext()->getStorageEngine()->listDatabases();
+    std::vector<DatabaseName> allDbs = catalog::listDatabases();
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
@@ -202,9 +201,13 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     LOGV2(20271, "closeCatalog: closing all databases");
     databaseHolder->closeAll(opCtx);
 
+    CollectionCatalog::write(opCtx, [opCtx](CollectionCatalog& catalog) {
+        catalog.deregisterAllCollectionsAndViews(opCtx->getServiceContext());
+    });
+
     // Close the storage engine's catalog.
     LOGV2(20272, "closeCatalog: closing storage engine catalog");
-    opCtx->getServiceContext()->getStorageEngine()->closeCatalog(opCtx);
+    opCtx->getServiceContext()->getStorageEngine()->closeDurableCatalog(opCtx);
 
     // Reset the stats counter for extended range time-series collections. This is maintained
     // outside the catalog itself.
@@ -230,7 +233,8 @@ void openCatalog(OperationContext* opCtx,
 
     // Ignore orphaned idents because this function is used during rollback and not at
     // startup recovery, when we may try to recover orphaned idents.
-    storageEngine->loadCatalog(opCtx, stableTimestamp, StorageEngine::LastShutdownState::kClean);
+    storageEngine->loadDurableCatalog(opCtx, StorageEngine::LastShutdownState::kClean);
+    catalog::initializeCollectionCatalog(opCtx, storageEngine, stableTimestamp);
 
     LOGV2(20274, "openCatalog: reconciling catalog and idents");
     auto reconcileResult =
