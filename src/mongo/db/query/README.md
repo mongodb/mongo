@@ -2,79 +2,47 @@
 
 ## Overview
 
-The query system is responsible for interpreting the user's request, finding an optimal way to
-satisfy it, and to actually compute the results. It is primarily exposed through the `find` and
-`aggregate` commands, but also used in associated read commands like `count`, `distinct`, and
-`mapReduce`.
+The query system is responsible for interpreting the user's request, finding an optimal way to satisfy it, and computing the final results. It is primarily exposed through the `find` and `aggregate` commands, but also used in associated read commands such as `count`, `distinct`, and `mapReduce` and write commands such as `update`, `delete`, and `findAndModify`.
 
-> This new README is split off into many different PRs. Please refer to the [old README][old readme]
-> for any information that is yet missing.
+## [Query Optimization Architecture Guide](README_QO.md)
 
-## Architecture
+The [QO Architecture Guide](README_QO.md) provides an overview of the query system components maintained by the QO team, including parsing, heuristic rewrites, query planning, plan caching, and query testing infrastructure.
 
-- Command parsing & validation
-- Query Language parsing & validation
-- Optimizer
-- Execution engine
-- Sharding
-- [Views][views]
-
-## Features
+## Additional Query Features
 
 - Change Streams
-- Field-level encryption
+- Field-Level Encryption
 - Geo
-- [Query shape][query shape]
-- [Query stats][query stats]
-- Queryable encryption
-- Search
-- [Timeseries][timeseries]
-- [Vector search][vector search]
+- [Query shape](query_shape/README.md)
+- [Query stats](query_stats/README.md)
+- Queryable Encryption
+- [Search](search/README.md)
+- [Timeseries](timeseries/README.md)
 
 ## Glossary
 
-- <a id="glossary-Aggregation"></a>Aggregation: The subsystem that runs `aggregate` stages.
-- <a id="glossary-BSON"></a>[BSON][bson]: Bin­ary-en­coded serialization of JSON-like documents. A
-  data format developed by MongoDB for data representation in its core.
-- <a id="glossary-CanonicalQuery"></a>[Canonical query][canonicalquery]: A standardized form for
-  queries, in BSON. It works as a container for the parsed query and projection portions of the
-  original query message. The filter portion is parsed into a
-  [`MatchExpression`](#glossary-MatchExpression).
-- <a id="glossary-DocumentSource"></a>DocumentSource: Represents one stage in an
-  [`aggregation`](#glossary-Aggregation) [pipeline](#glossary-Pipeline); not necessarily
-  one-to-one with the stages in the user-defined pipeline.
-- <a id="glossary-ExpressionContext"></a>[ExpressionContext][expressioncontext]: An object that
-  stores state that may be useful to access throughout the lifespan of a query, but is probably
-  not relevant to any other operations. This includes the collation, a time zone database, various
-  random booleans and state, etc.
-- <a id="glossary-Find"></a>Find: The subsystem that runs [`find`](#glossary-Find) stages and
-  [pushed-down](#glossary-Pushdown) [`aggregate`](#glossary-Aggregation) stages.
-- <a id="glossary-IDL"></a>[IDL][idl]: Interface Definition Language. YAML-formatted files to
-  generate C++ code.
-- <a id="glossary-LiteParsedPipeline"></a>[LiteParsedPipeline][liteparsedpipeline]: A very simple
-  model of an [`aggregate`](#glossary-Aggregation) [pipeline](#glossary-Pipeline). It is
-  constructed through a semi-parse that proceeds just enough to tease apart the stages that are
-  involved. It has neither verified that the input is well-formed, nor parsed the expressions or
-  detailed arguments to the stages. It can be used for requests that we want to inspect before
-  proceeding and building a full model of the user's query or request.
-- <a id="glossary-MatchExpression"></a>MatchExpression: The parsed Abstract Syntax Tree (AST) from
-  the filter portion of the query.
-- <a id="glossary-MQL"></a>MQL: MongoDB Query Language.
-- <a id="glossary-Pipeline"></a>Pipeline: A list of [`DocumentSources`](#glossary-DocumentSource)
-  which handles a part of the optimization.
-- <a id="glossary-Pushdown"></a>Pushdown: Convert an [`aggregate`](#glossary-Aggregation)
-  stage in the [pipeline](#glossary-Pipeline) to a [`find`](#glossary-Find) stage.
-
-<!-- Links -->
-
-[old readme]: README_old.md
-[timeseries]: timeseries/README.md
-[query stats]: query_stats/README.md
-[query shape]: query_shape/README.md
-[vector search]: ../pipeline/search/README.md
-[bson]: https://bsonspec.org/
-[idl]: ../../idl/README.md
-[canonicalquery]: canonical_query.h
-[liteparsedpipeline]: ../pipeline/lite_parsed_pipeline.h
-[expressioncontext]: ../pipeline/expression_context.h
-[views]: README_views.md
+- **Aggregation**: The subsystem that runs aggregate stages.
+- **BSON**: Binary-encoded serialization of JSON-like documents.
+  - A data format developed by MongoDB for data representation in its core.
+- **`CanonicalQuery`**: A standardized form for queries, in BSON.
+  - It works as a container for the parsed query, projection, and sort portions of the original query message. The filter portion is parsed into a **`MatchExpression`**.
+- **`DocumentSource`**: Represents one stage in an **aggregation** **pipeline**
+  - Not necessarily one-to-one with the stages in the user-defined pipeline.
+- **`ExpressionContext`**: An object that stores state that may be useful to access throughout the lifespan of a query, but is probably not relevant to any other operations. This includes the collation, a time zone database, various random booleans and state, etc.
+- **Find**: The subsystem that runs **find** stages and **pushed-down** **aggregate** stages.
+- **IDL**: Interface Definition Language. YAML-formatted files to generate C++ code.
+- **`LiteParsedPipeline`**: A very simple model of an **aggregate** **pipeline**, constructed through a semi-parse that proceeds just enough to tease apart the stages that are involved.
+  - It has neither verified that the input is well-formed, nor parsed the expressions or detailed arguments to the stages. It can be used for requests that we want to inspect before proceeding and building a full model of the user's query or request.
+- **`MatchExpression`**: The parsed Abstract Syntax Tree (AST) from the filter portion of the query.
+- **MQL**: MongoDB Query Language.
+- **Plan Cache**: Stores previously generated query plans to allow for faster retrieval and execution of recurring queries by avoiding the need to generate and score possible query plans from scratch.
+- **`PlanExecutor`**: An abstract type that executes a **`QuerySolution`** plan by cranking its tree of stages into execution. **`PlanExecutor`** has three primary subclasses:
+  1. `PlanExecutorImpl`: Executes **find** stages
+  1. `PlanExecutorPipeline`: Executes **aggregation** stages.
+  1. `PlanExecutorSBE`: Executes SBE plans.
+- **Pipeline**: A list of **`DocumentSource`s** which handles a part of the optimization.
+- **Pushdown**: Convert an **aggregate** stage in the **pipeline** to a **find** stage.
+- **`QuerySolution`**: A tree structure of `QuerySolutionNode`s that represents one possible execution plan for a query.
+  - Various operation nodes inherit from `QuerySolutionNode`
+    - For example: `CollectionScanNode`, `FetchNode`, `IndexScanNode`, `OrNode`, etc.
+  - Generally speaking, one winning **`QuerySolution`** is the output of the QO system and input of the QE system.
