@@ -701,7 +701,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/override_methods/**/txn_passthrough_cmd_massage.js @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/property_test_helpers/OWNERS.yml
-/jstests/libs/property_test_helpers/**/* @10gen/query-optimization @svc-auto-approve-bot
+/jstests/libs/property_test_helpers/**/* @10gen/query @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/query/OWNERS.yml
 /jstests/libs/query/**/* @10gen/query @svc-auto-approve-bot

@@ -11,26 +11,12 @@ import {
     assignableFieldArb,
     dollarFieldArb,
     fieldArb,
-    scalarArb
+    leafParameterArb
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
-
-export const leafParametersPerFamily = 10;
-export class LeafParameter {
-    constructor(concreteValues) {
-        this.concreteValues = concreteValues;
-    }
-}
-
-const leafParameterArb =
-    fc.array(scalarArb, {minLength: 1, maxLength: leafParametersPerFamily}).map((constants) => {
-        // In the leaves of the query family, we generate an object with a list of constants to
-        // place.
-        return new LeafParameter(constants);
-    });
 
 // Inclusion/Exclusion projections. {$project: {_id: 1, a: 0}}
 export function getSingleFieldProjectArb(isInclusion, {simpleFieldsOnly = false} = {}) {
@@ -51,7 +37,7 @@ const computedProjectArb = fc.tuple(fieldArb, dollarFieldArb).map(function([dest
 });
 
 // Add field with a constant argument. {$addFields: {a: 5}}
-const addFieldsConstArb =
+export const addFieldsConstArb =
     fc.tuple(fieldArb, leafParameterArb).map(function([destField, leafParams]) {
         return {$addFields: {[destField]: leafParams}};
     });

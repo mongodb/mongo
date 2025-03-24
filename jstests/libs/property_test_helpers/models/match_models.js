@@ -1,7 +1,10 @@
 /*
  * Fast-check models for $match.
  */
-import {fieldArb, scalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    fieldArb,
+    leafParameterArb
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -15,11 +18,12 @@ const comparisonTypeArb = fc.constantFrom('$eq', '$ne', '$lt', '$lte', '$gt', '$
  *
  * This helps us clearly define what each arbitrary is modeling.
  */
-const simpleConditionArb = fc.record({op: comparisonTypeArb, arg: scalarArb}).map(({op, arg}) => {
-    return {[op]: arg};
-});
-const inConditionArb = fc.record({$in: fc.array(scalarArb, {maxLength: 3})});
-const ninConditionArb = fc.record({$nin: fc.array(scalarArb, {maxLength: 3})});
+const simpleConditionArb =
+    fc.record({op: comparisonTypeArb, arg: leafParameterArb}).map(({op, arg}) => {
+        return {[op]: arg};
+    });
+const inConditionArb = fc.record({$in: fc.array(leafParameterArb, {maxLength: 3})});
+const ninConditionArb = fc.record({$nin: fc.array(leafParameterArb, {maxLength: 3})});
 const existsConditionArb = fc.record({$exists: fc.boolean()});
 
 /*

@@ -47,3 +47,17 @@ export const scalarArb = oneof(intArb, fc.boolean(), stringArb, dateArb, fc.cons
 export const fieldArb = fc.constantFrom('a', 'b', 't', 'm', '_id', 'm.m1', 'm.m2', 'array');
 export const dollarFieldArb = fieldArb.map(f => "$" + f);
 export const assignableFieldArb = fc.constantFrom('a', 'b', 't', 'm');
+
+export const leafParametersPerFamily = 10;
+export class LeafParameter {
+    constructor(concreteValues) {
+        this.concreteValues = concreteValues;
+    }
+}
+
+export const leafParameterArb =
+    fc.array(scalarArb, {minLength: 1, maxLength: leafParametersPerFamily}).map((constants) => {
+        // In the leaves of the query family, we generate an object with a list of constants to
+        // place.
+        return new LeafParameter(constants);
+    });

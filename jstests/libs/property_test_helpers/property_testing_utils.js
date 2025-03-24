@@ -4,7 +4,7 @@
 import {
     LeafParameter,
     leafParametersPerFamily
-} from "jstests/libs/property_test_helpers/models/query_models.js";
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 /*

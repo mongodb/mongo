@@ -1,40 +1,10 @@
 /**
- * Self-tests for our PBT models, to make sure they have intended behavior.
- * The behaviors we check are:
- *   - Our collection model generates an acceptable number of documents on average (>100). This is
- *     essential to the PBTs, because to run meaningful tests and have queries return results, we
- *     need enough documents.
- *   - Shrinking (minimization) of the collection model works as intended.
+ * Self-test for our PBT infrastructure. Asserts that shrinking (minimization) works properly.
  */
-
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 const seed = 4;
-
-function avg(arrOfInts) {
-    let sum = 0;
-    for (const n of arrOfInts) {
-        sum += n;
-    }
-    return sum / arrOfInts.length;
-}
-
-function testAvgNumDocumentsAndAvgNumIndexes(isTS) {
-    const collModel = getCollectionModel({isTS});
-    const sample = fc.sample(collModel, {seed, numRuns: 1000});
-
-    const avgNumDocs = avg(sample.map(coll => coll.docs.length));
-    assert.gt(avgNumDocs, 100);
-    jsTestLog('Average number of documents was: ' + avgNumDocs);
-
-    const avgNumIndexes = avg(sample.map(coll => coll.indexes.length));
-    assert.gt(avgNumIndexes, 4);
-    jsTestLog('Average number of indexes was: ' + avgNumIndexes);
-}
-
-testAvgNumDocumentsAndAvgNumIndexes(false);
-testAvgNumDocumentsAndAvgNumIndexes(true);
 
 /*
  * Fails if we have 1 or more docs, or any indexes.

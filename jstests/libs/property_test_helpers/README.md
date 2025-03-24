@@ -63,6 +63,36 @@ The Core PBT schema is:
 
 For now, this is also a valid model for a document in a time-series collection (where `t` is the time field and `m` is the meta field), but the models may diverge.
 
+### Query Generation
+
+TODO SERVER-102567 expand readme
+
+#### Query Families
+
+Rather than generating single, standalone queries, our query model generates a "family" of queries.
+At its leaves, a query family contains multiple values that the leaf could take on. For example instead of generating a single query with a concrete value `1` at the leaf:
+
+```
+[{$match: {a: 1}}, {$project: {b: 0}}]
+```
+
+We generate `1,2,3` as potential values this slot can hold.
+
+```
+[{$match: {a: {concreteValues: [1,2,3]}}}, {$project: {b: 0}}]
+```
+
+Then we extract several queries that have the same shape.
+
+```
+[{$match: {a: 1}}, {$project: {b: 0}}]
+[{$match: {a: 2}}, {$project: {b: 0}}]
+[{$match: {a: 3}}, {$project: {b: 0}}]
+```
+
+This allows us to write properties that use the plan cache more often rather than relying on chance.
+Properties can use the `getQuery` interface to ask for queries with different shapes, or the same shape with different leaf values plugged in.
+
 ## List of Core PBTs
 
 [index_correctness_pbt.js](../../core/query/index_correctness_pbt.js)
