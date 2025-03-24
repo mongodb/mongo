@@ -93,23 +93,24 @@ const defaultClientDisable =
 
 function shouldStart(serverDisable) {
     const serverDisabledProtocols = serverDisable === null ? defaultServerDisable : serverDisable;
-    // TODO:
-    // SERVER-98253: ssl_manager_openssl.cpp does not check if all supported protocols are disabled
+
     if (determineSSLProvider() === 'openssl') {
-        return true;
+        if ((serverDisabledProtocols & (TLS_1_0 | TLS_1_1 | TLS_1_2 | TLS_1_3)) ===
+            (TLS_1_0 | TLS_1_1 | TLS_1_2 | TLS_1_3)) {
+            return false;
+        }
+    }
+    // All valid TLS modes are disabled for Apple or Windows
+    if (determineSSLProvider() === 'apple' || determineSSLProvider() === 'windows') {
+        if ((serverDisabledProtocols & (TLS_1_0 | TLS_1_1 | TLS_1_2)) ===
+            (TLS_1_0 | TLS_1_1 | TLS_1_2)) {
+            // apple & windows only check for 1.0, 1.1, 1.2 and ignores 1.3
+            // SERVER-98279: support tls 1.3 for windows & apple
+            return false;
+        }
     }
 
-    // there are 2 scenarios where mongod will fail to start
-    // 1: all valid TLS modes are disabled
-    if ((serverDisabledProtocols & (TLS_1_0 | TLS_1_1 | TLS_1_2)) ===
-        (TLS_1_0 | TLS_1_1 | TLS_1_2)) {
-        // 'All valid TLS modes disabled'
-        // apple & windows only check for 1.0, 1.1, 1.2 and ignores 1.3
-        // SERVER-98279: support tls 1.3 for windows & apple
-        return false;
-    }
-
-    // 2: (apple only) if the available protocols is not a continuous range
+    // (Apple only) If the available protocols is not a continuous range
     if (determineSSLProvider() === 'apple') {
         // ssl_manager_apple.cpp: 'Can not disable TLS 1.1 while leaving 1.0 and 1.2 enabled'
         if ((serverDisabledProtocols & (TLS_1_0 | TLS_1_1 | TLS_1_2)) === TLS_1_1) {

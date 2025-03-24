@@ -2490,18 +2490,25 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
     // SSL_OP_NO_SSLv3 - Disable SSL v3 support
     long options = SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
 
-    // Set the supported TLS protocols. Allow --sslDisabledProtocols to disable selected
-    // ciphers.
+    // Checks if all valid TLS modes are disabled.
+    bool tls10 = true, tls11 = true, tls12 = true, tls13 = true;
     for (const SSLParams::Protocols& protocol : *disabledProtocols) {
         if (protocol == SSLParams::Protocols::TLS1_0) {
             options |= SSL_OP_NO_TLSv1;
+            tls10 = false;
         } else if (protocol == SSLParams::Protocols::TLS1_1) {
             options |= SSL_OP_NO_TLSv1_1;
+            tls11 = false;
         } else if (protocol == SSLParams::Protocols::TLS1_2) {
             options |= SSL_OP_NO_TLSv1_2;
+            tls12 = false;
         } else if (protocol == SSLParams::Protocols::TLS1_3) {
             options |= SSL_OP_NO_TLSv1_3;
+            tls13 = false;
         }
+    }
+    if (!tls10 && !tls11 && !tls12 && !tls13) {
+        return {ErrorCodes::InvalidSSLConfiguration, "All valid TLS modes disabled"};
     }
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000
