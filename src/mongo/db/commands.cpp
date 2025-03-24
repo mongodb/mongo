@@ -141,8 +141,7 @@ void checkAuthForRawData(OperationContext* opCtx,
     uassert(
         ErrorCodes::Unauthorized,
         "Not authorized to run command with rawData",
-        authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::performRawDataOperations) ||
-            authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::internal));
+        authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::performRawDataOperations));
 }
 
 auto getCommandInvocationHooks =
