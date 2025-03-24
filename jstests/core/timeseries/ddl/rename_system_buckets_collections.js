@@ -6,16 +6,12 @@
  *  requires_timeseries,
  *  # the rename command is not idempotent
  *  requires_non_retryable_commands,
- *  # Assumes FCV remain stable during the entire duration of the test
- *  # TODO SERVER-89999: remove once we stop using FeatureFlagUtil.isEnabled
- *  cannot_run_during_upgrade_downgrade,
  *  # rename only works across databases with same primary shard
  *  # TODO SERVER-90096: change this tag with a more specific one
  *  assumes_balancer_off,
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbName = db.getName();
@@ -25,10 +21,6 @@ const bucketsCollName = `system.buckets.${collName}`;
 const timeseriesOpts = {
     timeseries: {timeField: "time"}
 };
-
-// TODO SERVER-89999: remove once the feature flag version becomes last LTS
-const simpleBucketCollectionsDisallowed =
-    FeatureFlagUtil.isEnabled(db, "DisallowBucketCollectionWithoutTimeseriesOptions");
 
 function setupEnv() {
     db.dropDatabase();
@@ -69,11 +61,7 @@ function runTests(targetDbName) {
             renameCollection: `${dbName}.${collName}`,
             to: `${targetDbName}.system.buckets.newColl`
         });
-        if (simpleBucketCollectionsDisallowed) {
-            assert.commandFailedWithCode(res, [ErrorCodes.IllegalOperation]);
-        } else {
-            assert.commandWorked(res);
-        }
+        assert.commandFailedWithCode(res, [ErrorCodes.IllegalOperation]);
     }
     {
         jsTest.log(
@@ -96,30 +84,6 @@ function runTests(targetDbName) {
             db.adminCommand(
                 {renameCollection: `${dbName}.${bucketsCollName}`, to: `${targetDbName}.newColl`}),
             ErrorCodes.IllegalOperation);
-    }
-
-    if (simpleBucketCollectionsDisallowed) {
-        jsTest.log(
-            "Skipping test cases that needs creating bucket collection without timeseries options because it is not supported in current FCV version");
-    } else {
-        {
-            jsTest.log(
-                "Renaming a bucket collection without timeseries options to a normal collection works");
-            setupEnv();
-            assert.commandWorked(db.createCollection(bucketsCollName));
-            assert.commandWorked(db.adminCommand(
-                {renameCollection: `${dbName}.${bucketsCollName}`, to: `${targetDbName}.newColl`}));
-        }
-        {
-            jsTest.log(
-                "Renaming a bucket collection without timeseries options to a bucket collection works");
-            setupEnv();
-            assert.commandWorked(db.createCollection(bucketsCollName));
-            assert.commandWorked(db.adminCommand({
-                renameCollection: `${dbName}.${bucketsCollName}`,
-                to: `${targetDbName}.system.buckets.newColl`
-            }));
-        }
     }
 }
 

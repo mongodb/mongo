@@ -951,22 +951,18 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
                         ActionType::setUserWriteBlockMode));
     }
 
-    if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot rename non timeseries buckets collection '"
-                              << source.toStringForErrorMsg()
-                              << "' to a timeseries buckets namespace '"
-                              << target.toStringForErrorMsg() << "'.",
-                source.isTimeseriesBucketsCollection() || !target.isTimeseriesBucketsCollection());
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Cannot rename non timeseries buckets collection '"
+                          << source.toStringForErrorMsg() << "' to a timeseries buckets namespace '"
+                          << target.toStringForErrorMsg() << "'.",
+            source.isTimeseriesBucketsCollection() || !target.isTimeseriesBucketsCollection());
 
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot rename timeseries buckets collection '"
-                              << source.toStringForErrorMsg()
-                              << "' to a non timeseries buckets namespace '"
-                              << target.toStringForErrorMsg() << "'.",
-                !source.isTimeseriesBucketsCollection() || target.isTimeseriesBucketsCollection());
-    }
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Cannot rename timeseries buckets collection '"
+                          << source.toStringForErrorMsg()
+                          << "' to a non timeseries buckets namespace '"
+                          << target.toStringForErrorMsg() << "'.",
+            !source.isTimeseriesBucketsCollection() || target.isTimeseriesBucketsCollection());
 }
 
 void validateAndRunRenameCollection(OperationContext* opCtx,

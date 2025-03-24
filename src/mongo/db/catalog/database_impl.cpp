@@ -857,10 +857,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
         return swCollator.getStatus();
     }
 
-    if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
-            .isEnabledUseLastLTSFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries &&
+    if (nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries &&
         !MONGO_unlikely(skipCreateTimeseriesBucketsWithoutOptionsCheck.shouldFail())) {
         return Status(ErrorCodes::IllegalOperation,
                       "Creation of a timeseries bucket collection without timeseries "

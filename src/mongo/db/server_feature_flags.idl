@@ -104,14 +104,6 @@ feature_flags:
         cpp_varname: gFeatureFlagCompactOptions
         default: true
         shouldBeFCVGated: false
-    # TODO SERVER-89999 remove once the version becomes last LTS
-    featureFlagDisallowBucketCollectionWithoutTimeseriesOptions:
-        description: "Disallow creation of timeseries bucket collection without timeseries options"
-        cpp_varname: gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
-        default: true
-        shouldBeFCVGated: true
-        version: 8.0
-        fcv_context_unaware: true
     # TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
     featureFlagRemoveLegacyTimeseriesBucketingParametersHaveChanged:
         description: "Remove the legacy 'md.timeseriesBucketingParametersHaveChanged' flag from the collection metadata"
