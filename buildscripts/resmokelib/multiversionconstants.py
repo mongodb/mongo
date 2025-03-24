@@ -19,6 +19,7 @@ from buildscripts.resmokelib.multiversion.multiversion_service import (
     MultiversionService,
 )
 from buildscripts.resmokelib.multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
+from buildscripts.util.expansions import get_expansion
 
 LAST_LTS = "last_lts"
 LAST_CONTINUOUS = "last_continuous"
@@ -78,7 +79,12 @@ def get_releases_file_locally_or_fallback_to_remote():
 
 def generate_releases_file():
     """Generate the releases constants file."""
-    if _config.EVERGREEN_TASK_ID:
+
+    # If we are not in master, we want to grab the releases file from master as a source of truth.
+    # If we are on master in CI, we can grab it locally to accommodate any changes made for testing.
+    # On older versions we use the master releases.yml file to ensure we do not run multiversion
+    # testing against eol versions.
+    if _config.EVERGREEN_TASK_ID and get_expansion("branch_name") != "master":
         get_releases_file_from_remote()
     else:
         get_releases_file_locally_or_fallback_to_remote()
