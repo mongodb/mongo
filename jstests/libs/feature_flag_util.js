@@ -11,6 +11,34 @@ export var FeatureFlagUtil = (function() {
         kNotFound: 'kNotFound',
     };
 
+    function _getStatusLegacy(conn, ignoreFCV, flagDoc) {
+        const fcvDoc = assert.commandWorked(
+            conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+        assert(fcvDoc.hasOwnProperty("featureCompatibilityVersion"), fcvDoc);
+
+        const flagIsEnabled = flagDoc.value;
+        const flagVersionIsValid =
+            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
+                                           flagDoc.version) >= 0;
+
+        const flagShouldBeFCVGated = flagDoc.shouldBeFCVGated;
+
+        if (flagIsEnabled && (!flagShouldBeFCVGated || ignoreFCV || flagVersionIsValid)) {
+            return FlagStatus.kEnabled;
+        }
+        return FlagStatus.kDisabled;
+    }
+
+    function _getStatus(ignoreFCV, flagDoc) {
+        assert(flagDoc.hasOwnProperty("currentlyEnabled"));
+
+        if (flagDoc.shouldBeFCVGated && ignoreFCV) {
+            return flagDoc.value ? FlagStatus.kEnabled : FlagStatus.kDisabled;
+        } else {
+            return flagDoc.currentlyEnabled ? FlagStatus.kEnabled : FlagStatus.kDisabled;
+        }
+    }
+
     /**
      * @param 'featureFlag' - the name of the flag you want to check, but *without* the
      *     'featureFlag' prefix. For example, just "Toaster" instead of "featureFlagToaster."
@@ -64,34 +92,27 @@ export var FeatureFlagUtil = (function() {
             conn.auth(user.username, user.password);
         }
 
-        const fcvDoc = assert.commandWorked(
-            conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
-        assert(fcvDoc.hasOwnProperty("featureCompatibilityVersion"), fcvDoc);
-
         assert(!featureFlag.startsWith("featureFlag"),
                `unexpected prefix in feature flag name: "${featureFlag}". Use "${
                    featureFlag.replace(/^featureFlag/, '')}" instead.`);
         const fullFlagName = `featureFlag${featureFlag}`;
-        const flagDoc = conn.adminCommand({getParameter: 1, [fullFlagName]: 1});
-        if (!flagDoc.ok || !flagDoc.hasOwnProperty(fullFlagName)) {
+        const parameterDoc = conn.adminCommand({getParameter: 1, [fullFlagName]: 1});
+        if (!parameterDoc.ok || !parameterDoc.hasOwnProperty(fullFlagName)) {
             // Feature flag not found.
-            if (!flagDoc.ok) {
-                assert.eq(flagDoc.errmsg, "no option found to get");
+            if (!parameterDoc.ok) {
+                assert.eq(parameterDoc.errmsg, "no option found to get");
             }
             return FlagStatus.kNotFound;
         }
 
-        const flagIsEnabled = flagDoc[fullFlagName].value;
-        const flagVersionIsValid =
-            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                           flagDoc[fullFlagName].version) >= 0;
-
-        const flagShouldBeFCVGated = flagDoc[fullFlagName].shouldBeFCVGated;
-
-        if (flagIsEnabled && (!flagShouldBeFCVGated || ignoreFCV || flagVersionIsValid)) {
-            return FlagStatus.kEnabled;
+        const flagDoc = parameterDoc[fullFlagName];
+        // TODO (SERVER-102609): keep only top branch and remove _getStatusLegacy() once 9.0 becomes
+        // last LTS.
+        if (flagDoc.hasOwnProperty("currentlyEnabled")) {
+            return _getStatus(ignoreFCV, flagDoc);
+        } else {
+            return _getStatusLegacy(conn, ignoreFCV, flagDoc);
         }
-        return FlagStatus.kDisabled;
     }
 
     /**

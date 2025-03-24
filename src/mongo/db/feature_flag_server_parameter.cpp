@@ -77,6 +77,19 @@ void FeatureFlagServerParameter::append(OperationContext* opCtx,
         }
 
         sub.append("shouldBeFCVGated", std::holds_alternative<FCVGatedFeatureFlag*>(_storage));
+
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (fcvSnapshot.isVersionInitialized()) {
+            const bool currentlyEnabled =
+                visit(OverloadedVisitor{
+                          [](BinaryCompatibleFeatureFlag* impl) { return impl->isEnabled(); },
+                          [&](FCVGatedFeatureFlag* impl) {
+                              // TODO (SERVER-102076): Use VersionContext from opCtx.
+                              return impl->isEnabled(kVersionContextIgnored, fcvSnapshot);
+                          }},
+                      _storage);
+            sub.append("currentlyEnabled", currentlyEnabled);
+        }
     }
 }
 

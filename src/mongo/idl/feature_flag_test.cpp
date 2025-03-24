@@ -123,12 +123,13 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 
         _featureFlagBlender->append(nullptr, &builder, "blender", boost::none);
 
-        ASSERT_BSONOBJ_EQ(builder.obj(),
-                          // (Generic FCV reference): feature flag test.
-                          BSON("blender" << BSON("value" << true << "version"
-                                                         << multiversion::toString(
-                                                                multiversion::GenericFCV::kLatest)
-                                                         << "shouldBeFCVGated" << true)));
+        ASSERT_BSONOBJ_EQ(
+            builder.obj(),
+            // (Generic FCV reference): feature flag test.
+            BSON("blender" << BSON("value"
+                                   << true << "version"
+                                   << multiversion::toString(multiversion::GenericFCV::kLatest)
+                                   << "shouldBeFCVGated" << true << "currentlyEnabled" << true)));
     }
 
     {
@@ -140,7 +141,8 @@ TEST_F(FeatureFlagTest, ServerStatus) {
         _featureFlagBlender->append(nullptr, &builder, "blender", boost::none);
 
         ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON("blender" << BSON("value" << false << "shouldBeFCVGated" << true)));
+                          BSON("blender" << BSON("value" << false << "shouldBeFCVGated" << true
+                                                         << "currentlyEnabled" << false)));
     }
 
     {
@@ -156,7 +158,8 @@ TEST_F(FeatureFlagTest, ServerStatus) {
             builder.obj(),
             BSON("fork" << BSON("value" << true << "version"
                                         << multiversion::toString(multiversion::GenericFCV::kLatest)
-                                        << "shouldBeFCVGated" << false)));
+                                        << "shouldBeFCVGated" << false << "currentlyEnabled"
+                                        << true)));
     }
 
     {
@@ -168,7 +171,8 @@ TEST_F(FeatureFlagTest, ServerStatus) {
         _featureFlagFork->append(nullptr, &builder, "fork", boost::none);
 
         ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON("fork" << BSON("value" << false << "shouldBeFCVGated" << false)));
+                          BSON("fork" << BSON("value" << false << "shouldBeFCVGated" << false
+                                                      << "currentlyEnabled" << false)));
     }
 }
 
