@@ -195,7 +195,7 @@ public:
     struct WiredTigerConfig {
         // The amount of memory alloted for the WiredTiger cache. This specifies the value for the
         // cache_size configuration parameter.
-        int32_t cacheSizeMB;
+        int32_t cacheSizeMB{0};
         // The maximum number of sessions. This specifies the value for the session_max
         // configuration parameter.
         int32_t sessionMax{33000};

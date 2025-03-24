@@ -97,7 +97,7 @@ public:
     // Encapsulates configuration parameters to configure a WiredTiger table.
     struct WiredTigerTableConfig {
         // This specifies the value for the key_format configuration parameter.
-        KeyFormat keyFormat;
+        KeyFormat keyFormat{KeyFormat::Long};
         // This specifies the value for the log.enabled configuration parameter.
         bool logEnabled{true};
         // This specifies the value for the block_compressor configuration parameter.
