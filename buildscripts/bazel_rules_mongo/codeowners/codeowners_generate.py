@@ -5,13 +5,21 @@ import os
 import pathlib
 import subprocess
 import sys
-from functools import lru_cache
+from functools import cache, lru_cache
 
 import yaml
+from codeowners.validate_codeowners import run_validator
 
-from buildscripts.validate_codeowners import run_validator
+OWNERS_FILE_NAME = "OWNERS"
+OWNERS_FILE_EXTENSIONS = (".yml", ".yaml")
 
-OWNERS_FILE_NAME = "OWNERS.yml"
+
+@cache
+def should_add_auto_approver() -> bool:
+    env_opt = os.environ.get("ADD_AUTO_APPROVE_USER")
+    if env_opt and env_opt.lower() == "true":
+        return True
+    return False
 
 
 def add_pattern(output_lines: list[str], pattern: str, owners: set[str]) -> None:
@@ -75,9 +83,18 @@ def process_alias_import(path: str) -> dict[str, list[str]]:
 
 
 def process_owners_file(output_lines: list[str], directory: str) -> None:
-    owners_file_path = os.path.join(directory, OWNERS_FILE_NAME)
-    if not os.path.exists(owners_file_path):
+    owners_file_paths = []
+    for file_extension in OWNERS_FILE_EXTENSIONS:
+        file_name = f"{OWNERS_FILE_NAME}{file_extension}"
+        owners_file_path = os.path.join(directory, file_name)
+        if os.path.exists(owners_file_path):
+            owners_file_paths.append(owners_file_path)
+
+    if not owners_file_paths:
         return
+
+    assert len(owners_file_paths) <= 1, f"More than 1 OWNERS file found in {directory}"
+    owners_file_path = owners_file_paths[0]
     print(f"parsing: {owners_file_path}")
     output_lines.append(f"# The following patterns are parsed from {owners_file_path}")
 
@@ -138,7 +155,8 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
                         else:
                             process_owner(approver)
                     # Add the auto revert bot
-                    process_owner("svc-auto-approve-bot")
+                    if should_add_auto_approver():
+                        process_owner("svc-auto-approve-bot")
 
                 add_owner_line(output_lines, directory, pattern, owners)
     output_lines.append("")
@@ -167,12 +185,10 @@ def print_diff_and_instructions(old_codeowners_contents, new_codeowners_contents
     )
     sys.stdout.writelines(diff)
 
-    print("If you are seeing this message in CI you likely need to run `bazel run //:codeowners`")
-    print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
-    print("python buildscripts/install_bazel.py")
+    print("If you are seeing this message in CI you likely need to run `bazel run codeowners`")
 
 
-def validate_generated_codeowners() -> int:
+def validate_generated_codeowners(validator_path: str) -> int:
     """Validate the generated CODEOWNERS file.
 
     Returns:
@@ -180,7 +196,7 @@ def validate_generated_codeowners() -> int:
     """
     print("\nValidating generated CODEOWNERS file...")
     try:
-        validation_result = run_validator("./")
+        validation_result = run_validator(validator_path)
         if validation_result != 0:
             print("CODEOWNERS validation failed!", file=sys.stderr)
             return validation_result
@@ -200,6 +216,11 @@ def main():
         )
         default_dir = process.stdout.strip()
 
+    codeowners_validator_path = os.environ.get("CODEOWNERS_VALIDATOR_PATH")
+    if not codeowners_validator_path:
+        raise RuntimeError("no CODEOWNERS_VALIDATOR_PATH env var found")
+
+    codeowners_validator_path = os.path.abspath(codeowners_validator_path)
     parser = argparse.ArgumentParser(
         prog="GenerateCodeowners",
         description="This generates a CODEOWNERS file based off of our OWNERS.yml files. "
@@ -229,9 +250,7 @@ def main():
     output_lines = [
         "# This is a generated file do not make changes to this file.",
         "# This is generated from various OWNERS.yml files across the repo.",
-        "# To regenerate this file run `bazel run //:codeowners`",
-        "# If bazel is not installed, run the following:",
-        "#  python buildscripts/install_bazel.py",
+        "# To regenerate this file run `bazel run codeowners`",
         "# The documentation for the OWNERS.yml files can be found here:",
         "# https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md",
         "",
@@ -266,14 +285,14 @@ def main():
             return 1
 
         print("CODEOWNERS file is up to date")
-        return validate_generated_codeowners()
+        return validate_generated_codeowners(codeowners_validator_path)
 
     with open(output_file, "w") as file:
         file.write(new_contents)
         print(f"Successfully wrote to the CODEOWNERS file at: {os.path.abspath(output_file)}")
 
     # Add validation after generating CODEOWNERS file
-    return validate_generated_codeowners()
+    return validate_generated_codeowners(codeowners_validator_path)
 
 
 if __name__ == "__main__":

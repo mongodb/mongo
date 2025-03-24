@@ -1,8 +1,6 @@
 # This is a generated file do not make changes to this file.
 # This is generated from various OWNERS.yml files across the repo.
-# To regenerate this file run `bazel run //:codeowners`
-# If bazel is not installed, run the following:
-#  python buildscripts/install_bazel.py
+# To regenerate this file run `bazel run codeowners`
 # The documentation for the OWNERS.yml files can be found here:
 # https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md
 

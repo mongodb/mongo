@@ -1,0 +1,31 @@
+# Poetry rules for managing Python dependencies
+http_archive(
+    name = "rules_poetry",
+    sha256 = "48001b928488e78f03a47bcc712c56432a471fc6cdd90fe57c884efbfcd13696",
+    strip_prefix = "rules_poetry-917630033c736c188605cf0f558c34afc1eca540",
+    urls = [
+        # Implements retry by relisting each url multiple times to be used as a failover.
+        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+    ],
+)
+
+load("@rules_poetry//rules_poetry:defs.bzl", "poetry_deps")
+
+poetry_deps()
+
+load("@rules_poetry//rules_poetry:poetry.bzl", "poetry")
+
+poetry(
+    name = "poetry",
+    lockfile = "//:poetry.lock",
+    pyproject = "//:pyproject.toml",
+)
+
+load("//codeowners:codeowners_validator.bzl", "codeowners_validator")
+
+codeowners_validator()

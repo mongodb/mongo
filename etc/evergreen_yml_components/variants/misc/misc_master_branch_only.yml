@@ -22,6 +22,7 @@ buildvariants:
       - name: powercycle_sentinel
       - name: powercycle_smoke_skip_compile_gen
       - name: monitor_mongo_fork_10gen
+      - name: package_bazel_rules_mongo
       - name: monitor_build_status
         distros:
           - ubuntu2404-large

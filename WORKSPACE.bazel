@@ -182,3 +182,19 @@ filegroup(
 """,
     path = "mongot-localdev",
 )
+
+local_repository(
+    name = "bazel_rules_mongo",
+    path = "buildscripts/bazel_rules_mongo",
+    repo_mapping = {"@poetry": "@poetry_bazel_rules_mongo"},
+)
+
+load("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator")
+
+codeowners_validator()
+
+poetry(
+    name = "poetry_bazel_rules_mongo",
+    lockfile = "@bazel_rules_mongo//:poetry.lock",
+    pyproject = "@bazel_rules_mongo//:pyproject.toml",
+)

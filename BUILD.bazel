@@ -19,7 +19,6 @@ exports_files([
     "pyproject.toml",
     "poetry.lock",
     "symbols.orderfile",
-    "codeowners-validator",
 ])
 
 npm_link_all_packages(name = "node_modules")
@@ -81,7 +80,7 @@ alias(
 
 alias(
     name = "codeowners",
-    actual = "//buildscripts:codeowners",
+    actual = "@bazel_rules_mongo//codeowners:codeowners_add_auto_approver",
 )
 
 setup_mongo_toolchain_aliases()

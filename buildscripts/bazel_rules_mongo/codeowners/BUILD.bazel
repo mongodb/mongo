@@ -1,0 +1,44 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_binary(
+    name = "codeowners",
+    srcs = [
+        "codeowners_generate.py",
+        "validate_codeowners.py",
+    ],
+    data = [
+        "@codeowners_validator//:codeowners-validator",
+    ],
+    env = {
+        "CODEOWNERS_VALIDATOR_PATH": "$(execpath @codeowners_validator//:codeowners-validator)",
+    },
+    main = "codeowners_generate.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+        ),
+    ],
+)
+
+py_binary(
+    name = "codeowners_add_auto_approver",
+    srcs = [
+        "codeowners_generate.py",
+        "validate_codeowners.py",
+    ],
+    data = [
+        "@codeowners_validator//:codeowners-validator",
+    ],
+    env = {
+        "CODEOWNERS_VALIDATOR_PATH": "$(execpath @codeowners_validator//:codeowners-validator)",
+        "ADD_AUTO_APPROVE_USER": "true",
+    },
+    main = "codeowners_generate.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+        ),
+    ],
+)

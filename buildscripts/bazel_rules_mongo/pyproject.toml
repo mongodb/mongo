@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "bazel_rules_mongo"
+version = "0.1.2"
+description = "Bazel rule we use to ship common code between bazel repos"
+authors = ["Trevor Guidry <trevor.guidry@mongodb.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pyyaml = "^6.0.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

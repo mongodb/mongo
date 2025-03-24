@@ -1694,3 +1694,72 @@ tasks:
       - func: "get and apply version expansions"
       - func: "gen supplementary data"
       - func: "upload supplementary data"
+
+  - name: package_bazel_rules_mongo
+    tags: ["assigned_to_jira_team_devprod_build", "experimental"]
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/bazel_rules_mongo/scripts/package_mongo_rules.py"
+      - command: expansions.update
+        params:
+          file: src/bazel_rules_mongo_expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          bucket: mciuploads
+          content_type: application/gzip
+          display_name: "bazel_rules_mongo"
+          local_file: src/${bazel_rules_mongo_file_name}
+          permissions: public-read
+          remote_file: ${project}/${build_variant}/${version_id}/bazel_rules_mongo-${task_id}-${execution}/bazel_rules_mongo.tar.gz
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          bucket: mciuploads
+          content_type: text/plain
+          display_name: "bazel_rules_mongo.sha256"
+          local_file: src/${bazel_rules_mongo_file_name_sha256}
+          permissions: public-read
+          remote_file: ${project}/${build_variant}/${version_id}/bazel_rules_mongo-${task_id}-${execution}/bazel_rules_mongo.tar.gz.sha256
+      # these release assets will not exists in patch builds
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          bucket: mdb-build-public
+          content_type: application/gzip
+          display_name: "bazel_rules_mongo release"
+          local_file: src/${bazel_rules_mongo_release_file_name}
+          permissions: public-read
+          remote_file: bazel_rules_mongo/${bazel_rules_mongo_version}/bazel_rules_mongo.tar.gz
+          skip_existing: true
+          optional: true
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          bucket: mdb-build-public
+          content_type: text/plain
+          display_name: "bazel_rules_mongo.sha256 release"
+          local_file: src/${bazel_rules_mongo_release_sha256_file_name}
+          permissions: public-read
+          remote_file: bazel_rules_mongo/${bazel_rules_mongo_version}/bazel_rules_mongo.tar.gz.sha256
+          skip_existing: true
+          optional: true
