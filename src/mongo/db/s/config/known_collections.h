@@ -83,5 +83,6 @@ const StringDataSet kConfigCollections{
     NamespaceString::kTransactionCoordinatorsNamespace.coll(),
     NamespaceString::kUserWritesCriticalSectionsNamespace.coll(),
     NamespaceString::kVectorClockNamespace.coll(),
+    NamespaceString::kConfigShardDatabasesNamespace.coll(),
 };
 }  // namespace mongo

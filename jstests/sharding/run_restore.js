@@ -7,7 +7,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Because we restart nodes in standalone mode, it's possible for fast count, which doesn't
@@ -21,14 +20,6 @@ TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 const s =
     new ShardingTest({name: "runRestore", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
-
-// TODO (SERVER-100083): Re-enable this test to run with
-// `featureFlagShardAuthoritativeDbMetadataDDL`.
-if (FeatureFlagUtil.isPresentAndEnabled(s.s, "ShardAuthoritativeDbMetadataDDL")) {
-    jsTestLog("Skipping test since featureFlagShardAuthoritativeDbMetadataDDL is enabled");
-    s.stop();
-    quit();
-}
 
 let mongos = s.s0;
 let db = s.getDB("test");
