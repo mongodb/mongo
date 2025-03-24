@@ -6,6 +6,9 @@
  * @tags: [
  *   requires_timeseries,
  *   requires_fcv_72,
+ *   # Refusing to run a test that issues an aggregation command with explain because it may
+ *   # return incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
  * ]
  */
 
