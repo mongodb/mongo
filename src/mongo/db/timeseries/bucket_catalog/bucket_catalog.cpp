@@ -1157,6 +1157,8 @@ StatusWith<Bucket*> potentiallyReopenBucket(
         if (!swReopenedBucket.getValue()) {
             return nullptr;
         }
+
+        hangTimeseriesInsertBeforeReopeningBucket.pauseWhileSet();
         reopenedBucket = std::move(swReopenedBucket.getValue());
         // Reacquire the stripe lock to load the bucket back into the catalog.
     }
