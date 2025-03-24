@@ -44,6 +44,7 @@ namespace mongo {
 class CollatorInterface;
 class Collection;
 class CollectionPtr;
+class CollectionCatalog;
 class CollectionCatalogEntry;
 class Ident;
 class IndexAccessMethod;

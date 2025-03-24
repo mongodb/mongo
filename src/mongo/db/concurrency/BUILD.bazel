@@ -46,7 +46,6 @@ mongo_cc_library(
         "lock_request_list.h",
         "lock_stats.cpp",
         "locker.cpp",
-        "replication_state_transition_lock_guard.cpp",
         "resource_catalog.cpp",
     ],
     hdrs = [
@@ -57,7 +56,6 @@ mongo_cc_library(
         "lock_manager_defs.h",
         "lock_stats.h",
         "locker.h",
-        "replication_state_transition_lock_guard.h",
         "resource_catalog.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,

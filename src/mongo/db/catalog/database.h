@@ -30,10 +30,8 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/database_name.h"
@@ -42,7 +40,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 

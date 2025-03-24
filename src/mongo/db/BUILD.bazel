@@ -649,6 +649,86 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "shard_role_api_stor_ex",
+    srcs = [
+        "//src/mongo/db/catalog:collection.cpp",
+        "//src/mongo/db/concurrency:replication_state_transition_lock_guard.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/catalog:collection.h",
+        "//src/mongo/db/concurrency:replication_state_transition_lock_guard.h",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/collation:collator_factory_interface",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_role_api",
+    srcs = [
+        "direct_shard_client_tracker.cpp",
+        "dump_lock_manager_impl.cpp",
+        "replica_set_endpoint_sharding_state.cpp",
+        "replica_set_endpoint_util.cpp",
+        "transaction_resources.cpp",
+        "//src/mongo/db/catalog:collection_operation_source.cpp",
+        "//src/mongo/db/s:collection_metadata.cpp",
+        "//src/mongo/db/s:collection_sharding_state.cpp",
+        "//src/mongo/db/s:database_sharding_state.cpp",
+        "//src/mongo/db/s:global_user_write_block_state.cpp",
+        "//src/mongo/db/s:operation_sharding_state.cpp",
+        "//src/mongo/db/s:range_arithmetic.cpp",
+        "//src/mongo/db/s:replica_set_endpoint_feature_flag.cpp",
+        "//src/mongo/db/s:scoped_collection_metadata.cpp",
+        "//src/mongo/db/s:shard_filtering_util.cpp",
+        "//src/mongo/db/s:shard_key_index_util.cpp",
+        "//src/mongo/db/s:sharding_api_d_params_gen",
+        "//src/mongo/db/s:sharding_migration_critical_section.cpp",
+        "//src/mongo/db/s:sharding_statistics.cpp",
+        "//src/mongo/db/s:sharding_write_router.cpp",
+        "//src/mongo/db/s:transaction_coordinator_worker_curop_repository.cpp",
+    ],
+    hdrs = [
+        "direct_shard_client_tracker.h",
+        "dump_lock_manager_impl.h",
+        "replica_set_endpoint_sharding_state.h",
+        "replica_set_endpoint_util.h",
+        "transaction_resources.h",
+        "//src/mongo/db/catalog:collection_operation_source.h",
+        "//src/mongo/db/s:collection_metadata.h",
+        "//src/mongo/db/s:collection_sharding_state.h",
+        "//src/mongo/db/s:database_sharding_state.h",
+        "//src/mongo/db/s:global_user_write_block_state.h",
+        "//src/mongo/db/s:operation_sharding_state.h",
+        "//src/mongo/db/s:range_arithmetic.h",
+        "//src/mongo/db/s:replica_set_endpoint_feature_flag.h",
+        "//src/mongo/db/s:scoped_collection_metadata.h",
+        "//src/mongo/db/s:shard_filtering_util.h",
+        "//src/mongo/db/s:shard_key_index_util.h",
+        "//src/mongo/db/s:sharding_migration_critical_section.h",
+        "//src/mongo/db/s:sharding_statistics.h",
+        "//src/mongo/db/s:sharding_write_router.h",
+        "//src/mongo/db/s:transaction_coordinator_worker_curop_repository.h",
+    ],
+    deps = [
+        ":server_base",
+        ":server_feature_flags",  # TODO(SERVER-93876): Remove.
+        ":shard_role_api_stor_ex",
+        ":write_block_bypass",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/storage:write_unit_of_work",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s:grid",
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "shard_role",
     srcs = [
         ":db_raii.cpp",
@@ -788,68 +868,6 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_settings",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "shard_role_api",
-    srcs = [
-        "direct_shard_client_tracker.cpp",
-        "dump_lock_manager_impl.cpp",
-        "replica_set_endpoint_sharding_state.cpp",
-        "replica_set_endpoint_util.cpp",
-        "transaction_resources.cpp",
-        "//src/mongo/db/catalog:collection_operation_source.cpp",
-        "//src/mongo/db/s:collection_metadata.cpp",
-        "//src/mongo/db/s:collection_sharding_state.cpp",
-        "//src/mongo/db/s:database_sharding_state.cpp",
-        "//src/mongo/db/s:global_user_write_block_state.cpp",
-        "//src/mongo/db/s:operation_sharding_state.cpp",
-        "//src/mongo/db/s:range_arithmetic.cpp",
-        "//src/mongo/db/s:replica_set_endpoint_feature_flag.cpp",
-        "//src/mongo/db/s:scoped_collection_metadata.cpp",
-        "//src/mongo/db/s:shard_filtering_util.cpp",
-        "//src/mongo/db/s:shard_key_index_util.cpp",
-        "//src/mongo/db/s:sharding_api_d_params_gen",
-        "//src/mongo/db/s:sharding_migration_critical_section.cpp",
-        "//src/mongo/db/s:sharding_statistics.cpp",
-        "//src/mongo/db/s:sharding_write_router.cpp",
-        "//src/mongo/db/s:transaction_coordinator_worker_curop_repository.cpp",
-    ],
-    hdrs = [
-        "direct_shard_client_tracker.h",
-        "dump_lock_manager_impl.h",
-        "replica_set_endpoint_sharding_state.h",
-        "replica_set_endpoint_util.h",
-        "transaction_resources.h",
-        "//src/mongo/db/catalog:collection_operation_source.h",
-        "//src/mongo/db/s:collection_metadata.h",
-        "//src/mongo/db/s:collection_sharding_state.h",
-        "//src/mongo/db/s:database_sharding_state.h",
-        "//src/mongo/db/s:global_user_write_block_state.h",
-        "//src/mongo/db/s:operation_sharding_state.h",
-        "//src/mongo/db/s:range_arithmetic.h",
-        "//src/mongo/db/s:replica_set_endpoint_feature_flag.h",
-        "//src/mongo/db/s:scoped_collection_metadata.h",
-        "//src/mongo/db/s:shard_filtering_util.h",
-        "//src/mongo/db/s:shard_key_index_util.h",
-        "//src/mongo/db/s:sharding_migration_critical_section.h",
-        "//src/mongo/db/s:sharding_statistics.h",
-        "//src/mongo/db/s:sharding_write_router.h",
-        "//src/mongo/db/s:transaction_coordinator_worker_curop_repository.h",
-    ],
-    deps = [
-        ":server_base",
-        ":server_feature_flags",  # TODO(SERVER-93876): Remove.
-        ":shard_role_api_stor_ex",
-        ":write_block_bypass",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/catalog:index_catalog",
-        "//src/mongo/db/concurrency:lock_manager",
-        "//src/mongo/db/storage:write_unit_of_work",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/s:grid",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -1064,22 +1082,6 @@ mongo_cc_unit_test(
         ":commands",
         ":service_context_test_fixture",
         "//src/mongo/db/commands:standalone",
-    ],
-)
-
-mongo_cc_library(
-    name = "shard_role_api_stor_ex",
-    srcs = [
-        "//src/mongo/db/catalog:collection.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/catalog:collection.h",
-    ],
-    deps = [
-        ":server_base",
-        "//src/mongo/db/catalog:collection_options",
-        "//src/mongo/db/query/collation:collator_factory_interface",
-        "//src/mongo/s:common_s",
     ],
 )
 

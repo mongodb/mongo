@@ -53,6 +53,9 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+class CollectionCatalog;
+
 namespace auto_get_collection {
 enum class ViewMode { kViewsPermitted, kViewsForbidden };
 
