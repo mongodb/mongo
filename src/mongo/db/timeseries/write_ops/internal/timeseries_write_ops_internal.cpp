@@ -1616,6 +1616,8 @@ commit_result::Result commitTimeseriesBucketForBatch(
         return commit_result::ContinuableRetryableError{};
     }
 
+    hangTimeseriesInsertBeforeWrite.pauseWhileSet();
+
     const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
