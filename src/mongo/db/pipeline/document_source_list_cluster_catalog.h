@@ -105,6 +105,16 @@ public:
         return true;
     }
 
+    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const override {
+        // The listCollections command that runs under the hood only accepts 'local' read concern.
+        return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);
+    }
+
+    void assertSupportsMultiDocumentTransaction() const override {
+        transactionNotSupported(kStageName);
+    }
+
 private:
     PrivilegeVector _privileges;
 };

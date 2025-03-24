@@ -65,6 +65,12 @@ DB.prototype.commandHelp = function(name) {
     return res.help;
 };
 
+const kAggStagesThatNotSupportSecondaryReadPreference = new Set([
+    // Can't set a secondary read preference on $listClusterCatalog collection because it
+    // only accepts 'local' read concern.
+    "$listClusterCatalog",
+]);
+
 // Utility to attach readPreference if needed.
 DB.prototype._attachReadPreferenceToCommand = function(cmdObj, readPref) {
     "use strict";
@@ -76,6 +82,17 @@ DB.prototype._attachReadPreferenceToCommand = function(cmdObj, readPref) {
     // If user specifies $readPreference manually, then don't change it.
     if (cmdObj.hasOwnProperty("$readPreference")) {
         return cmdObj;
+    }
+
+    const cmdName = Object.keys(cmdObj)[0];
+
+    // Prevent setting `secondary` read preference if it's not allowed on specific aggregate stages.
+    if (cmdName === "aggregate" && readPref?.mode === "secondary" && cmdObj.pipeline &&
+        Array.isArray(cmdObj.pipeline) && cmdObj.pipeline.length !== 0) {
+        const stages = cmdObj.pipeline.map(obj => obj instanceof Object ? Object.keys(obj)[0] : "");
+        if (stages.some((stage) => kAggStagesThatNotSupportSecondaryReadPreference.has(stage))) {
+            return cmdObj;
+        }
     }
 
     // Copy object so we don't mutate the original.
