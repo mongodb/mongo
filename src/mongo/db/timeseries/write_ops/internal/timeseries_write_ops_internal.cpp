@@ -216,6 +216,7 @@ TimeseriesSingleWriteResult performTimeseriesInsert(
  */
 TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
     OperationContext* opCtx,
+    const NamespaceString& nss,
     const BSONObj& metadata,
     const mongo::write_ops::InsertCommandRequest& request,
     std::shared_ptr<bucket_catalog::WriteBatch> batch) {
@@ -225,10 +226,7 @@ TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performInserts(
             opCtx,
-            write_ops_utils::makeTimeseriesInsertOpFromBatch(
-                batch,
-                write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request)),
-                metadata),
+            write_ops_utils::makeTimeseriesInsertOpFromBatch(batch, nss, metadata),
             OperationSource::kTimeseriesInsert),
         request);
 }
@@ -1621,7 +1619,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
     const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
-        const auto output = performTimeseriesInsertFromBatch(opCtx, metadata, request, batch);
+        const auto output = performTimeseriesInsertFromBatch(opCtx, nss, metadata, request, batch);
         auto insertStatus = output.result.getStatus();
 
         if (!insertStatus.isOK()) {
