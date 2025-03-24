@@ -239,40 +239,51 @@ StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::
 
 void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
-    AutoGetCollection autoColl(opCtx, ns, MODE_X);
-    CollectionWriter collection(opCtx, autoColl);
     writeConflictRetry(
         opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns, [&] {
-            uassert(ErrorCodes::DatabaseDropPending,
-                    str::stream() << "The database is in the process of being dropped "
-                                  << ns.dbName().toStringForErrorMsg(),
-                    autoColl.getDb() && !CollectionCatalog::get(opCtx)->isDropPending(ns.dbName()));
+            // We use kPretendUnsharded since this is an a non_shardsvr process interface.
+            auto coll = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest(ns,
+                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kWrite),
+                MODE_X);
 
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Failed to create indexes for aggregation because collection "
                                      "does not exist: "
                                   << ns.toStringForErrorMsg() << ": "
                                   << BSON("indexes" << indexSpecs),
-                    collection.get());
+                    coll.exists());
 
-            invariant(collection->isEmpty(opCtx),
-                      str::stream() << "Expected empty collection for index creation: "
-                                    << ns.toStringForErrorMsg()
-                                    << ": numRecords: " << collection->numRecords(opCtx) << ": "
-                                    << BSON("indexes" << indexSpecs));
+            uassert(ErrorCodes::DatabaseDropPending,
+                    str::stream() << "The database is in the process of being dropped "
+                                  << ns.dbName().toStringForErrorMsg(),
+                    !CollectionCatalog::get(opCtx)->isDropPending(ns.dbName()));
+
+            const auto& collPtr = coll.getCollectionPtr();
+            tassert(7683200,
+                    str::stream() << "Expected empty collection for index creation: "
+                                  << ns.toStringForErrorMsg()
+                                  << ": numRecords: " << collPtr->numRecords(opCtx) << ": "
+                                  << BSON("indexes" << indexSpecs),
+                    collPtr->isEmpty(opCtx));
+
+            CollectionWriter collectionWriter(opCtx, &coll);
 
             // Secondary index builds do not filter existing indexes so we have to do this on the
             // primary.
             auto removeIndexBuildsToo = false;
-            auto filteredIndexes = collection->getIndexCatalog()->removeExistingIndexes(
-                opCtx, collection.get(), indexSpecs, removeIndexBuildsToo);
+            auto filteredIndexes = collectionWriter->getIndexCatalog()->removeExistingIndexes(
+                opCtx, collectionWriter.get(), indexSpecs, removeIndexBuildsToo);
             if (filteredIndexes.empty()) {
                 return;
             }
 
             WriteUnitOfWork wuow(opCtx);
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collection, filteredIndexes, false  // fromMigrate
+                opCtx, collectionWriter, filteredIndexes, false  // fromMigrate
             );
             wuow.commit();
         });
