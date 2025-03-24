@@ -316,6 +316,11 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
             batchedCommandRequest.setShardVersion(shardVersion);
             return batchedCommandRequest.toBSON();
         } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
+            if (isRawDataOperation(opCtx) && nss.isTimeseriesBucketsCollection()) {
+                opMsgRequest.body =
+                    rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(
+                        opMsgRequest.body, nss.coll());
+            }
             auto deleteRequest = write_ops::DeleteCommandRequest::parse(
                 IDLParserContext("_clusterWriteWithoutShardKeyForDelete"), opMsgRequest.body);
 

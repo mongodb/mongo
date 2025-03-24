@@ -26,8 +26,7 @@ assert.commandWorked(coll.insert([
     {[timeField]: time, [metaField]: 2, a: "c"},
 ]));
 
-// TODO SERVER-100926, SERVER-100929: This function will no longer need the rawData argument after
-// these tickets.
+// TODO SERVER-100929: This function will no longer need the rawData argument after these tickets.
 const assertExplain = function(commandResult, commandName, rawData) {
     assert(commandResult.ok);
     assert.eq(commandResult.command[commandName],
@@ -46,10 +45,14 @@ assertExplain(
     bucketsColl.explain().findAndModify({query: {"control.count": 2}, update: {$set: {meta: "3"}}}),
     "findAndModify",
     false);
-assertExplain(bucketsColl.explain().remove({"control.count": 2}), "delete", false);
-// Explain update on a field that uses cluster write without shard key and one that doesn't.
+assertExplain(coll.explain().remove({"control.count": 2}, {rawData: true}), "delete", true);
 assertExplain(coll.explain().update({"control.count": 1}, {$set: {meta: "3"}}, {rawData: true}),
               "update",
               true);
+
+// Additionally run explains that issue a cluster write without a shard key in a sharded environment
+// to test that path.
+assertExplain(
+    coll.explain().remove({"control.count": 2}, {rawData: true, justOne: true}), "delete", true);
 assertExplain(
     coll.explain().update({"_id": 1}, {$set: {meta: "3"}}, {rawData: true}), "update", true);

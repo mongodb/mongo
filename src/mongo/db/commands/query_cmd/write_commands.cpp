@@ -779,6 +779,10 @@ public:
             auto [isTimeseriesViewRequest, nss] =
                 timeseries::isTimeseriesViewRequest(opCtx, request());
 
+            if (isRawDataOperation(opCtx)) {
+                isTimeseriesViewRequest = false;
+            }
+
             auto deleteRequest = DeleteRequest{};
             deleteRequest.setNsString(nss);
             deleteRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
