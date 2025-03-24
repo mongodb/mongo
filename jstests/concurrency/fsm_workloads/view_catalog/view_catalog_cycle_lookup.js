@@ -152,7 +152,8 @@ export const $config = (function() {
             // be remapped to an OperationFailed error.
             assert(res.ok === 1 || res.code === ErrorCodes.CommandNotSupportedOnView ||
                        res.code === ErrorCodes.CursorNotFound ||
-                       res.code === ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
+                       res.code === ErrorCodes.CommandOnShardedViewNotSupportedOnMongod ||
+                       res.code === ErrorCodes.QueryPlanKilled,
                    () => tojson(res));
         }
 
