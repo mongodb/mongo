@@ -104,9 +104,32 @@ private:
 SizeRecoveryState& sizeRecoveryState(ServiceContext* serviceCtx);
 
 /**
- * Returns a mutable reference to an atomic boolean decoration on 'serviceCtx', which indicates
- * whether or not the server is currently undergoing replication recovery. Callers must explicitly
- * call 'load' and 'store' on this reference to get/set the underlying boolean.
+ * The "in replication recovery" flag. Provided by a thread-safe decorator on ServiceContext, this
+ * class provides an RAII utility around setting the flag value and allowing it to be checked by
+ * readers. Note that this flag is advisory-only: writers will not check for readers and no further
+ * synchronization is performed.
  */
-AtomicWord<bool>& inReplicationRecovery(ServiceContext* serviceCtx);
+class InReplicationRecovery final {
+    InReplicationRecovery(const InReplicationRecovery&) = delete;
+    InReplicationRecovery(InReplicationRecovery&&) = delete;
+    InReplicationRecovery& operator=(const InReplicationRecovery&) = delete;
+    InReplicationRecovery& operator=(InReplicationRecovery&&) = delete;
+
+    ServiceContext* _serviceContext{nullptr};
+
+public:
+    /**
+     * Constructing this class increments the `inReplicationRecovery` flag on
+     * the provided ServiceContext. The flag will be decremented upon
+     * destruction.
+     */
+    explicit InReplicationRecovery(ServiceContext*);
+    ~InReplicationRecovery();
+
+    /**
+     * Checks whether the flag is non-zero, indicating at least 1 context has
+     * declared that replication recovery is happening.
+     */
+    static bool isSet(ServiceContext*);
+};
 }  // namespace mongo

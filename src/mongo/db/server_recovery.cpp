@@ -37,12 +37,12 @@
 
 namespace mongo {
 namespace {
-const auto getInReplicationRecovery = ServiceContext::declareDecoration<AtomicWord<bool>>();
+const auto getInReplicationRecovery = ServiceContext::declareDecoration<AtomicWord<int32_t>>();
 const auto getSizeRecoveryState = ServiceContext::declareDecoration<SizeRecoveryState>();
 }  // namespace
 
 bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) const {
-    if (!inReplicationRecovery(getGlobalServiceContext()).load()) {
+    if (!InReplicationRecovery::isSet(getGlobalServiceContext())) {
         return true;
     }
 
@@ -76,13 +76,22 @@ bool SizeRecoveryState::shouldRecordStoresAlwaysCheckSize() const {
     // information is no longer accurate. This may be necessary if a collection creation was not
     // part of a stable checkpoint.
     return _recordStoresShouldAlwayCheckSize ||
-        inReplicationRecovery(getGlobalServiceContext()).load();
+        InReplicationRecovery::isSet(getGlobalServiceContext());
+}
+
+InReplicationRecovery::InReplicationRecovery(ServiceContext* serviceContext)
+    : _serviceContext(serviceContext) {
+    getInReplicationRecovery(_serviceContext).fetchAndAdd(1);
+}
+
+InReplicationRecovery::~InReplicationRecovery() {
+    getInReplicationRecovery(_serviceContext).fetchAndSubtract(1);
+}
+
+bool InReplicationRecovery::isSet(ServiceContext* serviceContext) {
+    return getInReplicationRecovery(serviceContext).load();
 }
 }  // namespace mongo
-
-mongo::AtomicWord<bool>& mongo::inReplicationRecovery(ServiceContext* serviceCtx) {
-    return getInReplicationRecovery(serviceCtx);
-}
 
 mongo::SizeRecoveryState& mongo::sizeRecoveryState(ServiceContext* serviceCtx) {
     return getSizeRecoveryState(serviceCtx);

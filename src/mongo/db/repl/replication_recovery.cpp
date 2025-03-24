@@ -426,14 +426,7 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
                             "Cannot use 'recoverToOplogTimestamp' without a stable checkpoint");
     }
 
-    const auto serviceCtx = opCtx->getServiceContext();
-    inReplicationRecovery(serviceCtx).store(true);
-    ON_BLOCK_EXIT([serviceCtx] {
-        invariant(
-            inReplicationRecovery(serviceCtx).load(),
-            "replication recovery flag is unexpectedly unset when exiting recoverFromOplogUpTo()");
-        inReplicationRecovery(serviceCtx).store(false);
-    });
+    InReplicationRecovery inReplicationRecovery(opCtx->getServiceContext());
 
     // This may take an IS lock on the oplog collection.
     _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, &recoveryTS);
@@ -482,14 +475,7 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
         return stableTimestamp;  // Initial Sync will take over so no cleanup is needed.
     }
 
-    const auto serviceCtx = getGlobalServiceContext();
-    inReplicationRecovery(serviceCtx).store(true);
-    ON_BLOCK_EXIT([serviceCtx] {
-        invariant(
-            inReplicationRecovery(serviceCtx).load(),
-            "replication recovery flag is unexpectedly unset when exiting recoverFromOplog()");
-        inReplicationRecovery(serviceCtx).store(false);
-    });
+    InReplicationRecovery inReplicationRecovery(getGlobalServiceContext());
 
     // If we were passed in a stable timestamp, we are in rollback recovery and should recover from
     // that stable timestamp. Otherwise, we're recovering at startup. If this storage engine
@@ -572,14 +558,7 @@ void ReplicationRecoveryImpl::truncateOplogToTimestamp(OperationContext* opCtx,
 void ReplicationRecoveryImpl::applyOplogEntriesForRestore(OperationContext* opCtx,
                                                           Timestamp stableTimestamp) {
     invariant(storageGlobalParams.magicRestore);
-    const auto serviceCtx = getGlobalServiceContext();
-    inReplicationRecovery(serviceCtx).store(true);
-    ON_BLOCK_EXIT([serviceCtx] {
-        invariant(inReplicationRecovery(serviceCtx).load(),
-                  "replication recovery flag is unexpectedly unset when exiting "
-                  "applyOplogEntriesForRestore()");
-        inReplicationRecovery(serviceCtx).store(false);
-    });
+    InReplicationRecovery inReplicationRecovery(getGlobalServiceContext());
     invariant(_storageInterface->supportsRecoveryTimestamp(opCtx->getServiceContext()));
 
     auto topOfOplogSW = _getTopOfOplog(opCtx);

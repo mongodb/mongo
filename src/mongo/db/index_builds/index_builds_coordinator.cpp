@@ -246,7 +246,7 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
 
     // This check happens before spawning the index build thread. So it does not race with the
     // replication recovery flag being modified.
-    if (inReplicationRecovery(opCtx->getServiceContext()).load()) {
+    if (InReplicationRecovery::isSet(opCtx->getServiceContext())) {
         return false;
     }
 
@@ -487,7 +487,7 @@ bool isIndexBuildResumable(OperationContext* opCtx,
     // startup recovery, the last optime here derived from the local oplog may not be a valid
     // optime to wait on for the majority commit point since the rest of the replica set may
     // be on a different branch of history.
-    if (inReplicationRecovery(opCtx->getServiceContext()).load()) {
+    if (InReplicationRecovery::isSet(opCtx->getServiceContext())) {
         LOGV2(5039100,
               "Index build: in replication recovery. Not waiting for last optime before "
               "interceptors to be majority committed",
