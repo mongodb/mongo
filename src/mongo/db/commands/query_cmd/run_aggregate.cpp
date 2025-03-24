@@ -103,6 +103,7 @@
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern.h"
@@ -1126,6 +1127,18 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     const bool useAcquisition = true;
     std::unique_ptr<AggCatalogState> aggCatalogState =
         aggExState.createAggCatalogState(useAcquisition);
+
+    BSONObj shardKey = BSONObj();
+    if (aggCatalogState->lockAcquired() && aggCatalogState->getPrimaryCollection()) {
+        const auto& coll = aggCatalogState->getPrimaryCollection();
+        if (coll.isSharded_DEPRECATED()) {
+            shardKey = coll.getShardKeyPattern().toBSON();
+        }
+    }
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics("ShardKeyDiagnostics",
+                                        diagnostic_printers::ShardKeyDiagnosticPrinter{shardKey});
 
     boost::optional<AutoStatsTracker> statsTracker;
     aggCatalogState->getStatsTrackerIfNeeded(statsTracker);

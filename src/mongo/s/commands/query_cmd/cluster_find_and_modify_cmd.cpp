@@ -63,6 +63,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -753,6 +754,14 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     }();
 
     const auto& cm = cri.cm;
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            cm.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
+
     auto isTrackedTimeseries = cm.hasRoutingTable() && cm.getTimeseriesFields();
     auto isTimeseriesViewRequest = false;
     if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {

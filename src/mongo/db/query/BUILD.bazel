@@ -84,6 +84,13 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "shard_key_diagnostic_printer",
+    hdrs = [
+        "shard_key_diagnostic_printer.h",
+    ],
+)
+
+mongo_cc_library(
     name = "canonical_query",
     srcs = [
         "canonical_query.cpp",

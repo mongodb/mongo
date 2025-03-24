@@ -81,6 +81,7 @@
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -253,6 +254,15 @@ public:
                     collOrViewAcquisition->isCollection());
             const auto& collection = collOrViewAcquisition->getCollection();
 
+            // Create an RAII object that prints the collection's shard key in the case of a tassert
+            // or crash.
+            ScopedDebugInfo shardKeyDiagnostics(
+                "ShardKeyDiagnostics",
+                diagnostic_printers::ShardKeyDiagnosticPrinter{
+                    collection.getShardingDescription().isSharded()
+                        ? collection.getShardingDescription().getKeyPattern()
+                        : BSONObj()});
+
             auto expCtx = makeExpressionContextForGetExecutor(
                 opCtx, request().getCollation().value_or(BSONObj()), ns, verbosity);
 
@@ -373,6 +383,15 @@ public:
                     "Expected ShardRole acquisition to be of type collection",
                     collOrViewAcquisition->isCollection());
             const auto& collection = collOrViewAcquisition->getCollection();
+
+            // Create an RAII object that prints the collection's shard key in the case of a tassert
+            // or crash.
+            ScopedDebugInfo shardKeyDiagnostics(
+                "ShardKeyDiagnostics",
+                diagnostic_printers::ShardKeyDiagnosticPrinter{
+                    collection.getShardingDescription().isSharded()
+                        ? collection.getShardingDescription().getKeyPattern()
+                        : BSONObj()});
 
             // Check whether we are allowed to read from this node after acquiring our locks.
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);

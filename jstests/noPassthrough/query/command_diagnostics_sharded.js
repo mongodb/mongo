@@ -129,6 +129,8 @@ const defaultExpCtxLog = [
     'subPipelineDepth: '
 ];
 
+const shardKeyLog = `\'shardKeyPattern\': { a: 1.0, b: 1.0, c: 1.0 }`;
+
 function runTests() {
     // Find
     runTest({
@@ -138,7 +140,8 @@ function runTests() {
             "{\'currentOp\': { ",
             `ns: \\"${ns}\\"`,
             `\'opDescription\': { find: \\"${collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1`,
-            ...defaultExpCtxLog
+            ...defaultExpCtxLog,
+            shardKeyLog,
         ],
     });
     runTest({
@@ -148,7 +151,8 @@ function runTests() {
         expectedDiagnosticInfo: [
             '{\'currentOp\': { op: \\"###\\", ns: \\"###\\"',
             '\'opDescription\': { find: \\"###\\", filter: { a: \\"###\\", b: \\"###\\" }, limit: \\"###\\"',
-            ...defaultExpCtxLog
+            ...defaultExpCtxLog,
+            shardKeyLog,
         ],
     });
 
@@ -160,7 +164,8 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             `\'opDescription\': { aggregate: \\"${
                 collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } } ]`,
-            ...defaultExpCtxLog
+            ...defaultExpCtxLog,
+            shardKeyLog,
         ]
     });
 
@@ -171,7 +176,8 @@ function runTests() {
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             `\'opDescription\': { count: \\"${collName}\\", query: { a: 1.0, b: 1.0 }`,
-            ...defaultExpCtxLog
+            ...defaultExpCtxLog,
+            shardKeyLog,
         ]
     });
 
@@ -183,7 +189,8 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             `\'opDescription\': { distinct: \\"${
                 collName}\\", key: \\"a\\", query: { a: 1.0, b: 1.0 }`,
-            ...defaultExpCtxLog
+            ...defaultExpCtxLog,
+            shardKeyLog,
         ]
     });
 
@@ -195,6 +202,7 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             'isMapReduceCommand: true',
             ...defaultExpCtxLog,
+            shardKeyLog,
         ]
     });
 
@@ -209,6 +217,7 @@ function runTests() {
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"remove\\", ns: \\"${ns}\\"`,
             '\'opDescription\': ',
+            shardKeyLog,
         ]
     });
 
@@ -223,6 +232,7 @@ function runTests() {
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"update\\", ns: \\"${ns}\\"`,
             '\'opDescription\': ',
+            shardKeyLog,
         ]
     });
 
@@ -238,6 +248,7 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             `\'opDescription\': { findAndModify: \\"${
                 collName}\\", query: { a: 1.0, b: 1.0 }, remove: true`,
+            shardKeyLog,
         ]
     });
 
@@ -245,8 +256,14 @@ function runTests() {
     runTest({
         command: {
             bulkWrite: 1,
-            ops: [{update: 0, filter: query, updateMods: {a: 1}}],
-            nsInfo: [{ns: `test.${jsTestName()}`}],
+            ops: [
+                {update: 0, filter: query, updateMods: {b: 1}},
+                {update: 1, filter: query, updateMods: {a: 1}}
+            ],
+            nsInfo: [
+                {ns: "test.differentNamespace"},
+                {ns: `test.${jsTestName()}`},
+            ],
         },
         description: 'bulkWrite fails',
         expectedDiagnosticInfo: [
@@ -255,6 +272,7 @@ function runTests() {
             'update: 0',
             'filter: { a: 1.0, b: 1.0 }',
             'updateMods: { a: 1.0 }',
+            shardKeyLog,
         ]
     });
 
@@ -266,7 +284,8 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { find: \\"${
                 collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1`,
-            ...defaultExpCtxLog
+            ...defaultExpCtxLog,
+            shardKeyLog,
         ],
     });
     runTest({
@@ -279,7 +298,8 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { aggregate: \\"${
                 collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: `,
-            ...defaultExpCtxLog
+            ...defaultExpCtxLog,
+            shardKeyLog,
         ]
     });
     runTest({
@@ -289,7 +309,17 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { distinct: \\"${
                 collName}\\", key: \\"a\\", query: { a: 1.0, b: 1.0 } }`,
-            ...defaultExpCtxLog
+            ...defaultExpCtxLog,
+            shardKeyLog,
+        ]
+    });
+    runTest({
+        description: "explain count",
+        command: {explain: {count: collName, query: query}},
+        expectedDiagnosticInfo: [
+            `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
+            `\'opDescription\': { explain: { count: \\"${collName}\\", query: { a: 1.0, b: 1.0 }`,
+            shardKeyLog,
         ]
     });
 }

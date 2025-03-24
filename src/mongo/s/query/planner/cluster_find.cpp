@@ -29,7 +29,6 @@
 
 #include "mongo/s/query/planner/cluster_find.h"
 
-#include "mongo/db/query/query_stats/query_stats.h"
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <chrono>
@@ -87,6 +86,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -698,6 +698,13 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
         }
 
         const auto cri = uassertStatusOK(std::move(swCri));
+
+        // Create an RAII object that prints the collection's shard key in the case of a tassert
+        // or crash.
+        ScopedDebugInfo shardKeyDiagnostics(
+            "ShardKeyDiagnostics",
+            diagnostic_printers::ShardKeyDiagnosticPrinter{
+                cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
 
         try {
             return runQueryWithoutRetrying(

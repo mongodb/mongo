@@ -90,6 +90,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/raw_data_operation.h"
@@ -469,6 +470,15 @@ public:
             return Status::OK();
         }
 
+        // Create an RAII object that prints the collection's shard key in the case of a tassert or
+        // crash.
+        auto collShardingDescription = collectionOrView->getCollection().getShardingDescription();
+        ScopedDebugInfo shardKeyDiagnostics("ShardKeyDiagnostics",
+                                            diagnostic_printers::ShardKeyDiagnosticPrinter{
+                                                collShardingDescription.isSharded()
+                                                    ? collShardingDescription.getKeyPattern()
+                                                    : BSONObj()});
+
         auto executor = createExecutorForDistinctCommand(
             opCtx, std::move(canonicalQuery), collectionOrView->getCollection());
         SerializationContext serializationCtx = request.getSerializationContext();
@@ -592,6 +602,15 @@ public:
                 opCtx, std::move(canonicalQuery), boost::none /* verbosity */, replyBuilder);
             return true;
         }
+
+        // Create an RAII object that prints the collection's shard key in the case of a tassert or
+        // crash.
+        auto collShardingDescription = collectionOrView->getCollection().getShardingDescription();
+        ScopedDebugInfo shardKeyDiagnostics("ShardKeyDiagnostics",
+                                            diagnostic_printers::ShardKeyDiagnosticPrinter{
+                                                collShardingDescription.isSharded()
+                                                    ? collShardingDescription.getKeyPattern()
+                                                    : BSONObj()});
 
         // Check whether we are allowed to read from this node after acquiring our locks.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);

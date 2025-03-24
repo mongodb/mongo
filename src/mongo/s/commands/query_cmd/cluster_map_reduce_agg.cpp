@@ -69,6 +69,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/map_reduce_output_format.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/version_context.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/idl_parser.h"
@@ -228,6 +229,14 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     auto cri = uassertStatusOK(
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
+
     auto expCtx = makeExpressionContext(opCtx, parsedMr, cri.cm, verbosity);
 
     // Create an RAII object that prints useful information about the ExpressionContext in the case

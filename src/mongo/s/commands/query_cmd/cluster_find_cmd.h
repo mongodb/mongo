@@ -46,6 +46,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -263,6 +264,13 @@ public:
                 const auto cri =
                     uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
                         opCtx, cq.getFindCommandRequest().getNamespaceOrUUID().nss()));
+
+                // Create an RAII object that prints the collection's shard key in the case of a
+                // tassert or crash.
+                ScopedDebugInfo shardKeyDiagnostics(
+                    "ShardKeyDiagnostics",
+                    diagnostic_printers::ShardKeyDiagnosticPrinter{
+                        cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
 
                 auto numShards = getTargetedShardsForCanonicalQuery(cq, cri.cm).size();
                 // When forwarding the command to multiple shards, need to transform it by adjusting

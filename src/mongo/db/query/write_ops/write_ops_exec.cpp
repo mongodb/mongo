@@ -96,6 +96,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
@@ -552,13 +553,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         },
         nss);
 
-    if (auto scoped = failAllInserts.scoped(); MONGO_unlikely(scoped.isActive())) {
-        tassert(9276700,
-                "failAllInserts failpoint active!",
-                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
-        uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
-    }
-
     boost::optional<CollectionAcquisition> collection;
     auto acquireCollection = [&] {
         while (true) {
@@ -625,6 +619,22 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             source == OperationSource::kTimeseriesInsert) {
             uasserted(9748801, "Collection was changed during insert");
         }
+    }
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            collection.has_value() && collection->getShardingDescription().isSharded()
+                ? collection.value().getShardingDescription().getKeyPattern()
+                : BSONObj()});
+
+    if (auto scoped = failAllInserts.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276700,
+                "failAllInserts failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
+        uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
     }
 
     if (shouldProceedWithBatchInsert) {
@@ -754,6 +764,15 @@ UpdateResult performUpdate(OperationContext* opCtx,
         AutoGetDb autoDb(opCtx, dbName, MODE_IX);
         return autoDb.ensureDbExists(opCtx);
     }();
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            collection.getShardingDescription().isSharded()
+                ? collection.getShardingDescription().getKeyPattern()
+                : BSONObj()});
 
     invariant(DatabaseHolder::get(opCtx)->getDb(opCtx, dbName));
     curOp->raiseDbProfileLevel(
@@ -918,6 +937,16 @@ long long performDelete(OperationContext* opCtx,
                           CollectionAcquisitionRequest::fromOpCtx(
                               opCtx, nsString, AcquisitionPrerequisites::kWrite, collectionUUID),
                           MODE_IX);
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            collection.getShardingDescription().isSharded()
+                ? collection.getShardingDescription().getKeyPattern()
+                : BSONObj()});
+
     const auto& collectionPtr = collection.getCollectionPtr();
 
     if (const auto& coll = collection.getCollectionPtr()) {
@@ -1403,6 +1432,15 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
             makeCollection(opCtx, ns);
         }
     }();
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            collection.getShardingDescription().isSharded()
+                ? collection.getShardingDescription().getKeyPattern()
+                : BSONObj()});
 
     if (source == OperationSource::kTimeseriesUpdate) {
         timeseries::timeseriesRequestChecks<UpdateRequest>(VersionContext::getDecoration(opCtx),
@@ -1890,6 +1928,15 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
     const auto collection = acquireCollection(
         opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            collection.getShardingDescription().isSharded()
+                ? collection.getShardingDescription().getKeyPattern()
+                : BSONObj()});
 
     if (source == OperationSource::kTimeseriesDelete) {
         timeseries::timeseriesRequestChecks<DeleteRequest>(VersionContext::getDecoration(opCtx),

@@ -108,6 +108,7 @@ const commonDiagnostics = [
     "locks: {}",
     "flowControl: {}",
 ];
+const omittedShardKeyLog = "omitted: collection isn't sharded";
 const commonQueryDiagnostics = [
     ...commonDiagnostics,
     "planCacheShapeHash:",
@@ -116,6 +117,7 @@ const commonQueryDiagnostics = [
     "queryFramework:",
     "planningTimeMicros:",
     'planSummary: \\"IXSCAN',
+    omittedShardKeyLog,
 ];
 const expectedExplainCollscanDiagnostic =
     ["'winningPlan': ", 'stage: \\"IXSCAN\\"', 'stage: \\"FETCH\\"', "'executionStats': "];
@@ -152,7 +154,7 @@ runTest({
         `{\'currentOp\': { op: \\"query\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { find: \\"command_diagnostics\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
     ],
 });
 
@@ -169,7 +171,8 @@ runTest({
         "'winningPlan': ",
         'stage: \\"###\\"',
         "'executionStats': ",
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ],
 });
 
@@ -183,7 +186,7 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { aggregate: \\"command_diagnostics\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } } ]',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
     ]
 });
 const outCmd = {
@@ -203,7 +206,7 @@ runTest({
         outCmdDescription,
         '{\'currentOp\': { op: \\"command\\", ns: \\"test.tmp.agg_out.',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
     ]
 });
 runTest({
@@ -216,7 +219,7 @@ runTest({
         '{\'currentOp\': { op: \\"insert\\", ns: \\"test.tmp.agg_out.',
         'ninserted: 0',
         // Not expecting any explain diagnostics for inserts.
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
     ]
 });
 
@@ -230,7 +233,8 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { count: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 
@@ -244,7 +248,7 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { distinct: \\"command_diagnostics\\", key: \\"a\\", query: { a: 1.0, b: 1.0 }',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
     ]
 });
 
@@ -281,6 +285,7 @@ runTest({
         '\'opDescription\': { insert: \\"command_diagnostics\\", ordered: false',
         'ninserted: 0',
         // Not expecting any explain diagnostics for inserts.
+        omittedShardKeyLog,
     ]
 });
 
@@ -297,7 +302,8 @@ runTest({
         `{\'currentOp\': { op: \\"remove\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { q: { a: 1.0, b: 1.0 }, limit: 1 }',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 
@@ -314,7 +320,8 @@ runTest({
         `{\'currentOp\': { op: \\"update\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { q: { a: 1.0, b: 1.0 }, u: { a: 2.0, b: 2.0 }',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 
@@ -332,7 +339,8 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { findAndModify: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }, remove: true',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 runTest({
@@ -348,7 +356,8 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { findAndModify: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }, update: { a: 2.0, b: 2.0 }',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 
@@ -378,7 +387,8 @@ runTest({
         '\'opDescription\': { delete: 0, filter: { a: 1.0 }',
         // Not expecting explain diagnostics here; this failpoint is reached before we have a query
         // plan to explain.
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 runTest({
@@ -397,6 +407,7 @@ runTest({
         'stage: \\"UPDATE\\"',
         "'executionStats': ",
         ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 runTest({
@@ -409,6 +420,7 @@ runTest({
         // Ensure the failing sub-operation is included in the diagnostic log.
         '\'opDescription\': { insert: 0, documents: [ { a: 0.0 } ] }',
         // Not expecting any explain diagnostics for inserts.
+        omittedShardKeyLog,
     ]
 });
 
@@ -424,7 +436,8 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { explain: { find: \\"command_diagnostics\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ],
 });
 runTest({
@@ -442,7 +455,8 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { explain: { aggregate: \\"command_diagnostics\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: \\"$arr\\" } ]',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 runTest({
@@ -456,7 +470,8 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { explain: { count: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 } }',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 runTest({
@@ -470,7 +485,8 @@ runTest({
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { explain: { distinct: \\"command_diagnostics\\", key: \\"a\\", query: { a: 1.0, b: 1.0 } }',
         ...expectedExplainCollscanDiagnostic,
-        ...defaultExpCtxLog
+        ...defaultExpCtxLog,
+        omittedShardKeyLog,
     ]
 });
 
@@ -547,7 +563,8 @@ runTest({
         'afterIn: \\"b\\"',
         ...defaultExpCtxLog,
         "'winningPlan': ",
-        "'executionStats': "
+        "'executionStats': ",
+        omittedShardKeyLog,
     ],
 });
 

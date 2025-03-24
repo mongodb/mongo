@@ -111,6 +111,7 @@
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -544,6 +545,16 @@ public:
                 return runFindAsAgg(opCtx, *cq, verbosity, replyBuilder);
             }
 
+            // Create an RAII object that prints the collection's shard key in the case of a tassert
+            // or crash.
+            auto collShardingDescription =
+                collectionOrView->getCollection().getShardingDescription();
+            ScopedDebugInfo shardKeyDiagnostics("ShardKeyDiagnostics",
+                                                diagnostic_printers::ShardKeyDiagnosticPrinter{
+                                                    collShardingDescription.isSharded()
+                                                        ? collShardingDescription.getKeyPattern()
+                                                        : BSONObj()});
+
             // Get the execution plan for the query.
             const auto& collection = collectionOrView->getCollection();
             auto exec = uassertStatusOK(getExecutorFind(opCtx,
@@ -824,6 +835,16 @@ public:
                 collectionOrView.reset();
                 return runFindAsAgg(opCtx, *cq, boost::none /* verbosity */, replyBuilder);
             }
+
+            // Create an RAII object that prints the collection's shard key in the case of a tassert
+            // or crash.
+            auto collShardingDescription =
+                collectionOrView->getCollection().getShardingDescription();
+            ScopedDebugInfo shardKeyDiagnostics("ShardKeyDiagnostics",
+                                                diagnostic_printers::ShardKeyDiagnosticPrinter{
+                                                    collShardingDescription.isSharded()
+                                                        ? collShardingDescription.getKeyPattern()
+                                                        : BSONObj()});
 
             const auto& collection = collectionOrView->getCollection();
 

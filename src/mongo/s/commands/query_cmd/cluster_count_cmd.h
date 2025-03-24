@@ -41,6 +41,7 @@
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/raw_data_operation.h"
@@ -180,6 +181,14 @@ public:
 
             const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+            // Create an RAII object that prints the collection's shard key in the case of a tassert
+            // or crash.
+            ScopedDebugInfo shardKeyDiagnostics(
+                "ShardKeyDiagnostics",
+                diagnostic_printers::ShardKeyDiagnosticPrinter{
+                    cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
+
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
 
             auto aggResult = BSONObjBuilder{};
@@ -388,6 +397,13 @@ public:
         BSONObj targetingCollation = countRequest.getCollation().value_or(BSONObj());
 
         const auto explainCmd = ClusterExplain::wrapAsExplain(countRequest.toBSON(), verbosity);
+
+        // Create an RAII object that prints the collection's shard key in the case of a tassert
+        // or crash.
+        ScopedDebugInfo shardKeyDiagnostics(
+            "ShardKeyDiagnostics",
+            diagnostic_printers::ShardKeyDiagnosticPrinter{
+                cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
 
         // We will time how long it takes to run the commands on the shards
         Timer timer;

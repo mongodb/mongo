@@ -81,6 +81,7 @@
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/raw_data_operation.h"
@@ -622,6 +623,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     if (routingTableIsAvailable) {
         rewritePipelineIfTimeseries(opCtx, request, *cri);
     }
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            (cri && cri->cm.isSharded()) ? cri->cm.getShardKeyPattern().toBSON() : BSONObj()});
 
     // pipelineBuilder will be invoked within AggregationTargeter::make() if and only if it chooses
     // any policy other than "specific shard only".
