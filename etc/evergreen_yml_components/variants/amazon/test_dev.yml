@@ -413,3 +413,77 @@ buildvariants:
       - amazon2023.3-arm64-xlarge
     tasks:
       - name: .crypt
+
+  - name: amazon2023-arm64-grav4
+    display_name: "Amazon Linux 2023 arm64 Graviton 4"
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - amazon2023-arm64-latest-small-m8g
+    expansions:
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        BAZEL_FLAGS="--subcommands"
+        --modules=
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--linkopt=-s"
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+        --enableEnterpriseTests=off
+      has_packages: false
+      repo_edition: org
+      scons_cache_scope: shared
+      large_distro_name: amazon2023-arm64-latest-small-m8g
+      compile_variant: amazon2023-arm64
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - amazon2023-arm64-latest-large-m8g
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - amazon2023-arm64-latest-large-m8g
+      - name: .release_critical !.requires_large_host !.incompatible_community !.publish
+      - name: .release_critical .requires_large_host !.incompatible_community !.publish
+        distros:
+          - amazon2023-arm64-latest-large-m8g
+
+  - name: enterprise-amazon2023-arm64-grav4
+    display_name: "Enterprise Amazon Linux 2023 arm64 Graviton 4"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - amazon2023-arm64-latest-small-m8g
+    expansions:
+      additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--linkopt=-s"
+      crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
+      has_packages: false
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      compile_variant: enterprise-amazon2023-arm64-grav4
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - amazon2023-arm64-latest-large-m8g
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2023-arm64-latest-large-m8g
+      - name: .release_critical !.requires_large_host !.publish !.publish_crypt
+      - name: .release_critical .requires_large_host !.publish !.publish_crypt
+        distros:
+          - amazon2023-arm64-latest-large-m8g

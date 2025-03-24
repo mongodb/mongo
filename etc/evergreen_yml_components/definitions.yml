@@ -18,6 +18,7 @@ variables:
       - amazon2023-arm64
       - enterprise-amazon2023
       - enterprise-amazon2023-arm64
+      - enterprise-amazon2023-arm64-grav4
       - debian12
       - enterprise-debian12-64
       - enterprise-rhel-81-ppc64le
