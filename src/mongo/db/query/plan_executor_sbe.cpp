@@ -159,15 +159,18 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         _secondaryNssVector = _solution->getAllSecondaryNamespaces(_nss);
     }
 
-    _planExplainer = plan_explainer_factory::make(_root.get(),
-                                                  &_rootData,
-                                                  _solution.get(),
-                                                  isMultiPlan,
-                                                  isCachedCandidate,
-                                                  cachedPlanHash,
-                                                  _rootData.debugInfo,
-                                                  std::move(classicRuntimePlannerStage),
-                                                  _remoteExplains.get());
+    _planExplainer =
+        plan_explainer_factory::make(_root.get(),
+                                     &_rootData,
+                                     // '_solution' can be a nullptr here. The following ternary is
+                                     // needed to silence a Coverity check.
+                                     _solution ? _solution.get() : nullptr,
+                                     isMultiPlan,
+                                     isCachedCandidate,
+                                     cachedPlanHash,
+                                     _rootData.debugInfo,
+                                     std::move(classicRuntimePlannerStage),
+                                     _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
 
     if (_remoteCursors) {
