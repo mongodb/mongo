@@ -381,6 +381,7 @@ void createTransactionTable(OperationContext* opCtx) {
     // Because we only have one partial index on this collection, the performance benefit outweighs
     // that cost.
     if (feature_flags::gFeatureFlagClusteredConfigTransactions.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
         options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
     auto storageInterface = repl::StorageInterface::get(opCtx);

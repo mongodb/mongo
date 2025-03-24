@@ -177,6 +177,7 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
                 // will be able to start an internal transaction to handle the
                 // wouldChangeOwningShard error thrown below.
                 if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                        VersionContext::getDecoration(opCtx()),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     uassert(
                         ErrorCodes::IllegalOperation,

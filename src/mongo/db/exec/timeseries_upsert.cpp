@@ -170,6 +170,7 @@ void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
                 // mongos will be able to start an internal transaction to handle the
                 // wouldChangeOwningShard error thrown below.
                 if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                        VersionContext::getDecoration(opCtx()),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     uassert(ErrorCodes::IllegalOperation,
                             "The upsert document could not be inserted onto the shard targeted "

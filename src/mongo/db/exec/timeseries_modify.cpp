@@ -313,6 +313,7 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
         // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
         // we can skip validation.
         if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                VersionContext::getDecoration(opCtx()),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uassert(ErrorCodes::IllegalOperation,
                     "Must run update to shard key field in a multi-statement transaction or with "
@@ -340,6 +341,7 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
         // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
         // we can skip validation.
         if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                VersionContext::getDecoration(opCtx()),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uassert(ErrorCodes::IllegalOperation,
                     "Must run update to shard key field in a multi-statement transaction or with "

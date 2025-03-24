@@ -916,6 +916,7 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
 
     if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
         if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             handleWouldChangeOwningShardError(opCtx, shardId, nss, cmdObj, responseStatus, result);
         } else {
