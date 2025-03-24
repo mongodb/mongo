@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/query-integration-timeseries
+  - "timeseries_group*":
+    approvers:
+      - 10gen/query-execution-sbe

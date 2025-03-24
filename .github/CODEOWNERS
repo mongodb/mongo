@@ -587,6 +587,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/timeseries/query/OWNERS.yml
 /jstests/core/timeseries/query/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
+/jstests/core/timeseries/query/**/timeseries_block_explain.js @10gen/query-execution-sbe @svc-auto-approve-bot
+/jstests/core/timeseries/query/**/timeseries_group* @10gen/query-execution-sbe @svc-auto-approve-bot
+/jstests/core/timeseries/query/**/timeseries_homogeneous_top_bottom.js @10gen/query-execution-sbe @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/timeseries/write/OWNERS.yml
 /jstests/core/timeseries/write/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -980,6 +983,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/timeseries/query/OWNERS.yml
 /jstests/noPassthrough/timeseries/query/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
+/jstests/noPassthrough/timeseries/query/**/timeseries_group* @10gen/query-execution-sbe @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/traffic_recording/OWNERS.yml
 /jstests/noPassthrough/traffic_recording/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
