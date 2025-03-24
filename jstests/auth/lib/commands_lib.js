@@ -8585,6 +8585,14 @@ export const authCommandsLib = {
               actions: ["performRawDataOperations"]
             }, {resource: {db: firstDbName, collection: "raw_data"}, actions: ["find"]}],
             expectFail: true,
+          },
+          {
+            runOnDb: firstDbName,
+            privileges: [{
+              resource: {db: firstDbName, collection: "raw_data"},
+              actions: ["internal"]
+            }, {resource: {db: firstDbName, collection: "raw_data"}, actions: ["find"]}],
+            expectFail: true,
           }
         ]
       },

@@ -1032,8 +1032,9 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
     tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
                                         ActionType::issueDirectShardOperations));
 
-    tempContract.addPrivilege(Privilege(ResourcePattern::forExactNamespace(NamespaceString{}),
-                                        ActionType::performRawDataOperations));
+    tempContract.addPrivilege(
+        Privilege(ResourcePattern::forExactNamespace(NamespaceString{}),
+                  {ActionType::performRawDataOperations, ActionType::internal}));
 
     uassert(5452401,
             "Authorization Session contains more authorization checks than permitted by contract.",
