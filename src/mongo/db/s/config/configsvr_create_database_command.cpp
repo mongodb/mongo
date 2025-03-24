@@ -48,6 +48,7 @@
 #include "mongo/db/s/create_database_coordinator.h"
 #include "mongo/db/s/create_database_coordinator_document_gen.h"
 #include "mongo/db/s/create_database_util.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_database_gen.h"
@@ -59,7 +60,6 @@
 
 
 namespace mongo {
-namespace {
 
 class ConfigSvrCreateDatabaseCommand final : public TypedCommand<ConfigSvrCreateDatabaseCommand> {
 public:
@@ -106,26 +106,55 @@ public:
             const auto optResolvedPrimaryShard =
                 create_database_util::resolvePrimaryShard(opCtx, request().getPrimaryShardId());
 
-            std::function<Response()> getCreateDatabaseResponse;
             {
-                FixedFCVRegion fixedFcvRegion{opCtx};
+                // The use isEnabledAndIgnoreFCVUnsafe is intentional, we want to check whether the
+                // feature flag is enabled on any version. This is a hack, but SERVER-102647 will
+                // get rid of this code before it hits production. The reason we take the DDL lock
+                // here is to respect the acquisition order DDL Lock -> FCV Lock, and avoid
+                // deadlocks. This is a pessimization, and thus we only do this if
+                // ShardAuthoritativeDbMetadataDDL is active in this binary.
+                // (Ignore FCV check): We need to know if the feature flag is active in any version.
+                // TODO (SERVER-102647): Remove this code.
+                boost::optional<DDLLockManager::ScopedBaseDDLLock> ddlLock;
+                if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabledAndIgnoreFCVUnsafe()) {
+                    ddlLock.emplace(
+                        opCtx,
+                        shard_role_details::getLocker(opCtx),
+                        DatabaseNameUtil::deserialize(boost::none,
+                                                      str::toLower(dbNameStr),
+                                                      request().getSerializationContext()),
+                        "createDatabase" /* reason */,
+                        MODE_X,
+                        true /*waitForRecovery*/);
+                }
+
+                boost::optional<FixedFCVRegion> fixedFcvRegion{opCtx};
                 bool createDatabaseDDLCoordinatorFeatureFlagEnabled =
                     feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
-                        (*fixedFcvRegion).acquireFCVSnapshot());
+                        (*fixedFcvRegion)->acquireFCVSnapshot());
                 bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
                     feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
-                        fixedFcvRegion->acquireFCVSnapshot());
+                        (*fixedFcvRegion)->acquireFCVSnapshot());
 
                 if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
-                    getCreateDatabaseResponse = [&]() {
-                        auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(
-                            opCtx,
-                            dbName,
-                            optResolvedPrimaryShard,
-                            request().getSerializationContext());
+                    // (Ignore FCV check): The use isEnabledAndIgnoreFCVUnsafe is intentional, we
+                    // want to check whether the feature flag is enabled on any version.
+                    // We need to maintain the FixedFCVRegion during the execution of the command
+                    // to guarantee that all in-flight legacy commands are drained after
+                    // transitioning to kUpgrading during FCV upgrade.
+                    // TODO (SERVER-102647): unconditionally exit the FixedFCVRegion here
+                    if (!feature_flags::gShardAuthoritativeDbMetadataDDL
+                             .isEnabledAndIgnoreFCVUnsafe()) {
+                        fixedFcvRegion.reset();
+                    }
 
-                        return Response(dbt.getVersion());
-                    };
+                    auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(
+                        opCtx,
+                        dbName,
+                        optResolvedPrimaryShard,
+                        request().getSerializationContext());
+
+                    return Response(dbt.getVersion());
                 } else {
                     CreateDatabaseCoordinatorDocument coordinatorDoc;
                     coordinatorDoc.setShardingDDLCoordinatorMetadata(
@@ -134,17 +163,16 @@ public:
                     coordinatorDoc.setUserSelectedPrimary(optResolvedPrimaryShard.is_initialized());
                     coordinatorDoc.setAuthoritativeShardCommit(
                         shardAuthoritativeDbMetadataFeatureFlagEnabled);
-                    auto service = ShardingDDLCoordinatorService::getService(opCtx);
                     auto createDatabaseCoordinator =
                         checked_pointer_cast<CreateDatabaseCoordinator>(
-                            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-                    getCreateDatabaseResponse = [opCtx,
-                                                 coord = std::move(createDatabaseCoordinator)]() {
-                        return coord->getResult(opCtx);
-                    };
+                            ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
+                                opCtx, coordinatorDoc.toBSON()));
+
+                    fixedFcvRegion.reset();
+                    ddlLock.reset();
+                    return createDatabaseCoordinator->getResult(opCtx);
                 }
             }
-            return getCreateDatabaseResponse();
         }
 
     private:
@@ -182,5 +210,4 @@ private:
 };
 MONGO_REGISTER_COMMAND(ConfigSvrCreateDatabaseCommand).forShard();
 
-}  // namespace
 }  // namespace mongo

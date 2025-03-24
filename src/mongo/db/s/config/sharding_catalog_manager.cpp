@@ -84,7 +84,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/placement_history_cleaner.h"
 #include "mongo/db/s/sharding_util.h"
@@ -96,23 +95,20 @@
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_config_version_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -123,12 +119,10 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -928,6 +922,49 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
             DatabaseName::kAdmin,
             cmdObj,
             Shard::RetryPolicy::kIdempotent);
+        if (!response.isOK()) {
+            return response.getStatus();
+        }
+        if (!response.getValue().commandStatus.isOK()) {
+            return response.getValue().commandStatus;
+        }
+        if (!response.getValue().writeConcernStatus.isOK()) {
+            return response.getValue().writeConcernStatus;
+        }
+    }
+
+    return Status::OK();
+}
+
+Status ShardingCatalogManager::runCloneAuthoritativeMetadataOnShards(OperationContext* opCtx) {
+    // No shards should be added until we have forwarded the clone command to all shards.
+    Lock::SharedLock lk(opCtx, _kShardMembershipLock);
+
+    // We do a direct read of the shards collection with local readConcern so no shards are missed,
+    // but don't go through the ShardRegistry to prevent it from caching data that may be rolled
+    // back.
+    const auto opTimeWithShards = uassertStatusOK(
+        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+
+    for (const auto& shardType : opTimeWithShards.value) {
+        const auto shardStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
+        if (!shardStatus.isOK()) {
+            continue;
+        }
+        const auto shard = shardStatus.getValue();
+
+        ShardsvrCloneAuthoritativeMetadata request;
+        request.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+        request.setDbName(DatabaseName::kAdmin);
+
+        auto response = shard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::kAdmin,
+            request.toBSON(),
+            Shard::RetryPolicy::kIdempotent);
+
         if (!response.isOK()) {
             return response.getStatus();
         }

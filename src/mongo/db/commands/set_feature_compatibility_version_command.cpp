@@ -28,15 +28,13 @@
  */
 
 
+#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 #include <functional>
-#include <map>
-#include <memory>
-#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -45,14 +43,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -60,7 +56,6 @@
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_indexes.h"
@@ -71,7 +66,6 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -93,9 +87,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -116,24 +108,19 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -404,17 +391,18 @@ public:
             // the FCV but encountered failover afterwards.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
-            // _finalizeUpgrade is only for any tasks that must be done to fully complete the FCV
-            // upgrade AFTER the FCV document has already been updated to the UPGRADED FCV.
-            // We call it here because it's possible that during an FCV upgrade, the
-            // replset/shard server/config server undergoes failover AFTER the FCV document has
-            // already been updated to the UPGRADED FCV, but before the cluster has completed
-            // _finalizeUpgrade. In this case, since the cluster failed over, the user/client may
-            // retry sending the setFCV command to the cluster, but the cluster is already in the
-            // requestedVersion (i.e. requestedVersion == actualVersion). However, the cluster
-            // should retry/complete the tasks from _finalizeUpgrade before sending ok:1 back to the
-            // user/client. Therefore, these tasks **must** be idempotent/retryable.
+            // _finalizeUpgrade and _finalizeDowngrade are only for any tasks that must be done to
+            // fully complete the FCV upgrade AFTER the FCV document has already been updated to the
+            // UPGRADED/DOWNGRADED FCV. We call it here because it's possible that during an FCV
+            // upgrade/downgrade, the replset/shard server/config server undergoes failover AFTER
+            // the FCV document has already been updated to the UPGRADED/DOWNGRADED FCV, but before
+            // the cluster has completed _finalize*. In this case, since the cluster failed over,
+            // the user/client may retry sending the setFCV command to the cluster, but the cluster
+            // is already in the requestedVersion (i.e. requestedVersion == actualVersion). However,
+            // the cluster should retry/complete the tasks from _finalize* before sending ok:1
+            // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
             _finalizeUpgrade(opCtx, requestedVersion);
+            _finalizeDowngrade(opCtx, requestedVersion);
             return true;
         }
 
@@ -616,14 +604,15 @@ public:
                 false /* setIsCleaningServerMetadata */);
         }
 
-        // _finalizeUpgrade is only for any tasks that must be done to fully complete the FCV
-        // upgrade AFTER the FCV document has already been updated to the UPGRADED FCV.
-        // This is because during _runUpgrade, the FCV is still in the transitional state (which
-        // behaves like the downgraded FCV), so certain tasks cannot be done yet until the FCV is
-        // fully upgraded.
-        // Everything in this function **must** be idempotent/retryable.
+        // _finalizeUpgrade/_finalizeDowngrade are only for any tasks that must be done to fully
+        // complete the FCV change AFTER the FCV document has already been updated to the requested
+        // FCV. This is because there are feature flags that only change value once the FCV document
+        // is on the requested value. Everything in these functions **must** be
+        // idempotent/retryable.
         if (requestedVersion > actualVersion) {
             _finalizeUpgrade(opCtx, requestedVersion);
+        } else {
+            _finalizeDowngrade(opCtx, requestedVersion);
         }
 
         LOGV2(6744302,
@@ -699,25 +688,31 @@ private:
                                                            DDLCoordinatorTypeEnum::kMovePrimary);
         }
 
-        // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
-        if (isDowngrading &&
-            feature_flags::gCreateDatabaseDDLCoordinator
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kCreateDatabase);
-        }
-
-        // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
-        if (isDowngrading &&
-            feature_flags::gCreateDatabaseDDLCoordinator
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kDropDatabase);
-        }
-
         if (isUpgrading) {
+            // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+            if (feature_flags::gShardAuthoritativeDbMetadataDDL
+                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                  originalVersion)) {
+                // This is is needed for SPM-3729. Since we're going to have a feature flag changing
+                // value in kUpgrading, we need to drain coordinators that started in FCV 8.0.
+                // waitForOngoingCoordinatorsToFinish() could also wait for coordinators that
+                // started AFTER the transition to kUpgrading. That's OK, it's a performance
+                // penalty, but there is no correctness issue.
+                // TODO (SERVER-101537): use new draining mechanism.
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForOngoingCoordinatorsToFinish(
+                        opCtx, [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
+                            static constexpr std::array drainCoordinatorTypes{
+                                DDLCoordinatorTypeEnum::kMovePrimary,
+                                DDLCoordinatorTypeEnum::kDropDatabase,
+                                DDLCoordinatorTypeEnum::kCreateDatabase,
+                            };
+                            const auto opType = coordinatorInstance.operationType();
+                            return std::ranges::any_of(drainCoordinatorTypes,
+                                                       [&](auto&& type) { return opType == type; });
+                        });
+            }
+
             _createShardingIndexCatalogIndexes(
                 opCtx, requestedVersion, NamespaceString::kShardIndexCatalogNamespace);
         }
@@ -857,6 +852,24 @@ private:
         if (!role || role->has(ClusterRole::None) || role->has(ClusterRole::ShardServer)) {
             const auto requestedVersion = request.getCommandParameter();
             _userCollectionsWorkForUpgrade(opCtx, requestedVersion);
+        }
+
+        // Run the authoritative clone phase on ALL shards (including the config
+        // server if it's also a shard).
+        if (role && role->has(ClusterRole::ConfigServer)) {
+            const auto requestedVersion = request.getCommandParameter();
+            const auto originalVersion =
+                getTransitionFCVInfo(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
+                    .from;
+
+            if (feature_flags::gShardAuthoritativeDbMetadataDDL
+                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                  originalVersion)) {
+                uassertStatusOK(
+                    ShardingCatalogManager::get(opCtx)->runCloneAuthoritativeMetadataOnShards(
+                        opCtx));
+            }
         }
 
         uassert(ErrorCodes::Error(549180),
@@ -1588,6 +1601,29 @@ private:
             feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
                 requestedVersion)) {
             _createConfigSessionsCollectionLocally(opCtx);
+        }
+    }
+
+    // _finalizeDowngrade is analogous to _finalizeUpgrade, but runs on downgrade. As with
+    // _finalizeUpgrade, all tasks in this function **must** be idempotent/retryable.
+    void _finalizeDowngrade(OperationContext* opCtx,
+                            const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        auto role = ShardingState::get(opCtx)->pollClusterRole();
+
+        // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
+        if (role && role->has(ClusterRole::ConfigServer) &&
+            !feature_flags::gCreateDatabaseDDLCoordinator.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
+                                                           DDLCoordinatorTypeEnum::kCreateDatabase);
+        }
+
+        // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
+        if (role && role->has(ClusterRole::ShardServer) &&
+            !feature_flags::gCreateDatabaseDDLCoordinator.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
+                                                           DDLCoordinatorTypeEnum::kDropDatabase);
         }
     }
 };

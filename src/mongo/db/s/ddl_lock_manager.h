@@ -355,6 +355,8 @@ protected:
     friend class ShardingDDLCoordinator;
     friend class ShardingDDLCoordinatorService;
     friend class ShardingDDLCoordinatorServiceTest;
+    // TODO (SERVER-102647): Remove this friend declaration.
+    friend class ConfigSvrCreateDatabaseCommand;
 };
 
 }  // namespace mongo

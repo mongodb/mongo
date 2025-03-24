@@ -129,10 +129,14 @@ feature_flags:
     shouldBeFCVGated: true
     fcv_context_unaware: true
   featureFlagCreateDatabaseDDLCoordinator:
-    description: "Feature flag for enabling the sharding DDL coordinator for database creation."
+    description: >
+      Feature flag for enabling the sharding DDL coordinator for database creation. Enabled in
+      transitional FCV because the new coordinator is needed during the transition phase of
+      authoritative databases.
     cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
     default: false
     shouldBeFCVGated: true
+    enable_on_transitional_fcv: true
     fcv_context_unaware: true
   # TODO (SERVER-95599): remove once 9.0 becomes last LTS.
   featureFlagConfigDebugDumpSupported:
