@@ -164,6 +164,10 @@ public:
 
     void endNonBlockingBackup() override {}
 
+    Timestamp getBackupCheckpointTimestamp() override {
+        return Timestamp(0, 0);
+    }
+
     StatusWith<std::deque<std::string>> extendBackupCursor() override;
 
     boost::optional<Timestamp> getLastStableRecoveryTimestamp() const override {
@@ -197,6 +201,15 @@ public:
     bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool) override {
         return true;
     }
+
+    StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
+                                             const std::string& requestingServiceName,
+                                             Timestamp requestedTimestamp,
+                                             bool roundUpIfTooOld) override {
+        return Timestamp(0, 0);
+    }
+
+    void unpinOldestTimestamp(const std::string& requestingServiceName) override {}
 
     bool underCachePressure() override {
         return false;

@@ -282,6 +282,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual Timestamp getBackupCheckpointTimestamp() = 0;
+
     virtual Status disableIncrementalBackup() {
         MONGO_UNREACHABLE;
     }
@@ -484,13 +486,9 @@ public:
     virtual StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
                                                      const std::string& requestingServiceName,
                                                      Timestamp requestedTimestamp,
-                                                     bool roundUpIfTooOld) {
-        MONGO_UNREACHABLE;
-    }
+                                                     bool roundUpIfTooOld) = 0;
 
-    virtual void unpinOldestTimestamp(const std::string& requestingServiceName) {
-        MONGO_UNREACHABLE
-    }
+    virtual void unpinOldestTimestamp(const std::string& requestingServiceName) = 0;
 
     /**
      * See `StorageEngine::setPinnedOplogTimestamp`

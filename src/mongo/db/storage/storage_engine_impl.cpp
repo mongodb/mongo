@@ -862,6 +862,10 @@ void StorageEngineImpl::endBackup() {
     _inBackupMode = false;
 }
 
+Timestamp StorageEngineImpl::getBackupCheckpointTimestamp() {
+    return _engine->getBackupCheckpointTimestamp();
+}
+
 Status StorageEngineImpl::disableIncrementalBackup() {
     LOGV2(9538600, "Disabling incremental backup");
     return _engine->disableIncrementalBackup();

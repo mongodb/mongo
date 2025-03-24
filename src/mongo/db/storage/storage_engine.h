@@ -288,6 +288,11 @@ public:
     virtual Status disableIncrementalBackup() = 0;
 
     /**
+     * Returns the timestamp of the checkpoint that the backup cursor is opened on.
+     */
+    virtual Timestamp getBackupCheckpointTimestamp() = 0;
+
+    /**
      * Represents the options that the storage engine can use during full and incremental backups.
      *
      * When performing a full backup where incrementalBackup=false, the values of 'blockSizeMB',
@@ -307,6 +312,7 @@ public:
         bool disableIncrementalBackup = false;
         bool incrementalBackup = false;
         int blockSizeMB = 16;
+        bool takeCheckpoint = true;
         boost::optional<std::string> thisBackupName;
         boost::optional<std::string> srcBackupName;
     };

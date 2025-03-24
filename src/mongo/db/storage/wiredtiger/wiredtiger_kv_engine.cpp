@@ -2858,6 +2858,17 @@ std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     return tmp;
 }
 
+Timestamp WiredTigerKVEngine::getBackupCheckpointTimestamp() {
+    // Buffer must be large enough to hold a NUL terminated, hex-encoded 8 byte timestamp.
+    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
+
+    invariantWTOK(_conn->query_timestamp(_conn, buf, "get=backup_checkpoint"), nullptr);
+    std::uint64_t backup_checkpoint_timestamp;
+    fassert(8120800, NumberParser().base(16)(buf, &backup_checkpoint_timestamp));
+
+    return Timestamp(backup_checkpoint_timestamp);
+}
+
 void WiredTigerKVEngine::dump() const {
     int ret = _conn->debug_info(
         _conn, "cache=true,cursors=true,handles=true,log=true,sessions=true,txn=true");

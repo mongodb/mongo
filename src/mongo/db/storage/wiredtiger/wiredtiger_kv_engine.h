@@ -352,6 +352,8 @@ public:
 
     void endBackup() override;
 
+    Timestamp getBackupCheckpointTimestamp() override;
+
     Status disableIncrementalBackup() override;
 
     StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(

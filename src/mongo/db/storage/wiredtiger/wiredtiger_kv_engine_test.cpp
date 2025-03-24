@@ -846,6 +846,11 @@ TEST_F(WiredTigerKVEngineTest, TestRestartUsesNewConn) {
     ASSERT_EQ(engine->getConn(), permit->conn());
 }
 
+TEST_F(WiredTigerKVEngineTest, TestGetBackupCheckpointTimestampWithoutOpenBackupCursor) {
+    auto* engine = _helper.getWiredTigerKVEngine();
+    ASSERT_EQ(Timestamp::min(), engine->getBackupCheckpointTimestamp());
+}
+
 DEATH_TEST_F(WiredTigerKVEngineTest, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {
     auto opCtx = _makeOperationContext();
     shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
