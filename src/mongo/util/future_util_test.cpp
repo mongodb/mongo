@@ -1382,7 +1382,7 @@ TEST_F(FutureUtilTest, WithCancellationWorksWithVoidInput) {
     ASSERT(cancelableFuture.isReady());
 }
 
-// TODO(SERVER-97447): One particular v5 buildvariant fails to build this test.
+// TODO(SERVER-102282): One particular v5 buildvariant fails to build this test.
 #if !(!defined(__clang__) && defined(__x86_64__) && __GNUC__ >= 14)
 TEST_F(FutureUtilTest, WithCancellationWorksWithSemiFutureInput) {
     const int kResult{5};
