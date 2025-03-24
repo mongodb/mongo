@@ -302,7 +302,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-latest-large-m8g
   - name: test_api_version_compatibility
