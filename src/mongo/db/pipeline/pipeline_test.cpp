@@ -5305,11 +5305,13 @@ public:
 
         getCatalogCacheMock()->setCollectionReturnValue(
             NamespaceString::createNamespaceString_forTest(kDBName, "outColl"),
-            CollectionRoutingInfo{ChunkManager{kMyShardName,
-                                               DatabaseVersion{UUID::gen(), timestamp},
-                                               makeStandaloneRoutingTableHistory(std::move(rt)),
-                                               timestamp},
-                                  boost::none});
+            CollectionRoutingInfo{
+                ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
+                boost::none,
+                DatabaseTypeValueHandle(
+                    DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
+                                 kMyShardName,
+                                 DatabaseVersion{}})});
 
         static const std::string kSentPipeJson = "[{$merge: {into: {db: '" + kDBName +
             "', coll: 'outColl'}, on: '_id', "
@@ -5350,11 +5352,12 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
     getCatalogCacheMock()->setCollectionReturnValue(
         NamespaceString::createNamespaceString_forTest(kDBName, "outColl"),
         CollectionRoutingInfo{
-            ChunkManager{kMyShardName,
-                         DatabaseVersion{UUID::gen(), timestamp},
-                         RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
-                         timestamp},
-            boost::none});
+            ChunkManager{RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}}, timestamp},
+            boost::none,
+            DatabaseTypeValueHandle(
+                DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
+                             kMyShardName,
+                             DatabaseVersion{UUID::gen(), timestamp}})});
     doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
            "[]" /*shardPipeJson*/,
            "[{$merge: {into: {db: '" + kDBName +
@@ -5404,11 +5407,13 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
 
     getCatalogCacheMock()->setCollectionReturnValue(
         fromCollNs,
-        CollectionRoutingInfo{ChunkManager{kMyShardName,
-                                           DatabaseVersion{UUID::gen(), timestamp},
-                                           makeStandaloneRoutingTableHistory(std::move(rt)),
-                                           timestamp},
-                              boost::none});
+        CollectionRoutingInfo{
+            ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
+            boost::none,
+            DatabaseTypeValueHandle(
+                DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
+                             kMyShardName,
+                             DatabaseVersion{UUID::gen(), timestamp}})});
     doTest(
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* inputPipeJson */
         ,
@@ -5440,11 +5445,13 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
 
     getCatalogCacheMock()->setCollectionReturnValue(
         fromCollNs,
-        CollectionRoutingInfo{ChunkManager{kMyShardName,
-                                           DatabaseVersion{UUID::gen(), timestamp},
-                                           makeStandaloneRoutingTableHistory(std::move(rt)),
-                                           timestamp},
-                              boost::none});
+        CollectionRoutingInfo{
+            ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
+            boost::none,
+            DatabaseTypeValueHandle(
+                DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
+                             kMyShardName,
+                             DatabaseVersion{UUID::gen(), timestamp}})});
     doTest(
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* inputPipeJson */
         ,

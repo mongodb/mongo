@@ -163,12 +163,12 @@ public:
 
         return CollectionRoutingInfo{
             ChunkManager(
-                _someDonorId,
-                DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                 ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)),
                 boost::none /* clusterTime */),
             ShardingIndexesCatalogCache(CollectionIndexes(_sourceUUID, Timestamp(1, 0)),
-                                        std::move(shardingIndexesCatalogMap))};
+                                        std::move(shardingIndexesCatalogMap)),
+            DatabaseTypeValueHandle(DatabaseType{
+                nss.dbName(), _someDonorId, DatabaseVersion(UUID::gen(), Timestamp(1, 1))})};
     }
 
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(

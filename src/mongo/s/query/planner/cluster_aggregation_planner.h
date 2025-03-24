@@ -86,7 +86,7 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
  * collation.
  */
 BSONObj getCollation(OperationContext* opCtx,
-                     const boost::optional<ChunkManager>& cm,
+                     const boost::optional<CollectionRoutingInfo>& cri,
                      const NamespaceString& nss,
                      const BSONObj& collation,
                      bool requiresCollationForParsingUnshardedAggregate);

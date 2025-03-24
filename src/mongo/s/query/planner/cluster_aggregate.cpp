@@ -401,13 +401,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // collation, and since collectionless aggregations generally run on the 'admin'
     // database, the standard logic would attempt to resolve its non-existent UUID and
     // collation by sending a specious 'listCollections' command to the config servers.
-    auto collationObj = hasChangeStream ? request.getCollation().value_or(BSONObj())
-                                        : cluster_aggregation_planner::getCollation(
-                                              opCtx,
-                                              cri ? boost::make_optional(cri->cm) : boost::none,
-                                              nsStruct.executionNss,
-                                              request.getCollation().value_or(BSONObj()),
-                                              requiresCollationForParsingUnshardedAggregate);
+    auto collationObj = hasChangeStream
+        ? request.getCollation().value_or(BSONObj())
+        : cluster_aggregation_planner::getCollation(opCtx,
+                                                    cri,
+                                                    nsStruct.executionNss,
+                                                    request.getCollation().value_or(BSONObj()),
+                                                    requiresCollationForParsingUnshardedAggregate);
 
     // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
     // includes all involved namespaces, and creates a shared MongoProcessInterface for use by

@@ -125,11 +125,8 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                            boost::none /* reshardingFields */,
                                            true,
                                            chunks);
-    return CollectionMetadata(ChunkManager(getShardId(0),
-                                           DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                           makeStandaloneRoutingTableHistory(std::move(rt)),
-                                           boost::none),
-                              getShardId(0));
+    return CollectionMetadata(
+        ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none), getShardId(0));
 }
 
 ShardId pessimalShardSelector(int i, int nShards, int nChunks) {
@@ -160,11 +157,8 @@ MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
         true /* allowMigration */,
         false /* unsplittable */,
         newChunks);
-    return CollectionMetadata(ChunkManager(getShardId(0),
-                                           DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                           makeStandaloneRoutingTableHistory(std::move(rt)),
-                                           boost::none),
-                              getShardId(0));
+    return CollectionMetadata(
+        ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none), getShardId(0));
 }
 
 /*
@@ -320,12 +314,9 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                boost::none /* reshardingFields */,
                                                true,
                                                chunks);
-        benchmark::DoNotOptimize(
-            CollectionMetadata(ChunkManager(getShardId(0),
-                                            DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                            makeStandaloneRoutingTableHistory(std::move(rt)),
-                                            boost::none),
-                               getShardId(0)));
+        benchmark::DoNotOptimize(CollectionMetadata(
+            ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none),
+            getShardId(0)));
     }
 }
 

@@ -698,14 +698,8 @@ struct EndpointComp {
  */
 class ChunkManager {
 public:
-    ChunkManager(ShardId dbPrimary,
-                 DatabaseVersion dbVersion,
-                 RoutingTableHistoryValueHandle rt,
-                 boost::optional<Timestamp> clusterTime)
-        : _dbPrimary(std::move(dbPrimary)),
-          _dbVersion(std::move(dbVersion)),
-          _rt(std::move(rt)),
-          _clusterTime(std::move(clusterTime)) {}
+    ChunkManager(RoutingTableHistoryValueHandle rt, boost::optional<Timestamp> clusterTime)
+        : _rt(std::move(rt)), _clusterTime(std::move(clusterTime)) {}
 
     // Methods supported on both sharded and unsharded collections
 
@@ -746,14 +740,6 @@ public:
      * to provide a stable view of its constituent shards.
      */
     bool allowMigrations() const;
-
-    const ShardId& dbPrimary() const {
-        return _dbPrimary;
-    }
-
-    const DatabaseVersion& dbVersion() const {
-        return _dbVersion;
-    }
 
     int numChunks() const {
         return _rt->optRt ? _rt->optRt->numChunks() : 1;
@@ -1019,9 +1005,6 @@ public:
     }
 
 private:
-    ShardId _dbPrimary;
-    DatabaseVersion _dbVersion;
-
     RoutingTableHistoryValueHandle _rt;
 
     boost::optional<Timestamp> _clusterTime;

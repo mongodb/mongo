@@ -107,8 +107,11 @@ std::unique_ptr<CatalogCacheMock> CatalogCacheMock::make() {
 
 CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoUntracked(
     const NamespaceString& nss, const ShardId& dbPrimaryShard, DatabaseVersion dbVersion) {
-    ChunkManager cm(dbPrimaryShard, dbVersion, OptionalRoutingTableHistory(), boost::none);
-    return CollectionRoutingInfo(std::move(cm), boost::none /*shardingIndexesCatalog*/);
+    ChunkManager cm(OptionalRoutingTableHistory(), boost::none);
+    return CollectionRoutingInfo(
+        std::move(cm),
+        boost::none /*shardingIndexesCatalog*/,
+        DatabaseTypeValueHandle(DatabaseType{nss.dbName(), dbPrimaryShard, dbVersion}));
 }
 
 CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoUnsplittable(
@@ -192,11 +195,12 @@ CollectionRoutingInfo CatalogCacheMock::_makeCollectionRoutingInfoTracked(
                                             true /*allowMigrations*/,
                                             chunkTypes);
 
-    ChunkManager cm(dbPrimaryShard,
-                    dbVersion,
-                    ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rth)),
+    ChunkManager cm(ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rth)),
                     boost::none /*clusterTime*/);
-    return CollectionRoutingInfo(std::move(cm), boost::none /*shardingIndexesCatalog*/);
+    return CollectionRoutingInfo(
+        std::move(cm),
+        boost::none /*shardingIndexesCatalog*/,
+        DatabaseTypeValueHandle(DatabaseType{nss.dbName(), dbPrimaryShard, dbVersion}));
 }
 
 CachedDatabaseInfo CatalogCacheMock::makeDatabaseInfo(const DatabaseName& dbName,

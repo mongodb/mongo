@@ -240,7 +240,7 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
                 FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
                     innerOpCtx, escNss, ChunkVersion::UNSHARDED()));
             ScopedSetShardRole escShardRole(
-                innerOpCtx, escNss, ShardVersion::UNSHARDED(), innerCri.cm.dbVersion());
+                innerOpCtx, escNss, ShardVersion::UNSHARDED(), innerCri.getDbVersion());
 
             cleanupESCAnchors(innerOpCtx, escNss, pq, tagsPerDelete, escStats);
         });

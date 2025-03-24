@@ -98,7 +98,7 @@ Rarely _sampler;
 
 auto makeExpressionContext(OperationContext* opCtx,
                            const MapReduceCommandRequest& parsedMr,
-                           const ChunkManager& cm,
+                           const CollectionRoutingInfo& cri,
                            boost::optional<ExplainOptions::Verbosity> verbosity) {
     // Populate the collection UUID and the appropriate collation to use.
     auto nss = parsedMr.getNamespace();
@@ -111,7 +111,7 @@ auto makeExpressionContext(OperationContext* opCtx,
     const auto requiresCollationForParsingUnshardedAggregate = false;
     auto collationObj =
         cluster_aggregation_planner::getCollation(opCtx,
-                                                  cm,
+                                                  cri,
                                                   nss,
                                                   parsedMr.getCollation().get_value_or(BSONObj()),
                                                   requiresCollationForParsingUnshardedAggregate);
@@ -156,7 +156,7 @@ auto makeExpressionContext(OperationContext* opCtx,
             .runtimeConstants(runtimeConstants)
             .inRouter(true)
             .build();
-    if (!cm.hasRoutingTable() && collationObj.isEmpty()) {
+    if (!cri.hasRoutingTable() && collationObj.isEmpty()) {
         expCtx->setIgnoreCollator();
     }
     return expCtx;
@@ -237,7 +237,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         diagnostic_printers::ShardKeyDiagnosticPrinter{
             cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
 
-    auto expCtx = makeExpressionContext(opCtx, parsedMr, cri.cm, verbosity);
+    auto expCtx = makeExpressionContext(opCtx, parsedMr, cri, verbosity);
 
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.

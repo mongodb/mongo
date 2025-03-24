@@ -111,9 +111,7 @@ public:
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
         auto chunk = ChunkType(
             uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), ShardId("other"));
-        ChunkManager cm(ShardId("0"),
-                        DatabaseVersion(UUID::gen(), timestamp),
-                        makeStandaloneRoutingTableHistory(
+        ChunkManager cm(makeStandaloneRoutingTableHistory(
                             RoutingTableHistory::makeNew(kTestNss,
                                                          uuid,
                                                          kShardKeyPattern,

@@ -86,9 +86,7 @@ public:
                                                                 true,         // allowMigration
                                                                 chunks);
 
-        return ChunkManager(_shardPrimary,
-                            _dbVersion,
-                            RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
+        return ChunkManager(RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
                                 std::move(routingTableHistory))),
                             boost::none);
     }

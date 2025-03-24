@@ -129,10 +129,8 @@ RoutingTableHistory makeRoutingTable(const std::vector<ChunkType>& chunks) {
 }
 
 ChunkManager makeChunkManager(const std::vector<ChunkType>& chunks) {
-    static const auto kConfigId = ShardId("config");
-    DatabaseVersion dbVersion;
     auto rt = std::make_shared<RoutingTableHistory>(makeRoutingTable(chunks));
-    return {kConfigId, std::move(dbVersion), {std::move(rt)}, boost::none /* atClusterTime */};
+    return {{std::move(rt)}, boost::none /* atClusterTime */};
 }
 
 DistributionStatus makeDistStatus(const ChunkManager& cm, ZoneInfo zoneInfo = ZoneInfo()) {

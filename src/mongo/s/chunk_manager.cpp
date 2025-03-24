@@ -908,7 +908,7 @@ void RoutingTableHistory::getAllChunkRanges(std::set<ChunkRange>* all) const {
 }
 
 ChunkManager ChunkManager::makeAtTime(const ChunkManager& cm, Timestamp clusterTime) {
-    return ChunkManager(cm.dbPrimary(), cm.dbVersion(), cm._rt, clusterTime);
+    return ChunkManager(cm._rt, clusterTime);
 }
 
 bool ChunkManager::allowMigrations() const {

@@ -291,16 +291,16 @@ boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContex
         return boost::none;
     }
     const auto cri = uassertStatusOK(swCRI);
-    const auto& cm = cri.cm;
 
-    if (cm.hasRoutingTable()) {
+    if (cri.hasRoutingTable()) {
+        const auto& cm = cri.cm;
         if (cm.isUnsplittable()) {
             return cm.getMinKeyShardIdWithSimpleCollation();
         } else {
             return boost::none;
         }
     } else {
-        return cm.dbPrimary();
+        return cri.getDbPrimaryShardId();
     }
     return boost::none;
 }

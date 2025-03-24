@@ -627,7 +627,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     const auto isUpsert = cmdObj.getBoolField("upsert");
     const auto let = getLet(cmdObj);
     const auto rc = getLegacyRuntimeConstants(cmdObj);
-    if (cm.hasRoutingTable()) {
+    if (cri.hasRoutingTable()) {
         // If the request is for a view on a sharded timeseries buckets collection, we need to
         // replace the namespace by buckets collection namespace in the command object.
         if (isTimeseriesViewRequest) {
@@ -650,7 +650,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
             shardId = targetSingleShard(expCtx, cm, query, collation, isTimeseriesViewRequest);
         }
     } else {
-        shardId = cm.dbPrimary();
+        shardId = cri.getDbPrimaryShardId();
     }
 
     // Time how long it takes to run the explain command on the shard.
@@ -663,10 +663,10 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         return Status::OK();
     }
 
-    auto shardVersion = cm.hasRoutingTable()
+    auto shardVersion = cri.hasRoutingTable()
         ? boost::make_optional(cri.getShardVersion(*shardId))
-        : boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED());
-    auto dbVersion = cm.hasRoutingTable() ? boost::none : boost::make_optional(cm.dbVersion());
+        : boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNSHARDED());
+    auto dbVersion = cri.hasRoutingTable() ? boost::none : boost::make_optional(cri.getDbVersion());
 
     _runCommand(
         opCtx,
@@ -762,7 +762,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         diagnostic_printers::ShardKeyDiagnosticPrinter{
             cm.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
 
-    auto isTrackedTimeseries = cm.hasRoutingTable() && cm.getTimeseriesFields();
+    auto isTrackedTimeseries = cri.hasRoutingTable() && cm.getTimeseriesFields();
     auto isTimeseriesViewRequest = false;
     if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {
         nss = std::move(cm.getNss());
@@ -773,7 +773,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
 
     // Append mongoS' runtime constants to the command object before forwarding it to the shard.
     auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
-    if (cm.hasRoutingTable()) {
+    if (cri.hasRoutingTable()) {
         // If the request is for a view on a sharded timeseries buckets collection, we need to
         // replace the namespace by buckets collection namespace in the command object.
         if (isTimeseriesViewRequest) {
@@ -867,9 +867,9 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     } else {
         getQueryCounters(opCtx).findAndModifyUnshardedCount.increment(1);
         _runCommand(opCtx,
-                    cm.dbPrimary(),
-                    boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
-                    cm.dbVersion(),
+                    cri.getDbPrimaryShardId(),
+                    boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNSHARDED()),
+                    cri.getDbVersion(),
                     nss,
                     applyReadWriteConcern(opCtx, this, cmdObjForShard),
                     false /* isExplain */,

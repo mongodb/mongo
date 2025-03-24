@@ -272,7 +272,7 @@ public:
                     diagnostic_printers::ShardKeyDiagnosticPrinter{
                         cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
 
-                auto numShards = getTargetedShardsForCanonicalQuery(cq, cri.cm).size();
+                auto numShards = getTargetedShardsForCanonicalQuery(cq, cri).size();
                 // When forwarding the command to multiple shards, need to transform it by adjusting
                 // query parameters such as limits and sorts.
                 if (numShards > 1) {

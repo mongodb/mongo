@@ -166,9 +166,7 @@ protected:
         auto range = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << MAXKEY));
         auto chunk = ChunkType(
             uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), shardThatChunkExistsOn);
-        ChunkManager cm(primaryShard,
-                        DatabaseVersion(uuid, timestamp),
-                        makeStandaloneRoutingTableHistory(
+        ChunkManager cm(makeStandaloneRoutingTableHistory(
                             RoutingTableHistory::makeNew(nss,
                                                          uuid,
                                                          shardKeyPattern,

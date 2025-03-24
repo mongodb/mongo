@@ -152,15 +152,17 @@ protected:
                                          true /* allowMigrations */,
                                          chunks);
 
-        auto cm = ChunkManager(ShardId("dummyPrimaryShard"),
-                               DatabaseVersion(UUID::gen(), timestamp),
-                               RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
+        auto cm = ChunkManager(RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
                                    std::move(routingTableHistory))),
                                boost::none);
         return CollectionRoutingInfoTargeter(
             nss,
-            CollectionRoutingInfo{std::move(cm),
-                                  boost::optional<ShardingIndexesCatalogCache>(boost::none)});
+            CollectionRoutingInfo{
+                std::move(cm),
+                boost::optional<ShardingIndexesCatalogCache>(boost::none),
+                DatabaseTypeValueHandle(DatabaseType{nss.dbName(),
+                                                     ShardId("dummyPrimaryShard"),
+                                                     DatabaseVersion(UUID::gen(), timestamp)})});
     }
 
     int32_t getRandomInt(int32_t limit) const {

@@ -223,16 +223,17 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
                                                             true /* allowMigrations */,
                                                             chunks);
 
-    auto cm = ChunkManager(ShardId("0"),
-                           DatabaseVersion(UUID::gen(), validAfter),
-                           RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
+    auto cm = ChunkManager(RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
                                std::move(routingTableHistory))),
                            boost::none);
 
     return CollectionRoutingInfoTargeter(
         nss,
-        CollectionRoutingInfo{std::move(cm),
-                              boost::optional<ShardingIndexesCatalogCache>(boost::none)});
+        CollectionRoutingInfo{
+            std::move(cm),
+            boost::optional<ShardingIndexesCatalogCache>(boost::none),
+            DatabaseTypeValueHandle(DatabaseType{
+                nss.dbName(), ShardId("0"), DatabaseVersion(UUID::gen(), validAfter)})});
 }
 
 /**

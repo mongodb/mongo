@@ -204,10 +204,10 @@ TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
 
 DEATH_TEST_REGEX_F(CatalogCacheRefreshTest,
                    ShouldFailToRefreshWhenLocksAreHeld,
-                   "Tripwire assertion.*7032314") {
+                   "Tripwire assertion.*10271000") {
     Lock::GlobalLock globalLock(operationContext(), MODE_X);
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
-    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, 7032314);
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, 10271000);
 }
 
 TEST_F(CatalogCacheRefreshTest, DatabaseNotFound) {
@@ -255,7 +255,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionNotFound) {
 
     auto cri = *future.default_timed_get();
     ASSERT(!cri.cm.isSharded());
-    ASSERT_EQ(ShardId{"0"}, cri.cm.dbPrimary());
+    ASSERT_EQ(ShardId{"0"}, cri.getDbPrimaryShardId());
 }
 
 TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {

@@ -632,9 +632,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardId("0")),
                        ChunkHistory(Timestamp(1, 0), ShardId("1"))});
 
-    ChunkManager chunkManager(ShardId("0"),
-                              DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                              makeStandaloneRoutingTableHistory(
+    ChunkManager chunkManager(makeStandaloneRoutingTableHistory(
                                   oldRoutingTable.makeUpdated(boost::none /* timeseriesFields */,
                                                               boost::none /* reshardingFields */,
                                                               true,
@@ -689,10 +687,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
                                            boost::none /* reshardingFields */,
                                            true,
                                            chunkVec);
-    ChunkManager cm(thisShard,
-                    DatabaseVersion(uuid, collTimestamp),
-                    makeStandaloneRoutingTableHistory(std::move(rt)),
-                    clusterTime);
+    ChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)), clusterTime);
 
     auto chunkIt = chunks.begin();
     while (chunkIt != chunks.end()) {

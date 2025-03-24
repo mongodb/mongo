@@ -189,7 +189,11 @@ protected:
         getCatalogCacheMock()->setCollectionReturnValue(
             _tempNss,
             CollectionRoutingInfo(createChunkManager(newShardKeyPattern, configCacheChunksData),
-                                  boost::none));
+                                  boost::none,
+                                  DatabaseTypeValueHandle(DatabaseType{_tempNss.dbName(),
+                                                                       getSourceId().getShardId(),
+                                                                       _sourceDbVersion})));
+
         auto [rawPipeline, expCtx] = _cloner->makeRawPipeline(
             operationContext(), std::make_shared<MockMongoInterface>(configCacheChunksData));
         _pipeline = Pipeline::parse(rawPipeline, expCtx);
@@ -255,10 +259,7 @@ protected:
                                                false,
                                                chunks);
 
-        return ChunkManager(getSourceId().getShardId(),
-                            _sourceDbVersion,
-                            makeStandaloneRoutingTableHistory(std::move(rt)),
-                            boost::none);
+        return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none);
     }
 
     void runPipelineTest(

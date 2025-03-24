@@ -186,10 +186,10 @@ BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> 
  * Returns true if the two CollectionRoutingInfo objects are different.
  */
 bool isMetadataDifferent(const CollectionRoutingInfo& criA, const CollectionRoutingInfo& criB) {
-    if (criA.cm.hasRoutingTable() != criB.cm.hasRoutingTable())
+    if (criA.hasRoutingTable() != criB.hasRoutingTable())
         return true;
 
-    if (criA.cm.hasRoutingTable()) {
+    if (criA.hasRoutingTable()) {
         if (criA.cm.getVersion() != criB.cm.getVersion())
             return true;
 
@@ -200,13 +200,13 @@ bool isMetadataDifferent(const CollectionRoutingInfo& criA, const CollectionRout
             criA.sii->getCollectionIndexes() != criB.sii->getCollectionIndexes();
     }
 
-    return criA.cm.dbVersion() != criB.cm.dbVersion();
+    return criA.getDbVersion() != criB.getDbVersion();
 }
 
 ShardEndpoint targetUnshardedCollection(const NamespaceString& nss,
                                         const CollectionRoutingInfo& cri) {
     invariant(!cri.cm.isSharded());
-    if (cri.cm.hasRoutingTable()) {
+    if (cri.hasRoutingTable()) {
         // Target the only shard that owns this collection.
         const auto shardId = cri.cm.getMinKeyShardIdWithSimpleCollation();
         return ShardEndpoint(shardId, cri.getShardVersion(shardId), boost::none);
@@ -215,9 +215,9 @@ ShardEndpoint targetUnshardedCollection(const NamespaceString& nss,
         // TODO (SERVER-51070): Remove the boost::none when the config server can support
         // shardVersion in commands
         return ShardEndpoint(
-            cri.cm.dbPrimary(),
+            cri.getDbPrimaryShardId(),
             nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
-            nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : cri.cm.dbVersion());
+            nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : cri.getDbVersion());
     }
 }
 
@@ -280,9 +280,9 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         }
     };
 
-    auto [cm, sii] = [&]() {
+    auto [cm, sii, dbInfo] = [&]() {
         auto cri = createDatabaseAndGetRoutingInfo(_nss);
-        return std::make_tuple(std::move(cri.cm), std::move(cri.sii));
+        return std::make_tuple(std::move(cri.cm), std::move(cri.sii), std::move(cri.dbInfo));
     }();
 
     // For a tracked time-series collection, only the underlying buckets collection is stored on the
@@ -325,7 +325,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
                 "Collection epoch has changed",
                 cm.getVersion().epoch() == *_targetEpoch);
     }
-    return CollectionRoutingInfo(std::move(cm), std::move(sii));
+    return CollectionRoutingInfo(std::move(cm), std::move(sii), std::move(dbInfo));
 }
 
 const NamespaceString& CollectionRoutingInfoTargeter::getNS() const {

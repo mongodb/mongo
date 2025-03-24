@@ -313,15 +313,14 @@ public:
                                                false,
                                                chunks);
 
-        return ChunkManager(_sourceId.getShardId(),
-                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                            makeStandaloneRoutingTableHistory(std::move(rt)),
-                            boost::none);
+        return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none);
     }
 
     void loadCatalogCacheValues() {
         _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(
-            DatabaseType(kAppliedToNs.dbName(), _cm->dbPrimary(), _cm->dbVersion()));
+            DatabaseType(kAppliedToNs.dbName(),
+                         _sourceId.getShardId(),
+                         DatabaseVersion(UUID::gen(), Timestamp(1, 1))));
         std::vector<ChunkType> chunks;
         _cm->forEachChunk([&](const auto& chunk) {
             chunks.emplace_back(

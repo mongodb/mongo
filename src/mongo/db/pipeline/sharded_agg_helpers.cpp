@@ -316,7 +316,7 @@ std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expC
     }
 
     tassert(8361100, "Need CollectionRoutingInfo to target sharded query", cri);
-    return getTargetedShardsForQuery(expCtx, cri->cm, shardQuery, collation);
+    return getTargetedShardsForQuery(expCtx, *cri, shardQuery, collation);
 }
 
 bool stageCanRunInParallel(const boost::intrusive_ptr<DocumentSource>& stage,
@@ -586,10 +586,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
     const CollectionRoutingInfo& targetingCri,
     const ShardId& localShardId) {
     try {
-        const auto& cm = targetingCri.cm;
         auto shardVersion = [&] {
-            auto sv = cm.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
-                                           : ShardVersion::UNSHARDED();
+            auto sv = targetingCri.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
+                                                     : ShardVersion::UNSHARDED();
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 if (auto optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime()) {
                     sv.setPlacementConflictTime(*optOriginalPlacementConflictTime);
@@ -601,7 +600,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
             opCtx,
             expCtx.getNamespaceString(),
             shardVersion,
-            boost::optional<DatabaseVersion>{!cm.hasRoutingTable(), cm.dbVersion()}};
+            boost::optional<DatabaseVersion>{!targetingCri.hasRoutingTable(),
+                                             targetingCri.getDbVersion()}};
 
         // TODO SERVER-77402 Wrap this in a shardRoleRetry loop instead of
         // catching exceptions. attachCursorSourceToPipelineForLocalRead enters the

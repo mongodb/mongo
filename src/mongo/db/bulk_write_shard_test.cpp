@@ -163,7 +163,6 @@ void installUnshardedCollectionMetadata(OperationContext* opCtx, const Namespace
 
 void installShardedCollectionMetadata(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      const DatabaseVersion& dbVersion,
                                       std::vector<ChunkType> chunks,
                                       ShardId thisShardId) {
     ASSERT(!chunks.empty());
@@ -196,8 +195,8 @@ void installShardedCollectionMetadata(OperationContext* opCtx,
         RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(std::move(rt)),
                                        ComparableChunkVersion::makeComparableChunkVersion(version));
 
-    const auto collectionMetadata = CollectionMetadata(
-        ChunkManager(thisShardId, dbVersion, rtHandle, boost::none), thisShardId);
+    const auto collectionMetadata =
+        CollectionMetadata(ChunkManager(rtHandle, boost::none), thisShardId);
 
     AutoGetCollection coll(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
@@ -228,7 +227,6 @@ void BulkWriteShardTest::setUp() {
     installShardedCollectionMetadata(
         opCtx(),
         nssShardedCollection1,
-        dbVersionTestDb1,
         {ChunkType(uuidShardedCollection1,
                    ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                    shardVersionShardedCollection1.placementVersion(),
@@ -241,7 +239,6 @@ void BulkWriteShardTest::setUp() {
     installShardedCollectionMetadata(
         opCtx(),
         nssShardedCollection2,
-        dbVersionTestDb2,
         {ChunkType(uuidShardedCollection2,
                    ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                    shardVersionShardedCollection2.placementVersion(),

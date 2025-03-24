@@ -78,12 +78,14 @@ protected:
             AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
             ->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
-        auto cm = ChunkManager(kMyShardName,
-                               _dbVersion,
-                               RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
+        auto cm = ChunkManager(RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
                                _dbVersion.getTimestamp());
         getCatalogCacheMock()->setCollectionReturnValue(
-            nss, CollectionRoutingInfo(std::move(cm), boost::none));
+            nss,
+            CollectionRoutingInfo(
+                std::move(cm),
+                boost::none,
+                DatabaseTypeValueHandle(DatabaseType{nss.dbName(), kMyShardName, _dbVersion})));
     }
 
     // Install sharded collection metadata for 1 chunk sharded collection and fills the cache.
@@ -131,7 +133,7 @@ protected:
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
 
-        auto cm = ChunkManager(shardName, _dbVersion, rtHandle, boost::none);
+        auto cm = ChunkManager(rtHandle, boost::none);
         const auto collectionMetadata = CollectionMetadata(cm, shardName);
 
         AutoGetCollection coll(opCtx, NamespaceStringOrUUID(nss), MODE_IX);
@@ -139,7 +141,11 @@ protected:
             ->setFilteringMetadata(opCtx, collectionMetadata);
 
         getCatalogCacheMock()->setCollectionReturnValue(
-            nss, CollectionRoutingInfo(std::move(cm), boost::none));
+            nss,
+            CollectionRoutingInfo(
+                std::move(cm),
+                boost::none,
+                DatabaseTypeValueHandle(DatabaseType{nss.dbName(), shardName, _dbVersion})));
     }
 
     DatabaseType createTestDatabase(const UUID& uuid, const Timestamp& timestamp) {

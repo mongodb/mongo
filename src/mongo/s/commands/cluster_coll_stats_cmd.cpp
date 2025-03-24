@@ -254,7 +254,7 @@ public:
             result.appendBool("sharded", true);
         } else {
             result.appendBool("sharded", false);
-            result.append("primary", cm.dbPrimary().toString());
+            result.append("primary", cri.getDbPrimaryShardId().toString());
         }
 
         int scale = 1;

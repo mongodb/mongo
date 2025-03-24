@@ -71,14 +71,20 @@ using CachedDatabaseInfo = DatabaseTypeValueHandle;
 
 struct CollectionRoutingInfo {
     CollectionRoutingInfo(ChunkManager&& chunkManager,
-                          boost::optional<ShardingIndexesCatalogCache>&& shardingIndexesCatalog)
-        : cm(std::move(chunkManager)), sii(std::move(shardingIndexesCatalog)) {}
+                          boost::optional<ShardingIndexesCatalogCache>&& shardingIndexesCatalog,
+                          CachedDatabaseInfo&& dbInfo)
+        : cm(std::move(chunkManager)),
+          sii(std::move(shardingIndexesCatalog)),
+          dbInfo(std::move(dbInfo)) {}
     ChunkManager cm;
     boost::optional<ShardingIndexesCatalogCache> sii;
+    CachedDatabaseInfo dbInfo;
 
     bool hasRoutingTable() const;
     ShardVersion getCollectionVersion() const;
     ShardVersion getShardVersion(const ShardId& shardId) const;
+    const ShardId& getDbPrimaryShardId() const;
+    const DatabaseVersion& getDbVersion() const;
 
     // When set to true, the ShardVersions returned by this object will have the
     // 'ignoreCollectionUuidMismatch' flag set, thus instructing the receiving shards to ignore
@@ -387,6 +393,10 @@ private:
                                                 const DatabaseName& dbName,
                                                 bool allowLocks = false);
 
+    StatusWith<CachedDatabaseInfo> _getDatabaseForCollectionRoutingInfo(OperationContext* opCtx,
+                                                                        const NamespaceString& nss,
+                                                                        bool allowLocks);
+
     StatusWith<CollectionRoutingInfo> _getCollectionRoutingInfoAt(
         OperationContext* opCtx,
         const NamespaceString& nss,
@@ -410,7 +420,8 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         ChunkManager&& cm,
-        boost::optional<ShardingIndexesCatalogCache>&& sii);
+        boost::optional<ShardingIndexesCatalogCache>&& sii,
+        CachedDatabaseInfo&& dbInfo);
 
     // (Optional) the kind of catalog cache instantiated. Used for logging and reporting purposes.
     std::string _kind;

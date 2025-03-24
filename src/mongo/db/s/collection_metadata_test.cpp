@@ -103,9 +103,7 @@ CollectionMetadata makeTrackedCollectionMetadataImpl(
     }
 
     return CollectionMetadata(
-        ChunkManager(kThisShard,
-                     DatabaseVersion(uuid, timestamp),
-                     ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
+        ChunkManager(ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
                          RoutingTableHistory::makeNew(kNss,
                                                       uuid,
                                                       shardKeyPattern,

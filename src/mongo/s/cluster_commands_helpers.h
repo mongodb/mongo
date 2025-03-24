@@ -417,7 +417,7 @@ bool appendEmptyResultSet(OperationContext* opCtx,
  * info.
  */
 std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                            const ChunkManager& cm,
+                                            const CollectionRoutingInfo& cri,
                                             const BSONObj& query,
                                             const BSONObj& collation);
 /**
@@ -425,7 +425,7 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
  * info.
  */
 std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query,
-                                                     const ChunkManager& cm);
+                                                     const CollectionRoutingInfo& cri);
 
 /**
  * Determines the shard(s) to which the given query will be targeted, and builds a separate

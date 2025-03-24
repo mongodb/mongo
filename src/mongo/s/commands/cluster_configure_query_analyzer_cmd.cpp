@@ -69,7 +69,7 @@ namespace {
  * info.
  */
 BSONObj makeVersionedCmdObj(const CollectionRoutingInfo& cri, const BSONObj& unversionedCmdObj) {
-    return appendDbVersionIfPresent(unversionedCmdObj, cri.cm.dbVersion());
+    return appendDbVersionIfPresent(unversionedCmdObj, cri.getDbVersion());
 }
 
 class ConfigureQueryAnalyzerCmd : public TypedCommand<ConfigureQueryAnalyzerCmd> {
@@ -87,7 +87,7 @@ public:
 
             const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-            const auto primaryShardId = cri.cm.dbPrimary();
+            const auto primaryShardId = cri.getDbPrimaryShardId();
 
             auto shard =
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));

@@ -187,10 +187,10 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
  * collation information).
  */
 BSONObj getUntrackedCollectionCollation(OperationContext* opCtx,
-                                        const ChunkManager& cm,
+                                        const CollectionRoutingInfo& cri,
                                         const NamespaceString& nss) {
-    auto shard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
+    auto shard = uassertStatusOK(
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cri.getDbPrimaryShardId()));
     BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << BSON("name" << nss.coll())
                                             << "cursor" << BSONObj());
     auto cursorResult = uassertStatusOK(
@@ -244,8 +244,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                                      const ShardId& shardId,
                                      const std::vector<ShardId>& targetedShards,
                                      bool hasSpecificMergeShard,
-                                     const ChunkManager& cm,
-                                     const boost::optional<ShardingIndexesCatalogCache>& sii,
+                                     const CollectionRoutingInfo& cri,
                                      bool mergingShardContributesData,
                                      const Pipeline* pipelineForMerging,
                                      bool requestQueryStatsFromRemotes) {
@@ -273,7 +272,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
             if (!mergeCtx->getIgnoreCollator()) {
                 return Value(mergeCtx->getCollator() ? mergeCtx->getCollator()->getSpec().toBSON()
                                                      : CollationSpec::kSimpleSpec);
-            } else if (!cm.hasRoutingTable() && !nss.isCollectionlessAggregateNS()) {
+            } else if (!cri.hasRoutingTable() && !nss.isCollectionlessAggregateNS()) {
                 // If we are dispatching a merging pipeline to a specific shard, and the main
                 // namespace is untracked, we must contact the primary shard to determine whether or
                 // not there exists a collection default collation. This is unfortunate, but
@@ -294,11 +293,12 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                 // shard.
                 tassert(8596500,
                         "Contacting primary shard for collation in unexpected case",
-                        targetedShards.size() == 1 && targetedShards[0] == cm.dbPrimary() &&
+                        targetedShards.size() == 1 &&
+                            targetedShards[0] == cri.getDbPrimaryShardId() &&
                             hasSpecificMergeShard);
 
                 if (auto untrackedDefaultCollation =
-                        getUntrackedCollectionCollation(mergeCtx->getOperationContext(), cm, nss);
+                        getUntrackedCollectionCollation(mergeCtx->getOperationContext(), cri, nss);
                     !untrackedDefaultCollation.isEmpty()) {
                     return Value(untrackedDefaultCollation);
                 }
@@ -348,8 +348,8 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     auto mergeCmdObj = appendShardVersion(
         mergeCmd.freeze().toBson(),
         ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                  sii ? boost::make_optional(sii->getCollectionIndexes())
-                                      : boost::none));
+                                  cri.sii ? boost::make_optional(cri.sii->getCollectionIndexes())
+                                          : boost::none));
 
     // Attach query settings to the command.
     if (auto querySettingsBSON = mergeCtx->getQuerySettings().toBSON();
@@ -425,8 +425,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                                     mergingShardId,
                                                     targetedShards,
                                                     shardDispatchResults.mergeShardId.has_value(),
-                                                    cri->cm,
-                                                    cri->sii,
+                                                    *cri,
                                                     mergingShardContributesData,
                                                     mergePipeline,
                                                     requestQueryStatsFromRemotes);
@@ -917,28 +916,28 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
 }
 
 BSONObj getCollation(OperationContext* opCtx,
-                     const boost::optional<ChunkManager>& cm,
+                     const boost::optional<CollectionRoutingInfo>& cri,
                      const NamespaceString& nss,
                      const BSONObj& collation,
                      bool requiresCollationForParsingUnshardedAggregate) {
     // If this is a collectionless aggregation or if the user specified an explicit collation,
     // we immediately return the user-defined collation if one exists, or an empty BSONObj
     // otherwise.
-    if (nss.isCollectionlessAggregateNS() || !collation.isEmpty() || !cm) {
+    if (nss.isCollectionlessAggregateNS() || !collation.isEmpty() || !cri) {
         return collation;
     }
 
     // If the target collection is untracked, we will contact the primary shard to discover this
     // information if it is necessary for pipeline parsing. Otherwise, we infer the collation once
     // the command is executed on the primary shard.
-    if (!cm->hasRoutingTable()) {
+    if (!cri->hasRoutingTable()) {
         return requiresCollationForParsingUnshardedAggregate
-            ? getUntrackedCollectionCollation(opCtx, *cm, nss)
+            ? getUntrackedCollectionCollation(opCtx, *cri, nss)
             : BSONObj();
     }
 
     // Return the default collator if one exists, otherwise return the simple collation.
-    if (auto defaultCollator = cm->getDefaultCollator()) {
+    if (auto defaultCollator = cri->cm.getDefaultCollator()) {
         return defaultCollator->getSpec().toBSON();
     }
 

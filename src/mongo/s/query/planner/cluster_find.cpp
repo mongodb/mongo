@@ -228,8 +228,6 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
     const boost::optional<UUID> sampleId,
     bool requestQueryStatsFromRemotes,
     const auto& opKey) {
-    const auto& cm = cri.cm;
-
     // Choose the shard to sample the query on if needed.
     const auto sampleShardId = sampleId
         ? boost::make_optional(analyze_shard_key::getRandomShardId(shardIds))
@@ -237,11 +235,11 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 
     // Helper methods for appending additional attributes to the shard command.
     auto appendShardVersion = [&](const auto& shardId, auto& cmdBuilder) {
-        if (cm.hasRoutingTable()) {
+        if (cri.hasRoutingTable()) {
             cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
             ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, &cmdBuilder);
-            cmdBuilder.append("databaseVersion", cm.dbVersion().toBSON());
+            cmdBuilder.append("databaseVersion", cri.getDbVersion().toBSON());
         }
     };
 
@@ -302,11 +300,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CollectionRoutingInfo& cri,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
-    const auto& cm = cri.cm;
-
     const auto& findCommand = query.getFindCommandRequest();
     // Get the set of shards on which we will run the query.
-    auto shardIds = getTargetedShardsForCanonicalQuery(query, cm);
+    auto shardIds = getTargetedShardsForCanonicalQuery(query, cri);
 
     bool requestQueryStatsFromRemotes =
         query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
@@ -415,7 +411,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
             !ex.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection() &&
-            !shardIds.count(cm.dbPrimary())) {
+            !shardIds.count(cri.getDbPrimaryShardId())) {
             // We received CollectionUUIDMismatch but it does not contain the actual namespace, and
             // we did not attempt to establish a cursor on the primary shard.
             uassertStatusOK(populateCollectionUUIDMismatch(opCtx, ex.toStatus()));
@@ -528,7 +524,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         opDebug.cursorExhausted = true;
 
         if (shardIds.size() > 0) {
-            updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
+            updateNumHostsTargetedMetrics(opCtx, cri.cm, shardIds.size());
         }
         if (const auto remoteMetrics = ccc->takeRemoteMetrics()) {
             opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(*remoteMetrics);
@@ -553,7 +549,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     opDebug.cursorid = cursorId;
 
     if (shardIds.size() > 0) {
-        updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
+        updateNumHostsTargetedMetrics(opCtx, cri.cm, shardIds.size());
     }
 
     return cursorId;

@@ -227,9 +227,7 @@ ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
                                                             true,         // allowMigration
                                                             chunks);
 
-    return ChunkManager(ShardId("dummyShardPrimary"),
-                        DatabaseVersion(UUID::gen(), timestamp),
-                        RoutingTableHistoryValueHandle(
+    return ChunkManager(RoutingTableHistoryValueHandle(
                             std::make_shared<RoutingTableHistory>(std::move(routingTableHistory))),
                         boost::none);
 }
@@ -253,8 +251,12 @@ void CollectionRoutingInfoTargeterTest::
     auto cm = makeCustomChunkManager(shardKeyPattern, splitPoints);
     auto criTargeter = CollectionRoutingInfoTargeter(
         kNss,
-        CollectionRoutingInfo{std::move(cm),
-                              boost::optional<ShardingIndexesCatalogCache>(boost::none)});
+        CollectionRoutingInfo{
+            std::move(cm),
+            boost::optional<ShardingIndexesCatalogCache>(boost::none),
+            DatabaseTypeValueHandle(DatabaseType{kNss.dbName(),
+                                                 ShardId("dummyShardPrimary"),
+                                                 DatabaseVersion(UUID::gen(), Timestamp(1, 0))})});
     ASSERT_EQ(criTargeter.getRoutingInfo().cm.numChunks(), 5);
 
     // Cause the global chunk manager to have some other configuration.
@@ -697,8 +699,8 @@ class CollectionRoutingInfoTargeterUntrackedTest : public RouterCatalogCacheTest
 public:
     CollectionRoutingInfoTargeter prepare() {
         const auto cri = makeUntrackedCollectionRoutingInfo(kNss);
-        primaryShard = cri.cm.dbPrimary();
-        dbVersion = cri.cm.dbVersion();
+        primaryShard = cri.getDbPrimaryShardId();
+        dbVersion = cri.getDbVersion();
         return CollectionRoutingInfoTargeter(kNss, cri);
     };
 

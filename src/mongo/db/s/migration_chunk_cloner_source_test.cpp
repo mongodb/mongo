@@ -744,10 +744,7 @@ protected:
                 ->setFilteringMetadata(
                     operationContext(),
                     CollectionMetadata(
-                        ChunkManager(ShardId("dummyShardId"),
-                                     DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                                     makeStandaloneRoutingTableHistory(std::move(rt)),
-                                     boost::none),
+                        ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none),
                         ShardId("dummyShardId")));
         }();
 

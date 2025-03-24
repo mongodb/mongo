@@ -182,6 +182,14 @@ bool CollectionRoutingInfo::hasRoutingTable() const {
     return cm.hasRoutingTable();
 }
 
+const ShardId& CollectionRoutingInfo::getDbPrimaryShardId() const {
+    return dbInfo->getPrimary();
+}
+
+const DatabaseVersion& CollectionRoutingInfo::getDbVersion() const {
+    return dbInfo->getVersion();
+}
+
 ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
     ShardVersion sv = ShardVersionFactory::make(
         cm, sii ? boost::make_optional(sii->getCollectionIndexes()) : boost::none);
@@ -361,6 +369,41 @@ StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCt
     }
 }
 
+StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabaseForCollectionRoutingInfo(
+    OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) {
+    tassert(10271000,
+            "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
+            "hold the lock during a network call, and can lead to a deadlock as described in "
+            "SERVER-37398.",
+            allowLocks || !shard_role_details::getLocker(opCtx)->isLocked());
+
+    auto swDbInfo = _getDatabase(opCtx, nss.dbName(), allowLocks);
+    if (!swDbInfo.isOK()) {
+        if (swDbInfo == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+            // Since collection refreshes always imply database refreshes, it is ok to transform
+            // this error into a collection error rather than a database error.
+            auto dbRefreshInfo =
+                swDbInfo.getStatus().extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+            LOGV2_DEBUG(7850500,
+                        2,
+                        "Adding collection name to ShardCannotRefreshDueToLocksHeld error",
+                        "dbName"_attr = dbRefreshInfo->getNss().dbName(),
+                        "nss"_attr = nss);
+            return Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
+                          "Routing info refresh did not complete"};
+        } else if (swDbInfo == ErrorCodes::NamespaceNotFound) {
+            LOGV2_FOR_CATALOG_REFRESH(
+                4947103,
+                2,
+                "Invalidating cached collection entry because its database has been dropped",
+                logAttrs(nss));
+            invalidateCollectionEntry_LINEARIZABLE(nss);
+        }
+        return swDbInfo.getStatus();
+    }
+    return swDbInfo;
+}
+
 StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -373,46 +416,16 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
             allowLocks || !shard_role_details::getLocker(opCtx)->isLocked());
 
     try {
-        const auto swDbInfo = _getDatabase(opCtx, nss.dbName(), allowLocks);
-        if (!swDbInfo.isOK()) {
-            if (swDbInfo == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
-                // Since collection refreshes always imply database refreshes, it is ok to transform
-                // this error into a collection error rather than a database error.
-                auto dbRefreshInfo =
-                    swDbInfo.getStatus().extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-                LOGV2_DEBUG(7850500,
-                            2,
-                            "Adding collection name to ShardCannotRefreshDueToLocksHeld error",
-                            "dbName"_attr = dbRefreshInfo->getNss().dbName(),
-                            "nss"_attr = nss);
-                return Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
-                              "Routing info refresh did not complete"};
-            } else if (swDbInfo == ErrorCodes::NamespaceNotFound) {
-                LOGV2_FOR_CATALOG_REFRESH(
-                    4947103,
-                    2,
-                    "Invalidating cached collection entry because its database has been dropped",
-                    logAttrs(nss));
-                invalidateCollectionEntry_LINEARIZABLE(nss);
-            }
-            return swDbInfo.getStatus();
-        }
-
         Timer curOpTimer{};
         ScopeGuard finishTiming([&] {
             CurOp::get(opCtx)->debug().catalogCacheCollectionLookupMillis +=
                 Milliseconds(curOpTimer.millis());
         });
 
-        const auto dbInfo = std::move(swDbInfo.getValue());
-
         if (nss.isNamespaceAlwaysUntracked()) {
             // If the collection is known to always be untracked, there is no need to request it to
             // the CollectionCache.
-            return ChunkManager(dbInfo->getPrimary(),
-                                dbInfo->getVersion(),
-                                OptionalRoutingTableHistory(),
-                                atClusterTime);
+            return ChunkManager(OptionalRoutingTableHistory(), atClusterTime);
         }
 
         auto collEntryFuture =
@@ -424,10 +437,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
             // use it, otherwise return an error
 
             if (collEntryFuture.isReady()) {
-                return ChunkManager(dbInfo->getPrimary(),
-                                    dbInfo->getVersion(),
-                                    collEntryFuture.get(opCtx),
-                                    atClusterTime);
+                return ChunkManager(collEntryFuture.get(opCtx), atClusterTime);
             } else {
                 return Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
                               "Routing info refresh did not complete"};
@@ -443,10 +453,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
                 auto collEntry = collEntryFuture.get(opCtx);
                 _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
 
-                return ChunkManager(dbInfo->getPrimary(),
-                                    dbInfo->getVersion(),
-                                    std::move(collEntry),
-                                    atClusterTime);
+                return ChunkManager(std::move(collEntry), atClusterTime);
             } catch (const DBException& ex) {
                 _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
                 bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
@@ -483,15 +490,19 @@ StatusWith<CollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoAt(
     bool allowLocks) {
     try {
         auto cri = [&]() -> StatusWith<CollectionRoutingInfo> {
+            auto dbInfo =
+                uassertStatusOK(_getDatabaseForCollectionRoutingInfo(opCtx, nss, allowLocks));
+
             auto cm = uassertStatusOK(
                 _getCollectionPlacementInfoAt(opCtx, nss, optAtClusterTime, allowLocks));
             if (!cm.isSharded()) {
                 // If the collection is unsharded, it cannot have global indexes so there is no need
                 // to fetch the index information.
-                return CollectionRoutingInfo{std::move(cm), boost::none};
+                return CollectionRoutingInfo{std::move(cm), boost::none, std::move(dbInfo)};
             }
             auto sii = _getCollectionIndexInfo(opCtx, nss, allowLocks);
-            return _retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
+            return _retryUntilConsistentRoutingInfo(
+                opCtx, nss, std::move(cm), std::move(sii), std::move(dbInfo));
         }();
         if (MONGO_unlikely(routerShouldRelaxCollectionUUIDConsistencyCheck(opCtx) && cri.isOK())) {
             cri.getValue().shouldIgnoreUuidMismatch = true;
@@ -591,7 +602,8 @@ StatusWith<CollectionRoutingInfo> CatalogCache::_retryUntilConsistentRoutingInfo
     OperationContext* opCtx,
     const NamespaceString& nss,
     ChunkManager&& cm,
-    boost::optional<ShardingIndexesCatalogCache>&& sii) {
+    boost::optional<ShardingIndexesCatalogCache>&& sii,
+    CachedDatabaseInfo&& dbInfo) {
     try {
         // A non-empty ShardingIndexesCatalogCache implies that the collection is sharded since
         // global indexes cannot be created on unsharded collections.
@@ -606,7 +618,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::_retryUntilConsistentRoutingInfo
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
-    return CollectionRoutingInfo{std::move(cm), std::move(sii)};
+    return CollectionRoutingInfo{std::move(cm), std::move(sii), std::move(dbInfo)};
 }
 
 StatusWith<ChunkManager> CatalogCache::getCollectionPlacementInfoWithRefresh(

@@ -126,9 +126,7 @@ void RangeDeleterServiceTest::_setFilteringMetadataByUUID(OperationContext* opCt
                                ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                                ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                                ShardId("this"));
-        ChunkManager cm(ShardId("this"),
-                        DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                        makeStandaloneRoutingTableHistory(
+        ChunkManager cm(makeStandaloneRoutingTableHistory(
                             RoutingTableHistory::makeNew(nss,
                                                          uuid,
                                                          kShardKeyPattern,

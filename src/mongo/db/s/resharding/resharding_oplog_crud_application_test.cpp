@@ -329,7 +329,6 @@ public:
 
 private:
     ChunkManager makeChunkManager(const OID& epoch,
-                                  const ShardId& shardId,
                                   const NamespaceString& nss,
                                   const UUID& uuid,
                                   const BSONObj& shardKey,
@@ -346,9 +345,7 @@ private:
                                                boost::none /* reshardingFields */,
                                                true /* allowMigrations */,
                                                chunks);
-        return ChunkManager(shardId,
-                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                            makeStandaloneRoutingTableHistory(std::move(rt)),
+        return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none /* clusterTime */);
     }
 
@@ -375,7 +372,7 @@ private:
                       _myDonorId}};
 
         return makeChunkManager(
-            epoch, _myDonorId, _sourceNss, _sourceUUID, BSON(_currentShardKey << 1), chunks);
+            epoch, _sourceNss, _sourceUUID, BSON(_currentShardKey << 1), chunks);
     }
 
     ChunkManager makeChunkManagerForOutputCollection() {
@@ -387,8 +384,7 @@ private:
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
                       _myDonorId}};
 
-        return makeChunkManager(
-            epoch, _myDonorId, _outputNss, outputUuid, BSON(_newShardKey << 1), chunks);
+        return makeChunkManager(epoch, _outputNss, outputUuid, BSON(_newShardKey << 1), chunks);
     }
 
     RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {

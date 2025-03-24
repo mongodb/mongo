@@ -152,11 +152,9 @@ protected:
                                                true,
                                                {std::move(chunk)});
 
-        return CollectionMetadata(ChunkManager(ShardId("this"),
-                                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                                               makeStandaloneRoutingTableHistory(std::move(rt)),
-                                               Timestamp(100, 0)),
-                                  ShardId("this"));
+        return CollectionMetadata(
+            ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), Timestamp(100, 0)),
+            ShardId("this"));
     }
 
     const DatabaseVersion dbVersion0 = DatabaseVersion{UUID::gen(), Timestamp(1, 0)};

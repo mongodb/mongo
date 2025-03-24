@@ -401,9 +401,7 @@ private:
                                                true /* allowMigrations */,
                                                chunks);
 
-        return ChunkManager(_myDonorId,
-                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                            makeStandaloneRoutingTableHistory(std::move(rt)),
+        return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none /* clusterTime */);
     }
 

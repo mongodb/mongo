@@ -250,9 +250,7 @@ protected:
         reshardingFields.setDonorFields(
             TypeCollectionDonorFields{tempNss, reshardKeyPattern, shards});
 
-        ChunkManager cm(shards[0],
-                        DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                        makeStandaloneRoutingTableHistory(
+        ChunkManager cm(makeStandaloneRoutingTableHistory(
                             RoutingTableHistory::makeNew(kNss,
                                                          collIdentifier,
                                                          shardKeyPattern,

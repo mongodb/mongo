@@ -259,9 +259,9 @@ CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* 
 void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                              const CollectionRoutingInfo& cri,
                                                              BSONObjBuilder* builder) {
-    if (cri.cm.getVersion(shardId) == ChunkVersion::UNSHARDED()) {
+    if (cri.getShardVersion(shardId) == ShardVersion::UNSHARDED()) {
         // Need to add the database version as well.
-        const auto& dbVersion = cri.cm.dbVersion();
+        const auto& dbVersion = cri.getDbVersion();
         if (!dbVersion.isFixed()) {
             BSONObjBuilder dbvBuilder(builder->subobjStart(DatabaseVersion::kDatabaseVersionField));
             dbVersion.serialize(&dbvBuilder);
@@ -311,9 +311,9 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
                 return chunkManagerMaybeAtClusterTime.getMinKeyShardIdWithSimpleCollation() ==
                     myShardId;
             } else {
-                // If collection is untracked, it is only local if this shard is the
-                // dbPrimary shard.
-                return chunkManagerMaybeAtClusterTime.dbPrimary() == myShardId;
+                // If collection is untracked, it is only local if this shard is the dbPrimary
+                // shard.
+                return nssCri->second.getDbPrimaryShardId() == myShardId;
             }
         }();
 
