@@ -4,6 +4,7 @@
  *   # TODO (SERVER-101293): Remove this tag.
  *   known_query_shape_computation_problem,
  *   featureFlagRawDataCrudOperations,
+ *   requires_fastcount,
  * ]
  */
 
@@ -53,10 +54,29 @@ assert.eq(numDocs,
           `Unexpected number of documents found with find
 ${tojson(docs)}`);
 
-let bucketsDocs = coll.aggregate([{$match: {}}], {rawData: true}).toArray();
-validateBuckets(bucketsDocs, numDocs);
-
-bucketsDocs = coll.find().rawData().toArray();
-validateBuckets(bucketsDocs, numDocs);
-
 assert.eq(numDocs, coll.distinct('_id').length);
+assert.eq(numDocs, coll.count());
+
+function testRawDataQueries() {
+    let bucketsDocs = coll.aggregate([{$match: {}}], {rawData: true}).toArray();
+    // There's no guarantee how many raw documents exist before unpacking. We only assert
+    // consistency across commands with rawData: true.
+    const numBucketDocs = bucketsDocs.length;
+    validateBuckets(bucketsDocs, numDocs);
+
+    bucketsDocs = coll.find().rawData().toArray();
+    validateBuckets(bucketsDocs, numDocs);
+
+    // A predicate which matches only bucket documents, not unpacked documents.
+    const bucketPredicate = {"control.count": {$exists: true}};
+
+    assert.eq(0, coll.distinct('_id', bucketPredicate, {rawData: false}));
+    assert.eq(numBucketDocs, coll.distinct('_id', bucketPredicate, {rawData: true}).length);
+
+    // Should return the same count as distinct().length.
+    assert.eq(numBucketDocs, coll.count(bucketPredicate, {rawData: true}));
+    // No unpacked documents should match the bucket structure.
+    assert.eq(0, coll.count(bucketPredicate, {rawData: false}));
+}
+
+testRawDataQueries();

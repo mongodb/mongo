@@ -16,6 +16,9 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    areViewlessTimeseriesEnabled
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -24,6 +27,7 @@ TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
     let coll = db[jsTestName()];
+    // Collection name used for assertions unless areViewlessTimeseriesEnabled(db) is true.
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';
@@ -33,7 +37,9 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(db.createCollection(coll.getName(), {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
     }));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
+    if (!areViewlessTimeseriesEnabled(db)) {
+        assert.contains(bucketsColl.getName(), db.getCollectionNames());
+    }
 
     insert(coll, {
         _id: 0,
@@ -404,7 +410,8 @@ TimeseriesTest.run((insert) => {
                 " failed with explain " + tojson(singleNodeQueryPlanner);
         }
 
-        if (sbeEnabled || singleNodeQueryPlanner.winningPlan.slotBasedPlan) {
+        if (sbeEnabled) {
+            assert(singleNodeQueryPlanner.winningPlan.hasOwnProperty("slotBasedPlan"), explain);
             const sbePlan = singleNodeQueryPlanner.winningPlan.slotBasedPlan.stages;
 
             if (testCase.usesBlockProcessing) {
@@ -436,7 +443,9 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(db.createCollection(coll.getName(), {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
     }));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
+    if (!areViewlessTimeseriesEnabled(db)) {
+        assert.contains(bucketsColl.getName(), db.getCollectionNames());
+    }
 
     insert(
         coll,

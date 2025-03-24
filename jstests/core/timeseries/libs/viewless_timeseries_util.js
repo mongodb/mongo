@@ -5,6 +5,6 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-export function areViewlessTimeseriesEnabled(conn) {
+export function areViewlessTimeseriesEnabled(db) {
     return FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
 }
