@@ -309,7 +309,9 @@
     MONGO_COMPILER_IF_CLANG(MONGO_COMPILER_PRAGMA(clang diagnostic ignored w))
 
 /**
- * TODO(SERVER-102303): Delete this macro once all its uses have been removed.
+ * TODO(SERVER-97447): We ignore these warnings on GCC 14 to facilitate
+ * transition to the v5 toolchain. They should be investigated more deeply by
+ * the teams owning each callsite.
  */
 #define MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL(w) \
     MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED(w))
