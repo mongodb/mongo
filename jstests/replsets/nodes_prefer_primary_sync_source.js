@@ -23,6 +23,8 @@ import {
 } from "jstests/replsets/libs/sync_source.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
+const changeSyncSourceThresholdMillis = 50;
+
 const name = jsTestName();
 const rst = new ReplSetTest({
     name,
@@ -35,8 +37,9 @@ const rst = new ReplSetTest({
             // Set 'changeSyncSourceThresholdMillis' to a higher value to mitigate failures due to
             // network jitter. As we rely on ping times to select a sync source, a smaller threshold
             // may result in unexpected sync source selections due to small network delays.
-            // We now consider nodes with ping difference <25ms to be in the same data center.
-            changeSyncSourceThresholdMillis: 25,
+            // We now consider nodes with ping difference < changeSyncSourceThresholdMillis to be in
+            // the same data center.
+            changeSyncSourceThresholdMillis: changeSyncSourceThresholdMillis,
         }
     },
     settings: {
@@ -111,9 +114,8 @@ jsTestLog(
     `Waiting for 'testNode' to receive heartbeats. The target sync source should have advanced its optime to ${
         tojson(advancedTimestamp)}`);
 
-let replSetGetStatus;
 assert.soon(() => {
-    replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
+    const replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
 
     // Wait for a heartbeat from the target sync source that shows that the target sync source's
     // last timestamp is at least 'advancedTimestamp'. This ensures the test node sees that the
@@ -141,7 +143,8 @@ assert.soon(() => {
     // ping time to that node is at least 'changeSyncSourceThresholdMillis' less than the ping time
     // to our current sync source.
     const primaryPingTime = replSetGetStatus.members[0].pingMs;
-    const exceedsChangeSyncSourceThreshold = (syncSourcePingTime - primaryPingTime > 20);
+    const exceedsChangeSyncSourceThreshold =
+        (syncSourcePingTime - primaryPingTime > changeSyncSourceThresholdMillis);
 
     if (!exceedsChangeSyncSourceThreshold) {
         jsTestLog("exceedsChangeSyncSourceThreshold check failed: syncSourcePingTime " +
@@ -153,8 +156,8 @@ assert.soon(() => {
     // considerably less than 'changeSyncSourceThresholdMillis' to ensure they are understood
     // as nodes in the same data center.
     const secondaryPingTime = replSetGetStatus.members[2].pingMs;
-    const centralWithinChangeSyncSourceThreshold =
-        (primaryPingTime - secondaryPingTime >= 0) && (primaryPingTime - secondaryPingTime < 20);
+    const centralWithinChangeSyncSourceThreshold = (primaryPingTime - secondaryPingTime >= 0) &&
+        (primaryPingTime - secondaryPingTime < changeSyncSourceThresholdMillis);
 
     if (!centralWithinChangeSyncSourceThreshold) {
         jsTestLog("centralWithinChangeSyncSourceThreshold check failed: primaryPing " +
@@ -164,7 +167,10 @@ assert.soon(() => {
 
     return (receivedCentralHb && receivedSyncSourceHb && exceedsChangeSyncSourceThreshold &&
             centralWithinChangeSyncSourceThreshold);
-}, tojson(replSetGetStatus));
+});
+
+const replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
+jsTestLog(replSetGetStatus);
 
 hangOplogFetcherBeforeAdvancingLastFetched.off();
 
