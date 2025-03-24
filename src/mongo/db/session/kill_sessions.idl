@@ -58,7 +58,7 @@ server_parameters:
         description: >-
             The maximum number of milliseconds for a session to checkout when aborting expired transactions.
         set_at: [ startup, runtime ]
-        cpp_vartype: int
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gAbortExpiredTransactionsSessionCheckoutTimeout
         default: 100
         redact: false

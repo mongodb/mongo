@@ -132,7 +132,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
                 int64_t numTimeOuts = 0;
                 killAllExpiredTransactions(
                     opCtx.get(),
-                    Milliseconds(gAbortExpiredTransactionsSessionCheckoutTimeout),
+                    Milliseconds(gAbortExpiredTransactionsSessionCheckoutTimeout.load()),
                     &numKills,
                     &numTimeOuts);
                 abortExpiredTransactionsPasses.increment(1);
