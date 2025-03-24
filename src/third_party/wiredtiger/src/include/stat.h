@@ -862,7 +862,8 @@ struct __wt_connection_stats {
     int64_t dh_sweep_skip_ckpt;
     int64_t dh_session_handles;
     int64_t dh_session_sweeps;
-    int64_t live_restore_state;
+    int64_t live_restore_bytes_copied;
+    int64_t live_restore_work_remaining;
     int64_t live_restore_source_read_count;
     int64_t live_restore_hist_source_read_latency_lt10;
     int64_t live_restore_hist_source_read_latency_lt50;
@@ -872,8 +873,7 @@ struct __wt_connection_stats {
     int64_t live_restore_hist_source_read_latency_lt1000;
     int64_t live_restore_hist_source_read_latency_gt1000;
     int64_t live_restore_hist_source_read_latency_total_msecs;
-    int64_t live_restore_bytes_copied;
-    int64_t live_restore_work_remaining;
+    int64_t live_restore_state;
     int64_t lock_btree_page_count;
     int64_t lock_btree_page_wait_application;
     int64_t lock_btree_page_wait_internal;

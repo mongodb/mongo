@@ -57,6 +57,8 @@ extern int __ut_live_restore_decode_bitmap(WT_SESSION_IMPL *session, const char 
 extern int __ut_live_restore_encode_bitmap(
   WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_ITEM *buf)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __ut_live_restore_fh_fill_bit_range(
+  WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_SESSION_IMPL *session, wt_off_t offset, size_t len);
 
 #endif
 

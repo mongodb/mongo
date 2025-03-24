@@ -28,14 +28,14 @@
 
 import os
 import wiredtiger, wttest
-from helper import copy_wiredtiger_home
 import glob
 import shutil
+from wtbackup import backup_base
 
 # test_live_restore01.py
 # Test live restore compatibility with various other connection options.
 @wttest.skip_for_hook("tiered", "using multiple WT homes")
-class test_live_restore01(wttest.WiredTigerTestCase):
+class test_live_restore01(backup_base):
 
     def expect_success(self, config_str):
         self.open_conn("DEST", config=config_str)
@@ -52,9 +52,11 @@ class test_live_restore01(wttest.WiredTigerTestCase):
 
     def test_live_restore01(self):
         # Close the default connection.
+
+        os.mkdir("SOURCE")
+        self.take_full_backup("SOURCE")
         self.close_conn()
 
-        copy_wiredtiger_home(self, '.', "SOURCE")
         # Remove everything but SOURCE / stderr / stdout.
         for f in glob.glob("*"):
             if not f == "SOURCE" and not f == "stderr.txt" and not f == "stdout.txt":

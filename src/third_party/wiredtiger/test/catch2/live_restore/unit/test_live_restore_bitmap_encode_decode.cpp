@@ -27,7 +27,7 @@ struct test_data {
     uint8_t *bitmap;
 };
 
-TEST_CASE("Encode various bitmaps", "[live_restore_bitmap]")
+TEST_CASE("Encode various bitmaps", "[live_restore_bitmap],[live_restore_bitmap_encode_decode]")
 {
     std::shared_ptr<mock_session> mock_session = mock_session::build_test_mock_session();
     WT_SESSION_IMPL *session = mock_session->get_wt_session_impl();

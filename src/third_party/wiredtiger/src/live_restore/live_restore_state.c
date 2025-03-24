@@ -369,20 +369,36 @@ __wti_live_restore_validate_directories(WT_SESSION_IMPL *session, WTI_LIVE_RESTO
     char **dirlist_source = NULL, **dirlist_dest = NULL;
     uint32_t num_source_files = 0, num_dest_files = 0;
     WTI_LIVE_RESTORE_STATE state_from_file;
+    bool contain_backup_file = false;
 
-    /* First check that the source doesn't contain any live restore metadata files. */
+    /*
+     * First check that the source doesn't contain any live restore stop files, but does contain a
+     * backup file.
+     */
     WT_ERR(lr_fs->os_file_system->fs_directory_list(lr_fs->os_file_system, (WT_SESSION *)session,
       lr_fs->source.home, "", &dirlist_source, &num_source_files));
 
     if (num_source_files == 0)
         WT_ERR_MSG(session, EINVAL, "Source directory is empty. Nothing to restore!");
 
-    for (uint32_t i = 0; i < num_source_files; ++i)
+    for (uint32_t i = 0; i < num_source_files; ++i) {
         if (WT_SUFFIX_MATCH(dirlist_source[i], WTI_LIVE_RESTORE_STOP_FILE_SUFFIX))
             WT_ERR_MSG(session, EINVAL,
               "Source directory contains live restore stop file: %s. This implies it is a "
               "destination directory that hasn't finished restoration",
               dirlist_source[i]);
+
+        if (WT_SUFFIX_MATCH(dirlist_source[i], WT_METADATA_BACKUP))
+            contain_backup_file = true;
+    }
+
+    /*
+     * We rely on the backup process to clean the metadata file in the source and remove instances
+     * of nbits=-1. If we don't live restore could see this nbits=-1, think it applies to the file
+     * in the destination, and never copy across the file causing data loss.
+     */
+    if (!contain_backup_file)
+        WT_ERR_MSG(session, EINVAL, "Source directory is not a valid backup directory");
 
     /* Now check the destination folder */
 

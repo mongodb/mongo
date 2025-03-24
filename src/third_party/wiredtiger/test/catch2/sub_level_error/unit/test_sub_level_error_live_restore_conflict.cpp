@@ -13,6 +13,7 @@
 #include "../../wrappers/connection_wrapper.h"
 #include "../utils_sub_level_error.h"
 #include "../../../utility/test_util.h"
+#include "../../live_restore/live_restore_test_env.h"
 
 /*
  * [sub_level_error_live_restore_conflict]: test_sub_level_error_live_restore_conflict.cpp
@@ -33,17 +34,10 @@ TEST_CASE("Test WT_CONFLICT_LIVE_RESTORE",
 
     SECTION("Test WT_CONFLICT_LIVE_RESTORE while opening backup cursor")
     {
-        // We need to have a real WiredTiger database in the source directory.
-        // Wrap it in its own scope to close the connection.
-        {
-            connection_wrapper source_conn_wrapper =
-              connection_wrapper("WT_LR_SOURCE", "create=true");
-            source_conn_wrapper.clear_do_cleanup();
-        }
 
-        connection_wrapper conn_wrapper =
-          connection_wrapper(".", "create=true,live_restore=(enabled=true, path=WT_LR_SOURCE)");
-        utils::prepare_session_and_error(&conn_wrapper, &session, &err_info);
+        utils::live_restore_test_env env;
+        connection_wrapper *conn_wrapper = env.conn.get();
+        utils::prepare_session_and_error(conn_wrapper, &session, &err_info);
 
         REQUIRE(session->open_cursor(session, "backup:", NULL, NULL, &cursor) == EINVAL);
         REQUIRE(cursor == NULL);

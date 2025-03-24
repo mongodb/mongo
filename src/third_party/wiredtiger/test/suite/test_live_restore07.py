@@ -29,10 +29,10 @@
 import os, wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_live_restore06.py
+# test_live_restore07.py
 # Test that restoring from an empty database fails.
 @wttest.skip_for_hook("tiered", "using multiple WT homes")
-class test_live_restore02(wttest.WiredTigerTestCase):
+class test_live_restore07(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('row_integer', dict(key_format='i', value_format='S')),
@@ -41,7 +41,7 @@ class test_live_restore02(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(format_values)
 
-    def test_live_restore02(self):
+    def test_live_restore07(self):
         # Live restore is not supported on Windows.
         if os.name == 'nt':
             return
