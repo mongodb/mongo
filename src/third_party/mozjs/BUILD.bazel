@@ -249,10 +249,6 @@ mongo_cc_library(
             # and they just clutter the output logs
             "-Wno-unused-variable",
             "-Wno-implicit-fallthrough",
-
-            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated'
-            #                     after Mozjs Update
-            "-Wno-deprecated",
             # Bazel doesn't differentiate between compile flags for C and C++.
             # This leads to errors where certain flags are invalid under C
             # compilation.

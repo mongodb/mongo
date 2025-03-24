@@ -907,12 +907,6 @@ mongo_cc_library(
     hdrs = [
         "wait_for_majority_service.h",
     ],
-    copts = select({
-        # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' after
-        #                     Mozjs Update
-        "@platforms//os:windows": [],
-        "//conditions:default": ["-Wno-deprecated"],
-    }),
     deps = [
         "//src/mongo/db:rw_concern_d",
         "//src/mongo/db:server_base",

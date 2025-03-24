@@ -48,9 +48,11 @@ mongo_cc_binary(
         "-Wno-unused-but-set-parameter",
         "-Wno-unused-variable",
         "-Wno-return-type",
-        "-Wno-volatile",
-        "-Wno-deprecated-volatile",
-    ],
+    ] + select({
+        "//bazel/config:compiler_type_gcc": ["-Wno-volatile"],
+        "//bazel/config:compiler_type_clang": ["-Wno-deprecated-volatile"],
+        "//conditions:default": [],
+    }),
     includes = ["."],
     skip_global_deps = [
         "allocator",

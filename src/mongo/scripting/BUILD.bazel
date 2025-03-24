@@ -47,14 +47,6 @@ mongo_cc_library(
         "engine.h",
         "jsexception.h",
     ],
-    copts = select({
-        "@platforms//os:windows": [],
-        "//conditions:default": [
-            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated'
-            #                     After Mozjs Update
-            "-Wno-deprecated",
-        ],
-    }),
     deps = [
         ":bson_template_evaluator",  # TODO(SERVER-93876): Remove.
         "//src/mongo/client:clientdriver_minimal",
@@ -183,16 +175,14 @@ mongo_cc_library(
             "/wd5104",
             "/wd5105",
         ],
-        "//conditions:default": [
-            "-Wno-unknown-warning-option",
-            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
-            "-Wno-deprecated",
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:compiler_type_clang": [
+            "-Wno-dangling",
+        ],
+        "//bazel/config:compiler_type_gcc": [
             "-Wno-dangling-pointer",
         ],
-    }),
-    features = select({
-        # TODO(SERVER-59992): Remove -Wno-class-memaccess where possible.
-        "//bazel/config:compiler_type_gcc": ["no_class_memaccess_warning"],
         "//conditions:default": [],
     }),
     local_defines = select({
@@ -270,14 +260,7 @@ mongo_cc_unit_test(
             "/wd5104",
             "/wd5105",
         ],
-        "//conditions:default": [
-            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
-            "-Wno-unknown-warning-option",
-            "-Wno-class-memaccess",
-            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated'
-            #                     after Mozjs Update.
-            "-Wno-deprecated",
-        ],
+        "//conditions:default": [],
     }),
     local_defines = select({
         "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],

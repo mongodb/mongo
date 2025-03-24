@@ -81,8 +81,15 @@ mongo_cc_library(
         "//conditions:default": [
             "-Isrc/third_party/pcre2/build_posix",
             "-Wno-implicit-fallthrough",
+        ],
+    }) + select({
+        "//bazel/config:compiler_type_clang": [
+            "-Wno-dangling",
+        ],
+        "//bazel/config:compiler_type_gcc": [
             "-Wno-dangling-pointer",
         ],
+        "//conditions:default": [],
     }),
     defines = [
         "PCRE2_STATIC",
