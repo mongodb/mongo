@@ -42,25 +42,31 @@ const explain = coll.find({a: 7, b: 9}).explain("executionStats");
 let ixscans = getPlanStages(getWinningPlanFromExplain(explain), "IXSCAN");
 assert.neq(ixscans.length, 0, explain);
 for (let ixscan of ixscans) {
-    assert.eq(ixscan.indexName, a1b1IndexName, explain);
+    assert.eq(ixscan.indexName, a1b1IndexName, "Expected a1b1 index to be used", {explain});
 }
 
 // Verify that the winning SBE plan has index scan stage on 'a_1_b_1'.
 const executionStages = getExecutionStages(explain);
-assert.neq(executionStages.length, 0, explain);
+assert.neq(executionStages.length, 0, "Expected explain stages to be present", {explain});
 for (let executionStage of executionStages) {
     let ixscans = getPlanStages(executionStage, "ixseek");
-    assert.neq(ixscans.length, 0);
+    assert.neq(ixscans.length, 0, "Expected ixseek to be present", {explain, executionStages});
     for (let ixscan of ixscans) {
-        assert.eq(ixscan.indexName, a1b1IndexName, ixscan);
+        assert.eq(ixscan.indexName,
+                  a1b1IndexName,
+                  "Expected a1b1 index to be used",
+                  {ixscan, ixscans, executionStage, explain});
     }
 }
 
 // Verify that rejected plans should have index scan on 'a_1' or 'b_1'.
 for (let rejectedPlan of getRejectedPlans(explain)) {
     let ixscans = getPlanStages(getRejectedPlan(rejectedPlan), "IXSCAN");
-    assert.neq(ixscans.length, 0, explain);
+    assert.neq(ixscans.length, 0, "Expected rejected plans to use a1 or b1 index", {explain});
     for (let ixscan of ixscans) {
-        assert.contains(ixscan.indexName, [a1IndexName, b1IndexName], ixscan);
+        assert.contains(ixscan.indexName,
+                        [a1IndexName, b1IndexName],
+                        "Expected rejected plans to use a1 or b1 index",
+                        {ixscan, ixscans, rejectedPlan, explain});
     }
 }
