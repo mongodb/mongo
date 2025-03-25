@@ -1,6 +1,9 @@
 /**
  * Test that tassert during command execution for an unsharded collection in a sharded environment
  * will correctly show that the collection is unsharded.
+ *
+ * This test expects collections to persist across a restart.
+ * @tags: [requires_persistence]
  */
 import {
     assertOnDiagnosticLogContents,
