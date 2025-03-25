@@ -64,6 +64,9 @@ namespace mongo::timeseries {
  */
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl);
 
+std::shared_ptr<bucket_catalog::WriteBatch>& extractFromSelf(
+    std::shared_ptr<bucket_catalog::WriteBatch>& batch);
+
 /**
  * Returns the document for writing a new bucket with 'measurements'. Generates the id and
  * calculates the min and max fields while building the document.

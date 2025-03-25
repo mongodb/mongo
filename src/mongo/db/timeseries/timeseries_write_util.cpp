@@ -151,11 +151,6 @@ void updateTimeseriesDocument(OperationContext* opCtx,
                                         &args);
 }
 
-std::shared_ptr<bucket_catalog::WriteBatch>& extractFromSelf(
-    std::shared_ptr<bucket_catalog::WriteBatch>& batch) {
-    return batch;
-}
-
 uint64_t getStorageCacheSizeBytes(OperationContext* opCtx) {
     return opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
         1024;
@@ -296,6 +291,11 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
 }
 
 }  // namespace
+
+std::shared_ptr<bucket_catalog::WriteBatch>& extractFromSelf(
+    std::shared_ptr<bucket_catalog::WriteBatch>& batch) {
+    return batch;
+}
 
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
     uassert(
