@@ -23,6 +23,7 @@ selector:
   exclude_files:
     - jstests/multiVersion/libs/*.js
     - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+    - jstests/multiVersion/genericBinVersion/dbcheck_old*.js
     - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
   exclude_with_any_tags:
     - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
