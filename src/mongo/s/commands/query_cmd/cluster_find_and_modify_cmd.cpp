@@ -529,7 +529,7 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
         feature_flags::gTimeseriesUpdatesSupport.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    if (!arbitraryTimeseriesWritesEnabled || cri.cm.hasRoutingTable() ||
+    if (!arbitraryTimeseriesWritesEnabled || cri.hasRoutingTable() ||
         maybeTsNss.isTimeseriesBucketsCollection()) {
         return cri;
     }
@@ -541,7 +541,8 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
     // timeseries buckets collections.
     auto bucketCollNss = maybeTsNss.makeTimeseriesBucketsNamespace();
     auto bucketCollCri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketCollNss));
-    if (!bucketCollCri.cm.hasRoutingTable() || !bucketCollCri.cm.getTimeseriesFields()) {
+    if (!bucketCollCri.hasRoutingTable() ||
+        !bucketCollCri.getChunkManager().getTimeseriesFields()) {
         return cri;
     }
 
@@ -632,7 +633,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
     const auto cri = getCollectionRoutingInfo(opCtx, cmdObj, nss);
-    const auto& cm = cri.cm;
+    const auto& cm = cri.getChunkManager();
     auto isTrackedTimeseries = cm.hasRoutingTable() && cm.getTimeseriesFields();
     auto isTimeseriesViewRequest = false;
     if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {
@@ -776,7 +777,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         }
     }();
 
-    const auto& cm = cri.cm;
+    const auto& cm = cri.getChunkManager();
 
     // Create an RAII object that prints the collection's shard key in the case of a tassert
     // or crash.

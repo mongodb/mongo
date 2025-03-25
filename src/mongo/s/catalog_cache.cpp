@@ -179,20 +179,20 @@ const OperationContext::Decoration<bool> routerShouldRelaxCollectionUUIDConsiste
 }  // namespace
 
 bool CollectionRoutingInfo::hasRoutingTable() const {
-    return cm.hasRoutingTable();
+    return _cm.hasRoutingTable();
 }
 
 const ShardId& CollectionRoutingInfo::getDbPrimaryShardId() const {
-    return dbInfo->getPrimary();
+    return _dbInfo->getPrimary();
 }
 
 const DatabaseVersion& CollectionRoutingInfo::getDbVersion() const {
-    return dbInfo->getVersion();
+    return _dbInfo->getVersion();
 }
 
 ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
     ShardVersion sv = ShardVersionFactory::make(
-        cm, sii ? boost::make_optional(sii->getCollectionIndexes()) : boost::none);
+        _cm, _sii ? boost::make_optional(_sii->getCollectionIndexes()) : boost::none);
     if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
         sv.setIgnoreShardingCatalogUuidMismatch();
     }
@@ -201,7 +201,7 @@ ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
 
 ShardVersion CollectionRoutingInfo::getShardVersion(const ShardId& shardId) const {
     auto sv = ShardVersionFactory::make(
-        cm, shardId, sii ? boost::make_optional(sii->getCollectionIndexes()) : boost::none);
+        _cm, shardId, _sii ? boost::make_optional(_sii->getCollectionIndexes()) : boost::none);
     if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
         sv.setIgnoreShardingCatalogUuidMismatch();
     }

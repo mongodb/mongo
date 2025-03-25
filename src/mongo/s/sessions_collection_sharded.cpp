@@ -88,12 +88,14 @@ std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwnin
             str::stream() << "Collection "
                           << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " is not sharded",
-            cri.cm.isSharded());
+            cri.isSharded());
 
     std::multimap<ShardId, LogicalSessionId> sessionIdsByOwningShard;
     for (const auto& session : sessions) {
         sessionIdsByOwningShard.emplace(
-            cri.cm.findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
+            cri.getChunkManager()
+                .findIntersectingChunkWithSimpleCollation(session.getId().toBSON())
+                .getShardId(),
             session);
     }
 
@@ -114,12 +116,14 @@ std::vector<LogicalSessionRecord> SessionsCollectionSharded::_groupSessionRecord
             str::stream() << "Collection "
                           << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " is not sharded",
-            cri.cm.isSharded());
+            cri.isSharded());
 
     std::multimap<ShardId, LogicalSessionRecord> sessionsByOwningShard;
     for (const auto& session : sessions) {
         sessionsByOwningShard.emplace(
-            cri.cm.findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
+            cri.getChunkManager()
+                .findIntersectingChunkWithSimpleCollation(session.getId().toBSON())
+                .getShardId(),
             session);
     }
 

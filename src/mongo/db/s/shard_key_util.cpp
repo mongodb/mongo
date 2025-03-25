@@ -522,7 +522,11 @@ std::vector<BSONObj> ValidationBehaviorsReshardingBulkIndex::loadIndexes(
     }
     auto cri = uassertStatusOK(grid->catalogCache()->getCollectionRoutingInfo(_opCtx, nss));
     auto [indexSpecs, _] = MigrationDestinationManager::getCollectionIndexes(
-        _opCtx, nss, cri.cm.getMinKeyShardIdWithSimpleCollation(), cri, _cloneTimestamp);
+        _opCtx,
+        nss,
+        cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(),
+        cri,
+        _cloneTimestamp);
     return indexSpecs;
 }
 
@@ -532,7 +536,7 @@ void ValidationBehaviorsReshardingBulkIndex::verifyUsefulNonMultiKeyIndex(
     auto cri =
         uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(_opCtx, nss));
     auto shard = uassertStatusOK(Grid::get(_opCtx)->shardRegistry()->getShard(
-        _opCtx, cri.cm.getMinKeyShardIdWithSimpleCollation()));
+        _opCtx, cri.getChunkManager().getMinKeyShardIdWithSimpleCollation()));
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(shard->runCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),

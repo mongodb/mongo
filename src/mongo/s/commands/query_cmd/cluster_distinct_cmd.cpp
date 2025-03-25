@@ -294,7 +294,7 @@ public:
         ScopedDebugInfo shardKeyDiagnostics(
             "ShardKeyDiagnostics",
             diagnostic_printers::ShardKeyDiagnosticPrinter{
-                cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
+                cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
 
         if (timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, cri)) {
             runDistinctAsAgg(opCtx,
@@ -383,7 +383,7 @@ public:
             cmdObj, canonicalQuery->getExpCtx()->getQuerySettings(), requestQueryStats);
 
         const auto cri = uassertStatusOK(std::move(swCri));
-        const auto& cm = cri.cm;
+        const auto& cm = cri.getChunkManager();
 
         // Create an RAII object that prints the collection's shard key in the case of a tassert
         // or crash.

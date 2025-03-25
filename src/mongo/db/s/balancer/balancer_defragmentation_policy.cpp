@@ -114,7 +114,7 @@ ShardVersion getShardVersion(OperationContext* opCtx,
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Expected collection " << nss.toStringForErrorMsg()
                           << " to be sharded",
-            cri.cm.isSharded());
+            cri.isSharded());
     return cri.getShardVersion(shardId);
 }
 

@@ -114,8 +114,9 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
 
     // Advances the version in the cache if the chunk manager is not yet available or its version is
     // stale.
-    if (!cri.cm.hasRoutingTable() ||
-        cri.cm.getVersion().isOlderThan(shardVersion.placementVersion())) {
+    if (!cri.hasRoutingTable() ||
+        cri.getCollectionVersion().placementVersion().isOlderThan(
+            shardVersion.placementVersion())) {
         catalogCache->onStaleCollectionVersion(ns, boost::none /* wanted */);
 
         uasserted(ShardCannotRefreshDueToLocksHeldInfo(ns),
@@ -126,7 +127,7 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
 
     // Retrieve the shard id for the given shard key value.
     std::set<ShardId> shardIds;
-    cri.cm.getShardIdsForRange(shardKeyVal, shardKeyVal, &shardIds);
+    cri.getChunkManager().getShardIdsForRange(shardKeyVal, shardKeyVal, &shardIds);
     uassert(6868601, "The value should belong to exactly one ShardId", shardIds.size() == 1);
     const auto shardId = *(shardIds.begin());
     return Value(shardId.toString());

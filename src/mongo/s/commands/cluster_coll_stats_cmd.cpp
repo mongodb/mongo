@@ -249,7 +249,7 @@ public:
 
         const auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
         const auto cri = targeter.getRoutingInfo();
-        const auto& cm = cri.cm;
+        const auto& cm = cri.getChunkManager();
         if (cm.isSharded()) {
             result.appendBool("sharded", true);
         } else {

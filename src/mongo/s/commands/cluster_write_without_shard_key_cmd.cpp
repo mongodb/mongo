@@ -193,7 +193,7 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
     const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
     uassert(ErrorCodes::NamespaceNotSharded,
             "_clusterWriteWithoutShardKey can only be run against sharded collections.",
-            cri.cm.isSharded());
+            cri.isSharded());
     const auto shardVersion = cri.getShardVersion(shardId);
     // For time-series collections, the 'targetDocId' corresponds to a measurement document's '_id'
     // field which is not guaranteed to exist and does not uniquely identify a measurement so we

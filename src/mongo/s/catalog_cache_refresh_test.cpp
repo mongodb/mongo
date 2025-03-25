@@ -185,21 +185,23 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
         kNss, epoch, timestamp, reshardingUUID, shardKeyPattern, boost::none, {});
 
     auto cri = *future.default_timed_get();
-    ASSERT(cri.cm.isSharded());
-    ASSERT_EQ(4, cri.cm.numChunks());
-    ASSERT_EQ(reshardingUUID, cri.cm.getReshardingFields()->getReshardingUUID());
+    ASSERT(cri.isSharded());
+    ASSERT(cri.getChunkManager().isSharded());
+    ASSERT_EQ(4, cri.getChunkManager().numChunks());
+    ASSERT_EQ(reshardingUUID, cri.getChunkManager().getReshardingFields()->getReshardingUUID());
 }
 
 TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     auto initialRoutingInfo(
         makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {BSON("_id" << 0)}, {}));
-    ASSERT_EQ(2, initialRoutingInfo.cm.numChunks());
+    ASSERT_EQ(2, initialRoutingInfo.getChunkManager().numChunks());
 
     auto futureNoRefresh = scheduleRoutingInfoUnforcedRefresh(kNss);
     auto cri = *futureNoRefresh.default_timed_get();
-    ASSERT(cri.cm.isSharded());
-    ASSERT_EQ(2, cri.cm.numChunks());
+    ASSERT(cri.isSharded());
+    ASSERT(cri.getChunkManager().isSharded());
+    ASSERT_EQ(2, cri.getChunkManager().numChunks());
 }
 
 DEATH_TEST_REGEX_F(CatalogCacheRefreshTest,
@@ -221,7 +223,7 @@ TEST_F(CatalogCacheRefreshTest, DatabaseNotFound) {
     try {
         auto cri = *future.default_timed_get();
         FAIL(str::stream() << "Returning no database did not fail and returned "
-                           << cri.cm.toString());
+                           << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::NamespaceNotFound, ex.code());
     }
@@ -239,7 +241,7 @@ TEST_F(CatalogCacheRefreshTest, DatabaseBSONCorrupted) {
     try {
         auto cri = *future.default_timed_get();
         FAIL(str::stream() << "Returning corrupted database entry did not fail and returned "
-                           << cri.cm.toString());
+                           << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::IDLFailedToParse, ex.code());
     }
@@ -254,7 +256,8 @@ TEST_F(CatalogCacheRefreshTest, CollectionNotFound) {
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
 
     auto cri = *future.default_timed_get();
-    ASSERT(!cri.cm.isSharded());
+    ASSERT(!cri.isSharded());
+    ASSERT(!cri.getChunkManager().isSharded());
     ASSERT_EQ(ShardId{"0"}, cri.getDbPrimaryShardId());
 }
 
@@ -272,7 +275,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
     try {
         auto cri = *future.default_timed_get();
         FAIL(str::stream() << "Returning corrupted collection entry did not fail and returned "
-                           << cri.cm.toString());
+                           << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::IDLFailedToParse, ex.code());
     }
@@ -306,7 +309,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoadNoChunksFound) {
     try {
         auto cri = *future.default_timed_get();
         FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
-                           << cri.cm.toString());
+                           << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
@@ -315,12 +318,15 @@ TEST_F(CatalogCacheRefreshTest, FullLoadNoChunksFound) {
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadNoChunksFound) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
-    auto initialRoutingInfo(
-        makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, {}));
-    const OID epoch = initialRoutingInfo.cm.getVersion().epoch();
-    const Timestamp timestamp = initialRoutingInfo.cm.getVersion().getTimestamp();
+    auto initialRoutingInfo =
+        makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, {});
 
-    ASSERT_EQ(1, initialRoutingInfo.cm.numChunks());
+    const auto& cm = initialRoutingInfo.getChunkManager();
+
+    const OID epoch = cm.getVersion().epoch();
+    const Timestamp timestamp = cm.getVersion().getTimestamp();
+
+    ASSERT_EQ(1, cm.numChunks());
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
@@ -343,7 +349,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadNoChunksFound) {
     try {
         auto cri = *future.default_timed_get();
         FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
-                           << cri.cm.toString());
+                           << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
@@ -378,7 +384,7 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
     try {
         auto cri = *future.default_timed_get();
         FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
-                           << cri.cm.toString());
+                           << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
     }
@@ -426,7 +432,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithLowestVersion) {
         auto cri = *future.default_timed_get();
         FAIL(
             str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << cri.cm.toString());
+                          << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ChunkMetadataInconsistency, ex.code());
     }
@@ -474,7 +480,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithHighestVersion) {
         auto cri = *future.default_timed_get();
         FAIL(
             str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << cri.cm.toString());
+                          << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ChunkMetadataInconsistency, ex.code());
     }
@@ -485,11 +491,12 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
 
     auto initialRoutingInfo(
         makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, {}));
-    const OID epoch = initialRoutingInfo.cm.getVersion().epoch();
-    const UUID uuid = initialRoutingInfo.cm.getUUID();
-    const auto timestamp = initialRoutingInfo.cm.getVersion().getTimestamp();
+    const auto& cm = initialRoutingInfo.getChunkManager();
+    const OID epoch = cm.getVersion().epoch();
+    const UUID uuid = cm.getUUID();
+    const auto timestamp = cm.getVersion().getTimestamp();
 
-    ASSERT_EQ(1, initialRoutingInfo.cm.numChunks());
+    ASSERT_EQ(1, cm.numChunks());
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
@@ -525,7 +532,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
         auto cri = *future.default_timed_get();
         FAIL(
             str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << cri.cm.toString());
+                          << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ChunkMetadataInconsistency, ex.code());
     }
@@ -536,11 +543,13 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
 
     auto initialRoutingInfo(
         makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, {}));
-    const OID epoch = initialRoutingInfo.cm.getVersion().epoch();
-    const UUID uuid = initialRoutingInfo.cm.getUUID();
-    const auto timestamp = initialRoutingInfo.cm.getVersion().getTimestamp();
+    const auto& cm = initialRoutingInfo.getChunkManager();
 
-    ASSERT_EQ(1, initialRoutingInfo.cm.numChunks());
+    const OID epoch = cm.getVersion().epoch();
+    const UUID uuid = cm.getUUID();
+    const auto timestamp = cm.getVersion().getTimestamp();
+
+    ASSERT_EQ(1, cm.numChunks());
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
@@ -575,7 +584,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
         auto cri = *future.default_timed_get();
         FAIL(
             str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << cri.cm.toString());
+                          << cri.getChunkManager().toString());
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ChunkMetadataInconsistency, ex.code());
     }
@@ -586,15 +595,16 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
 
     auto initialRoutingInfo(
         makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, {}));
-    ASSERT_EQ(1, initialRoutingInfo.cm.numChunks());
+    const auto& initialCm = initialRoutingInfo.getChunkManager();
+    ASSERT_EQ(1, initialCm.numChunks());
 
     setupNShards(2);
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
-    ChunkVersion oldVersion = initialRoutingInfo.cm.getVersion();
+    ChunkVersion oldVersion = initialCm.getVersion();
     ChunkVersion newVersion({OID::gen(), Timestamp(2)}, {1, 0});
-    const UUID uuid = initialRoutingInfo.cm.getUUID();
+    const UUID uuid = initialCm.getUUID();
 
     // Return collection with a different epoch and a set of chunks, which represent a split
     onFindCommand([&](const RemoteCommandRequest& request) {
@@ -635,19 +645,20 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     expectCollectionAndIndexesAggregation(kNss,
                                           newVersion.epoch(),
                                           newVersion.getTimestamp(),
-                                          initialRoutingInfo.cm.getUUID(),
+                                          initialCm.getUUID(),
                                           shardKeyPattern,
                                           boost::none,
                                           {});
 
     auto cri = *future.default_timed_get();
-    ASSERT(cri.cm.isSharded());
-    ASSERT_EQ(2, cri.cm.numChunks());
-    ASSERT_EQ(newVersion, cri.cm.getVersion());
+    const auto& cm = cri.getChunkManager();
+    ASSERT(cm.isSharded());
+    ASSERT_EQ(2, cm.numChunks());
+    ASSERT_EQ(newVersion, cm.getVersion());
     ASSERT_EQ(ChunkVersion({newVersion.epoch(), newVersion.getTimestamp()}, {1, 0}),
-              cri.cm.getVersion({"0"}));
+              cm.getVersion({"0"}));
     ASSERT_EQ(ChunkVersion({newVersion.epoch(), newVersion.getTimestamp()}, {1, 1}),
-              cri.cm.getVersion({"1"}));
+              cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
@@ -655,9 +666,10 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
 
     auto initialRoutingInfo(
         makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, {}));
-    ASSERT_EQ(1, initialRoutingInfo.cm.numChunks());
+    const auto& initialCm = initialRoutingInfo.getChunkManager();
+    ASSERT_EQ(1, initialCm.numChunks());
 
-    ChunkVersion version = initialRoutingInfo.cm.getVersion();
+    ChunkVersion version = initialCm.getVersion();
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
@@ -705,18 +717,19 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     expectCollectionAndIndexesAggregation(kNss,
                                           version.epoch(),
                                           version.getTimestamp(),
-                                          initialRoutingInfo.cm.getUUID(),
+                                          initialCm.getUUID(),
                                           shardKeyPattern,
                                           boost::none,
                                           {});
 
     auto cri = *future.default_timed_get();
-    ASSERT(cri.cm.isSharded());
-    ASSERT_EQ(2, cri.cm.numChunks());
-    ASSERT_EQ(version, cri.cm.getVersion());
-    ASSERT_EQ(version, cri.cm.getVersion({"0"}));
+    const auto& cm = cri.getChunkManager();
+    ASSERT(cm.isSharded());
+    ASSERT_EQ(2, cm.numChunks());
+    ASSERT_EQ(version, cm.getVersion());
+    ASSERT_EQ(version, cm.getVersion({"0"}));
     ASSERT_EQ(ChunkVersion({version.epoch(), version.getTimestamp()}, {0, 0}),
-              cri.cm.getVersion({"1"}));
+              cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdded) {
@@ -725,11 +738,12 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
 
     auto initialRoutingInfo(
         makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {BSON("_id" << 0)}, {}));
-    ASSERT_EQ(2, initialRoutingInfo.cm.numChunks());
-    ASSERT(boost::none == initialRoutingInfo.cm.getReshardingFields());
+    const auto& initialCm = initialRoutingInfo.getChunkManager();
+    ASSERT_EQ(2, initialCm.numChunks());
+    ASSERT(boost::none == initialCm.getReshardingFields());
 
-    ChunkVersion version = initialRoutingInfo.cm.getVersion();
-    const UUID uuid = initialRoutingInfo.cm.getUUID();
+    ChunkVersion version = initialCm.getVersion();
+    const UUID uuid = initialCm.getUUID();
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
@@ -759,12 +773,13 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
                                           {});
 
     auto cri = *future.default_timed_get();
-    ASSERT(cri.cm.isSharded());
-    ASSERT_EQ(2, cri.cm.numChunks());
-    ASSERT_EQ(reshardingUUID, cri.cm.getReshardingFields()->getReshardingUUID());
-    ASSERT_EQ(version, cri.cm.getVersion());
-    ASSERT_EQ(version, cri.cm.getVersion({"0"}));
-    ASSERT_EQ(expectedDestPlacementVersion, cri.cm.getVersion({"1"}));
+    const auto& cm = cri.getChunkManager();
+    ASSERT(cm.isSharded());
+    ASSERT_EQ(2, cm.numChunks());
+    ASSERT_EQ(reshardingUUID, cm.getReshardingFields()->getReshardingUUID());
+    ASSERT_EQ(version, cm.getVersion());
+    ASSERT_EQ(version, cm.getVersion({"0"}));
+    ASSERT_EQ(expectedDestPlacementVersion, cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingFieldsRemoved) {
@@ -776,13 +791,13 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
 
     auto initialRoutingInfo(
         makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, {}, reshardingFields));
-
-    ASSERT_EQ(1, initialRoutingInfo.cm.numChunks());
-    ASSERT_EQ(reshardingUUID, initialRoutingInfo.cm.getReshardingFields()->getReshardingUUID());
+    const auto& initialCm = initialRoutingInfo.getChunkManager();
+    ASSERT_EQ(1, initialCm.numChunks());
+    ASSERT_EQ(reshardingUUID, initialCm.getReshardingFields()->getReshardingUUID());
 
     setupNShards(2);
 
-    ChunkVersion version = initialRoutingInfo.cm.getVersion();
+    ChunkVersion version = initialCm.getVersion();
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
@@ -790,7 +805,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
     // Return set of chunks, which represent a move
     version.incMajor();
     ChunkType chunk1(
-        initialRoutingInfo.cm.getUUID(),
+        initialCm.getUUID(),
         {shardKeyPattern.getKeyPattern().globalMin(), shardKeyPattern.getKeyPattern().globalMax()},
         version,
         {"1"});
@@ -802,19 +817,20 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
     expectCollectionAndIndexesAggregation(kNss,
                                           version.epoch(),
                                           version.getTimestamp(),
-                                          initialRoutingInfo.cm.getUUID(),
+                                          initialCm.getUUID(),
                                           shardKeyPattern,
                                           boost::none,
                                           {});
 
     auto cri = *future.default_timed_get();
-    ASSERT(cri.cm.isSharded());
-    ASSERT_EQ(1, cri.cm.numChunks());
-    ASSERT_EQ(version, cri.cm.getVersion());
+    const auto& cm = cri.getChunkManager();
+    ASSERT(cm.isSharded());
+    ASSERT_EQ(1, cm.numChunks());
+    ASSERT_EQ(version, cm.getVersion());
     ASSERT_EQ(ChunkVersion({version.epoch(), version.getTimestamp()}, {0, 0}),
-              cri.cm.getVersion({"0"}));
-    ASSERT_EQ(version, cri.cm.getVersion({"1"}));
-    ASSERT(boost::none == cri.cm.getReshardingFields());
+              cm.getVersion({"0"}));
+    ASSERT_EQ(version, cm.getVersion({"1"}));
+    ASSERT(boost::none == cm.getReshardingFields());
 }
 
 }  // namespace

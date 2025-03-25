@@ -912,10 +912,9 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
 
     auto isShardedCollection = [&] {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            auto cm = uassertStatusOK(
-                          Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
-                          .cm;
-            return cm.isSharded();
+            const auto cri = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            return cri.isSharded();
         }
         return false;
     }();

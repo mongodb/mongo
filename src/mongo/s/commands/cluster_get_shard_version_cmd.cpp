@@ -127,8 +127,8 @@ public:
         } else {
             // Return the collection's information.
             const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-            const auto& cm = cri.cm;
-            const auto& sii = cri.sii;
+            const auto& cm = cri.getChunkManager();
+            const auto& sii = cri.getIndexesInfo();
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Collection " << nss.toStringForErrorMsg()
                                   << " does not have a routing table.",

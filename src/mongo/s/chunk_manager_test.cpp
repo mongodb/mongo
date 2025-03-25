@@ -85,7 +85,7 @@ TEST_F(ChunkManagerTest, FindIntersectingWithVaryingHashedPrefixAndConstantRange
                             << "c.d" << 1),
                        splitPoints);
 
-    const auto& shardKeyPattern = cri.cm.getShardKeyPattern();
+    const auto& shardKeyPattern = cri.getChunkManager().getShardKeyPattern();
     for (int i = 0; i < 1000; i++) {
         auto insertObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
 
@@ -94,11 +94,12 @@ TEST_F(ChunkManagerTest, FindIntersectingWithVaryingHashedPrefixAndConstantRange
         auto hashValue =
             BSONElementHasher::hash64(insertObj["a"]["b"], BSONElementHasher::DEFAULT_HASH_SEED);
 
-        auto intersectingChunk = cri.cm.findIntersectingChunk(shardKey, CollationSpec::kSimpleSpec);
+        auto intersectingChunk =
+            cri.getChunkManager().findIntersectingChunk(shardKey, CollationSpec::kSimpleSpec);
 
         // Verify that the given document is being routed based on hashed value of 'i'.
-        auto expectedChunk =
-            cri.cm.findIntersectingChunkWithSimpleCollation(BSON("a.b" << hashValue));
+        auto expectedChunk = cri.getChunkManager().findIntersectingChunkWithSimpleCollation(
+            BSON("a.b" << hashValue));
         auto chunkRange = intersectingChunk.getRange();
         ASSERT_BSONOBJ_EQ(expectedChunk.getMin(), chunkRange.getMin());
         ASSERT_BSONOBJ_EQ(expectedChunk.getMax(), chunkRange.getMax());
@@ -128,35 +129,35 @@ TEST_F(ChunkManagerTest, FindIntersectingWithConstantHashedPrefixAndVaryingRange
                        splitPoints);
 
     checkChunkRangeForDoc("{a: {b: 0}, c: {d: -111}}",
-                          cri.cm,
+                          cri.getChunkManager(),
                           BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL),
                           BSON("a.b" << hashedValueOfZero << "c.d" << -100));
 
     checkChunkRangeForDoc("{a: {b: 0}, c: {d: -11}}",
-                          cri.cm,
+                          cri.getChunkManager(),
                           BSON("a.b" << hashedValueOfZero << "c.d" << -100),
                           BSON("a.b" << hashedValueOfZero << "c.d" << 0));
 
     checkChunkRangeForDoc("{a: {b: 0}, c: {d: 0}}",
-                          cri.cm,
+                          cri.getChunkManager(),
                           BSON("a.b" << hashedValueOfZero << "c.d" << 0),
                           BSON("a.b" << hashedValueOfZero << "c.d" << 100));
 
     checkChunkRangeForDoc("{a: {b: 0}, c: {d: 111}}",
-                          cri.cm,
+                          cri.getChunkManager(),
                           BSON("a.b" << hashedValueOfZero << "c.d" << 100),
                           BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
 
     // Missing field will be treated as null and will be targeted to the chunk which holds null,
     // which is shard '1'.
     checkChunkRangeForDoc("{a: {b: 0}}",
-                          cri.cm,
+                          cri.getChunkManager(),
                           BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL),
                           BSON("a.b" << hashedValueOfZero << "c.d" << -100));
 
 
     checkChunkRangeForDoc("{a: {b: 0}, c: 5}",
-                          cri.cm,
+                          cri.getChunkManager(),
                           BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL),
                           BSON("a.b" << hashedValueOfZero << "c.d" << -100));
 }

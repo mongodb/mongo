@@ -187,7 +187,8 @@ public:
             ScopedDebugInfo shardKeyDiagnostics(
                 "ShardKeyDiagnostics",
                 diagnostic_printers::ShardKeyDiagnosticPrinter{
-                    cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
+                    cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
+                                    : BSONObj()});
 
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
 
@@ -403,7 +404,7 @@ public:
         ScopedDebugInfo shardKeyDiagnostics(
             "ShardKeyDiagnostics",
             diagnostic_printers::ShardKeyDiagnosticPrinter{
-                cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
+                cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
 
         // We will time how long it takes to run the commands on the shards
         Timer timer;

@@ -235,7 +235,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     ScopedDebugInfo shardKeyDiagnostics(
         "ShardKeyDiagnostics",
         diagnostic_printers::ShardKeyDiagnosticPrinter{
-            cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
+            cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
 
     auto expCtx = makeExpressionContext(opCtx, parsedMr, cri, verbosity);
 

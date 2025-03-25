@@ -145,7 +145,7 @@ protected:
     void _incrementMetricsForQuery(const QueryTargetingInfo& info);
 
     const ChunkManager& _getChunkManager() const {
-        return _targeter.getRoutingInfo().cm;
+        return _targeter.getRoutingInfo().getChunkManager();
     }
 
     const ShardKeyPattern& _getShardKeyPattern() const {

@@ -741,8 +741,9 @@ bool AggExState::canReadUnderlyingCollectionLocally(const CollectionRoutingInfo&
     const auto myShardId = ShardingState::get(_opCtx)->shardId();
     const auto atClusterTime = repl::ReadConcernArgs::get(_opCtx).getArgsAtClusterTime();
 
-    const auto chunkManagerMaybeAtClusterTime =
-        atClusterTime ? ChunkManager::makeAtTime(cri.cm, atClusterTime->asTimestamp()) : cri.cm;
+    const auto chunkManagerMaybeAtClusterTime = atClusterTime
+        ? ChunkManager::makeAtTime(cri.getChunkManager(), atClusterTime->asTimestamp())
+        : cri.getChunkManager();
 
     if (chunkManagerMaybeAtClusterTime.isSharded()) {
         return false;

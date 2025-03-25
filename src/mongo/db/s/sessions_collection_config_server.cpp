@@ -147,7 +147,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                     const auto& cri = uassertStatusOK(
                         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
-                    if (cri.cm.isSharded()) {
+                    if (cri.isSharded()) {
                         return cri;
                     }
 

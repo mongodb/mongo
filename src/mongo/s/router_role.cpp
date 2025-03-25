@@ -301,8 +301,9 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
 
         const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
         const auto chunkManagerMaybeAtClusterTime = atClusterTime
-            ? ChunkManager::makeAtTime(nssCri->second.cm, atClusterTime->asTimestamp())
-            : nssCri->second.cm;
+            ? ChunkManager::makeAtTime(nssCri->second.getChunkManager(),
+                                       atClusterTime->asTimestamp())
+            : nssCri->second.getChunkManager();
 
         bool isNssLocal = [&]() {
             if (chunkManagerMaybeAtClusterTime.isSharded()) {

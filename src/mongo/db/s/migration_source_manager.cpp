@@ -488,7 +488,7 @@ void MigrationSourceManager::enterCriticalSection() {
 
     // Check that there are no chunks on the recepient shard. Write an oplog event for change
     // streams if this is the first migration to the recipient.
-    if (!cri.cm.getVersion(_args.getToShard()).isSet()) {
+    if (!cri.getShardVersion(_args.getToShard()).placementVersion().isSet()) {
         migrationutil::notifyChangeStreamsOnRecipientFirstChunk(
             _opCtx, nss(), _args.getFromShard(), _args.getToShard(), _collectionUUID);
 

@@ -380,7 +380,8 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         BSONObj shardKey = BSONObj();
         auto criTargeter = dynamic_cast<const CollectionRoutingInfoTargeter*>(&targeter);
         if (criTargeter && criTargeter->isTargetedCollectionSharded()) {
-            shardKey = criTargeter->getRoutingInfo().cm.getShardKeyPattern().toBSON();
+            shardKey =
+                criTargeter->getRoutingInfo().getChunkManager().getShardKeyPattern().toBSON();
         }
         // Create an RAII object that prints the collection's shard key in the case of a tassert
         // or crash.

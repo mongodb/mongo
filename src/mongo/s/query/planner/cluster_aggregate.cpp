@@ -202,7 +202,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                         .canBeRejected(canBeRejected)
                         .build();
 
-    if (!(cri && cri->cm.hasRoutingTable()) && collationObj.isEmpty()) {
+    if (!(cri && cri->hasRoutingTable()) && collationObj.isEmpty()) {
         mergeCtx->setIgnoreCollator();
     }
 
@@ -231,9 +231,9 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
 
 void updateHostsTargetedMetrics(OperationContext* opCtx,
                                 const NamespaceString& executionNss,
-                                const boost::optional<ChunkManager>& cm,
+                                const boost::optional<CollectionRoutingInfo>& cri,
                                 const stdx::unordered_set<NamespaceString>& involvedNamespaces) {
-    if (!cm)
+    if (!cri)
         return;
 
     // Create a set of ShardIds that own a chunk belonging to any of the collections involved in
@@ -247,11 +247,11 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
     std::set<ShardId> shardsOwningChunks = [&]() {
         std::set<ShardId> shardsIds;
 
-        if (cm->isSharded()) {
+        if (cri->isSharded()) {
             std::set<ShardId> shardIdsForNs;
             // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
             // result is only used to update stats.
-            cm->getAllShardIds_UNSAFE_NotPointInTime(&shardIdsForNs);
+            cri->getChunkManager().getAllShardIds_UNSAFE_NotPointInTime(&shardIdsForNs);
             for (const auto& shardId : shardIdsForNs) {
                 shardsIds.insert(shardId);
             }
@@ -261,13 +261,14 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
             if (nss == executionNss)
                 continue;
 
-            const auto resolvedNsCM =
-                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss)).cm;
-            if (resolvedNsCM.isSharded()) {
+            const auto resolvedNsCri =
+                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            if (resolvedNsCri.isSharded()) {
                 std::set<ShardId> shardIdsForNs;
                 // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
                 // result is only used to update stats.
-                resolvedNsCM.getAllShardIds_UNSAFE_NotPointInTime(&shardIdsForNs);
+                resolvedNsCri.getChunkManager().getAllShardIds_UNSAFE_NotPointInTime(
+                    &shardIdsForNs);
                 for (const auto& shardId : shardIdsForNs) {
                     shardsIds.insert(shardId);
                 }
@@ -468,7 +469,7 @@ void rewritePipelineIfTimeseries(OperationContext* const opCtx,
                                  const CollectionRoutingInfo& cri) {
     if (timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, cri)) {
         // TypeCollectionTimeseriesFields encapsulates TimeseriesOptions.
-        const auto timeseriesFields = cri.cm.getTimeseriesFields();
+        const auto timeseriesFields = cri.getChunkManager().getTimeseriesFields();
         tassert(9949202,
                 "Expected getTimeseriesFields() to return a meaningful value",
                 timeseriesFields.has_value());
@@ -536,7 +537,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             return false;
         }
         const auto& cri = uassertStatusOK(criSW);
-        return cri.cm.isSharded();
+        return cri.isSharded();
     };
     bool isExplain = request.getExplain().get_value_or(false);
     liteParsedPipeline.verifyIsSupported(opCtx, isSharded, isExplain);
@@ -629,7 +630,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     ScopedDebugInfo shardKeyDiagnostics(
         "ShardKeyDiagnostics",
         diagnostic_printers::ShardKeyDiagnosticPrinter{
-            (cri && cri->cm.isSharded()) ? cri->cm.getShardKeyPattern().toBSON() : BSONObj()});
+            (cri && cri->isSharded()) ? cri->getChunkManager().getShardKeyPattern().toBSON()
+                                      : BSONObj()});
 
     // pipelineBuilder will be invoked within AggregationTargeter::make() if and only if it chooses
     // any policy other than "specific shard only".
@@ -837,10 +839,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     if (status.isOK()) {
-        updateHostsTargetedMetrics(opCtx,
-                                   namespaces.executionNss,
-                                   cri ? boost::make_optional(cri->cm) : boost::none,
-                                   involvedNamespaces);
+        updateHostsTargetedMetrics(opCtx, namespaces.executionNss, cri, involvedNamespaces);
         if (expCtx->getExplain()) {
             explain_common::generateQueryShapeHash(expCtx->getOperationContext(), result);
             // Add 'command' object to explain output. If this command was done as passthrough, it
@@ -906,9 +905,9 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
 
             if (criSt.isOK()) {
                 const CollectionRoutingInfo& cri = criSt.getValue();
-                if (cri.cm.isSharded()) {
+                if (cri.isSharded()) {
                     snapshotCri = cri;
-                    return cri.cm.getTimeseriesFields().get_ptr();
+                    return cri.getChunkManager().getTimeseriesFields().get_ptr();
                 }
             }
             return nullptr;

@@ -124,7 +124,7 @@ void writeToLocalShard(OperationContext* opCtx,
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     const auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    return cri.cm.isSharded();
+    return cri.isSharded();
 }
 
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
@@ -138,7 +138,7 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
         auto currentShardingIndexCatalogInfo =
             uassertStatusOK(
                 catalogCache->getCollectionRoutingInfo(expCtx->getOperationContext(), nss))
-                .sii;
+                .getIndexesInfo();
 
         // Mark the cache entry routingInfo for the 'nss' if the entry is staler than
         // 'targetCollectionPlacementVersion'.
@@ -155,13 +155,15 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     auto wantedVersion = [&] {
         auto routingInfo = uassertStatusOK(
             catalogCache->getCollectionRoutingInfo(expCtx->getOperationContext(), nss));
-        auto foundVersion = routingInfo.cm.hasRoutingTable() ? routingInfo.cm.getVersion()
-                                                             : ChunkVersion::UNSHARDED();
+        auto foundVersion = routingInfo.hasRoutingTable()
+            ? routingInfo.getCollectionVersion().placementVersion()
+            : ChunkVersion::UNSHARDED();
 
         auto ignoreIndexVersion = ShardVersionFactory::make(
             foundVersion,
-            routingInfo.sii ? boost::make_optional(routingInfo.sii->getCollectionIndexes())
-                            : boost::none);
+            routingInfo.getIndexesInfo()
+                ? boost::make_optional(routingInfo.getIndexesInfo()->getCollectionIndexes())
+                : boost::none);
         return ignoreIndexVersion;
     }();
 

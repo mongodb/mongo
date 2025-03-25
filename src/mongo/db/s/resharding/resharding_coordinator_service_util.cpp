@@ -535,13 +535,12 @@ void writeToConfigIndexesForTempNss(OperationContext* opCtx,
 
     switch (nextState) {
         case CoordinatorStateEnum::kPreparingToDonate: {
-            const auto optSii =
+            const auto cri =
                 uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(
-                                    opCtx, coordinatorDoc.getSourceNss()))
-                    .sii;
-            if (optSii) {
+                    opCtx, coordinatorDoc.getSourceNss()));
+            if (const auto& indexesInfo = cri.getIndexesInfo()) {
                 std::vector<BSONObj> indexes;
-                optSii->forEachIndex([&](const auto index) {
+                indexesInfo->forEachIndex([&](const auto index) {
                     IndexCatalogType copyIdx(index);
                     copyIdx.setCollectionUUID(coordinatorDoc.getReshardingUUID());
                     // TODO SERVER-73304: add the new index collection UUID here if neccessary.

@@ -111,8 +111,8 @@ bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Expected collection '" << nss.toStringForErrorMsg()
                           << "' to be tracked",
-            cri.cm.hasRoutingTable());
-    return !cri.cm.getDefaultCollator();
+            cri.hasRoutingTable());
+    return !cri.getChunkManager().getDefaultCollator();
 }
 
 }  // namespace
@@ -854,7 +854,7 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
         return resharding::data_copy::insertBatchTransactionally(opCtx,
                                                                  _outputNss,
-                                                                 cri.sii,
+                                                                 cri.getIndexesInfo(),
                                                                  txnNum,
                                                                  batch,
                                                                  _reshardingUUID,

@@ -1826,7 +1826,7 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
             nss() == NamespaceString::kLogicalSessionsNamespace) {
             const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss()));
-            return cri.cm.hasRoutingTable();
+            return cri.hasRoutingTable();
         } else {
             return sharding_ddl_util::getCollectionUUID(opCtx, nss()).is_initialized();
         }
@@ -1849,7 +1849,7 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
         // take the existing one from config.collections.
         const auto& cri = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss()));
-        _uuid = cri.cm.getUUID();
+        _uuid = cri.getChunkManager().getUUID();
     } else {
         _uuid = *optUuid;
     }

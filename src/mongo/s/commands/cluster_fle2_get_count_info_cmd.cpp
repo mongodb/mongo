@@ -136,7 +136,7 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
     auto nss = request().getNamespace();
     const auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    tassert(7924701, "ESC collection cannot be sharded", !cri.cm.isSharded());
+    tassert(7924701, "ESC collection cannot be sharded", !cri.isSharded());
 
     auto& cmd = request();
     setReadWriteConcern(opCtx, cmd, this);

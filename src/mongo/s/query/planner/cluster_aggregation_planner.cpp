@@ -347,9 +347,11 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     // version check but will nonetheless mark the operation as versioned.
     auto mergeCmdObj = appendShardVersion(
         mergeCmd.freeze().toBson(),
-        ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                  cri.sii ? boost::make_optional(cri.sii->getCollectionIndexes())
-                                          : boost::none));
+        ShardVersionFactory::make(
+            ChunkVersion::IGNORED(),
+            cri.getIndexesInfo()
+                ? boost::make_optional(cri.getIndexesInfo()->getCollectionIndexes())
+                : boost::none));
 
     // Attach query settings to the command.
     if (auto querySettingsBSON = mergeCtx->getQuerySettings().toBSON();
@@ -937,7 +939,7 @@ BSONObj getCollation(OperationContext* opCtx,
     }
 
     // Return the default collator if one exists, otherwise return the simple collation.
-    if (auto defaultCollator = cri->cm.getDefaultCollator()) {
+    if (auto defaultCollator = cri->getChunkManager().getDefaultCollator()) {
         return defaultCollator->getSpec().toBSON();
     }
 

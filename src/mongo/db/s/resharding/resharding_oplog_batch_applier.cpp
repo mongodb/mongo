@@ -110,7 +110,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                        ->catalogCache()
                                        ->getCollectionRoutingInfo(opCtx.get(),
                                                                   _crudApplication.getOutputNss()));
-                               const auto& sii = cri.sii;
+                               const auto& sii = cri.getIndexesInfo();
                                ScopedSetShardRole scopedSetShardRole(
                                    opCtx.get(),
                                    _crudApplication.getOutputNss(),

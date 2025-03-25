@@ -118,7 +118,6 @@ void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
 
 void Grid::clearForUnitTests() {
     _catalogCache.reset();
-    _catalogClient.reset();
     _shardRegistry.reset();
     _cursorManager.reset();
     _balancerConfig.reset();

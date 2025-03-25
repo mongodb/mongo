@@ -155,7 +155,7 @@ public:
         // If the collection is not sharded, or is sharded only on the 'files_id' field, we only
         // need to target a single shard, because the files' chunks can only be contained in a
         // single sharded chunk
-        const auto& cm = cri.cm;
+        const auto& cm = cri.getChunkManager();
         if (!cm.isSharded() ||
             SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
                                                         BSON("files_id" << 1))) {

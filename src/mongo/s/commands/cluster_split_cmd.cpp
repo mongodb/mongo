@@ -223,7 +223,7 @@ public:
 
         boost::optional<Chunk> chunk;
 
-        const auto& cm = cri.cm;
+        const auto& cm = cri.getChunkManager();
 
         if (!find.isEmpty()) {
             // find

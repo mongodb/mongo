@@ -113,7 +113,8 @@ protected:
                                     const std::set<ShardId>& expectedShardIds) {
         const ShardKeyPattern shardKeyPattern(shardKey);
         auto chunkManager =
-            makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, false, splitPoints, {}).cm;
+            makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, false, splitPoints, {})
+                .getChunkManager();
 
         std::set<ShardId> shardIds;
         chunkManager.getShardIdsForRange(min, max, &shardIds);
@@ -133,7 +134,7 @@ protected:
         auto chunkManager =
             makeCollectionRoutingInfo(
                 kNss, shardKeyPattern, std::move(defaultCollator), false, splitPoints, {})
-                .cm;
+                .getChunkManager();
 
         std::set<ShardId> shardIds;
         QueryTargetingInfo info;

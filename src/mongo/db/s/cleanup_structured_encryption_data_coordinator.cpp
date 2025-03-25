@@ -234,7 +234,7 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
             tassert(7647924,
                     str::stream() << "Namespace " << escNss.toStringForErrorMsg()
                                   << " is expected to be unsharded, but is sharded",
-                    !innerCri.cm.isSharded());
+                    !innerCri.isSharded());
 
             uassertStatusOK(
                 FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(

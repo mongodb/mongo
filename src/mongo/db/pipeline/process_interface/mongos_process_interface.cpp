@@ -96,9 +96,8 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(
     auto swRoutingInfo = catalogCache->getCollectionRoutingInfo(expCtx->getOperationContext(),
                                                                 expCtx->getNamespaceString());
     // Additionally check that the ExpressionContext's UUID matches the collection routing info.
-    if (swRoutingInfo.isOK() && expCtx->getUUID() &&
-        swRoutingInfo.getValue().cm.hasRoutingTable()) {
-        if (!swRoutingInfo.getValue().cm.uuidMatches(*expCtx->getUUID())) {
+    if (swRoutingInfo.isOK() && expCtx->getUUID() && swRoutingInfo.getValue().hasRoutingTable()) {
+        if (!swRoutingInfo.getValue().getChunkManager().uuidMatches(*expCtx->getUUID())) {
             return {ErrorCodes::NamespaceNotFound,
                     str::stream() << "The UUID of collection "
                                   << expCtx->getNamespaceString().toStringForErrorMsg()
@@ -226,7 +225,7 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
                 auto cri = uassertStatusOK(getCollectionRoutingInfo(foreignExpCtx));
 
                 // Finalize the 'find' command object based on the routing table information.
-                if (findCmdIsByUuid && cri.cm.hasRoutingTable()) {
+                if (findCmdIsByUuid && cri.hasRoutingTable()) {
                     // Find by UUID and shard versioning do not work together (SERVER-31946).  In
                     // the sharded case we've already checked the UUID, so find by namespace is
                     // safe.  In the unlikely case that the collection has been deleted and a new
@@ -386,7 +385,7 @@ std::vector<GenericCursor> MongosProcessInterface::getIdleCursors(
 bool MongosProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     const auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    return cri.cm.isSharded();
+    return cri.isSharded();
 }
 
 MongoProcessInterface::SupportingUniqueIndex
@@ -462,7 +461,7 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
         catalogCache->onStaleCollectionVersion(outputNs, boost::none);
         const auto& cri = uassertStatusOK(
             catalogCache->getCollectionRoutingInfo(expCtx->getOperationContext(), outputNs));
-        if (!cri.cm.isSharded()) {
+        if (!cri.isSharded()) {
             return boost::none;
         }
 

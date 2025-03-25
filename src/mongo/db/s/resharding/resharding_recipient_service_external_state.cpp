@@ -162,7 +162,7 @@ CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getTrackedCollecti
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Expected collection " << nss.toStringForErrorMsg()
                           << " to be tracked",
-            cri.cm.hasRoutingTable());
+            cri.hasRoutingTable());
     return cri;
 }
 
@@ -207,7 +207,7 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
         return MigrationDestinationManager::getCollectionIndexes(
             opCtx,
             nss,
-            cri.cm.getMinKeyShardIdWithSimpleCollation(),
+            cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(),
             cri,
             afterClusterTime,
             expandSimpleCollation);

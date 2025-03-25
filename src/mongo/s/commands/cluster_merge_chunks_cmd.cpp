@@ -85,8 +85,9 @@ public:
             BSONObj minKey = bounds[0];
             BSONObj maxKey = bounds[1];
 
-            const auto cm =
-                getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns()).cm;
+            const auto cri = getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns());
+
+            const auto& cm = cri.getChunkManager();
 
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "shard key bounds "

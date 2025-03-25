@@ -69,15 +69,12 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const Namespac
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             invariant(catalogCache);
 
-            _reshardingChunkMgr =
-                uassertStatusOK(
-                    catalogCache->getCollectionRoutingInfo(
-                        opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */))
-                    .cm;
-
+            const auto& cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(
+                opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */));
             tassert(6862800,
                     "Routing information for the temporary resharding collection is stale",
-                    _reshardingChunkMgr->hasRoutingTable());
+                    cri.hasRoutingTable());
+            _reshardingChunkMgr = cri.getChunkManager();
         }
     }
 }

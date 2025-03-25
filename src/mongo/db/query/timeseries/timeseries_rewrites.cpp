@@ -70,7 +70,7 @@ inline bool isViewlessTimeseriesCollection(const auto& catalogData) {
 bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
                                              const CollectionRoutingInfo& cri) {
     return !isRawDataOperation(opCtx) && cri.hasRoutingTable() &&
-        isViewlessTimeseriesCollection(cri.cm);
+        isViewlessTimeseriesCollection(cri.getChunkManager());
 }
 
 bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,

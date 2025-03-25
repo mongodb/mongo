@@ -282,13 +282,14 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 }
 
 void updateNumHostsTargetedMetrics(OperationContext* opCtx,
-                                   const ChunkManager& cm,
+                                   const CollectionRoutingInfo& cri,
                                    int nTargetedShards) {
     // Note: It is fine to use 'getAproxNShardsOwningChunks' here because the result is only used to
     // update stats.
-    int nShardsOwningChunks = cm.hasRoutingTable() ? cm.getAproxNShardsOwningChunks() : 0;
+    int nShardsOwningChunks =
+        cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
     auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
-        opCtx, nTargetedShards, nShardsOwningChunks, cm.isSharded());
+        opCtx, nTargetedShards, nShardsOwningChunks, cri.isSharded());
     NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(
         NumHostsTargetedMetrics::QueryType::kFindCmd, targetType);
 }
@@ -524,7 +525,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         opDebug.cursorExhausted = true;
 
         if (shardIds.size() > 0) {
-            updateNumHostsTargetedMetrics(opCtx, cri.cm, shardIds.size());
+            updateNumHostsTargetedMetrics(opCtx, cri, shardIds.size());
         }
         if (const auto remoteMetrics = ccc->takeRemoteMetrics()) {
             opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(*remoteMetrics);
@@ -549,7 +550,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     opDebug.cursorid = cursorId;
 
     if (shardIds.size() > 0) {
-        updateNumHostsTargetedMetrics(opCtx, cri.cm, shardIds.size());
+        updateNumHostsTargetedMetrics(opCtx, cri, shardIds.size());
     }
 
     return cursorId;
@@ -700,7 +701,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
         ScopedDebugInfo shardKeyDiagnostics(
             "ShardKeyDiagnostics",
             diagnostic_printers::ShardKeyDiagnosticPrinter{
-                cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
+                cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
 
         try {
             return runQueryWithoutRetrying(

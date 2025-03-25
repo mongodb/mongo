@@ -69,27 +69,57 @@ using DatabaseTypeCache = ReadThroughCache<DatabaseName, DatabaseType, Comparabl
 using DatabaseTypeValueHandle = DatabaseTypeCache::ValueHandle;
 using CachedDatabaseInfo = DatabaseTypeValueHandle;
 
-struct CollectionRoutingInfo {
+class CollectionRoutingInfo {
+public:
     CollectionRoutingInfo(ChunkManager&& chunkManager,
                           boost::optional<ShardingIndexesCatalogCache>&& shardingIndexesCatalog,
                           CachedDatabaseInfo&& dbInfo)
-        : cm(std::move(chunkManager)),
-          sii(std::move(shardingIndexesCatalog)),
-          dbInfo(std::move(dbInfo)) {}
-    ChunkManager cm;
-    boost::optional<ShardingIndexesCatalogCache> sii;
-    CachedDatabaseInfo dbInfo;
+        : _dbInfo(std::move(dbInfo)),
+          _cm(std::move(chunkManager)),
+          _sii(std::move(shardingIndexesCatalog)) {}
 
+    /**
+     * Returns true if the collection is tracked in the global catalog.
+     *
+     * If this is the case the collection will also have an associated routing table (ChunkManager).
+     */
     bool hasRoutingTable() const;
+
+    /**
+     * Returns true if the collection is tracked in the global catalog and is sharded.
+     *
+     * A sharded collection can have more than one chunks and chunks could be distributed on several
+     * shards.
+     */
+    bool isSharded() const {
+        return _cm.isSharded();
+    }
+
+    const ChunkManager& getChunkManager() const {
+        return _cm;
+    }
+
     ShardVersion getCollectionVersion() const;
     ShardVersion getShardVersion(const ShardId& shardId) const;
+
+    const CachedDatabaseInfo& getDatabaseInfo() const {
+        return _dbInfo;
+    }
     const ShardId& getDbPrimaryShardId() const;
     const DatabaseVersion& getDbVersion() const;
-
+    const boost::optional<ShardingIndexesCatalogCache>& getIndexesInfo() const {
+        return _sii;
+    }
     // When set to true, the ShardVersions returned by this object will have the
     // 'ignoreCollectionUuidMismatch' flag set, thus instructing the receiving shards to ignore
     // collection UUID mismatches between the sharding catalog and their local catalog.
     bool shouldIgnoreUuidMismatch = false;
+
+
+private:
+    CachedDatabaseInfo _dbInfo;
+    ChunkManager _cm;
+    boost::optional<ShardingIndexesCatalogCache> _sii;
 };
 
 /**

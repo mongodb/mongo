@@ -119,7 +119,8 @@ CoreCatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const Namespa
     auto catalogCache = Grid::get(getServiceContext())->catalogCache();
     const auto cri =
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
-    ASSERT(cri.cm.isSharded());
+    ASSERT(cri.isSharded());
+    ASSERT(cri.getChunkManager().isSharded());
 
     // Simulates the shard wanting a higher version than the one sent by the router.
     catalogCache->onStaleCollectionVersion(nss, boost::none);
@@ -393,7 +394,7 @@ ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoSha
         });
     }
 
-    return future.default_timed_get()->cm;
+    return future.default_timed_get()->getChunkManager();
 }
 
 }  // namespace mongo

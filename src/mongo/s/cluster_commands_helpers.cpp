@@ -193,7 +193,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
                       .build();
 
     // Ignore the collator if the collection is untracked and the user did not specify a collator.
-    if (!cri.cm.hasRoutingTable() && noCollationSpecified) {
+    if (!cri.hasRoutingTable() && noCollationSpecified) {
         expCtx->setIgnoreCollator();
     }
     return expCtx;
@@ -208,8 +208,8 @@ std::vector<AsyncRequestsSender::Request> buildShardVersionedRequests(
     const std::set<ShardId>& shardIds,
     const BSONObj& cmdObj,
     bool eligibleForSampling) {
-    const auto& cm = cri.cm;
-    tassert(10162100, "Expected to find a routing table", cm.hasRoutingTable());
+    tassert(10162100, "Expected to find a routing table", cri.hasRoutingTable());
+    const auto& cm = cri.getChunkManager();
 
     std::vector<AsyncRequestsSender::Request> requests;
     requests.reserve(shardIds.size());
@@ -296,11 +296,9 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
     const std::set<ShardId>& shardIds,
     const BSONObj& cmdObj,
     bool eligibleForSampling) {
-    const auto& cm = cri.cm;
-    if (cm.hasRoutingTable()) {
+    if (cri.hasRoutingTable()) {
         return buildShardVersionedRequests(expCtx, nss, cri, shardIds, cmdObj, eligibleForSampling);
     }
-
     tassert(
         10162103,
         [&]() {
@@ -348,7 +346,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     } else {
         // The collection has a routing table. Target all shards that own chunks that match the
         // query.
-        getShardIdsForQuery(expCtx, query, collation, cri.cm, &shardIds);
+        getShardIdsForQuery(expCtx, query, collation, cri.getChunkManager(), &shardIds);
     }
     for (const auto& shardToSkip : shardsToSkip) {
         shardIds.erase(shardToSkip);
@@ -695,8 +693,9 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
                                                                boost::none /*letParameters*/,
                                                                boost::none /*runtimeConstants*/);
 
-    const auto query =
-        cri.cm.isSharded() ? cri.cm.getShardKeyPattern().getKeyPattern().globalMin() : BSONObj();
+    const auto query = cri.isSharded()
+        ? cri.getChunkManager().getShardKeyPattern().getKeyPattern().globalMin()
+        : BSONObj();
 
     auto responses = gatherResponses(
         opCtx,
@@ -883,7 +882,7 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
         // The collection has a routing table. Use it to decide which shards to target based on the
         // query and collation.
         std::set<ShardId> shardIds;
-        getShardIdsForQuery(expCtx, query, collation, cri.cm, &shardIds);
+        getShardIdsForQuery(expCtx, query, collation, cri.getChunkManager(), &shardIds);
         return shardIds;
     }
 
@@ -894,7 +893,7 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
 std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query,
                                                      const CollectionRoutingInfo& cri) {
     if (cri.hasRoutingTable()) {
-        const auto& cm = cri.cm;
+        const auto& cm = cri.getChunkManager();
 
         // The collection has a routing table. Use it to decide which shards to target based on the
         // query and collation.
@@ -1001,7 +1000,7 @@ CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Command not supported on unsharded collection "
                           << nss.toStringForErrorMsg(),
-            cri.cm.isSharded());
+            cri.isSharded());
     return cri;
 };
 
@@ -1045,7 +1044,7 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
             // For a collection that has a routing table, we must load indexes from a shard with
             // chunks. For consistency with cluster listIndexes, load from the shard that owns
             // the minKey chunk.
-            const auto& cm = cri.cm;
+            const auto& cm = cri.getChunkManager();
             const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
             return {
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),

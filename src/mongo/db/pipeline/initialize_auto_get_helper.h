@@ -53,7 +53,7 @@ inline std::vector<ScopedSetShardRole> createScopedShardRoles(
                 "Must be an entry in criMap for namespace " + nss.toStringForErrorMsg(),
                 nssCri != criMap.end());
 
-        bool isTracked = nssCri->second.cm.hasRoutingTable();
+        bool isTracked = nssCri->second.hasRoutingTable();
         auto shardVersion = [&] {
             auto sv =
                 isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNSHARDED();

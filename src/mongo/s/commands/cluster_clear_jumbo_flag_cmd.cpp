@@ -95,8 +95,8 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-            const auto cm =
-                getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns()).cm;
+            const auto cm = getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns())
+                                .getChunkManager();
 
             uassert(ErrorCodes::InvalidOptions,
                     "bounds can only have exactly 2 elements",

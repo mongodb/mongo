@@ -211,9 +211,9 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
     const auto criSW = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-    if (criSW.isOK() && criSW.getValue().cm.isSharded()) {
+    if (criSW.isOK() && criSW.getValue().isSharded()) {
         return shardKeyToDocumentKeyFields(
-            criSW.getValue().cm.getShardKeyPattern().getKeyPatternFields());
+            criSW.getValue().getChunkManager().getShardKeyPattern().getKeyPatternFields());
     } else if (!criSW.isOK() && criSW.getStatus().code() != ErrorCodes::NamespaceNotFound) {
         uassertStatusOK(criSW);
     }
@@ -293,7 +293,7 @@ boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContex
     const auto cri = uassertStatusOK(swCRI);
 
     if (cri.hasRoutingTable()) {
-        const auto& cm = cri.cm;
+        const auto& cm = cri.getChunkManager();
         if (cm.isUnsplittable()) {
             return cm.getMinKeyShardIdWithSimpleCollation();
         } else {

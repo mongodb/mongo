@@ -270,7 +270,8 @@ public:
                 ScopedDebugInfo shardKeyDiagnostics(
                     "ShardKeyDiagnostics",
                     diagnostic_printers::ShardKeyDiagnosticPrinter{
-                        cri.cm.isSharded() ? cri.cm.getShardKeyPattern().toBSON() : BSONObj()});
+                        cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
+                                        : BSONObj()});
 
                 auto numShards = getTargetedShardsForCanonicalQuery(cq, cri).size();
                 // When forwarding the command to multiple shards, need to transform it by adjusting

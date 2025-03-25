@@ -129,7 +129,8 @@ public:
             Timer t;
 
             const auto chunkManager =
-                getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns()).cm;
+                getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns())
+                    .getChunkManager();
             uassert(ErrorCodes::NamespaceNotSharded,
                     str::stream() << "Can't execute " << Request::kCommandName
                                   << " on unsharded collection " << ns().toStringForErrorMsg(),

@@ -74,7 +74,7 @@ StatusWith<ChunkManager> CatalogCacheMock::getCollectionPlacementInfoWithRefresh
     OperationContext* opCtx, const NamespaceString& nss) {
     const auto it = _collectionCache.find(nss);
     if (it != _collectionCache.end()) {
-        return it->second.cm;
+        return it->second.getChunkManager();
     } else {
         return Status(
             ErrorCodes::InternalError,

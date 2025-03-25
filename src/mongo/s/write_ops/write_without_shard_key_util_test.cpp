@@ -89,7 +89,7 @@ private:
                                          false,
                                          {BSON("a" << 50 << "b" << 50)},
                                          {})
-            .cm;
+            .getChunkManager();
     }
 
     boost::optional<ChunkManager> _cm;
@@ -118,7 +118,7 @@ private:
                                          {},
                                          boost::none,
                                          std::move(timeseriesFields))
-            .cm;
+            .getChunkManager();
     }
 };
 
@@ -432,7 +432,8 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
     }
 
     auto cri = *future.default_timed_get();
-    ASSERT(!cri.cm.isSharded());
+    ASSERT(!cri.isSharded());
+    ASSERT(!cri.getChunkManager().isSharded());
 
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
@@ -465,7 +466,8 @@ TEST_F(TimeseriesUnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseP
     }
 
     auto cri = *future.default_timed_get();
-    ASSERT(!cri.cm.isSharded());
+    ASSERT(!cri.isSharded());
+    ASSERT(!cri.getChunkManager().isSharded());
 
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),

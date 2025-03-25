@@ -213,17 +213,19 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
     // Unsharded collections always target one single shard.
-    if (!cri.cm.isSharded()) {
+    if (!cri.isSharded()) {
         return false;
     }
 
-    auto tsFields = cri.cm.getTimeseriesFields();
+    const auto& cm = cri.getChunkManager();
+
+    auto tsFields = cm.getTimeseriesFields();
 
     // updateOne and deleteOne do not use the two phase protocol for single writes that specify
     // _id in their queries, unless a document is being upserted. An exact _id match requires
     // default collation if the _id value is a collatable type.
     if (isUpdateOrDelete && query.hasField("_id") &&
-        CollectionRoutingInfoTargeter::isExactIdQuery(opCtx, nss, query, collation, cri.cm) &&
+        CollectionRoutingInfoTargeter::isExactIdQuery(opCtx, nss, query, collation, cm) &&
         !isUpsert && !isTimeseriesViewRequest) {
         return false;
     }
@@ -245,7 +247,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     auto shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
         expCtx,
-        cri.cm.getShardKeyPattern(),
+        cm.getShardKeyPattern(),
         !isTimeseriesViewRequest
             ? query
             : timeseries::getBucketLevelPredicateForRouting(query,
@@ -264,13 +266,13 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
             }
             auto collator = uassertStatusOK(
                 CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
-            return CollatorInterface::collatorsMatch(collator.get(), cri.cm.getDefaultCollator());
+            return CollatorInterface::collatorsMatch(collator.get(), cm.getDefaultCollator());
         }();
 
         // If the default collection collation is not used or the default collation is not the
         // simple collation and any field of the shard key is a collatable type, then we will use
         // the two phase write protocol since we cannot target directly to a shard.
-        if ((!hasDefaultCollation || cri.cm.getDefaultCollator()) &&
+        if ((!hasDefaultCollation || cm.getDefaultCollator()) &&
             shardKeyHasCollatableType(shardKey)) {
             return true;
         } else {

@@ -701,7 +701,7 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
 
     const auto cri =
         uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, mergeStage->getOutputNs()));
-    if (!cri.cm.isSharded()) {
+    if (!cri.isSharded()) {
         return boost::none;
     }
 
@@ -713,7 +713,7 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
     // inserted on. With this ability we can insert an exchange on the shards to partition the
     // documents based on which shard will end up owning them. Then each shard can perform a merge
     // of only those documents which belong to it (optimistically, barring chunk migrations).
-    return walkPipelineBackwardsTrackingShardKey(opCtx, mergePipeline, cri.cm);
+    return walkPipelineBackwardsTrackingShardKey(opCtx, mergePipeline, cri.getChunkManager());
 }
 
 BSONObj createPassthroughCommandForShard(
@@ -1065,8 +1065,8 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                         mergeShardId.has_value() ? mergeShardId->toString() : "false");
 
         boost::optional<OrderedPathSet> shardKeyPaths;
-        if (cri && cri->cm.isSharded()) {
-            shardKeyPaths = getShardKeyPathsSet(cri->cm.getShardKeyPattern());
+        if (cri && cri->isSharded()) {
+            shardKeyPaths = getShardKeyPathsSet(cri->getChunkManager().getShardKeyPattern());
         }
         splitPipelines = SplitPipeline::split(std::move(pipeline), std::move(shardKeyPaths));
 
