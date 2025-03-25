@@ -180,7 +180,8 @@ const retryableErrs = [
     "WriteConcernLegacyOK",
     "UnknownReplWriteConcern",
     "UnsatisfiableWriteConcern",
-    "The server is in quiesce mode and will shut down"
+    "The server is in quiesce mode and will shut down",
+    "operation was interrupted",
 ];
 const retryableErrsPlusShellGeneratedNetworkErrs = [...retryableErrs, ...shellGeneratedNetworkErrs];
 /**

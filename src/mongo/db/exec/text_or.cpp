@@ -68,7 +68,6 @@ TextOrStage::TextOrStage(ExpressionContext* expCtx,
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _keyPrefixSize(keyPrefixSize),
       _ws(ws),
-      _scoreIterator(_scores.end()),
       _filter(filter),
       _idRetrying(WorkingSet::INVALID_ID) {}
 
@@ -209,8 +208,6 @@ PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
                 doForceSpill();
             }
             _sorterIterator = _sorter->done();
-        } else {
-            _scoreIterator = _scores.begin();
         }
         _internalState = State::kReturningResults;
 
@@ -231,14 +228,15 @@ PlanStage::StageState TextOrStage::returnResults(WorkingSetID* out) {
 }
 
 PlanStage::StageState TextOrStage::returnResultsInMemory(WorkingSetID* out) {
-    if (_scoreIterator == _scores.end()) {
+    if (_scores.empty()) {
         _internalState = State::kDone;
         return PlanStage::IS_EOF;
     }
 
     // Retrieve the record that contains the text score.
-    TextRecordData textRecordData = _scoreIterator->second;
-    ++_scoreIterator;
+    auto it = _scores.begin();
+    TextRecordData textRecordData = it->second;
+    _scores.erase(it);
 
     // Ignore non-matched documents.
     if (textRecordData.score == kRejectedDocumentScore) {
@@ -377,6 +375,10 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 }
 
 void TextOrStage::doForceSpill() {
+    if (_scores.empty()) {
+        return;
+    }
+
     if (!_sorter) {
         initSorter();
     }
@@ -407,6 +409,10 @@ void TextOrStage::doForceSpill() {
         1 /*spills*/, _currentMemoryBytes, recordsToSpill, _sorterStats->bytesSpilled());
 
     _currentMemoryBytes = 0;
+
+    if (_internalState == State::kReturningResults) {
+        _sorterIterator = _sorter->done();
+    }
 }
 
 void TextOrStage::initSorter() {

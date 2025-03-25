@@ -46,6 +46,8 @@ selector:
     - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
+    # Test collect server status from all nodes
+    - jstests/core/query/release_memory/release_memory_text_or.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

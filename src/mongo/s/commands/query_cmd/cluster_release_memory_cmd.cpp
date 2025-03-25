@@ -128,16 +128,8 @@ public:
                                     dataForFailCommand, nss, command, opCtx->getClient());
                             });
                     }
-                    auto resp = pinnedCursor.getValue()->releaseMemory();
-                    // Check the status and decide where the result should go
-                    if (resp.isOK()) {
-                        cursorsReleased.push_back(id);
-                    } else {
-                        LOGV2_ERROR(9745601,
-                                    "ReleaseMemory returned non-OK status",
-                                    "cursorId"_attr = id,
-                                    "status"_attr = resp.toString());
-                    }
+                    uassertStatusOK(pinnedCursor.getValue()->releaseMemory());
+                    cursorsReleased.push_back(id);
                     // Upon successful completion, transfer ownership of the cursor back to the
                     // cursor manager.
                     pinnedCursor.getValue().returnCursor(
@@ -149,10 +141,7 @@ public:
                 } else if (pinnedCursor.getStatus().code() == ErrorCodes::CursorNotFound) {
                     cursorsNotFound.push_back(id);
                 } else {
-                    LOGV2_ERROR(9745602,
-                                "ReleaseMemory returned unexpected status",
-                                "cursorId"_attr = id,
-                                "status"_attr = pinnedCursor.getStatus().toString());
+                    uassertStatusOK(pinnedCursor.getStatus());
                 }
             }
 
