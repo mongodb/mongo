@@ -76,6 +76,8 @@ public:
 
     ValueType operator()(optimizer::ABT& n, optimizer::Let& let);
 
+    ValueType operator()(optimizer::ABT& n, optimizer::MultiLet& multiLet);
+
     ValueType operator()(optimizer::ABT& n, optimizer::BinaryOp& op);
 
     ValueType operator()(optimizer::ABT& n, optimizer::FunctionCall& op);

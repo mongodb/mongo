@@ -39,6 +39,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/db/query/stage_builder/sbe/vectorizer.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::stage_builder {
@@ -4314,6 +4315,103 @@ TEST(VectorizerTest, ConvertSwitch) {
         *processed.expr);
 }
 
+TEST(VectorizerTest, ConvertMultiLet) {
+    // TODO SERVER-100579 Remove this when feature flag is removed
+    RAIIServerParameterControllerForTest sbeUpgradeBinaryTreesFeatureFlag{
+        "featureFlagSbeUpgradeBinaryTrees", true};
+
+    auto tree = make<MultiLet>(
+        std::vector<std::pair<ProjectionName, ABT>>{
+            {"var1", make<BinaryOp>(Operations::Add, make<Variable>("s1"), make<Variable>("s2"))},
+            {"var2", make<BinaryOp>(Operations::Add, make<Variable>("s3"), make<Variable>("s4"))}},
+        make<BinaryOp>(Operations::Add, make<Variable>("var1"), make<Variable>("var2")));
+
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace(
+        "s1"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+    bindings.emplace(
+        "s2"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    bindings.emplace(
+        "s3"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+    bindings.emplace(
+        "s4"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    sbe::value::FrameIdGenerator generator;
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"MultiLet\", \n"
+        "    variable0: \"var1\", \n"
+        "    variable1: \"var2\", \n"
+        "    bind0: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"valueBlockAdd\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"Nothing\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"s1\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"s2\"\n"
+        "            }\n"
+        "        ]\n"
+        "    }, \n"
+        "    bind1: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"valueBlockAdd\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"Nothing\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"s3\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"s4\"\n"
+        "            }\n"
+        "        ]\n"
+        "    }, \n"
+        "    expression: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"valueBlockAdd\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"Nothing\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"var1\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"var2\"\n"
+        "            }\n"
+        "        ]\n"
+        "    }\n"
+        "}\n",
+        *processed.expr);
+}
 
 }  // namespace
 }  // namespace mongo::stage_builder

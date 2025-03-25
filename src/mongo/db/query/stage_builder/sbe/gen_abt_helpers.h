@@ -203,6 +203,10 @@ optimizer::ABT makeLet(const optimizer::ProjectionName& name,
                        optimizer::ABT bindExpr,
                        optimizer::ABT expr);
 
+optimizer::ABT makeLet(std::vector<optimizer::ProjectionName> bindNames,
+                       optimizer::ABTVector bindExprs,
+                       optimizer::ABT inExpr);
+
 optimizer::ABT makeLet(sbe::FrameId frameId, optimizer::ABT bindExpr, optimizer::ABT expr);
 
 optimizer::ABT makeLet(sbe::FrameId frameId, optimizer::ABTVector bindExprs, optimizer::ABT expr);

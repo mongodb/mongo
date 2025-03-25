@@ -116,6 +116,8 @@ public:
 
     Tree operator()(const optimizer::ABT& n, const optimizer::Let& op);
 
+    Tree operator()(const optimizer::ABT& n, const optimizer::MultiLet& op);
+
     Tree operator()(const optimizer::ABT& n, const optimizer::If& op);
 
     Tree operator()(const optimizer::ABT& n, const optimizer::Switch& op);

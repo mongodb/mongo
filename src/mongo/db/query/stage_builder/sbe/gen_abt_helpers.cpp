@@ -285,13 +285,40 @@ optimizer::ABT makeLet(sbe::FrameId frameId, optimizer::ABT bindExpr, optimizer:
 }
 
 optimizer::ABT makeLet(sbe::FrameId frameId, optimizer::ABTVector bindExprs, optimizer::ABT expr) {
-    for (size_t idx = bindExprs.size(); idx > 0;) {
-        --idx;
-        expr = optimizer::make<optimizer::Let>(
-            getABTLocalVariableName(frameId, idx), std::move(bindExprs[idx]), std::move(expr));
-    }
+    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+        for (size_t idx = bindExprs.size(); idx > 0;) {
+            --idx;
+            expr = optimizer::make<optimizer::Let>(
+                getABTLocalVariableName(frameId, idx), std::move(bindExprs[idx]), std::move(expr));
+        }
 
-    return expr;
+        return expr;
+    } else {
+        std::vector<optimizer::ProjectionName> bindNames;
+        bindNames.reserve(bindExprs.size());
+        for (size_t idx = 0; idx < bindExprs.size(); ++idx) {
+            bindNames.emplace_back(getABTLocalVariableName(frameId, idx));
+        }
+
+        bindExprs.emplace_back(std::move(expr));
+        return optimizer::make<optimizer::MultiLet>(std::move(bindNames), std::move(bindExprs));
+    }
+}
+
+optimizer::ABT makeLet(std::vector<optimizer::ProjectionName> bindNames,
+                       optimizer::ABTVector bindExprs,
+                       optimizer::ABT inExpr) {
+    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+        for (size_t idx = bindExprs.size(); idx > 0;) {
+            --idx;
+            inExpr = optimizer::make<optimizer::Let>(
+                std::move(bindNames[idx]), std::move(bindExprs[idx]), std::move(inExpr));
+        }
+        return inExpr;
+    } else {
+        bindExprs.emplace_back(std::move(inExpr));
+        return optimizer::make<optimizer::MultiLet>(std::move(bindNames), std::move(bindExprs));
+    }
 }
 
 optimizer::ABT makeLocalLambda(sbe::FrameId frameId, optimizer::ABT expr) {

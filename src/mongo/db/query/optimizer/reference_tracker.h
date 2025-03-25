@@ -105,11 +105,6 @@ public:
     ~VariableEnvironment();
 
     /**
-     * Returns the projections produced by the root of the ABT.
-     */
-    ProjectionNameSet topLevelProjections() const;
-
-    /**
      * Returns the defintion of 'var' in the ABT, regardless of the visibility of 'var' in the tree.
      * If there is no definition for 'var', returns an empty Definition.
      */

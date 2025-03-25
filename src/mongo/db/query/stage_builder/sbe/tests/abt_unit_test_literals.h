@@ -218,6 +218,28 @@ inline auto _let(StringData pn, ExprHolder inBind, ExprHolder inExpr) {
     return ExprHolder{make<Let>(ProjectionName{pn}, std::move(inBind._n), std::move(inExpr._n))};
 }
 
+inline auto _multiLet(
+    StringData pn1, ExprHolder inBind1, StringData pn2, ExprHolder inBind2, ExprHolder inExpr) {
+    return ExprHolder{
+        make<MultiLet>(std::vector{std::pair{ProjectionName{pn1}, std::move(inBind1._n)},
+                                   std::pair{ProjectionName{pn2}, std::move(inBind2._n)}},
+                       std::move(inExpr._n))};
+}
+
+inline auto _multiLet(StringData pn1,
+                      ExprHolder inBind1,
+                      StringData pn2,
+                      ExprHolder inBind2,
+                      StringData pn3,
+                      ExprHolder inBind3,
+                      ExprHolder inExpr) {
+    return ExprHolder{
+        make<MultiLet>(std::vector{std::pair{ProjectionName{pn1}, std::move(inBind1._n)},
+                                   std::pair{ProjectionName{pn2}, std::move(inBind2._n)},
+                                   std::pair{ProjectionName{pn3}, std::move(inBind3._n)}},
+                       std::move(inExpr._n))};
+}
+
 inline auto _lambda(StringData pn, ExprHolder body) {
     return ExprHolder{make<LambdaAbstraction>(ProjectionName{pn}, std::move(body._n))};
 }

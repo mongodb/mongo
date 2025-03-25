@@ -135,6 +135,26 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n, optimizer::Let& let, bo
 }
 
 TypeSignature TypeChecker::operator()(optimizer::ABT& n,
+                                      optimizer::MultiLet& multiLet,
+                                      bool saveInference) {
+    // Define the new variables with the type of the 'bind' expressions
+    for (size_t idx = 0; idx < multiLet.numBinds(); ++idx) {
+        bind(multiLet.varName(idx), multiLet.bind(idx).visit(*this, false));
+    }
+
+    // The MultiLet node returns the value of its 'in' child.
+    TypeSignature resultType = multiLet.in().visit(*this, false);
+
+    // The current binding must be the one where we defined the variables.
+    for (auto&& name : multiLet.varNames()) {
+        invariant(_bindings.back().contains(name));
+        _bindings.back().erase(name);
+    }
+
+    return resultType;
+}
+
+TypeSignature TypeChecker::operator()(optimizer::ABT& n,
                                       optimizer::UnaryOp& op,
                                       bool saveInference) {
     TypeSignature childType = op.getChild().visit(*this, false);

@@ -41,6 +41,7 @@ class UnaryOp;
 class BinaryOp;
 class If;
 class Let;
+class MultiLet;
 class LambdaAbstraction;
 class LambdaApplication;
 class FunctionCall;

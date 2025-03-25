@@ -804,11 +804,7 @@ public:
                                  "only one date allowed in an $add expression")}},
                 std::move(addOp));
 
-            for (size_t idx = 0; idx < arity; ++idx) {
-                addExpr = optimizer::make<optimizer::Let>(
-                    std::move(names[idx]), std::move(binds[idx]), std::move(addExpr));
-            }
-
+            addExpr = makeLet(std::move(names), std::move(binds), std::move(addExpr));
             pushABT(std::move(addExpr));
         }
     }
@@ -2558,11 +2554,7 @@ public:
             makeABTFail(ErrorCodes::Error{7157721},
                         "only numbers are allowed in an $multiply expression"));
 
-        for (size_t i = 0; i < arity; ++i) {
-            multiplyExpr = optimizer::make<optimizer::Let>(
-                std::move(names[i]), std::move(binds[i]), std::move(multiplyExpr));
-        }
-
+        multiplyExpr = makeLet(std::move(names), std::move(binds), std::move(multiplyExpr));
         pushABT(std::move(multiplyExpr));
     }
     void visit(const ExpressionNot* expr) final {
@@ -4280,11 +4272,8 @@ private:
                                                              std::move(variables)));
             }
         }();
-        for (size_t i = 0; i < arity; ++i) {
-            setExpr = optimizer::make<optimizer::Let>(
-                std::move(argNames[i]), std::move(args[i]), std::move(setExpr));
-        }
 
+        setExpr = makeLet(std::move(argNames), std::move(args), std::move(setExpr));
         pushABT(std::move(setExpr));
     }
 

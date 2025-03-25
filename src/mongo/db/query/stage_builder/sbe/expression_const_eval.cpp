@@ -105,8 +105,9 @@ void ExpressionConstEval::transport(optimizer::ABT& n, const optimizer::Variable
                 swapAndUpdate(n, def.definition.copy());
             } else if (_singleRef.erase(var.name())) {
                 swapAndUpdate(n, def.definition.copy());
-            } else if (auto let = def.definedBy.cast<optimizer::Let>(); let) {
-                auto itLet = _varRefs.find(let->varName());
+            } else if (def.definedBy.cast<optimizer::Let>() ||
+                       def.definedBy.cast<optimizer::MultiLet>()) {
+                auto itLet = _varRefs.find(var.name());
                 tassert(10252300, "Found reference to undefined variable", itLet != _varRefs.end());
                 itLet->second++;
             }
@@ -151,6 +152,68 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
     }
     _varRefs.erase(itLet);
     _variableDefinitions.erase(let.varName());
+}
+
+void ExpressionConstEval::prepare(optimizer::ABT& n, const optimizer::MultiLet& multiLet) {
+    for (size_t i = 0; i < multiLet.numBinds(); ++i) {
+        const auto& varName = multiLet.varNames()[i];
+        tassert(
+            10130811, "Found duplicate variable definition", _varRefs.emplace(varName, 0).second);
+        _variableDefinitions.emplace(varName,
+                                     optimizer::Definition{n.ref(), multiLet.bind(i).ref()});
+    }
+}
+
+void ExpressionConstEval::transport(optimizer::ABT& n,
+                                    const optimizer::MultiLet& multiLet,
+                                    std::vector<optimizer::ABT>& args) {
+    auto& varNames = multiLet.varNames();
+    if (std::all_of(varNames.begin(), varNames.end(), [&](auto&& varName) {
+            return _varRefs.find(varName)->second == 0;
+        })) {
+        // None of the bind expressions have been referenced so it is dead code and the whole
+        // multiLet expression can be removed
+        auto result = std::exchange(args.back(), optimizer::make<optimizer::Blackhole>());
+
+        // Swap the current node (n) for the result.
+        swapAndUpdate(n, std::move(result));
+    } else if (std::any_of(varNames.begin(), varNames.end(), [&](auto&& varName) {
+                   return _varRefs.find(varName)->second == 0;
+               })) {
+        // Trim out the bind expressions which have not been referenced, then constant fold it
+        std::vector<optimizer::ProjectionName> newVarNames;
+        std::vector<optimizer::ABT> newNodes;
+
+        for (size_t idx = 0; idx < multiLet.numBinds(); ++idx) {
+            if (_varRefs[varNames[idx]] != 0) {
+                newVarNames.push_back(varNames[idx]);
+                newNodes.emplace_back(
+                    std::exchange(args[idx], optimizer::make<optimizer::Blackhole>()));
+            }
+        }
+        newNodes.emplace_back(std::exchange(args.back(), optimizer::make<optimizer::Blackhole>()));
+        auto trimmedMultiLet =
+            optimizer::make<optimizer::MultiLet>(std::move(newVarNames), std::move(newNodes));
+        swapAndUpdate(n, trimmedMultiLet);
+    }
+
+    if (auto maybeMultiLet = n.cast<optimizer::MultiLet>(); maybeMultiLet &&
+        std::any_of(maybeMultiLet->varNames().begin(),
+                    maybeMultiLet->varNames().end(),
+                    [&](auto&& varName) { return _varRefs.find(varName)->second == 1; })) {
+        // For the bind expressions which have been referenced exactly once, schedule them for
+        // inlining.
+        std::for_each(varNames.begin(), varNames.end(), [&](auto&& varName) {
+            if (_varRefs.find(varName)->second == 1) {
+                _singleRef.emplace(varName);
+            }
+        });
+        _changed = true;
+    }
+    for (auto&& name : varNames) {
+        _varRefs.erase(name);
+        _variableDefinitions.erase(name);
+    }
 }
 
 void ExpressionConstEval::transport(optimizer::ABT& n,

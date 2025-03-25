@@ -853,6 +853,47 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             body.sourceCell};
 }
 
+Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::MultiLet& op) {
+    // Simply recreate the MultiLet node using the processed inputs.
+    std::vector<Tree> bindVec;
+    bindVec.reserve(op.numBinds());
+
+    for (size_t idx = 0; idx < op.numBinds(); ++idx) {
+        auto bind = op.bind(idx).visit(*this);
+        if (!bind.expr.has_value()) {
+            return bind;
+        }
+        bindVec.emplace_back(std::move(bind));
+    }
+
+    // Forward the inferred type to the inner expressions.
+    for (size_t idx = 0; idx < op.numBinds(); ++idx) {
+        _variableTypes.insert_or_assign(
+            op.varName(idx), std::make_pair(bindVec[idx].typeSignature, bindVec[idx].sourceCell));
+    }
+
+    auto body = op.in().visit(*this);
+
+    for (auto&& name : op.varNames()) {
+        _variableTypes.erase(name);
+    }
+
+    if (!body.expr.has_value()) {
+        return body;
+    }
+
+    optimizer::ABTVector nodes;
+    nodes.reserve(op.numBinds() + 1);
+
+    for (size_t idx = 0; idx < op.numBinds(); ++idx) {
+        nodes.emplace_back(std::move(*bindVec[idx].expr));
+    }
+
+    return {makeLet(op.varNames(), std::move(nodes), std::move(*body.expr)),
+            body.typeSignature,
+            body.sourceCell};
+}
+
 template <typename Cond, typename Then, typename Else>
 Vectorizer::Tree Vectorizer::vectorizeCond(Cond condNode, Then thenNode, Else elseNode) {
     auto test = condNode();

@@ -53,10 +53,6 @@ TEST(ReferenceTrackerTest, GetDefinitionsForLet) {
     auto env = VariableEnvironment::build(letOp);
     ASSERT(!env.hasFreeVariables());
 
-    // The let does not pass up its local definitions to ancestor nodes.
-    ProjectionNameSet expectedProjSet = {};
-    ASSERT(expectedProjSet == env.topLevelProjections());
-
     // But, the environment keeps the info about the definitions for all variables in the ABT. Check
     // that the local variable is defined by the Let.
     const Variable* xVar = nullptr;
@@ -169,6 +165,224 @@ TEST(ReferenceTrackerTest, InMarksOnlyLocalVarLastRef) {
     ASSERT(!inEnv.hasFreeVariables());
     ASSERT(inEnv.isLastRef(*localVarRef.cast<Variable>()));
     ASSERT_FALSE(inEnv.isLastRef(*otherVarRef.cast<Variable>()));
+}
+
+TEST(ReferenceTrackerTest, MultiLetDefinition) {
+    auto multiLetOp = ABT::make<MultiLet>(
+        std::vector<std::pair<ProjectionName, ABT>>{{"x", Constant::int64(100)},
+                                                    {"y", Constant::int64(200)}},
+        make<BinaryOp>(Operations::Add, make<Variable>("x"), make<Variable>("y")));
+    auto multiLetRef = multiLetOp.ref();
+
+    // The multiLet resolves references to its local variable.
+    auto env = VariableEnvironment::build(multiLetOp);
+    ASSERT_FALSE(env.hasFreeVariables());
+
+    // The environment keeps the info about the definitions for all variables in the ABT.
+    // Check that the local variables are defined by the MultiLet.
+    const Variable* xVar = nullptr;
+    const Variable* yVar = nullptr;
+    VariableEnvironment::walkVariables(multiLetOp, [&](const Variable& var) {
+        if (var.name() == "x") {
+            xVar = &var;
+        } else if (var.name() == "y") {
+            yVar = &var;
+        }
+    });
+    ASSERT(env.isLastRef(*xVar));
+    ASSERT(env.isLastRef(*yVar));
+    ASSERT(env.getDefinition(*xVar).definedBy == multiLetRef);
+    ASSERT(env.getDefinition(*yVar).definedBy == multiLetRef);
+    ASSERT(env.getDefinition(*xVar).definition == multiLetOp.cast<MultiLet>()->bind(0).ref());
+    ASSERT(env.getDefinition(*yVar).definition == multiLetOp.cast<MultiLet>()->bind(1).ref());
+}
+
+TEST(ReferenceTrackerTest, MultiLetFreeVariables) {
+    {
+        // ABT is a MultiLet expression. This time, it also refers to a projection not
+        // defined in the ABT.
+        auto multiLetOp = ABT::make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{{"x", Constant::int64(100)},
+                                                        {"y", Constant::int64(200)}},
+            make<BinaryOp>(
+                Operations::Add,
+                make<Variable>("x"),
+                make<BinaryOp>(Operations::Add, make<Variable>("y"), make<Variable>("free"))));
+
+        // The "free" variable referenced by the multiLet correctly cannot be resolved.
+        auto env = VariableEnvironment::build(multiLetOp);
+        ASSERT(env.hasFreeVariables());
+    }
+    {
+        // There are free variables when referencing variables masked by MultiLet.
+        auto multiLetNode = make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{{"x", Constant::int64(100)},
+                                                        {"y", Constant::int64(200)}},
+            make<BinaryOp>(Operations::Sub, make<Variable>("x"), make<Variable>("y")));
+        auto sumNode = make<BinaryOp>(
+            Operations::Add,
+            std::move(multiLetNode),
+            make<BinaryOp>(Operations::Add, make<Variable>("x"), make<Variable>("y")));
+        auto env = VariableEnvironment::build(sumNode);
+        ASSERT(env.hasFreeVariables());
+        ASSERT_EQ(env.freeOccurences("x"), 1);
+        ASSERT_EQ(env.freeOccurences("y"), 1);
+    }
+    {
+        // There are no free variables when multiple variables can be resolved by single definition.
+        auto multiLetNode = make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{{"x", Constant::int64(100)},
+                                                        {"y", Constant::int64(200)}},
+            make<BinaryOp>(
+                Operations::Sub,
+                make<BinaryOp>(Operations::Add, make<Variable>("x"), make<Variable>("x")),
+                make<BinaryOp>(Operations::Add, make<Variable>("y"), make<Variable>("y"))));
+        auto env = VariableEnvironment::build(multiLetNode);
+        ASSERT_FALSE(env.hasFreeVariables());
+    }
+}
+
+TEST(ReferenceTrackerTest, MultiLetLastRefs) {
+    {
+        //  Let [z = 1] in
+        //      z + (MultiLet [x = 1, y = 1] in
+        //          x /*lastRef*/ + y /*lastRef*/) + z)
+        //
+
+        auto xVar = make<Variable>("x");
+        auto xVarRef = xVar.ref();
+
+        auto yVar = make<Variable>("y");
+        auto yVarRef = yVar.ref();
+
+        auto zVar = make<Variable>("z");
+        auto zVarRef = zVar.ref();
+
+        auto zVar2 = make<Variable>("z");
+        auto zVarRef2 = zVar2.ref();
+
+        auto multiLetOp = ABT::make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{{"x", Constant::int64(1)},
+                                                        {"y", Constant::int64(1)}},
+            make<BinaryOp>(Operations::Add,
+                           std::move(xVar),
+                           make<BinaryOp>(Operations::Add, std::move(yVar), std::move(zVar2))));
+
+        ABT tree =
+            make<Let>("z",
+                      Constant::int64(1),
+                      make<BinaryOp>(Operations::Add, std::move(multiLetOp), std::move(zVar)));
+
+        auto env = VariableEnvironment::build(tree);
+        ASSERT_FALSE(env.hasFreeVariables());
+        ASSERT(env.isLastRef(*xVarRef.cast<Variable>()));
+        ASSERT(env.isLastRef(*yVarRef.cast<Variable>()));
+        ASSERT_FALSE(env.isLastRef(*zVarRef.cast<Variable>()));
+        ASSERT_FALSE(env.isLastRef(*zVarRef2.cast<Variable>()));
+    }
+    {
+        //
+        //  Let [u = 1] in
+        //      Let [v = 1] in
+        //          Let [w = 1] in
+        //              MultiLet [x = u /*lastRef*/ + v, y = v /*lastRef*/ + w] in
+        //                  x /*lastRef*/ + y /*lastRef*/ + w /*lastRef*/
+        //
+        auto uVar = make<Variable>("u");
+        auto uVarRef = uVar.ref();
+
+        auto vVar = make<Variable>("v");
+        auto vVarRef = vVar.ref();
+
+        auto vVar2 = make<Variable>("v");
+        auto vVarRef2 = vVar2.ref();
+
+        auto wVar = make<Variable>("w");
+        auto wVarRef = wVar.ref();
+
+        auto wVar2 = make<Variable>("w");
+        auto wVarRef2 = wVar2.ref();
+
+        auto xVar = make<Variable>("x");
+        auto xVarRef = xVar.ref();
+
+        auto yVar = make<Variable>("y");
+        auto yVarRef = yVar.ref();
+
+        std::vector<ProjectionName> varNames = {"x", "y"};
+        auto multiLetNode = make<MultiLet>(
+            std::move(varNames),
+            makeSeq(
+                make<BinaryOp>(Operations::Add, std::move(uVar), std::move(vVar)),
+                make<BinaryOp>(Operations::Add, std::move(vVar2), std::move(wVar)),
+                make<BinaryOp>(Operations::Add,
+                               std::move(wVar2),
+                               make<BinaryOp>(Operations::Add, std::move(xVar), std::move(yVar)))));
+
+        auto tree =
+            make<Let>("u",
+                      Constant::int64(1),
+                      make<Let>("v",
+                                Constant::int64(1),
+                                make<Let>("w", Constant::int64(1), std::move(multiLetNode))));
+
+        auto env = VariableEnvironment::build(tree);
+
+        ASSERT_FALSE(env.hasFreeVariables());
+        ASSERT(env.isLastRef(*uVarRef.cast<Variable>()));
+        ASSERT_FALSE(env.isLastRef(*vVarRef.cast<Variable>()));
+        ASSERT(env.isLastRef(*vVarRef2.cast<Variable>()));
+        ASSERT_FALSE(env.isLastRef(*wVarRef.cast<Variable>()));
+        ASSERT(env.isLastRef(*wVarRef2.cast<Variable>()));
+        ASSERT(env.isLastRef(*xVarRef.cast<Variable>()));
+        ASSERT(env.isLastRef(*yVarRef.cast<Variable>()));
+    }
+    {
+        // [MultiLet x = 1, y = x + 2, z = x + y + 3] in
+        //      x /*lastRef*/ + y /*lastRef*/ + z /*lastRef*/
+
+        auto xVar = make<Variable>("x");
+        auto xVarRef = xVar.ref();
+
+        auto xVar2 = make<Variable>("x");
+        auto xVarRef2 = xVar2.ref();
+
+        auto xVar3 = make<Variable>("x");
+        auto xVarRef3 = xVar3.ref();
+
+        auto yVar = make<Variable>("y");
+        auto yVarRef = yVar.ref();
+
+        auto yVar2 = make<Variable>("y");
+        auto yVarRef2 = yVar2.ref();
+
+        auto zVar = make<Variable>("z");
+        auto zVarRef = zVar.ref();
+
+        std::vector<ProjectionName> varNames = {"x", "y", "z"};
+        auto tree = make<MultiLet>(
+            std::move(varNames),
+            makeSeq(Constant::int64(1),
+                    make<BinaryOp>(Operations::Add, std::move(xVar), Constant::int64(2)),
+                    make<BinaryOp>(
+                        Operations::Add,
+                        std::move(xVar2),
+                        make<BinaryOp>(Operations::Add, std::move(yVar), Constant::int64(3))),
+                    make<BinaryOp>(
+                        Operations::Add,
+                        std::move(xVar3),
+                        make<BinaryOp>(Operations::Add, std::move(yVar2), std::move(zVar)))));
+
+        auto env = VariableEnvironment::build(tree);
+
+        ASSERT_FALSE(env.hasFreeVariables());
+        ASSERT_FALSE(env.isLastRef(*xVarRef.cast<Variable>()));
+        ASSERT_FALSE(env.isLastRef(*xVarRef2.cast<Variable>()));
+        ASSERT(env.isLastRef(*xVarRef3.cast<Variable>()));
+        ASSERT_FALSE(env.isLastRef(*yVarRef.cast<Variable>()));
+        ASSERT(env.isLastRef(*yVarRef2.cast<Variable>()));
+        ASSERT(env.isLastRef(*zVarRef.cast<Variable>()));
+    }
 }
 }  // namespace
 }  // namespace mongo::optimizer

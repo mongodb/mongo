@@ -917,6 +917,34 @@ public:
     }
 
     ExplainPrinter transport(const ABT::reference_type /*n*/,
+                             const MultiLet& expr,
+                             std::vector<ExplainPrinter> results) {
+        auto numBinds = expr.numBinds();
+
+        ExplainPrinter printer("MultiLet");
+        printer.separator(" [");
+        for (size_t idx = 0; idx < numBinds; ++idx) {
+            std::stringstream ss;
+            ss << "variable" << idx;
+            printer.fieldName(ss.str(), ExplainVersion::V3).print(expr.varName(idx));
+            if (idx < numBinds - 1) {
+                printer.separator(", ");
+            }
+        }
+        printer.separator("]").setChildCount(numBinds + 1).maybeReverse();
+
+        for (size_t idx = 0; idx < numBinds; ++idx) {
+            std::stringstream ss;
+            ss << "bind" << idx;
+            printer.fieldName(ss.str(), ExplainVersion::V3).print(results[idx]);
+        }
+
+        printer.fieldName("expression", ExplainVersion::V3).print(results.back());
+
+        return printer;
+    }
+
+    ExplainPrinter transport(const ABT::reference_type /*n*/,
                              const LambdaAbstraction& expr,
                              ExplainPrinter inResult) {
         ExplainPrinter printer("LambdaAbstraction");

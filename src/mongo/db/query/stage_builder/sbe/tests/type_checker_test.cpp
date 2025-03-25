@@ -410,5 +410,38 @@ TEST(TypeCheckerTest, FoldTraverseP) {
     ASSERT_EQ(signature.typesMask, TypeSignature::kNumericType.typesMask);
 }
 
+TEST(TypeCheckerTest, TypeCheckMultiLet) {
+    {
+        auto tree = make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{{"Var1", Constant::int32(1)},
+                                                        {"Var2", Constant::int32(2)}},
+            make<BinaryOp>(Operations::Mult, make<Variable>("Var1"), make<Variable>("Var2")));
+        auto signature = TypeChecker{}.typeCheck(tree);
+        ASSERT_EQ(signature.typesMask, TypeSignature::kNumericType.typesMask);
+    }
+    {
+        auto tree = make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{{"Var1", Constant::int32(1)},
+                                                        {"Var2", Constant::int32(2)}},
+            make<BinaryOp>(Operations::And,
+                           make<FunctionCall>("exists", makeSeq(make<Variable>("var3"))),
+                           make<FunctionCall>("isNumber", makeSeq(make<Variable>("var4")))));
+        auto signature = TypeChecker{}.typeCheck(tree);
+        ASSERT_EQ(signature.typesMask,
+                  TypeSignature::kNothingType.include(TypeSignature::kBooleanType).typesMask);
+    }
+    {
+        auto tree = make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{{"Var1", Constant::int32(1)},
+                                                        {"Var2", Constant::int32(2)}},
+            make<BinaryOp>(Operations::And,
+                           make<FunctionCall>("exists", makeSeq(make<Variable>("var1"))),
+                           make<FunctionCall>("isNumber", makeSeq(make<Variable>("var1")))));
+        TypeChecker{}.typeCheck(tree);
+        auto signature = TypeChecker{}.typeCheck(tree);
+        ASSERT_EQ(signature.typesMask, TypeSignature::kBooleanType.typesMask);
+    }
+}
+
 }  // namespace
 }  // namespace mongo::stage_builder

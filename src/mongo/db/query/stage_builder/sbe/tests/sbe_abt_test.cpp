@@ -335,5 +335,84 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
     checkCmp3w("aCC", "abb", 1);
     checkCmp3w("AbX", "aBy", -1);
 }
+
+TEST_F(AbtToSbeExpression, LowerMultiLet) {
+    {
+        //  MultiLet [x = 100, y = var] in
+        //      y / x
+        //
+        // var: 500
+
+        auto tree = make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{{"x", Constant::int64(100)},
+                                                        {"y", make<Variable>("var")}},
+            make<BinaryOp>(Operations::Div, make<Variable>("y"), make<Variable>("x")));
+
+        boost::optional<
+            std::pair<ProjectionName, std::pair<sbe::value::TypeTags, sbe::value::Value>>>
+            var = {{ProjectionName{"var"}, std::pair{sbe::value::TypeTags::NumberInt64, 500}}};
+        auto [resultTag, resultVal] = evalExpr(tree, var);
+
+        ASSERT_EQ(sbe::value::TypeTags::NumberDouble, resultTag);
+        ASSERT_EQ(sbe::value::bitcastTo<double>(resultVal), 5.0);
+    }
+    {
+        //  MultiLet [x = 1, y = x + 2, z = x + y + 3] in
+        //      x + y + z
+        //
+
+        auto tree = make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{
+                {"x", Constant::int64(1)},
+                {"y", make<BinaryOp>(Operations::Add, make<Variable>("x"), Constant::int64(2))},
+                {"z",
+                 make<BinaryOp>(
+                     Operations::Add,
+                     make<Variable>("x"),
+                     make<BinaryOp>(Operations::Add, make<Variable>("y"), Constant::int64(3)))}},
+            make<BinaryOp>(
+                Operations::Add,
+                make<Variable>("x"),
+                make<BinaryOp>(Operations::Add, make<Variable>("y"), make<Variable>("z"))));
+
+        auto [resultTag, resultVal] = evalExpr(tree, boost::none);
+
+        ASSERT_EQ(sbe::value::TypeTags::NumberInt64, resultTag);
+        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), 11);
+    }
+    {
+        //  Let [var2 = 100] in
+        //      MultiLet [x = var2, y = var] in
+        //          y / x
+        //
+        // var: 500
+
+        auto tree = make<Let>(
+            "var2",
+            Constant::int64(100),
+            make<MultiLet>(
+                std::vector<std::pair<ProjectionName, ABT>>{{"x", make<Variable>("var2")},
+                                                            {"y", make<Variable>("var")}},
+                make<BinaryOp>(Operations::Div, make<Variable>("y"), make<Variable>("x"))));
+
+        boost::optional<
+            std::pair<ProjectionName, std::pair<sbe::value::TypeTags, sbe::value::Value>>>
+            var = {{ProjectionName{"var"}, std::pair{sbe::value::TypeTags::NumberInt64, 500}}};
+        auto [resultTag, resultVal] = evalExpr(tree, var);
+
+        ASSERT_EQ(sbe::value::TypeTags::NumberDouble, resultTag);
+        ASSERT_EQ(sbe::value::bitcastTo<double>(resultVal), 5.0);
+    }
+    {
+        auto tree = make<MultiLet>(
+            std::vector<ProjectionName>{"x"},
+            makeSeq(Constant::int64(10),
+                    make<BinaryOp>(Operations::Add, make<Variable>("x"), Constant::int64(1))));
+        auto [resultTag, resultVal] = evalExpr(tree, boost::none);
+
+        ASSERT_EQ(sbe::value::TypeTags::NumberInt64, resultTag);
+        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), 11);
+    }
+}
 }  // namespace
 }  // namespace mongo::stage_builder::abt

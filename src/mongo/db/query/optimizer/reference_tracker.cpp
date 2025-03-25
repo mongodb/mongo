@@ -73,11 +73,6 @@ struct CollectedInfo {
     using VarRefsMap = ProjectionNameMap<opt::unordered_map<const Variable*, bool>>;
 
     /**
-     * Current definitions available for use in ancestor nodes (projections).
-     */
-    DefinitionsMap defs;
-
-    /**
      * All free variables (i.e. so far not resolved) seen so far, regardless of visibility in the
      * ABT. Maps from projection name to all Variable instances referencing that name. Variables
      * move from 'freeVars' to 'Collector::resolvedVariables' when they are resolved.
@@ -93,30 +88,7 @@ struct CollectedInfo {
     /**
      * This is a destructive merge, the 'other' will be siphoned out.
      */
-    template <bool resolveFreeVarsWithOther = true>
     void merge(CollectedInfo&& other) {
-        if constexpr (resolveFreeVarsWithOther) {
-            // Incoming (other) info has some definitions. So let's try to resolve our free
-            // variables.
-            if (!other.defs.empty() && !freeVars.empty()) {
-                for (auto&& [name, def] : other.defs) {
-                    resolveFreeVars(name, def);
-                }
-            }
-
-            // We have some definitions so let try to resolve other's free variables.
-            if (!defs.empty() && !other.freeVars.empty()) {
-                for (auto&& [name, def] : defs) {
-                    other.resolveFreeVars(name, def);
-                }
-            }
-        }
-
-        // There should not be two projections of the same name propagated up by a single operator,
-        // so every definition should be moved from other.
-        defs.merge(other.defs);
-        tassert(6624025, "Found a duplicate projection name", other.defs.empty());
-
         for (auto&& [name, vars] : other.freeVars) {
             auto& v = freeVars[name];
             v.insert(v.end(), vars.begin(), vars.end());
@@ -134,30 +106,6 @@ struct CollectedInfo {
     }
 
     /**
-     * A special merge asserting that the 'other' has no defined projections. Expressions do not
-     * project anything.
-     *
-     * We still have to track free variables though.
-     */
-    void mergeNoDefs(CollectedInfo&& other) {
-        other.assertEmptyDefs();
-        merge(std::move(other));
-    }
-
-    static ProjectionNameSet getProjections(const DefinitionsMap& defs) {
-        ProjectionNameSet result;
-
-        for (auto&& [k, v] : defs) {
-            result.emplace(k);
-        }
-        return result;
-    }
-
-    ProjectionNameSet getProjections() const {
-        return getProjections(defs);
-    }
-
-    /**
      * Resolve any free Variables matching the given the name with the corresponding definition.
      */
     void resolveFreeVars(const ProjectionName& name, const Definition& def) {
@@ -167,10 +115,6 @@ struct CollectedInfo {
             }
             freeVars.erase(it);
         }
-    }
-
-    void assertEmptyDefs() {
-        tassert(6624028, "Definitions must be empty", defs.empty());
     }
 };
 
@@ -198,6 +142,12 @@ public:
 
     void transport(const Let& op, const ABT& /*bind*/, const ABT& /*expr*/) {
         _variableDefinitionCallback(op.varName());
+    }
+
+    void transport(const MultiLet& op, const std::vector<optimizer::ABT>& /*nodes*/) {
+        for (auto&& name : op.varNames()) {
+            _variableDefinitionCallback(name);
+        }
     }
 
 private:
@@ -240,7 +190,6 @@ struct Collector {
 
         result.merge(std::move(bindResult));
 
-        // Local variables are not part of projections (i.e. we do not track them in defs) so
         // resolve any free variables manually.
         inResult.resolveFreeVars(let.varName(), Definition{n.ref(), let.bind().ref()});
         result.merge(std::move(inResult));
@@ -248,10 +197,23 @@ struct Collector {
         return result;
     }
 
+    CollectedInfo transport(const ABT& n,
+                            const MultiLet& multiLet,
+                            std::vector<CollectedInfo> results) {
+        auto& result = results.back();
+
+        for (int idx = multiLet.numBinds() - 1; idx >= 0; --idx) {
+            result.resolveFreeVars(multiLet.varName(idx),
+                                   Definition{n.ref(), multiLet.bind(idx).ref()});
+            result.merge(std::move(results[idx]));
+        }
+
+        return result;
+    }
+
     CollectedInfo transport(const ABT& n, const LambdaAbstraction& lam, CollectedInfo inResult) {
         CollectedInfo result{collectorState};
 
-        // Local variables are not part of projections (i.e. we do not track them in defs) so
         // resolve any free variables manually.
         inResult.resolveFreeVars(lam.varName(), Definition{n.ref(), ABT::reference_type{}});
         result.merge(std::move(inResult));
@@ -410,6 +372,17 @@ struct LastRefsTransporter {
         return inResult;
     }
 
+    Result transport(const ABT& n, const MultiLet& multiLet, std::vector<Result> results) {
+        auto& inResult = results.back();
+
+        for (int idx = multiLet.numBinds() - 1; idx >= 0; --idx) {
+            mergeKeepLastRefs(inResult, results[idx]);
+            finalizeLastRefs(inResult, multiLet.varName(idx));
+        }
+
+        return inResult;
+    }
+
     Result transport(const ABT& n, const LambdaAbstraction& lam, Result inResult) {
         // As in the Let case, we can finalize the last ref for the local variable.
         finalizeLastRefs(inResult, lam.varName());
@@ -508,10 +481,6 @@ Definition VariableEnvironment::getDefinition(const Variable& var) const {
         return it->second;
     }
     return {};
-}
-
-ProjectionNameSet VariableEnvironment::topLevelProjections() const {
-    return _info->getProjections();
 }
 
 bool VariableEnvironment::hasFreeVariables() const {

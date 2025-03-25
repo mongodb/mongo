@@ -1232,5 +1232,101 @@ TEST(ValueLifetimeTest, ProcessFillTypeOnMixedReferences) {
         tree3);
 }
 
+TEST(ValueLifetimeTest, ProcessMultiLet) {
+    auto tree = make<Let>(
+        "letVar",
+        make<FunctionCall>("newObj", makeSeq(Constant::str("a"), Constant::int32(9))),
+        make<MultiLet>(
+            std::vector<std::pair<ProjectionName, ABT>>{
+                {ProjectionName{"multiLetVar1"},
+                 make<FunctionCall>("newObj", makeSeq(Constant::str("a"), Constant::int32(5)))},
+                {ProjectionName{"multiLetVar2"}, make<Variable>("letVar")}},
+            make<FunctionCall>("newObj",
+                               makeSeq(Constant::str("a"),
+                                       make<Variable>("letVar1"),
+                                       Constant::str("b"),
+                                       make<Variable>("letVar2")))));
+
+    ValueLifetime{}.validate(tree);
+
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"Let\", \n"
+        "    variable: \"letVar\", \n"
+        "    bind: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"newObj\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"StringSmall\", \n"
+        "                value: \"a\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Const\", \n"
+        "                tag: \"NumberInt32\", \n"
+        "                value: 9\n"
+        "            }\n"
+        "        ]\n"
+        "    }, \n"
+        "    expression: {\n"
+        "        nodeType: \"MultiLet\", \n"
+        "        variable0: \"multiLetVar1\", \n"
+        "        variable1: \"multiLetVar2\", \n"
+        "        bind0: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"newObj\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"StringSmall\", \n"
+        "                    value: \"a\"\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 5\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        bind1: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"makeOwn\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"letVar\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        expression: {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"newObj\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"StringSmall\", \n"
+        "                    value: \"a\"\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"letVar1\"\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"StringSmall\", \n"
+        "                    value: \"b\"\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"letVar2\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }\n"
+        "    }\n"
+        "}\n",
+        tree);
+}
+
 }  // namespace
 }  // namespace mongo::stage_builder

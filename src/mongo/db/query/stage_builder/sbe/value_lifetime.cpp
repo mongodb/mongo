@@ -86,6 +86,29 @@ ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer:
     return resultType;
 }
 
+ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n,
+                                                   optimizer::MultiLet& multiLet) {
+    // Define the new variables with the type of the 'bind' expressions.
+    // If the value is a reference, promote it to local value.
+    for (size_t idx = 0; idx < multiLet.numBinds(); ++idx) {
+        ValueType bindType = multiLet.bind(idx).visit(*this);
+        if (bindType == ValueType::Reference) {
+            wrapNode(multiLet.bind(idx));
+            bindType = ValueType::LocalValue;
+        }
+        _bindings[multiLet.varName(idx)] = bindType;
+    }
+
+    // The MultiLet node returns the value of its 'in' child.
+    ValueType resultType = multiLet.in().visit(*this);
+
+    for (auto&& name : multiLet.varNames()) {
+        _bindings.erase(name);
+    }
+
+    return resultType;
+}
+
 ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer::BinaryOp& op) {
 
     ValueType lhs = op.getLeftChild().visit(*this);

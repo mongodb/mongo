@@ -97,6 +97,8 @@ public:
 
     TypeSignature operator()(optimizer::ABT& n, optimizer::Let& let, bool saveInference);
 
+    TypeSignature operator()(optimizer::ABT& n, optimizer::MultiLet& let, bool saveInference);
+
     TypeSignature operator()(optimizer::ABT& n, optimizer::UnaryOp& op, bool saveInference);
 
     TypeSignature operator()(optimizer::ABT& n, optimizer::BinaryOp& op, bool saveInference);

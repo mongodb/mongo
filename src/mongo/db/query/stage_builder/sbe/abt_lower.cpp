@@ -108,9 +108,37 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     auto frameId = it->second;
     _letMap.erase(it);
 
-    // ABT let binds only a single variable. When we extend it to support multiple binds then we
-    // have to revisit how we map variable names to sbe slot ids.
     return sbe::makeE<sbe::ELocalBind>(frameId, sbe::makeEs(std::move(bind)), std::move(in));
+}
+
+void SBEExpressionLowering::prepare(const MultiLet& multiLet) {
+    // Assign a frame ID and slotId for the local variables bound by this MultiLet expression.
+
+    optimizer::ProjectionNameMap<sbe::value::SlotId> slotIdMap{};
+    auto frameId = generateFrameId();
+
+    sbe::value::SlotId id = 0;
+    for (auto& name : multiLet.varNames()) {
+        slotIdMap.emplace(name, id++);
+    }
+
+    _multiLetMap[&multiLet] = {frameId, std::move(slotIdMap)};
+}
+
+std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
+    const MultiLet& multiLet, std::vector<std::unique_ptr<sbe::EExpression>> args) {
+    auto it = _multiLetMap.find(&multiLet);
+    tassert(10130804, "incorrect multiLet map", it != _multiLetMap.end());
+    auto frameId = it->second.first;
+    _multiLetMap.erase(it);
+
+    sbe::EExpression::Vector binds;
+    binds.reserve(args.size() - 1);
+    for (size_t idx = 0; idx < args.size() - 1; ++idx) {
+        binds.emplace_back(std::move(args[idx]));
+    }
+
+    return sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(args.back()));
 }
 
 void SBEExpressionLowering::prepare(const LambdaAbstraction& lam) {
@@ -148,6 +176,18 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(const Variabl
             tassert(6624203, "incorrect let map", it != _letMap.end());
 
             return sbe::makeE<sbe::EVariable>(it->second, 0, _env.isLastRef(var));
+        } else if (auto multiLet = def.definedBy.cast<MultiLet>(); multiLet) {
+            auto it = _multiLetMap.find(multiLet);
+            tassert(10130807, "incorrect multiLet map", it != _multiLetMap.end());
+
+            auto slotId = it->second.second.find(var.name());
+            tassert(10130808,
+                    str::stream() << "couldn't find variable: " << var.name()
+                                  << " in the slotId map",
+                    slotId != it->second.second.end());
+
+            return sbe::makeE<sbe::EVariable>(
+                it->second.first, slotId->second, _env.isLastRef(var));
         } else if (auto lam = def.definedBy.cast<LambdaAbstraction>(); lam) {
             // Similarly if the variable was defined by a lambda abstraction, use a frame ID rather
             // than a slot.

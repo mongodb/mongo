@@ -392,6 +392,81 @@ public:
 };
 
 /**
+ * Defines variables from multiple expressions and specified names which are available to be
+ * referenced in a final expression.
+ */
+class MultiLet final : public ABTOpDynamicArity<0>, public ExpressionSyntaxSort {
+    using Base = ABTOpDynamicArity<0>;
+
+    std::vector<ProjectionName> _varNames;
+
+    void validate() {
+        tassert(10130800, "Invalid arguments", _varNames.size() + 1 == nodes().size());
+        tassert(10130809, "expected at least one binding", !_varNames.empty());
+
+        std::set<ProjectionName> set{_varNames.begin(), _varNames.end()};
+        tassert(10130810, "Variable names should be unique", set.size() == _varNames.size());
+    }
+
+public:
+    MultiLet(std::vector<ProjectionName> names, ABTVector exprs)
+        : Base(std::move(exprs)), _varNames(names) {
+        for (auto&& a : nodes()) {
+            assertExprSort(a);
+        }
+        validate();
+    }
+
+    MultiLet(std::vector<std::pair<ProjectionName, ABT>> inBinds, ABT inExpr)
+        : Base(std::vector<ABT>()) {
+        nodes().reserve(inBinds.size() + 1 /*inExpr*/);
+        for (auto&& inBind : inBinds) {
+            assertExprSort(inBind.second);
+            nodes().emplace_back(std::move(inBind.second));
+            _varNames.emplace_back(std::move(inBind.first));
+        }
+        assertExprSort(inExpr);
+        nodes().emplace_back(std::move(inExpr));
+        validate();
+    }
+
+    bool operator==(const MultiLet& other) const {
+        return _varNames == other._varNames && nodes() == other.nodes();
+    }
+
+    size_t numBinds() const {
+        return _varNames.size();
+    }
+
+    auto& varNames() const {
+        return _varNames;
+    }
+
+    auto& varName(size_t idx) const {
+        tassert(10130801, "Index out of bounds", idx < numBinds());
+        return _varNames[idx];
+    }
+
+    const ABT& bind(size_t idx) const {
+        tassert(10130802, "Index out of bounds", idx < numBinds());
+        return nodes()[idx];
+    }
+
+    ABT& bind(size_t idx) {
+        tassert(10130803, "Index out of bounds", idx < numBinds());
+        return nodes()[idx];
+    }
+
+    const ABT& in() const {
+        return nodes().back();
+    }
+
+    ABT& in() {
+        return nodes().back();
+    }
+};
+
+/**
  * Represents a single argument lambda. Defines a local variable (representing the argument) which
  * can be referenced within the lambda. The variable takes on the value to which LambdaAbstraction
  * is applied by its parent.
