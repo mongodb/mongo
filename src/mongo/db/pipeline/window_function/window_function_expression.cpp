@@ -293,7 +293,7 @@ std::pair<BSONElement, WindowBounds> ExpressionMinMaxScaler::parseTopLevelKeys(
     //      input: <expr>
     //      min: <constant numerical expr> // optional, default 0
     //      max: <constant numerical expr> // optional, default 1
-    //   }
+    //   },
     //   window: {...} // optional, default ['unbounded', 'unbounded']
     // }
 
@@ -340,7 +340,7 @@ std::pair<BSONElement, WindowBounds> ExpressionMinMaxScaler::parseTopLevelKeys(
             // index greater than the current document (0), and that the maximum is not an index
             // less than the current document (0). The computation is equivalent for both document
             // and range based bounds, because range based bounds always require that the numerical
-            // bounds tolerances are relative to the values that the doucments are sorted by.
+            // bounds tolerances are relative to the values that the documents are sorted by.
             //
             // Get a bound value as a number. The first value of the return is the bound value,
             // the second value is whether or not the bound is numerically expressable.
@@ -399,19 +399,6 @@ std::pair<BSONElement, WindowBounds> ExpressionMinMaxScaler::parseTopLevelKeys(
             }
         }
     }
-
-    // TODO: SERVER-95229 remove this check when non-removable implementations are supported.
-    visit(
-        OverloadedVisitor{
-            [&](const auto& bounds) {
-                if (holds_alternative<WindowBounds::Unbounded>(bounds.lower)) {
-                    uasserted(ErrorCodes::NotImplemented,
-                              str::stream() << "left unbounded windows for "
-                                               "$minMaxScaler are not yet supported");
-                }
-            },
-        },
-        bounds->bounds);
 
     return {minMaxScalerArgs, *bounds};
 }

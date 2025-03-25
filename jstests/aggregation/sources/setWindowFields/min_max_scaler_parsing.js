@@ -136,6 +136,16 @@ expectFailureWithArgs(
     },
     ErrorCodes.FailedToParse);
 expectFailureWithArgs(
+    // Inclusivity bounds check: document based bounds cannot have upper bound less than 0.
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue":
+                {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", -1]}},
+        }
+    },
+    ErrorCodes.FailedToParse);
+expectFailureWithArgs(
     // Inclusivity bounds check: range based bounds cannot have lower bound greater than 0.
     {
         sortBy: {_id: 1},
@@ -154,16 +164,14 @@ expectFailureWithArgs(
     },
     ErrorCodes.FailedToParse);
 expectFailureWithArgs(
-    // Unspecified bounds default to unbounded document bounds, which are currently unsupported.
+    // Inclusivity bounds check: range based bounds cannot have upper bound less than 0.
     {
         sortBy: {_id: 1},
         output: {
-            "relativeXValue": {
-                $minMaxScaler: {input: "$x", min: 0, max: 10},
-            },
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", -0.5]}},
         }
     },
-    ErrorCodes.NotImplemented);
+    ErrorCodes.FailedToParse);
 
 // $setWindowFields args that should succeed.
 expectSuccessWithArgs({
@@ -176,9 +184,62 @@ expectSuccessWithArgs({
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
+        "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [0, "unbounded"]}},
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
+        "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", 0]}},
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
         "relativeXValue": {
             $minMaxScaler: {input: "$x", min: 0, max: 10},
             window: {documents: ["current", "unbounded"]}
+        },
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
+        "relativeXValue":
+            {$minMaxScaler: {input: "$x", min: 0, max: 10}, window: {range: [0, "unbounded"]}},
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
+        "relativeXValue": {
+            $minMaxScaler: {input: "$x"},
+        },
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
+        "relativeXValue": {
+            $minMaxScaler: {input: "$x", min: 0, max: 10},
+        },
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
+        "relativeXValue": {
+            $minMaxScaler: {input: "$x", min: 0, max: 10},
+            window: {documents: ["unbounded", "unbounded"]}
+        },
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
+        "relativeXValue": {
+            $minMaxScaler: {input: "$x", min: 0, max: 10},
+            window: {range: ["unbounded", "unbounded"]}
         },
     }
 });

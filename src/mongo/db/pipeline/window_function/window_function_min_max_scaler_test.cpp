@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <random>
-
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -132,7 +130,7 @@ TEST_F(WindowFunctionMinMaxScalerTest, GetValueOnWindowMax) {
 }
 
 TEST_F(WindowFunctionMinMaxScalerTest, GetValueOnWindowIntermediate) {
-    // Get the value when current value is inbetween the min and max.
+    // Get the value when current value is in-between the min and max.
     std::vector<Value> values = {Value(35), Value(10) /*min*/, Value(110) /*max*/, Value(23)};
     // $minMaxScaler = (xi - min(x)) / (max(x) - min(x)) = (35 - 10) / (110 - 10) = 25 / 100 = 0.25
     runTestCase(values, Value(0.25));
@@ -147,7 +145,7 @@ TEST_F(WindowFunctionMinMaxScalerTest, GetValueOnWindowIntermediate) {
 }
 
 TEST_F(WindowFunctionMinMaxScalerTest, GetValueOnWindowIntermediateWithDoubles) {
-    // Get the value when current value is inbetween the min and max.
+    // Get the value when current value is in-between the min and max.
     std::vector<Value> values = {Value(3.5), Value(1.0) /*min*/, Value(11.0) /*max*/, Value(2.3)};
     // $minMaxScaler = (xi - min(x)) / (max(x) - min(x)) = (3.5 - 1.0) / (11.0 - 1.0) = 2.5 / 10.0 =
     // 0.25

@@ -30,17 +30,18 @@
 #pragma once
 
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/window_function/partition_iterator.h"
-#include "mongo/db/pipeline/window_function/window_function_exec.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_non_removable_range_common.h"
 
 namespace mongo {
 
 /**
  * An executor that handles left-unbounded, range-based windows.
+ *
+ * Uses a generic accumulator type (AccumulatorState), provided as a construction argument,
+ * to determine how the window is updated, and reset; and how to get the current window value,
+ * and fetch the current mem usage.
  */
-class WindowFunctionExecNonRemovableRange final : public WindowFunctionExec {
+class WindowFunctionExecNonRemovableRange final : public WindowFunctionExecNonRemovableRangeCommon {
 public:
     WindowFunctionExecNonRemovableRange(PartitionIterator* iter,
                                         boost::intrusive_ptr<Expression> input,
@@ -48,71 +49,26 @@ public:
                                         boost::intrusive_ptr<AccumulatorState> function,
                                         WindowBounds bounds,
                                         SimpleMemoryUsageTracker* memTracker)
-        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kRightEndpoint),
-                             memTracker),
-          _input(std::move(input)),
-          _sortExpr(std::move(sortExpr)),
-          _function(std::move(function)),
-          _bounds(bounds) {}
+        : WindowFunctionExecNonRemovableRangeCommon(iter, input, sortExpr, bounds, memTracker),
+          _function(std::move(function)) {}
 
-    Value getNext(boost::optional<Document> current = boost::none) final {
-        update();
+    void updateWindow(const Value& input) final {
+        _function->process(input, false);
+    }
+
+    void resetWindow() final {
+        _function->reset();
+    }
+
+    Value getWindowValue(boost::optional<Document> current) final {
         return _function->getValue(false);
     }
 
-    void reset() final {
-        _function->reset();
-        _lastEndpoints = boost::none;
+    int64_t getMemUsage() final {
+        return _function->getMemUsage();
     }
 
 private:
-    void update() {
-        auto endpoints = _iter.getEndpoints(_bounds, _lastEndpoints);
-        // There are 4 different transitions we can make:
-        if (_lastEndpoints) {
-            if (endpoints) {
-                // Transition from nonempty to nonempty: add new values based on how the window
-                // changed.
-                for (int i = _lastEndpoints->second + 1; i <= endpoints->second; ++i) {
-                    addValueAt(i);
-                }
-            } else {
-                // Transition from nonempty to empty: discard the accumulator state.
-                _function->reset();
-                _memTracker->set(_function->getMemUsage());
-            }
-        } else {
-            if (endpoints) {
-                // Transition from empty to nonempty: add the new values.
-                for (int i = endpoints->first; i <= endpoints->second; ++i) {
-                    addValueAt(i);
-                }
-            } else {
-                // Transition from empty to empty: nothing to do!
-            }
-        }
-
-        if (endpoints) {
-            // Shift endpoints by 1 because we will have advanced by 1 document on the next call
-            // to update().
-            _lastEndpoints = std::pair(endpoints->first - 1, endpoints->second - 1);
-        } else {
-            _lastEndpoints = boost::none;
-        }
-    }
-    void addValueAt(int offset) {
-        auto doc = _iter[offset];
-        tassert(5429411, "endpoints must fall in the partition", doc);
-        Value v = _input->evaluate(*doc, &_input->getExpressionContext()->variables);
-        _function->process(v, false);
-        _memTracker->set(_function->getMemUsage());
-    }
-
-    boost::intrusive_ptr<Expression> _input;
-    boost::intrusive_ptr<ExpressionFieldPath> _sortExpr;
     boost::intrusive_ptr<AccumulatorState> _function;
-    WindowBounds _bounds;
-
-    boost::optional<std::pair<int, int>> _lastEndpoints;
 };
 }  // namespace mongo

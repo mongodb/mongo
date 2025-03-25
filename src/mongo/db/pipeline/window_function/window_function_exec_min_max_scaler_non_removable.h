@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,46 +29,57 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/window_function/window_function_exec.h"
+#include "mongo/db/exec/expression/evaluate.h"
+
+#include "mongo/db/pipeline/window_function/window_function_exec_non_removable_common.h"
+#include "mongo/db/pipeline/window_function/window_function_min_max_scaler_util.h"
 
 namespace mongo {
 
 /**
- * Custom WindowFunctionExec class specifically for the implementation of $minMaxScaler
- * for WindowBounds that do not remove documents from the window.
- * $minMaxScaler cannot use the generic WindowFunctionExec classes that handle non-removable
- * implementations because it cannot implement a generic accumulator, that does not allow
- * for reading the value of the "current" document.
+ * An executor specifically for the implementation of $minMaxScaler
+ * for document based WindowBounds that do not remove documents from the window (left unbounded).
+ *
+ * TODO SERVER-102701: Add unit test coverage.
  */
-class WindowFunctionExecMinMaxScalerNonRemovable final : public WindowFunctionExec {
+class WindowFunctionExecMinMaxScalerNonRemovable final
+    : public WindowFunctionExecNonRemovableCommon {
 public:
     WindowFunctionExecMinMaxScalerNonRemovable(PartitionIterator* iter,
                                                boost::intrusive_ptr<Expression> input,
-                                               std::pair<Value, Value> sMinAndsMax,
-                                               SimpleMemoryUsageTracker* memTracker)
-        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints),
-                             memTracker),
-          _input(input),
-          _sMinAndsMax(sMinAndsMax) {}
+                                               WindowBounds::Bound<int> upperDocumentBound,
+                                               SimpleMemoryUsageTracker* memTracker,
+                                               std::pair<Value, Value> sMinAndsMax)
+        : WindowFunctionExecNonRemovableCommon(iter, input, upperDocumentBound, memTracker),
+          _sMinAndsMax(sMinAndsMax.first, sMinAndsMax.second){};
 
-    // TODO: SERVER-95229 fill in implemenation to support non-removable windows
-    Value getNext(boost::optional<Document> current) override {
-        uasserted(ErrorCodes::NotImplemented,
-                  "non-removable $minMaxScaler window functions are not yet supported");
-        tassert(9459905,
-                "WindowFunctionExecMinMaxScalerNonRemovable must be provided with the value of the "
-                "current document",
-                current.has_value());
-        return Value{BSONNULL};
+    void updateWindow(const Value& input) final {
+        _windowMinAndMax.update(input);
     }
 
-    void reset() override {}
+    void resetWindow() final {
+        _windowMinAndMax.reset();
+    }
+
+    Value getWindowValue(boost::optional<Document> current) final {
+        return min_max_scaler::computeResult(
+            _input->evaluate(*current, &_input->getExpressionContext()->variables),
+            _windowMinAndMax,
+            _sMinAndsMax);
+    }
+
+    int64_t getMemUsage() final {
+        // TODO SERVER-102248: set memory tracker here.
+        return 0;
+    }
 
 private:
-    boost::intrusive_ptr<Expression> _input;
     // Output domain Value is bounded between sMin and sMax (inclusive).
-    // First value is min, second value is max.
-    std::pair<Value, Value> _sMinAndsMax;
+    // These are provided as arguments to $minMaxScaler, and do not change.
+    const min_max_scaler::MinAndMax _sMinAndsMax;
+
+    // The min and max Values of the window seen so far.
+    min_max_scaler::MinAndMax _windowMinAndMax;
 };
 
 }  // namespace mongo
