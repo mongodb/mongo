@@ -353,6 +353,11 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
             return batchedCommandRequest.toBSON();
         } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
                    commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
+            if (isRawDataOperation(opCtx) && nss.isTimeseriesBucketsCollection()) {
+                opMsgRequest.body =
+                    rewriteCommandForRawDataOperation<write_ops::FindAndModifyCommandRequest>(
+                        opMsgRequest.body, nss.coll());
+            }
             auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
                 IDLParserContext("_clusterWriteWithoutShardKeyForFindAndModify"),
                 opMsgRequest.body);

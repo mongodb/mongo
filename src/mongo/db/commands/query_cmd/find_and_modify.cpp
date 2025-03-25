@@ -386,6 +386,10 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
     auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, request);
 
+    if (isRawDataOperation(opCtx)) {
+        isTimeseriesViewRequest = false;
+    }
+
     uassertStatusOK(userAllowedWriteNS(opCtx, nss));
     OpDebug* const opDebug = &curOp->debug();
     auto const dbName = request.getDbName();

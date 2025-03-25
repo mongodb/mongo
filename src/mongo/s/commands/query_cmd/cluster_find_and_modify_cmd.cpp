@@ -55,6 +55,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/query_cmd/explain_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
@@ -378,6 +379,26 @@ void handleWouldChangeOwningShardErrorTransactionLegacy(OperationContext* opCtx,
     }
 }
 
+BSONObj translateExplainObjForRawData(OperationContext* opCtx,
+                                      const BSONObj& cmdObj,
+                                      const NamespaceString& ns) {
+    if (!isRawDataOperation(opCtx) || !ns.isTimeseriesBucketsCollection()) {
+        return cmdObj;
+    }
+    BSONObjBuilder bob{cmdObj.objsize()};
+    for (auto&& [fieldName, elem] : cmdObj) {
+        if (fieldName == ExplainCommandRequest::kCommandName) {
+            bob.append(fieldName,
+                       rewriteCommandForRawDataOperation<write_ops::FindAndModifyCommandRequest>(
+                           elem.Obj(), ns.coll()));
+        } else {
+            bob.append(elem);
+        }
+    }
+
+    return bob.obj();
+}
+
 BSONObj prepareCmdObjForPassthrough(
     OperationContext* opCtx,
     const BSONObj& cmdObj,
@@ -616,7 +637,9 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     auto isTimeseriesViewRequest = false;
     if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {
         nss = std::move(cm.getNss());
-        isTimeseriesViewRequest = true;
+        if (!isRawDataOperation(opCtx)) {
+            isTimeseriesViewRequest = true;
+        }
     }
     // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
     // writing to a tracked timeseries collection.
@@ -1017,22 +1040,24 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
 // Two-phase protocol to run an explain for a findAndModify command without a shard key or _id.
 void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
                                                   const NamespaceString& nss,
-                                                  const BSONObj& cmdObj,
+                                                  const BSONObj& originalExplainObj,
                                                   ExplainOptions::Verbosity verbosity,
                                                   BSONObjBuilder* result) {
     auto cmdObjForPassthrough = prepareCmdObjForPassthrough(
         opCtx,
-        cmdObj,
+        originalExplainObj,
         nss,
         true /* isExplain */,
         boost::none /* dbVersion */,
         boost::none /* shardVersion */,
         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */);
 
+    auto explainObj = translateExplainObjForRawData(opCtx, cmdObjForPassthrough, nss);
+
     // Explain currently cannot be run within a transaction, so each command is instead run
     // separately outside of a transaction, and we compose the results at the end.
     auto clusterQueryWithoutShardKeyExplainRes = [&] {
-        ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(cmdObjForPassthrough);
+        ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(explainObj);
         const auto explainClusterQueryWithoutShardKeyCmd =
             ClusterExplain::wrapAsExplain(clusterQueryWithoutShardKeyCommand.toBSON(), verbosity);
         auto opMsg = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
