@@ -4707,6 +4707,56 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     future.default_timed_get();
 }
 
+TEST_F(TransactionRouterTestWithDefaultSession,
+       DisallowSingleWriteShardCommitResetForFutureTransactions) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    auto opCtx = operationContext();
+
+    //
+    // Disallow single write shard commit for one transaction on a session.
+    //
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(opCtx);
+
+    txnRouter.disallowSingleWriteShardCommit();
+
+    // One read shard and one write shard, which qualifies for the single write shard commit.
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard2, kDummyFindCmd);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
+
+    // Committing will use the 2PC protocol instead of sending commitTransaction directly.
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+    auto future = launchAsync([&] { txnRouter.commitTransaction(opCtx, boost::none); });
+    expectCoordinateCommitTransaction();
+    future.default_timed_get();
+
+    //
+    // A new transaction on the same session should be able to use the optimization.
+    //
+
+    txnNum += 1;
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(opCtx);
+
+    // One read shard and one write shard, which qualifies for the single write shard commit.
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard2, kDummyFindCmd);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
+
+    // Committing uses the optimization and sends commitTransaction directly.
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+    future = launchAsync([&] { txnRouter.commitTransaction(opCtx, boost::none); });
+    expectCommitTransaction();
+    expectCommitTransaction();
+    future.default_timed_get();
+}
+
 TEST_F(TransactionRouterTestWithDefaultSession, CannotAdvanceTxnNumberWithActiveYielder) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);
