@@ -335,8 +335,10 @@ common --remote_upload_local_results=False
 common:clang-tidy --config=dbg
 common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests
 common:clang-tidy --//bazel/config:compiler_type=clang
+common:clang-tidy --keep_going
 common:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 common:clang-tidy --output_groups=report
+common:clang-tidy --@bazel_clang_tidy//:clang_tidy_excludes=".pb.cc,icu_init.cpp"
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config_strict
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=//:clang_tidy
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_additional_deps=//:toolchain_files

@@ -13,17 +13,13 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 http_archive(
     name = "bazel_clang_tidy",
-    integrity = "sha256-nar8iWq+4goJBEfmQZPWGsRlHdt+paVu5LY1WQ/BCZA=",
-    strip_prefix = "bazel_clang_tidy-a46e57159bfe2d5d41135cec61f1c9cd514c1964",
+    integrity = "sha256-A+TGGfuHdS7vWT20eyAEiA3u4YXFtuzsJDcpTEmDMS0=",
+    strip_prefix = "bazel_clang_tidy-10c4bf70a8946789e3932f30e29dfba2dfb78e67",
     urls = [
         # Implements retry by relisting each url multiple times to be used as a failover.
         # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/a46e57159bfe2d5d41135cec61f1c9cd514c1964.tar.gz",
-    ],
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/10c4bf70a8946789e3932f30e29dfba2dfb78e67.tar.gz",
+    ] * 5,
 )
 
 bazel_dep(name = "platforms", version = "0.0.9")

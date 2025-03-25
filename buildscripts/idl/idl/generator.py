@@ -3503,7 +3503,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self.write_empty_line()
 
     def _gen_config_options_register(self, root_opts, sections, returns_status):
-        self._writer.write_line("namespace moe = ::mongo::optionenvironment;")
+        self._writer.write_line(
+            "namespace moe = ::mongo::optionenvironment;  // NOLINT(misc-unused-alias-decls)"
+        )
         self.write_empty_line()
 
         for opt in root_opts:
@@ -3531,7 +3533,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def _gen_config_options_store(self, configs, return_status):
         # Setup initializer for storing configured options in their variables.
-        self._writer.write_line("namespace moe = ::mongo::optionenvironment;")
+        self._writer.write_line(
+            "namespace moe = ::mongo::optionenvironment;  // NOLINT(misc-unused-alias-decls)"
+        )
         self.write_empty_line()
 
         for opt in configs:
