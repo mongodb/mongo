@@ -61,7 +61,7 @@ commands:
         command_name: configureCollectionBalancing
         cpp_name: ConfigureCollectionBalancing
         description: "Public configureCollectionBalancing command on mongos"
-        strict: false
+        strict: true
         namespace: type
         api_version: ""
         reply_type: OkReply
