@@ -1770,11 +1770,16 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         const auto critSecReason = criticalSectionReason(*_sessionId);
 
         runWithoutSession(outerOpCtx, [&] {
-            // Persist the migration recipient recovery document so that in case of failover, the
-            // new primary will resume the MigrationDestinationManager and retake the critical
-            // section.
-            migrationutil::persistMigrationRecipientRecoveryDocument(
-                opCtx, {*_migrationId, _nss, *_sessionId, range, _fromShard, _lsid, _txnNumber});
+            MigrationRecipientRecoveryDocument recoveryDoc;
+            {
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                recoveryDoc = {
+                    *_migrationId, _nss, *_sessionId, range, _fromShard, _lsid, _txnNumber};
+            }
+            // Persist the migration recipient recovery document so that in case of failover,
+            // the new primary will resume the MigrationDestinationManager and retake the
+            // critical section.
+            migrationutil::persistMigrationRecipientRecoveryDocument(opCtx, recoveryDoc);
 
             LOGV2_DEBUG(5899113,
                         2,
