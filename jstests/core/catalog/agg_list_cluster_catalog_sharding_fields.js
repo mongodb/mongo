@@ -8,7 +8,8 @@
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
  *    # Avoid implicitly sharding a collection.
- *    assumes_no_implicit_collection_creation_on_get_collection
+ *    assumes_no_implicit_collection_creation_on_get_collection,
+ *    requires_getmore,
  * ]
  */
 

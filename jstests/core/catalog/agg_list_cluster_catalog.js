@@ -11,6 +11,7 @@
  *    # None of them can read at a provided timestamp, therefore this test cannot run in a suite
  *    # that can change a collection's incarnation.
  *    assumes_stable_collection_uuid,
+ *    requires_getmore,
  * ]
  */
 
