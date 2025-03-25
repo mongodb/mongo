@@ -109,15 +109,15 @@ public:
                     {
                         FixedFCVRegion fcvRegion(opCtx);
 
-                        const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
-                            feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                        const auto authoritativeMetadataAccessLevel =
+                            sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
                                 fcvRegion->acquireFCVSnapshot());
 
                         DropDatabaseCoordinatorDocument coordinatorDoc;
                         coordinatorDoc.setShardingDDLCoordinatorMetadata(
                             {{ns(), DDLCoordinatorTypeEnum::kDropDatabase}});
-                        coordinatorDoc.setAuthoritativeShardCommit(
-                            shardAuthoritativeDbMetadataFeatureFlagEnabled);
+                        coordinatorDoc.setAuthoritativeMetadataAccessLevel(
+                            authoritativeMetadataAccessLevel);
 
                         dropDatabaseCoordinator = checked_pointer_cast<DropDatabaseCoordinator>(
                             service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));

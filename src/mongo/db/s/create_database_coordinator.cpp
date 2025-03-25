@@ -182,17 +182,6 @@ DatabaseType CreateDatabaseCoordinator::_commitClusterCatalog(OperationContext* 
         opCtx, dbName, _doc.getPrimaryShard().get(), _doc.getUserSelectedPrimary());
 }
 
-void CreateDatabaseCoordinator::_commitShardLocalCatalog(
-    OperationContext* opCtx,
-    const DatabaseType& db,
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token) {
-    if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
-        sharding_ddl_util::commitCreateDatabaseMetadataToShardLocalCatalog(
-            opCtx, db, getNewSession(opCtx), executor, token);
-    }
-}
-
 ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -212,19 +201,25 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                                      _setupPrimaryShard(opCtx);
                                      _enterCriticalSection(opCtx, executor, token);
                                  }))
-        .then(_buildPhaseHandler(Phase::kCommitOnShardingCatalog,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
+        .then(_buildPhaseHandler(
+            Phase::kCommitOnShardingCatalog,
+            [this, token, executor = executor, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
 
-                                     auto db = _commitClusterCatalog(opCtx);
-                                     _commitShardLocalCatalog(opCtx, db, executor, token);
+                auto db = _commitClusterCatalog(opCtx);
 
-                                     // Persists the metadata of the created database on the
-                                     // coordinator doc.
-                                     _storeDBVersion(opCtx, db);
-                                     _result = ConfigsvrCreateDatabaseResponse(db.getVersion());
-                                 }))
+                if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    const auto& session = getNewSession(opCtx);
+                    sharding_ddl_util::commitCreateDatabaseMetadataToShardLocalCatalog(
+                        opCtx, db, session, executor, token);
+                }
+
+                // Persists the metadata of the created database on the coordinator doc.
+                _storeDBVersion(opCtx, db);
+                _result = ConfigsvrCreateDatabaseResponse(db.getVersion());
+            }))
         .then(_buildPhaseHandler(
             Phase::kExitCriticalSectionOnPrimary,
             [this, token, executor = executor, anchor = shared_from_this()] {

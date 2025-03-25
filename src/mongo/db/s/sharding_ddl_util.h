@@ -64,6 +64,9 @@
 
 namespace mongo {
 
+// Forward declaration
+enum class AuthoritativeMetadataAccessLevelEnum : std::int32_t;
+
 // TODO (SERVER-74481): Define these functions in the nested `sharding_ddl_util` namespace when the
 // IDL compiler will support the use case.
 void sharding_ddl_util_serializeErrorStatusToBSON(const Status& status,
@@ -334,5 +337,13 @@ void commitDropDatabaseMetadataToShardLocalCatalog(
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
+
+/**
+ * Based on a FCV snapshot, get the where the DDL needs to act accordingly to the database
+ * authoritativeness.
+ */
+AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
+    const ServerGlobalParams::FCVSnapshot& snapshot);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

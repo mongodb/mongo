@@ -64,6 +64,26 @@ enums:
             kAddShard: "addShard"
             kCloneAuthoritativeMetadata: "cloneAuthoritativeMetadata"
 
+    # TODO (SERVER-98118): Remove this enum once v9.0 become last-lts.
+    AuthoritativeMetadataAccessLevel:
+        description: >-
+            Indicates the level of access to authoritative metadata granted by the FCV state at the
+            time of DDL document creation. The possible values are:
+                - `kNone`: No access to authoritative metadata. The DDL operates in a
+                    non-authoritative mode.
+                - `kWritesAllowed`: Write operations are permitted on authoritative metadata, but
+                    read access remains restricted. In this phase, the DDL is responsible for
+                    cloning the authoritative metadata from the global catalog to the shard catalog
+                    and committing changes to both catalogs.
+                - `kWritesAndReadsAllowed`: Both read and write operations are fully enabled. The
+                    DDL must still commit to both catalogs, but cloning is no longer required, as
+                    authoritative metadata is already present and reliable.
+        type: string
+        values:
+            kNone: "none"
+            kWritesAllowed: "writesAllowed"
+            kWritesAndReadsAllowed: "writesAndReadsAllowed"
+
 types:
     ForwardableOperationMetadata:
         description: "Forwardable operation metadata assiociated with this coordinator."

@@ -101,8 +101,8 @@ public:
             const auto coordinatorFuture = [&] {
                 FixedFCVRegion fcvRegion(opCtx);
 
-                const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
-                    feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                const auto authoritativeMetadataAccessLevel =
+                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
                         fcvRegion->acquireFCVSnapshot());
 
                 // TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
@@ -126,7 +126,7 @@ public:
                     doc.setShardingDDLCoordinatorMetadata(
                         {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
                     doc.setToShardId(toShard->getId());
-                    doc.setAuthoritativeShardCommit(shardAuthoritativeDbMetadataFeatureFlagEnabled);
+                    doc.setAuthoritativeMetadataAccessLevel(authoritativeMetadataAccessLevel);
                     return doc.toBSON();
                 }();
 

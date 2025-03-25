@@ -69,8 +69,8 @@ structs:
                 description: "Collection currently being dropped."
                 type: CollectionInfo
                 optional: true
-            authoritativeShardCommit:
-                 type: safeBool
-                 description: "If the primary shard needs to commit to the shard-local durable collection"
-                 optional: true
+            authoritativeMetadataAccessLevel:
+                type: AuthoritativeMetadataAccessLevel
+                description: "The access level to authoritative metadata granted by the FCV state at the creation of this document."
+                default: kNone
 

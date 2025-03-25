@@ -55,6 +55,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -124,16 +125,41 @@ BSONObj makeDatabaseQuery(const DatabaseName& dbName, const DatabaseVersion& dbV
 }
 
 void removeDatabaseMetadataFromShard(OperationContext* opCtx,
-                                     bool isAuthoritativeShardCommitEnabled,
                                      const DatabaseName& dbName,
                                      const OperationSessionInfo& osi,
                                      const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                      const CancellationToken& token) {
-    if (isAuthoritativeShardCommitEnabled) {
-        const auto thisShardId = ShardingState::get(opCtx)->shardId();
-        sharding_ddl_util::commitDropDatabaseMetadataToShardLocalCatalog(
-            opCtx, dbName, thisShardId, osi, executor, token);
-    }
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+    sharding_ddl_util::commitDropDatabaseMetadataToShardLocalCatalog(
+        opCtx, dbName, thisShardId, osi, executor, token);
+}
+
+/**
+ * Fetches database metadata from the global catalog and installs it in the shard catalog. This
+ * operation is necessary when the FCV is transitioning to 9.0 to prevent potential races with
+ * _shardsvrCloneAuthoritativeMetadata during the upgrade phase.
+ *
+ * TODO (SERVER-98118): Remove this method once v9.0 become last-lts.
+ */
+void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto dbMetadata =
+        catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+
+    tassert(10162500,
+            fmt::format("Expecting to have fetched database metadata from a database which "
+                        "this shard owns. DatabaseName: {}. Database primary shard: {}. "
+                        "This shard: {}",
+                        dbName.toStringForErrorMsg(),
+                        dbMetadata.getPrimary().toString(),
+                        thisShardId.toString()),
+            thisShardId == dbMetadata.getPrimary());
+
+    opCtx->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(
+        opCtx,
+        {DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()), dbMetadata});
 }
 
 void removeDatabaseMetadataFromConfigAndUpdatePlacementHistory(
@@ -361,11 +387,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", dbNss);
 
-                // Drop all collections under this DB
-                auto const catalogClient = Grid::get(opCtx)->catalogClient();
-                const auto allCollectionsForDb = catalogClient->getCollections(
-                    opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
-
                 // Make sure we were primary when we read the collections metadata so it is safe
                 // to proceed using the collection uuids to perform destructive operations
                 sharding_ddl_util::performNoopMajorityWriteLocally(opCtx);
@@ -376,6 +397,17 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                     return;  // skip to FlushDatabaseCacheUpdates
                 }
+
+                auto const catalogClient = Grid::get(opCtx)->catalogClient();
+
+                if (_doc.getAuthoritativeMetadataAccessLevel() ==
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    cloneAuthoritativeDatabaseMetadata(opCtx, _dbName);
+                }
+
+                // Drop all collections under this DB
+                const auto allCollectionsForDb = catalogClient->getCollections(
+                    opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
 
                 if (_doc.getCollInfo()) {
                     const auto coll = _doc.getCollInfo().value();
@@ -486,7 +518,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         //   dbVersion to the request and ignore StaleDbVersion exceptions.
                         // - If the shards are database metadata authoritative, we use the OSI
                         // protocol.
-                        if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
+                        if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                            AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                             const auto session = getNewSession(opCtx);
                             generic_argument_util::setOperationSessionInfo(
                                 dropDatabaseParticipantCmd, session);
@@ -514,13 +547,11 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         }
                     }
 
-                    removeDatabaseMetadataFromShard(
-                        opCtx,
-                        _doc.getAuthoritativeShardCommit().get_value_or(false),
-                        _dbName,
-                        getNewSession(opCtx),
-                        executor,
-                        token);
+                    if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                        const auto& session = getNewSession(opCtx);
+                        removeDatabaseMetadataFromShard(opCtx, _dbName, session, executor, token);
+                    }
 
                     {
                         const auto& session = getNewSession(opCtx);

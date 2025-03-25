@@ -173,6 +173,15 @@ private:
                                      std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
     /**
+     * Fetches database metadata from the global catalog and installs it in the shard catalog. This
+     * operation is necessary when the FCV is transitioning to 9.0 to prevent potential races with
+     * _shardsvrCloneAuthoritativeMetadata during the upgrade phase.
+     *
+     * TODO (SERVER-98118): Remove this method once v9.0 become last-lts.
+     */
+    void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx) const;
+
+    /**
      * Blocks write operations on the database, causing them to fail with the
      * `MovePrimaryInProgress` error.
      */

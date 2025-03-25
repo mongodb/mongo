@@ -129,12 +129,12 @@ public:
                 }
 
                 boost::optional<FixedFCVRegion> fixedFcvRegion{opCtx};
-                bool createDatabaseDDLCoordinatorFeatureFlagEnabled =
-                    feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
-                        (*fixedFcvRegion)->acquireFCVSnapshot());
-                bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
-                    feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
-                        (*fixedFcvRegion)->acquireFCVSnapshot());
+
+                const auto fcvSnapshot = (*fixedFcvRegion)->acquireFCVSnapshot();
+                const auto createDatabaseDDLCoordinatorFeatureFlagEnabled =
+                    feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(fcvSnapshot);
+                const auto authoritativeMetadataAccessLevel =
+                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(fcvSnapshot);
 
                 if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
                     // (Ignore FCV check): The use isEnabledAndIgnoreFCVUnsafe is intentional, we
@@ -161,8 +161,8 @@ public:
                         {{NamespaceString(dbName), DDLCoordinatorTypeEnum::kCreateDatabase}});
                     coordinatorDoc.setPrimaryShard(optResolvedPrimaryShard);
                     coordinatorDoc.setUserSelectedPrimary(optResolvedPrimaryShard.is_initialized());
-                    coordinatorDoc.setAuthoritativeShardCommit(
-                        shardAuthoritativeDbMetadataFeatureFlagEnabled);
+                    coordinatorDoc.setAuthoritativeMetadataAccessLevel(
+                        authoritativeMetadataAccessLevel);
                     auto createDatabaseCoordinator =
                         checked_pointer_cast<CreateDatabaseCoordinator>(
                             ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(

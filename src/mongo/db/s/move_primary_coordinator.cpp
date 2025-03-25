@@ -56,6 +56,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -260,6 +261,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 logChange(opCtx, "start");
 
+                if (_doc.getAuthoritativeMetadataAccessLevel() ==
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    cloneAuthoritativeDatabaseMetadata(opCtx);
+                }
+
                 ScopeGuard unblockWritesLegacyOnExit([&] {
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
                     UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT
@@ -328,7 +334,10 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 auto dbMetadata = getPostCommitDatabaseMetadata(opCtx);
                 assertChangedMetadataOnConfig(opCtx, dbMetadata, preCommitDbVersion);
 
-                commitMetadataToShards(opCtx, dbMetadata.getVersion(), executor, token);
+                if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    commitMetadataToShards(opCtx, dbMetadata.getVersion(), executor, token);
+                }
 
                 notifyChangeStreamsOnMovePrimary(
                     opCtx, _dbName, ShardingState::get(opCtx)->shardId(), _doc.getToShardId());
@@ -721,18 +730,18 @@ void MovePrimaryCoordinator::commitMetadataToShards(
     const DatabaseVersion& preCommitDbVersion,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
-        const auto thisShardId = ShardingState::get(opCtx)->shardId();
-        sharding_ddl_util::commitDropDatabaseMetadataToShardLocalCatalog(
-            opCtx, _dbName, thisShardId, getNewSession(opCtx), executor, token);
+    const auto& sessionForDrop = getNewSession(opCtx);
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+    sharding_ddl_util::commitDropDatabaseMetadataToShardLocalCatalog(
+        opCtx, _dbName, thisShardId, sessionForDrop, executor, token);
 
-        sharding_ddl_util::commitCreateDatabaseMetadataToShardLocalCatalog(
-            opCtx,
-            {_dbName, _doc.getToShardId(), preCommitDbVersion},
-            getNewSession(opCtx),
-            executor,
-            token);
-    }
+    const auto& sessionForCreate = getNewSession(opCtx);
+    sharding_ddl_util::commitCreateDatabaseMetadataToShardLocalCatalog(
+        opCtx,
+        {_dbName, _doc.getToShardId(), preCommitDbVersion},
+        sessionForCreate,
+        executor,
+        token);
 }
 
 void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const {
@@ -785,6 +794,27 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
             true /* fromMigrate */,
             true /* dropSystemCollections */);
     }
+}
+
+void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx) const {
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto dbMetadata =
+        catalogClient->getDatabase(opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+
+    tassert(10162501,
+            fmt::format("Expecting to have fetched database metadata from a database which "
+                        "this shard owns. DatabaseName: {}. Database primary shard: {}. "
+                        "This shard: {}",
+                        _dbName.toStringForErrorMsg(),
+                        dbMetadata.getPrimary().toString(),
+                        thisShardId.toString()),
+            thisShardId == dbMetadata.getPrimary());
+
+    opCtx->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(
+        opCtx,
+        {DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()), dbMetadata});
 }
 
 void MovePrimaryCoordinator::blockWritesLegacy(OperationContext* opCtx) const {

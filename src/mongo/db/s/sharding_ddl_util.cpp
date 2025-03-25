@@ -97,6 +97,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_cluster_parameters_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -900,6 +901,29 @@ void commitDropDatabaseMetadataToShardLocalCatalog(
         **executor, token, std::move(shardsvrRequest));
 
     sendAuthenticatedCommandToShards(opCtx, opts, {shardId});
+}
+
+AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
+    const ServerGlobalParams::FCVSnapshot& snapshot) {
+    const bool isAuthoritativeDDLEnabled =
+        feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(snapshot);
+    const bool isAuthoritativeCRUDEnabled =
+        feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(snapshot);
+
+    tassert(10162502,
+            "shardAuthoritativeDbMetadataCRUD should not be enabled if "
+            "shardAuthoritativeDbMetadataDDL is disabled",
+            isAuthoritativeDDLEnabled || !isAuthoritativeCRUDEnabled);
+
+    if (!isAuthoritativeDDLEnabled) {
+        return AuthoritativeMetadataAccessLevelEnum::kNone;
+    }
+
+    if (!isAuthoritativeCRUDEnabled) {
+        return AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+    }
+
+    return AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed;
 }
 
 }  // namespace sharding_ddl_util
