@@ -40,6 +40,7 @@ env.SConscript(
         "process_health",
         "index",
         "matcher",
+        "memory_tracking",
         "op_observer",
         "pipeline",
         "query",

@@ -35,18 +35,11 @@
 namespace mongo {
 namespace {
 
-class MemoryTrackingTest : public ServiceContextTest {
-public:
-    using ServiceContextTest::ServiceContextTest;
+ServiceContext::UniqueOperationContext makeOpCtx() {
+    return cc().makeOperationContext();
+}
 
-    auto makeOpCtx(std::string desc = "MemoryTrackingTest",
-                   std::shared_ptr<transport::Session> session = nullptr) {
-        auto client = getServiceContext()->getService()->makeClient(desc, session);
-        return client->makeOperationContext();
-    }
-};
-
-TEST_F(MemoryTrackingTest, OpMemoryUseCanAttachToOpCtx) {
+TEST_F(ServiceContextTest, OpMemoryUseCanAttachToOpCtx) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
                                                                true);
 
