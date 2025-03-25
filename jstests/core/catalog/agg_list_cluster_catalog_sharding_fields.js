@@ -51,7 +51,7 @@ expectedResults[SHARDED_CLUSTER][kCollUnsharded] = {
     'balancingEnabled': undefined
 };
 expectedResults[REPLICA_SET][kCollUnsharded] = {
-    'shards': [null],
+    'shards': [],
     'tracked': false,
     'balancingEnabled': undefined
 };
@@ -77,7 +77,7 @@ expectedResults[SHARDED_CLUSTER]["system.buckets." + kCollTimeseries] = {
 expectedResults[REPLICA_SET][kCollTimeseries] = {
     sharded: false,
     shardKey: undefined,
-    shards: [null],
+    shards: [],
     tracked: false,
     balancingEnabled: undefined,
     balancingEnabledReason: undefined
@@ -85,7 +85,7 @@ expectedResults[REPLICA_SET][kCollTimeseries] = {
 expectedResults[REPLICA_SET]["system.buckets." + kCollTimeseries] = {
     sharded: false,
     shardKey: undefined,
-    shards: [null],
+    shards: [],
     tracked: false,
     balancingEnabled: undefined,
     balancingEnabledReason: undefined
@@ -104,7 +104,7 @@ expectedResults[SHARDED_CLUSTER][kView] = {
 expectedResults[REPLICA_SET][kView] = {
     sharded: false,
     shardKey: undefined,
-    shards: [null],
+    shards: [],
     tracked: false,
     balancingEnabled: undefined,
     balancingEnabledReason: undefined

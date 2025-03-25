@@ -208,9 +208,9 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceListClusterCatalog::createFrom
                       $cond: {  
                            if: "$tracked",  
                            then: {$first: "$matchingShards.shards"},  
-                           else: {$concatArrays: [["$primary"]]}  
-                       }  
-                   }  
+                           else: {$cond: ["$primary", ["$primary"], []]}
+                       }
+                   }
                }  
            })");
     }
