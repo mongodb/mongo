@@ -59,9 +59,13 @@ public:
     StatusWith<ClusterQueryResult> next() final;
 
     Status releaseMemory() final {
-        _mergePipeline->forceSpill();
-        // When I have the bytes I will return them from here. Now, I have nothing to return.
-        return Status::OK();
+        try {
+            _mergePipeline->forceSpill();
+            // When I have the bytes I will return them from here. Now, I have nothing to return.
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
     void kill(OperationContext* opCtx) final;

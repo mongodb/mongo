@@ -684,9 +684,12 @@ Status AsyncResultsMerger::releaseMemoryResult(OperationContext* opCtx) {
         // If we are done, all remotes should have sent a response.
         tassert(9745603, "remote should have releaseMemoryResponse", remote->releaseMemoryResponse);
         auto response = remote->releaseMemoryResponse.get();
-        Status responseStatus = getStatusFromCommandResult(response);
-        if (!responseStatus.isOK()) {
-            return responseStatus;
+        if (!response.getCursorsWithErrors().empty()) {
+            // AsyncResultsMerger sends one cursor per remote.
+            ReleaseMemoryError error = response.getCursorsWithErrors().front();
+            return response.getCursorsWithErrors().front().getStatus()->withContext(
+                str::stream() << "Failed to release memory from cursor " << error.getCursorId()
+                              << " on " << remote->getTargetHost());
         }
     }
 
@@ -1015,13 +1018,13 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
     _signalCurrentEventIfReady(lk);  // Wake up anyone waiting on '_currentEvent'.
 }
 
-void AsyncResultsMerger::_handleReleaseMemoryResponse(WithLock lk,
-                                                      StatusWith<BSONObj>& parsedResponse,
-                                                      const RemoteCursorPtr& remote) {
+void AsyncResultsMerger::_handleReleaseMemoryResponse(
+    WithLock lk,
+    StatusWith<ReleaseMemoryCommandReply>& parsedResponse,
+    const RemoteCursorPtr& remote) {
     // Got a response from remote, so indicate we are no longer waiting for one.
     remote->releaseMemoryCbHandle = executor::TaskExecutor::CallbackHandle();
     remote->releaseMemoryResponse = std::move(parsedResponse.getValue());
-
 
     if (!_haveOutstandingReleaseMemoryRequests(lk)) {
         tassert(9745604, "_releaseMemoryCompleteInfo should exist", _releaseMemoryCompleteInfo);
@@ -1228,13 +1231,13 @@ Status AsyncResultsMerger::_scheduleReleaseMemory(WithLock, OperationContext* op
             [self = shared_from_this(), cursorId, remote /* intrusive_ptr copy! */](
                 auto const& cbData) {
                 // Parse response outside of the mutex.
-                auto parsedResponse = [&](const auto& cbData) -> StatusWith<BSONObj> {
+                auto parsedResponse =
+                    [&](const auto& cbData) -> StatusWith<ReleaseMemoryCommandReply> {
                     if (!cbData.response.isOK()) {
                         return cbData.response.status;
                     }
-
-                    // Not much to do here really.
-                    return std::move(cbData.response.data);
+                    return ReleaseMemoryCommandReply::parse(
+                        IDLParserContext("ReleaseMemoryCommandReply"), cbData.response.data);
                 }(cbData);
 
                 // Handle the response and update the remote's status under the mutex.

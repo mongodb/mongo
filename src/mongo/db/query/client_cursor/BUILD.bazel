@@ -109,6 +109,20 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "release_memory_util",
+    srcs = [
+        "release_memory_util.cpp",
+    ],
+    hdrs = [
+        "release_memory_util.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
 idl_generator(
     name = "release_memory_gen",
     src = "release_memory.idl",

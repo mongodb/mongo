@@ -31,6 +31,7 @@
 #include "mongo/db/commands/query_cmd/acquire_locks.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/release_memory_gen.h"
+#include "mongo/db/query/client_cursor/release_memory_util.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -75,6 +76,17 @@ public:
             std::vector<CursorId> released;
             std::vector<CursorId> notFound;
             std::vector<CursorId> currentlyPinned;
+            std::vector<ReleaseMemoryError> errors;
+
+            auto handleError = [&](CursorId cursorId, Status status) {
+                ReleaseMemoryError error{cursorId};
+                error.setStatus(status);
+                errors.push_back(std::move(error));
+                LOGV2_ERROR(10217801,
+                            "ReleaseMemory returned unexpected status",
+                            "cursorId"_attr = cursorId,
+                            "status"_attr = status.toString());
+            };
 
             for (CursorId cursorId : request().getCommandParameter()) {
                 auto cursorPin = CursorManager::get(opCtx)->pinCursor(opCtx, cursorId);
@@ -87,19 +99,47 @@ public:
                         releaseMemoryHangAfterPinCursor.pauseWhileSet(opCtx);
                     }
 
-                    acquireLocksAndReleaseMemory(opCtx, cursorPin.getValue());
-                    released.push_back(cursorId);
+                    Status response = Status::OK();
+                    const NamespaceString& nss = cursorPin.getValue().getCursor()->nss();
+                    failReleaseMemoryAfterCursorCheckout.executeIf(
+                        [&](const BSONObj& data) {
+                            auto errorCode =
+                                (data["errorCode"]
+                                     ? ErrorCodes::Error{data["errorCode"].safeNumberInt()}
+                                     : ErrorCodes::InternalError);
+                            response =
+                                Status{errorCode,
+                                       "Hit the 'failReleaseMemoryAfterCursorCheckout' failpoint"};
+                        },
+                        [&opCtx, nss](const BSONObj& data) {
+                            auto dataForFailCommand = data.addField(
+                                BSON("failCommands" << BSON_ARRAY("releaseMemory")).firstElement());
+                            auto* command = CommandHelpers::findCommand(opCtx, "releaseMemory");
+                            return CommandHelpers::shouldActivateFailCommandFailPoint(
+                                dataForFailCommand, nss, command, opCtx->getClient());
+                        });
+
+                    if (response.isOK()) {
+                        response = acquireLocksAndReleaseMemory(opCtx, cursorPin.getValue());
+                    }
+                    if (response.isOK()) {
+                        released.push_back(cursorId);
+                    } else {
+                        handleError(cursorId, response);
+                    }
                 } else if (cursorPin.getStatus().code() == ErrorCodes::CursorNotFound) {
                     notFound.push_back(cursorId);
                 } else if (cursorPin.getStatus().code() == ErrorCodes::CursorInUse) {
                     currentlyPinned.push_back(cursorId);
                 } else {
-                    uassertStatusOK(cursorPin.getStatus());
+                    handleError(cursorId, cursorPin.getStatus());
                 }
             }
 
-            return ReleaseMemoryCommandReply{
-                std::move(released), std::move(notFound), std::move(currentlyPinned)};
+            return ReleaseMemoryCommandReply{std::move(released),
+                                             std::move(notFound),
+                                             std::move(currentlyPinned),
+                                             std::move(errors)};
         }
 
     private:
@@ -129,18 +169,26 @@ public:
             return request().getGenericArguments();
         }
 
-        void acquireLocksAndReleaseMemory(OperationContext* opCtx, ClientCursorPin& cursorPin) {
-            applyConcernsAndReadPreference(opCtx, *cursorPin.getCursor());
-            CursorLocks locks{opCtx, cursorPin.getCursor()->nss(), cursorPin};
+        Status acquireLocksAndReleaseMemory(OperationContext* opCtx, ClientCursorPin& cursorPin) {
+            try {
+                applyConcernsAndReadPreference(opCtx, *cursorPin.getCursor());
+                CursorLocks locks{opCtx, cursorPin.getCursor()->nss(), cursorPin};
 
-            if (!cursorPin->isAwaitData()) {
-                opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
+                if (!cursorPin->isAwaitData()) {
+                    auto status = opCtx->checkForInterruptNoAssert();
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                }
+
+                PlanExecutor* exec = cursorPin->getExecutor();
+                exec->reattachToOperationContext(opCtx);
+                ScopeGuard opCtxGuard([&]() { exec->detachFromOperationContext(); });
+                exec->forceSpill();
+                return Status::OK();
+            } catch (const DBException& e) {
+                return e.toStatus();
             }
-
-            PlanExecutor* exec = cursorPin->getExecutor();
-            exec->reattachToOperationContext(opCtx);
-            ScopeGuard opCtxGuard([&]() { exec->detachFromOperationContext(); });
-            exec->forceSpill();
         }
     };
 

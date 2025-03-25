@@ -49,6 +49,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/query/client_cursor/release_memory_gen.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/server_options.h"
@@ -417,7 +418,7 @@ private:
         // The buffer of results that have been retrieved but not yet returned to the caller.
         std::queue<BSONObj> docBuffer;
         // Keep outside the docBuffer so not to mess with buffered results from normal execution.
-        boost::optional<BSONObj> releaseMemoryResponse;
+        boost::optional<ReleaseMemoryCommandReply> releaseMemoryResponse;
 
         // Is valid if there is currently a pending request to this remote.
         executor::TaskExecutor::CallbackHandle cbHandle;
@@ -522,7 +523,7 @@ private:
                               const RemoteCursorPtr& remote);
 
     void _handleReleaseMemoryResponse(WithLock lk,
-                                      StatusWith<BSONObj>& response,
+                                      StatusWith<ReleaseMemoryCommandReply>& response,
                                       const RemoteCursorPtr& remote);
 
     /**

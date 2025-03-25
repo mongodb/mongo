@@ -13,6 +13,7 @@
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getServerParameter(knob) {
@@ -118,8 +119,11 @@ assert.eq(previousSpillCount, getTextOrSpillCounter());
         coll.find(predicate, {score: {$meta: "textScore"}}).batchSize(1).allowDiskUse(false);
     const cursorId = cursor.getId();
 
-    assert.commandFailedWithCode(db.runCommand({releaseMemory: [cursorId]}),
-                                 [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed]);
+    const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
+    assert.commandWorked(releaseMemoryRes);
+    assertReleaseMemoryFailedWithCode(
+        releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+
     assert.eq(previousSpillCount, getTextOrSpillCounter());
 
     assert.eq(expectedResults, cursor.toArray().sort(idCompare));

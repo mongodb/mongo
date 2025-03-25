@@ -620,6 +620,7 @@ let viewsCommandTests = {
                 cursorsReleased: [cursor.id],
                 cursorsNotFound: [],
                 cursorsCurrentlyPinned: [],
+                cursorsWithErrors: [],
                 ok: 1
             };
             delete res.operationTime;

@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/query/client_cursor/cursor_id.h"
+        - "mongo/db/query/client_cursor/release_memory_util.h"
 
 imports:
     - "mongo/db/auth/access_checks.idl"
@@ -44,7 +45,26 @@ types:
         deserializer: "mongo::BSONElement::_numberLong"
         is_view: false
 
+    status:
+        bson_serialization_type: any
+        description: "Status of a failed release memory for a specific cursor"
+        cpp_type: "::mongo::Status"
+        serializer: "::mongo::serializeErrorStatusToBSON"
+        deserializer: "::mongo::deserializeErrorStatusFromBSON"
+        is_view: false
+
 structs:
+    ReleaseMemoryError:
+        description: >-
+            A structure that holds a cursor id and an error that happened during
+            releasing memory for this cursor.
+        fields:
+            cursorId:
+                type: cursorId
+            status:
+                type: status
+                optional: true
+
     ReleaseMemoryCommandReply:
         description: 'Response from releaseMemory command'
         strict: false
@@ -59,6 +79,9 @@ structs:
             cursorsCurrentlyPinned:
                 description: 'Cursors that were already pinned during command execution'
                 type: array<cursorId>
+            cursorsWithErrors:
+                description: 'Cursors for which release memory failed with an error.'
+                type: array<ReleaseMemoryError>
 
 commands:
     releaseMemory:

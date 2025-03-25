@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/release_memory_gen.h"
+#include "mongo/db/query/client_cursor/release_memory_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 
@@ -51,10 +52,6 @@
 namespace mongo {
 
 namespace {
-
-MONGO_FAIL_POINT_DEFINE(failReleaseMemoryAfterCursorCheckout);
-
-
 class ClusterReleaseMemoryCmd final : public TypedCommand<ClusterReleaseMemoryCmd> {
 public:
     using Request = ReleaseMemoryCommandRequest;
@@ -96,6 +93,17 @@ public:
             std::vector<CursorId> cursorsReleased;
             std::vector<CursorId> cursorsNotFound;
             std::vector<CursorId> cursorsCurrentlyPinned;
+            std::vector<ReleaseMemoryError> errors;
+
+            auto handleError = [&](CursorId cursorId, Status status) {
+                ReleaseMemoryError error{cursorId};
+                error.setStatus(status);
+                errors.push_back(std::move(error));
+                LOGV2_ERROR(9745602,
+                            "ReleaseMemory returned unexpected status",
+                            "cursorId"_attr = cursorId,
+                            "status"_attr = status.toString());
+            };
 
             for (CursorId id : cursorIds) {
                 auto pinnedCursor = cursorManager->checkOutCursorNoAuthCheck(id, opCtx);
@@ -105,19 +113,21 @@ public:
                         pinnedCursor.getValue().returnCursor(
                             ClusterCursorManager::CursorState::NotExhausted);
                     });
+                    Status response = Status::OK();
                     {
                         // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an
                         // exception with the given 'errorCode' value, or ErrorCodes::InternalError
                         // if 'errorCode' is omitted.
                         auto nss = ns();
                         failReleaseMemoryAfterCursorCheckout.executeIf(
-                            [](const BSONObj& data) {
+                            [&](const BSONObj& data) {
                                 auto errorCode =
-                                    (data["errorCode"] ? data["errorCode"].safeNumberLong()
-                                                       : ErrorCodes::InternalError);
-                                uasserted(
+                                    (data["errorCode"]
+                                         ? ErrorCodes::Error{data["errorCode"].safeNumberInt()}
+                                         : ErrorCodes::InternalError);
+                                response = Status{
                                     errorCode,
-                                    "Hit the 'failReleaseMemoryAfterCursorCheckout' failpoint");
+                                    "Hit the 'failReleaseMemoryAfterCursorCheckout' failpoint"};
                             },
                             [&opCtx, nss](const BSONObj& data) {
                                 auto dataForFailCommand = data.addField(
@@ -128,8 +138,15 @@ public:
                                     dataForFailCommand, nss, command, opCtx->getClient());
                             });
                     }
-                    uassertStatusOK(pinnedCursor.getValue()->releaseMemory());
-                    cursorsReleased.push_back(id);
+                    if (response.isOK()) {
+                        response = pinnedCursor.getValue()->releaseMemory();
+                    }
+                    // Check the status and decide where the result should go
+                    if (response.isOK()) {
+                        cursorsReleased.push_back(id);
+                    } else {
+                        handleError(id, response);
+                    }
                     // Upon successful completion, transfer ownership of the cursor back to the
                     // cursor manager.
                     pinnedCursor.getValue().returnCursor(
@@ -141,13 +158,14 @@ public:
                 } else if (pinnedCursor.getStatus().code() == ErrorCodes::CursorNotFound) {
                     cursorsNotFound.push_back(id);
                 } else {
-                    uassertStatusOK(pinnedCursor.getStatus());
+                    handleError(id, pinnedCursor.getStatus());
                 }
             }
 
             return ReleaseMemoryCommandReply{std::move(cursorsReleased),
                                              std::move(cursorsNotFound),
-                                             std::move(cursorsCurrentlyPinned)};
+                                             std::move(cursorsCurrentlyPinned),
+                                             std::move(errors)};
         }
 
     private:
