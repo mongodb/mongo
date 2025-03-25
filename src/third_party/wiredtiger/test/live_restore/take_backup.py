@@ -25,30 +25,45 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+#
+# take_backup.py
+#   Take a backup of the database created by btree-500m-populate.wtperf to be used
+#   as the source directory in live restore perf tests.
+#   This script needs to be run from build/bench/wtperf and the btree-500m-populate
+#   task must have run already to generate the WT_TEST_0_0 folder.
 
-import os, wiredtiger, wttest
-from wtscenario import make_scenarios
+import os
+import shutil
+import sys
 
-# test_live_restore07.py
-# Test that restoring from an empty database fails.
-@wttest.skip_for_hook("tiered", "using multiple WT homes")
-class test_live_restore07(wttest.WiredTigerTestCase):
-    format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('row_integer', dict(key_format='i', value_format='S')),
-    ]
+sys.path.append(os.path.abspath('../../lang/python'))
 
+from  wiredtiger import wiredtiger_open
 
-    scenarios = make_scenarios(format_values)
+def main():
 
-    def test_live_restore07(self):
-        # Live restore is not supported on Windows.
-        if os.name == 'nt':
-            return
+    home = "WT_TEST_0_0"
+    backup_dir = "WT_TEST_0_0_backup"
 
-        # Close the default connection.
-        self.close_conn()
-        os.mkdir("SOURCE")
-        os.mkdir("DEST")
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.open_conn("DEST", config="live_restore=(enabled=true,path=\"SOURCE\")"), '/Source directory is empty. Nothing to restore!/')
+    # Create a clean backup directory
+    if os.path.exists(backup_dir):
+        shutil.rmtree(backup_dir)
+    os.makedirs(backup_dir)
+
+    # Connect to the database and open a session
+    conn = wiredtiger_open('WT_TEST_0_0', None)
+    session = conn.open_session()
+
+    backup_cursor = session.open_cursor('backup:', None)
+
+    while backup_cursor.next() == 0:
+        orig_file = f'{home}/{backup_cursor.get_key()}'
+        backup_file = f'{backup_dir}/{backup_cursor.get_key()}'
+        shutil.copyfile(orig_file, backup_file)
+
+    backup_cursor.close()
+    session.close()
+    conn.close()
+
+if __name__ == "__main__":
+    main()

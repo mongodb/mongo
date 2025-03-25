@@ -67,10 +67,10 @@ connection_manager::create(
     }
     logger::log_msg(LOG_INFO, "wiredtiger_open config: " + config);
 
-    // FIXME-WT-14151 Add an assert here that we're not clobbering an existing database.
+    testutil_assert(!testutil_exists(".", home.c_str()));
 
     /* Create the working dir. */
-    testutil_recreate_dir(home.c_str());
+    testutil_mkdir(home.c_str());
     if (create_log_directory)
         testutil_mkdir((home + "/journal").c_str());
 

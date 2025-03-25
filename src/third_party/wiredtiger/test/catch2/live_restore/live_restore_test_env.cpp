@@ -18,26 +18,35 @@ namespace utils {
  */
 live_restore_test_env::live_restore_test_env()
 {
-    // Clean up any pre-existing folders. Make sure an empty DB_SOURCE exists
-    // as it need to exist to open the connection in live restore mode.
-    testutil_recreate_dir(DB_DEST.c_str());
-    testutil_recreate_dir(DB_SOURCE.c_str());
+    // Clean up any pre-existing folders.
+    testutil_remove(DB_DEST.c_str());
+    testutil_remove(DB_SOURCE.c_str());
 
-    // WiredTiger stores state in the turtle file so we always need to have a valid database in
-    // the source folder. Open and close a connection to initialize the source folder.
+    // Live restore requires the source directory to be a valid backup. Create one now.
     {
         static std::string non_lr_config = "create=true";
-        conn = std::make_unique<connection_wrapper>(DB_SOURCE.c_str(), non_lr_config.c_str());
-        conn->clear_do_cleanup();
+        auto backup_conn =
+          std::make_unique<connection_wrapper>(DB_DEST.c_str(), non_lr_config.c_str());
+
+        backup_conn->get_wt_connection_impl();
+        WT_SESSION *session = (WT_SESSION *)backup_conn->create_session();
+        WT_CURSOR *backup_cursor = nullptr;
+        REQUIRE(session->open_cursor(session, "backup:", nullptr, nullptr, &backup_cursor) == 0);
+
+        testutil_mkdir(DB_SOURCE.c_str());
+        while (backup_cursor->next(backup_cursor) == 0) {
+            const char *uri = nullptr;
+            REQUIRE(backup_cursor->get_key(backup_cursor, &uri) == 0);
+            std::string dest_file = DB_DEST + "/" + uri;
+            std::string source_file = DB_SOURCE + "/" + uri;
+            testutil_copy(dest_file.c_str(), source_file.c_str());
+        }
+
+        backup_cursor->close(backup_cursor);
+        session->close(session, nullptr);
     }
 
-    /*
-     * We're using a connection to set up the file system and let us print WT traces, but all of our
-     * tests will use empty folders where we create files manually. The issue here is
-     * wiredtiger_open will create metadata and turtle files on open and think it needs to remove
-     * them on close. Move these files to a temp location. We'll restore them in destructor before
-     * _conn->close() is called.
-     */
+    testutil_remove(DB_DEST.c_str());
     static std::string cfg_string =
       "create=true,live_restore=(enabled=true, path=" + DB_SOURCE + ",threads_max=0)";
     conn = std::make_unique<connection_wrapper>(DB_DEST.c_str(), cfg_string.c_str());

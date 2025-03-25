@@ -100,6 +100,9 @@ main(int argc, char *argv[])
     const std::string conn_config = CONNECTION_CREATE + ",cache_size=500MB";
     const std::string home_dir = std::string(DEFAULT_DIR) + '_' + progname;
 
+    /* Clean up any artifacts from prior runs. */
+    testutil_remove(home_dir.c_str());
+
     /* Create connection. */
     connection_manager::instance().create(conn_config, home_dir);
     WT_CONNECTION *conn = connection_manager::instance().get_connection();

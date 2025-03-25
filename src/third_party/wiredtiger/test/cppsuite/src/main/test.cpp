@@ -160,9 +160,12 @@ test::run()
     /* Add the user supplied wiredtiger open config. */
     db_create_config += "," + _args.wt_open_config;
 
+    /* Clean up any pre-existing test artifacts. */
+    std::string home = _args.home.empty() ? DEFAULT_DIR : _args.home;
+    testutil_remove(home.c_str());
+
     /* Create connection. */
-    connection_manager::instance().create(
-      db_create_config, _args.home.empty() ? DEFAULT_DIR : _args.home);
+    connection_manager::instance().create(db_create_config, home);
 
     /* Load each component. They have to be all loaded first before being able to run. */
     for (const auto &it : _components)

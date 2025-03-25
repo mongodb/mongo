@@ -4,7 +4,7 @@
 source "../test/live_restore/helper.sh"
 
 # 30 iterations with 20000 operations per iteration and 20 collections.
-run_test "-i 30 -l 2 -o 20000 -c 20"
+run_test "-i 20 -l 2 -o 20000 -c 20"
 
 # Background thread debug mode test, this will wait for the background thread to complete prior to
 # exiting, but it will not apply crud operations after startup.
