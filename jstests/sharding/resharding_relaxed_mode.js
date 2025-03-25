@@ -6,7 +6,7 @@
  *
  * @tags: [
  *  requires_sharding,
- *  requires_fcv_81,
+ *  requires_fcv_82,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
