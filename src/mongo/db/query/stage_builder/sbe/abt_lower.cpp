@@ -252,6 +252,23 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 }
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
+    const NaryOp& op, std::vector<std::unique_ptr<sbe::EExpression>> args) {
+
+    sbe::EPrimNary::Op sbeOp;
+    switch (op.op()) {
+        case Operations::And:
+            sbeOp = sbe::EPrimNary::logicAnd;
+            break;
+        case Operations::Or:
+            sbeOp = sbe::EPrimNary::logicOr;
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+    return sbe::makeE<sbe::EPrimNary>(sbeOp, std::move(args));
+}
+
+std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     const UnaryOp& op, std::unique_ptr<sbe::EExpression> arg) {
 
     sbe::EPrimUnary::Op sbeOp = getEPrimUnaryOp(op.op());

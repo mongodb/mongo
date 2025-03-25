@@ -166,6 +166,15 @@ inline auto makeEs(Ts&&... pack) {
     return exprs;
 }
 
+template <typename... Ts>
+inline auto makeVEs(Ts&&... pack) {
+    std::vector<std::unique_ptr<EExpression>> exprs;
+
+    (exprs.emplace_back(std::forward<Ts>(pack)), ...);
+
+    return exprs;
+}
+
 namespace detail {
 // base case
 template <typename R>
@@ -317,14 +326,45 @@ private:
 };
 
 /**
+ * This is a n-ary primitive (builtin) operation.
+ */
+class EPrimNary final : public EExpression {
+public:
+    enum Op {
+        // Logical operations. These operations are short-circuiting.
+        logicAnd,
+        logicOr,
+    };
+
+    EPrimNary(Op op, std::vector<std::unique_ptr<EExpression>> args) : _op(op) {
+        _nodes.reserve(args.size());
+        for (auto&& arg : args) {
+            _nodes.emplace_back(std::move(arg));
+        }
+        validateNodes();
+    }
+
+    std::unique_ptr<EExpression> clone() const override;
+
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
+
+    std::vector<DebugPrinter::Block> debugPrint() const override;
+
+    size_t estimateSize() const final;
+
+private:
+    Op _op;
+};
+
+/**
  * This is a binary primitive (builtin) operation.
  */
 class EPrimBinary final : public EExpression {
 public:
     enum Op {
         // Logical operations. These operations are short-circuiting.
-        logicAnd,
-        logicOr,
+        logicAnd,  // TODO: remove with SERVER-100579
+        logicOr,   // TODO: remove with SERVER-100579
 
         // Nothing-handling operation. This is short-circuiting like logicOr,
         // but it checks Nothing / non-Nothing instead of false / true.

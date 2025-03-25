@@ -343,6 +343,55 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
     return TypeSignature::kAnyScalarType;
 }
 
+TypeSignature TypeChecker::operator()(optimizer::ABT& n,
+                                      optimizer::NaryOp& op,
+                                      bool saveInference) {
+    if (op.op() == optimizer::Operations::And) {
+        // In an And operation, due to the short-circuiting logic, a child node
+        // can infer some extra type information just because it is being evaluated
+        // after another node that must have returned a 'true' value.
+        // E.g. (exists(s4) && isNumber(s4)) can never be Nothing because the only place
+        //      where Nothing can be returned is isNumber, but s4 cannot be Nothing because
+        //      the first child of the And node had to return 'true' in order for isNumber to
+        //      be executed, and this excludes the possibility that s4 is Nothing.
+
+        // If we are requested *not* to preserve our inferences, define a local binding where the
+        // variables used inside the And can be constrained as each test is assumed to succeed.
+        // If the saveInference is true, we will be writing directly in the scope that our caller
+        // set up.
+        if (!saveInference) {
+            enterLocalBinding();
+        }
+
+        bool canBeNothing = false;
+        // Visit the logical children in their natural order.
+        for (auto& node : op.nodes()) {
+            // Visit the child node using the flag 'saveInference' set to true, so that any
+            // constraint applied to a variable can be stored in the local binding.
+            TypeSignature nodeType = node.visit(*this, true);
+            canBeNothing |= TypeSignature::kNothingType.isSubset(nodeType);
+        }
+
+        if (!saveInference) {
+            exitLocalBinding();
+        }
+        // The signature of the And is boolean plus Nothing if any operands can be Nothing.
+        return canBeNothing ? TypeSignature::kBooleanType.include(TypeSignature::kNothingType)
+                            : TypeSignature::kBooleanType;
+    } else if (op.op() == optimizer::Operations::Or) {
+        // Visit the logical children in their natural order.
+        bool canBeNothing = false;
+        for (auto& node : op.nodes()) {
+            TypeSignature nodeType = node.visit(*this, false);
+            canBeNothing |= TypeSignature::kNothingType.isSubset(nodeType);
+        }
+        // The signature of the Or is boolean plus Nothing if any operands can be Nothing.
+        return canBeNothing ? TypeSignature::kBooleanType.include(TypeSignature::kNothingType)
+                            : TypeSignature::kBooleanType;
+    }
+    return TypeSignature::kAnyScalarType;
+}
+
 TypeSignature TypeChecker::evaluateTypeTest(optimizer::ABT& n,
                                             TypeSignature argSignature,
                                             TypeSignature typeToCheck) {

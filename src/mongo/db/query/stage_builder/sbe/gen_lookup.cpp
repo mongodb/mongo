@@ -280,10 +280,10 @@ std::pair<SbSlot /* keyValueSlot */, SbStage> buildForeignKeysStream(SbSlot inpu
             // Don't get field from scalars inside arrays (it would fail but we also don't want to
             // fill with "null" in this case to match the MQL semantics described above.)
             SbExpr shouldGetField =
-                b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                               b.makeFunction("isObject", keyValueSlot),
-                               b.makeUnaryOp(sbe::EPrimUnary::logicNot,
-                                             b.makeFunction("isArray", prevKeyValueSlot)));
+                b.makeBooleanOpTree(optimizer::Operations::Or,
+                                    b.makeFunction("isObject", keyValueSlot),
+                                    b.makeUnaryOp(sbe::EPrimUnary::logicNot,
+                                                  b.makeFunction("isArray", prevKeyValueSlot)));
 
             getFieldFromObject =
                 b.makeIf(std::move(shouldGetField),
@@ -852,8 +852,8 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
                        b.makeConstant(sbe::value::TypeTags::bsonUndefined, 0)));
     SbSlot arrayBranchOutput = arrayBranchOutSlots[0];
 
-    auto shouldProduceSeekForArray = b.makeBinaryOp(
-        sbe::EPrimBinary::logicAnd,
+    auto shouldProduceSeekForArray = b.makeBooleanOpTree(
+        optimizer::Operations::And,
         b.makeFunction("isArray", singleLocalValueSlot),
         b.makeUnaryOp(sbe::EPrimUnary::logicNot,
                       b.makeFunction("isMember", arrayBranchOutput, localKeysSetSlot)));

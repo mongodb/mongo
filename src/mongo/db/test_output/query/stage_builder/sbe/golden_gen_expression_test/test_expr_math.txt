@@ -105,7 +105,7 @@ ExpressionRound
     in 
         if (typeMatch(l25.0, 1088) ?: true) 
         then null 
-        elif (((l25.0 != trunc(l25.0)) ?: true) || ((l25.0 < -20) || (l25.0 > 100))) 
+        elif (((l25.0 != trunc(l25.0)) ?: true) || (l25.0 < -20) || (l25.0 > 100)) 
         then fail(5155301, "$round requires "place" argument to be an integer between -20 and 100") 
         else round(1.123456L, move(l25.0)) 
 

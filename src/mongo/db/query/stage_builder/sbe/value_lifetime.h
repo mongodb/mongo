@@ -80,6 +80,8 @@ public:
 
     ValueType operator()(optimizer::ABT& n, optimizer::BinaryOp& op);
 
+    ValueType operator()(optimizer::ABT& n, optimizer::NaryOp& op);
+
     ValueType operator()(optimizer::ABT& n, optimizer::FunctionCall& op);
 
     ValueType operator()(optimizer::ABT& n, optimizer::If& op);

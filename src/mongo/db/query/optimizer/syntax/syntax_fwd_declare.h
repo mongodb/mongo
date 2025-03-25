@@ -39,6 +39,7 @@ class Constant;
 class Variable;
 class UnaryOp;
 class BinaryOp;
+class NaryOp;
 class If;
 class Let;
 class MultiLet;

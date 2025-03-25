@@ -1618,9 +1618,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
                 b.makeFail(ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
 
             auto failOnParallelArraysExpr =
-                b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                               std::move(sortKeys.parallelArraysCheckExpr),
-                               std::move(parallelArraysError));
+                b.makeBooleanOpTree(optimizer::Operations::Or,
+                                    std::move(sortKeys.parallelArraysCheckExpr),
+                                    std::move(parallelArraysError));
 
             projects.emplace_back(std::move(failOnParallelArraysExpr), boost::none);
         }

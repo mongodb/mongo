@@ -178,6 +178,13 @@ inline auto _binary(StringData name, ExprHolder input1, ExprHolder input2) {
         make<BinaryOp>(getOpByName(name), std::move(input1._n), std::move(input2._n))};
 }
 
+template <typename... Ts>
+inline auto _nary(StringData name, Ts&&... pack) {
+    std::vector<ExprHolder> v;
+    (v.push_back(std::forward<Ts>(pack)), ...);
+    return ExprHolder{make<NaryOp>(getOpByName(name), holdersToABTs(std::move(v)))};
+}
+
 inline auto _if(ExprHolder condExpr, ExprHolder thenExpr, ExprHolder elseExpr) {
     return ExprHolder{
         make<If>(std::move(condExpr._n), std::move(thenExpr._n), std::move(elseExpr._n))};

@@ -862,6 +862,24 @@ public:
     }
 
     ExplainPrinter transport(const ABT::reference_type /*n*/,
+                             const NaryOp& expr,
+                             std::vector<ExplainPrinter> argResults) {
+        ExplainPrinter printer("NaryOp");
+        printer.separator(" [")
+            .fieldName("op", ExplainVersion::V3)
+            .print(toStringData(expr.op()))
+            .separator("]")
+            .setChildCount(argResults.size())
+            .maybeReverse();
+        for (size_t i = 0; i < argResults.size(); i++) {
+            std::stringstream ss;
+            ss << "arg" << i;
+            printer.fieldName(ss.str(), ExplainVersion::V3).print(argResults[i]);
+        }
+        return printer;
+    }
+
+    ExplainPrinter transport(const ABT::reference_type /*n*/,
                              const If& expr,
                              ExplainPrinter condResult,
                              ExplainPrinter thenResult,

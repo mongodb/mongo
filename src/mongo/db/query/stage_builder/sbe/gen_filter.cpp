@@ -532,14 +532,14 @@ void generateBitTest(MatchExpressionVisitorContext* context,
 }
 
 // Build specified logical expression with branches stored on stack.
-void buildLogicalExpression(sbe::EPrimBinary::Op op,
+void buildLogicalExpression(optimizer::Operations op,
                             size_t numChildren,
                             MatchExpressionVisitorContext* context) {
     SbExprBuilder b(context->state);
 
     if (numChildren == 0) {
         // If an $and or $or expression does not have any children, a constant is returned.
-        generateAlwaysBoolean(context, op == sbe::EPrimBinary::logicAnd);
+        generateAlwaysBoolean(context, op == optimizer::Operations::And);
         return;
     } else if (numChildren == 1) {
         // For $and or $or expressions with 1 child, do nothing and return. The post-visitor for
@@ -550,14 +550,14 @@ void buildLogicalExpression(sbe::EPrimBinary::Op op,
     auto& frame = context->topFrame();
 
     // Move the children's outputs off of the matchStack into a vector in preparation for
-    // calling makeBalancedBooleanOpTree().
+    // calling makeBooleanOpTree().
     std::vector<SbExpr> exprs;
     for (size_t i = 0; i < numChildren; ++i) {
         exprs.emplace_back(frame.popExpr());
     }
     std::reverse(exprs.begin(), exprs.end());
 
-    frame.pushExpr(b.makeBalancedBooleanOpTree(op, std::move(exprs)));
+    frame.pushExpr(b.makeBooleanOpTree(op, std::move(exprs)));
 }
 
 /**
@@ -774,7 +774,7 @@ public:
     }
 
     void visit(const AndMatchExpression* expr) final {
-        buildLogicalExpression(sbe::EPrimBinary::logicAnd, expr->numChildren(), _context);
+        buildLogicalExpression(optimizer::Operations::And, expr->numChildren(), _context);
     }
 
     void visit(const BitsAllClearMatchExpression* expr) final {
@@ -803,25 +803,26 @@ public:
         auto lambdaFrameId = *_context->topFrame().frameId;
         auto lambdaParam = SbLocalVar{lambdaFrameId, 0};
 
-        auto lambdaBodyExpr =
-            b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                           b.makeFunction("typeMatch",
-                                          lambdaParam,
-                                          b.makeInt32Constant(getBSONTypeMask(BSONType::Array) |
-                                                              getBSONTypeMask(BSONType::Object))),
-                           _context->topFrame().popExpr());
+        auto lambdaBodyExpr = b.makeBooleanOpTree(
+            optimizer::Operations::And,
+            b.makeFunction("typeMatch",
+                           lambdaParam,
+                           b.makeInt32Constant(getBSONTypeMask(BSONType::Array) |
+                                               getBSONTypeMask(BSONType::Object))),
+            _context->topFrame().popExpr());
 
         _context->popFrame();
 
         auto lambdaExpr = b.makeLocalLambda(lambdaFrameId, std::move(lambdaBodyExpr));
 
         auto makePredicate = [&](SbExpr inputExpr) {
-            return b.makeFillEmptyFalse(b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                                                       b.makeFunction("isArray", inputExpr.clone()),
-                                                       b.makeFunction("traverseF",
-                                                                      inputExpr.clone(),
-                                                                      std::move(lambdaExpr),
-                                                                      b.makeBoolConstant(false))));
+            return b.makeFillEmptyFalse(
+                b.makeBooleanOpTree(optimizer::Operations::And,
+                                    b.makeFunction("isArray", inputExpr.clone()),
+                                    b.makeFunction("traverseF",
+                                                   inputExpr.clone(),
+                                                   std::move(lambdaExpr),
+                                                   b.makeBoolConstant(false))));
         };
 
         const auto traversalMode = LeafTraversalMode::kDoNotTraverseLeaf;
@@ -838,7 +839,7 @@ public:
         auto lambdaFrameId = *_context->topFrame().frameId;
 
         // Move the children's outputs off of the expr stack into a vector in preparation for
-        // calling makeBalancedBooleanOpTree().
+        // calling makeBooleanOpTree().
         std::vector<SbExpr> exprs;
         for (size_t i = 0; i < numChildren; ++i) {
             exprs.emplace_back(_context->topFrame().popExpr());
@@ -847,18 +848,18 @@ public:
 
         _context->popFrame();
 
-        auto lambdaBodyExpr =
-            b.makeBalancedBooleanOpTree(sbe::EPrimBinary::logicAnd, std::move(exprs));
+        auto lambdaBodyExpr = b.makeBooleanOpTree(optimizer::Operations::And, std::move(exprs));
 
         auto lambdaExpr = b.makeLocalLambda(lambdaFrameId, std::move(lambdaBodyExpr));
 
         auto makePredicate = [&](SbExpr inputExpr) {
-            return b.makeFillEmptyFalse(b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                                                       b.makeFunction("isArray", inputExpr.clone()),
-                                                       b.makeFunction("traverseF",
-                                                                      inputExpr.clone(),
-                                                                      std::move(lambdaExpr),
-                                                                      b.makeBoolConstant(false))));
+            return b.makeFillEmptyFalse(
+                b.makeBooleanOpTree(optimizer::Operations::And,
+                                    b.makeFunction("isArray", inputExpr.clone()),
+                                    b.makeFunction("traverseF",
+                                                   inputExpr.clone(),
+                                                   std::move(lambdaExpr),
+                                                   b.makeBoolConstant(false))));
         };
 
         const auto traversalMode = LeafTraversalMode::kDoNotTraverseLeaf;
@@ -968,8 +969,8 @@ public:
         regexArrSetGuard.reset();
 
         auto makePredicate = [&, hasNull = hasNull](SbExpr inputExpr) {
-            auto resultExpr = b.makeBinaryOp(
-                sbe::EPrimBinary::logicOr,
+            auto resultExpr = b.makeBooleanOpTree(
+                optimizer::Operations::Or,
                 b.makeFillEmptyFalse(
                     b.makeFunction("isMember", inputExpr.clone(), std::move(regexSetConstant))),
                 b.makeFillEmptyFalse(b.makeFunction(
@@ -983,8 +984,8 @@ public:
                                          inputExpr.clone());
                 }
 
-                resultExpr = b.makeBinaryOp(
-                    sbe::EPrimBinary::logicOr,
+                resultExpr = b.makeBooleanOpTree(
+                    optimizer::Operations::Or,
                     b.makeFunction("isMember", std::move(inputExpr), std::move(equalitiesExpr)),
                     std::move(resultExpr));
             }
@@ -1034,9 +1035,9 @@ public:
             generateExpressionCompare(state, cmpOp, lhsVar.clone(), b.makeConstant(rhsTag, rhsVal));
 
         auto isArrayExpr =
-            b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                           b.makeFillEmptyFalse(b.makeFunction("isArray", lhsVar.clone())),
-                           std::move(translatedCmpExpr));
+            b.makeBooleanOpTree(optimizer::Operations::Or,
+                                b.makeFillEmptyFalse(b.makeFunction("isArray", lhsVar.clone())),
+                                std::move(translatedCmpExpr));
 
         // Now generate the actual field path expression for the LHS.
         FieldPath fp("CURRENT." + expr->fieldRef()->dottedField().toString());
@@ -1114,7 +1115,7 @@ public:
 
         // $nor is implemented as a negation of $or. First step is to build $or expression from
         // stack.
-        buildLogicalExpression(sbe::EPrimBinary::logicOr, expr->numChildren(), _context);
+        buildLogicalExpression(optimizer::Operations::Or, expr->numChildren(), _context);
 
         // Second step is to negate the result of $or expression.
         // Here we discard the index value of the state even if it was set by expressions below NOR.
@@ -1136,7 +1137,7 @@ public:
     }
 
     void visit(const OrMatchExpression* expr) final {
-        buildLogicalExpression(sbe::EPrimBinary::logicOr, expr->numChildren(), _context);
+        buildLogicalExpression(optimizer::Operations::Or, expr->numChildren(), _context);
     }
 
     void visit(const RegexMatchExpression* expr) final {
@@ -1578,8 +1579,8 @@ SbExpr generateRegexExpr(StageBuilderState& state,
         }
     }();
 
-    auto resultExpr = b.makeBinaryOp(
-        sbe::EPrimBinary::logicOr,
+    auto resultExpr = b.makeBooleanOpTree(
+        optimizer::Operations::Or,
         b.makeFillEmptyFalse(
             b.makeBinaryOp(sbe::EPrimBinary::eq, inputExpr.clone(), std::move(bsonRegexExpr))),
         b.makeFillEmptyFalse(

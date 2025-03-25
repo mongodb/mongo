@@ -200,16 +200,14 @@ std::vector<DebugPrinter::Block> EVariable::debugPrint() const {
     return ret;
 }
 
-std::unique_ptr<EExpression> EPrimBinary::clone() const {
-    if (_nodes.size() == 2) {
-        return std::make_unique<EPrimBinary>(_op, _nodes[0]->clone(), _nodes[1]->clone());
-    } else {
-        invariant(_nodes.size() == 3);
-        return std::make_unique<EPrimBinary>(
-            _op, _nodes[0]->clone(), _nodes[1]->clone(), _nodes[2]->clone());
+std::unique_ptr<EExpression> EPrimNary::clone() const {
+    std::vector<std::unique_ptr<EExpression>> args;
+    args.reserve(_nodes.size());
+    for (auto& arg : _nodes) {
+        args.emplace_back(arg->clone());
     }
+    return std::make_unique<EPrimNary>(_op, std::move(args));
 }
-
 
 /*
  * Given a vector of clauses named [lhs1,...,lhsN-1, rhs], and a boolean isDisjunctive to indicate
@@ -240,9 +238,8 @@ std::unique_ptr<EExpression> EPrimBinary::clone() const {
  * @true:     push true
  * @end:
  */
-vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx,
-                                       const std::vector<const EExpression*>& clauses,
-                                       bool isDisjunction) {
+template <typename Vector>
+vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx, const Vector& clauses, bool isDisjunction) {
     return withNewLabels(ctx, [&](vm::LabelId endLabel, vm::LabelId resultLabel) {
         // Build code fragment for all but the last clause, which is used for the final result
         // branch.
@@ -279,6 +276,48 @@ vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx,
         code.appendLabel(endLabel);
         return code;
     });
+}
+
+vm::CodeFragment EPrimNary::compileDirect(CompileCtx& ctx) const {
+    return buildShortCircuitCode(ctx, _nodes, _op == EPrimNary::logicOr /*isDisjunction*/);
+}
+
+std::vector<DebugPrinter::Block> EPrimNary::debugPrint() const {
+    std::vector<DebugPrinter::Block> ret;
+
+    ret.emplace_back("(`");
+    for (size_t i = 0; i < _nodes.size(); i++) {
+        DebugPrinter::addBlocks(ret, _nodes[i]->debugPrint());
+        if (i != _nodes.size() - 1) {
+            switch (_op) {
+                case EPrimNary::logicAnd:
+                    ret.emplace_back("&&");
+                    break;
+                case EPrimNary::logicOr:
+                    ret.emplace_back("||");
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+    }
+    ret.emplace_back("`)");
+
+    return ret;
+}
+
+size_t EPrimNary::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_nodes);
+}
+
+std::unique_ptr<EExpression> EPrimBinary::clone() const {
+    if (_nodes.size() == 2) {
+        return std::make_unique<EPrimBinary>(_op, _nodes[0]->clone(), _nodes[1]->clone());
+    } else {
+        invariant(_nodes.size() == 3);
+        return std::make_unique<EPrimBinary>(
+            _op, _nodes[0]->clone(), _nodes[1]->clone(), _nodes[2]->clone());
+    }
 }
 
 vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
