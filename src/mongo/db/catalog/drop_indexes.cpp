@@ -90,33 +90,25 @@ MONGO_FAIL_POINT_DEFINE(hangAfterAbortingIndexes);
 // Field name in dropIndexes command for indexes to drop.
 constexpr auto kIndexFieldName = "index"_sd;
 
-Status checkView(OperationContext* opCtx,
-                 const NamespaceString& nss,
-                 const CollectionPtr& collection) {
-    if (!collection) {
-        if (CollectionCatalog::get(opCtx)->lookupView(opCtx, nss)) {
-            return Status(ErrorCodes::CommandNotSupportedOnView,
-                          str::stream()
-                              << "Cannot drop indexes on view " << nss.toStringForErrorMsg());
-        }
+Status checkCollExists(const NamespaceString& nss, const CollectionAcquisition& collAcq) {
+    if (!collAcq.exists()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "ns not found " << nss.toStringForErrorMsg());
     }
     return Status::OK();
 }
 
-Status checkReplState(OperationContext* opCtx,
-                      NamespaceStringOrUUID dbAndUUID,
-                      const CollectionPtr& collection) {
+Status checkReplState(OperationContext* opCtx, const CollectionPtr& collPtr) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    auto canAcceptWrites = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
+    auto canAcceptWrites = replCoord->canAcceptWritesFor(opCtx, collPtr->ns());
     bool writesAreReplicatedAndNotPrimary = opCtx->writesAreReplicated() && !canAcceptWrites;
 
     if (writesAreReplicatedAndNotPrimary) {
-        return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while dropping indexes on database "
-                                    << dbAndUUID.dbName().toStringForErrorMsg()
-                                    << " with collection " << dbAndUUID.uuid());
+        return Status(
+            ErrorCodes::NotWritablePrimary,
+            fmt::format("Not primary while dropping indexes for collection '{}' with UUID {}",
+                        collPtr->ns().toStringForErrorMsg(),
+                        collPtr->uuid().toString()));
     }
 
     return Status::OK();
@@ -430,24 +422,26 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
 }  // namespace
 
 DropIndexesReply dropIndexes(OperationContext* opCtx,
-                             const NamespaceString& nss,
+                             const NamespaceString& origNss,
                              const boost::optional<UUID>& expectedUUID,
                              const IndexArgument& index) {
+
     // We only need to hold an intent lock to send abort signals to the active index builder(s) we
     // intend to abort.
-    boost::optional<AutoGetCollection> collection;
-    collection.emplace(
-        opCtx, nss, MODE_IX, AutoGetCollection::Options{}.expectedUUID(expectedUUID));
+    auto collAcq = boost::make_optional<CollectionAcquisition>(acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, origNss, AcquisitionPrerequisites::OperationType::kRead, expectedUUID),
+        LockMode::MODE_IX));
 
-    uassertStatusOK(checkView(opCtx, nss, collection->getCollection()));
+    uassertStatusOK(checkCollExists(origNss, *collAcq));
+    uassertStatusOK(checkReplState(opCtx, collAcq->getCollectionPtr()));
 
-    const UUID collectionUUID = (*collection)->uuid();
-    const NamespaceStringOrUUID dbAndUUID = {nss.dbName(), collectionUUID};
-    uassertStatusOK(checkReplState(opCtx, dbAndUUID, collection->getCollection()));
+    const UUID collectionUUID = collAcq->uuid();
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(51806,
               "CMD: dropIndexes",
-              logAttrs(nss),
+              logAttrs(collAcq->nss()),
               "uuid"_attr = collectionUUID,
               "indexes"_attr = visit(OverloadedVisitor{[](const std::string& arg) { return arg; },
                                                        [](const std::vector<std::string>& arg) {
@@ -459,13 +453,13 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                                      index));
     }
 
-    if ((*collection)->isClustered() &&
-        containsClusteredIndex(collection->getCollection(), index)) {
+    if (collAcq->getCollectionPtr()->isClustered() &&
+        containsClusteredIndex(collAcq->getCollectionPtr(), index)) {
         uasserted(5979800, "It is illegal to drop the clusteredIndex");
     }
 
     DropIndexesReply reply;
-    reply.setNIndexesWas((*collection)->getIndexCatalog()->numIndexesTotal());
+    reply.setNIndexesWas(collAcq->getCollectionPtr()->getIndexCatalog()->numIndexesTotal());
 
     const bool isWildcard = holds_alternative<std::string>(index) && get<std::string>(index) == "*";
 
@@ -474,22 +468,18 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
     // When releasing the collection lock to send the abort signal to the index builders, it's
     // possible for new index builds to start. Keep aborting in-progress index builds if they
     // satisfy the caller's input.
+    std::vector<std::string> indexNames =
+        uassertStatusOK(getIndexNames(opCtx, collAcq->getCollectionPtr(), index));
+    NamespaceString collNs = collAcq->nss();
+    // Release locks before aborting index builds. The helper will acquire locks on our behalf.
+    collAcq.reset();
+
     std::vector<UUID> abortedIndexBuilders;
-    std::vector<std::string> indexNames;
+    boost::optional<AutoGetCollection> collection;
     while (true) {
-        indexNames = uassertStatusOK(getIndexNames(opCtx, collection->getCollection(), index));
-
-        // Copy the namespace and UUID before dropping locks.
-        auto collUUID = (*collection)->uuid();
-        auto collNs = (*collection)->ns();
-
-        // Release locks before aborting index builds. The helper will acquire locks on our
-        // behalf.
-        collection = boost::none;
-
         // Send the abort signal to any index builders that match the users request. Waits until
         // all aborted builders complete.
-        auto justAborted = abortActiveIndexBuilders(opCtx, collNs, collUUID, indexNames);
+        auto justAborted = abortActiveIndexBuilders(opCtx, collNs, collectionUUID, indexNames);
         abortedIndexBuilders.insert(
             abortedIndexBuilders.end(), justAborted.begin(), justAborted.end());
 
@@ -502,25 +492,31 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         // disk state, which may have changed when we released the lock temporarily.
         shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
+
         // Take an exclusive lock on the collection now to be able to perform index catalog
         // writes when removing ready indexes from disk.
-        collection.emplace(opCtx, dbAndUUID, MODE_X);
+        //
+        // This time we acquire by UUID because we want to be sure to re-acquire the same
+        // collection even if it has been concurrently renamed while the lock was released.
+        //
+        // We don't use acquisition API here because they do not allow to acquire by UUID when the
+        // request has been sent with a ShardVersion.
+        collection.emplace(opCtx, NamespaceStringOrUUID(collNs.dbName(), collectionUUID), MODE_X);
 
-        if (!*collection) {
-            uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream()
-                          << "Collection '" << nss.toStringForErrorMsg() << "' with UUID "
-                          << dbAndUUID.uuid() << " in database "
-                          << dbAndUUID.dbName().toStringForErrorMsg() << " does not exist.");
-        }
+        // If the UUID of the collection changed we fail with NamespcaeNotFound.
+        // The UUID of the collection can change because we released and re-acquired the
+        // collection locks.
+        uassert(ErrorCodes::NamespaceNotFound,
+                fmt::format("UUID for collection '{}' changed during execution of drop index "
+                            "operation. Original UUID {}.",
+                            collNs.toStringForErrorMsg(),
+                            collectionUUID.toString()),
+                *collection);
 
-        // The collection could have been renamed when we dropped locks.
-        collNs = (*collection)->ns();
+        const auto& collPtr = collection->getCollection();
+        uassertStatusOK(checkReplState(opCtx, collPtr));
 
-        uassertStatusOK(checkReplState(opCtx, dbAndUUID, collection->getCollection()));
-
-        // Check to see if a new index build was started that the caller requested to be
-        // aborted.
+        // Check to see if a new index build was started that the caller requested to be aborted.
         bool abortAgain = false;
         if (isWildcard) {
             abortAgain = indexBuildsCoord->inProgForCollection(collectionUUID);
@@ -529,9 +525,16 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         }
 
         if (!abortAgain) {
-            assertNoMovePrimaryInProgress(opCtx, collNs);
+            assertNoMovePrimaryInProgress(opCtx, collPtr->ns());
             break;
         }
+
+        // Before releasing the lock again refresh the variables needed by this loop.
+        indexNames = uassertStatusOK(getIndexNames(opCtx, collPtr, index));
+        // The collection could have been renamed when we dropped locks.
+        collNs = collPtr->ns();
+        // Reelase the lock and loop again.
+        collection.reset();
     }
 
     // Drop any ready indexes that were created while we yielded our locks while aborting using
@@ -540,7 +543,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         // The index catalog requires that no active index builders are running when dropping ready
         // indexes.
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
-        writeConflictRetry(opCtx, "dropIndexes", dbAndUUID, [&] {
+        writeConflictRetry(opCtx, "dropIndexes", (*collection)->ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
 
             // This is necessary to check shard version.
@@ -553,9 +556,9 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             auto writableColl = collWriter.getWritableCollection(opCtx);
             auto indexCatalog = writableColl->getIndexCatalog();
             for (const auto& indexName : indexNames) {
-                auto collDesc =
-                    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-                        ->getCollectionDescription(opCtx);
+                auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(
+                                    opCtx, (*collection)->ns())
+                                    ->getCollectionDescription(opCtx);
                 if (collDesc.isSharded()) {
                     uassert(ErrorCodes::CannotDropShardKeyIndex,
                             "Cannot drop the only compatible index for this collection's shard key",
@@ -595,15 +598,16 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         invariant((*collection)->getIndexCatalog()->numIndexesInProgress() == 0);
     }
 
-    writeConflictRetry(opCtx, "dropIndexes", dbAndUUID, [opCtx, &collection, &indexNames, &reply] {
-        WriteUnitOfWork wunit(opCtx);
+    writeConflictRetry(
+        opCtx, "dropIndexes", (*collection)->ns(), [opCtx, &collection, &indexNames, &reply] {
+            WriteUnitOfWork wunit(opCtx);
 
-        // This is necessary to check shard version.
-        OldClientContext ctx(opCtx, (*collection)->ns());
-        CollectionWriter writer{opCtx, *collection};
-        dropReadyIndexes(opCtx, writer.getWritableCollection(opCtx), indexNames, &reply, false);
-        wunit.commit();
-    });
+            // This is necessary to check shard version.
+            OldClientContext ctx(opCtx, (*collection)->ns());
+            CollectionWriter writer{opCtx, *collection};
+            dropReadyIndexes(opCtx, writer.getWritableCollection(opCtx), indexNames, &reply, false);
+            wunit.commit();
+        });
 
     return reply;
 }
@@ -621,10 +625,14 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                                      cmdObjWithDb);
 
     return writeConflictRetry(opCtx, "dropIndexes", nss, [opCtx, &nss, &cmdObj, &parsed] {
-        AutoGetCollection collection(opCtx, nss, MODE_X);
+        auto collAcq =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+                              LockMode::MODE_X);
 
         // If db/collection does not exist, short circuit and return.
-        Status status = checkView(opCtx, nss, collection.getCollection());
+        Status status = checkCollExists(nss, collAcq);
         if (!status.isOK()) {
             return status;
         }
@@ -636,7 +644,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                   "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
         }
 
-        auto swIndexNames = getIndexNames(opCtx, collection.getCollection(), parsed.getIndex());
+        auto swIndexNames = getIndexNames(opCtx, collAcq.getCollectionPtr(), parsed.getIndex());
         if (!swIndexNames.isOK()) {
             return swIndexNames.getStatus();
         }
@@ -646,7 +654,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
         // This is necessary to check shard version.
         OldClientContext ctx(opCtx, nss);
 
-        CollectionWriter writer{opCtx, collection};
+        CollectionWriter writer{opCtx, &collAcq};
 
         DropIndexesReply ignoredReply;
         dropReadyIndexes(opCtx,
