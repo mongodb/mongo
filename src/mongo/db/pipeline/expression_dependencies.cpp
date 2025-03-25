@@ -79,7 +79,6 @@ public:
     void visit(const ExpressionArrayToObject*) override {}
     void visit(const ExpressionBsonSize*) override {}
     void visit(const ExpressionCeil*) override {}
-    void visit(const ExpressionCoerceToBool*) override {}
     void visit(const ExpressionCompare*) override {}
     void visit(const ExpressionConcat*) override {}
     void visit(const ExpressionConcatArrays*) override {}

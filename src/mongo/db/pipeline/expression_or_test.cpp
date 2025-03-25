@@ -154,10 +154,8 @@ class ConstantNonConstantFalse : public OptimizeBase {
         return BSON("$or" << BSON_ARRAY(0 << "$a"));
     }
     BSONObj expectedOptimized() override {
-        return BSON("$and" << BSON_ARRAY("$a"));
+        return BSON("$or" << BSON_ARRAY("$a"));
     }
-    // note: using $and as serialization of ExpressionCoerceToBool rather than
-    // ExpressionAnd
 };
 
 /** An expression with a field path and '1'. */
@@ -176,7 +174,7 @@ class NonConstantZero : public OptimizeBase {
         return BSON("$or" << BSON_ARRAY("$a" << 0));
     }
     BSONObj expectedOptimized() override {
-        return BSON("$and" << BSON_ARRAY("$a"));
+        return BSON("$or" << BSON_ARRAY("$a"));
     }
 };
 
@@ -219,7 +217,7 @@ class ZeroZeroNonConstant : public OptimizeBase {
         return BSON("$or" << BSON_ARRAY(0 << 0 << "$a"));
     }
     BSONObj expectedOptimized() override {
-        return BSON("$and" << BSON_ARRAY("$a"));
+        return BSON("$or" << BSON_ARRAY("$a"));
     }
 };
 

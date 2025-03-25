@@ -128,68 +128,6 @@ Value valueFromBson(BSONObj obj) {
 }
 
 /* ------------------------- Old-style tests -------------------------- */
-
-namespace CoerceToBool {
-
-/** Dependencies forwarded from nested expression. */
-class Dependencies {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> nested = ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(&expCtx, nested);
-        DepsTracker dependencies;
-        expression::addDependencies(expression.get(), &dependencies);
-        ASSERT_EQUALS(1U, dependencies.fields.size());
-        ASSERT_EQUALS(1U, dependencies.fields.count("a.b"));
-        ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.getNeedsAnyMetadata());
-    }
-};
-
-/** Output to BSONObj. */
-class AddToBsonObj {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(
-            &expCtx, ExpressionFieldPath::deprecatedCreate(&expCtx, "foo"));
-
-        // serialized as $and because CoerceToBool isn't an ExpressionNary
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{field:{$and:['$foo']}}"), toBsonObj(expression));
-    }
-
-private:
-    static BSONObj toBsonObj(const intrusive_ptr<Expression>& expression) {
-        return BSON("field" << expression->serialize());
-    }
-};
-
-/** Output to BSONArray. */
-class AddToBsonArray {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(
-            &expCtx, ExpressionFieldPath::deprecatedCreate(&expCtx, "foo"));
-
-        // serialized as $and because CoerceToBool isn't an ExpressionNary
-        ASSERT_BSONOBJ_BINARY_EQ(BSON_ARRAY(fromjson("{$and:['$foo']}")), toBsonArray(expression));
-    }
-
-private:
-    static BSONArray toBsonArray(const intrusive_ptr<Expression>& expression) {
-        BSONArrayBuilder bab;
-        bab << expression->serialize();
-        return bab.arr();
-    }
-};
-
-// TODO Test optimize(), difficult because a CoerceToBool cannot be output as
-// BSON.
-
-}  // namespace CoerceToBool
-
 namespace Constant {
 
 /** No optimization is performed. */
@@ -1216,10 +1154,6 @@ public:
     All() : OldStyleSuiteSpecification("expression") {}
 
     void setupTests() override {
-        add<CoerceToBool::Dependencies>();
-        add<CoerceToBool::AddToBsonObj>();
-        add<CoerceToBool::AddToBsonArray>();
-
         add<Constant::Optimize>();
         add<Constant::Dependencies>();
         add<Constant::AddToBsonObj>();

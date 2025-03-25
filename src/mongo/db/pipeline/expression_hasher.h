@@ -287,10 +287,6 @@ public:
         combine(OpType::kCeil);
     }
 
-    void visit(const ExpressionCoerceToBool* expr) final {
-        combine(OpType::kCoerceToBool);
-    }
-
     void visit(const ExpressionCompare* expr) final {
         combine(OpType::kCompare, expr->getOp());
     }

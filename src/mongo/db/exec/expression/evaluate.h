@@ -309,12 +309,6 @@ inline Value evaluate(const ExpressionAnd& expr, const Document& root, Variables
 Value evaluate(const ExpressionAllElementsTrue& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionAnyElementTrue& expr, const Document& root, Variables* variables);
 
-inline Value evaluate(const ExpressionCoerceToBool& expr,
-                      const Document& root,
-                      Variables* variables) {
-    return Value(expr.getExpression()->evaluate(root, variables).coerceToBool());
-}
-
 inline Value evaluate(const ExpressionCompare& expr, const Document& root, Variables* variables) {
     const auto& children = expr.getChildren();
     int cmp = expr.getExpressionContext()->getValueComparator().compare(

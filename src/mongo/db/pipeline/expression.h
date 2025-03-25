@@ -1093,35 +1093,6 @@ private:
     }
 };
 
-
-class ExpressionCoerceToBool final : public Expression {
-public:
-    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(const SerializationOptions& options = {}) const final;
-
-    static boost::intrusive_ptr<ExpressionCoerceToBool> create(
-        ExpressionContext* expCtx, boost::intrusive_ptr<Expression> pExpression);
-
-    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
-        return visitor->visit(this);
-    }
-
-    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
-        return visitor->visit(this);
-    }
-
-    const Expression* getExpression() const {
-        return _children[_kExpression].get();
-    }
-
-private:
-    ExpressionCoerceToBool(ExpressionContext* expCtx, boost::intrusive_ptr<Expression> pExpression);
-
-    static constexpr size_t _kExpression = 0;
-};
-
-
 class ExpressionCompare final : public ExpressionFixedArity<ExpressionCompare, 2> {
 public:
     /**

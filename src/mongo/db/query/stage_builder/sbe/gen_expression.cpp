@@ -294,7 +294,6 @@ public:
     void visit(const ExpressionArrayToObject* expr) final {}
     void visit(const ExpressionBsonSize* expr) final {}
     void visit(const ExpressionCeil* expr) final {}
-    void visit(const ExpressionCoerceToBool* expr) final {}
     void visit(const ExpressionCompare* expr) final {}
     void visit(const ExpressionConcat* expr) final {}
     void visit(const ExpressionConcatArrays* expr) final {}
@@ -460,7 +459,6 @@ public:
     void visit(const ExpressionArrayToObject* expr) final {}
     void visit(const ExpressionBsonSize* expr) final {}
     void visit(const ExpressionCeil* expr) final {}
-    void visit(const ExpressionCoerceToBool* expr) final {}
     void visit(const ExpressionCompare* expr) final {}
     void visit(const ExpressionConcat* expr) final {}
     void visit(const ExpressionConcatArrays* expr) final {}
@@ -982,11 +980,6 @@ public:
 
         pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(ceilExpr)));
-    }
-    void visit(const ExpressionCoerceToBool* expr) final {
-        // Since $coerceToBool is internal-only and there are not yet any input expressions that
-        // generate an ExpressionCoerceToBool expression, we will leave it as unreachable for now.
-        MONGO_UNREACHABLE;
     }
     void visit(const ExpressionCompare* expr) final {
         _context->ensureArity(2);

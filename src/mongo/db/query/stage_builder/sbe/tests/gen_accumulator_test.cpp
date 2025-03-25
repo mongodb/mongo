@@ -2314,13 +2314,8 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
 
 TEST_F(SbeStageBuilderGroupTest, SbeIncompatibleExpressionInGroup) {
     std::vector<std::string> testCases = {
-        R"(_id: {$and: ["$a", true]})",
-        R"(_id: {$or: ["$a", false]})",
-        R"(_id: null, x: {$sum: {$and: ["$a", true]}})",
-        R"(_id: null, x: {$sum: {$or: ["$a", false]}})",
-        R"(_id: null, x: {$sum: {$add: ["$b", {$and: ["$a", true]}]}})",
-        R"(_id: null, x: {$sum: {$add: ["$b", {$or: ["$a", false]}]}})",
-    };
+        R"(_id: null, x: {$sum: {$convert: {to: 'int', input: '$_id', onError: 'NULL'}}})",
+        R"(_id: {$map: {input: '$_id', as: 'y', in: {z: {$sum: ['$$y', 1]}}}})"};
 
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     for (const auto& testCase : testCases) {

@@ -55,7 +55,6 @@ class ExpressionObjectToArray;
 class ExpressionArrayToObject;
 class ExpressionBsonSize;
 class ExpressionCeil;
-class ExpressionCoerceToBool;
 class ExpressionCompare;
 class ExpressionConcat;
 class ExpressionConcatArrays;
@@ -243,7 +242,6 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArrayToObject>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBsonSize>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCeil>) = 0;
-    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCoerceToBool>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCompare>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionConcat>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionConcatArrays>) = 0;
@@ -444,7 +442,6 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionArrayToObject*) override {}
     void visit(const ExpressionBsonSize*) override {}
     void visit(const ExpressionCeil*) override {}
-    void visit(const ExpressionCoerceToBool*) override {}
     void visit(const ExpressionCompare*) override {}
     void visit(const ExpressionConcat*) override {}
     void visit(const ExpressionConcatArrays*) override {}

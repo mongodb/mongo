@@ -230,8 +230,6 @@ class ConstantNonConstantTrue : public OptimizeBase {
     BSONObj expectedOptimized() override {
         return BSON("$and" << BSON_ARRAY("$a"));
     }
-    // note: using $and as serialization of ExpressionCoerceToBool rather than
-    // ExpressionAnd
 };
 
 class ConstantNonConstantFalse : public OptimizeBase {

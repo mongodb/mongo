@@ -448,18 +448,6 @@ intrusive_ptr<Expression> ExpressionAnd::optimize() {
     }
 
     /*
-      If we got here, the final operand was true, so we don't need it
-      anymore.  If there was only one other operand, we don't need the
-      conjunction either.  Note we still need to keep the promise that
-      the result will be a boolean.
-     */
-    if (n == 2) {
-        intrusive_ptr<Expression> pFinal(
-            ExpressionCoerceToBool::create(getExpressionContext(), std::move(pAnd->_children[0])));
-        return pFinal;
-    }
-
-    /*
       Remove the final "true" value, and return the new expression.
 
       CW TODO:
@@ -614,44 +602,6 @@ Value ExpressionCeil::evaluate(const Document& root, Variables* variables) const
 REGISTER_STABLE_EXPRESSION(ceil, ExpressionCeil::parse);
 const char* ExpressionCeil::getOpName() const {
     return "$ceil";
-}
-
-/* -------------------- ExpressionCoerceToBool ------------------------- */
-
-intrusive_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
-    ExpressionContext* const expCtx, intrusive_ptr<Expression> pExpression) {
-    return new ExpressionCoerceToBool(expCtx, std::move(pExpression));
-}
-
-ExpressionCoerceToBool::ExpressionCoerceToBool(ExpressionContext* const expCtx,
-                                               intrusive_ptr<Expression> pExpression)
-    : Expression(expCtx, {std::move(pExpression)}) {
-    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-}
-
-intrusive_ptr<Expression> ExpressionCoerceToBool::optimize() {
-    /* optimize the operand */
-    _children[_kExpression] = _children[_kExpression]->optimize();
-
-    /* if the operand already produces a boolean, then we don't need this */
-    /* LATER - Expression to support a "typeof" query? */
-    Expression* pE = _children[_kExpression].get();
-    if (dynamic_cast<ExpressionAnd*>(pE) || dynamic_cast<ExpressionOr*>(pE) ||
-        dynamic_cast<ExpressionNot*>(pE) || dynamic_cast<ExpressionCoerceToBool*>(pE))
-        return _children[_kExpression];
-
-    return intrusive_ptr<Expression>(this);
-}
-
-Value ExpressionCoerceToBool::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
-}
-
-Value ExpressionCoerceToBool::serialize(const SerializationOptions& options) const {
-    // When not explaining, serialize to an $and expression. When parsed, the $and expression
-    // will be optimized back into a ExpressionCoerceToBool.
-    const char* name = options.verbosity ? "$coerceToBool" : "$and";
-    return Value(DOC(name << DOC_ARRAY(_children[_kExpression]->serialize(options))));
 }
 
 /* ----------------------- ExpressionCompare --------------------------- */
@@ -2680,18 +2630,6 @@ intrusive_ptr<Expression> ExpressionOr::optimize() {
     if (last) {
         intrusive_ptr<ExpressionConstant> pFinal(
             ExpressionConstant::create(getExpressionContext(), Value(true)));
-        return pFinal;
-    }
-
-    /*
-      If we got here, the final operand was false, so we don't need it
-      anymore.  If there was only one other operand, we don't need the
-      conjunction either.  Note we still need to keep the promise that
-      the result will be a boolean.
-     */
-    if (n == 2) {
-        intrusive_ptr<Expression> pFinal(
-            ExpressionCoerceToBool::create(getExpressionContext(), std::move(pOr->_children[0])));
         return pFinal;
     }
 

@@ -548,12 +548,11 @@ explain = coll.explain().aggregate([
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
 assert(explain.stages[1].hasOwnProperty("$group"));
 
-// Another case of supported group and then a group with no supported accumulators. A boolean
-// expression may be translated to an internal expression $coerceToBool which is not supported by
-// SBE.
+// Another case of supported group and then a group with no supported accumulators. $convert is not
+// supported by SBE.
 explain = coll.explain().aggregate([
     {$group: {_id: "$item", s: {$sum: "$price"}}},
-    {$group: {_id: "$quantity", c: {$sum: {$and: ["$a", true]}}}}
+    {$group: {_id: "$quantity", x: {$sum: {$convert: {to: 'int', input: '$_id', onError: 'NULL'}}}}}
 ]);
 
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);

@@ -49,24 +49,6 @@ namespace expression_evaluation_test {
 
 using boost::intrusive_ptr;
 
-/* ------------------------ CoerceToBool -------------------- */
-
-TEST(ExpressionCoerceToBoolTest, EvaluateTrue) {
-    /** Nested expression coerced to true. */
-    auto expCtx = ExpressionContextForTest{};
-    intrusive_ptr<Expression> nested = ExpressionConstant::create(&expCtx, Value(5));
-    intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(&expCtx, nested);
-    ASSERT(expression->evaluate({}, &expCtx.variables).getBool());
-}
-
-TEST(ExpressionCoerceToBoolTest, EvaluateFalse) {
-    /** Nested expression coerced to false. */
-    auto expCtx = ExpressionContextForTest{};
-    intrusive_ptr<Expression> nested = ExpressionConstant::create(&expCtx, Value(0));
-    intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(&expCtx, nested);
-    ASSERT(!expression->evaluate({}, &expCtx.variables).getBool());
-}
-
 namespace all_any_elements {
 void runTest(Document spec) {
     auto expCtx = ExpressionContextForTest{};
