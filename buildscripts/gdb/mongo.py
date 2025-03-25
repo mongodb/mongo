@@ -20,7 +20,6 @@ def detect_toolchain(progspace):
     readelf_bin = "readelf"
     for path in [
         "/opt/mongodbtoolchain/v5/bin/llvm-readelf",
-        "/opt/mongodbtoolchain/v4/bin/llvm-readelf",  # TODO(SERVER-97447): Remove.
     ]:
         if os.path.exists(path):
             readelf_bin = path

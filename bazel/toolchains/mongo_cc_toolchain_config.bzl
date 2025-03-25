@@ -772,25 +772,11 @@ def _impl(ctx):
     # inconsistent interference sizes between builds should not affect correctness.
     no_interference_size_warning_feature = feature(
         name = "no_interference_size_warning",
-        enabled = True,
+        enabled = ctx.attr.compiler == "gcc",
         flag_sets = [
             flag_set(
                 actions = all_cpp_compile_actions,
                 flag_groups = [flag_group(flags = ["-Wno-interference-size"])],
-            ),
-        ],
-    )
-
-    # TODO(SERVER-97447): Remove this once we're fully on the v5 toolchain.
-    # In the meantime, we need to suppress some warnings that are only
-    # recognized by the new compilers.
-    no_unknown_warning_option_feature = feature(
-        name = "no_unknown_warning_option",
-        enabled = ctx.attr.compiler == "clang",
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = ["-Wno-unknown-warning-option"])],
             ),
         ],
     )
@@ -882,7 +868,6 @@ def _impl(ctx):
         no_invalid_offsetof_warning_feature,
         no_class_memaccess_warning_feature,
         no_interference_size_warning_feature,
-        no_unknown_warning_option_feature,
         disable_warnings_for_third_party_libraries_clang_feature,
         disable_warnings_for_third_party_libraries_gcc_feature,
     ]
