@@ -222,29 +222,30 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
                 try {
                     opCtxPtr = client->makeOperationContext();
                     opCtxPtr->setEnforceConstraints(false);
-                    auto opCtx = opCtxPtr.get();
+                    auto collectionOpCtx = opCtxPtr.get();
 
                     ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
-                        opCtx, AdmissionContext::Priority::kExempt);
+                        collectionOpCtx, AdmissionContext::Priority::kExempt);
 
                     // Set a secondaryOk=true read preference because some collections run commands
                     // such as aggregation which are AllowedOnSecondary::kOptIn.
-                    ReadPreferenceSetting::get(opCtx) =
+                    ReadPreferenceSetting::get(collectionOpCtx) =
                         ReadPreferenceSetting{ReadPreference::Nearest};
 
-                    // If we are running router collectors, we need to make sure that the opCtx
-                    // points to the router service.
+                    // If we are running router collectors, we need to make sure that the
+                    // collectionOpCtx points to the router service.
                     boost::optional<replica_set_endpoint::ScopedSetRouterService>
                         scopedRouterService;
                     if (collector.role.has(ClusterRole::RouterServer) &&
-                        !opCtx->getService()->role().has(ClusterRole::RouterServer)) {
-                        scopedRouterService.emplace(opCtx);
+                        !collectionOpCtx->getService()->role().has(ClusterRole::RouterServer)) {
+                        scopedRouterService.emplace(collectionOpCtx);
                     }
 
-                    collectorBuilder.appendDate(kFTDCCollectStartField, getCurrentDate(opCtx));
-                    collector.collectFn(opCtx, &collectorBuilder);
-                    collectorBuilder.appendDate(kFTDCCollectEndField, getCurrentDate(opCtx));
-
+                    collectorBuilder.appendDate(kFTDCCollectStartField,
+                                                getCurrentDate(collectionOpCtx));
+                    collector.collectFn(collectionOpCtx, &collectorBuilder);
+                    collectorBuilder.appendDate(kFTDCCollectEndField,
+                                                getCurrentDate(collectionOpCtx));
                 } catch (const DBException& e) {
                     LOGV2_WARNING(
                         10179600, "Collector threw an error", "collector"_attr = it->first);
