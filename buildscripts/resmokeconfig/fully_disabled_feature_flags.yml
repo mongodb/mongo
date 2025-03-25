@@ -29,3 +29,5 @@
 - featureFlagSnapshotFCVInDDLCoordinators
 # TODO SERVER-101589: start testing viewless timeseries in allFeatureFlag variant
 - featureFlagCreateViewlessTimeseriesCollections
+# TODO SERVER-67034: enable featureFlagSbeFull
+- featureFlagSbeFull

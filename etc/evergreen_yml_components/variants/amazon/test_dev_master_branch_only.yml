@@ -227,6 +227,41 @@ buildvariants:
           - amazon2023-arm64-latest-large
       - name: .fuzzer_deterministic !.multiversion
 
+  # TODO SERVER-67034: remove this variant.
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2-arm64-all-feature-flags-sbe-full
+    display_name: "Amazon Linux 2 arm64 Atlas Enterprise SBE full"
+    tags: ["experimental"]
+    cron: "0 0 * * *" # Run once a day.
+    expansions:
+      <<: *amazon_linux2023_arm64_dynamic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      target_resmoke_time: 10
+      max_sub_suites: 5
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --additionalFeatureFlags "featureFlagSbeFull"
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-large
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-large
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-large
+      - name: .fuzzer_deterministic
+
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-fuzzers
     display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Fuzzers"
