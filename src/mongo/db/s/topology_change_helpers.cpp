@@ -632,49 +632,17 @@ void removeAllClusterParametersFromReplicaSet(
 
 }  // namespace
 
-namespace add_shard_util {
+namespace topology_change_helpers {
 
-ShardsvrAddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
-    ShardsvrAddShard addShardCmd;
-    addShardCmd.setDbName(DatabaseName::kAdmin);
-
-    ShardIdentity shardIdentity;
+ShardIdentityType createShardIdentity(OperationContext* opCtx, const ShardId& shardName) {
+    ShardIdentityType shardIdentity;
     shardIdentity.setShardName(shardName.toString());
     shardIdentity.setClusterId(ClusterIdentityLoader::get(opCtx)->getClusterId());
     shardIdentity.setConfigsvrConnectionString(
         repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString());
 
-    addShardCmd.setShardIdentity(shardIdentity);
-    return addShardCmd;
+    return shardIdentity;
 }
-
-BSONObj createShardIdentityUpsertForAddShard(const ShardsvrAddShard& addShardCmd,
-                                             const WriteConcernOptions& wc) {
-    // TODO SERVER-88742 Just use write_ops::UpdateCommandRequest
-    BatchedCommandRequest request([&] {
-        write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(BSON("_id" << kShardIdentityDocumentId));
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                addShardCmd.getShardIdentity().toBSON()));
-            entry.setUpsert(true);
-            return entry;
-        }()});
-
-        return updateOp;
-    }());
-
-    // Add the WC to the serialized BatchedCommandRequest.
-    BSONObjBuilder cmdObjBuilder;
-    request.serialize(&cmdObjBuilder);
-    cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField, wc.toBSON());
-    return cmdObjBuilder.obj();
-}
-
-}  // namespace add_shard_util
-
-namespace topology_change_helpers {
 
 long long getRangeDeletionCount(OperationContext* opCtx) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
@@ -1177,14 +1145,16 @@ std::string createShardName(OperationContext* opCtx,
     return selectedName;
 }
 
-void createShardIdentity(
+void installShardIdentity(
     OperationContext* opCtx,
+    const ShardIdentityType& identity,
     RemoteCommandTargeter& targeter,
-    const std::string& shardName,
     boost::optional<APIParameters> apiParameters,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor) {
-    ShardsvrAddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardName);
+    ShardsvrAddShard addShardCmd;
+    addShardCmd.setDbName(DatabaseName::kAdmin);
+    addShardCmd.setShardIdentity(identity);
 
     if (apiParameters) {
         apiParameters->setInfo(addShardCmd);
@@ -1198,6 +1168,43 @@ void createShardIdentity(
     auto response = runCommandForAddShard(
         opCtx, targeter, DatabaseName::kAdmin, addShardCmd.toBSON(), executor);
     uassertStatusOK(response.commandStatus);
+}
+
+bool installShardIdentity(OperationContext* opCtx, const ShardIdentityType& identity) {
+    BSONObj newIdentity = identity.toShardIdentityDocument();
+
+    write_ops::InsertCommandRequest insertOp(NamespaceString::kServerConfigurationNamespace);
+    insertOp.setDocuments({newIdentity});
+    BSONObjBuilder cmdObjBuilder;
+    insertOp.serialize(&cmdObjBuilder);
+    cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField,
+                         ShardingCatalogClient::kLocalWriteConcern.toBSON());
+
+    DBDirectClient localClient(opCtx);
+
+    BSONObj res;
+    localClient.runCommand(DatabaseName::kAdmin, cmdObjBuilder.obj(), res);
+    const auto status = getStatusFromWriteCommandReply(res);
+    if (status.code() != ErrorCodes::DuplicateKey) {
+        uassertStatusOK(status);
+        return true;
+    }
+
+    // If we have a duplicate key, that means, we already have a shardIdentity document. If
+    // so, we only allow it to be the very same as the one in the command, otherwise a
+    // cluster could steal an other cluster's shard without the former knowing it.
+    const auto existingIdentity = localClient.findOne(
+        NamespaceString::kServerConfigurationNamespace, BSON("_id" << identity.IdName));
+
+    invariant(!existingIdentity.isEmpty());
+
+    uassert(ErrorCodes::IllegalOperation,
+            "Shard already has an identity that differs",
+            newIdentity.woCompare(existingIdentity,
+                                  {},
+                                  BSONObj::ComparisonRules::kConsiderFieldName |
+                                      BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0);
+    return false;
 }
 
 void setClusterParametersOnReplicaSet(

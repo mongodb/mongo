@@ -65,45 +65,6 @@
 namespace mongo {
 namespace {
 
-bool writeShardIdentityLocal(OperationContext* opCtx, const ShardsvrAddShard& request) {
-    BSONObj newIdentity = request.getShardIdentity().toBSON().addFields(
-        BSON("_id" << add_shard_util::kShardIdentityDocumentId));
-
-    write_ops::InsertCommandRequest insertOp(NamespaceString::kServerConfigurationNamespace);
-    insertOp.setDocuments({newIdentity});
-    BSONObjBuilder cmdObjBuilder;
-    insertOp.serialize(&cmdObjBuilder);
-    cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField,
-                         ShardingCatalogClient::kLocalWriteConcern.toBSON());
-
-    DBDirectClient localClient(opCtx);
-
-    BSONObj res;
-    localClient.runCommand(DatabaseName::kAdmin, cmdObjBuilder.obj(), res);
-    const auto status = getStatusFromWriteCommandReply(res);
-    if (status.code() != ErrorCodes::DuplicateKey) {
-        uassertStatusOK(status);
-        return true;
-    }
-
-    // If we have a duplicate key, that means, we already have a shardIdentity document. If
-    // so, we only allow it to be the very same as the one in the command, otherwise a
-    // cluster could steal an other cluster's shard without the former knowing it.
-    const auto existingIdentity =
-        localClient.findOne(NamespaceString::kServerConfigurationNamespace,
-                            BSON("_id" << add_shard_util::kShardIdentityDocumentId));
-
-    invariant(!existingIdentity.isEmpty());
-
-    uassert(ErrorCodes::IllegalOperation,
-            "Shard already has an identity that differs",
-            newIdentity.woCompare(existingIdentity,
-                                  {},
-                                  BSONObj::ComparisonRules::kConsiderFieldName |
-                                      BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0);
-    return false;
-}
-
 void writeNoopEntryLocal(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     client.update(NamespaceString::kServerConfigurationNamespace,
@@ -163,7 +124,8 @@ public:
             // another session. Doing this instantiates the grid locally which allows us to wait
             // for majority on an AlternativeClientRegion without having to create a separate
             // executor.
-            bool wroteSomething = writeShardIdentityLocal(opCtx, addShardCmd);
+            bool wroteSomething = topology_change_helpers::installShardIdentity(
+                opCtx, addShardCmd.getShardIdentity());
 
             // If the write of the shard identity document didn't actually write anything (the
             // document already existed) then we need to do a noop write so that we have something

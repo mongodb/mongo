@@ -135,12 +135,11 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     apiParameters = APIParameters::fromBSON(params.value());
                 }
 
-                topology_change_helpers::createShardIdentity(opCtx,
-                                                             targeter,
-                                                             _doc.getChosenName()->toString(),
-                                                             apiParameters,
-                                                             _osiGenerator(),
-                                                             **executor);
+                const auto shardIdentity = topology_change_helpers::createShardIdentity(
+                    opCtx, _doc.getChosenName()->toString());
+
+                topology_change_helpers::installShardIdentity(
+                    opCtx, shardIdentity, targeter, apiParameters, _osiGenerator(), **executor);
 
                 _standardizeClusterParameters(opCtx, executor);
             }))

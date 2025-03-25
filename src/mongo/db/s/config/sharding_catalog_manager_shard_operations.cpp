@@ -457,29 +457,9 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogManager::_getCollListFrom
 
 void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx) {
     invariant(!ShardingState::get(opCtx)->enabled());
-
-    // Insert a shard identity document. Note we insert with local write concern, so the shard
-    // identity may roll back, which will trigger an fassert to clear the in-memory sharding state.
-    {
-        auto addShardCmd = add_shard_util::createAddShardCmd(opCtx, ShardId::kConfigServerId);
-
-        auto shardIdUpsertCmd = add_shard_util::createShardIdentityUpsertForAddShard(
-            addShardCmd, ShardingCatalogClient::kLocalWriteConcern);
-
-        // A request dispatched through a local client is served within the same thread that submits
-        // it (so that the opCtx needs to be used as the vehicle to pass the WC to the
-        // ServiceEntryPoint).
-        const auto originalWC = opCtx->getWriteConcern();
-        ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
-        opCtx->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
-
-        DBDirectClient localClient(opCtx);
-        BSONObj res;
-
-        localClient.runCommand(DatabaseName::kAdmin, shardIdUpsertCmd, res);
-
-        uassertStatusOK(getStatusFromWriteCommandReply(res));
-    }
+    const auto identity =
+        topology_change_helpers::createShardIdentity(opCtx, ShardId::kConfigServerId);
+    topology_change_helpers::installShardIdentity(opCtx, identity);
 }
 
 Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterAddShardIfNeeded(
@@ -688,8 +668,10 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         }
 
         try {
-            topology_change_helpers::createShardIdentity(
-                opCtx, *targeter, shardName, boost::none, boost::none, _executorForAddShard);
+            const auto shardIdentity =
+                topology_change_helpers::createShardIdentity(opCtx, shardName);
+            topology_change_helpers::installShardIdentity(
+                opCtx, shardIdentity, *targeter, boost::none, boost::none, _executorForAddShard);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }

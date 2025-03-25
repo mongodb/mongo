@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/remove_shard_draining_progress_gen.h"
+#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -64,30 +65,6 @@ class BSONObj;
 class OperationContext;
 
 class ShardId;
-
-// Contains a collection of utility functions relating to the addShard command
-namespace add_shard_util {
-
-/*
- * The _id value for shard identity documents
- */
-constexpr StringData kShardIdentityDocumentId = "shardIdentity"_sd;
-
-/**
- * Creates an ShardsvrAddShard command object that's sent from the config server to
- * a mongod to instruct it to initialize itself as a shard in the cluster.
- */
-ShardsvrAddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName);
-
-/**
- * Returns a BSON representation of an update request that can be used to insert a shardIdentity
- * doc into the shard with the given shardName (or update the shard's existing shardIdentity
- * doc's configsvrConnString if the _id, shardName, and clusterId do not conflict).
- */
-BSONObj createShardIdentityUpsertForAddShard(const ShardsvrAddShard& addShardCmd,
-                                             const WriteConcernOptions& wc);
-
-}  // namespace add_shard_util
 
 // TODO (SERVER-97816): remove these helpers and move the implementations into the add/remove shard
 // coordinators once 9.0 becomes last LTS.
@@ -198,16 +175,30 @@ std::string createShardName(OperationContext* opCtx,
                             bool isConfigShard,
                             const boost::optional<StringData>& proposedShardName,
                             std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Creates a ShardIdentity
+ */
+ShardIdentityType createShardIdentity(OperationContext* opCtx, const ShardId& shardName);
+
 /**
  * Issues a command on the remote host to insert a shard identity document
  */
-void createShardIdentity(
+void installShardIdentity(
     OperationContext* opCtx,
+    const ShardIdentityType& identity,
     RemoteCommandTargeter& targeter,
-    const std::string& shardName,
     boost::optional<APIParameters> apiParameters,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Installs a shard identity locally.
+ * If a shard identity already exists, check if the new one is the same. If not, throws an
+ * IllegalOperation.
+ * Returns true if a new shard identity installed, false otherwise.
+ */
+bool installShardIdentity(OperationContext* opCtx, const ShardIdentityType& identity);
 
 /**
  * Remove all existing cluster parameters on the replica set and sets the ones stored on the config
