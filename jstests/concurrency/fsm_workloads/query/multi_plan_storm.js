@@ -3,7 +3,7 @@
  * queries in the test are range queries which means that a cached plan can be frequently
  * invalidated.
  * @tags: [
- *  requires_fcv_81,
+ *  requires_fcv_82,
  *  requires_getmore,
  *  incompatible_with_concurrency_simultaneous,
  * ]
@@ -12,7 +12,7 @@ export const $config = (function() {
     const data = {
         numDocs: 20000,
         numUniqueKeys: 100,
-        concurrentMultiplanningThresholdOriginalValues: [],
+        concurrentMultiPlanningThresholdOriginalValues: [],
     };
 
     const states = {
@@ -30,13 +30,13 @@ export const $config = (function() {
     const transitions = {query: {query: 1}};
 
     function setup(db, collName, cluster) {
-        // Forcing the multiplanning rate limiter.
+        // Forcing the multi-planning rate limiter.
         cluster.executeOnMongodNodes(db => {
             const originalParamValue = assert.commandWorked(db.adminCommand(
                 {getParameter: 1, internalQueryConcurrentMultiPlanningThreshold: 1}));
             assert.commandWorked(db.adminCommand(
                 {setParameter: 1, internalQueryConcurrentMultiPlanningThreshold: 5}));
-            this.concurrentMultiplanningThresholdOriginalValues[db.getMongo().host] =
+            this.concurrentMultiPlanningThresholdOriginalValues[db.getMongo().host] =
                 originalParamValue.internalQueryConcurrentMultiPlanningThreshold;
         });
 
@@ -65,7 +65,7 @@ export const $config = (function() {
             assert.commandWorked(db.adminCommand({
                 setParameter: 1,
                 internalQueryConcurrentMultiPlanningThreshold:
-                    this.concurrentMultiplanningThresholdOriginalValues[db.getMongo().host]
+                    this.concurrentMultiPlanningThresholdOriginalValues[db.getMongo().host]
             }));
         });
     }
