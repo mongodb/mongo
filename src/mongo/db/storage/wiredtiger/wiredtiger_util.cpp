@@ -94,7 +94,7 @@ StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
 
 using std::string;
 
-void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
+void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerSession& session,
                                            const std::string& tableUri,
                                            std::string* type,
                                            std::string* source) {
@@ -102,7 +102,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
     const size_t colon = tableUri.find(':');
     invariant(colon != string::npos);
     colgroupUri += tableUri.substr(colon);
-    StatusWith<std::string> colgroupResult = getMetadataCreate(ru, colgroupUri);
+    StatusWith<std::string> colgroupResult = getMetadataCreate(session, colgroupUri);
     invariant(colgroupResult.getStatus());
     WiredTigerConfigParser parser(colgroupResult.getValue());
 
@@ -137,11 +137,6 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& ses
     return _getMetadata(cursor, uri);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit& ru,
-                                                          StringData uri) {
-    return getMetadataCreate(*ru.getSessionNoTxn(), uri);
-}
-
 StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, StringData uri) {
     WT_CURSOR* cursor = nullptr;
     try {
@@ -161,14 +156,10 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, 
     return _getMetadata(cursor, uri);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerRecoveryUnit& ru, StringData uri) {
-    return getMetadata(*ru.getSessionNoTxn(), uri);
-}
-
-Status WiredTigerUtil::getApplicationMetadata(WiredTigerRecoveryUnit& ru,
+Status WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
                                               StringData uri,
                                               BSONObjBuilder* bob) {
-    StatusWith<std::string> metadataResult = getMetadata(ru, uri);
+    StatusWith<std::string> metadataResult = getMetadata(session, uri);
     if (!metadataResult.isOK()) {
         return metadataResult.getStatus();
     }
@@ -219,10 +210,10 @@ Status WiredTigerUtil::getApplicationMetadata(WiredTigerRecoveryUnit& ru,
     return Status::OK();
 }
 
-StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(WiredTigerRecoveryUnit& ru,
+StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
                                                            StringData uri) {
     BSONObjBuilder bob;
-    Status status = getApplicationMetadata(ru, uri, &bob);
+    Status status = getApplicationMetadata(session, uri, &bob);
     if (!status.isOK()) {
         return StatusWith<BSONObj>(status);
     }
@@ -230,8 +221,8 @@ StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(WiredTigerRecoveryUni
 }
 
 StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(
-    WiredTigerRecoveryUnit& ru, StringData uri, int64_t minimumVersion, int64_t maximumVersion) {
-    StatusWith<std::string> result = getMetadata(ru, uri);
+    WiredTigerSession& session, StringData uri, int64_t minimumVersion, int64_t maximumVersion) {
+    StatusWith<std::string> result = getMetadata(session, uri);
     if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
         return result.getStatus();
     }
@@ -394,13 +385,13 @@ int64_t WiredTigerUtil::getIdentSize(WiredTigerSession& s, const std::string& ur
     return result.getValue();
 }
 
-int64_t WiredTigerUtil::getEphemeralIdentSize(WiredTigerSession& s, const std::string& uri) {
+int64_t WiredTigerUtil::getEphemeralIdentSize(WiredTigerSession& session, const std::string& uri) {
     // For ephemeral case, use cursor statistics
     const auto statsUri = "statistics:" + uri;
 
     // Helper function to retrieve stats and check for errors
     auto getStats = [&](int key) -> int64_t {
-        auto result = getStatisticsValue(s, statsUri, "statistics=(fast)", key);
+        auto result = getStatisticsValue(session, statsUri, "statistics=(fast)", key);
         if (!result.isOK()) {
             if (result.getStatus().code() == ErrorCodes::CursorNotFound)
                 return 0;  // ident gone, so return 0
@@ -425,17 +416,17 @@ int64_t WiredTigerUtil::getEphemeralIdentSize(WiredTigerSession& s, const std::s
     return numEntries * bytesPerEntry;
 }
 
-int64_t WiredTigerUtil::getIdentReuseSize(WiredTigerSession& s, const std::string& uri) {
+int64_t WiredTigerUtil::getIdentReuseSize(WiredTigerSession& session, const std::string& uri) {
     auto result = WiredTigerUtil::getStatisticsValue(
-        s, "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_REUSE_BYTES);
+        session, "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_REUSE_BYTES);
     uassertStatusOK(result.getStatus());
     return result.getValue();
 }
 
-int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WiredTigerSession& s,
+int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WiredTigerSession& session,
                                                              const std::string& uri) {
     auto result =
-        WiredTigerUtil::getStatisticsValue(s,
+        WiredTigerUtil::getStatisticsValue(session,
                                            "statistics:" + uri,
                                            "statistics=(fast)",
                                            WT_STAT_DSRC_BTREE_COMPACT_BYTES_REWRITTEN_EXPECTED);
@@ -764,30 +755,30 @@ int WiredTigerUtil::ErrorAccumulator::onError(WT_EVENT_HANDLER* handler,
     }
 }
 
-int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
+int WiredTigerUtil::verifyTable(WiredTigerSession& session,
                                 const std::string& uri,
                                 const boost::optional<std::string>& configurationOverride,
                                 StringSet* errors) {
     ErrorAccumulator eventHandler(errors);
 
     // Try to close as much as possible to avoid EBUSY errors.
-    ru.getSession()->closeAllCursors(uri);
-    WiredTigerConnection* connection = ru.getConnection();
+    session.closeAllCursors(uri);
+    WiredTigerConnection& connection = session.getConnection();
 
     // Open a new session with custom error handlers.
     const char* sessionConfig = nullptr;
-    if (gFeatureFlagPrefetch.isEnabled() && !connection->isEphemeral()) {
+    if (gFeatureFlagPrefetch.isEnabled() && !connection.isEphemeral()) {
         sessionConfig = "prefetch=(enabled=true)";
     }
-    WiredTigerSession session(ru.getConnection(), &eventHandler, sessionConfig);
+    WiredTigerSession verifySession(&connection, &eventHandler, sessionConfig);
 
     const char* verifyConfig =
         configurationOverride.has_value() ? configurationOverride->c_str() : nullptr;
     // Do the verify. Weird parens prevent treating "verify" as a macro.
-    return session.verify(uri.c_str(), verifyConfig);
+    return verifySession.verify(uri.c_str(), verifyConfig);
 }
 
-void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,
+void WiredTigerUtil::validateTableLogging(WiredTigerSession& session,
                                           StringData uri,
                                           bool isLogged,
                                           boost::optional<StringData> indexName,
@@ -806,7 +797,7 @@ void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,
     }
     attrs.add("uri", uri);
 
-    auto metadata = WiredTigerUtil::getMetadataCreate(ru, uri);
+    auto metadata = WiredTigerUtil::getMetadataCreate(session, uri);
     if (!metadata.isOK()) {
         attrs.add("error", metadata.getStatus());
         LOGV2_WARNING(6898100, "Failed to check WT table logging setting", attrs);
@@ -866,7 +857,7 @@ bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
     return true;
 }
 
-Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
+Status WiredTigerUtil::setTableLogging(WiredTigerSession& session,
                                        const std::string& uri,
                                        bool on) {
     if (gWiredTigerSkipTableLoggingChecksOnStartup) {
@@ -877,8 +868,8 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     const std::string setting = on ? "log=(enabled=true)" : "log=(enabled=false)";
 
     // Try to close as much as possible to avoid EBUSY errors.
-    ru.getSession()->closeAllCursors(uri);
-    WiredTigerConnection* connection = ru.getConnection();
+    session.closeAllCursors(uri);
+    WiredTigerConnection& connection = session.getConnection();
 
     // This method uses the WiredTiger config parser to see if the table is in the expected logging
     // state. Only attempt to alter the table when a change is needed. This avoids grabbing heavy
@@ -889,8 +880,8 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     // succeed.
     std::string existingMetadata;
     {
-        auto session = connection->getUninterruptibleSession();
-        existingMetadata = getMetadataCreate(*session, uri).getValue();
+        auto managedSession = connection.getUninterruptibleSession();
+        existingMetadata = getMetadataCreate(*managedSession, uri).getValue();
     }
 
     {
@@ -912,10 +903,10 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
         22432, 1, "Changing table logging settings", "uri"_attr = uri, "loggingEnabled"_attr = on);
     // Only alter the metadata once we're sure that we need to change the table settings, since
     // WT_SESSION::alter may return EBUSY and require taking a checkpoint to make progress.
-    auto status = connection->getKVEngine()->alterMetadata(uri, setting);
+    auto status = connection.getKVEngine()->alterMetadata(uri, setting);
     if (!status.isOK()) {
         // Dump the storage engine's internal state to assist in diagnosis.
-        connection->getKVEngine()->dump();
+        connection.getKVEngine()->dump();
 
         LOGV2_FATAL(50756,
                     "Failed to update log setting",

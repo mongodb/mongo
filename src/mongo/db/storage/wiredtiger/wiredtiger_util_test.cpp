@@ -125,6 +125,13 @@ protected:
         return _ru.get();
     }
 
+    WiredTigerSession& getSessionNoTxn() {
+        if (!_managedSession) {
+            _managedSession = _harnessHelper.getConnection()->getUninterruptibleSession();
+        }
+        return *_managedSession;
+    }
+
     void createSession(const char* config) {
         WiredTigerSession* wtSession = _ru->getSession();
         ASSERT_OK(wtRCToStatus(wtSession->create(getURI(), config), *wtSession));
@@ -133,11 +140,11 @@ protected:
 private:
     WiredTigerUtilHarnessHelper _harnessHelper;
     std::unique_ptr<WiredTigerRecoveryUnit> _ru;
+    WiredTigerManagedSession _managedSession;
 };
 
 TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateInvalid) {
-    StatusWith<std::string> result =
-        WiredTigerUtil::getMetadataCreate(*getRecoveryUnit(), getURI());
+    StatusWith<std::string> result = WiredTigerUtil::getMetadataCreate(getSessionNoTxn(), getURI());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
@@ -145,8 +152,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateInvalid) {
 TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateNull) {
     const char* config = nullptr;
     createSession(config);
-    StatusWith<std::string> result =
-        WiredTigerUtil::getMetadataCreate(*getRecoveryUnit(), getURI());
+    StatusWith<std::string> result = WiredTigerUtil::getMetadataCreate(getSessionNoTxn(), getURI());
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().empty());
 }
@@ -154,14 +160,13 @@ TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateNull) {
 TEST_F(WiredTigerUtilMetadataTest, GetMetadataCreateStringSimple) {
     const char* config = "app_metadata=(abc=123)";
     createSession(config);
-    StatusWith<std::string> result =
-        WiredTigerUtil::getMetadataCreate(*getRecoveryUnit(), getURI());
+    StatusWith<std::string> result = WiredTigerUtil::getMetadataCreate(getSessionNoTxn(), getURI());
     ASSERT_OK(result.getStatus());
     ASSERT_STRING_CONTAINS(result.getValue(), config);
 }
 
 TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringInvalidURI) {
-    StatusWith<std::string> result = WiredTigerUtil::getMetadata(*getRecoveryUnit(), getURI());
+    StatusWith<std::string> result = WiredTigerUtil::getMetadata(getSessionNoTxn(), getURI());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
@@ -169,7 +174,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringInvalidURI) {
 TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringNull) {
     const char* config = nullptr;
     createSession(config);
-    StatusWith<std::string> result = WiredTigerUtil::getMetadata(*getRecoveryUnit(), getURI());
+    StatusWith<std::string> result = WiredTigerUtil::getMetadata(getSessionNoTxn(), getURI());
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().empty());
 }
@@ -177,14 +182,14 @@ TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringNull) {
 TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringSimple) {
     const char* config = "app_metadata=(abc=123)";
     createSession(config);
-    StatusWith<std::string> result = WiredTigerUtil::getMetadata(*getRecoveryUnit(), getURI());
+    StatusWith<std::string> result = WiredTigerUtil::getMetadata(getSessionNoTxn(), getURI());
     ASSERT_OK(result.getStatus());
     ASSERT_STRING_CONTAINS(result.getValue(), config);
 }
 
 TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataInvalidURI) {
     StatusWith<BSONObj> result =
-        WiredTigerUtil::getApplicationMetadata(*getRecoveryUnit(), getURI());
+        WiredTigerUtil::getApplicationMetadata(getSessionNoTxn(), getURI());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
@@ -193,7 +198,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataNull) {
     const char* config = nullptr;
     createSession(config);
     StatusWith<BSONObj> result =
-        WiredTigerUtil::getApplicationMetadata(*getRecoveryUnit(), getURI());
+        WiredTigerUtil::getApplicationMetadata(getSessionNoTxn(), getURI());
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().isEmpty());
 }
@@ -202,7 +207,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataString) {
     const char* config = "app_metadata=\"abc\"";
     createSession(config);
     StatusWith<BSONObj> result =
-        WiredTigerUtil::getApplicationMetadata(*getRecoveryUnit(), getURI());
+        WiredTigerUtil::getApplicationMetadata(getSessionNoTxn(), getURI());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
 }
@@ -211,7 +216,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataDuplicateKeys) {
     const char* config = "app_metadata=(abc=123,abc=456)";
     createSession(config);
     StatusWith<BSONObj> result =
-        WiredTigerUtil::getApplicationMetadata(*getRecoveryUnit(), getURI());
+        WiredTigerUtil::getApplicationMetadata(getSessionNoTxn(), getURI());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(50998, result.getStatus().code());
 }
@@ -223,7 +228,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataTypes) {
         "structkey=(k1=v2,k2=v2))";
     createSession(config);
     StatusWith<BSONObj> result =
-        WiredTigerUtil::getApplicationMetadata(*getRecoveryUnit(), getURI());
+        WiredTigerUtil::getApplicationMetadata(getSessionNoTxn(), getURI());
     ASSERT_OK(result.getStatus());
     const BSONObj& obj = result.getValue();
 
@@ -255,33 +260,33 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataTypes) {
 TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionMissingKey) {
     createSession("app_metadata=(abc=123)");
     ASSERT_OK(
-        WiredTigerUtil::checkApplicationMetadataFormatVersion(*getRecoveryUnit(), getURI(), 1, 1));
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 1, 1));
     ASSERT_NOT_OK(
-        WiredTigerUtil::checkApplicationMetadataFormatVersion(*getRecoveryUnit(), getURI(), 2, 2));
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 2, 2));
 }
 
 TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionString) {
     createSession("app_metadata=(formatVersion=\"bar\")");
     ASSERT_NOT_OK(
-        WiredTigerUtil::checkApplicationMetadataFormatVersion(*getRecoveryUnit(), getURI(), 1, 1));
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 1, 1));
 }
 
 TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionNumber) {
     createSession("app_metadata=(formatVersion=2)");
     ASSERT_EQUALS(
-        WiredTigerUtil::checkApplicationMetadataFormatVersion(*getRecoveryUnit(), getURI(), 2, 3)
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 2, 3)
             .getValue(),
         2);
     ASSERT_NOT_OK(
-        WiredTigerUtil::checkApplicationMetadataFormatVersion(*getRecoveryUnit(), getURI(), 1, 1));
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 1, 1));
     ASSERT_NOT_OK(
-        WiredTigerUtil::checkApplicationMetadataFormatVersion(*getRecoveryUnit(), getURI(), 3, 3));
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 3, 3));
 }
 
 TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
     createSession("\"");
     Status result =
-        WiredTigerUtil::checkApplicationMetadataFormatVersion(*getRecoveryUnit(), getURI(), 0, 3)
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 0, 3)
             .getStatus();
     ASSERT_NOT_OK(result);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.code());

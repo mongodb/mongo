@@ -99,6 +99,10 @@ public:
 
     ~WiredTigerSession();
 
+    WiredTigerConnection& getConnection() {
+        return *_connection;
+    }
+
     // Safe accessor for the internal session
     template <typename Functor>
     auto with(Functor functor) {

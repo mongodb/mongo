@@ -62,7 +62,8 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
                                             const std::string& uri) {
     {
         BSONObjBuilder metadata(output->subobjStart("metadata"));
-        Status status = WiredTigerUtil::getApplicationMetadata(ru, uri, &metadata);
+        Status status =
+            WiredTigerUtil::getApplicationMetadata(*ru.getSessionNoTxn(), uri, &metadata);
         if (!status.isOK()) {
             metadata.append("error", "unable to retrieve metadata");
             metadata.append("code", static_cast<int>(status.code()));
@@ -70,8 +71,9 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
         }
     }
     std::string type, sourceURI;
-    WiredTigerUtil::fetchTypeAndSourceURI(ru, uri, &type, &sourceURI);
-    StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadataCreate(ru, sourceURI);
+    WiredTigerUtil::fetchTypeAndSourceURI(*ru.getSessionNoTxn(), uri, &type, &sourceURI);
+    StatusWith<std::string> metadataResult =
+        WiredTigerUtil::getMetadataCreate(*ru.getSessionNoTxn(), sourceURI);
     StringData creationStringName("creationString");
     if (!metadataResult.isOK()) {
         BSONObjBuilder creationString(output->subobjStart(creationStringName));
@@ -175,8 +177,8 @@ void WiredTigerIndexUtil::validateStructure(
         return;
     }
 
-    auto err =
-        WiredTigerUtil::verifyTable(ru, uri, configurationOverride, results.getErrorsUnsafe());
+    auto err = WiredTigerUtil::verifyTable(
+        *ru.getSession(), uri, configurationOverride, results.getErrorsUnsafe());
     if (err == EBUSY) {
         std::string msg = str::stream()
             << "Could not complete validation of " << uri << ". "

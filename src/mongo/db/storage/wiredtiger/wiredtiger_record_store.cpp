@@ -129,7 +129,8 @@ static CompiledConfiguration upperExclusiveBoundConfig("WT_CURSOR.bound",
 static CompiledConfiguration clearBoundConfig("WT_CURSOR.bound", "action=clear");
 
 void checkOplogFormatVersion(WiredTigerRecoveryUnit& ru, const std::string& uri) {
-    StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(ru, uri);
+    StatusWith<BSONObj> appMetadata =
+        WiredTigerUtil::getApplicationMetadata(*ru.getSessionNoTxn(), uri);
     fassert(39999, appMetadata);
 
     fassertNoTrace(39998, appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
@@ -402,15 +403,16 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         // This is a clustered record store. Its WiredTiger table requires key_format='u' for
         // correct operation.
         const std::string wtTableConfig =
-            uassertStatusOK(WiredTigerUtil::getMetadataCreate(ru, _uri));
+            uassertStatusOK(WiredTigerUtil::getMetadataCreate(*ru.getSessionNoTxn(), _uri));
         const bool wtTableConfigMatchesStringKeyFormat =
             wtTableConfig.find("key_format=u") != std::string::npos;
         invariant(wtTableConfigMatchesStringKeyFormat);
     }
 
-    Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-                               ru, _uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)
-                               .getStatus();
+    Status versionStatus =
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(
+            *ru.getSessionNoTxn(), _uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)
+            .getStatus();
 
     if (!versionStatus.isOK()) {
         LOGV2_ERROR(7887900,
@@ -425,7 +427,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         }
     }
 
-    uassertStatusOK(WiredTigerUtil::setTableLogging(ru, _uri, _isLogged));
+    uassertStatusOK(WiredTigerUtil::setTableLogging(*ru.getSession(), _uri, _isLogged));
 
     // If no SizeStorer is in use, start counting at zero. In practice, this will only ever be the
     // case for temporary RecordStores (those not associated with any collection) and in unit
@@ -1050,14 +1052,14 @@ void WiredTigerRecordStore::validate(RecoveryUnit& ru,
     }
 
     WiredTigerUtil::validateTableLogging(
-        WiredTigerRecoveryUnit::get(ru), _uri, _isLogged, boost::none, *results);
+        *WiredTigerRecoveryUnit::get(ru).getSessionNoTxn(), _uri, _isLogged, boost::none, *results);
 
     if (!options.isFullValidation()) {
         invariant(!options.verifyConfigurationOverride().has_value());
         return;
     }
 
-    int err = WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit::get(ru),
+    int err = WiredTigerUtil::verifyTable(*WiredTigerRecoveryUnit::get(ru).getSession(),
                                           _uri,
                                           options.verifyConfigurationOverride(),
                                           results->getErrorsUnsafe());
@@ -1108,8 +1110,7 @@ void WiredTigerRecordStore::appendAllCustomStats(RecoveryUnit& ru,
     BSONObjBuilder bob(result->subobjStart(_engineName));
     {
         BSONObjBuilder metadata(bob.subobjStart("metadata"));
-        Status status = WiredTigerUtil::getApplicationMetadata(
-            WiredTigerRecoveryUnit::get(ru), getURI(), &metadata);
+        Status status = WiredTigerUtil::getApplicationMetadata(*session, getURI(), &metadata);
         if (!status.isOK()) {
             metadata.append("error", "unable to retrieve metadata");
             metadata.append("code", static_cast<int>(status.code()));
@@ -1118,9 +1119,8 @@ void WiredTigerRecordStore::appendAllCustomStats(RecoveryUnit& ru,
     }
 
     std::string type, sourceURI;
-    WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit::get(ru), _uri, &type, &sourceURI);
-    StatusWith<std::string> metadataResult =
-        WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit::get(ru), sourceURI);
+    WiredTigerUtil::fetchTypeAndSourceURI(*session, _uri, &type, &sourceURI);
+    StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadataCreate(*session, sourceURI);
     StringData creationStringName("creationString");
     if (!metadataResult.isOK()) {
         BSONObjBuilder creationString(bob.subobjStart(creationStringName));
@@ -1505,8 +1505,11 @@ void WiredTigerRecordStore::Oplog::validate(RecoveryUnit& ru,
         return;
     }
 
-    WiredTigerUtil::validateTableLogging(
-        WiredTigerRecoveryUnit::get(ru), getURI(), _isLogged, boost::none, *results);
+    WiredTigerUtil::validateTableLogging(*WiredTigerRecoveryUnit::get(ru).getSessionNoTxn(),
+                                         getURI(),
+                                         _isLogged,
+                                         boost::none,
+                                         *results);
 
     if (!options.isFullValidation()) {
         invariant(!options.verifyConfigurationOverride().has_value());

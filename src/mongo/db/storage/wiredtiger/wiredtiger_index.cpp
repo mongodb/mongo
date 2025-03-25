@@ -339,12 +339,9 @@ boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx,
 IndexValidateResults WiredTigerIndex::validate(
     OperationContext* opCtx, const CollectionValidation::ValidationOptions& options) const {
     IndexValidateResults results;
+    auto wtRu = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WiredTigerUtil::validateTableLogging(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-        _uri,
-        _isLogged,
-        StringData{_indexName},
-        results);
+        *wtRu->getSessionNoTxn(), _uri, _isLogged, StringData{_indexName}, results);
 
     if (!options.isFullIndexValidation()) {
         invariant(!options.verifyConfigurationOverride().has_value());
@@ -352,10 +349,7 @@ IndexValidateResults WiredTigerIndex::validate(
     }
 
     WiredTigerIndexUtil::validateStructure(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-        _uri,
-        options.verifyConfigurationOverride(),
-        results);
+        *wtRu, _uri, options.verifyConfigurationOverride(), results);
 
     return results;
 }
@@ -642,7 +636,8 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
         // The updated data format is guaranteed to be within the supported version range.
         _dataFormatVersion =
             WiredTigerUtil::checkApplicationMetadataFormatVersion(
-                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
+                     ->getSessionNoTxn(),
                 uri,
                 kMinimumIndexVersion,
                 kMaximumIndexVersion)
@@ -662,7 +657,7 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                         const IndexDescriptor* desc,
                                                         bool isLogged) {
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx)),
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx))->getSessionNoTxn(),
         uri,
         kMinimumIndexVersion,
         kMaximumIndexVersion);
@@ -693,7 +688,9 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
     }
 
     uassertStatusOK(WiredTigerUtil::setTableLogging(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx)), uri, isLogged));
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx))->getSession(),
+        uri,
+        isLogged));
 
     /*
      * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format 8, 12, and
