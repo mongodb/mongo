@@ -1,8 +1,6 @@
 /**
- * Test for validating that _shardsvrFetchCollMetadata persists collection metadata.
- * This test verifies that the collection metadata is cloned from the global catalog
- * (config.collections) to the shard-local catalog (config.shard.collections).
- *
+ * Test that _shardsvrFetchCollMetadata correctly persists collection and chunk metadata locally
+ * on the shard.
  */
 
 import {ShardingTest} from 'jstests/libs/shardingtest.js';
@@ -14,6 +12,11 @@ function getCollMetadataFromGlobalCatalog(ns) {
     return st.s.getDB("config").collections.findOne({_id: ns});
 }
 
+// Helper: Get chunks metadata from the global catalog.
+function getChunksMetadataFromGlobalCatalog(uuid) {
+    return st.s.getDB("config").chunks.find({uuid}).toArray();
+}
+
 // Helper: Validate that the shard-local collection metadata matches expected.
 function validateShardLocalCatalog(ns, shard, expectedCollMetadata) {
     const collMetadataFromShard =
@@ -23,8 +26,24 @@ function validateShardLocalCatalog(ns, shard, expectedCollMetadata) {
               "Mismatch in collection metadata for namespace: " + ns);
 }
 
+// Helper: Validate that the shard-local chunks metadata matches expected.
+function validateShardLocalChunksCatalog(uuid, shard, expectedChunksMetadata) {
+    const chunksMetadataFromShard =
+        shard.getDB("config").getCollection("shard.chunks").find({uuid}).toArray();
+
+    assert.eq(expectedChunksMetadata.length,
+              chunksMetadataFromShard.length,
+              "Mismatch in number of chunks for uuid: " + uuid);
+
+    expectedChunksMetadata.forEach(expectedChunk => {
+        const localChunk = chunksMetadataFromShard.find(c => c._id.equals(expectedChunk._id));
+        assert(localChunk, "Chunk " + expectedChunk._id + " missing locally on shard");
+        assert.docEq(localChunk, expectedChunk, "Chunk metadata mismatch for " + expectedChunk._id);
+    });
+}
+
 {
-    jsTest.log("Test that _shardsvrFetchCollMetadata persists collection metadata");
+    jsTest.log("Test that _shardsvrFetchCollMetadata persists collection and chunk metadata");
 
     const dbName = jsTestName();
     const collName = "testColl";
@@ -35,17 +54,43 @@ function validateShardLocalCatalog(ns, shard, expectedCollMetadata) {
         st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-    // Set allowMigrations to false (should be done by the DDL)
+    // Insert data.
+    const testColl = st.s.getDB(dbName).getCollection(collName);
+    for (let i = 0; i < 100; ++i) {
+        assert.commandWorked(testColl.insert({_id: i}));
+    }
+
+    // Explicitly create multiple chunks.
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 25}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 50}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 75}}));
+
+    // Disable migrations.
     assert.commandWorked(st.configRS.getPrimary().adminCommand(
         {_configsvrSetAllowMigrations: ns, allowMigrations: false, writeConcern: {w: "majority"}}));
 
-    // Run the command on the primary shard that owns the collection.
+    // Fetch the UUID explicitly.
+    const globalCollMetadata = getCollMetadataFromGlobalCatalog(ns);
+    assert(globalCollMetadata, "Collection metadata not found for namespace: " + ns);
+    const collUUID = globalCollMetadata.uuid;
+
+    // Verify explicitly that splits occurred.
+    let chunks;
+    assert.soon(() => {
+        chunks = getChunksMetadataFromGlobalCatalog(collUUID);
+        return chunks.length >= 4;
+    }, "Chunk splitting failed; expected at least 4 chunks.", 5000, 1000);
+
+    // Run the command on the shard.
     assert.commandWorked(st.shard0.getDB(dbName).runCommand(
         {_shardsvrFetchCollMetadata: ns, writeConcern: {w: "majority"}}));
 
-    // Validate that the shard-local collection metadata matches the global catalog.
-    const globalCollMetadata = getCollMetadataFromGlobalCatalog(ns);
+    // Validate collection metadata.
     validateShardLocalCatalog(ns, st.shard0, globalCollMetadata);
+
+    // Validate chunks metadata.
+    const globalChunksMetadata = getChunksMetadataFromGlobalCatalog(collUUID);
+    validateShardLocalChunksCatalog(collUUID, st.shard0, globalChunksMetadata);
 }
 
 {
@@ -55,13 +100,11 @@ function validateShardLocalCatalog(ns, shard, expectedCollMetadata) {
     const collName = "testCollWithMigrations";
     const ns = dbName + "." + collName;
 
-    // Enable sharding on the database and shard the collection.
     assert.commandWorked(
         st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-    // Intentionally set allowMigrations to true on the config server so that migrations are
-    // allowed.
+    // Intentionally set allowMigrations to true on the config server
     assert.commandWorked(st.configRS.getPrimary().adminCommand(
         {_configsvrSetAllowMigrations: ns, allowMigrations: true, writeConcern: {w: "majority"}}));
 
@@ -74,7 +117,7 @@ function validateShardLocalCatalog(ns, shard, expectedCollMetadata) {
 
 {
     jsTest.log(
-        "Test idempotency: Running _shardsvrFetchCollMetadata twice produces consistent metadata");
+        "Test idempotency: Running _shardsvrFetchCollMetadata twice produces consistent metadata ");
 
     const dbName = jsTestName();
     const collName = "idempotentColl";
@@ -85,28 +128,46 @@ function validateShardLocalCatalog(ns, shard, expectedCollMetadata) {
         st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
+    // Insert data
+    const testColl = st.s.getDB(dbName).getCollection(collName);
+    for (let i = 0; i < 100; ++i) {
+        assert.commandWorked(testColl.insert({_id: i}));
+    }
+
+    // Explicitly create multiple chunks
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 25}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 50}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 75}}));
+
     // Disable migrations.
     assert.commandWorked(st.configRS.getPrimary().adminCommand(
         {_configsvrSetAllowMigrations: ns, allowMigrations: false, writeConcern: {w: "majority"}}));
+
+    // Fetch the UUID explicitly.
+    const globalCollMetadata = getCollMetadataFromGlobalCatalog(ns);
+    assert(globalCollMetadata, "Collection metadata not found for namespace: " + ns);
+    const collUUID = globalCollMetadata.uuid;
+
+    // Verify explicitly that splits occurred.
+    let chunks;
+    assert.soon(() => {
+        chunks = getChunksMetadataFromGlobalCatalog(collUUID);
+        return chunks.length >= 4;
+    }, "Chunk splitting failed; expected at least 4 chunks.", 5000, 1000);
 
     // Run the command for the first time.
     assert.commandWorked(st.shard0.getDB(dbName).runCommand(
         {_shardsvrFetchCollMetadata: ns, writeConcern: {w: "majority"}}));
 
-    // Capture the metadata.
-    let firstMetadata = st.s.getDB("config").collections.findOne({_id: ns});
-
-    // Run the command a second time.
+    // Run the command a second time (idempotency)
     assert.commandWorked(st.shard0.getDB(dbName).runCommand(
         {_shardsvrFetchCollMetadata: ns, writeConcern: {w: "majority"}}));
 
-    // Capture the metadata again.
-    let secondMetadata = st.s.getDB("config").collections.findOne({_id: ns});
+    // Validate metadata consistency.
+    const globalChunksMetadata = getChunksMetadataFromGlobalCatalog(collUUID);
 
-    // They should be identical.
-    assert.eq(firstMetadata,
-              secondMetadata,
-              "Metadata should be idempotent after two invocations of _shardsvrFetchCollMetadata");
+    validateShardLocalCatalog(ns, st.shard0, globalCollMetadata);
+    validateShardLocalChunksCatalog(collUUID, st.shard0, globalChunksMetadata);
 }
 
 st.stop();

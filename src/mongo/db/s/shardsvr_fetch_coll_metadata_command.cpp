@@ -97,7 +97,14 @@ public:
                             true /* upsert */,
                             false /* multi */);
 
-            // TODO (SERVER-102400): Persist chunks metadata.
+            // Persist chunk metadata locally.
+            for (const auto& chunk : collAndChunks.second) {
+                dbClient.update(NamespaceString::kConfigShardChunksNamespace,
+                                BSON(ChunkType::name() << chunk.getName()),
+                                chunk.toConfigBSON(),
+                                true /* upsert */,
+                                false /* multi */);
+            }
 
             LOGV2(10140202, "Persisted metadata locally on shard", "ns"_attr = nss);
         }
