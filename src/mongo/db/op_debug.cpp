@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_bson_helpers.h"
 #include "mongo/db/profile_filter.h"
@@ -249,7 +250,8 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("placementVersionRefreshDuration", placementVersionRefreshMillis);
     }
 
-    if (totalOplogSlotDurationMicros > Microseconds::zero()) {
+    if (auto totalOplogSlotDurationMicros = LocalOplogInfo::getTotalOplogSlotDurationMicros(opCtx);
+        totalOplogSlotDurationMicros > Microseconds::zero()) {
         pAttrs->add("totalOplogSlotDuration", totalOplogSlotDurationMicros);
     }
 
@@ -670,7 +672,8 @@ void OpDebug::append(OperationContext* opCtx,
 
     OPDEBUG_APPEND_OPTIONAL(b, "estimatedCardinality", estimatedCardinality);
 
-    if (totalOplogSlotDurationMicros > Microseconds::zero()) {
+    if (auto totalOplogSlotDurationMicros = LocalOplogInfo::getTotalOplogSlotDurationMicros(opCtx);
+        totalOplogSlotDurationMicros > Microseconds::zero()) {
         b.appendNumber("totalOplogSlotDurationMicros",
                        durationCount<Microseconds>(totalOplogSlotDurationMicros));
     }
@@ -1037,9 +1040,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("totalOplogSlotDurationMicros", [](auto field, auto args, auto& b) {
-        if (args.op.totalOplogSlotDurationMicros > Nanoseconds::zero()) {
-            b.appendNumber(field,
-                           durationCount<Microseconds>(args.op.totalOplogSlotDurationMicros));
+        if (auto totalOplogSlotDurationMicros =
+                LocalOplogInfo::getTotalOplogSlotDurationMicros(args.opCtx);
+            totalOplogSlotDurationMicros > Microseconds::zero()) {
+            b.appendNumber(field, durationCount<Microseconds>(totalOplogSlotDurationMicros));
         }
     });
 

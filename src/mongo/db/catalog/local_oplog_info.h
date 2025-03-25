@@ -47,6 +47,7 @@ namespace mongo {
  */
 class LocalOplogInfo {
 public:
+    static Microseconds getTotalOplogSlotDurationMicros(OperationContext* opCtx);
     static LocalOplogInfo* get(ServiceContext& service);
     static LocalOplogInfo* get(ServiceContext* service);
     static LocalOplogInfo* get(OperationContext* opCtx);

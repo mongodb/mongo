@@ -36,7 +36,6 @@
 #include <mutex>
 #include <utility>
 
-#include "mongo/db/curop.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -55,7 +54,11 @@
 
 namespace mongo {
 namespace {
-
+// Stores the total time an operation spends with an uncommitted oplog slot held open. Indicator
+// that an operation is holding back replication by causing oplog holes to remain open for
+// unusual amounts of time.
+const auto totalOplogSlotDurationMicros =
+    OperationContext::declareDecoration<AtomicWord<int64_t>>();
 const auto localOplogInfo = ServiceContext::declareDecoration<LocalOplogInfo>();
 
 }  // namespace
@@ -73,6 +76,11 @@ LocalOplogInfo* LocalOplogInfo::get(ServiceContext* service) {
 // static
 LocalOplogInfo* LocalOplogInfo::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
+}
+
+// static
+Microseconds LocalOplogInfo::getTotalOplogSlotDurationMicros(OperationContext* opCtx) {
+    return Microseconds(totalOplogSlotDurationMicros(opCtx).loadRelaxed());
 }
 
 RecordStore* LocalOplogInfo::getRecordStore() const {
@@ -160,8 +168,9 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
                                                                OperationContext* opCtx) {
         replCoord->attemptToAdvanceStableTimestamp();
         // Sum the oplog slot durations. An operation may participate in multiple transactions.
-        CurOp::get(opCtx)->debug().totalOplogSlotDurationMicros +=
-            Microseconds(oplogSlotDurationTimer.elapsed());
+        totalOplogSlotDurationMicros(opCtx).fetchAndAdd(
+            durationCount<Microseconds>(oplogSlotDurationTimer.elapsed()));
+
 
         // Only reset these properties when the first slot is released.
         if (isFirstOpTime) {
@@ -174,8 +183,8 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
         [oplogSlotDurationTimer, isFirstOpTime, prevAssertOnLockAttempt, prevRuBlockingAllowed](
             OperationContext* opCtx, boost::optional<Timestamp>) {
             // Sum the oplog slot durations. An operation may participate in multiple transactions.
-            CurOp::get(opCtx)->debug().totalOplogSlotDurationMicros +=
-                Microseconds(oplogSlotDurationTimer.elapsed());
+            totalOplogSlotDurationMicros(opCtx).fetchAndAdd(
+                durationCount<Microseconds>(oplogSlotDurationTimer.elapsed()));
 
             // Only reset these properties when the first slot is released.
             if (isFirstOpTime) {
