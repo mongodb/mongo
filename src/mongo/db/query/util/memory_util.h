@@ -32,7 +32,6 @@
 #include <cstddef>
 #include <string>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 
 namespace mongo::memory_util {

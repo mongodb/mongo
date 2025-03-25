@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <functional>
 #include <map>
 #include <stack>
 #include <string>
@@ -39,7 +38,6 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"

@@ -35,9 +35,7 @@
 #include <string>
 #include <utility>
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

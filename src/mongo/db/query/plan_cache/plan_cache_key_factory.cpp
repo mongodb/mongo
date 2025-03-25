@@ -31,7 +31,6 @@
 
 #include <cstddef>
 #include <map>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -41,6 +40,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_info.h"

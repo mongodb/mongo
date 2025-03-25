@@ -31,7 +31,6 @@
 
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
-#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
@@ -47,11 +46,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 class CollatorInterface;

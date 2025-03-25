@@ -30,7 +30,6 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
-#include "mongo/db/query/analyze_regex.h"
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <boost/container/flat_set.hpp>
@@ -41,12 +40,10 @@
 #include <functional>
 #include <memory>
 #include <set>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/field_ref.h"
@@ -65,7 +62,6 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 

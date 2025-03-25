@@ -34,12 +34,9 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 

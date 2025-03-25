@@ -30,7 +30,6 @@
 #include "mongo/db/query/query_settings.h"
 
 #include <boost/move/utility_core.hpp>
-#include <mutex>
 #include <tuple>
 #include <utility>
 

@@ -32,7 +32,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
-#include <utility>
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/matcher/expression.h"

@@ -347,6 +347,7 @@ mongo_cc_benchmark(
     ],
     deps = [
         ":idl_parser",
+        "//src/mongo/db:api_parameters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/query:query_request",

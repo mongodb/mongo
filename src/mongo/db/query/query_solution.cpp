@@ -37,7 +37,6 @@
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 #include <fmt/format.h>
-#include <numeric>
 #include <queue>
 #include <s2cellid.h>
 #include <tuple>
@@ -51,11 +50,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -69,11 +66,8 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
 

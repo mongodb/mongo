@@ -77,7 +77,7 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:exception_util",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/index:index_access_method",
-        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query:command_shapes",
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_shape",
         "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
@@ -108,7 +108,7 @@ mongo_cc_benchmark(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:processinfo",

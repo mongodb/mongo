@@ -31,6 +31,7 @@
 #include "mongo/db/query/util/spill_util.h"
 
 #include "mongo/db/storage/disk_space_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

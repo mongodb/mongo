@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/json.h"

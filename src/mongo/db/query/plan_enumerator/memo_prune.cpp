@@ -37,7 +37,6 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/matcher/path.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/map_utils.h"
 

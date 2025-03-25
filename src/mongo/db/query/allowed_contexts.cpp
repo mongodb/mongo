@@ -28,14 +28,11 @@
  */
 
 #include <boost/move/utility_core.hpp>
-#include <memory>
-#include <string>
 
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"

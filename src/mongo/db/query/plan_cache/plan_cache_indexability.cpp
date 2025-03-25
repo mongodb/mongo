@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor_utils.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -44,7 +43,6 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

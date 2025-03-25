@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
 

@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/client_cursor/cursor_request.h"
 
-#include <cstdint>
-
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

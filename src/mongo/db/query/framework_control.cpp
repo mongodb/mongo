@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <utility>
-
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
@@ -36,12 +34,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/synchronized_value.h"

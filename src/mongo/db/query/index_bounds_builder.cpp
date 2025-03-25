@@ -38,7 +38,6 @@
 #include <cmath>
 #include <limits>
 #include <memory>
-#include <set>
 #include <vector>
 
 #include "mongo/base/string_data.h"

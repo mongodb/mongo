@@ -32,11 +32,8 @@
 #include <string>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 

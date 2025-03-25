@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 

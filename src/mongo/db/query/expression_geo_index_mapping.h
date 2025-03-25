@@ -38,7 +38,6 @@
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"  // For OrderedIntervalList
 

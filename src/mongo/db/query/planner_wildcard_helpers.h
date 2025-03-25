@@ -34,16 +34,12 @@
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 namespace wildcard_planning {

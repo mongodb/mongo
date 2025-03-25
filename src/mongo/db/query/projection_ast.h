@@ -42,19 +42,14 @@
 #include <absl/container/flat_hash_map.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/projection_ast_visitor.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace projection_ast {

@@ -33,12 +33,10 @@
 #include <boost/optional/optional.hpp>
 #include <functional>
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 /**

@@ -31,7 +31,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <memory>
 #include <stack>
 #include <string>
 #include <vector>

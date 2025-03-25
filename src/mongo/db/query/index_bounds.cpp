@@ -32,7 +32,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <iterator>
-#include <memory>
 #include <utility>
 
 #include "mongo/bson/bsonobjbuilder.h"

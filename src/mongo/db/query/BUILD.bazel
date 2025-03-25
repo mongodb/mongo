@@ -21,16 +21,14 @@ mongo_cc_library(
         "find.h",
         "find_common.h",
     ],
-    deps = [
-        ":common_query_enums_and_helpers",
-        ":query_planner",
-        ":query_request",
+    header_deps = [
         "//src/mongo/db:curop_failpoint_helpers",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/query/collation:collator_factory_icu",
-        "//src/mongo/db/query/collation:collator_icu",
+    ],
+    deps = [
+        ":canonical_query_base",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
         "//src/mongo/db/query/datetime:init_timezone_data",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -44,9 +42,9 @@ mongo_cc_library(
         "canonical_distinct.h",
     ],
     deps = [
+        "//src/mongo:base",
         "//src/mongo/db:commands",
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db:server_base",
     ],
 )
 
@@ -91,39 +89,70 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "canonical_query",
+    name = "parsed_find_command",
+    srcs = [
+        "parsed_find_command.cpp",
+    ],
+    hdrs = [
+        "parsed_find_command.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/pipeline",
+    ],
+    deps = [
+        ":projection_ast",
+        ":sort_pattern",
+        "//src/mongo:base",
+        "//src/mongo/db/query/stats:collection_statistics_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "canonical_query_base",
     srcs = [
         "canonical_query.cpp",
         "canonical_query_encoder.cpp",
+    ],
+    hdrs = [
+        "canonical_query.h",
+        "canonical_query_encoder.h",
+    ],
+    deps = [
+        ":parsed_find_command",
+        "//src/mongo/db/pipeline",
+    ],
+)
+
+mongo_cc_library(
+    name = "parsed_distinct_command",
+    srcs = [
         "parsed_distinct_command.cpp",
-        "parsed_find_command.cpp",
+    ],
+    hdrs = [
+        "parsed_distinct_command.h",
+    ],
+    deps = [
+        ":canonical_distinct",
+        ":canonical_query_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "command_shapes",
+    srcs = [
         "//src/mongo/db/query/query_shape:count_cmd_shape.cpp",
         "//src/mongo/db/query/query_shape:distinct_cmd_shape.cpp",
         "//src/mongo/db/query/query_shape:find_cmd_shape.cpp",
         "//src/mongo/db/query/query_stats:find_key.cpp",
     ],
     hdrs = [
-        "canonical_query.h",
-        "canonical_query_encoder.h",
-        "indexability.h",
-        "parsed_distinct_command.h",
-        "parsed_find_command.h",
         "//src/mongo/db/query/query_shape:count_cmd_shape.h",
         "//src/mongo/db/query/query_shape:distinct_cmd_shape.h",
         "//src/mongo/db/query/query_shape:find_cmd_shape.h",
         "//src/mongo/db/query/query_stats:find_key.h",
     ],
     deps = [
-        ":canonical_distinct",
-        ":common_query_enums_and_helpers",
-        ":projection_ast",
-        ":sort_pattern",
-        "//src/mongo/crypto:encrypted_field_config",
-        "//src/mongo/db:query_expressions",
-        "//src/mongo/db/pipeline",
-        "//src/mongo/db/query/collation:collator_factory_interface",
-        "//src/mongo/db/query/collation:collator_interface",
-        "//src/mongo/db/query/stats",
+        ":parsed_distinct_command",
     ],
 )
 
@@ -136,7 +165,6 @@ mongo_cc_library(
         "//src/mongo/db/query/util:memory_util.h",
     ],
     deps = [
-        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:processinfo",
     ],
 )
@@ -163,7 +191,6 @@ mongo_cc_library(
         "//src/mongo/db:api_parameters",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -210,14 +237,16 @@ mongo_cc_library(
     name = "projection_ast",
     srcs = [
         "projection.cpp",
+        "projection_ast_path_tracking_visitor.h",
         "projection_ast_util.cpp",
         "projection_parser.cpp",
         "//src/mongo/base:exact_cast.h",
-        "//src/mongo/db/query:projection_ast_path_tracking_visitor.h",
     ],
     hdrs = [
         "projection.h",
+        "projection_ast.h",
         "projection_ast_util.h",
+        "projection_ast_visitor.h",
         "projection_parser.h",
     ],
     deps = [
@@ -234,10 +263,12 @@ mongo_cc_library(
     hdrs = [
         "sort_pattern.h",
     ],
+    header_deps = [
+        "//src/mongo/db/exec/document_value",
+    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/exec/document_value",
     ],
 )
 
@@ -250,13 +281,10 @@ mongo_cc_library(
         "plan_yield_policy.h",
     ],
     deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
-        "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/storage:recovery_unit_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/query_settings",
         "//src/mongo/util:elapsed_tracker",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -272,16 +300,12 @@ mongo_cc_library(
         "plan_yield_policy_remote_cursor.h",
         "yield_policy_callbacks_impl.h",
     ],
-    deps = [
-        ":plan_yield_policy",
+    header_deps = [
         ":query_common",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_filterer",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:collection_query_info",
-        "//src/mongo/db/catalog:database_holder",
-        "//src/mongo/db/collection_crud",
-        "//src/mongo/executor:task_executor_cursor",
+    ],
+    deps = [
+        ":plan_yield_policy",
     ],
 )
 
@@ -304,7 +328,6 @@ mongo_cc_library(
         "//src/mongo/db/query/util:spill_util.h",
     ],
     deps = [
-        ":query_knobs",
         "//src/mongo/db/storage:disk_space_util",
     ],
 )
@@ -329,9 +352,7 @@ mongo_cc_library(
         ":memory_util",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
         "//src/mongo/idl:cluster_server_parameter",
-        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -345,8 +366,6 @@ mongo_cc_library(
     ],
     deps = [
         ":query_knobs",
-        "//src/mongo/db:mongohasher",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -390,7 +409,7 @@ mongo_cc_library(
         "interval_evaluation_tree.h",
     ],
     deps = [
-        ":canonical_query",
+        ":canonical_query_base",
         ":index_multikey_helpers",
         ":query_index_bounds",
         "//src/mongo/db:server_base",
@@ -402,11 +421,14 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "index_bounds_builder_test_fixture",
-    hdrs = [
+    srcs = [
         "index_bounds_builder_test_fixture.h",
     ],
     deps = [
+        ":index_bounds_builder",
+        ":query_test_service_context",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/unittest",
     ],
 )
 
@@ -448,23 +470,15 @@ mongo_cc_library(
         "//src/mongo/db/query/plan_enumerator:plan_enumerator.h",
     ],
     deps = [
-        ":canonical_query",
         ":index_bounds_builder",
-        ":index_multikey_helpers",
         ":query_index_bounds",
-        ":query_knobs",
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db:record_id_helpers",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
-        "//src/mongo/db/fts:base_fts",
-        "//src/mongo/db/index:expression_params",
-        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query/collation:collator_factory_icu",
         "//src/mongo/db/query/cost_based_ranker:cardinality_estimator",
         "//src/mongo/db/query/cost_based_ranker:cost_estimator",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
+        "//src/third_party/s2",
     ],
 )
 
@@ -481,10 +495,8 @@ mongo_cc_library(
         "//src/mongo/db/query/timeseries:bucket_spec.h",
     ],
     deps = [
-        "//src/mongo/bson/column",
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db/exec/document_value",
-        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/third_party/s2",
     ],
 )
 
@@ -533,17 +545,13 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:cursor_response.h",
     ],
     deps = [
-        ":query_request",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:core_headers_library",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/query:hint_parser",
+        "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/client_cursor:release_memory_util",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
-        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc",
-        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/idl:idl_parser",
     ],
 )
 
@@ -572,20 +580,22 @@ mongo_cc_library(
         "query_request_helper.h",
         "tailable_mode.h",
     ],
+    header_deps = [
+        "//src/mongo/db:api_parameters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s:common_s",
+    ],
     deps = [
         ":hint_parser",
         "//src/mongo/crypto:fle_fields",
-        "//src/mongo/db:api_parameters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/pipeline:runtime_constants_idl",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/query_settings",
-        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/s:common_s",
     ],
 )
 
@@ -655,12 +665,8 @@ mongo_cc_library(
         "query_test_service_context.h",
     ],
     deps = [
-        "//src/mongo:base",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/query/collation:collator_factory_mock",
-        "//src/mongo/s:grid",
-        "//src/mongo/util:tick_source_mock",
     ],
 )
 
@@ -690,9 +696,7 @@ mongo_cc_library(
     deps = [
         ":query_planner",
         ":query_test_service_context",
-        "//src/mongo:base",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query/collation:collator_factory_mock",
     ],
 )
 
@@ -886,7 +890,7 @@ mongo_cc_benchmark(
     deps = [
         "//src/mongo/db/matcher:expressions_mongod_only",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:query_test_service_context",
     ],
 )

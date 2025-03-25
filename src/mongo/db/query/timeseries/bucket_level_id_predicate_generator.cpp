@@ -32,7 +32,6 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/query/timeseries/bucket_level_comparison_predicate_generator.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/timeseries/timeseries_constants.h"

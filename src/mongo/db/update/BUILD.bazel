@@ -190,7 +190,7 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
     ],
 )

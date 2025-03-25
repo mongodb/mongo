@@ -36,7 +36,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <iosfwd>
 #include <iterator>
@@ -49,15 +48,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/exec/eof.h"
 #include "mongo/db/fts/fts_query.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_hasher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -78,14 +73,11 @@
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
-#include "mongo/db/record_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hash_utils.h"
 #include "mongo/util/id_generator.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 

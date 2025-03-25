@@ -32,7 +32,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
 #include <string>
 
 #include "mongo/base/error_codes.h"
@@ -45,8 +44,6 @@
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
 

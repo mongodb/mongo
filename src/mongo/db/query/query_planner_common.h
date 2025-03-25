@@ -31,18 +31,14 @@
 
 #include <boost/optional/optional.hpp>
 #include <cstddef>
-#include <vector>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 

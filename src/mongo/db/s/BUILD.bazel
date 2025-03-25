@@ -1786,6 +1786,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
         "//src/mongo/db/query:query_request",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/collation:collator_factory_icu",
         "//src/mongo/db/query/write_ops:write_ops_exec",
         "//src/mongo/db/repl:image_collection_entry",
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",

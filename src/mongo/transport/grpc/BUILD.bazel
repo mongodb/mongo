@@ -1,7 +1,6 @@
 load(
     "//bazel:mongo_src_rules.bzl",
     "idl_generator",
-    "mongo_cc_binary",
     "mongo_cc_grpc_library",
     "mongo_cc_integration_test",
     "mongo_cc_library",
