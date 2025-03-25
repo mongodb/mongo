@@ -1009,20 +1009,22 @@ export class ReplSetTest {
         let rst = this;
         let configVersion = -2;
         let configTerm = -2;
-        assert.soon(function() {
-            const res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-            const primaryMember = res.members.find((m) => m.self);
-            configVersion = primaryMember.configVersion;
-            configTerm = primaryMember.configTerm;
-            function hasSameConfig(member) {
-                return member.configVersion === primaryMember.configVersion &&
-                    member.configTerm === primaryMember.configTerm;
-            }
-            let members = res.members;
-            if (nodes) {
-                members = res.members.filter((m) => nodes.some((node) => m.name === node.name));
-            }
-            return members.every((m) => hasSameConfig(m));
+        asCluster(this, primary, () => {
+            assert.soon(function() {
+                const res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+                const primaryMember = res.members.find((m) => m.self);
+                configVersion = primaryMember.configVersion;
+                configTerm = primaryMember.configTerm;
+                function hasSameConfig(member) {
+                    return member.configVersion === primaryMember.configVersion &&
+                        member.configTerm === primaryMember.configTerm;
+                }
+                let members = res.members;
+                if (nodes) {
+                    members = res.members.filter((m) => nodes.some((node) => m.name === node.name));
+                }
+                return members.every((m) => hasSameConfig(m));
+            });
         });
 
         jsTest.log.info("waitForConfigReplication: config on " + primary.host +
