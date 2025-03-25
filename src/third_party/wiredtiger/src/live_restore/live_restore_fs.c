@@ -1251,10 +1251,25 @@ __wt_live_restore_metadata_to_fh(
       "Reading in bitmap information from metadata but bitmap information already exists in "
       "memory");
 
+    /*
+     * Once we're in the clean up stage or later all data has been migrated across to the
+     * destination. There's no need for hole tracking and therefore nothing to reconstruct. The
+     * migration state must be checked before we check the number of bits in the bitmap as we clear
+     * that once it finishes.
+     */
+    if (__wti_live_restore_migration_complete(session)) {
+        /*
+         * Even though the migration has completed we may still have a source file, this indicates
+         * that the live restore finished while this file was being opened.
+         */
+        WT_ERR(__live_restore_fh_close_source(session, lr_fh, true));
+        return (0);
+    }
+
     __wt_writelock(session, &lr_fh->lock);
     lr_fh->allocsize = lr_fh_meta->allocsize;
 
-    /* If there is no source file there is nothing to migrate and therefore no metadata to parse. */
+    /* If there is no source file the migration has completed. */
     if (WTI_DEST_COMPLETE(lr_fh)) {
         __wt_writeunlock(session, &lr_fh->lock);
         return (0);
@@ -1264,10 +1279,12 @@ __wt_live_restore_metadata_to_fh(
      * !!!
      * While the live restore is in progress, the bit count reported by in the live restore metadata
      * can hold three states:
-     *  (0)         : This means the file has not started migration.
+     *  (0)         : This means file has not yet had a bitmap representation written to the
+     *                metadata file and therefore no application writes have gone to the
+     *                destination. In theory background thread writes may have happened but unless
+     *                the tree was dirtied the metadata update was not written out.
      *  (-1)        : This indicates the file has finished migration and the bitmap is empty.
-     *  (nbits > 0) : The number of bits in the bitmap. This is set when the file is in the
-     *                process of being migrated.
+     *  (nbits > 0) : The number of bits in the bitmap.
      */
     if (lr_fh_meta->nbits == 0) {
         WT_ASSERT(session, !WTI_DEST_COMPLETE(lr_fh));
@@ -1288,10 +1305,6 @@ __wt_live_restore_metadata_to_fh(
           session, lr_fh_meta->bitmap_str, (uint64_t)lr_fh_meta->nbits, lr_fh));
     } else {
         WT_ASSERT(session, lr_fh_meta->nbits == -1);
-        /*
-         * Our file open logic always opens the backing source file when it exists, but since we've
-         * completed migration we don't need it.
-         */
         WT_ERR(__live_restore_fh_close_source(session, lr_fh, false));
     }
 
@@ -1313,6 +1326,10 @@ __wt_live_restore_fh_to_metadata(WT_SESSION_IMPL *session, WT_FILE_HANDLE *fh, W
 {
     WT_DECL_RET;
     if (!F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+        return (WT_NOTFOUND);
+
+    /* Once we're past the background migration stage there's no need to track hole information. */
+    if (__wti_live_restore_migration_complete(session))
         return (WT_NOTFOUND);
 
     WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh = (WTI_LIVE_RESTORE_FILE_HANDLE *)fh;
@@ -1370,16 +1387,20 @@ __wt_live_restore_clean_metadata_string(WT_SESSION_IMPL *session, char *value)
         WT_ASSERT_ALWAYS(
           session, cval.len == 0, "Found non-empty bitmap when cleaning config string");
 
-        WT_RET(__wt_config_subgets(session, &v, "nbits", &cval));
-
         /*
          * Live restore uses -1 in the nbits field to indicate the file has been fully migrated.
-         * However, if this value is copied into a backup, future live restores using this backup as
-         * a source will see the nbits=-1 value and assume a file that still needs migrating has
-         * already been migrated. Set it to 0 now to indicate it is yet to be migrated.
+         * This value should be updated to 0 when live restore moves past the background migration
+         * phase, but we can only do so if the file is open when we force a checkpoint during clean
+         * up, or if its btree is dirtied after live restore completes but before restarting in
+         * non-live restore mode. If neither of these events take place the metadata won't be
+         * updated on disk and the -1 value persists. A future live restore using this file as a
+         * source will see this value and incorrectly assume the file has already been migrated. To
+         * prevent this manually overwrite the -1 with the correct value 0.
          */
+        WT_RET(__wt_config_subgets(session, &v, "nbits", &cval));
+
+        wt_off_t nbits_val_str_offset = cval.str - value;
         if (WT_STRING_LIT_MATCH("-1", cval.str, 2)) {
-            wt_off_t nbits_val_str_offset = cval.str - value;
             /*
              * We need to overwrite two characters, but only need to write one. Add a redundant
              * comma so we don't need to resize the string. The config parser will ignore it.
@@ -1387,14 +1408,8 @@ __wt_live_restore_clean_metadata_string(WT_SESSION_IMPL *session, char *value)
             value[nbits_val_str_offset] = '0';
             value[nbits_val_str_offset + 1] = ',';
         } else
-            /*
-             * There are only two possible values for nbits here. Either nbits=-1 because the file
-             * underwent a complete live restore, or nbits=0 because we're backing up a database
-             * that didn't undergo live restore. Any other value indicates a file has been partially
-             * live restored and is missing data.
-             */
-            WT_ASSERT_ALWAYS(session, WT_STRING_LIT_MATCH("0", cval.str, 1),
-              "Invalid live restore metadata detected while cleaning string");
+            WT_ASSERT_ALWAYS(session, cval.len == 1 && WT_STRING_LIT_MATCH("0", cval.str, 1),
+              "nbits value other than -1 or 0 found when cleaning metadata string: %s\n", value);
     }
 
     return (0);
