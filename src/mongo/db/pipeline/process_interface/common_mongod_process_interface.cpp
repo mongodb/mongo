@@ -77,7 +77,6 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -595,60 +594,23 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     std::vector<NamespaceStringOrUUID> secondaryNamespaces = lpp.getForeignExecutionNamespaces();
     auto* opCtx = expCtx->getOperationContext();
 
-    const auto& primaryNss = expCtx->getNamespaceString();
-    AutoStatsTracker tracker{opCtx,
-                             primaryNss,
-                             Top::LockType::ReadLocked,
-                             AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                             DatabaseProfileSettings::get(opCtx->getServiceContext())
-                                 .getDatabaseProfileLevel(primaryNss.dbName()),
-                             Date_t::max(),
-                             secondaryNamespaces.cbegin(),
-                             secondaryNamespaces.cend()};
-
-    CollectionOrViewAcquisitionMap allAcquisitions;
+    boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl = boost::none;
     auto initAutoGetCallback = [&]() {
-        CollectionOrViewAcquisitionRequests requests;
-        requests.reserve(secondaryNamespaces.size() + 1);
-        std::transform(secondaryNamespaces.begin(),
-                       secondaryNamespaces.end(),
-                       std::back_inserter(requests),
-                       [opCtx](const NamespaceStringOrUUID& nsOrUuid) {
-                           return CollectionOrViewAcquisitionRequest::fromOpCtx(
-                               opCtx, nsOrUuid, AcquisitionPrerequisites::kRead);
-                       });
-        // Append acquisition for the primary nss.
-        requests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx,
-            primaryNss,
-            AcquisitionPrerequisites::kRead,
-            AcquisitionPrerequisites::kMustBeCollection));
-
-        // Acquire all the nss at the same snapshot.
-        allAcquisitions =
-            makeAcquisitionMap(acquireCollectionsOrViewsMaybeLockFree(opCtx, requests));
+        autoColl.emplace(opCtx,
+                         expCtx->getNamespaceString(),
+                         AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                             secondaryNamespaces.cbegin(), secondaryNamespaces.cend()),
+                         AutoStatsTracker::LogMode::kUpdateTop);
     };
 
-    bool isAnySecondaryCollectionNotLocal =
-        initializeAutoGet(opCtx, primaryNss, secondaryNamespaces, initAutoGetCallback);
+    bool isAnySecondaryCollectionNotLocal = initializeAutoGet(
+        opCtx, expCtx->getNamespaceString(), secondaryNamespaces, initAutoGetCallback);
 
-    // Extract the main acquisition.
-    auto primaryAcquisition = allAcquisitions.extract(primaryNss).mapped();
-    auto& secondaryAcquisitions = allAcquisitions;
+    tassert(8322002,
+            "Should have initialized AutoGet* after calling 'initializeAutoGet'",
+            autoColl.has_value());
 
-    tassert(10004200,
-            "Expected the primary namespace to be a collection.",
-            primaryAcquisition.isCollection());
-
-    bool isAnySecondaryNamespaceAView =
-        std::any_of(secondaryAcquisitions.begin(),
-                    secondaryAcquisitions.end(),
-                    [](const auto& acq) { return acq.second.isView(); });
-
-    bool isAnySecondaryNamespaceAViewOrNotFullyLocal =
-        isAnySecondaryNamespaceAView || isAnySecondaryCollectionNotLocal;
-
-    const auto& collPtr = primaryAcquisition.getCollection().getCollectionPtr();
+    const auto& collPtr = autoColl->getCollection();
     if (aggRequest && aggRequest->getCollectionUUID() && collPtr) {
         checkCollectionUUIDMismatch(
             opCtx, expCtx->getNamespaceString(), collPtr, aggRequest->getCollectionUUID());
@@ -661,20 +623,19 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
         expCtx->setCollator(collPtr->getDefaultCollator()->clone());
     }
 
-    MultipleCollectionAccessor holder{
-        primaryAcquisition, secondaryAcquisitions, isAnySecondaryNamespaceAViewOrNotFullyLocal};
-
+    MultipleCollectionAccessor holder{expCtx->getOperationContext(),
+                                      &autoColl->getCollection(),
+                                      autoColl->getNss(),
+                                      autoColl->isAnySecondaryNamespaceAView() ||
+                                          isAnySecondaryCollectionNotLocal,
+                                      secondaryNamespaces};
     auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
-    auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
     PipelineD::buildAndAttachInnerQueryExecutorToPipeline(holder,
                                                           expCtx->getNamespaceString(),
                                                           resolvedAggRequest,
                                                           pipeline.get(),
-                                                          sharedStasher,
+                                                          nullptr /* transactionResourcesStasher */,
                                                           shardFilterPolicy);
-
-    // Stash resources to free locks.
-    stashTransactionResourcesFromOperationContext(opCtx, sharedStasher.get());
 
     return pipeline;
 }
