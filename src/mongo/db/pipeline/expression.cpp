@@ -630,10 +630,9 @@ intrusive_ptr<Expression> ExpressionCompare::parse(ExpressionContext* const expC
                                                    BSONElement bsonExpr,
                                                    const VariablesParseState& vps,
                                                    CmpOp op) {
-    intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(expCtx, op);
     ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
-    expr->validateArguments(args);
-    expr->_children = std::move(args);
+    intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(expCtx, op, std::move(args));
+    expr->validateChildren();
     return expr;
 }
 
@@ -715,12 +714,14 @@ boost::intrusive_ptr<Expression> ExpressionCond::create(ExpressionContext* const
                                                         boost::intrusive_ptr<Expression> ifExp,
                                                         boost::intrusive_ptr<Expression> elseExpr,
                                                         boost::intrusive_ptr<Expression> thenExpr) {
-    intrusive_ptr<ExpressionCond> ret = new ExpressionCond(expCtx);
-    ret->_children.resize(3);
+    ExpressionVector children;
+    children.resize(3);
+    children[0] = ifExp;
+    children[1] = elseExpr;
+    children[2] = thenExpr;
 
-    ret->_children[0] = ifExp;
-    ret->_children[1] = elseExpr;
-    ret->_children[2] = thenExpr;
+    intrusive_ptr<ExpressionCond> ret = new ExpressionCond(expCtx, std::move(children));
+
     return ret;
 }
 
@@ -732,26 +733,28 @@ intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
     }
     MONGO_verify(expr.fieldNameStringData() == "$cond");
 
-    intrusive_ptr<ExpressionCond> ret = new ExpressionCond(expCtx);
-    ret->_children.resize(3);
+    ExpressionVector children;
+    children.resize(3);
 
     const BSONObj args = expr.embeddedObject();
     for (auto&& arg : args) {
         if (arg.fieldNameStringData() == "if") {
-            ret->_children[0] = parseOperand(expCtx, arg, vps);
+            children[0] = parseOperand(expCtx, arg, vps);
         } else if (arg.fieldNameStringData() == "then") {
-            ret->_children[1] = parseOperand(expCtx, arg, vps);
+            children[1] = parseOperand(expCtx, arg, vps);
         } else if (arg.fieldNameStringData() == "else") {
-            ret->_children[2] = parseOperand(expCtx, arg, vps);
+            children[2] = parseOperand(expCtx, arg, vps);
         } else {
             uasserted(17083,
                       str::stream() << "Unrecognized parameter to $cond: " << arg.fieldName());
         }
     }
 
-    uassert(17080, "Missing 'if' parameter to $cond", ret->_children[0]);
-    uassert(17081, "Missing 'then' parameter to $cond", ret->_children[1]);
-    uassert(17082, "Missing 'else' parameter to $cond", ret->_children[2]);
+    uassert(17080, "Missing 'if' parameter to $cond", children[0]);
+    uassert(17081, "Missing 'then' parameter to $cond", children[1]);
+    uassert(17082, "Missing 'else' parameter to $cond", children[2]);
+
+    intrusive_ptr<ExpressionCond> ret = new ExpressionCond(expCtx, std::move(children));
 
     return ret;
 }
@@ -2165,10 +2168,10 @@ const char* ExpressionMultiply::getOpName() const {
 
 /* ----------------------- ExpressionIfNull ---------------------------- */
 
-void ExpressionIfNull::validateArguments(const ExpressionVector& args) const {
+void ExpressionIfNull::validateChildren() const {
     uassert(1257300,
-            str::stream() << "$ifNull needs at least two arguments, had: " << args.size(),
-            args.size() >= 2);
+            str::stream() << "$ifNull needs at least two arguments, had: " << _children.size(),
+            _children.size() >= 2);
 }
 
 Value ExpressionIfNull::evaluate(const Document& root, Variables* variables) const {
@@ -2922,10 +2925,10 @@ const char* ExpressionSetDifference::getOpName() const {
 
 /* ----------------------- ExpressionSetEquals ---------------------------- */
 
-void ExpressionSetEquals::validateArguments(const ExpressionVector& args) const {
+void ExpressionSetEquals::validateChildren() const {
     uassert(17045,
-            str::stream() << "$setEquals needs at least two arguments had: " << args.size(),
-            args.size() >= 2);
+            str::stream() << "$setEquals needs at least two arguments had: " << _children.size(),
+            _children.size() >= 2);
 }
 
 Value ExpressionSetEquals::evaluate(const Document& root, Variables* variables) const {
