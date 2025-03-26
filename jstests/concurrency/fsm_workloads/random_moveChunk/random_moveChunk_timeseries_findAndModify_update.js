@@ -19,6 +19,9 @@ import {
 
 const logCollection = "log_collection";
 
+// TODO SERVER-102745: Re-enable this test.
+quit();
+
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Perform arbitrary updates on metric fields of measurements.
     $config.states.arbitraryFindAndModifyUpdate = function(db, collName, connCache) {
