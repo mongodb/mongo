@@ -4,8 +4,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-import typer
-from typing_extensions import Annotated
+# WARNING: this file is imported from outside of any virtual env so the main import block MUST NOT
+# import any third-party non-std libararies. Libraries needed when running as a script can be
+# conditionally imported below.
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -103,7 +104,7 @@ def _get_bazel_toolchain_path(version: str) -> Path:
     return _get_bazel_execroot() / "external" / f"mongo_toolchain_{version}" / version
 
 
-def _get_toolchain_from_path(path: str) -> MongoToolchain:
+def _get_toolchain_from_path(path: str | Path) -> MongoToolchain:
     toolchain = MongoToolchain(Path(path).resolve())
     toolchain.check_exists()
     return toolchain
@@ -173,29 +174,31 @@ def try_get_mongo_toolchain(*args, **kwargs) -> MongoToolchain | None:
         return None
 
 
-_app = typer.Typer(add_completion=False)
-
-
-@_app.command()
-def main(
-    tool: Annotated[Optional[str], typer.Argument()] = None,
-    version: Annotated[Optional[str], typer.Option("--version")] = None,
-    from_bazel: Annotated[Optional[bool], typer.Option("--bazel/--no-bazel")] = None,
-):
-    """
-    Prints the path to tools in the mongo toolchain or the toolchain's root directory (which
-    should contain bin/, include/, and so on).
-    If MONGO_TOOLCHAIN_PATH is set in the environment, it overrides all options to this script.
-    Otherwise, MONGO_TOOLCHAIN_VERSION is a lower-precedence alternative to --version and
-    MONGO_TOOLCHAIN_FROM_BAZEL is a lower-precedence alternative to --bazel/--no-bazel.
-    None of these are required, and if none are given, the default configuration will be used.
-    """
-    toolchain = get_mongo_toolchain(version=version, from_bazel=from_bazel)
-    if tool is not None:
-        print(toolchain.get_tool_path(tool))
-    else:
-        print(toolchain.get_root_dir())
-
-
 if __name__ == "__main__":
+    # See comment on main import block
+    import typer
+    from typing_extensions import Annotated
+
+    _app = typer.Typer(add_completion=False)
+
+    @_app.command()
+    def main(
+        tool: Annotated[Optional[str], typer.Argument()] = None,
+        version: Annotated[Optional[str], typer.Option("--version")] = None,
+        from_bazel: Annotated[Optional[bool], typer.Option("--bazel/--no-bazel")] = None,
+    ):
+        """
+        Prints the path to tools in the mongo toolchain or the toolchain's root directory (which
+        should contain bin/, include/, and so on).
+        If MONGO_TOOLCHAIN_PATH is set in the environment, it overrides all options to this script.
+        Otherwise, MONGO_TOOLCHAIN_VERSION is a lower-precedence alternative to --version and
+        MONGO_TOOLCHAIN_FROM_BAZEL is a lower-precedence alternative to --bazel/--no-bazel.
+        None of these are required, and if none are given, the default configuration will be used.
+        """
+        toolchain = get_mongo_toolchain(version=version, from_bazel=from_bazel)
+        if tool is not None:
+            print(toolchain.get_tool_path(tool))
+        else:
+            print(toolchain.get_root_dir())
+
     _app()
