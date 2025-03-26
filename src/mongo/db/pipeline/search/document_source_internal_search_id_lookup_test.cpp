@@ -115,8 +115,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotRemoveMetadata) {
     // Create a mock data source.
     MutableDocument docOne(Document({{"_id", 0}}));
     docOne.metadata().setSearchScore(0.123);
-    auto searchScoreDetails = BSON("scoreDetails"
-                                   << "foo");
+    auto searchScoreDetails = BSON("scoreDetails" << "foo");
     docOne.metadata().setSearchScoreDetails(searchScoreDetails);
     DocumentSourceMock mockLocalSource({docOne.freeze()}, expCtx);
 
@@ -181,21 +180,18 @@ TEST_F(InternalSearchIdLookupTest, ShouldFailToParseInvalidArgumentTypes) {
 
     // Test parsing with not an object.
     ASSERT_THROWS_CODE(
-        DocumentSourceInternalSearchIdLookUp::createFromBson(BSON("$_internalSearchIdLookup"
-                                                                  << "string spec")
-                                                                 .firstElement(),
-                                                             expCtx),
+        DocumentSourceInternalSearchIdLookUp::createFromBson(
+            BSON("$_internalSearchIdLookup" << "string spec").firstElement(), expCtx),
         AssertionException,
         ErrorCodes::FailedToParse);
 
     // Test parsing with an unknown field.
-    ASSERT_THROWS_CODE(DocumentSourceInternalSearchIdLookUp::createFromBson(
-                           BSON("$_internalSearchIdLookup" << BSON("unknownParameter"
-                                                                   << "a"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       ErrorCodes::IDLUnknownField);
+    ASSERT_THROWS_CODE(
+        DocumentSourceInternalSearchIdLookUp::createFromBson(
+            BSON("$_internalSearchIdLookup" << BSON("unknownParameter" << "a")).firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::IDLUnknownField);
 }
 
 TEST_F(InternalSearchIdLookupTest, ShouldAllowStringOrObjectIdValues) {

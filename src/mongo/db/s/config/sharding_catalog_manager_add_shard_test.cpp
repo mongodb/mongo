@@ -217,10 +217,9 @@ protected:
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, nss.dbName());
-            ASSERT_BSONOBJ_EQ(request.cmdObj,
-                              BSON("drop" << nss.coll() << "writeConcern"
-                                          << BSON("w"
-                                                  << "majority")));
+            ASSERT_BSONOBJ_EQ(
+                request.cmdObj,
+                BSON("drop" << nss.coll() << "writeConcern" << BSON("w" << "majority")));
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("ok" << 1);
@@ -255,20 +254,16 @@ protected:
                               BSON("find"
                                    << NamespaceString::kUserWritesCriticalSectionsNamespace.coll()
                                    << "maxTimeMS" << 60000 << "readConcern"
-                                   << BSON("level"
-                                           << "majority")));
+                                   << BSON("level" << "majority")));
 
-            auto cursorRes =
-                CursorResponse(NamespaceString::createNamespaceString_forTest(
-                                   request.dbname,
-                                   NamespaceString::kUserWritesCriticalSectionsNamespace.coll()),
-                               0,
-                               {
-                                   BSON("_id"
-                                        << "doc1"),
-                                   BSON("_id"
-                                        << "doc2"),
-                               });
+            auto cursorRes = CursorResponse(
+                NamespaceString::createNamespaceString_forTest(
+                    request.dbname, NamespaceString::kUserWritesCriticalSectionsNamespace.coll()),
+                0,
+                {
+                    BSON("_id" << "doc1"),
+                    BSON("_id" << "doc2"),
+                });
             return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
         });
 
@@ -276,21 +271,16 @@ protected:
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname,
                       NamespaceString::kUserWritesCriticalSectionsNamespace.dbName());
-            ASSERT_BSONOBJ_EQ(request.cmdObj,
-                              BSON("delete"
-                                   << NamespaceString::kUserWritesCriticalSectionsNamespace.coll()
-                                   << "bypassDocumentValidation" << false << "ordered" << true
-                                   << "deletes"
-                                   << BSON_ARRAY(BSON("q" << BSON("_id"
-                                                                  << "doc1")
-                                                          << "limit" << 1)
-                                                 << BSON("q" << BSON("_id"
-                                                                     << "doc2")
-                                                             << "limit" << 1))
-                                   << "writeConcern"
-                                   << BSON("w"
-                                           << "majority"
-                                           << "wtimeout" << 60000)));
+            ASSERT_BSONOBJ_EQ(
+                request.cmdObj,
+                BSON("delete" << NamespaceString::kUserWritesCriticalSectionsNamespace.coll()
+                              << "bypassDocumentValidation" << false << "ordered" << true
+                              << "deletes"
+                              << BSON_ARRAY(BSON("q" << BSON("_id" << "doc1") << "limit" << 1)
+                                            << BSON("q" << BSON("_id" << "doc2") << "limit" << 1))
+                              << "writeConcern"
+                              << BSON("w" << "majority"
+                                          << "wtimeout" << 60000)));
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("ok" << 1);
@@ -318,16 +308,13 @@ protected:
                 ASSERT_BSONOBJ_EQ(request.cmdObj,
                                   BSON("find" << NamespaceString::kClusterParametersNamespace.coll()
                                               << "maxTimeMS" << 60000 << "readConcern"
-                                              << BSON("level"
-                                                      << "majority")));
-                auto cursorRes =
-                    CursorResponse(
-                        NamespaceString::createNamespaceString_forTest(
-                            request.dbname, NamespaceString::kClusterParametersNamespace.coll()),
-                        0,
-                        {BSON("_id"
-                              << "testStrClusterParameter"
-                              << "strData" << request.dbname.toStringWithTenantId_forTest())});
+                                              << BSON("level" << "majority")));
+                auto cursorRes = CursorResponse(
+                    NamespaceString::createNamespaceString_forTest(
+                        request.dbname, NamespaceString::kClusterParametersNamespace.coll()),
+                    0,
+                    {BSON("_id" << "testStrClusterParameter"
+                                << "strData" << request.dbname.toStringWithTenantId_forTest())});
                 return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse,
                                         serializationCtx);
             });
@@ -361,8 +348,7 @@ protected:
             ASSERT_BSONOBJ_EQ(request.cmdObj,
                               BSON("find" << NamespaceString::kKeysCollectionNamespace.coll()
                                           << "maxTimeMS" << 60000 << "readConcern"
-                                          << BSON("level"
-                                                  << "local")));
+                                          << BSON("level" << "local")));
 
             KeysCollectionDocument key(1);
             key.setKeysCollectionDocumentBase(
@@ -440,9 +426,8 @@ protected:
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
             NamespaceString::createNamespaceString_forTest("config.changelog"),
-            BSON("what"
-                 << "addShard"
-                 << "details.name" << addedShard.getName()),
+            BSON("what" << "addShard"
+                        << "details.name" << addedShard.getName()),
             BSONObj(),
             1));
         ASSERT_EQ(1U, response.docs.size());
@@ -615,9 +600,7 @@ TEST_F(AddShardTest, AddMongosAsShard) {
         ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
     });
 
-    expectHello(shardTarget,
-                BSON("msg"
-                     << "isdbgrid"));
+    expectHello(shardTarget, BSON("msg" << "isdbgrid"));
 
     future.timed_get(kLongFutureTimeout);
 }

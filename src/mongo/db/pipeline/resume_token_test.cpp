@@ -116,9 +116,8 @@ TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexEncoding) {
 }
 
 TEST(ResumeToken, NonDocumentKeyResumeTokenRoundTripsThroughHexEncoding) {
-    auto eventIdentifier = Value(BSON("operationType"
-                                      << "create"
-                                      << "operationDescription" << BSONObj()));
+    auto eventIdentifier = Value(BSON("operationType" << "create"
+                                                      << "operationDescription" << BSONObj()));
     ResumeTokenData resumeTokenDataIn{Timestamp{1001, 3},
                                       ResumeTokenData::kDefaultTokenVersion,
                                       /* txnOpIndex */ 0,

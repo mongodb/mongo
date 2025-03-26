@@ -89,18 +89,15 @@ boost::intrusive_ptr<DocumentSource> addScoreDetails(
             // {$addFields: {prefix_scoreDetails: {$meta: "scoreDetails"}}}
             // We don't grab {$meta: "score"} because we assume any existing scoreDetails already
             // includes its own score at "scoreDetails.value".
-            addFieldsBob.append(scoreDetails,
-                                BSON("$meta"
-                                     << "scoreDetails"));
+            addFieldsBob.append(scoreDetails, BSON("$meta" << "scoreDetails"));
         } else if (inputGeneratesScore) {
             // If the input pipeline does not generate scoreDetails but does generate a "score" (for
             // example, a $text query sorted on the text score), we'll build our own scoreDetails
             // for the pipeline like:
             // {$addFields: {prefix_scoreDetails: {value: {$meta: "score"}, details: []}}}
-            addFieldsBob.append(scoreDetails,
-                                BSON("value" << BSON("$meta"
-                                                     << "score")
-                                             << "details" << BSONArrayBuilder().arr()));
+            addFieldsBob.append(
+                scoreDetails,
+                BSON("value" << BSON("$meta" << "score") << "details" << BSONArrayBuilder().arr()));
         } else {
             // If the input pipeline generates neither "score" not "scoreDetails" (for example, a
             // pipeline with just a $sort), we don't have any interesting information to include in
@@ -157,10 +154,10 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
     auto setScoreDetails = DocumentSourceSetMetadata::create(
         expCtx,
         Expression::parseObject(expCtx.get(),
-                                BSON("value"
-                                     << "$score"
-                                     << "description" << scoreDetailsDescription << "details"
-                                     << "$calculatedScoreDetails"),
+                                BSON("value" << "$score"
+                                             << "description" << scoreDetailsDescription
+                                             << "details"
+                                             << "$calculatedScoreDetails"),
                                 expCtx->variablesParseState),
         DocumentMetadataFields::kScoreDetails);
     return setScoreDetails;

@@ -396,10 +396,9 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesFieldsContainingStrin
     OrderedIntervalList oilC{};
     oilC.name = "c";
     oilC.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                   << "a"
-                                                   << ""
-                                                   << "b"),
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << "a"
+                                                      << ""
+                                                      << "b"),
                                               BoundInclusion::kIncludeBothStartAndEndKeys));
     bounds.fields.push_back(oilC);
 
@@ -757,8 +756,7 @@ TEST(QuerySolutionTest, HashedIndexScanNodeDoesTruncatesSortWhenCollationDoesntM
 
     OrderedIntervalList b{};
     b.name = "b";
-    b.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON(""
-                                                                     << "p")));
+    b.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << "p")));
     node.bounds.fields.push_back(b);
 
     OrderedIntervalList c{};
@@ -800,10 +798,9 @@ TEST(QuerySolutionTest,
     OrderedIntervalList b{};
     b.name = "b";
     b.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                   << "a"
-                                                   << ""
-                                                   << "b"),
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << "a"
+                                                      << ""
+                                                      << "b"),
                                               BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(b);
 
@@ -958,8 +955,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatch)
 
     OrderedIntervalList b{};
     b.name = "b.d";
-    b.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON(""
-                                                                     << "p")));
+    b.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << "p")));
     node.bounds.fields.push_back(b);
 
     OrderedIntervalList c{};
@@ -1015,10 +1011,9 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatchW
     OrderedIntervalList b{};
     b.name = "b.d";
     b.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                   << "a"
-                                                   << ""
-                                                   << "b"),
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << "a"
+                                                      << ""
+                                                      << "b"),
                                               BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(b);
 
@@ -1065,8 +1060,7 @@ TEST(QuerySolutionTest, CompoundIndexWithNonMatchingCollationFiltersAllSortsWith
 
     OrderedIntervalList b{};
     b.name = "b";
-    b.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON(""
-                                                                     << "p")));
+    b.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << "p")));
     node.bounds.fields.push_back(b);
 
     OrderedIntervalList c{};
@@ -1151,10 +1145,9 @@ TEST(QuerySolutionTest, WithNonMatchingCollatorAndNoEqualityPrefixSortsAreNotDup
     OrderedIntervalList oilB{};
     oilB.name = "b";
     oilB.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                   << "a"
-                                                   << ""
-                                                   << "b"),
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << "a"
+                                                      << ""
+                                                      << "b"),
                                               BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilB);
     node.computeProperties();
@@ -1170,10 +1163,9 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldIncludesStringFieldWhenNoCollator) 
     OrderedIntervalList oilA{};
     oilA.name = "a";
     oilA.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                   << "str"
-                                                   << ""
-                                                   << "str"),
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << "str"
+                                                      << ""
+                                                      << "str"),
                                               BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilA);
 
@@ -1212,10 +1204,9 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesStringFieldWhenIndexHasColl
     OrderedIntervalList oilB{};
     oilB.name = "b";
     oilB.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                   << "bar"
-                                                   << ""
-                                                   << "foo"),
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << "bar"
+                                                      << ""
+                                                      << "foo"),
                                               BoundInclusion::kIncludeStartKeyOnly));
     node.bounds.fields.push_back(oilB);
 

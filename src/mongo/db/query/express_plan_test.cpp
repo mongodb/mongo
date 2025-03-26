@@ -281,9 +281,8 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
     StringData indexName = "a_1"_sd;
-    auto collationSpec = BSON("locale"
-                              << "en_US"
-                              << "strength" << 2);
+    auto collationSpec = BSON("locale" << "en_US"
+                                       << "strength" << 2);
     auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1) << "collation"
                               << collationSpec);
     auto collection = createAndPopulateTestCollectionWithIndex(

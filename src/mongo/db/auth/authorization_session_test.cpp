@@ -472,26 +472,22 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
 TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRestrictions) {
     ASSERT_OK(backendMock->insertUserDocument(
         _opCtx.get(),
-        BSON("user"
-             << "spencer"
-             << "db"
-             << "test"
-             << "credentials" << credentials << "roles"
-             << BSON_ARRAY(BSON("role"
-                                << "readWrite"
-                                << "db"
-                                << "test"))
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("192.168.0.0/24"
-                                                             << "192.168.2.10")
+        BSON("user" << "spencer"
+                    << "db"
+                    << "test"
+                    << "credentials" << credentials << "roles"
+                    << BSON_ARRAY(BSON("role" << "readWrite"
+                                              << "db"
+                                              << "test"))
+                    << "authenticationRestrictions"
+                    << BSON_ARRAY(
+                           BSON("clientSource" << BSON_ARRAY("192.168.0.0/24" << "192.168.2.10")
                                                << "serverAddress" << BSON_ARRAY("192.168.0.2"))
                            << BSON("clientSource" << BSON_ARRAY("2001:DB8::1") << "serverAddress"
                                                   << BSON_ARRAY("2001:DB8::2"))
-                           << BSON("clientSource" << BSON_ARRAY("127.0.0.1"
-                                                                << "::1")
+                           << BSON("clientSource" << BSON_ARRAY("127.0.0.1" << "::1")
                                                   << "serverAddress"
-                                                  << BSON_ARRAY("127.0.0.1"
-                                                                << "::1")))),
+                                                  << BSON_ARRAY("127.0.0.1" << "::1")))),
         BSONObj()));
 
 
@@ -891,8 +887,7 @@ TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotVa
 
         authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
 
-        BSONArray pipeline = BSON_ARRAY(BSON("$out"
-                                             << ""));
+        BSONArray pipeline = BSON_ARRAY(BSON("$out" << ""));
         auto aggReq = buildAggReq(nss, pipeline);
         ASSERT_THROWS_CODE(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false),
                            AssertionException,
@@ -1388,8 +1383,7 @@ TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
 }
 
 TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
-    BSONObj stringObj = BSON("a"
-                             << "string");
+    BSONObj stringObj = BSON("a" << "string");
     BSONObj uuidObj = BSON("a" << UUID::gen());
 
     // Strings require no privileges
@@ -1425,15 +1419,13 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
 
     // Add a user without the restore role and ensure we can't bypass
     ASSERT_OK(backendMock->insertUserDocument(_opCtx.get(),
-                                              BSON("user"
-                                                   << "spencer"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials" << credentials << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "readWrite"
-                                                                      << "db"
-                                                                      << "test"))),
+                                              BSON("user" << "spencer"
+                                                          << "db"
+                                                          << "test"
+                                                          << "credentials" << credentials << "roles"
+                                                          << BSON_ARRAY(BSON("role" << "readWrite"
+                                                                                    << "db"
+                                                                                    << "test"))),
                                               BSONObj()));
     ASSERT_OK(
         authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
@@ -1441,15 +1433,13 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
 
     // Add a user with restore role on admin db and ensure we can bypass
     ASSERT_OK(backendMock->insertUserDocument(_opCtx.get(),
-                                              BSON("user"
-                                                   << "gmarks"
-                                                   << "db"
-                                                   << "admin"
-                                                   << "credentials" << credentials << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "restore"
-                                                                      << "db"
-                                                                      << "admin"))),
+                                              BSON("user" << "gmarks"
+                                                          << "db"
+                                                          << "admin"
+                                                          << "credentials" << credentials << "roles"
+                                                          << BSON_ARRAY(BSON("role" << "restore"
+                                                                                    << "db"
+                                                                                    << "admin"))),
                                               BSONObj()));
     authzSession->logoutDatabase(kTestDB, "End of test"_sd);
 
@@ -1464,15 +1454,13 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
     // Add a user with the root role, which should confer restore role for cluster resource, and
     // ensure we can bypass
     ASSERT_OK(backendMock->insertUserDocument(_opCtx.get(),
-                                              BSON("user"
-                                                   << "admin"
-                                                   << "db"
-                                                   << "admin"
-                                                   << "credentials" << credentials << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "root"
-                                                                      << "db"
-                                                                      << "admin"))),
+                                              BSON("user" << "admin"
+                                                          << "db"
+                                                          << "admin"
+                                                          << "credentials" << credentials << "roles"
+                                                          << BSON_ARRAY(BSON("role" << "root"
+                                                                                    << "db"
+                                                                                    << "admin"))),
                                               BSONObj()));
     authzSession->logoutDatabase(kAdminDB, ""_sd);
 

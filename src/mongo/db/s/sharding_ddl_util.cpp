@@ -283,8 +283,7 @@ void deleteShardingIndexCatalogMetadata(OperationContext* opCtx,
 
 write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
     write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
-    auto queryFilter = BSON("_id"
-                            << "shardingDDLCoordinatorRecoveryDoc");
+    auto queryFilter = BSON("_id" << "shardingDDLCoordinatorRecoveryDoc");
     auto updateModification =
         write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$inc" << BSON("noopWriteCount" << 1))));
@@ -618,10 +617,11 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to) {
     return BSON(
-        "command"
-        << "rename"
-        << "from" << NamespaceStringUtil::serialize(from, SerializationContext::stateDefault())
-        << "to" << NamespaceStringUtil::serialize(to, SerializationContext::stateDefault()));
+        "command" << "rename"
+                  << "from"
+                  << NamespaceStringUtil::serialize(from, SerializationContext::stateDefault())
+                  << "to"
+                  << NamespaceStringUtil::serialize(to, SerializationContext::stateDefault()));
 }
 
 void runTransactionOnShardingCatalog(OperationContext* opCtx,

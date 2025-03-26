@@ -883,7 +883,9 @@ public:
 
 TEST_F(AsioTransportLayerWithServiceContextTest, TimerServiceDoesNotSpawnThreadsBeforeStart) {
     ThreadCounter counter;
-    { AsioTransportLayer::TimerService service{{counter.makeSpawnFunc()}}; }
+    {
+        AsioTransportLayer::TimerService service{{counter.makeSpawnFunc()}};
+    }
     ASSERT_EQ(counter.created(), 0);
 }
 

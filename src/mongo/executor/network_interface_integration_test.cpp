@@ -197,9 +197,8 @@ public:
     }
 
     BSONObj makeFindCmdObj() {
-        return BSON("find"
-                    << "test"
-                    << "filter" << BSONObj());
+        return BSON("find" << "test"
+                           << "filter" << BSONObj());
     }
 
     BSONObj makeSleepCmdObj() {
@@ -209,14 +208,12 @@ public:
     }
 
     RemoteCommandResponse runCurrentOpForCommand(HostAndPort target, const std::string command) {
-        const auto cmdObj =
-            BSON("aggregate" << 1 << "pipeline"
-                             << BSON_ARRAY(BSON("$currentOp" << BSON("localOps" << true))
-                                           << BSON("$match" << BSON(("command." + command)
-                                                                    << BSON("$exists" << true))))
-                             << "cursor" << BSONObj() << "$readPreference"
-                             << BSON("mode"
-                                     << "nearest"));
+        const auto cmdObj = BSON(
+            "aggregate" << 1 << "pipeline"
+                        << BSON_ARRAY(BSON("$currentOp" << BSON("localOps" << true))
+                                      << BSON("$match" << BSON(("command." + command)
+                                                               << BSON("$exists" << true))))
+                        << "cursor" << BSONObj() << "$readPreference" << BSON("mode" << "nearest"));
         RemoteCommandRequest request{
             target, DatabaseName::kAdmin, cmdObj, BSONObj(), nullptr, kNoTimeout};
         auto res = runCommandSync(request);
@@ -405,10 +402,9 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotely) {
     ON_BLOCK_EXIT([&] {
         // Disable blockConnection.
         assertCommandOK(DatabaseName::kAdmin,
-                        BSON("configureFailPoint"
-                             << "failCommand"
-                             << "mode"
-                             << "off"),
+                        BSON("configureFailPoint" << "failCommand"
+                                                  << "mode"
+                                                  << "off"),
                         kNoTimeout);
     });
 
@@ -456,17 +452,15 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
                          << "data"
                          << BSON("blockConnection" << true << "blockTimeMS" << 5000
                                                    << "failCommands"
-                                                   << BSON_ARRAY("echo"
-                                                                 << "_killOperations"))),
+                                                   << BSON_ARRAY("echo" << "_killOperations"))),
                     kNoTimeout);
 
     ON_BLOCK_EXIT([&] {
         // Disable blockConnection.
         assertCommandOK(DatabaseName::kAdmin,
-                        BSON("configureFailPoint"
-                             << "failCommand"
-                             << "mode"
-                             << "off"),
+                        BSON("configureFailPoint" << "failCommand"
+                                                  << "mode"
+                                                  << "off"),
                         kNoTimeout);
     });
 
@@ -582,12 +576,12 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutDuringConnectionHands
 
     // If network timeout occurs during connection setup before handshake completes,
     // HostUnreachable should be returned.
-    FailPointEnableBlock fpb1("connectionPoolDropConnectionsBeforeGetConnection",
-                              BSON("instance"
-                                   << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
-    FailPointEnableBlock fpb2("triggerConnectionSetupHandshakeTimeout",
-                              BSON("instance"
-                                   << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
+    FailPointEnableBlock fpb1(
+        "connectionPoolDropConnectionsBeforeGetConnection",
+        BSON("instance" << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
+    FailPointEnableBlock fpb2(
+        "triggerConnectionSetupHandshakeTimeout",
+        BSON("instance" << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
     auto cbh = makeCallbackHandle();
     auto deferred = runCommand(cbh, makeTestCommand(Milliseconds(100), makeEchoCmdObj()));
 
@@ -811,10 +805,9 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, FireAndForget) {
 
     ON_BLOCK_EXIT([&] {
         assertCommandOK(DatabaseName::kAdmin,
-                        BSON("configureFailPoint"
-                             << "failCommand"
-                             << "mode"
-                             << "off"));
+                        BSON("configureFailPoint" << "failCommand"
+                                                  << "mode"
+                                                  << "off"));
     });
 
     // Run fireAndForget commands and verify that we get status OK responses.
@@ -939,19 +932,17 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
     const auto opKey = UUID::gen();
     assertCommandOK(DatabaseName::kAdmin,
-                    BSON("configureFailPoint"
-                         << "failIfOperationKeyMismatch"
-                         << "mode"
-                         << "alwaysOn"
-                         << "data" << BSON("clientOperationKey" << opKey)),
+                    BSON("configureFailPoint" << "failIfOperationKeyMismatch"
+                                              << "mode"
+                                              << "alwaysOn"
+                                              << "data" << BSON("clientOperationKey" << opKey)),
                     kNoTimeout);
 
     ON_BLOCK_EXIT([&] {
         assertCommandOK(DatabaseName::kAdmin,
-                        BSON("configureFailPoint"
-                             << "failIfOperationKeyMismatch"
-                             << "mode"
-                             << "off"),
+                        BSON("configureFailPoint" << "failIfOperationKeyMismatch"
+                                                  << "mode"
+                                                  << "off"),
                         kNoTimeout);
     });
 
@@ -994,21 +985,19 @@ TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldReceiveMultipleResponses) 
 TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
     // Both assetCommandOK and makeTestCommand target the first host in the connection string, so we
     // are guaranteed that the failpoint is set on the same host that we run the exhaust command on.
-    auto configureFailpointCmd = BSON("configureFailPoint"
-                                      << "failCommand"
-                                      << "mode"
-                                      << "alwaysOn"
-                                      << "data"
-                                      << BSON("errorCode" << ErrorCodes::CommandFailed
-                                                          << "failCommands"
-                                                          << BSON_ARRAY("isMaster")));
+    auto configureFailpointCmd =
+        BSON("configureFailPoint" << "failCommand"
+                                  << "mode"
+                                  << "alwaysOn"
+                                  << "data"
+                                  << BSON("errorCode" << ErrorCodes::CommandFailed << "failCommands"
+                                                      << BSON_ARRAY("isMaster")));
     assertCommandOK(DatabaseName::kAdmin, configureFailpointCmd);
 
     ON_BLOCK_EXIT([&] {
-        auto stopFpRequest = BSON("configureFailPoint"
-                                  << "failCommand"
-                                  << "mode"
-                                  << "off");
+        auto stopFpRequest = BSON("configureFailPoint" << "failCommand"
+                                                       << "mode"
+                                                       << "off");
         assertCommandOK(DatabaseName::kAdmin, stopFpRequest);
     });
 

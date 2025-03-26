@@ -92,7 +92,7 @@ bool ReplicationConsistencyMarkersMock::isOplogTruncateAfterPointBeingUsedForPri
 }
 
 void ReplicationConsistencyMarkersMock::setOplogTruncateAfterPointToTopOfOplog(
-    OperationContext* opCtx){};
+    OperationContext* opCtx) {};
 
 boost::optional<OpTimeAndWallTime>
 ReplicationConsistencyMarkersMock::refreshOplogTruncateAfterPointIfPrimary(

@@ -66,10 +66,8 @@ public:
                                 const UUID& collUuid,
                                 double samplesPerSec,
                                 const Date_t& startTime)
-            : _nss(nss),
-              _collUuid(collUuid),
-              _samplesPerSec(samplesPerSec),
-              _startTime(startTime){};
+            : _nss(nss), _collUuid(collUuid), _samplesPerSec(samplesPerSec), _startTime(startTime) {
+              };
 
         NamespaceString getNs() const {
             return _nss;

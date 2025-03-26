@@ -95,7 +95,9 @@ TEST(CancelTest,
      DestroyingACopyOfACancellationSourceDoesNotSetErrorOnCancellationFutureFromOriginalSource) {
     CancellationSource source;
     auto token = source.token();
-    { auto copy = source; }
+    {
+        auto copy = source;
+    }
     ASSERT_FALSE(token.onCancel().isReady());
 }
 

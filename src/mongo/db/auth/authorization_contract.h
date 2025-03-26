@@ -58,7 +58,7 @@ namespace mongo {
 class AuthorizationContract {
 public:
     AuthorizationContract() = default;
-    AuthorizationContract(bool isTestModeEnabled) : _isTestModeEnabled(isTestModeEnabled){};
+    AuthorizationContract(bool isTestModeEnabled) : _isTestModeEnabled(isTestModeEnabled) {};
 
     template <typename Checks, typename Privileges>
     AuthorizationContract(const Checks& checks, const Privileges& privileges) {

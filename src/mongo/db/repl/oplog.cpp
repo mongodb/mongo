@@ -431,25 +431,25 @@ void logOplogRecords(OperationContext* opCtx,
     }
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit([replCoord, finalOpTime, wallTime](
-                                                             OperationContext* opCtx,
-                                                             boost::optional<Timestamp>
-                                                                 commitTime) {
-        if (commitTime) {
-            // The `finalOpTime` may be less than the `commitTime` if multiple oplog entries
-            // are logging within one WriteUnitOfWork.
-            invariant(finalOpTime.getTimestamp() <= *commitTime,
-                      str::stream() << "Final OpTime: " << finalOpTime.toString()
-                                    << ". Commit Time: " << commitTime->toString());
-        }
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [replCoord, finalOpTime, wallTime](OperationContext* opCtx,
+                                           boost::optional<Timestamp> commitTime) {
+            if (commitTime) {
+                // The `finalOpTime` may be less than the `commitTime` if multiple oplog entries
+                // are logging within one WriteUnitOfWork.
+                invariant(finalOpTime.getTimestamp() <= *commitTime,
+                          str::stream() << "Final OpTime: " << finalOpTime.toString()
+                                        << ". Commit Time: " << commitTime->toString());
+            }
 
-        // Optimes on the primary should always represent consistent database states.
-        replCoord->setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward({finalOpTime, wallTime});
+            // Optimes on the primary should always represent consistent database states.
+            replCoord->setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+                {finalOpTime, wallTime});
 
-        // We set the last op on the client to 'finalOpTime', because that contains the
-        // timestamp of the operation that the client actually performed.
-        ReplClientInfo::forClient(opCtx->getClient()).setLastOp(opCtx, finalOpTime);
-    });
+            // We set the last op on the client to 'finalOpTime', because that contains the
+            // timestamp of the operation that the client actually performed.
+            ReplClientInfo::forClient(opCtx->getClient()).setLastOp(opCtx, finalOpTime);
+        });
 }
 
 OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {

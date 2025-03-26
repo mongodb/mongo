@@ -75,9 +75,7 @@ void addMatchRemovingNestedArrays(BSONArrayBuilder* pipelineBuilder, const Field
         StringData pathPrefix = unwindPath.getSubpath(i);
         // Add a clause to the $match predicate requiring that intermediate paths are objects so
         // that no implicit array traversal happens.
-        predicateBuilder.append(pathPrefix,
-                                BSON("$_internalSchemaType"
-                                     << "object"));
+        predicateBuilder.append(pathPrefix, BSON("$_internalSchemaType" << "object"));
     }
 
     predicateBuilder.doneFast();

@@ -70,7 +70,8 @@ public:
     StateMachine(const StateMachineType&) = delete;
     StateMachineType& operator=(const StateMachineType&) = delete;
 
-    StateMachine(State initialState) : _started(false), _initial(initialState), _current(nullptr){};
+    StateMachine(State initialState)
+        : _started(false), _initial(initialState), _current(nullptr) {};
 
     StateMachine(StateMachineType&& sm) {
         *this = std::move(sm);

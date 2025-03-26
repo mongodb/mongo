@@ -78,9 +78,7 @@ TEST_F(WorkingSetFixture, noFieldToGet) {
     ASSERT_TRUE(member->getFieldDotted("foo", &elt));
 
     WorkingSetMember* member = ws->get(id);
-    member->doc = {SnapshotId(),
-                   Document{BSON("fake"
-                                 << "obj")}};
+    member->doc = {SnapshotId(), Document{BSON("fake" << "obj")}};
     ws->transitionToOwnedObj(id);
     ASSERT_TRUE(member->getFieldDotted("foo", &elt));
 }

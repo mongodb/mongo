@@ -2425,10 +2425,7 @@ TEST_F(UnstructuredLoggingTest, UserBothStringAndBSON) {
 }
 
 TEST_F(UnstructuredLoggingTest, VectorBSON) {
-    std::vector<BSONObj> vectorBSON = {BSON("str1"
-                                            << "str2"),
-                                       BSON("str3"
-                                            << "str4")};
+    std::vector<BSONObj> vectorBSON = {BSON("str1" << "str2"), BSON("str3" << "str4")};
     logd("{}", vectorBSON);  // NOLINT
     validate([](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
@@ -2437,12 +2434,8 @@ TEST_F(UnstructuredLoggingTest, VectorBSON) {
 }
 
 TEST_F(UnstructuredLoggingTest, MapBSON) {
-    std::map<std::string, BSONObj> mapBSON = {{"key1",
-                                               BSON("str1"
-                                                    << "str2")},
-                                              {"key2",
-                                               BSON("str3"
-                                                    << "str4")}};
+    std::map<std::string, BSONObj> mapBSON = {{"key1", BSON("str1" << "str2")},
+                                              {"key2", BSON("str3" << "str4")}};
     logd("{}", mapBSON);  // NOLINT
     validate([](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),

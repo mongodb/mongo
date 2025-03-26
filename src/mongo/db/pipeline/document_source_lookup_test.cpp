@@ -131,10 +131,10 @@ TEST_F(DocumentSourceLookUpTest, PreservesParentPipelineLetVariables) {
     expCtx->variables.setValue(varId, Value(123));
 
     auto docSource = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                      << "as"
+                                      << "as"))
             .firstElement(),
         expCtx);
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
@@ -151,10 +151,10 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineSyntax) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto docSource = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                      << "as"
+                                      << "as"))
             .firstElement(),
         expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
@@ -169,17 +169,12 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineWithLetSyntax) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto docSource = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "let"
-                               << BSON("var1"
-                                       << "$x")
-                               << "pipeline"
-                               << BSON_ARRAY(BSON("$project" << BSON("hasX"
-                                                                     << "$$var1"))
-                                             << BSON("$match" << BSON("hasX" << true)))
-                               << "as"
-                               << "as"))
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "let" << BSON("var1" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$project" << BSON("hasX" << "$$var1"))
+                                                    << BSON("$match" << BSON("hasX" << true)))
+                                      << "as"
+                                      << "as"))
             .firstElement(),
         expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
@@ -215,34 +210,30 @@ TEST_F(DocumentSourceLookUpTest, LookupWithOutInPipelineNotAllowed) {
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     ASSERT_THROWS_CODE(
-        DocumentSourceLookUp::createFromBson(BSON("$lookup" << BSON("from"
-                                                                    << "coll"
-                                                                    << "pipeline"
-                                                                    << BSON_ARRAY(BSON("$out"
-                                                                                       << "target"))
-                                                                    << "as"
-                                                                    << "as"))
-                                                 .firstElement(),
-                                             expCtx),
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << "coll"
+                                          << "pipeline" << BSON_ARRAY(BSON("$out" << "target"))
+                                          << "as"
+                                          << "as"))
+                .firstElement(),
+            expCtx),
         AssertionException,
         ERROR_CODE_OUT_BANNED_IN_LOOKUP);
 }
 
 TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedNamespaces) {
-    auto stageSpec =
-        BSON("$lookup" << BSON("from"
-                               << "namespace1"
-                               << "pipeline"
-                               << BSON_ARRAY(BSON(
-                                      "$lookup"
-                                      << BSON("from"
-                                              << "namespace2"
-                                              << "as"
-                                              << "lookup2"
-                                              << "pipeline"
-                                              << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
-                               << "as"
-                               << "lookup1"));
+    auto stageSpec = BSON(
+        "$lookup" << BSON(
+            "from" << "namespace1"
+                   << "pipeline"
+                   << BSON_ARRAY(BSON("$lookup" << BSON(
+                                          "from" << "namespace2"
+                                                 << "as"
+                                                 << "lookup2"
+                                                 << "pipeline"
+                                                 << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
+                   << "as"
+                   << "lookup1"));
 
     auto expCtx = getExpCtx();
 
@@ -269,11 +260,10 @@ TEST_F(DocumentSourceLookUpTest, RejectLookupWhenDepthLimitIsExceeded) {
 
     ASSERT_THROWS_CODE(
         DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from"
-                                   << "coll"
-                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                   << "as"
-                                   << "as"))
+            BSON("$lookup" << BSON("from" << "coll"
+                                          << "pipeline"
+                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                          << "as"))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -322,15 +312,15 @@ TEST_F(DocumentSourceLookUpTest, AcceptsLocalFieldForeignFieldAndPipelineSyntax)
 
     try {
         auto docSource = DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from"
-                                   << "coll"
-                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                   << "localField"
-                                   << "a"
-                                   << "foreignField"
-                                   << "b"
-                                   << "as"
-                                   << "as"))
+            BSON("$lookup" << BSON("from" << "coll"
+                                          << "pipeline"
+                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                          << "localField"
+                                          << "a"
+                                          << "foreignField"
+                                          << "b"
+                                          << "as"
+                                          << "as"))
                 .firstElement(),
             expCtx);
         auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
@@ -349,21 +339,16 @@ TEST_F(DocumentSourceLookUpTest, AcceptsLocalFieldForeignFieldAndPipelineWithLet
 
     try {
         auto docSource = DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from"
-                                   << "coll"
-                                   << "let"
-                                   << BSON("var1"
-                                           << "$x")
-                                   << "pipeline"
-                                   << BSON_ARRAY(BSON("$project" << BSON("hasX"
-                                                                         << "$$var1"))
-                                                 << BSON("$match" << BSON("hasX" << true)))
-                                   << "localField"
-                                   << "a"
-                                   << "foreignField"
-                                   << "b"
-                                   << "as"
-                                   << "as"))
+            BSON("$lookup" << BSON("from" << "coll"
+                                          << "let" << BSON("var1" << "$x") << "pipeline"
+                                          << BSON_ARRAY(BSON("$project" << BSON("hasX" << "$$var1"))
+                                                        << BSON("$match" << BSON("hasX" << true)))
+                                          << "localField"
+                                          << "a"
+                                          << "foreignField"
+                                          << "b"
+                                          << "as"
+                                          << "as"))
                 .firstElement(),
             expCtx);
         auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
@@ -380,21 +365,19 @@ TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenLetIsSpecified
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(BSON("$lookup" << BSON("from"
-                                                                                   << "coll"
-                                                                                   << "let"
-                                                                                   << BSON("var1"
-                                                                                           << "$a")
-                                                                                   << "localField"
-                                                                                   << "a"
-                                                                                   << "foreignField"
-                                                                                   << "b"
-                                                                                   << "as"
-                                                                                   << "as"))
-                                                                .firstElement(),
-                                                            expCtx),
-                       AssertionException,
-                       ErrorCodes::FailedToParse);
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << "coll"
+                                          << "let" << BSON("var1" << "$a") << "localField"
+                                          << "a"
+                                          << "foreignField"
+                                          << "b"
+                                          << "as"
+                                          << "as"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
@@ -405,14 +388,13 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
 
     ASSERT_THROWS_CODE(
         DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from"
-                                   << "coll"
-                                   << "let"
-                                   << BSON(""  // Empty variable name.
-                                           << "$a")
-                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                   << "as"
-                                   << "as"))
+            BSON("$lookup" << BSON("from" << "coll"
+                                          << "let"
+                                          << BSON(""  // Empty variable name.
+                                                  << "$a")
+                                          << "pipeline"
+                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                          << "as"))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -420,14 +402,11 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
 
     ASSERT_THROWS_CODE(
         DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from"
-                                   << "coll"
-                                   << "let"
-                                   << BSON("^invalidFirstChar"
-                                           << "$a")
-                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                   << "as"
-                                   << "as"))
+            BSON("$lookup" << BSON("from" << "coll"
+                                          << "let" << BSON("^invalidFirstChar" << "$a")
+                                          << "pipeline"
+                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                          << "as"))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -435,14 +414,11 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
 
     ASSERT_THROWS_CODE(
         DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from"
-                                   << "coll"
-                                   << "let"
-                                   << BSON("contains.invalidChar"
-                                           << "$a")
-                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                   << "as"
-                                   << "as"))
+            BSON("$lookup" << BSON("from" << "coll"
+                                          << "let" << BSON("contains.invalidChar" << "$a")
+                                          << "pipeline"
+                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                          << "as"))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -456,13 +432,10 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto lookupStage = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "let"
-                               << BSON("local_x"
-                                       << "$x")
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "let" << BSON("local_x" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                      << "as"))
             .firstElement(),
         expCtx);
 
@@ -727,18 +700,15 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithFieldsA
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto lookupStage = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "let"
-                               << BSON("local_x"
-                                       << "$x")
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                               << "localField"
-                               << "a"
-                               << "foreignField"
-                               << "b"
-                               << "as"
-                               << "as"))
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "let" << BSON("local_x" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                      << "localField"
+                                      << "a"
+                                      << "foreignField"
+                                      << "b"
+                                      << "as"
+                                      << "as"))
             .firstElement(),
         expCtx);
 
@@ -793,10 +763,9 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) 
         boost::none, "config", "cache.chunks.test.foo");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    auto originalBSON = BSON("$lookup" << BSON("from" << BSON("db"
-                                                              << "config"
-                                                              << "coll"
-                                                              << "cache.chunks.test.foo")
+    auto originalBSON = BSON("$lookup" << BSON("from" << BSON("db" << "config"
+                                                                   << "coll"
+                                                                   << "cache.chunks.test.foo")
                                                       << "localField"
                                                       << "x"
                                                       << "foreignField"
@@ -832,15 +801,11 @@ TEST_F(DocumentSourceLookUpTest, LookupWithLetReParseSerializedStageWithFromDBAn
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto originalBSON =
-        BSON("$lookup" << BSON("from" << BSON("db"
-                                              << "config"
-                                              << "coll"
-                                              << "cache.chunks.test.foo")
-                                      << "let"
-                                      << BSON("local_x"
-                                              << "$x")
-                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                      << "as"
+        BSON("$lookup" << BSON("from" << BSON("db" << "config"
+                                                   << "coll"
+                                                   << "cache.chunks.test.foo")
+                                      << "let" << BSON("local_x" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
                                       << "as"));
     auto lookupStage = DocumentSourceLookUp::createFromBson(originalBSON.firstElement(), expCtx);
 
@@ -919,13 +884,11 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithSearchPipelineS
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    auto originalBSON = BSON("$lookup" << BSON("from"
-                                               << "coll"
-                                               << "pipeline"
-                                               << BSON_ARRAY(BSON("$search" << BSON("term"
-                                                                                    << "asdf")))
-                                               << "as"
-                                               << "as"));
+    auto originalBSON = BSON(
+        "$lookup" << BSON("from" << "coll"
+                                 << "pipeline"
+                                 << BSON_ARRAY(BSON("$search" << BSON("term" << "asdf"))) << "as"
+                                 << "as"));
     auto lookupStage = DocumentSourceLookUp::createFromBson(originalBSON.firstElement(), expCtx);
 
     //
@@ -1070,15 +1033,11 @@ TEST_F(DocumentSourceLookUpTest, FromDBAndCollDistributedPlanLogic) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto lookupStage = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from" << BSON("db"
-                                              << "config"
-                                              << "coll"
-                                              << "cache.chunks.test.foo")
-                                      << "let"
-                                      << BSON("local_x"
-                                              << "$x")
-                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                      << "as"
+        BSON("$lookup" << BSON("from" << BSON("db" << "config"
+                                                   << "coll"
+                                                   << "cache.chunks.test.foo")
+                                      << "let" << BSON("local_x" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
                                       << "as"))
             .firstElement(),
         expCtx);
@@ -1095,10 +1054,10 @@ TEST_F(DocumentSourceLookUpTest, LookupDistributedPlanLogic) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto lookupStage = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                      << "as"
+                                      << "as"))
             .firstElement(),
         expCtx);
     ASSERT(lookupStage->distributedPlanLogic());
@@ -1816,18 +1775,15 @@ TEST_F(DocumentSourceLookUpTest, RedactsCorrectlyWithPipeline) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     BSONArrayBuilder pipeline;
-    pipeline << BSON("$match" << BSON("a"
-                                      << "myStr"));
+    pipeline << BSON("$match" << BSON("a" << "myStr"));
     pipeline << BSON("$project" << BSON("_id" << 0 << "a" << 1));
     auto docSource = DocumentSourceLookUp::createFromBson(
         BSON("$lookup" << BSON("from" << fromNs.coll() << "localField"
                                       << "foo"
                                       << "foreignField"
                                       << "bar"
-                                      << "let"
-                                      << BSON("var1"
-                                              << "$x")
-                                      << "pipeline" << pipeline.arr() << "as"
+                                      << "let" << BSON("var1" << "$x") << "pipeline"
+                                      << pipeline.arr() << "as"
                                       << "out"))
             .firstElement(),
         expCtx);
@@ -1870,15 +1826,13 @@ TEST_F(DocumentSourceLookUpTest, LookupParseSerializedStageWithAbsorbedUnwind) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto lookup = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "pipeline"
-                               << BSON_ARRAY(BSON("$match" << BSON("subfield" << BSON("$eq" << 1))))
-                               << "as"
-                               << "asField"
-                               << "$_internalUnwind"
-                               << BSON("$unwind" << BSON("path"
-                                                         << "$asField"))))
+        BSON("$lookup" << BSON(
+                 "from" << "coll"
+                        << "pipeline"
+                        << BSON_ARRAY(BSON("$match" << BSON("subfield" << BSON("$eq" << 1))))
+                        << "as"
+                        << "asField"
+                        << "$_internalUnwind" << BSON("$unwind" << BSON("path" << "$asField"))))
             .firstElement(),
         expCtx);
 
@@ -1893,20 +1847,18 @@ TEST_F(DocumentSourceLookUpServerlessTest,
 
     auto expCtx = getExpCtx();
 
-    auto stageSpec =
-        BSON("$lookup" << BSON("from"
-                               << "namespace1"
-                               << "pipeline"
-                               << BSON_ARRAY(BSON(
-                                      "$lookup"
-                                      << BSON("from"
-                                              << "namespace2"
-                                              << "as"
-                                              << "lookup2"
-                                              << "pipeline"
-                                              << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
-                               << "as"
-                               << "lookup1"));
+    auto stageSpec = BSON(
+        "$lookup" << BSON(
+            "from" << "namespace1"
+                   << "pipeline"
+                   << BSON_ARRAY(BSON("$lookup" << BSON(
+                                          "from" << "namespace2"
+                                                 << "as"
+                                                 << "lookup2"
+                                                 << "pipeline"
+                                                 << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
+                   << "as"
+                   << "lookup1"));
 
     auto liteParsedLookup = DocumentSourceLookUp::LiteParsed::parse(
         expCtx->getNamespaceString(), stageSpec.firstElement(), LiteParserOptions{});
@@ -1928,25 +1880,22 @@ TEST_F(
 
     auto expCtx = getExpCtx();
 
-    auto stageSpec =
-        BSON("$lookup" << BSON(
-                 "from" << BSON("db"
-                                << "config"
+    auto stageSpec = BSON(
+        "$lookup" << BSON(
+            "from" << BSON("db" << "config"
                                 << "coll"
                                 << "cache.chunks.test.foo")
-                        << "pipeline"
-                        << BSON_ARRAY(BSON(
-                               "$lookup"
-                               << BSON("from" << BSON("db"
-                                                      << "local"
-                                                      << "coll"
-                                                      << "oplog.rs")
-                                              << "as"
-                                              << "lookup2"
-                                              << "pipeline"
-                                              << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
-                        << "as"
-                        << "lookup1"));
+                   << "pipeline"
+                   << BSON_ARRAY(BSON("$lookup" << BSON(
+                                          "from" << BSON("db" << "local"
+                                                              << "coll"
+                                                              << "oplog.rs")
+                                                 << "as"
+                                                 << "lookup2"
+                                                 << "pipeline"
+                                                 << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
+                   << "as"
+                   << "lookup1"));
 
     for (bool flagStatus : {false, true}) {
         RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
@@ -1968,25 +1917,22 @@ TEST_F(DocumentSourceLookUpServerlessTest,
 
     auto expCtx = getExpCtx();
 
-    auto stageSpec =
-        BSON("$lookup" << BSON(
-                 "from" << BSON("db"
-                                << "config"
+    auto stageSpec = BSON(
+        "$lookup" << BSON(
+            "from" << BSON("db" << "config"
                                 << "coll"
                                 << "cache.chunks.test.foo")
-                        << "pipeline"
-                        << BSON_ARRAY(BSON(
-                               "$lookup"
-                               << BSON("from" << BSON("db"
-                                                      << "local"
-                                                      << "coll"
-                                                      << "oplog.rs")
-                                              << "as"
-                                              << "lookup2"
-                                              << "pipeline"
-                                              << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
-                        << "as"
-                        << "lookup1"));
+                   << "pipeline"
+                   << BSON_ARRAY(BSON("$lookup" << BSON(
+                                          "from" << BSON("db" << "local"
+                                                              << "coll"
+                                                              << "oplog.rs")
+                                                 << "as"
+                                                 << "lookup2"
+                                                 << "pipeline"
+                                                 << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
+                   << "as"
+                   << "lookup1"));
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         boost::none, expCtx->getNamespaceString().dbName().toString_forTest(), _targetColl);
@@ -2020,10 +1966,10 @@ TEST_F(DocumentSourceLookUpServerlessTest, CreateFromBSONContainsExpectedNamespa
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto docSource = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << "coll"
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                      << "as"
+                                      << "as"))
             .firstElement(),
         expCtx);
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());

@@ -217,12 +217,11 @@ auto makeSetStatusOnRemoteExhaustCommandCompletionClosure(
     };
 }
 
-static inline const RemoteCommandRequest kDummyRequest{HostAndPort("localhost", 27017),
-                                                       DatabaseName::createDatabaseName_forTest(
-                                                           boost::none, "mydb"),
-                                                       BSON("whatsUp"
-                                                            << "doc"),
-                                                       nullptr};
+static inline const RemoteCommandRequest kDummyRequest{
+    HostAndPort("localhost", 27017),
+    DatabaseName::createDatabaseName_forTest(boost::none, "mydb"),
+    BSON("whatsUp" << "doc"),
+    nullptr};
 
 COMMON_EXECUTOR_TEST(RunOne) {
     TaskExecutor& executor = getExecutor();

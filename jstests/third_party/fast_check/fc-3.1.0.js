@@ -1529,8 +1529,7 @@ export var fc = (function() {
         } else {
             rangeSizeArrayIntValue.data[1] += 1;
         }
-        (0,
-         UnsafeUniformArrayIntDistributionInternal_1.unsafeUniformArrayIntDistributionInternal)(
+        (0, UnsafeUniformArrayIntDistributionInternal_1.unsafeUniformArrayIntDistributionInternal)(
             sharedData, rangeSizeArrayIntValue.data, rng);
         return sharedData[0] * 0x100000000 + sharedData[1] + from;
     }

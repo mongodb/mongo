@@ -200,8 +200,7 @@ public:
             // against older requests with old txnNumbers.
             DBDirectClient client(opCtx);
             client.update(NamespaceString::kServerConfigurationNamespace,
-                          BSON("_id"
-                               << "CloneCatalogDataStats"),
+                          BSON("_id" << "CloneCatalogDataStats"),
                           BSON("$inc" << BSON("count" << 1)),
                           true /* upsert */,
                           false /* multi */);

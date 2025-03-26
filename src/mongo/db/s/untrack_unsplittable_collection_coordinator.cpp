@@ -44,11 +44,10 @@ namespace mongo {
 
 void UntrackUnsplittableCollectionCoordinator::appendCommandInfo(
     BSONObjBuilder* cmdInfoBuilder) const {
-    cmdInfoBuilder->appendElements(BSON("op"
-                                        << "untrackUnsplittableCollection"
-                                        << "nss"
-                                        << NamespaceStringUtil::serialize(
-                                               nss(), SerializationContext::stateDefault())));
+    cmdInfoBuilder->appendElements(
+        BSON("op" << "untrackUnsplittableCollection"
+                  << "nss"
+                  << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())));
 }
 
 void UntrackUnsplittableCollectionCoordinator::checkIfOptionsConflict(

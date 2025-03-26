@@ -95,8 +95,7 @@ protected:
             shard->runCommand(operationContext(),
                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                               DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
-                              BSON("unused"
-                                   << "cmd"),
+                              BSON("unused" << "cmd"),
                               Shard::RetryPolicy::kNoRetry));
     }
 };

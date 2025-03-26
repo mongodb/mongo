@@ -1168,8 +1168,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
     auto matchStage = DocumentSourceMatch::createFromBson(
         Document{{"$match", std::move(matchStageBson)}}.toBson().firstElement(), expCtx);
 
-    auto groupStageBson = BSON("_id"
-                               << "$ns");
+    auto groupStageBson = BSON("_id" << "$ns");
     auto groupStage = DocumentSourceGroup::createFromBson(
         Document{{"$group", std::move(groupStageBson)}}.toBson().firstElement(), expCtx);
 
@@ -1748,11 +1747,8 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
 
     // 2 & 3. Sort by timestamp and extract the first document for collection and database
     auto sortStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-    auto groupStageBson = BSON("_id"
-                               << "$nss"
-                               << "shards"
-                               << BSON("$first"
-                                       << "$shards"));
+    auto groupStageBson = BSON("_id" << "$nss"
+                                     << "shards" << BSON("$first" << "$shards"));
     auto groupStage = DocumentSourceGroup::createFromBson(
         Document{{"$group", std::move(groupStageBson)}}.toBson().firstElement(), expCtx);
 
@@ -1761,21 +1757,17 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
         DocumentSourceMatch::create(BSON("shards" << BSON("$not" << BSON("$size" << 0))), expCtx);
 
     // Stage 5. Group all documents and concat shards (this will generate an array of arrays)
-    auto groupStageBson2 = BSON("_id"
-                                << ""
-                                << "shards"
-                                << BSON("$push"
-                                        << "$shards"));
+    auto groupStageBson2 = BSON("_id" << ""
+                                      << "shards" << BSON("$push" << "$shards"));
     auto groupStageConcat = DocumentSourceGroup::createFromBson(
         Document{{"$group", std::move(groupStageBson2)}}.toBson().firstElement(), expCtx);
 
     // Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
-    auto projectStageBson =
-        BSON("shards" << BSON("$reduce" << BSON("input"
-                                                << "$shards"
-                                                << "initialValue" << BSONArray() << "in"
-                                                << BSON("$setUnion" << BSON_ARRAY("$$this"
-                                                                                  << "$$value")))));
+    auto projectStageBson = BSON(
+        "shards" << BSON(
+            "$reduce" << BSON("input" << "$shards"
+                                      << "initialValue" << BSONArray() << "in"
+                                      << BSON("$setUnion" << BSON_ARRAY("$$this" << "$$value")))));
     auto projectStageFlatten = DocumentSourceProject::createFromBson(
         Document{{"$project", std::move(projectStageBson)}}.toBson().firstElement(), expCtx);
 

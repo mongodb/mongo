@@ -630,90 +630,87 @@ function runMainTests(
 
 // Test with integer index entries (1, 2, 3, etc.), single character string entries ("1",
 // "2", "3", etc.), and long string entries ("1aaaaaaaaaa")
-[null,
- "",
- "aaaaaaaaaa"]
-    .forEach((docSuffix) => {
-        // Test with docs < batch size
-        runMainTests(10,
-                     defaultMaxDocsPerBatch,
-                     defaultSnapshotSize,
-                     false /*skipLookupForExtraKeys*/,
-                     docSuffix);
+[null, "", "aaaaaaaaaa"].forEach((docSuffix) => {
+    // Test with docs < batch size
+    runMainTests(10,
+                 defaultMaxDocsPerBatch,
+                 defaultSnapshotSize,
+                 false /*skipLookupForExtraKeys*/,
+                 docSuffix);
 
-        // Test with docs > batch size.
-        runMainTests(1000,
-                     defaultMaxDocsPerBatch,
-                     defaultSnapshotSize,
-                     false /*skipLookupForExtraKeys*/,
-                     docSuffix);
+    // Test with docs > batch size.
+    runMainTests(1000,
+                 defaultMaxDocsPerBatch,
+                 defaultSnapshotSize,
+                 false /*skipLookupForExtraKeys*/,
+                 docSuffix);
 
-        // Test with snapshot size < batch size
-        runMainTests(1000,
-                     99 /* batchSize */,
-                     19 /* snapshotSize */,
-                     false /*skipLookupForExtraKeys*/,
-                     docSuffix);
+    // Test with snapshot size < batch size
+    runMainTests(1000,
+                 99 /* batchSize */,
+                 19 /* snapshotSize */,
+                 false /*skipLookupForExtraKeys*/,
+                 docSuffix);
 
-        // Pass in start/end parameters with full range.
+    // Pass in start/end parameters with full range.
+    runMainTests(10,
+                 defaultMaxDocsPerBatch,
+                 defaultSnapshotSize,
+                 false /*skipLookupForExtraKeys*/,
+                 docSuffix,
+                 0,
+                 9);
+    // Test a specific range.
+    runMainTests(10,
+                 defaultMaxDocsPerBatch,
+                 defaultSnapshotSize,
+                 false /*skipLookupForExtraKeys*/,
+                 docSuffix,
+                 2,
+                 8);
+    // Start < first doc (a: 0)
+    runMainTests(10,
+                 defaultMaxDocsPerBatch,
+                 defaultSnapshotSize,
+                 false /*skipLookupForExtraKeys*/,
+                 docSuffix,
+                 -1,
+                 8);
+    // End > last doc (a: 9)
+    if (docSuffix) {
         runMainTests(10,
                      defaultMaxDocsPerBatch,
                      defaultSnapshotSize,
                      false /*skipLookupForExtraKeys*/,
                      docSuffix,
-                     0,
-                     9);
-        // Test a specific range.
+                     "3",
+                     "9z");
+    } else {
         runMainTests(10,
                      defaultMaxDocsPerBatch,
                      defaultSnapshotSize,
                      false /*skipLookupForExtraKeys*/,
                      docSuffix,
-                     2,
-                     8);
-        // Start < first doc (a: 0)
-        runMainTests(10,
-                     defaultMaxDocsPerBatch,
-                     defaultSnapshotSize,
-                     false /*skipLookupForExtraKeys*/,
-                     docSuffix,
-                     -1,
-                     8);
-        // End > last doc (a: 9)
-        if (docSuffix) {
-            runMainTests(10,
-                         defaultMaxDocsPerBatch,
-                         defaultSnapshotSize,
-                         false /*skipLookupForExtraKeys*/,
-                         docSuffix,
-                         "3",
-                         "9z");
-        } else {
-            runMainTests(10,
-                         defaultMaxDocsPerBatch,
-                         defaultSnapshotSize,
-                         false /*skipLookupForExtraKeys*/,
-                         docSuffix,
-                         3,
-                         10);
-        }
+                     3,
+                     10);
+    }
 
-        // Test only start or end parameter passed in.
-        runMainTests(10,
-                     defaultMaxDocsPerBatch,
-                     defaultSnapshotSize,
-                     false /*skipLookupForExtraKeys*/,
-                     docSuffix,
-                     4,
-                     null /*end*/);
-        runMainTests(10,
-                     defaultMaxDocsPerBatch,
-                     defaultSnapshotSize,
-                     false /*skipLookupForExtraKeys*/,
-                     docSuffix,
-                     null /*start*/,
-                     7);
-    });
+    // Test only start or end parameter passed in.
+    runMainTests(10,
+                 defaultMaxDocsPerBatch,
+                 defaultSnapshotSize,
+                 false /*skipLookupForExtraKeys*/,
+                 docSuffix,
+                 4,
+                 null /*end*/);
+    runMainTests(10,
+                 defaultMaxDocsPerBatch,
+                 defaultSnapshotSize,
+                 false /*skipLookupForExtraKeys*/,
+                 docSuffix,
+                 null /*start*/,
+                 7);
+});
 
 // Test with start/end parameters and multiple batches/snapshots
 // Test with specific range in the middle of the index and snapshotSize < batchSize.

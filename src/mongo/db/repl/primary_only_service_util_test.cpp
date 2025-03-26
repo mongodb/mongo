@@ -104,7 +104,7 @@ public:
         return boost::none;
     };
 
-    void checkIfOptionsConflict(const BSONObj& stateDoc) const final{};
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const final {};
 
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -161,7 +161,7 @@ public:
     void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
-        const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) final{};
+        const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) final {};
 
     std::shared_ptr<repl::PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) final {

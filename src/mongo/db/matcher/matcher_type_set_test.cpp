@@ -81,8 +81,7 @@ TEST(MatcherTypeSetTest, ParseFromStringFailsToParseUnknownAlias) {
 }
 
 TEST(MatcherTypeSetTest, ParseFromElementCanParseNumberAlias) {
-    auto obj = BSON(""
-                    << "number");
+    auto obj = BSON("" << "number");
     auto result = MatcherTypeSet::parse(obj.firstElement());
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().allNumbers);
@@ -90,8 +89,7 @@ TEST(MatcherTypeSetTest, ParseFromElementCanParseNumberAlias) {
 }
 
 TEST(MatcherTypeSetTest, ParseFromElementCanParseLongAlias) {
-    auto obj = BSON(""
-                    << "long");
+    auto obj = BSON("" << "long");
     auto result = MatcherTypeSet::parse(obj.firstElement());
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
@@ -100,15 +98,13 @@ TEST(MatcherTypeSetTest, ParseFromElementCanParseLongAlias) {
 }
 
 TEST(MatcherTypeSetTest, ParseFromElementFailsToParseUnknownAlias) {
-    auto obj = BSON(""
-                    << "unknown");
+    auto obj = BSON("" << "unknown");
     auto result = MatcherTypeSet::parse(obj.firstElement());
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatcherTypeSetTest, ParseFromElementFailsToParseWrongElementType) {
-    auto obj = BSON("" << BSON(""
-                               << ""));
+    auto obj = BSON("" << BSON("" << ""));
     auto result = MatcherTypeSet::parse(obj.firstElement());
     ASSERT_NOT_OK(result.getStatus());
 
@@ -133,8 +129,7 @@ TEST(MatcherTypeSetTest, ParseFromElementFailsToParseEOOTypeCode) {
 }
 
 TEST(MatcherTypeSetTest, ParseFromElementFailsToParseEOOTypeName) {
-    auto obj = BSON(""
-                    << "missing");
+    auto obj = BSON("" << "missing");
     auto result = MatcherTypeSet::parse(obj.firstElement());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
@@ -224,8 +219,7 @@ TEST(MatcherTypeSetTest, ParseFailsWhenDecimalElementIsInfinite) {
 }
 
 TEST(MatcherTypeSetTest, ParseFromElementFailsWhenArrayHasUnknownType) {
-    auto obj = BSON("" << BSON_ARRAY("long"
-                                     << "unknown"));
+    auto obj = BSON("" << BSON_ARRAY("long" << "unknown"));
     auto result = MatcherTypeSet::parse(obj.firstElement());
     ASSERT_NOT_OK(result.getStatus());
 }

@@ -71,9 +71,7 @@ std::map<std::string, BSONTypeInfo> bsonTypeValueMap = {
     {"object",
      {BSON_TYPE_DOCUMENT,
       [](BSONObjBuilder& builder, const std::string& key) {
-          builder.append(key,
-                         BSON("inner obj"
-                              << "banana"));
+          builder.append(key, BSON("inner obj" << "banana"));
       }}},
     {"array",
      {BSON_TYPE_ARRAY,

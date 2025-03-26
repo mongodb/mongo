@@ -274,7 +274,9 @@ public:
 
         txnParticipant.unstashTransactionResources(opCtx, "preparedTransaction");
         // The transaction machinery cannot store an empty locker.
-        { Lock::GlobalLock globalLock(opCtx, MODE_IX); }
+        {
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+        }
         auto opTime = [opCtx] {
             TransactionParticipant::SideTransactionBlock sideTxn{opCtx};
 
@@ -1394,11 +1396,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
     newSessionInfo.setSessionId(sessionId);
     newSessionInfo.setTxnNumber(20);
 
-    insertDocWithSessionInfo(newSessionInfo,
-                             kNs,
-                             BSON("_id"
-                                  << "newerSess"),
-                             0);
+    insertDocWithSessionInfo(newSessionInfo, kNs, BSON("_id" << "newerSess"), 0);
 
     SessionCatalogMigrationDestination sessionMigration(
         kNs, kFromShard, migrationId(), _cancellationSource.token());
@@ -1440,9 +1438,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
     TransactionHistoryIterator historyIter(txnParticipant.getLastWriteOpTime());
     ASSERT_TRUE(historyIter.hasNext());
     auto oplog = historyIter.next(opCtx);
-    ASSERT_BSONOBJ_EQ(BSON("_id"
-                           << "newerSess"),
-                      oplog.getObject());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << "newerSess"), oplog.getObject());
 
     ASSERT_FALSE(historyIter.hasNext());
 
@@ -1479,11 +1475,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     // Ensure that the previous oplog has been processed before proceeding.
     returnOplog({});
 
-    insertDocWithSessionInfo(newSessionInfo,
-                             kNs,
-                             BSON("_id"
-                                  << "newerSess"),
-                             0);
+    insertDocWithSessionInfo(newSessionInfo, kNs, BSON("_id" << "newerSess"), 0);
 
     auto oplog2 = makeOplogEntry(OpTime(Timestamp(80, 2), 1),  // optime
                                  OpTypeEnum::kInsert,          // op type
@@ -1505,9 +1497,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     TransactionHistoryIterator historyIter(txnParticipant.getLastWriteOpTime());
     ASSERT_TRUE(historyIter.hasNext());
     auto oplog = historyIter.next(opCtx);
-    ASSERT_BSONOBJ_EQ(BSON("_id"
-                           << "newerSess"),
-                      oplog.getObject());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << "newerSess"), oplog.getObject());
 
     checkStatementExecuted(opCtx, 20, 0);
 }
@@ -1668,11 +1658,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     // Ensure that the previous oplog has been processed before proceeding.
     returnOplog({});
 
-    insertDocWithSessionInfo(sessionInfo,
-                             kNs,
-                             BSON("_id"
-                                  << "newerSess"),
-                             0);
+    insertDocWithSessionInfo(sessionInfo, kNs, BSON("_id" << "newerSess"), 0);
 
     auto oplog2 = makeOplogEntry(OpTime(Timestamp(80, 2), 1),  // optime
                                  OpTypeEnum::kInsert,          // op type
@@ -1698,9 +1684,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     checkOplogWithNestedOplog(oplog2, historyIter.next(opCtx));
 
     auto oplog = historyIter.next(opCtx);
-    ASSERT_BSONOBJ_EQ(BSON("_id"
-                           << "newerSess"),
-                      oplog.getObject());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << "newerSess"), oplog.getObject());
 
     ASSERT_TRUE(historyIter.hasNext());
     checkOplogWithNestedOplog(oplog1, historyIter.next(opCtx));

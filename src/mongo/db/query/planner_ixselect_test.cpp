@@ -1228,8 +1228,7 @@ TEST(QueryPlannerIXSelectTest, InternalExprEqCanUseNonMultikeyIndexWithNoPathLev
 }
 
 TEST(QueryPlannerIXSelectTest, InternalExprEqCanUseHashedIndex) {
-    auto entry = buildSimpleIndexEntry(BSON("a"
-                                            << "hashed"));
+    auto entry = buildSimpleIndexEntry(BSON("a" << "hashed"));
     std::vector<IndexEntry> indices;
     indices.push_back(entry);
     std::set<size_t> expectedIndices = {0};
@@ -1249,9 +1248,8 @@ TEST(QueryPlannerIXSelectTest, InternalExprEqCannotUseTextIndexPrefix) {
 }
 
 TEST(QueryPlannerIXSelectTest, InternalExprEqCanUseTextIndexSuffix) {
-    auto entry = buildSimpleIndexEntry(BSON("_fts"
-                                            << "text"
-                                            << "_ftsx" << 1 << "a" << 1));
+    auto entry = buildSimpleIndexEntry(BSON("_fts" << "text"
+                                                   << "_ftsx" << 1 << "a" << 1));
     std::vector<IndexEntry> indices;
     indices.push_back(entry);
     std::set<size_t> expectedIndices = {0};
@@ -1365,24 +1363,21 @@ TEST(QueryPlannerIXSelectTest,
 }
 
 TEST(QueryPlannerIXSelectTest, HashedIndexShouldNotBeRelevantForNotPredicate) {
-    auto entry = buildSimpleIndexEntry(BSON("a"
-                                            << "hashed"));
+    auto entry = buildSimpleIndexEntry(BSON("a" << "hashed"));
     entry.type = IndexType::INDEX_HASHED;
     std::set<size_t> expectedIndices = {};
     testRateIndices("{a: {$ne: 4}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
 }
 
 TEST(QueryPlannerIXSelectTest, HashedIndexShouldNotBeRelevantForNotEqualsNullPredicate) {
-    auto entry = buildSimpleIndexEntry(BSON("a"
-                                            << "hashed"));
+    auto entry = buildSimpleIndexEntry(BSON("a" << "hashed"));
     entry.type = IndexType::INDEX_HASHED;
     std::set<size_t> expectedIndices = {};
     testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
 }
 
 TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForExistsFalse) {
-    auto entry = buildSimpleIndexEntry(BSON("a"
-                                            << "hashed"));
+    auto entry = buildSimpleIndexEntry(BSON("a" << "hashed"));
     entry.type = IndexType::INDEX_HASHED;
     entry.sparse = true;
     std::set<size_t> expectedIndices = {};
@@ -1390,8 +1385,7 @@ TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForExistsFals
 }
 
 TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForEqualsNull) {
-    auto entry = buildSimpleIndexEntry(BSON("a"
-                                            << "hashed"));
+    auto entry = buildSimpleIndexEntry(BSON("a" << "hashed"));
     entry.type = IndexType::INDEX_HASHED;
     entry.sparse = true;
     std::set<size_t> expectedIndices = {};
@@ -1399,8 +1393,7 @@ TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForEqualsNull
 }
 
 TEST(QueryPlannerIXSelectTest, HashedNonSparseIndexShouldBeRelevantForExistsFalse) {
-    auto entry = buildSimpleIndexEntry(BSON("a"
-                                            << "hashed"));
+    auto entry = buildSimpleIndexEntry(BSON("a" << "hashed"));
     entry.type = IndexType::INDEX_HASHED;
     entry.sparse = false;
     std::set<size_t> expectedIndices = {0};
@@ -1408,8 +1401,7 @@ TEST(QueryPlannerIXSelectTest, HashedNonSparseIndexShouldBeRelevantForExistsFals
 }
 
 TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldBeRelevantForExistsTrue) {
-    auto entry = buildSimpleIndexEntry(BSON("a"
-                                            << "hashed"));
+    auto entry = buildSimpleIndexEntry(BSON("a" << "hashed"));
     entry.type = IndexType::INDEX_HASHED;
     entry.sparse = true;
     std::set<size_t> expectedIndices = {0};
@@ -1489,8 +1481,7 @@ TEST(QueryPlannerIXSelectTest, CanUseIndexWithSimpleCollatorForNonPrefixRegexFil
 TEST(QueryPlannerIXSelectTest, GeoPredicateCanOnlyUse2dsphereIndex) {
     std::vector<IndexEntry> indices;
     auto btreeEntry = buildSimpleIndexEntry(BSON("loc" << 1));
-    auto twodSphereEntry = buildSimpleIndexEntry(BSON("loc"
-                                                      << "2dsphere"));
+    auto twodSphereEntry = buildSimpleIndexEntry(BSON("loc" << "2dsphere"));
     indices.push_back(btreeEntry);
     indices.push_back(twodSphereEntry);
     std::set<size_t> expectedIndices = {1};
@@ -1506,8 +1497,7 @@ TEST(QueryPlannerIXSelectTest, GeoPredicateCanOnlyUse2dsphereIndex) {
 TEST(QueryPlannerIXSelectTest, GeoPredicateUnderNotCannotUse2dsphereIndex) {
     std::vector<IndexEntry> indices;
     auto btreeEntry = buildSimpleIndexEntry(BSON("loc" << 1));
-    auto twodSphereEntry = buildSimpleIndexEntry(BSON("loc"
-                                                      << "2dsphere"));
+    auto twodSphereEntry = buildSimpleIndexEntry(BSON("loc" << "2dsphere"));
     indices.push_back(btreeEntry);
     indices.push_back(twodSphereEntry);
     // There are no expectedIndices. The $geoWithin under $not cannot use the 2dsphere index.

@@ -249,8 +249,7 @@ TEST(InMatchExpression, MatchesUndefined) {
 }
 
 TEST(InMatchExpression, InMatchExpressionsWithDifferentNumbersOfElementsAreUnequal) {
-    BSONObj obj = BSON(""
-                       << "string");
+    BSONObj obj = BSON("" << "string");
     InMatchExpression eq1(""_sd);
     InMatchExpression eq2(""_sd);
     std::vector<BSONElement> equalities{obj.firstElement()};
@@ -279,10 +278,8 @@ TEST(InMatchExpression, InMatchExpressionsWithEqualCollatorsAreEqual) {
 }
 
 TEST(InMatchExpression, InMatchExpressionsWithCollationEquivalentElementsAreEqual) {
-    BSONObj obj1 = BSON(""
-                        << "string1");
-    BSONObj obj2 = BSON(""
-                        << "string2");
+    BSONObj obj1 = BSON("" << "string1");
+    BSONObj obj2 = BSON("" << "string2");
     CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kAlwaysEqual);
     InMatchExpression eq1(""_sd);
     eq1.setCollator(&collator1);
@@ -300,10 +297,8 @@ TEST(InMatchExpression, InMatchExpressionsWithCollationEquivalentElementsAreEqua
 }
 
 TEST(InMatchExpression, InMatchExpressionsWithCollationNonEquivalentElementsAreUnequal) {
-    BSONObj obj1 = BSON(""
-                        << "string1");
-    BSONObj obj2 = BSON(""
-                        << "string2");
+    BSONObj obj1 = BSON("" << "string1");
+    BSONObj obj2 = BSON("" << "string2");
     CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kReverseString);
     InMatchExpression eq1(""_sd);
     eq1.setCollator(&collator1);
@@ -321,10 +316,8 @@ TEST(InMatchExpression, InMatchExpressionsWithCollationNonEquivalentElementsAreU
 }
 
 TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualities) {
-    BSONObj obj1 = BSON(""
-                        << "string1");
-    BSONObj obj2 = BSON(""
-                        << "string2");
+    BSONObj obj1 = BSON("" << "string1");
+    BSONObj obj2 = BSON("" << "string2");
     CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
     CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
     InMatchExpression in(""_sd);
@@ -369,10 +362,8 @@ TEST(InMatchExpression, SerializeToQueryShapeSingleElementList) {
 DEATH_TEST_REGEX(RegexMatchExpression,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400209") {
-    BSONObj match = BSON("a"
-                         << "b");
-    BSONObj notMatch = BSON("a"
-                            << "c");
+    BSONObj match = BSON("a" << "b");
+    BSONObj notMatch = BSON("a" << "c");
     RegexMatchExpression regex(""_sd, "b", "");
 
     ASSERT_EQ(regex.numChildren(), 0);
@@ -420,8 +411,7 @@ DEATH_TEST_REGEX(BitTestMatchExpression,
 DEATH_TEST_REGEX(ComparisonMatchExpression,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400209") {
-    BSONObj operand = BSON("a"
-                           << "string");
+    BSONObj operand = BSON("a" << "string");
     EqualityMatchExpression eq("a"_sd, operand["a"]);
 
     ASSERT_EQ(eq.numChildren(), 0);

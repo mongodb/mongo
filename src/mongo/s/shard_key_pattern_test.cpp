@@ -79,19 +79,14 @@ TEST_F(ShardKeyPatternTest, SingleFieldShardKeyPatternsValidityCheck) {
     ShardKeyPattern s1(BSON("a" << 1));
     ShardKeyPattern s2(BSON("a" << 1.0f));
     ShardKeyPattern s3(BSON("a" << (long long)1L));
-    ShardKeyPattern s4(BSON("a"
-                            << "hashed"));
+    ShardKeyPattern s4(BSON("a" << "hashed"));
     ShardKeyPattern s5(BSON("a$" << 1));
 
     ASSERT_THROWS(ShardKeyPattern(BSONObj()), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << -1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << -1.0)), DBException);
-    ASSERT_THROWS(ShardKeyPattern(BSON("a"
-                                       << "1")),
-                  DBException);
-    ASSERT_THROWS(ShardKeyPattern(BSON("a"
-                                       << "hash")),
-                  DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("a" << "1")), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("a" << "hash")), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("" << 1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("." << 1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("$" << 1)), DBException);
@@ -189,9 +184,8 @@ TEST_F(ShardKeyPatternTest, ExtractDocShardKeySingle) {
                              BSON("a" << regex << "b"
                                       << "20")),
                       BSON("a" << regex));
-    const BSONObj ref = BSON("$ref"
-                             << "coll"
-                             << "$id" << 1);
+    const BSONObj ref = BSON("$ref" << "coll"
+                                    << "$id" << 1);
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSON("a" << ref)), BSON("a" << ref));
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$dollarPrefixKey:true}}")),
                       fromjson("{a:{$dollarPrefixKey:true}}"));
@@ -251,9 +245,8 @@ TEST_F(ShardKeyPatternTest, ExtractDocShardKeyNested) {
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{b:10}, c:30}")), fromjson("{'a.b':10, c:30}"));
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{d:[1,2],b:10},c:30,d:40}")),
                       fromjson("{'a.b':10, c:30}"));
-    const BSONObj ref = BSON("$ref"
-                             << "coll"
-                             << "$id" << 1);
+    const BSONObj ref = BSON("$ref" << "coll"
+                                    << "$id" << 1);
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSON("a" << BSON("b" << ref) << "c" << 30)),
                       BSON("a.b" << ref << "c" << 30));
 
@@ -324,8 +317,7 @@ TEST_F(ShardKeyPatternTest, ExtractDocShardKeyHashed) {
     const long long nullHashValue = BSONElementHasher::hash64(nullBsonValue.firstElement(),
                                                               BSONElementHasher::DEFAULT_HASH_SEED);
 
-    ShardKeyPattern pattern(BSON("a.b"
-                                 << "hashed"));
+    ShardKeyPattern pattern(BSON("a.b" << "hashed"));
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSON("a" << BSON("b" << value))), BSON("a.b" << hashValue));
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSON("a" << BSON("b" << value) << "c" << 30)),
                       BSON("a.b" << hashValue));
@@ -499,8 +491,7 @@ TEST_F(ShardKeyPatternTest, ExtractQueryShardKeyHashed) {
         BSONElementHasher::hash64(bsonValue.firstElement(), BSONElementHasher::DEFAULT_HASH_SEED);
 
     // Hashed works basically the same as non-hashed, but applies the hash function at the end
-    ShardKeyPattern pattern(BSON("a.b"
-                                 << "hashed"));
+    ShardKeyPattern pattern(BSON("a.b" << "hashed"));
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a.b" << value)), BSON("a.b" << hashValue));
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a" << BSON("b" << value))), BSON("a.b" << hashValue));
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a.b" << BSON("$eq" << value))),
@@ -519,9 +510,8 @@ TEST_F(ShardKeyPatternTest, ExtractQueryShardKeyHashed) {
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a" << BSON("b" << BSON_ARRAY(value)))), BSONObj());
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a" << BSON_ARRAY(BSON("b" << value)))), BSONObj());
 
-    pattern = ShardKeyPattern(BSON("a.b"
-                                   << "hashed"
-                                   << "c.d" << 1));
+    pattern = ShardKeyPattern(BSON("a.b" << "hashed"
+                                         << "c.d" << 1));
 
     ASSERT_BSONOBJ_EQ(queryKey(pattern, BSON("a.b" << value << "c.d" << value)),
                       BSON("a.b" << hashValue << "c.d" << value));
@@ -592,17 +582,14 @@ TEST_F(ShardKeyPatternTest, UniqueIndexCompatibleHashed) {
     // Hashed ShardKeyPatterns
     //
 
-    ShardKeyPattern pattern(BSON("a.b"
-                                 << "hashed"));
+    ShardKeyPattern pattern(BSON("a.b" << "hashed"));
 
     ASSERT(indexComp(pattern, BSON("a.b" << 1)));
     ASSERT(indexComp(pattern, BSON("a.b" << -1)));
     ASSERT(indexComp(pattern, BSON("a.b" << 1 << "c" << 1)));
     ASSERT(indexComp(pattern, BSON("a.b" << -1 << "c" << 1)));
 
-    ASSERT(indexComp(pattern,
-                     BSON("a.b"
-                          << "hashed")));
+    ASSERT(indexComp(pattern, BSON("a.b" << "hashed")));
 
     ASSERT(indexComp(pattern, BSON("_id" << 1)));
     ASSERT(indexComp(pattern, BSON("_id" << -1 << "c" << 1)));
@@ -612,9 +599,7 @@ TEST_F(ShardKeyPatternTest, UniqueIndexCompatibleHashed) {
 }
 
 TEST_F(ShardKeyPatternTest, IsHashedPattern) {
-    ASSERT(ShardKeyPattern(BSON("a.b"
-                                << "hashed"))
-               .isHashedPattern());
+    ASSERT(ShardKeyPattern(BSON("a.b" << "hashed")).isHashedPattern());
     ASSERT(ShardKeyPattern(BSON("a.b" << 1 << "c"
                                       << "hashed"
                                       << "d" << 1))
@@ -627,14 +612,10 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_WithNumericFieldName
                                          << "hashed"));
     auto indexPattern = BSON("a.0.1" << 1.0 << "p" << 1 << "c.d.0"
                                      << "hashed");
-    auto indexData = BSON("" << BSON("field"
-                                     << "subObject")
-                             << "" << 1 << ""
+    auto indexData = BSON("" << BSON("field" << "subObject") << "" << 1 << ""
                              << "c.d.0_value");
     ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
-                      BSON("a.0.1" << BSON("field"
-                                           << "subObject")
-                                   << "c.d.0"
+                      BSON("a.0.1" << BSON("field" << "subObject") << "c.d.0"
                                    << "c.d.0_value"));
 
     // If the index provides array value for a field('a.0.1') we should return an empty object.
@@ -653,31 +634,24 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_NonHashedIndexAndSha
     auto indexPattern = BSON("c.d" << 1.0 << "p"
                                    << "hashed"
                                    << "a.b" << 1);
-    auto indexData = BSON("" << BSON("field"
-                                     << "subObject")
-                             << "" << 1 << ""
+    auto indexData = BSON("" << BSON("field" << "subObject") << "" << 1 << ""
                              << "ab_value");
     ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
-                      BSON("a.b"
-                           << "ab_value"
-                           << "c.d"
-                           << BSON("field"
-                                   << "subObject")));
+                      BSON("a.b" << "ab_value"
+                                 << "c.d" << BSON("field" << "subObject")));
 }
 
 TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_HashedIndexAndShardKey) {
     ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
                                        << "hashed"
                                        << "p.q" << 1));
-    auto indexPattern = BSON("c.d"
-                             << "hashed"
-                             << "p.q" << 1 << "a.b" << 1);
+    auto indexPattern = BSON("c.d" << "hashed"
+                                   << "p.q" << 1 << "a.b" << 1);
     auto indexData = BSON("" << 123 << "" << BSONNULL << ""
                              << "ab_value");
     ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
-                      BSON("a.b"
-                           << "ab_value"
-                           << "c.d" << 123 << "p.q" << BSONNULL));
+                      BSON("a.b" << "ab_value"
+                                 << "c.d" << 123 << "p.q" << BSONNULL));
 }
 
 DEATH_TEST_REGEX(ShardKeyPattern,
@@ -686,9 +660,8 @@ DEATH_TEST_REGEX(ShardKeyPattern,
     ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
                                        << "hashed"
                                        << "p.q.0" << 1));
-    auto indexPattern = BSON("c.d"
-                             << "hashed"
-                             << "p.q" << 1 << "a.b" << 1);
+    auto indexPattern = BSON("c.d" << "hashed"
+                                   << "p.q" << 1 << "a.b" << 1);
     auto indexData = BSON("" << 123 << "" << BSON_ARRAY("1") << ""
                              << "ab_value");
 
@@ -701,9 +674,8 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_WithArrayInIndex) {
     ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
                                        << "hashed"
                                        << "p.q" << 1));
-    auto indexPattern = BSON("c.d"
-                             << "hashed"
-                             << "p" << 1 << "a.b" << 1);
+    auto indexPattern = BSON("c.d" << "hashed"
+                                   << "p" << 1 << "a.b" << 1);
     auto indexData = BSON("" << 123 << "" << 1 << "" << BSON_ARRAY("ab_value"));
 
     // A shard key field cannot have array values. When we encounter array value from an index, we
@@ -716,50 +688,37 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_WithArrayForNonShard
     ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
                                        << "hashed"
                                        << "p.q" << 1));
-    auto indexPattern = BSON("c.d"
-                             << "hashed"
-                             << "p.q" << 1 << "a.b" << 1 << "arrayField" << 1);
+    auto indexPattern = BSON("c.d" << "hashed"
+                                   << "p.q" << 1 << "a.b" << 1 << "arrayField" << 1);
     auto indexData = BSON("" << 123 << "" << BSONNULL << ""
                              << "ab_value"
-                             << ""
-                             << BSON_ARRAY("1"
-                                           << "2"));
+                             << "" << BSON_ARRAY("1" << "2"));
     ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
-                      BSON("a.b"
-                           << "ab_value"
-                           << "c.d" << 123 << "p.q" << BSONNULL));
+                      BSON("a.b" << "ab_value"
+                                 << "c.d" << 123 << "p.q" << BSONNULL));
 }
 
 TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_NonHashedIndexAndHashedShardKey) {
-    ShardKeyPattern pattern(BSON("a.b"
-                                 << "hashed"
-                                 << "c.d" << 1.0 << "e.null" << 1));
+    ShardKeyPattern pattern(BSON("a.b" << "hashed"
+                                       << "c.d" << 1.0 << "e.null" << 1));
     auto indexPattern = BSON("e.null" << 1 << "c.d" << 1.0 << "p"
                                       << "hashed"
                                       << "a.b" << 1);
-    auto indexData = BSON("" << BSONNULL << ""
-                             << BSON("field"
-                                     << "subObject")
-                             << "" << 1 << ""
+    auto indexData = BSON("" << BSONNULL << "" << BSON("field" << "subObject") << "" << 1 << ""
                              << "ab_value");
-    auto hashedValue = BSONElementHasher::hash64(BSON(""
-                                                      << "ab_value")
-                                                     .firstElement(),
+    auto hashedValue = BSONElementHasher::hash64(BSON("" << "ab_value").firstElement(),
                                                  BSONElementHasher::DEFAULT_HASH_SEED);
     ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData({{indexData, indexPattern}}),
-                      BSON("a.b" << hashedValue << "c.d"
-                                 << BSON("field"
-                                         << "subObject")
-                                 << "e.null" << BSONNULL));
+                      BSON("a.b" << hashedValue << "c.d" << BSON("field" << "subObject") << "e.null"
+                                 << BSONNULL));
 }
 
 DEATH_TEST_REGEX(ShardKeyPattern,
                  ExtractShardKeyFromIndexKeyData_HashedIndexAndNonHashedShardKey,
                  "Invariant failure.*isHashedPatternEl") {
     ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d" << 1.0));
-    auto indexPattern = BSON("c.d"
-                             << "hashed"
-                             << "p" << 1 << "a.b" << 1);
+    auto indexPattern = BSON("c.d" << "hashed"
+                                   << "p" << 1 << "a.b" << 1);
     auto indexData = BSON("" << 1 << "" << 1 << ""
                              << "ab_value");
 
@@ -773,43 +732,38 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_FromMultipleIndexes)
                                                 << "hashed"
                                                 << "null" << 1));
     auto indexPattern1 = BSON("a.firstIndex" << 1 << "null" << 1);
-    auto indexData1 = BSON(""
-                           << "a_first_val"
-                           << "" << BSONNULL);
+    auto indexData1 = BSON("" << "a_first_val"
+                              << "" << BSONNULL);
     auto indexPattern2 = BSON("a.secondIndex" << 1 << "c.secondIndex" << 1);
     auto valueToHash = 23;
-    auto indexData2 = BSON(""
-                           << "a_sec_val"
-                           << "" << valueToHash);
+    auto indexData2 = BSON("" << "a_sec_val"
+                              << "" << valueToHash);
     auto hashedValue = BSONElementHasher::hash64(BSON("" << valueToHash).firstElement(),
                                                  BSONElementHasher::DEFAULT_HASH_SEED);
 
     ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData(
                           {{indexData1, indexPattern1}, {indexData2, indexPattern2}}),
-                      BSON("a.firstIndex"
-                           << "a_first_val"
-                           << "a.secondIndex"
-                           << "a_sec_val"
-                           << "c.secondIndex" << hashedValue << "null" << BSONNULL));
+                      BSON("a.firstIndex" << "a_first_val"
+                                          << "a.secondIndex"
+                                          << "a_sec_val"
+                                          << "c.secondIndex" << hashedValue << "null" << BSONNULL));
 }
 
 TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_FromMultipleIndexesProvidingSameField) {
     ShardKeyPattern pattern(BSON("a.firstIndex" << 1 << "a.secondIndex" << 1.0 << "a.thirdIndex"
                                                 << "hashed"
                                                 << "null" << 1));
-    auto indexPattern1 = BSON("a.firstIndex"
-                              << "hashed"
-                              << "null" << 1 << "a.thirdIndex" << 1);
+    auto indexPattern1 = BSON("a.firstIndex" << "hashed"
+                                             << "null" << 1 << "a.thirdIndex" << 1);
     auto valueToHash = 23;
     auto indexData1 = BSON("" << 1 << "" << BSONNULL << "" << valueToHash);
     auto indexPattern2 = BSON("a.firstIndex" << 1 << "a.secondIndex" << 1 << "a.thirdIndex"
                                              << "hashed");
 
-    auto indexData2 = BSON(""
-                           << "non_hashed_value"
-                           << ""
-                           << "a_sec_val"
-                           << "" << 1111);
+    auto indexData2 = BSON("" << "non_hashed_value"
+                              << ""
+                              << "a_sec_val"
+                              << "" << 1111);
     auto hashedValue = BSONElementHasher::hash64(BSON("" << valueToHash).firstElement(),
                                                  BSONElementHasher::DEFAULT_HASH_SEED);
 
@@ -817,11 +771,10 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_FromMultipleIndexesP
     // the index value that provides non-hashed value.
     ASSERT_BSONOBJ_EQ(pattern.extractShardKeyFromIndexKeyData(
                           {{indexData1, indexPattern1}, {indexData2, indexPattern2}}),
-                      BSON("a.firstIndex"
-                           << "non_hashed_value"
-                           << "a.secondIndex"
-                           << "a_sec_val"
-                           << "a.thirdIndex" << hashedValue << "null" << BSONNULL));
+                      BSON("a.firstIndex" << "non_hashed_value"
+                                          << "a.secondIndex"
+                                          << "a_sec_val"
+                                          << "a.thirdIndex" << hashedValue << "null" << BSONNULL));
 }
 
 BSONObj getDocumentKey(const BSONObj& obj, const ShardKeyPattern& shardKeyPattern) {
@@ -915,9 +868,8 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromDocumentKey_Hashed) {
     const long long nullHashValue = BSONElementHasher::hash64(nullBsonValue.firstElement(),
                                                               BSONElementHasher::DEFAULT_HASH_SEED);
 
-    ShardKeyPattern shardKeyPattern(BSON("a.b"
-                                         << "hashed"
-                                         << "c" << 1));
+    ShardKeyPattern shardKeyPattern(BSON("a.b" << "hashed"
+                                               << "c" << 1));
 
     ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(getDocumentKey(
                           BSON("a" << BSON("b" << value) << "c" << 20), shardKeyPattern)),
@@ -950,16 +902,13 @@ TEST_F(ShardKeyPatternTest, IsExtendedBy) {
     ShardKeyPattern shardKeyPattern3(BSON("a" << 1 << "b" << 1 << "c" << 1));
 
     // NumberOfFields_PositionOfHash
-    ShardKeyPattern shardKeyPatternHashed1_0(BSON("a"
-                                                  << "hashed"));
-    ShardKeyPattern shardKeyPatternHashed2_0(BSON("a"
-                                                  << "hashed"
-                                                  << "b" << 1));
+    ShardKeyPattern shardKeyPatternHashed1_0(BSON("a" << "hashed"));
+    ShardKeyPattern shardKeyPatternHashed2_0(BSON("a" << "hashed"
+                                                      << "b" << 1));
     ShardKeyPattern shardKeyPatternHashed2_1(BSON("a" << 1 << "b"
                                                       << "hashed"));
-    ShardKeyPattern shardKeyPatternHashed3_0(BSON("a"
-                                                  << "hashed"
-                                                  << "b" << 1 << "c" << 1));
+    ShardKeyPattern shardKeyPatternHashed3_0(BSON("a" << "hashed"
+                                                      << "b" << 1 << "c" << 1));
     ShardKeyPattern shardKeyPatternHashed3_1(BSON("a" << 1 << "b"
                                                       << "hashed"
                                                       << "c" << 1));

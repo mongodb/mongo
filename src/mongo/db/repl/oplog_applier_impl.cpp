@@ -358,7 +358,7 @@ namespace {
 class ApplyBatchFinalizer {
 public:
     ApplyBatchFinalizer(ReplicationCoordinator* replCoord) : _replCoord(replCoord) {}
-    virtual ~ApplyBatchFinalizer(){};
+    virtual ~ApplyBatchFinalizer() {};
 
     virtual void record(const OpTimeAndWallTime& newOpTimeAndWallTime) {
         _recordApplied(newOpTimeAndWallTime);

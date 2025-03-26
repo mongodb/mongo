@@ -81,8 +81,7 @@ using WhenMatched = MergeStrategyDescriptor::WhenMatched;
 using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
 
 constexpr auto kStageName = DocumentSourceMerge::kStageName;
-const auto kDefaultPipelineLet = BSON("new"
-                                      << "$$ROOT");
+const auto kDefaultPipelineLet = BSON("new" << "$$ROOT");
 
 /**
  * Checks if a pair of whenMatched/whenNotMatched merge modes is supported.

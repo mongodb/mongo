@@ -247,10 +247,14 @@ namespace SyntaxTests {
 template <typename Clonable>
 void construction() {
     // Test default construction
-    { mongo::clonable_ptr<Clonable>{}; }
+    {
+        mongo::clonable_ptr<Clonable>{};
+    }
 
     // Test construction from a nullptr
-    { mongo::clonable_ptr<Clonable>{nullptr}; }
+    {
+        mongo::clonable_ptr<Clonable>{nullptr};
+    }
 
     // Test construction from a Clonable pointer.
     {
@@ -259,7 +263,9 @@ void construction() {
     }
 
     // Test move construction.
-    { std::ignore = mongo::clonable_ptr<Clonable>{mongo::clonable_ptr<Clonable>{}}; }
+    {
+        std::ignore = mongo::clonable_ptr<Clonable>{mongo::clonable_ptr<Clonable>{}};
+    }
 
     // Test copy construction.
     {
@@ -281,7 +287,9 @@ void construction() {
     }
 
     // Test unique pointer construction
-    { mongo::clonable_ptr<Clonable>{std::make_unique<Clonable>()}; }
+    {
+        mongo::clonable_ptr<Clonable>{std::make_unique<Clonable>()};
+    }
 
     // Test unique pointer construction (conversion)
     {
@@ -291,7 +299,9 @@ void construction() {
     }
 
     // Test non-conversion pointer construction
-    { static_assert(!std::is_convertible<Clonable*, mongo::clonable_ptr<Clonable>>::value); }
+    {
+        static_assert(!std::is_convertible<Clonable*, mongo::clonable_ptr<Clonable>>::value);
+    }
 
     // Test conversion unique pointer construction
     {
@@ -310,7 +320,9 @@ void augmentedConstruction() {
     }
 
     // Test Clone Factory construction
-    { mongo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()}; }
+    {
+        mongo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()};
+    }
 
 // TODO: Revist this when MSVC's enable-if and deletion on ctors works.
 #ifndef _MSC_VER
@@ -322,7 +334,9 @@ void augmentedConstruction() {
 #endif
 
     // Test construction from a nullptr with factory
-    { mongo::clonable_ptr<Clonable, CloneFactory>{nullptr, Clonable::getCloningFunction()}; }
+    {
+        mongo::clonable_ptr<Clonable, CloneFactory>{nullptr, Clonable::getCloningFunction()};
+    }
 
 // TODO: Revist this when MSVC's enable-if and deletion on ctors works.
 #ifndef _MSC_VER

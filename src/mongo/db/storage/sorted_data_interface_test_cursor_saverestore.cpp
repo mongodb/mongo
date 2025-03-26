@@ -730,10 +730,8 @@ TEST_F(SortedDataInterfaceTest, SaveUnpositionedAndRestore) {
 }
 
 TEST_F(SortedDataInterfaceTest, SaveRestoreLex) {
-    const auto key1 = BSON(""
-                           << "abc");
-    const auto key2 = BSON(""
-                           << "abcd");
+    const auto key1 = BSON("" << "abc");
+    const auto key2 = BSON("" << "abcd");
     auto sorted =
         harnessHelper()->newSortedDataInterface(opCtx(),
                                                 /*unique=*/false,
@@ -765,10 +763,8 @@ TEST_F(SortedDataInterfaceTest, SaveRestoreLex) {
 }
 
 TEST_F(SortedDataInterfaceTest, SaveRestoreLexWithEndPosition) {
-    const auto key1 = BSON(""
-                           << "abc");
-    const auto key2 = BSON(""
-                           << "abcd");
+    const auto key1 = BSON("" << "abc");
+    const auto key2 = BSON("" << "abcd");
     auto sorted =
         harnessHelper()->newSortedDataInterface(opCtx(),
                                                 /*unique=*/false,

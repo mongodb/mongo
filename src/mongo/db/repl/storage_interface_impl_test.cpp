@@ -2579,20 +2579,14 @@ TEST_F(StorageInterfaceImplTest, UpdateDocumentsWithArrayFilter) {
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
-    auto doc1 = BSON("_id" << 0 << "participants"
-                           << BSON_ARRAY("a"
-                                         << "b"));
-    auto doc2 = BSON("_id" << 1 << "participants"
-                           << BSON_ARRAY("c"
-                                         << "b"));
+    auto doc1 = BSON("_id" << 0 << "participants" << BSON_ARRAY("a" << "b"));
+    auto doc2 = BSON("_id" << 1 << "participants" << BSON_ARRAY("c" << "b"));
     ASSERT_OK(storage.insertDocuments(opCtx, nss, {InsertStatement{doc1}, InsertStatement{doc2}}));
 
     TimestampedBSONObj update;
-    update.obj = BSON("$set" << BSON("participants.$[src]"
-                                     << "d"));
+    update.obj = BSON("$set" << BSON("participants.$[src]" << "d"));
     update.timestamp = Timestamp();
-    std::vector<BSONObj> arrayFilters{BSON("src"
-                                           << "b")};
+    std::vector<BSONObj> arrayFilters{BSON("src" << "b")};
 
     ASSERT_OK(storage.updateDocuments(opCtx, nss, {} /* query */, update, arrayFilters));
     auto docs =
@@ -2604,12 +2598,8 @@ TEST_F(StorageInterfaceImplTest, UpdateDocumentsWithArrayFilter) {
                                                   BoundInclusion::kIncludeStartKeyOnly,
                                                   -1 /* limit */));
     ASSERT_EQ(2, docs.size());
-    BSONObj expectedDoc0 = BSON("_id" << 0 << "participants"
-                                      << BSON_ARRAY("a"
-                                                    << "d"));
-    BSONObj expectedDoc1 = BSON("_id" << 1 << "participants"
-                                      << BSON_ARRAY("c"
-                                                    << "d"));
+    BSONObj expectedDoc0 = BSON("_id" << 0 << "participants" << BSON_ARRAY("a" << "d"));
+    BSONObj expectedDoc1 = BSON("_id" << 1 << "participants" << BSON_ARRAY("c" << "d"));
 
     ASSERT_BSONOBJ_EQ(expectedDoc0, docs[0]);
     ASSERT_BSONOBJ_EQ(expectedDoc1, docs[1]);
@@ -2654,8 +2644,7 @@ TEST_F(StorageInterfaceImplTest, DropCollectionsWithPrefix) {
 TEST_F(StorageInterfaceImplTest, FindByIdThrowsIfUUIDNotInCatalog) {
     auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     auto opCtx = getOperationContext();
-    auto obj = BSON("_id"
-                    << "kyle");
+    auto obj = BSON("_id" << "kyle");
     StorageInterfaceImpl storage;
     ASSERT_THROWS_CODE(
         storage.findById(opCtx, {DatabaseName::kLocal, UUID::gen()}, obj["_id"]).getStatus(),
@@ -2746,8 +2735,7 @@ TEST_F(StorageInterfaceImplTest, FindByIdReturnsBadStatusIfPlanExecutorFails) {
 TEST_F(StorageInterfaceImplTest, DeleteByIdThrowsIfUUIDNotInCatalog) {
     auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     auto opCtx = getOperationContext();
-    auto obj = BSON("_id"
-                    << "kyle");
+    auto obj = BSON("_id" << "kyle");
     StorageInterfaceImpl storage;
     ASSERT_THROWS_CODE(
         storage.deleteById(opCtx, {DatabaseName::kLocal, UUID::gen()}, obj["_id"]).getStatus(),
@@ -2821,8 +2809,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsDocumentWhenDocumentExists) {
 TEST_F(StorageInterfaceImplTest, UpsertByIdThrowsIfUUIDNotInCatalog) {
     auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     auto opCtx = getOperationContext();
-    auto obj = BSON("_id"
-                    << "kyle");
+    auto obj = BSON("_id" << "kyle");
     StorageInterfaceImpl storage;
     ASSERT_THROWS_CODE(
         storage.upsertById(opCtx, {DatabaseName::kLocal, UUID::gen()}, obj["_id"], obj),
@@ -3248,9 +3235,8 @@ TEST_F(StorageInterfaceImplTest,
 
     // Create a collection using a case-insensitive collation.
     CollectionOptions options = generateOptionsWithUuid();
-    options.collation = BSON("locale"
-                             << "en_US"
-                             << "strength" << 2);
+    options.collation = BSON("locale" << "en_US"
+                                      << "strength" << 2);
     ASSERT_OK(storage.createCollection(opCtx, nss, options));
 
     auto doc1 = BSON("_id" << 1 << "x"
@@ -3270,8 +3256,7 @@ TEST_F(StorageInterfaceImplTest,
 
     // This filter should remove doc1 and doc2 because the values of the field "x"
     // are equivalent to "aBc" under the case-insensive collation.
-    auto filter = BSON("x"
-                       << "aBc");
+    auto filter = BSON("x" << "aBc");
     ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
 
     _assertDocumentsInCollectionEquals(opCtx, nss, {doc3, doc4});

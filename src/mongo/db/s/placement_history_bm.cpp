@@ -175,7 +175,7 @@ public:
     }
 
 private:
-    void _doTest() override{};
+    void _doTest() override {};
 
     std::vector<BSONObj> _generateConfigShardSampleData(int nShards) const {
         std::vector<BSONObj> configShardData;

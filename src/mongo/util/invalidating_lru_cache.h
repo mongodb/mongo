@@ -445,8 +445,9 @@ public:
      * destroyed before the owning cache object itself is destroyed.
      */
     template <typename KeyType>
-    requires IsComparable<KeyType> ValueHandle
-    get(const KeyType& key,
+    requires IsComparable<KeyType>
+    ValueHandle get(
+        const KeyType& key,
         CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
@@ -534,8 +535,8 @@ public:
      * 'advanceTimeInStore'. Otherwise, returns a nullptr ValueHandle and Time().
      */
     template <typename KeyType>
-    requires IsComparable<KeyType> std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(
-        const KeyType& key) {
+    requires IsComparable<KeyType>
+    std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(const KeyType& key) {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {

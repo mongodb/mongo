@@ -55,9 +55,8 @@ using namespace mongo;
 
 // Basic test that it works.
 TEST_F(QueryPlannerTest, SimpleText) {
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(fromjson("{$text: {$search: 'blah'}}"));
 
     assertNumSolutions(1);
@@ -201,9 +200,8 @@ TEST_F(QueryPlannerTest, IndexOnOwnFieldButNotLeafPrefix) {
 
 TEST_F(QueryPlannerTest, IndexOnOwnFieldButNotLeafSuffixNoPrefix) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1 << "b" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1 << "b" << 1));
 
     runQuery(fromjson("{b:{$elemMatch:{$gt: 0, $lt: 2}}, $text:{$search: 'blah'}}"));
     assertNumSolutions(1);
@@ -238,9 +236,8 @@ TEST_F(QueryPlannerTest, TextInsideAndWithCompoundIndexAndMultiplePredsOnIndexPr
 TEST_F(QueryPlannerTest, TextInsideOrBasic) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(fromjson("{a: 0, $or: [{_id: 1}, {$text: {$search: 'foo'}}]}"));
 
     assertNumSolutions(1U);
@@ -254,9 +251,8 @@ TEST_F(QueryPlannerTest, TextInsideOrBasic) {
 TEST_F(QueryPlannerTest, TextInsideOrWithAnotherOr) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(
         fromjson("{$and: [{$or: [{a: 3}, {a: 4}]}, "
                  "{$or: [{$text: {$search: 'foo'}}, {a: 5}]}]}"));
@@ -273,9 +269,8 @@ TEST_F(QueryPlannerTest, TextInsideOrWithAnotherOr) {
 TEST_F(QueryPlannerTest, TextInsideOrOfAnd) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(
         fromjson("{$or: [{a: {$gt: 1, $gt: 2}}, "
                  "{a: {$gt: 3}, $text: {$search: 'foo'}}]}"));
@@ -297,9 +292,8 @@ TEST_F(QueryPlannerTest, TextInsideAndOrAnd) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(
         fromjson("{a: 1, $or: [{a:2}, {b:2}, "
                  "{a: 1, $text: {$search: 'foo'}}]}"));
@@ -321,9 +315,8 @@ TEST_F(QueryPlannerTest, TextInsideAndOrAnd_DisabledSimplifier) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(
         fromjson("{a: 1, $or: [{a:2}, {b:2}, "
                  "{a: 1, $text: {$search: 'foo'}}]}"));
@@ -340,9 +333,8 @@ TEST_F(QueryPlannerTest, TextInsideAndOrAnd_DisabledSimplifier) {
 TEST_F(QueryPlannerTest, TextInsideAndOrAndOr) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(
         fromjson("{$or: [{a: {$gt: 1, $gt: 2}}, "
                  "{a: {$gt: 3}, $or: [{$text: {$search: 'foo'}}, "
@@ -363,9 +355,8 @@ TEST_F(QueryPlannerTest, TextInsideAndOrAndOr) {
 TEST_F(QueryPlannerTest, TextInsideOrOneBranchNotIndexed) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runInvalidQuery(fromjson("{a: 1, $or: [{b: 2}, {$text: {$search: 'foo'}}]}"));
 
     assertNoSolutions();
@@ -376,9 +367,8 @@ TEST_F(QueryPlannerTest, TextInsideOrOneBranchNotIndexed) {
 TEST_F(QueryPlannerTest, TextInsideOrWithAnotherUnindexableOr) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(
         fromjson("{$and: [{$or: [{a: 1}, {b: 1}]}, "
                  "{$or: [{a: 2}, {$text: {$search: 'foo'}}]}]}"));
@@ -391,9 +381,8 @@ TEST_F(QueryPlannerTest, TextInsideOrWithAnotherUnindexableOr) {
 }
 
 TEST_F(QueryPlannerTest, AndTextWithGeoNonNear) {
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(
         fromjson("{$text: {$search: 'foo'}, a: {$geoIntersects: {$geometry: "
                  "{type: 'Point', coordinates: [3.0, 1.0]}}}}"));
@@ -435,9 +424,8 @@ TEST_F(QueryPlannerTest, OrTextInexactCovered) {
 }
 
 TEST_F(QueryPlannerTest, TextCaseSensitive) {
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(fromjson("{$text: {$search: 'blah', $caseSensitive: true}}"));
 
     assertNumSolutions(1);
@@ -445,9 +433,8 @@ TEST_F(QueryPlannerTest, TextCaseSensitive) {
 }
 
 TEST_F(QueryPlannerTest, TextDiacriticSensitive) {
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
     runQuery(fromjson("{$text: {$search: 'blah', $diacriticSensitive: true}}"));
 
     assertNumSolutions(1);
@@ -455,9 +442,8 @@ TEST_F(QueryPlannerTest, TextDiacriticSensitive) {
 }
 
 TEST_F(QueryPlannerTest, SortKeyMetaProjectionWithTextScoreMetaSort) {
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1));
 
     runQuerySortProj(fromjson("{$text: {$search: 'foo'}}"),
                      fromjson("{a: {$meta: 'textScore'}}"),
@@ -545,9 +531,8 @@ TEST_F(QueryPlannerTest, ExprEqCannotUsePrefixOfTextIndex) {
 
 TEST_F(QueryPlannerTest, ExprEqCanUseSuffixOfTextIndex) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
-    addIndex(BSON("_fts"
-                  << "text"
-                  << "_ftsx" << 1 << "a" << 1));
+    addIndex(BSON("_fts" << "text"
+                         << "_ftsx" << 1 << "a" << 1));
 
     runQuery(fromjson("{a: {$_internalExprEq: 3}, $text: {$search: 'blah'}}"));
 

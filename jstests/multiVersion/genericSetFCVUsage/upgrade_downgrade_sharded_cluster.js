@@ -11,6 +11,7 @@
  */
 
 import "jstests/multiVersion/libs/multi_cluster.js";
+
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();

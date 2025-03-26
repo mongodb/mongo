@@ -819,8 +819,7 @@ TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
     AutoGetCollectionForReadCommand ctx(_opCtx.get(), nss);
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setFilter(BSON("fake"
-                                << "query"));
+    findCommand->setFilter(BSON("fake" << "query"));
     auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});

@@ -80,7 +80,7 @@ bool waitUntil(const void* uaddr,
 template <typename T>
 requires(std::has_unique_object_representations_v<T> && sizeof(T) == 4 &&
          sizeof(AtomicWord<T>) == 4)  //
-    class BasicWaitableAtomic : public AtomicWord<T> {
+class BasicWaitableAtomic : public AtomicWord<T> {
 public:
     using AtomicWord<T>::AtomicWord;
 

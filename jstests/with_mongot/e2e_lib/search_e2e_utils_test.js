@@ -32,7 +32,9 @@ function assertResultsExpectedFuzzyTest() {
     }
 
     // Trival success case, empty arrays must be equal.
-    { assertDocArrExpectedFuzzy([], []); }
+    {
+        assertDocArrExpectedFuzzy([], []);
+    }
 
     // Test that tolerance percentages within range [0, 1] are accepted.
     {

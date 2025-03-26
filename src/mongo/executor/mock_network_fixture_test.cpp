@@ -53,7 +53,7 @@ using namespace test::mock;
 
 class MockNetworkTest : public NetworkInterfaceMockTest {
 public:
-    MockNetworkTest() : NetworkInterfaceMockTest(), _mock(&NetworkInterfaceMockTest::net()){};
+    MockNetworkTest() : NetworkInterfaceMockTest(), _mock(&NetworkInterfaceMockTest::net()) {};
 
     MockNetwork& mock() {
         return _mock;
@@ -113,8 +113,7 @@ public:
     RemoteCommandRequest kExampleRequestFour{
         {testHost()}, dbName, BSON(kExampleCmdNameFour << 1), rpc::makeEmptyMetadata(), nullptr};
 
-    BSONObj kExampleResponse = BSON("some"
-                                    << "response");
+    BSONObj kExampleResponse = BSON("some" << "response");
 
     RemoteCommandRequest makeRequest(std::string cmdName) {
         return {{testHost()}, dbName, BSON(cmdName << 1), rpc::makeEmptyMetadata(), nullptr};

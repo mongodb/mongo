@@ -70,7 +70,7 @@ export const $config = (function() {
 
         runQueryStatsWithHmac: (db, collName) => runQueryStats({db: db, options: hmacOptions}),
         runQueryStatsWithoutHmac: (db, collName) => runQueryStats({db: db, options: {}}),
-        init: (db, collName) => { /* no op */ },
+        init: (db, collName) => {/* no op */},
     };
 
     const transitions = {

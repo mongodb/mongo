@@ -802,109 +802,98 @@ TEST(FLECollectionOptions, Equality_ExtraFields) {
 
 TEST(FLECollectionOptions, Range_MinMax) {
     {
-        auto doc = BSON("encryptedFields"
-                        << BSON("fields" << BSON_ARRAY(BSON("path"
-                                                            << "firstName"
-                                                            << "keyId" << UUID::gen() << "bsonType"
-                                                            << "int"
-                                                            << "queries"
-                                                            << BSON("queryType"
-                                                                    << "range"
-                                                                    << "sparsity" << 1 << "min" << 2
-                                                                    << "max" << 1)))));
-
-        ASSERT_STATUS_CODE(6720005, CollectionOptions::parse(doc));
-    }
-
-    {
-        auto doc = BSON("encryptedFields"
-                        << BSON("fields" << BSON_ARRAY(BSON("path"
-                                                            << "firstName"
-                                                            << "keyId" << UUID::gen() << "bsonType"
-                                                            << "long"
-                                                            << "queries"
-                                                            << BSON("queryType"
-                                                                    << "range"
-                                                                    << "sparsity" << 1 << "min"
-                                                                    << 2LL << "max" << 1LL)))));
-
-        ASSERT_STATUS_CODE(6720005, CollectionOptions::parse(doc));
-    }
-
-    {
-        auto doc =
-            BSON("encryptedFields" << BSON(
-                     "fields" << BSON_ARRAY(BSON("path"
-                                                 << "firstName"
-                                                 << "keyId" << UUID::gen() << "bsonType"
-                                                 << "double"
-                                                 << "queries"
-                                                 << BSON("queryType"
-                                                         << "range"
-                                                         << "sparsity" << 1 << "min" << 2.0)))));
-
-        ASSERT_STATUS_CODE(6967100, CollectionOptions::parse(doc));
-
-        doc = BSON("encryptedFields" << BSON(
-                       "fields" << BSON_ARRAY(BSON("path"
-                                                   << "firstName"
+        auto doc = BSON(
+            "encryptedFields" << BSON(
+                "fields" << BSON_ARRAY(BSON("path" << "firstName"
                                                    << "keyId" << UUID::gen() << "bsonType"
-                                                   << "double"
+                                                   << "int"
                                                    << "queries"
-                                                   << BSON("queryType"
-                                                           << "range"
-                                                           << "sparsity" << 1 << "max" << 2.0)))));
+                                                   << BSON("queryType" << "range"
+                                                                       << "sparsity" << 1 << "min"
+                                                                       << 2 << "max" << 1)))));
+
+        ASSERT_STATUS_CODE(6720005, CollectionOptions::parse(doc));
+    }
+
+    {
+        auto doc = BSON(
+            "encryptedFields" << BSON(
+                "fields" << BSON_ARRAY(BSON("path" << "firstName"
+                                                   << "keyId" << UUID::gen() << "bsonType"
+                                                   << "long"
+                                                   << "queries"
+                                                   << BSON("queryType" << "range"
+                                                                       << "sparsity" << 1 << "min"
+                                                                       << 2LL << "max" << 1LL)))));
+
+        ASSERT_STATUS_CODE(6720005, CollectionOptions::parse(doc));
+    }
+
+    {
+        auto doc = BSON("encryptedFields" << BSON(
+                            "fields" << BSON_ARRAY(BSON(
+                                "path" << "firstName"
+                                       << "keyId" << UUID::gen() << "bsonType"
+                                       << "double"
+                                       << "queries"
+                                       << BSON("queryType" << "range"
+                                                           << "sparsity" << 1 << "min" << 2.0)))));
 
         ASSERT_STATUS_CODE(6967100, CollectionOptions::parse(doc));
 
         doc = BSON("encryptedFields"
-                   << BSON("fields"
-                           << BSON_ARRAY(BSON("path"
-                                              << "firstName"
-                                              << "keyId" << UUID::gen() << "bsonType"
-                                              << "double"
-                                              << "queries"
-                                              << BSON("queryType"
-                                                      << "range"
+                   << BSON("fields" << BSON_ARRAY(BSON(
+                               "path" << "firstName"
+                                      << "keyId" << UUID::gen() << "bsonType"
+                                      << "double"
+                                      << "queries"
+                                      << BSON("queryType" << "range"
+                                                          << "sparsity" << 1 << "max" << 2.0)))));
+
+        ASSERT_STATUS_CODE(6967100, CollectionOptions::parse(doc));
+
+        doc = BSON("encryptedFields" << BSON(
+                       "fields" << BSON_ARRAY(BSON(
+                           "path" << "firstName"
+                                  << "keyId" << UUID::gen() << "bsonType"
+                                  << "double"
+                                  << "queries"
+                                  << BSON("queryType" << "range"
                                                       << "sparsity" << 1 << "precision" << 2)))));
 
         ASSERT_STATUS_CODE(6967100, CollectionOptions::parse(doc));
 
         doc = BSON("encryptedFields"
-                   << BSON("fields" << BSON_ARRAY(
-                               BSON("path"
-                                    << "firstName"
-                                    << "keyId" << UUID::gen() << "bsonType"
-                                    << "decimal"
-                                    << "queries"
-                                    << BSON("queryType"
-                                            << "range"
-                                            << "sparsity" << 1 << "min" << Decimal128(2.0))))));
-
-        ASSERT_STATUS_CODE(6967100, CollectionOptions::parse(doc));
-
-        doc = BSON("encryptedFields"
-                   << BSON("fields" << BSON_ARRAY(
-                               BSON("path"
-                                    << "firstName"
-                                    << "keyId" << UUID::gen() << "bsonType"
-                                    << "decimal"
-                                    << "queries"
-                                    << BSON("queryType"
-                                            << "range"
-                                            << "sparsity" << 1 << "max" << Decimal128(2.0))))));
+                   << BSON("fields"
+                           << BSON_ARRAY(BSON("path" << "firstName"
+                                                     << "keyId" << UUID::gen() << "bsonType"
+                                                     << "decimal"
+                                                     << "queries"
+                                                     << BSON("queryType" << "range"
+                                                                         << "sparsity" << 1 << "min"
+                                                                         << Decimal128(2.0))))));
 
         ASSERT_STATUS_CODE(6967100, CollectionOptions::parse(doc));
 
         doc = BSON("encryptedFields"
                    << BSON("fields"
-                           << BSON_ARRAY(BSON("path"
-                                              << "firstName"
-                                              << "keyId" << UUID::gen() << "bsonType"
-                                              << "decimal"
-                                              << "queries"
-                                              << BSON("queryType"
-                                                      << "range"
+                           << BSON_ARRAY(BSON("path" << "firstName"
+                                                     << "keyId" << UUID::gen() << "bsonType"
+                                                     << "decimal"
+                                                     << "queries"
+                                                     << BSON("queryType" << "range"
+                                                                         << "sparsity" << 1 << "max"
+                                                                         << Decimal128(2.0))))));
+
+        ASSERT_STATUS_CODE(6967100, CollectionOptions::parse(doc));
+
+        doc = BSON("encryptedFields" << BSON(
+                       "fields" << BSON_ARRAY(BSON(
+                           "path" << "firstName"
+                                  << "keyId" << UUID::gen() << "bsonType"
+                                  << "decimal"
+                                  << "queries"
+                                  << BSON("queryType" << "range"
                                                       << "sparsity" << 1 << "precision" << 2)))));
 
         ASSERT_STATUS_CODE(6967100, CollectionOptions::parse(doc));
@@ -914,16 +903,15 @@ TEST(FLECollectionOptions, Range_MinMax) {
     Date_t start = Date_t::now();
     Date_t end = start;
     end += Hours(1);
-    auto doc = BSON("encryptedFields"
-                    << BSON("fields" << BSON_ARRAY(BSON("path"
-                                                        << "firstName"
-                                                        << "keyId" << UUID::gen() << "bsonType"
-                                                        << "date"
-                                                        << "queries"
-                                                        << BSON("queryType"
-                                                                << "range"
-                                                                << "sparsity" << 1 << "min" << end
-                                                                << "max" << start)))));
+    auto doc = BSON(
+        "encryptedFields" << BSON(
+            "fields" << BSON_ARRAY(BSON("path" << "firstName"
+                                               << "keyId" << UUID::gen() << "bsonType"
+                                               << "date"
+                                               << "queries"
+                                               << BSON("queryType" << "range"
+                                                                   << "sparsity" << 1 << "min"
+                                                                   << end << "max" << start)))));
 
     ASSERT_STATUS_CODE(6720005, CollectionOptions::parse(doc));
 }

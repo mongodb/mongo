@@ -305,7 +305,7 @@ private:
     void onConsistentDataAvailable(OperationContext* opCtx,
                                    bool isMajority,
                                    bool isRollback) final {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) final{};
+    void onStepUpBegin(OperationContext* opCtx, long long term) final {};
     void onBecomeArbiter() final {}
 };
 

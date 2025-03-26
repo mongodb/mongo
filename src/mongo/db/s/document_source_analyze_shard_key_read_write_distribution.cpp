@@ -307,8 +307,7 @@ void processSampledDiffs(OperationContext* opCtx,
             const auto prefixPath =
                 SampledQueryDiffDocument::kDiffFieldName + "." + shardKeyPrefixFieldName;
             andArrayBuilder.append(BSON(prefixPath << BSON("$exists" << true)));
-            andArrayBuilder.append(BSON(prefixPath << BSON("$not" << BSON("$type"
-                                                                          << "object"))));
+            andArrayBuilder.append(BSON(prefixPath << BSON("$not" << BSON("$type" << "object"))));
             andArrayBuilder.done();
             orArrayBuilder.append(andBuilder.done());
 

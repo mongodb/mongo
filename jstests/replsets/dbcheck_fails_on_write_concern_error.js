@@ -98,15 +98,13 @@ function runTest(validateMode, writeConcern) {
     rst.stopSet();
 }
 
-["dataConsistencyAndMissingIndexKeysCheck",
- "extraIndexKeysCheck"]
-    .forEach((failpointName) => {
-        runTest(failpointName, {
-            w: 'majority',
-            wtimeout: 100,
-        });
-        runTest(failpointName, {
-            w: 3,
-            wtimeout: 100,
-        });
+["dataConsistencyAndMissingIndexKeysCheck", "extraIndexKeysCheck"].forEach((failpointName) => {
+    runTest(failpointName, {
+        w: 'majority',
+        wtimeout: 100,
     });
+    runTest(failpointName, {
+        w: 3,
+        wtimeout: 100,
+    });
+});

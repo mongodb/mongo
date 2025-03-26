@@ -516,13 +516,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectNonStringFullDocumentOption) {
 TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
     auto expCtx = getExpCtx();
 
-    ASSERT_THROWS_CODE(
-        DSChangeStream::createFromBson(BSON(DSChangeStream::kStageName << BSON("fullDocument"
-                                                                               << "unrecognized"))
-                                           .firstElement(),
-                                       expCtx),
-        AssertionException,
-        ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(BSON(DSChangeStream::kStageName << BSON(
+                                                               "fullDocument" << "unrecognized"))
+                                                          .firstElement(),
+                                                      expCtx),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {
@@ -2705,8 +2704,7 @@ TEST_F(ChangeStreamStageTest, DSCSOplogMatchStageSerialization) {
 TEST_F(ChangeStreamStageTest, DSCSUnwindTransactionStageSerialization) {
     auto expCtx = getExpCtx();
 
-    auto filter = BSON("ns" << BSON("$regex"
-                                    << "^db\\.coll$"));
+    auto filter = BSON("ns" << BSON("$regex" << "^db\\.coll$"));
     DocumentSourceChangeStreamUnwindTransactionSpec spec{std::move(filter)};
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
@@ -3733,10 +3731,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
                      << makeResumeToken(
                             kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
-        BSON("$match" << BSON("operationType"
-                              << "insert")),
-        BSON("$match" << BSON("operationType"
-                              << "insert"))};
+        BSON("$match" << BSON("operationType" << "insert")),
+        BSON("$match" << BSON("operationType" << "insert"))};
 
     auto pipeline = buildTestPipeline(rawPipeline);
 
@@ -3845,8 +3841,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithProjectMatchAndResumeToken) {
                             kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$project" << BSON("operationType" << 1)),
-        BSON("$match" << BSON("operationType"
-                              << "insert"))};
+        BSON("$match" << BSON("operationType" << "insert"))};
 
     auto pipeline = buildTestPipeline(rawPipeline);
 
@@ -3925,8 +3920,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithUnsetAndResumeToken) {
                      << makeResumeToken(
                             kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
-        BSON("$unset"
-             << "operationType")};
+        BSON("$unset" << "operationType")};
 
     auto pipeline = buildTestPipeline(rawPipeline);
 
@@ -4131,8 +4125,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceRootAndResumeToken) {
                      << makeResumeToken(
                             kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
-        BSON("$replaceRoot" << BSON("newRoot"
-                                    << "$fullDocument"))};
+        BSON("$replaceRoot" << BSON("newRoot" << "$fullDocument"))};
 
     auto pipeline = buildTestPipeline(rawPipeline);
 
@@ -4185,8 +4178,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceWithAndResumeToken) {
                      << makeResumeToken(
                             kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
-        BSON("$replaceWith"
-             << "$fullDocument")};
+        BSON("$replaceWith" << "$fullDocument")};
 
     auto pipeline = buildTestPipeline(rawPipeline);
 
@@ -4247,8 +4239,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseInjectsMatc
 TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseAndUserMatch) {
     const std::vector<BSONObj> rawPipeline = {
         fromjson("{$changeStream: {showExpandedEvents: false}}"),
-        BSON("$match" << BSON("operationType"
-                              << "insert"))};
+        BSON("$match" << BSON("operationType" << "insert"))};
 
     auto pipeline = buildTestPipeline(rawPipeline);
 
@@ -4272,8 +4263,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseAndUserProj
     const std::vector<BSONObj> rawPipeline = {
         fromjson("{$changeStream: {showExpandedEvents: false}}"),
         BSON("$project" << BSON("operationType" << 1)),
-        BSON("$match" << BSON("operationType"
-                              << "insert")),
+        BSON("$match" << BSON("operationType" << "insert")),
     };
 
     auto pipeline = buildTestPipeline(rawPipeline);
@@ -4304,16 +4294,12 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithAllStagesAndResumeToken) {
                             kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$project" << BSON("operationType" << 1)),
-        BSON("$unset"
-             << "_id"),
+        BSON("$unset" << "_id"),
         BSON("$addFields" << BSON("stockPrice" << 100)),
         BSON("$set" << BSON("fullDocument.stockPrice" << 100)),
-        BSON("$match" << BSON("operationType"
-                              << "insert")),
-        BSON("$replaceRoot" << BSON("newRoot"
-                                    << "$fullDocument")),
-        BSON("$replaceWith"
-             << "fullDocument.stockPrice")};
+        BSON("$match" << BSON("operationType" << "insert")),
+        BSON("$replaceRoot" << BSON("newRoot" << "$fullDocument")),
+        BSON("$replaceWith" << "fullDocument.stockPrice")};
 
     auto pipeline = buildTestPipeline(rawPipeline);
 

@@ -482,9 +482,7 @@ class SeveralMoreDocuments : public CheckResultsBase {
     deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << BSONNULL),
                 DOC("_id" << 1),
-                DOC("_id" << 2 << "a"
-                          << DOC_ARRAY("a"_sd
-                                       << "b"_sd)),
+                DOC("_id" << 2 << "a" << DOC_ARRAY("a"_sd << "b"_sd)),
                 DOC("_id" << 3),
                 DOC("_id" << 4 << "a" << DOC_ARRAY(1 << 2 << 3)),
                 DOC("_id" << 5 << "a" << DOC_ARRAY(4 << 5 << 6)),
@@ -835,66 +833,55 @@ TEST_F(UnwindStageTest, ShouldRejectNonStringPath) {
 }
 
 TEST_F(UnwindStageTest, ShouldRejectNonDollarPrefixedPath) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind"
-                                         << "somePath")),
-                       AssertionException,
-                       28818);
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "somePath"))),
-                       AssertionException,
-                       28818);
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << "somePath")), AssertionException, 28818);
+    ASSERT_THROWS_CODE(
+        createUnwind(BSON("$unwind" << BSON("path" << "somePath"))), AssertionException, 28818);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectNonBoolPreserveNullAndEmptyArrays) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "preserveNullAndEmptyArrays" << 2))),
-                       AssertionException,
-                       28809);
+    ASSERT_THROWS_CODE(
+        createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                   << "preserveNullAndEmptyArrays" << 2))),
+        AssertionException,
+        28809);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectNonStringIncludeArrayIndex) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "includeArrayIndex" << 2))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "includeArrayIndex" << 2))),
                        AssertionException,
                        28810);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectEmptyStringIncludeArrayIndex) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "includeArrayIndex"
-                                                           << ""))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "includeArrayIndex"
+                                                                  << ""))),
                        AssertionException,
                        28810);
 }
 
 TEST_F(UnwindStageTest, ShoudlRejectDollarPrefixedIncludeArrayIndex) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "includeArrayIndex"
-                                                           << "$"))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "includeArrayIndex"
+                                                                  << "$"))),
                        AssertionException,
                        28822);
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "includeArrayIndex"
-                                                           << "$path"))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "includeArrayIndex"
+                                                                  << "$path"))),
                        AssertionException,
                        28822);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectUnrecognizedOption) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "preserveNullAndEmptyArrays" << true
-                                                           << "foo" << 3))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "preserveNullAndEmptyArrays"
+                                                                  << true << "foo" << 3))),
                        AssertionException,
                        28811);
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "foo" << 3))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "foo" << 3))),
                        AssertionException,
                        28811);
 }

@@ -34,7 +34,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-SorterFileStats::SorterFileStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker){};
+SorterFileStats::SorterFileStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker) {};
 
 void SorterFileStats::addSpilledDataSize(long long data) {
     _bytesSpilled.fetchAndAdd(data);
@@ -50,7 +50,7 @@ void SorterFileStats::addSpilledDataSizeUncompressed(long long data) {
     }
 }
 
-SorterStats::SorterStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker){};
+SorterStats::SorterStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker) {};
 
 void SorterStats::incrementSpilledRanges() {
     _spilledRanges++;

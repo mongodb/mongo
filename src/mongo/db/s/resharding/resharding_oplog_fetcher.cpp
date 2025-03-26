@@ -551,8 +551,8 @@ bool ReshardingOplogFetcher::consume(Client* client,
                         oplog.setOpType(repl::OpTypeEnum::kNoop);
                         oplog.setUuid(_collUUID);
                         oplog.set_id(Value(newStartAt.toBSON()));
-                        oplog.setObject(BSON("msg"
-                                             << "Latest oplog ts from donor's cursor response"));
+                        oplog.setObject(
+                            BSON("msg" << "Latest oplog ts from donor's cursor response"));
                         oplog.setObject2(BSON("type" << resharding::kReshardProgressMark));
                         oplog.setOpTime(OplogSlot());
                         oplog.setWallClockTime(

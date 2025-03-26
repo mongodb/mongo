@@ -112,15 +112,9 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenYielding) {
     };
 
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestShardIds[0],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[1],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[2],
-                          BSON("find"
-                               << "bar"));
+    requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[2], BSON("find" << "bar"));
 
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
@@ -174,15 +168,9 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
     };
 
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestShardIds[0],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[1],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[2],
-                          BSON("find"
-                               << "bar"));
+    requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[2], BSON("find" << "bar"));
     std::set<ShardId> pendingShardIds{kTestShardIds[0], kTestShardIds[1], kTestShardIds[2]};
 
     auto ars = AsyncRequestsSender(operationContext(),
@@ -255,9 +243,7 @@ TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
     };
 
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestShardIds[0],
-                          BSON("find"
-                               << "bar"));
+    requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"));
 
     auto yielder = std::make_unique<CountingResourceYielder>();
     auto yielderPointer = yielder.get();
@@ -289,15 +275,9 @@ TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
 
 TEST_F(AsyncRequestsSenderTest, DesignatedHostChosen) {
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestShardIds[0],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[1],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[2],
-                          BSON("find"
-                               << "bar"));
+    requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[2], BSON("find" << "bar"));
 
     AsyncRequestsSender::ShardHostMap designatedHosts;
 
@@ -356,15 +336,9 @@ TEST_F(AsyncRequestsSenderTest, DesignatedHostChosen) {
 
 TEST_F(AsyncRequestsSenderTest, DesignatedHostMustBeInShard) {
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestShardIds[0],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[1],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[2],
-                          BSON("find"
-                               << "bar"));
+    requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[2], BSON("find" << "bar"));
 
     AsyncRequestsSender::ShardHostMap designatedHosts;
     designatedHosts[kTestShardIds[1]] = HostAndPort("HostNotInShard", 12345);
@@ -392,18 +366,9 @@ TEST_F(AsyncRequestsSenderTest, PreLoadedShardIsUsedForInitialRequest) {
     // Intentionally provide ShardIds mismatched with Shard types to prove the Shard given in the
     // request is used for the initial attempt.
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestShardIds[0],
-                          BSON("find"
-                               << "bar"),
-                          shard1);
-    requests.emplace_back(kTestShardIds[1],
-                          BSON("find"
-                               << "bar"),
-                          shard2);
-    requests.emplace_back(kTestShardIds[2],
-                          BSON("find"
-                               << "bar"),
-                          shard0);
+    requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"), shard1);
+    requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"), shard2);
+    requests.emplace_back(kTestShardIds[2], BSON("find" << "bar"), shard0);
 
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
@@ -480,15 +445,9 @@ TEST_F(AsyncRequestsSenderTest, MultipleRetriesReceivedInconclusiveError) {
     auto shard2 = uassertStatusOK(shardRegistry->getShard(operationContext(), kTestShardIds[2]));
 
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestShardIds[0],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[1],
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestShardIds[2],
-                          BSON("find"
-                               << "bar"));
+    requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[2], BSON("find" << "bar"));
 
     const BSONObj writeConcernError = BSON("code" << ErrorCodes::HostUnreachable << "errmsg"
                                                   << "Third mock network error");

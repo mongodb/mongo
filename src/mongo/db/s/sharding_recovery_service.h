@@ -67,7 +67,7 @@ public:
      */
     class NoCustomAction : public BeforeReleasingCustomAction {
     public:
-        void operator()(OperationContext*, const NamespaceString&) const final{};
+        void operator()(OperationContext*, const NamespaceString&) const final {};
     };
 
 

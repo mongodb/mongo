@@ -75,10 +75,9 @@ using ExpressionConvertTest = AggregationContextFixture;
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithoutOptionalArguments) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
@@ -93,12 +92,11 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithoutOptionalArguments) {
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithToSubDocument) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
+    auto spec =
+        BSON("$convert" << BSON("input" << "$path1"
                                         << "to"
-                                        << BSON("type"
-                                                << "binData"
-                                                << "subtype" << static_cast<int>(newUUID))
+                                        << BSON("type" << "binData"
+                                                       << "subtype" << static_cast<int>(newUUID))
                                         << "format"
                                         << "uuid"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
@@ -156,11 +154,10 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithToSubDocument) {
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"
-                                        << "onError" << 0));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"
+                                                << "onError" << 0));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(
@@ -176,11 +173,10 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"
-                                        << "onNull" << 0));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"
+                                                << "onNull" << 0));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(
@@ -196,9 +192,8 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
 TEST_F(ExpressionConvertTest, ConvertWithoutInputFailsToParse) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("to"
-                                        << "int"
-                                        << "onError" << 0));
+    auto spec = BSON("$convert" << BSON("to" << "int"
+                                             << "onError" << 0));
     ASSERT_THROWS_WITH_CHECK(
         Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
         AssertionException,
@@ -211,9 +206,8 @@ TEST_F(ExpressionConvertTest, ConvertWithoutInputFailsToParse) {
 TEST_F(ExpressionConvertTest, ConvertWithoutToFailsToParse) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "onError" << 0));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "onError" << 0));
     ASSERT_THROWS_WITH_CHECK(
         Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
         AssertionException,
@@ -227,19 +221,16 @@ TEST_F(ExpressionConvertTest, RoundTripSerialization) {
     auto expCtx = getExpCtx();
 
     // Round-trip serialization of an argument that *looks* like an expression.
-    auto spec = BSON("$convert" << BSON("input" << BSON("$literal" << BSON("$toString"
-                                                                           << "this is a string"))
-                                                << "to"
-                                                << "string"));
+    auto spec =
+        BSON("$convert" << BSON(
+                 "input" << BSON("$literal" << BSON("$toString" << "this is a string")) << "to"
+                         << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
     auto serialized = convertExp->serialize(opts);
-    ASSERT_VALUE_EQ(Value(BSON("$convert" << BSON("input" << BSON("$const" << BSON("?"
-                                                                                   << "?"))
-                                                          << "to"
-                                                          << BSON("$const"
-                                                                  << "string")))),
+    ASSERT_VALUE_EQ(Value(BSON("$convert" << BSON("input" << BSON("$const" << BSON("?" << "?"))
+                                                          << "to" << BSON("$const" << "string")))),
                     serialized);
 
     auto roundTrip = Expression::parseExpression(expCtx.get(),

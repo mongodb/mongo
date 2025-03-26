@@ -80,10 +80,9 @@ BSONObj buildSampleObj(uint64_t i) {
     return BSON(GENOID << "name"
                        << "Wile E. Coyote"
                        << "age" << pseudoRandomAge(i) << "i" << static_cast<int>(i) << "address"
-                       << BSON("street"
-                               << "433 W 43rd St"
-                               << "zip_code" << pseudoRandomZipCode(i) << "city"
-                               << "New York")
+                       << BSON("street" << "433 W 43rd St"
+                                        << "zip_code" << pseudoRandomZipCode(i) << "city"
+                                        << "New York")
                        << "random" << pseudoRandom7Digits(i) << "phone_no" << pseudoRandomPhoneNo(i)
                        << "long_string" << pseudoRandomLongStr(i));
 }

@@ -5,12 +5,12 @@
  */
 import {
     aggPlanHasStage,
+    assertEngine,
     getAggPlanStage,
     getAggPlanStages,
     hasRejectedPlans,
     planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
-import {assertEngine} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

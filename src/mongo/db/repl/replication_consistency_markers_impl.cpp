@@ -74,8 +74,7 @@ namespace repl {
 
 namespace {
 const BSONObj kInitialSyncFlag(BSON(MinValidDocument::kInitialSyncFlagFieldName << true));
-const BSONObj kOplogTruncateAfterPointId(BSON("_id"
-                                              << "oplogTruncateAfterPoint"));
+const BSONObj kOplogTruncateAfterPointId(BSON("_id" << "oplogTruncateAfterPoint"));
 }  // namespace
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
@@ -331,9 +330,9 @@ Status ReplicationConsistencyMarkersImpl::_setOplogTruncateAfterPoint(
     return _upsertOplogTruncateAfterPointDocument(
         collection,
         opCtx,
-        BSON("_id"
-             << "oplogTruncateAfterPoint"
-             << OplogTruncateAfterPointDocument::kOplogTruncateAfterPointFieldName << timestamp));
+        BSON("_id" << "oplogTruncateAfterPoint"
+                   << OplogTruncateAfterPointDocument::kOplogTruncateAfterPointFieldName
+                   << timestamp));
 }
 
 void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationContext* opCtx,

@@ -171,8 +171,7 @@ TEST(MapReduceAggTest, testFeatureLadenTranslate) {
         MapReduceJavascriptCode{reduceJavascript.toString()},
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Replace, false}};
     mr.setSort(BSON("foo" << 1));
-    mr.setQuery(BSON("foo"
-                     << "fooval"));
+    mr.setQuery(BSON("foo" << "fooval"));
     mr.setFinalize(
         boost::make_optional(MapReduceJavascriptCodeOrNull{finalizeJavascript.toString()}));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));

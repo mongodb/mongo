@@ -114,7 +114,7 @@ public:
     }
 
 private:
-    void _doTest() override{};
+    void _doTest() override {};
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

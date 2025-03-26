@@ -220,9 +220,13 @@ WiredTigerOplogManager::VisibilityUpdateResult WiredTigerOplogManager::_updateVi
         // Check once a millisecond, up to the delay deadline, whether the delay should be
         // preempted because of waiting callers or shutdown.
         while (now < deadline &&
-               !_oplogVisibilityThreadCV.wait_until(lk, now.toSystemTimePoint(), [this, &oplog] {
-                   return !_running || _opsWaitingForOplogVisibilityUpdate || oplog.hasWaiters();
-               })) {
+               !_oplogVisibilityThreadCV.wait_until(
+                   lk,
+                   now.toSystemTimePoint(),
+                   [this, &oplog] {
+                       return !_running || _opsWaitingForOplogVisibilityUpdate ||
+                           oplog.hasWaiters();
+                   })) {
             now += Milliseconds{1};
         }
     }

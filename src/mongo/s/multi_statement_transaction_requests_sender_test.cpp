@@ -162,9 +162,8 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedI
     TransactionRouter::get(operationContext()).setDefaultAtClusterTime(operationContext());
 
     auto cmdName = "find";
-    std::vector<AsyncRequestsSender::Request> requests{{kTestRemoteShardId1,
-                                                        BSON("find"
-                                                             << "bar")}};
+    std::vector<AsyncRequestsSender::Request> requests{
+        {kTestRemoteShardId1, BSON("find" << "bar")}};
 
     auto msars =
         MultiStatementTransactionRequestsSender(operationContext(),
@@ -199,13 +198,11 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedI
     operationContext()->setInMultiDocumentTransaction();
     operationContext()->setActiveTransactionParticipant();
     repl::ReadConcernArgs readConcernArgs;
-    ASSERT_OK(
-        readConcernArgs.initialize(BSON("find"
-                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
-                                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
-                                                << LogicalTime(Timestamp(1, 0)).asTimestamp()
-                                                << repl::ReadConcernArgs::kLevelFieldName
-                                                << "snapshot"))));
+    ASSERT_OK(readConcernArgs.initialize(
+        BSON("find" << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                    << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                            << LogicalTime(Timestamp(1, 0)).asTimestamp()
+                            << repl::ReadConcernArgs::kLevelFieldName << "snapshot"))));
     repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
     RouterOperationContextSession rocs(operationContext());
     TransactionRouter::get(operationContext())
@@ -214,9 +211,8 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedI
                             TransactionRouter::TransactionActions::kStartOrContinue);
 
     auto cmdName = "find";
-    std::vector<AsyncRequestsSender::Request> requests{{kTestRemoteShardId1,
-                                                        BSON("find"
-                                                             << "bar")}};
+    std::vector<AsyncRequestsSender::Request> requests{
+        {kTestRemoteShardId1, BSON("find" << "bar")}};
 
     auto msars =
         MultiStatementTransactionRequestsSender(operationContext(),
@@ -315,12 +311,8 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
 
     // Schedule remote requests
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestRemoteShardId1,
-                          BSON("find"
-                               << "bar"));
-    requests.emplace_back(kTestRemoteShardId2,
-                          BSON("find"
-                               << "bar"));
+    requests.emplace_back(kTestRemoteShardId1, BSON("find" << "bar"));
+    requests.emplace_back(kTestRemoteShardId2, BSON("find" << "bar"));
     std::set<ShardId> pendingShardIds{kTestRemoteShardId1, kTestRemoteShardId2};
 
     auto msars = MultiStatementTransactionRequestsSender(
@@ -398,9 +390,7 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest, FailUnyieldIfTxnStas
 
     // Schedule remote request
     std::vector<AsyncRequestsSender::Request> requests;
-    requests.emplace_back(kTestRemoteShardId1,
-                          BSON("find"
-                               << "bar"));
+    requests.emplace_back(kTestRemoteShardId1, BSON("find" << "bar"));
     std::set<ShardId> pendingShardIds{kTestRemoteShardId1};
 
     auto msars = MultiStatementTransactionRequestsSender(
@@ -412,9 +402,7 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest, FailUnyieldIfTxnStas
         Shard::RetryPolicy::kNoRetry);
 
     // Force the ARS to hang after it yields
-    setGlobalFailPoint("hangAfterYield",
-                       BSON("mode"
-                            << "alwaysOn"));
+    setGlobalFailPoint("hangAfterYield", BSON("mode" << "alwaysOn"));
 
     // Call MSARS::next(), which will hang after yielding because of the failpoint above. Once the
     // failpoint is turned off and the MSARS tries to unyield, it should fail.
@@ -455,9 +443,7 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest, FailUnyieldIfTxnStas
     // Wait until the concurrent request has unstashed the txnResources, then turn off the
     // failpoint.
     mockConcurrentRequestFuture.default_timed_get();
-    setGlobalFailPoint("hangAfterYield",
-                       BSON("mode"
-                            << "off"));
+    setGlobalFailPoint("hangAfterYield", BSON("mode" << "off"));
 
     // Mock a successful find response from the remote shard, and then wait for the MSARS to fail
     // when unyieding.

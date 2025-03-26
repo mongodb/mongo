@@ -364,12 +364,11 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
 }
 
 TEST_F(HashAggStageTest, HashAggCollationTest) {
-    auto inputArr = BSON_ARRAY("A"
-                               << "a"
-                               << "b"
-                               << "c"
-                               << "B"
-                               << "a");
+    auto inputArr = BSON_ARRAY("A" << "a"
+                                   << "b"
+                                   << "c"
+                                   << "B"
+                                   << "a");
 
     // Collator groups the values as: ["A", "a", "a"], ["B", "b"], ["c"].
     auto collatorExpectedOutputArr = BSON_ARRAY(3 << 2 << 1);

@@ -95,8 +95,7 @@ namespace shell_utils {
 namespace {
 
 BSONObj listFiles(const BSONObj& _args, void* data) {
-    BSONObj cd = BSON("0"
-                      << ".");
+    BSONObj cd = BSON("0" << ".");
     BSONObj args = _args.isEmpty() ? cd : _args;
 
     uassert(10257, "need to specify 1 argument to listFiles", args.nFields() == 1);

@@ -530,8 +530,7 @@ TEST_F(FleCompactTest, GetUniqueECOCDocsMultipleFieldsWithManyDuplicateValues) {
 // Tests V2 compaction on an ESC that does not contain non-anchors
 TEST_F(FleCompactTest, CompactValueV2_NoNonAnchors) {
     ECStats escStats;
-    auto testPair = BSON("first"
-                         << "brian");
+    auto testPair = BSON("first" << "brian");
     auto ecocDoc = generateTestECOCDocumentV2(testPair);
     assertDocumentCounts(0, 0, 0);
 
@@ -807,8 +806,7 @@ TEST_F(FleCompactTest, RandomESCNonAnchorDeletions) {
 // Tests cleanup on an empty ESC
 TEST_F(FleCompactTest, CleanupValueV2_EmptyESC) {
     ECStats escStats;
-    auto testPair = BSON("first"
-                         << "brian");
+    auto testPair = BSON("first" << "brian");
     auto ecocDoc = generateTestECOCDocumentV2(testPair);
     assertDocumentCounts(0, 0, 0);
     size_t anchorLimit = 100;

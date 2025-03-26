@@ -489,9 +489,8 @@ TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
     BSONObj currentQueue = bsonObj.getObjectField("currentQueue");
     BSONObj queueStats = bsonObj.getObjectField("queues");
 
-    auto expectedCurrentQueue = BSON("name"
-                                     << "execution"
-                                     << "timeQueuedMicros" << 5000);
+    auto expectedCurrentQueue = BSON("name" << "execution"
+                                            << "timeQueuedMicros" << 5000);
     auto expectedQueueStats =
         BSON("execution" << BSON("admissions" << 7 << "totalTimeQueuedMicros" << 5000
                                               << "isHoldingTicket" << false)

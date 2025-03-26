@@ -1,4 +1,4 @@
-//#include "mongo/config.h"
+// #include "mongo/config.h"
 
 namespace mongo {
 #define MONGO_CONFIG_TEST1 1

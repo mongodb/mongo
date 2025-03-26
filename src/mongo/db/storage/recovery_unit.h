@@ -538,7 +538,7 @@ public:
      * data, and will attempt to keep higher-priority data from being evicted from the cache. This
      * may not be called in an active transaction.
      */
-    virtual void setReadOnce(bool readOnce){};
+    virtual void setReadOnce(bool readOnce) {};
 
     virtual bool getReadOnce() const {
         return false;
@@ -559,7 +559,7 @@ public:
      *
      * Must be reset when the WriteUnitOfWork is either committed or rolled back.
      */
-    virtual void ignoreAllMultiTimestampConstraints(){};
+    virtual void ignoreAllMultiTimestampConstraints() {};
 
     /**
      * Registers a callback to be called prior to a WriteUnitOfWork committing the storage

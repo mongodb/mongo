@@ -129,8 +129,7 @@ public:
                                     ClockSource* clockSource,
                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
         : _impl{UUID::gen(),
-                BSON("command"
-                     << "test"),
+                BSON("command" << "test"),
                 NamespaceString::createNamespaceString_forTest("test.source"),
                 ShardingDataTransformInstanceMetrics::Role::kDonor,
                 startTime,

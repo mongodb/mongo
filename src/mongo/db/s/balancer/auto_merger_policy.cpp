@@ -339,11 +339,8 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
             expCtx));
 
         // 3. Unwind stage to get the list of collections with mergeable chunks
-        stages.emplace_back(
-            DocumentSourceUnwind::createFromBson(BSON("$unwind" << BSON("path"
-                                                                        << "$chunks"))
-                                                     .firstElement(),
-                                                 expCtx));
+        stages.emplace_back(DocumentSourceUnwind::createFromBson(
+            BSON("$unwind" << BSON("path" << "$chunks")).firstElement(), expCtx));
 
         auto pipeline = Pipeline::create(std::move(stages), expCtx);
         auto aggRequest =

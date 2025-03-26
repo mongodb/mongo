@@ -51,7 +51,7 @@ public:
                                    WindowBounds::Bound<int> upperDocumentBound,
                                    SimpleMemoryUsageTracker* memTracker)
         : WindowFunctionExecNonRemovableCommon(iter, input, upperDocumentBound, memTracker),
-          _function(std::move(function)){};
+          _function(std::move(function)) {};
 
     void updateWindow(const Value& input) final {
         _function->process(input, false);

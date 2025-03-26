@@ -228,10 +228,10 @@ public:
                                              << ("$" +
                                                  ReshardingRecipientResumeData::
                                                      kDocumentsCopiedFieldName))))));
-                ASSERT_BSONOBJ_EQ(pipeline[2],
-                                  BSON("$project" << BSON("_id" << 0 << "documentsCopied"
-                                                                << BSON("$arrayToObject"
-                                                                        << "$pairs"))));
+                ASSERT_BSONOBJ_EQ(
+                    pipeline[2],
+                    BSON("$project" << BSON("_id" << 0 << "documentsCopied"
+                                                  << BSON("$arrayToObject" << "$pairs"))));
 
                 ASSERT_BSONOBJ_EQ(aggRequest.getReadConcern()->toBSON(),
                                   repl::ReadConcernArgs::kMajority.toBSON());
@@ -284,19 +284,15 @@ public:
                 ASSERT_EQUALS(aggRequest.getNamespace(), sourceNss);
 
                 ASSERT_EQ(aggRequest.getPipeline().size(), 1);
-                ASSERT_BSONOBJ_EQ(aggRequest.getPipeline()[0],
-                                  BSON("$count"
-                                       << "count"));
+                ASSERT_BSONOBJ_EQ(aggRequest.getPipeline()[0], BSON("$count" << "count"));
                 ASSERT_BSONOBJ_EQ(*aggRequest.getHint(), BSON("_id" << 1));
 
                 ASSERT_BSONOBJ_EQ(
                     aggRequest.getReadConcern()->toBSON(),
-                    BSON("readConcern" << BSON("level"
-                                               << "snapshot"
-                                               << "atClusterTime" << cloneTimestamp)));
+                    BSON("readConcern" << BSON("level" << "snapshot"
+                                                       << "atClusterTime" << cloneTimestamp)));
                 ASSERT_BSONOBJ_EQ(*aggRequest.getUnwrappedReadPref(),
-                                  BSON("$readPreference" << BSON("mode"
-                                                                 << "secondaryPreferred")));
+                                  BSON("$readPreference" << BSON("mode" << "secondaryPreferred")));
                 ASSERT_EQ(aggRequest.getShardVersion(), shardVersions.find(donorShardId)->second);
 
                 return true;

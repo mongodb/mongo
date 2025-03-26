@@ -187,9 +187,7 @@ TEST(DiffSerializationTest, SubDiff) {
 }
 
 TEST(DiffSerializationTest, SubArrayWithSubDiff) {
-    const BSONObj kDummyObj(BSON("a" << 1 << "b"
-                                     << BSON("foo"
-                                             << "bar")));
+    const BSONObj kDummyObj(BSON("a" << 1 << "b" << BSON("foo" << "bar")));
     diff_tree::DocumentSubDiffNode diffNode;
     {
         auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
@@ -327,16 +325,13 @@ TEST(DiffSerializationTest, SubArrayHighIndex) {
 
 TEST(DiffSerializationTest, ValidateComputeApproxSize) {
     const size_t padding = 25;
-    const auto storage = BSON("num" << 4 << "str"
-                                    << "val"
-                                    << "emptyStr"
-                                    << ""
-                                    << "null" << BSONNULL << "array"
-                                    << BSON_ARRAY("val1"
-                                                  << "val2" << 3)
-                                    << "subObj"
-                                    << BSON(""
-                                            << "update"));
+    const auto storage =
+        BSON("num" << 4 << "str"
+                   << "val"
+                   << "emptyStr"
+                   << ""
+                   << "null" << BSONNULL << "array" << BSON_ARRAY("val1" << "val2" << 3) << "subObj"
+                   << BSON("" << "update"));
 
     diff_tree::DocumentSubDiffNode diffNode(padding);
     diffNode.addDelete("deleteField");

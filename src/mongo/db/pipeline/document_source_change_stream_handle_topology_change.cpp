@@ -296,8 +296,7 @@ Value DocumentSourceChangeStreamHandleTopologyChange::doSerialize(
     const SerializationOptions& opts) const {
     if (opts.isSerializingForExplain()) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
-                         << DOC("stage"
-                                << "internalHandleTopologyChange"_sd)));
+                         << DOC("stage" << "internalHandleTopologyChange"_sd)));
     }
 
     return Value(Document{{kStageName, Document()}});

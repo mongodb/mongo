@@ -16,6 +16,7 @@
 // ]
 
 import "jstests/libs/query/sbe_assert_error_override.js";
+
 import {getExecutionStats} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.expr;

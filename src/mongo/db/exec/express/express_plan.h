@@ -185,7 +185,8 @@ struct WrapInOptionalIfNeeded {
 };
 
 template <class T>
-requires(std::is_default_constructible_v<T>) struct WrapInOptionalIfNeeded<T> {
+requires(std::is_default_constructible_v<T>)
+struct WrapInOptionalIfNeeded<T> {
     using type = T;
 };
 

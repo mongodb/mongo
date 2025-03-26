@@ -552,9 +552,8 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
             builder.reset();
             keyString.serialize(builder);
             BSONBinData binData(builder.buf(), builder.len(), BinDataGeneral);
-            toInsert.emplace_back(BSON("op"
-                                       << "i"
-                                       << "key" << binData));
+            toInsert.emplace_back(BSON("op" << "i"
+                                            << "key" << binData));
         }
     }
 

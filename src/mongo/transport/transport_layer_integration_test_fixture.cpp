@@ -264,9 +264,8 @@ void AsyncClientIntegrationTestFixture::testRunCommandRequestCancelEarly() {
 
     cancelSource.cancel();
 
-    auto req = makeTestRequest(DatabaseName::kAdmin,
-                               BSON("echo"
-                                    << "RunCommandRequestCancelEarly"));
+    auto req =
+        makeTestRequest(DatabaseName::kAdmin, BSON("echo" << "RunCommandRequestCancelEarly"));
     auto fut = client->runCommandRequest(req, baton(), nullptr, cancelSource.token());
     ASSERT(fut.isReady());
     ASSERT_EQ(fut.getNoThrow(interruptible()), ErrorCodes::CallbackCanceled);
@@ -280,8 +279,7 @@ void AsyncClientIntegrationTestFixture::testRunCommandRequestCancelSourceDismiss
     auto fpGuard = configureFailCommand(fpClient, "echo", boost::none, Milliseconds(1000));
 
     auto req = makeTestRequest(DatabaseName::kAdmin,
-                               BSON("echo"
-                                    << "RunCommandRequestCancelSourceDismissed"));
+                               BSON("echo" << "RunCommandRequestCancelSourceDismissed"));
 
     auto runCommandFuture = client->runCommandRequest(req, baton(), nullptr, cancelSource->token());
     cancelSource.reset();

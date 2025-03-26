@@ -431,7 +431,7 @@ public:
                         std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
         : PipelineRewrite(nss, encryptInfo, std::move(toRewrite)) {}
 
-    ~MockPipelineRewrite() override{};
+    ~MockPipelineRewrite() override {};
 
 protected:
     fle::QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) override {

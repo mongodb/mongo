@@ -216,12 +216,7 @@ TEST_F(ChunkManagerQueryTest, EmptyQueryMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSONObj(),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
@@ -232,12 +227,7 @@ TEST_F(ChunkManagerQueryTest, UniversalRangeMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSON("b" << 1),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
@@ -249,8 +239,7 @@ TEST_F(ChunkManagerQueryTest, EqualityRangeSingleShard) {
                  nullptr,
                  false,
                  {},
-                 BSON("a"
-                      << "x"),
+                 BSON("a" << "x"),
                  BSONObj(),
                  {ShardId("0")},
                  {QueryTargetingInfo::Description::kSingleKey, {}});
@@ -260,14 +249,8 @@ TEST_F(ChunkManagerQueryTest, EqualityRangeMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
-                 BSON("a"
-                      << "y"),
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
+                 BSON("a" << "y"),
                  BSONObj(),
                  {ShardId("2")},
                  {QueryTargetingInfo::Description::kSingleKey, {}});
@@ -277,12 +260,7 @@ TEST_F(ChunkManagerQueryTest, SetRangeMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  fromjson("{a:{$in:['u','y']}}"),
                  BSONObj(),
                  {ShardId("0"), ShardId("2")},
@@ -293,12 +271,7 @@ TEST_F(ChunkManagerQueryTest, GTRangeMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSON("a" << GT << "x"),
                  BSONObj(),
                  {ShardId("1"), ShardId("2"), ShardId("3")},
@@ -309,12 +282,7 @@ TEST_F(ChunkManagerQueryTest, GTERangeMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSON("a" << GTE << "x"),
                  BSONObj(),
                  {ShardId("1"), ShardId("2"), ShardId("3")},
@@ -327,12 +295,7 @@ TEST_F(ChunkManagerQueryTest, LTRangeMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSON("a" << LT << "y"),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2")},
@@ -343,12 +306,7 @@ TEST_F(ChunkManagerQueryTest, LTERangeMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSON("a" << LTE << "y"),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2")},
@@ -359,12 +317,7 @@ TEST_F(ChunkManagerQueryTest, OrEqualities) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  fromjson("{$or:[{a:'u'},{a:'y'}]}"),
                  BSONObj(),
                  {ShardId("0"), ShardId("2")},
@@ -375,12 +328,7 @@ TEST_F(ChunkManagerQueryTest, OrEqualityInequality) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  fromjson("{$or:[{a:'u'},{a:{$gte:'y'}}]}"),
                  BSONObj(),
                  {ShardId("0"), ShardId("2"), ShardId("3")},
@@ -391,12 +339,7 @@ TEST_F(ChunkManagerQueryTest, OrEqualityInequalityUnhelpful) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  fromjson("{$or:[{a:'u'},{a:{$gte:'zz'}},{}]}"),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
@@ -418,12 +361,7 @@ TEST_F(ChunkManagerQueryTest, UnsatisfiableRangeMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSON("a" << GT << "x" << LT << "x"),
                  BSONObj(),
                  {ShardId("0")},
@@ -434,12 +372,7 @@ TEST_F(ChunkManagerQueryTest, EqualityThenUnsatisfiable) {
     runQueryTest(BSON("a" << 1 << "b" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSON("a" << 1 << "b" << GT << 4 << LT << 4),
                  BSONObj(),
                  {ShardId("0")},
@@ -450,12 +383,7 @@ TEST_F(ChunkManagerQueryTest, InequalityThenUnsatisfiable) {
     runQueryTest(BSON("a" << 1 << "b" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  BSON("a" << GT << 1 << "b" << GT << 4 << LT << 4),
                  BSONObj(),
                  {ShardId("0")},
@@ -466,12 +394,7 @@ TEST_F(ChunkManagerQueryTest, OrEqualityUnsatisfiableInequality) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
                  fromjson("{$or:[{a:'x'},{a:{$gt:'u',$lt:'u'}},{a:{$gte:'y'}}]}"),
                  BSONObj(),
                  {ShardId("1"), ShardId("2"), ShardId("3")},
@@ -494,16 +417,9 @@ TEST_F(ChunkManagerQueryTest, CollationStringsMultiShard) {
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
-                 {BSON("a"
-                       << "x"),
-                  BSON("a"
-                       << "y"),
-                  BSON("a"
-                       << "z")},
-                 BSON("a"
-                      << "y"),
-                 BSON("locale"
-                      << "mock_reverse_string"),
+                 {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
+                 BSON("a" << "y"),
+                 BSON("locale" << "mock_reverse_string"),
                  {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
                  {QueryTargetingInfo::Description::kMinKeyToMaxKey, {}});
 }
@@ -513,16 +429,9 @@ TEST_F(ChunkManagerQueryTest, DefaultCollationStringsMultiShard) {
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
-        {BSON("a"
-              << "x"),
-         BSON("a"
-              << "y"),
-         BSON("a"
-              << "z")},
-        BSON("a"
-             << "y"),
-        BSON("locale"
-             << "mock_reverse_string"),
+        {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
+        BSON("a" << "y"),
+        BSON("locale" << "mock_reverse_string"),
         {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
         {QueryTargetingInfo::Description::kMinKeyToMaxKey, {}});
 }
@@ -532,16 +441,9 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationStringsMultiShard) {
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
-        {BSON("a"
-              << "x"),
-         BSON("a"
-              << "y"),
-         BSON("a"
-              << "z")},
-        BSON("a"
-             << "y"),
-        BSON("locale"
-             << "simple"),
+        {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
+        BSON("a" << "y"),
+        BSON("locale" << "simple"),
         {ShardId("2")},
         {QueryTargetingInfo::Description::kSingleKey, {}});
 }
@@ -551,15 +453,9 @@ TEST_F(ChunkManagerQueryTest, CollationNumbersMultiShard) {
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
-        {BSON("a"
-              << "x"),
-         BSON("a"
-              << "y"),
-         BSON("a"
-              << "z")},
+        {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
         BSON("a" << 5),
-        BSON("locale"
-             << "mock_reverse_string"),
+        BSON("locale" << "mock_reverse_string"),
         {ShardId("0")},
         {QueryTargetingInfo::Description::kSingleKey, {}});
 }
@@ -569,12 +465,7 @@ TEST_F(ChunkManagerQueryTest, DefaultCollationNumbersMultiShard) {
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
-        {BSON("a"
-              << "x"),
-         BSON("a"
-              << "y"),
-         BSON("a"
-              << "z")},
+        {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
         BSON("a" << 5),
         BSONObj(),
         {ShardId("0")},
@@ -586,15 +477,9 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationNumbersMultiShard) {
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
-        {BSON("a"
-              << "x"),
-         BSON("a"
-              << "y"),
-         BSON("a"
-              << "z")},
+        {BSON("a" << "x"), BSON("a" << "y"), BSON("a" << "z")},
         BSON("a" << 5),
-        BSON("locale"
-             << "simple"),
+        BSON("locale" << "simple"),
         {ShardId("0")},
         {QueryTargetingInfo::Description::kSingleKey, {}});
 }

@@ -67,8 +67,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     // Find all tenant config databases.
     ListDatabasesForAllTenantsCommand listDbCommand;
     listDbCommand.setDbName(DatabaseName::kAdmin);
-    listDbCommand.setFilter(BSON("name"_sd
-                                 << "config"));
+    listDbCommand.setFilter(BSON("name"_sd << "config"));
     listDbCommand.setNameOnly(true);
     std::set<boost::optional<TenantId>> tenantIds;
 
@@ -113,8 +112,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     // Find all tenant config databases.
     ListDatabasesForAllTenantsCommand listDbCommand;
     listDbCommand.setDbName(DatabaseName::kAdmin);
-    listDbCommand.setFilter(BSON("name"_sd
-                                 << "config"));
+    listDbCommand.setFilter(BSON("name"_sd << "config"));
     listDbCommand.setNameOnly(true);
     std::set<boost::optional<TenantId>> tenantIds;
 

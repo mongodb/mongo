@@ -4,6 +4,7 @@
  */
 import "jstests/multiVersion/libs/verify_versions.js";
 import "jstests/multiVersion/libs/multi_rs.js";
+
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

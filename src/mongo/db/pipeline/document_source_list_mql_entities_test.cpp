@@ -75,8 +75,7 @@ TEST_F(DocumentSourceListMqlEntitiesTest, Serialize) {
         parse(fromjson("{$listMqlEntities: {'entityType': 'aggregationStages'}}"));
     ASSERT_VALUE_EQ(
         boost::dynamic_pointer_cast<DocumentSourceListMqlEntities>(listMqlEntitiesDS)->serialize(),
-        Value(DOC("$listMqlEntities" << DOC("entityType"_sd
-                                            << "aggregationStages"_sd))));
+        Value(DOC("$listMqlEntities" << DOC("entityType"_sd << "aggregationStages"_sd))));
 }
 
 }  // namespace

@@ -155,9 +155,8 @@ BSONObj beginEvent(StringData name, int64_t time) {
 }
 
 BSONObj endEvent(int64_t time) {
-    return BSON("ph"
-                << "E"
-                << "ts" << time << "pid" << 1 << "tid" << 1);
+    return BSON("ph" << "E"
+                     << "ts" << time << "pid" << 1 << "tid" << 1);
 }
 
 TEST(TracingSupportTest, BasicEventUsage) {

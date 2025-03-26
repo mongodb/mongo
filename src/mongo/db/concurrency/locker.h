@@ -838,8 +838,8 @@ private:
     bool _oldValue;
 #else
 public:
-    DisableLockerRuntimeOrderingChecks(OperationContext* opCtx){};
-    ~DisableLockerRuntimeOrderingChecks(){};
+    DisableLockerRuntimeOrderingChecks(OperationContext* opCtx) {};
+    ~DisableLockerRuntimeOrderingChecks() {};
 #endif
 };
 

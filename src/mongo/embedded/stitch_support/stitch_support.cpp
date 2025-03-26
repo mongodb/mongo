@@ -196,7 +196,7 @@ struct stitch_support_v1_matcher {
                      .collator(collator ? collator->collator->clone() : nullptr)
                      .ns(mongo::kDummyNamespaceStr)
                      .build()),
-          matcher(filterBSON.getOwned(), expCtx){};
+          matcher(filterBSON.getOwned(), expCtx) {};
 
     mongo::ServiceContext::UniqueClient client;
     mongo::ServiceContext::UniqueOperationContext opCtx;
@@ -720,7 +720,7 @@ const char* MONGO_API_CALL stitch_support_v1_update_details_path(
 
 void MONGO_API_CALL stitch_support_v1_bson_free(uint8_t* bson) {
     mongo::StitchSupportStatusImpl* nullStatus = nullptr;
-    static_cast<void>(enterCXX(nullStatus, [=]() { delete[](bson); }));
+    static_cast<void>(enterCXX(nullStatus, [=]() { delete[] (bson); }));
 }
 
 }  // extern "C"

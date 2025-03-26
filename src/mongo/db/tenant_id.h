@@ -168,6 +168,6 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& stream,
  *     BSON("tenant" << tenantId)
  */
 template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<<TenantId>(TenantId value);
+BSONObjBuilder& BSONObjBuilderValueStream::operator<< <TenantId>(TenantId value);
 
 }  // namespace mongo

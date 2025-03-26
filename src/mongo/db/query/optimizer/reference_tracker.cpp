@@ -68,7 +68,7 @@ struct CollectorState {
  * the parent's CollectedInfo.
  */
 struct CollectedInfo {
-    CollectedInfo(CollectorState& collr) : collector(collr){};
+    CollectedInfo(CollectorState& collr) : collector(collr) {};
 
     using VarRefsMap = ProjectionNameMap<opt::unordered_map<const Variable*, bool>>;
 

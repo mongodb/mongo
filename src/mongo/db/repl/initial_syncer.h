@@ -130,7 +130,7 @@ public:
     public:
         OplogFetcherRestartDecisionInitialSyncer(InitialSyncSharedData* sharedData,
                                                  std::size_t maxFetcherRestarts)
-            : _sharedData(sharedData), _defaultDecision(maxFetcherRestarts){};
+            : _sharedData(sharedData), _defaultDecision(maxFetcherRestarts) {};
 
         bool shouldContinue(OplogFetcher* fetcher, Status status) final;
 

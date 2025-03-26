@@ -504,9 +504,8 @@ TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
     ASSERT_TRUE(res["cursor"].Obj().hasField("id") && cursorId != 0);
 
     // Kills the cursor.
-    auto killCursorCmdObj = BSON("killCursors"
-                                 << "coll"
-                                 << "cursors" << BSON_ARRAY(cursorId));
+    auto killCursorCmdObj = BSON("killCursors" << "coll"
+                                               << "cursors" << BSON_ARRAY(cursorId));
     res = runCommand(killCursorCmdObj.getOwned());
     ASSERT_EQ(res["ok"].Number(), 1.0);
     auto cursorsKilled = res["cursorsKilled"].Array();

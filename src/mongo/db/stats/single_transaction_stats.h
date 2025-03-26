@@ -82,9 +82,9 @@ public:
     };
 
     SingleTransactionStats()
-        : _txnNumberAndRetryCounter(kUninitializedTxnNumber, kUninitializedTxnRetryCounter){};
+        : _txnNumberAndRetryCounter(kUninitializedTxnNumber, kUninitializedTxnRetryCounter) {};
     SingleTransactionStats(TxnNumberAndRetryCounter txnNumberAndRetryCounter)
-        : _txnNumberAndRetryCounter(txnNumberAndRetryCounter){};
+        : _txnNumberAndRetryCounter(txnNumberAndRetryCounter) {};
 
     /**
      * Sets the transaction's start time, only if it hasn't already been set.

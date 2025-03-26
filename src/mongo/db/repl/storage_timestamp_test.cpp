@@ -1192,7 +1192,9 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
         NamespaceString::createNamespaceString_forTest("unittests.secondaryCreateCollection");
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
-    { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+    {
+        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+    }
 
     BSONObjBuilder resultBuilder;
     auto swResult =
@@ -1205,7 +1207,9 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
                    });
     ASSERT_OK(swResult);
 
-    { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+    {
+        ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+    }
 
     assertNamespaceInIdents(nss, _pastTs, false);
     assertNamespaceInIdents(nss, _presentTs, true);
@@ -1225,8 +1229,12 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss1));
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
 
-    { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection()); }
-    { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
+    {
+        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection());
+    }
+    {
+        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection());
+    }
 
     const LogicalTime dummyLt = const_cast<const LogicalTime&>(_futureLt).addTicks(1);
     const Timestamp dummyTs = dummyLt.asTimestamp();
@@ -1246,8 +1254,12 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
                    });
     ASSERT_OK(swResult);
 
-    { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection()); }
-    { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
+    {
+        ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection());
+    }
+    {
+        ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection());
+    }
 
     assertNamespaceInIdents(nss1, _pastTs, false);
     assertNamespaceInIdents(nss1, _presentTs, true);
@@ -1288,7 +1300,9 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
         AutoGetCollection autoColl(_opCtx, nss1, LockMode::MODE_IX);
 
         ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
-        { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
+        {
+            ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection());
+        }
 
         BSONObjBuilder resultBuilder;
         auto swResult = doApplyOps(
@@ -1346,7 +1360,9 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
         "unittests.primaryCreateCollectionInApplyOps");
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
-    { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+    {
+        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+    }
 
     BSONObjBuilder resultBuilder;
     auto swResult =
@@ -1359,7 +1375,9 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
                    });
     ASSERT_OK(swResult);
 
-    { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+    {
+        ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+    }
 
     BSONObj result;
     ASSERT(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace, result));
@@ -2174,18 +2192,16 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
         ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
     }
 
-    auto indexCreateInitTs = queryOplog(BSON("op"
-                                             << "c"
-                                             << "o.startIndexBuild" << nss.coll()
-                                             << "o.indexes.0.name"
-                                             << "a_1"))["ts"]
-                                 .timestamp();
-    auto commitIndexBuildTs = queryOplog(BSON("op"
-                                              << "c"
-                                              << "o.commitIndexBuild" << nss.coll()
-                                              << "o.indexes.0.name"
-                                              << "a_1"))["ts"]
-                                  .timestamp();
+    auto indexCreateInitTs =
+        queryOplog(BSON("op" << "c"
+                             << "o.startIndexBuild" << nss.coll() << "o.indexes.0.name"
+                             << "a_1"))["ts"]
+            .timestamp();
+    auto commitIndexBuildTs =
+        queryOplog(BSON("op" << "c"
+                             << "o.commitIndexBuild" << nss.coll() << "o.indexes.0.name"
+                             << "a_1"))["ts"]
+            .timestamp();
     auto indexBComplete = commitIndexBuildTs;
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_S);
@@ -2298,16 +2314,15 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // Empty temporary collections generate createIndexes oplog entry even if the node
     // supports 2 phase index build.
     const auto createIndexesDocument =
-        queryOplog(BSON("ns" << renamedNss.db_forTest() + ".$cmd"
-                             << "o.createIndexes" << BSON("$exists" << true) << "o.name"
+        queryOplog(BSON("ns" << renamedNss.db_forTest() + ".$cmd" << "o.createIndexes"
+                             << BSON("$exists" << true) << "o.name"
                              << "b_1"));
     const auto tmpCollName =
         createIndexesDocument.getObjectField("o").getStringField("createIndexes");
     tmpName = NamespaceString::createNamespaceString_forTest(renamedNss.db_forTest(), tmpCollName);
     indexCommitTs = createIndexesDocument["ts"].timestamp();
-    const Timestamp indexCreateInitTs = queryOplog(BSON("op"
-                                                        << "c"
-                                                        << "o.create" << tmpName.coll()))["ts"]
+    const Timestamp indexCreateInitTs = queryOplog(BSON("op" << "c"
+                                                             << "o.create" << tmpName.coll()))["ts"]
                                             .timestamp();
 
 
@@ -2407,13 +2422,13 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
     // Confirm that startIndexBuild and abortIndexBuild oplog entries have been written to the
     // oplog.
     auto indexStartDocument =
-        queryOplog(BSON("ns" << nss.db_forTest() + ".$cmd"
-                             << "o.startIndexBuild" << nss.coll() << "o.indexes.0.name"
+        queryOplog(BSON("ns" << nss.db_forTest() + ".$cmd" << "o.startIndexBuild" << nss.coll()
+                             << "o.indexes.0.name"
                              << "a_1"));
     auto indexStartTs = indexStartDocument["ts"].timestamp();
     auto indexAbortDocument =
-        queryOplog(BSON("ns" << nss.db_forTest() + ".$cmd"
-                             << "o.abortIndexBuild" << nss.coll() << "o.indexes.0.name"
+        queryOplog(BSON("ns" << nss.db_forTest() + ".$cmd" << "o.abortIndexBuild" << nss.coll()
+                             << "o.indexes.0.name"
                              << "a_1"));
     auto indexAbortTs = indexAbortDocument["ts"].timestamp();
 
@@ -2908,17 +2923,14 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
                                BSON("create" << viewNss.coll() << "pipeline" << BSONArray()
                                              << "viewOn" << backingCollNss.coll())));
 
-    const Timestamp systemViewsCreateTs = queryOplog(BSON("op"
-                                                          << "c"
-                                                          << "ns"
-                                                          << (viewNss.db_forTest() + ".$cmd")
-                                                          << "o.create"
-                                                          << "system.views"))["ts"]
-                                              .timestamp();
-    const Timestamp viewCreateTs = queryOplog(BSON("op"
-                                                   << "i"
-                                                   << "ns" << systemViewsNss.ns_forTest() << "o._id"
-                                                   << viewNss.ns_forTest()))["ts"]
+    const Timestamp systemViewsCreateTs =
+        queryOplog(BSON("op" << "c"
+                             << "ns" << (viewNss.db_forTest() + ".$cmd") << "o.create"
+                             << "system.views"))["ts"]
+            .timestamp();
+    const Timestamp viewCreateTs = queryOplog(BSON("op" << "i"
+                                                        << "ns" << systemViewsNss.ns_forTest()
+                                                        << "o._id" << viewNss.ns_forTest()))["ts"]
                                        .timestamp();
 
     {
@@ -2948,7 +2960,9 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
 TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.system.users");
 
-    { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+    {
+        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+    }
 
     ASSERT_OK(createCollection(_opCtx, nss.dbName(), BSON("create" << nss.coll())));
 
@@ -2959,10 +2973,9 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
         catalogId = coll.getCollection()->getCatalogId();
     }
 
-    BSONObj result = queryOplog(BSON("op"
-                                     << "c"
-                                     << "ns" << nss.getCommandNS().ns_forTest() << "o.create"
-                                     << nss.coll()));
+    BSONObj result = queryOplog(BSON("op" << "c"
+                                          << "ns" << nss.getCommandNS().ns_forTest() << "o.create"
+                                          << nss.coll()));
     repl::OplogEntry op(result);
     // The logOp() call for createCollection should have timestamp 'futureTs', which will also
     // be the timestamp at which we do the write which creates the collection. Thus we expect
@@ -2976,12 +2989,12 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     // Empty collections generate createIndexes oplog entry even if the node
     // supports 2 phase index build.
     indexStartTs = op.getTimestamp();
-    indexCreateTs = repl::OplogEntry(queryOplog(BSON("op"
-                                                     << "c"
-                                                     << "ns" << nss.getCommandNS().ns_forTest()
-                                                     << "o.createIndexes" << nss.coll() << "o.name"
-                                                     << "user_1_db_1")))
-                        .getTimestamp();
+    indexCreateTs =
+        repl::OplogEntry(queryOplog(BSON("op" << "c"
+                                              << "ns" << nss.getCommandNS().ns_forTest()
+                                              << "o.createIndexes" << nss.coll() << "o.name"
+                                              << "user_1_db_1")))
+            .getTimestamp();
     indexCompleteTs = indexCreateTs;
 
     assertNamespaceInIdents(nss, _pastTs, false);
@@ -3498,14 +3511,13 @@ TEST_F(MultiDocumentTransactionTest, MultiOplogEntryTransaction) {
         assertFilteredDocumentAtTimestamp(coll, query2, _nullTs, doc2);
 
         // Implicit commit oplog entry should exist at commitEntryTs.
-        const auto commitFilter =
-            BSON("ts" << commitEntryTs << "o"
-                      << BSON("applyOps"
-                              << BSON_ARRAY(BSON("op"
-                                                 << "i"
+        const auto commitFilter = BSON(
+            "ts" << commitEntryTs << "o"
+                 << BSON("applyOps"
+                         << BSON_ARRAY(BSON("op" << "i"
                                                  << "ns" << nss.ns_forTest() << "ui" << coll->uuid()
                                                  << "o" << doc2 << "o2" << doc2Key))
-                              << "count" << 2));
+                         << "count" << 2));
         assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
         assertOplogDocumentExistsAtTimestamp(commitFilter, firstOplogEntryTs, false);
@@ -3521,14 +3533,13 @@ TEST_F(MultiDocumentTransactionTest, MultiOplogEntryTransaction) {
         assertOldestActiveTxnTimestampEquals(boost::none, _nullTs);
 
         // first oplog entry should exist at firstOplogEntryTs and after it.
-        const auto firstOplogEntryFilter =
-            BSON("ts" << firstOplogEntryTs << "o"
-                      << BSON("applyOps"
-                              << BSON_ARRAY(BSON("op"
-                                                 << "i"
+        const auto firstOplogEntryFilter = BSON(
+            "ts" << firstOplogEntryTs << "o"
+                 << BSON("applyOps"
+                         << BSON_ARRAY(BSON("op" << "i"
                                                  << "ns" << nss.ns_forTest() << "ui" << coll->uuid()
                                                  << "o" << doc << "o2" << docKey))
-                              << "partialTxn" << true));
+                         << "partialTxn" << true));
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, firstOplogEntryTs, true);
@@ -3689,14 +3700,13 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
         assertOplogDocumentExistsAtTimestamp(commitFilter, _nullTs, true);
 
         // The first oplog entry should exist at firstOplogEntryTs and onwards.
-        const auto firstOplogEntryFilter =
-            BSON("ts" << firstOplogEntryTs << "o"
-                      << BSON("applyOps"
-                              << BSON_ARRAY(BSON("op"
-                                                 << "i"
+        const auto firstOplogEntryFilter = BSON(
+            "ts" << firstOplogEntryTs << "o"
+                 << BSON("applyOps"
+                         << BSON_ARRAY(BSON("op" << "i"
                                                  << "ns" << nss.ns_forTest() << "ui" << coll->uuid()
                                                  << "o" << doc << "o2" << docKey))
-                              << "partialTxn" << true));
+                         << "partialTxn" << true));
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, firstOplogEntryTs, true);
@@ -3704,14 +3714,13 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, commitEntryTs, true);
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, _nullTs, true);
         // The prepare oplog entry should exist at prepareEntryTs and onwards.
-        const auto prepareOplogEntryFilter =
-            BSON("ts" << prepareEntryTs << "o"
-                      << BSON("applyOps"
-                              << BSON_ARRAY(BSON("op"
-                                                 << "i"
+        const auto prepareOplogEntryFilter = BSON(
+            "ts" << prepareEntryTs << "o"
+                 << BSON("applyOps"
+                         << BSON_ARRAY(BSON("op" << "i"
                                                  << "ns" << nss.ns_forTest() << "ui" << coll->uuid()
                                                  << "o" << doc2 << "o2" << doc2Key))
-                              << "prepare" << true << "count" << 2));
+                         << "prepare" << true << "count" << 2));
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, beforeTxnTs, false);
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, firstOplogEntryTs, false);
@@ -3815,13 +3824,12 @@ TEST_F(MultiDocumentTransactionTest, AbortPreparedMultiOplogEntryTransaction) {
         }
 
         // The prepare oplog entry should exist at firstOplogEntryTs and onwards.
-        const auto prepareOplogEntryFilter =
-            BSON("ts" << prepareEntryTs << "o"
-                      << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                            << "i"
+        const auto prepareOplogEntryFilter = BSON(
+            "ts" << prepareEntryTs << "o"
+                 << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
                                                             << "ns" << nss.ns_forTest() << "ui"
                                                             << ui << "o" << doc << "o2" << docKey))
-                                         << "prepare" << true));
+                                    << "prepare" << true));
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, beforeTxnTs, false);
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, prepareEntryTs, true);

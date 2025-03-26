@@ -504,8 +504,7 @@ TEST_F(WiredTigerUtilTest, GetSanitizedStorageOptionsForSecondaryReplication) {
     }
     {
         // Preserve WT config string without encryption options.
-        auto input = BSON("wiredTiger" << BSON("configString"
-                                               << "split_pct=88"));
+        auto input = BSON("wiredTiger" << BSON("configString" << "split_pct=88"));
         auto expectedOutput = input;
         auto output = WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(input);
         ASSERT_BSONOBJ_EQ(output, expectedOutput);
@@ -515,15 +514,13 @@ TEST_F(WiredTigerUtilTest, GetSanitizedStorageOptionsForSecondaryReplication) {
         auto input = BSON(
             "wiredTiger" << BSON("configString"
                                  << "encryption=(name=AES256-CBC,keyid=\".system\"),split_pct=88"));
-        auto expectedOutput = BSON("wiredTiger" << BSON("configString"
-                                                        << "split_pct=88"));
+        auto expectedOutput = BSON("wiredTiger" << BSON("configString" << "split_pct=88"));
         auto output = WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(input);
         ASSERT_BSONOBJ_EQ(output, expectedOutput);
     }
     {
         // Leave non-WT settings intact.
-        auto input = BSON("inMemory" << BSON("configString"
-                                             << "split_pct=66"));
+        auto input = BSON("inMemory" << BSON("configString" << "split_pct=66"));
         auto expectedOutput = input;
         auto output = WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(input);
         ASSERT_BSONOBJ_EQ(output, expectedOutput);
@@ -531,16 +528,12 @@ TEST_F(WiredTigerUtilTest, GetSanitizedStorageOptionsForSecondaryReplication) {
     {
         // Change only WT settings in storage options containing a mix of WT and non-WT settings.
         auto input = BSON(
-            "inMemory" << BSON("configString"
-                               << "split_pct=66")
-                       << "wiredTiger"
+            "inMemory" << BSON("configString" << "split_pct=66") << "wiredTiger"
                        << BSON("configString"
                                << "encryption=(name=AES256-CBC,keyid=\".system\"),split_pct=88"));
-        auto expectedOutput = BSON("inMemory" << BSON("configString"
-                                                      << "split_pct=66")
-                                              << "wiredTiger"
-                                              << BSON("configString"
-                                                      << "split_pct=88"));
+        auto expectedOutput =
+            BSON("inMemory" << BSON("configString" << "split_pct=66") << "wiredTiger"
+                            << BSON("configString" << "split_pct=88"));
         auto output = WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(input);
         ASSERT_BSONOBJ_EQ(output, expectedOutput);
     }

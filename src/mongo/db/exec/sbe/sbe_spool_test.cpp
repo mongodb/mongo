@@ -115,9 +115,8 @@ public:
 };
 
 TEST_F(SbeSpoolTest, SpoolEagerProducerBasic) {
-    auto inputArray = BSON_ARRAY("a"
-                                 << "b"
-                                 << "c");
+    auto inputArray = BSON_ARRAY("a" << "b"
+                                     << "c");
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
@@ -142,9 +141,8 @@ TEST_F(SbeSpoolTest, SpoolEagerProducerBasic) {
 }
 
 TEST_F(SbeSpoolTest, SpoolLazyProducerBasic) {
-    auto inputArray = BSON_ARRAY("a"
-                                 << "b"
-                                 << "c");
+    auto inputArray = BSON_ARRAY("a" << "b"
+                                     << "c");
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
@@ -169,9 +167,8 @@ TEST_F(SbeSpoolTest, SpoolLazyProducerBasic) {
 }
 
 TEST_F(SbeSpoolTest, SpoolAndConsumeNonStack) {
-    auto inputArray = BSON_ARRAY("a"
-                                 << "b"
-                                 << "c");
+    auto inputArray = BSON_ARRAY("a" << "b"
+                                     << "c");
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
@@ -192,9 +189,8 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeNonStack) {
 }
 
 TEST_F(SbeSpoolTest, SpoolAndConsumeStack) {
-    auto inputArray = BSON_ARRAY("a"
-                                 << "b"
-                                 << "c");
+    auto inputArray = BSON_ARRAY("a" << "b"
+                                     << "c");
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
@@ -252,15 +248,13 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeStack) {
 TEST_F(SbeSpoolTest, SpoolAndConsumeCloseAndReopen) {
     auto ctx = makeCompileCtx();
 
-    auto inputArray1 = BSON_ARRAY("a"
-                                  << "b"
-                                  << "c");
+    auto inputArray1 = BSON_ARRAY("a" << "b"
+                                      << "c");
     auto [inputTag1, inputVal1] = stage_builder::makeValue(inputArray1);
     value::ValueGuard inputGuard1{inputTag1, inputVal1};
 
-    auto inputArray2 = BSON_ARRAY("d"
-                                  << "e"
-                                  << "f");
+    auto inputArray2 = BSON_ARRAY("d" << "e"
+                                      << "f");
     auto [inputTag2, inputVal2] = stage_builder::makeValue(inputArray2);
     value::ValueGuard inputGuard2{inputTag2, inputVal2};
 
@@ -309,12 +303,11 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeCloseAndReopen) {
     auto [resultsTag, resultsVal] = getAllResults(rootStage.get(), accessor);
     value::ValueGuard resultGuard{resultsTag, resultsVal};
 
-    auto expectedResultsArray = BSON_ARRAY("a"
-                                           << "b"
-                                           << "c"
-                                           << "d"
-                                           << "e"
-                                           << "f");
+    auto expectedResultsArray = BSON_ARRAY("a" << "b"
+                                               << "c"
+                                               << "d"
+                                               << "e"
+                                               << "f");
     auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedResultsArray);
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
     assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);

@@ -6,6 +6,7 @@
  */
 
 import "jstests/libs/query/sbe_assert_error_override.js";
+
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.runtime_constants;

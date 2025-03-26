@@ -39,7 +39,7 @@ namespace mongo {
  */
 class TemporaryRecordStore {
 public:
-    TemporaryRecordStore(std::unique_ptr<RecordStore> rs) : _rs(std::move(rs)){};
+    TemporaryRecordStore(std::unique_ptr<RecordStore> rs) : _rs(std::move(rs)) {};
     virtual ~TemporaryRecordStore() {}
 
     // Not copyable.

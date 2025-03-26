@@ -230,7 +230,7 @@ private:
         boost::optional<executor::TaskExecutor::CallbackHandle> callbackHandle;
         HealthCheckContext(std::unique_ptr<SharedSemiFuture<HealthCheckStatus>> future,
                            boost::optional<executor::TaskExecutor::CallbackHandle> cbHandle)
-            : result(std::move(future)), callbackHandle(cbHandle){};
+            : result(std::move(future)), callbackHandle(cbHandle) {};
     };
 
     stdx::unordered_map<FaultFacetType, HealthCheckContext> _healthCheckContexts;

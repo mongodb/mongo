@@ -423,9 +423,8 @@ TEST(DumpUtils, BasicDumpWriteRead) {
     std::vector<BSONObj> expected = {one, two, three};
 
     // Write our test array
-    BSONObj result = writeBsonArrayToFile(BSON("a" << tempDir.path() + "/test.bson"
-                                                   << "b" << dump),
-                                          nullptr);
+    BSONObj result =
+        writeBsonArrayToFile(BSON("a" << tempDir.path() + "/test.bson" << "b" << dump), nullptr);
     ASSERT_EQ(1, result.nFields());
     ASSERT_EQ(BSONType::Undefined, result.firstElement().type());
 

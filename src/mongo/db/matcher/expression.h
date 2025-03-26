@@ -593,7 +593,7 @@ protected:
      * Subclasses that are collation-aware must implement this method in order to capture changes
      * to the collator that occur after initialization time.
      */
-    virtual void _doSetCollator(const CollatorInterface* collator){};
+    virtual void _doSetCollator(const CollatorInterface* collator) {};
 
     void _debugAddSpace(StringBuilder& debug, int indentationLevel) const;
 

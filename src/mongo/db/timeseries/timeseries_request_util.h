@@ -38,29 +38,19 @@
 namespace mongo::timeseries {
 
 template <typename T>
-concept HasGetNs = requires(const T& t) {
-    t.getNs();
-};
+concept HasGetNs = requires(const T& t) { t.getNs(); };
 
 template <typename T>
-concept HasGetNamespace = requires(const T& t) {
-    t.getNamespace();
-};
+concept HasGetNamespace = requires(const T& t) { t.getNamespace(); };
 
 template <typename T>
-concept HasGetNsString = requires(const T& t) {
-    t.getNsString();
-};
+concept HasGetNsString = requires(const T& t) { t.getNsString(); };
 
 template <typename T>
-concept HasGetNamespaceOrUUID = requires(const T& t) {
-    t.getNamespaceOrUUID();
-};
+concept HasGetNamespaceOrUUID = requires(const T& t) { t.getNamespaceOrUUID(); };
 
 template <typename T>
-concept HasGetIsTimeseriesNamespace = requires(const T& t) {
-    t.getIsTimeseriesNamespace();
-};
+concept HasGetIsTimeseriesNamespace = requires(const T& t) { t.getIsTimeseriesNamespace(); };
 
 template <typename T>
 concept IsRequestableOnTimeseries =
@@ -97,8 +87,8 @@ bool getIsTimeseriesNamespaceFlag(const T& request, const NamespaceStringOrUUID&
  * Extracts the namespace or UUID for the given request.
  */
 template <typename T>
-requires IsRequestableOnTimeseries<T> mongo::NamespaceStringOrUUID getNamespaceOrUUID(
-    const T& request) {
+requires IsRequestableOnTimeseries<T>
+mongo::NamespaceStringOrUUID getNamespaceOrUUID(const T& request) {
     if constexpr (HasGetNamespace<T>) {
         return request.getNamespace();
     } else if constexpr (HasGetNsString<T>) {
@@ -187,8 +177,9 @@ bool isTimeseriesRequest(OperationContext* opCtx, const T& request) {
  * timeseries collection will exist and this function will always return false.
  */
 template <typename T>
-requires IsRequestableOnTimeseries<T> std::pair<bool, NamespaceString> isTimeseriesViewRequest(
-    OperationContext* opCtx, const T& request) {
+requires IsRequestableOnTimeseries<T>
+std::pair<bool, NamespaceString> isTimeseriesViewRequest(OperationContext* opCtx,
+                                                         const T& request) {
     auto nssOrUUID = getNamespaceOrUUID(request);
     auto isTimeseriesNamespaceFlag = getIsTimeseriesNamespaceFlag(request, nssOrUUID);
     auto lookupTimeseriesInfo =

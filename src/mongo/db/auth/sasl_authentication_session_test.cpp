@@ -149,13 +149,12 @@ SaslConversation::SaslConversation(std::string mech)
     ASSERT_OK(
         authzBackend->insert(opCtx.get(),
                              NamespaceString::createNamespaceString_forTest("admin.system.users"),
-                             BSON("_id"
-                                  << "test.andy"
-                                  << "user"
-                                  << "andy"
-                                  << "db"
-                                  << "test"
-                                  << "credentials" << creds << "roles" << BSONArray()),
+                             BSON("_id" << "test.andy"
+                                        << "user"
+                                        << "andy"
+                                        << "db"
+                                        << "test"
+                                        << "credentials" << creds << "roles" << BSONArray()),
                              BSONObj()));
 }
 

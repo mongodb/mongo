@@ -462,8 +462,7 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
                                    const LogicalSessionId& lsid,
                                    TxnNumber currentTxnNumber) {
     write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
-    auto queryFilter = BSON("_id"
-                            << "migrationCoordinatorStats");
+    auto queryFilter = BSON("_id" << "migrationCoordinatorStats");
     auto updateModification = write_ops::UpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(BSON("$inc" << BSON("count" << 1))));
 

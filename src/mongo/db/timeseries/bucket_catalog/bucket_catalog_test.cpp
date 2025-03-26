@@ -359,7 +359,7 @@ StatusWith<tracking::unique_ptr<Bucket>> BucketCatalogTest::_testRehydrateBucket
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, uuid);
     auto stripeNumber = internal::getStripeNumber(*_bucketCatalog, key);
     InsertContext insertContext{key, stripeNumber, *options, stats};
-    auto validator = [ opCtx = _opCtx, &coll ](const BSONObj& bucketDoc) -> auto {
+    auto validator = [opCtx = _opCtx, &coll](const BSONObj& bucketDoc) -> auto {
         return coll->checkValidation(opCtx, bucketDoc);
     };
     auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
@@ -397,7 +397,7 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     InsertContext insertContext{key, stripeNumber, *options, stats};
 
     // Validate the bucket document against the schema.
-    auto validator = [ opCtx = _opCtx, &coll ](const BSONObj& bucketDoc) -> auto {
+    auto validator = [opCtx = _opCtx, &coll](const BSONObj& bucketDoc) -> auto {
         return coll->checkValidation(opCtx, bucketDoc);
     };
     auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
@@ -917,8 +917,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField
                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
-                                                          << BSON_ARRAY("123"
-                                                                        << "456")))))));
+                                                          << BSON_ARRAY("123" << "456")))))));
 
     auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
         *_bucketCatalog,
@@ -926,8 +925,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField
                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
-                                                          << BSON_ARRAY("123"
-                                                                        << "456")))))));
+                                                          << BSON_ARRAY("123" << "456")))))));
 
     // Check metadata in buckets.
     ASSERT_EQ(std::get<InsertContext>(insertContextAndTime1),
@@ -1470,42 +1468,40 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
 
         // Bad control.version type.
         BSONObj badVersionObj = compressedBucketDoc.addFields(BSON(
-            "control" << BSON("version" << BSONArray() << "min"
-                                        << BSON("time" << BSON("$date"
-                                                               << "2022-06-06T15:34:00.000Z"))
-                                        << "max"
-                                        << BSON("time" << BSON("$date"
-                                                               << "2022-06-06T15:34:30.000Z")))));
+            "control" << BSON(
+                "version" << BSONArray() << "min"
+                          << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z")) << "max"
+                          << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badVersionObj));
 
         // Bad control.min type.
         BSONObj badMinObj = compressedBucketDoc.addFields(BSON(
-            "control" << BSON("version" << 1 << "min" << 123 << "max"
-                                        << BSON("time" << BSON("$date"
-                                                               << "2022-06-06T15:34:30.000Z")))));
+            "control" << BSON("version"
+                              << 1 << "min" << 123 << "max"
+                              << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badMinObj));
 
         // Bad control.max type.
         BSONObj badMaxObj = compressedBucketDoc.addFields(
-            BSON("control" << BSON("version" << 1 << "min"
-                                             << BSON("time" << BSON("$date"
-                                                                    << "2022-06-06T15:34:00.000Z"))
-                                             << "max" << 123)));
+            BSON("control" << BSON("version"
+                                   << 1 << "min"
+                                   << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
+                                   << "max" << 123)));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badMaxObj));
 
         // Missing control.min.time.
         BSONObj missingMinTimeObj = compressedBucketDoc.addFields(BSON(
-            "control" << BSON("version" << 1 << "min" << BSON("abc" << 1) << "max"
-                                        << BSON("time" << BSON("$date"
-                                                               << "2022-06-06T15:34:30.000Z")))));
+            "control" << BSON("version"
+                              << 1 << "min" << BSON("abc" << 1) << "max"
+                              << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingMinTimeObj));
 
         // Missing control.max.time.
         BSONObj missingMaxTimeObj = compressedBucketDoc.addFields(
-            BSON("control" << BSON("version" << 1 << "min"
-                                             << BSON("time" << BSON("$date"
-                                                                    << "2022-06-06T15:34:00.000Z"))
-                                             << "max" << BSON("abc" << 1))));
+            BSON("control" << BSON("version"
+                                   << 1 << "min"
+                                   << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
+                                   << "max" << BSON("abc" << 1))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingMaxTimeObj));
     }
 
@@ -1740,42 +1736,40 @@ TEST_F(BucketCatalogTest, RehydrateMalformedBucket) {
 
         // Bad control.version type.
         BSONObj badVersionObj = compressedBucketDoc.addFields(BSON(
-            "control" << BSON("version" << BSONArray() << "min"
-                                        << BSON("time" << BSON("$date"
-                                                               << "2022-06-06T15:34:00.000Z"))
-                                        << "max"
-                                        << BSON("time" << BSON("$date"
-                                                               << "2022-06-06T15:34:30.000Z")))));
+            "control" << BSON(
+                "version" << BSONArray() << "min"
+                          << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z")) << "max"
+                          << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badVersionObj));
 
         // Bad control.min type.
         BSONObj badMinObj = compressedBucketDoc.addFields(BSON(
-            "control" << BSON("version" << 1 << "min" << 123 << "max"
-                                        << BSON("time" << BSON("$date"
-                                                               << "2022-06-06T15:34:30.000Z")))));
+            "control" << BSON("version"
+                              << 1 << "min" << 123 << "max"
+                              << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badMinObj));
 
         // Bad control.max type.
         BSONObj badMaxObj = compressedBucketDoc.addFields(
-            BSON("control" << BSON("version" << 1 << "min"
-                                             << BSON("time" << BSON("$date"
-                                                                    << "2022-06-06T15:34:00.000Z"))
-                                             << "max" << 123)));
+            BSON("control" << BSON("version"
+                                   << 1 << "min"
+                                   << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
+                                   << "max" << 123)));
         ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badMaxObj));
 
         // Missing control.min.time.
         BSONObj missingMinTimeObj = compressedBucketDoc.addFields(BSON(
-            "control" << BSON("version" << 1 << "min" << BSON("abc" << 1) << "max"
-                                        << BSON("time" << BSON("$date"
-                                                               << "2022-06-06T15:34:30.000Z")))));
+            "control" << BSON("version"
+                              << 1 << "min" << BSON("abc" << 1) << "max"
+                              << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingMinTimeObj));
 
         // Missing control.max.time.
         BSONObj missingMaxTimeObj = compressedBucketDoc.addFields(
-            BSON("control" << BSON("version" << 1 << "min"
-                                             << BSON("time" << BSON("$date"
-                                                                    << "2022-06-06T15:34:00.000Z"))
-                                             << "max" << BSON("abc" << 1))));
+            BSON("control" << BSON("version"
+                                   << 1 << "min"
+                                   << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
+                                   << "max" << BSON("abc" << 1))));
         ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingMaxTimeObj));
     }
 
@@ -2045,7 +2039,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
                                    "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"}}},
             "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}}}})");
     ASSERT_NE(bucketDoc["_id"].OID(), oldBucketId.oid);
-    auto validator = [ opCtx = _opCtx, &autoColl ](const BSONObj& bucketDoc) -> auto {
+    auto validator = [opCtx = _opCtx, &autoColl](const BSONObj& bucketDoc) -> auto {
         return autoColl->checkValidation(opCtx, bucketDoc);
     };
 

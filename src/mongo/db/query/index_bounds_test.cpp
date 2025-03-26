@@ -639,10 +639,9 @@ TEST(IndexBoundsTest, BoundsDebugStringFormatTest) {
     // {a: [["string", "string"]], b: [[1,1]]}.
     OrderedIntervalList stringInterval;
     stringInterval.name = "a";
-    stringInterval.intervals.push_back(Interval(BSON(""
-                                                     << "string"
-                                                     << ""
-                                                     << "string"),
+    stringInterval.intervals.push_back(Interval(BSON("" << "string"
+                                                        << ""
+                                                        << "string"),
                                                 true,
                                                 true));
 

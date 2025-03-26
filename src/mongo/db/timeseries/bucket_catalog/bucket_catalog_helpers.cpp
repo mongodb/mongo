@@ -142,15 +142,13 @@ std::vector<BSONObj> generateReopeningPipeline(const Date_t& time,
                  time, metadata, controlMinTimePath, maxDataTimeFieldPath, bucketMaxSpanSeconds)));
 
     // Stage 2: Add an observable field for the bucket document size.
-    pipeline.push_back(BSON("$set" << BSON("object_size" << BSON("$bsonSize"
-                                                                 << "$$ROOT"))));
+    pipeline.push_back(BSON("$set" << BSON("object_size" << BSON("$bsonSize" << "$$ROOT"))));
 
     // Stage 3: Restrict bucket documents exceeding the max bucket size.
     pipeline.push_back(BSON("$match" << BSON("object_size" << BSON("$lt" << bucketMaxSize))));
 
     // Stage 4: Unset the document size field.
-    pipeline.push_back(BSON("$unset"
-                            << "object_size"));
+    pipeline.push_back(BSON("$unset" << "object_size"));
 
     // Stage 5: Restrict the aggregation to one document.
     pipeline.push_back(BSON("$limit" << 1));

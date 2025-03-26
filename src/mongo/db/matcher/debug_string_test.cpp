@@ -221,8 +221,7 @@ TEST(DebugStringTest, ExpressionLeaf) {
 
 TEST(DebugStringTest, ExpressionText) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
-    auto expr = BSON("$text" << BSON("$search"
-                                     << "something"));
+    auto expr = BSON("$text" << BSON("$search" << "something"));
     auto tme = uassertStatusOK(
         MatchExpressionParser::parse(expr,
                                      new ExpressionContextForTest(),
@@ -233,10 +232,8 @@ TEST(DebugStringTest, ExpressionText) {
 
 TEST(DebugStringTest, ExpressionTree) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
-    auto baseOperand1 = BSON("$lt"
-                             << "z1");
-    auto baseOperand2 = BSON("$gt"
-                             << "a1");
+    auto baseOperand1 = BSON("$lt" << "z1");
+    auto baseOperand2 = BSON("$gt" << "a1");
     auto sub1 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand1["$lt"]);
     auto sub2 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand2["$gt"]);
     auto sub3 = std::make_unique<RegexMatchExpression>("a"_sd, "1", "");
@@ -284,8 +281,7 @@ TEST(DebugStringTest, ExpressionType) {
 
 TEST(DebugStringTest, ExpressionWhere) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
-    auto expr = BSON("$where"
-                     << "function() {print(where);}");
+    auto expr = BSON("$where" << "function() {print(where);}");
     auto whereExpr = uassertStatusOK(
         MatchExpressionParser::parse(expr,
                                      new ExpressionContextForTest(),

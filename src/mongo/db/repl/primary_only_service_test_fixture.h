@@ -82,13 +82,13 @@ protected:
      * Used to add your own op observer to the op observer registry during setUp prior to running
      * your tests.
      */
-    virtual void setUpOpObserverRegistry(OpObserverRegistry* opObserverRegistry){};
+    virtual void setUpOpObserverRegistry(OpObserverRegistry* opObserverRegistry) {};
 
     /**
      * Used in order to set persistent data (such as state doc on disk) during setUp prior to
      * running your tests.
      */
-    virtual void setUpPersistence(OperationContext* opCtx){};
+    virtual void setUpPersistence(OperationContext* opCtx) {};
 
     virtual void shutdownHook();
 

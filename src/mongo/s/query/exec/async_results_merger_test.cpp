@@ -1599,10 +1599,9 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     readyEvent = unittest::assertGet(arm->nextEvent());
 
     BSONObj scheduledCmd = getNthPendingRequest(0).cmdObj;
-    auto cmd = GetMoreCommandRequest::parse(IDLParserContext{"getMore"},
-                                            scheduledCmd.addField(BSON("$db"
-                                                                       << "anydbname")
-                                                                      .firstElement()));
+    auto cmd = GetMoreCommandRequest::parse(
+        IDLParserContext{"getMore"},
+        scheduledCmd.addField(BSON("$db" << "anydbname").firstElement()));
     ASSERT_EQ(*cmd.getBatchSize(), 3LL);
     ASSERT_EQ(cmd.getCommandParameter(), 1LL);
     scheduleNetworkResponses(std::move(responses));
@@ -1807,9 +1806,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsOnRetriableErrorNoRetries) {
 }
 
 TEST_F(AsyncResultsMergerTest, MaxTimeMSExpiredAllowPartialResultsTrue) {
-    BSONObj findCmd = BSON("find"
-                           << "testcoll"
-                           << "allowPartialResults" << true);
+    BSONObj findCmd = BSON("find" << "testcoll"
+                                  << "allowPartialResults" << true);
     std::vector<RemoteCursor> cursors;
     // Two shards.
     cursors.push_back(
@@ -1846,9 +1844,8 @@ TEST_F(AsyncResultsMergerTest, MaxTimeMSExpiredAllowPartialResultsTrue) {
 }
 
 TEST_F(AsyncResultsMergerTest, MaxTimeMSExpiredAllowPartialResultsFalse) {
-    BSONObj findCmd = BSON("find"
-                           << "testcoll"
-                           << "allowPartialResults" << false);
+    BSONObj findCmd = BSON("find" << "testcoll"
+                                  << "allowPartialResults" << false);
     std::vector<RemoteCursor> cursors;
     // two shards
     cursors.push_back(

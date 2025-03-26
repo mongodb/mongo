@@ -965,10 +965,7 @@ protected:
 class SetNumToStr : public Base {
 public:
     void doIt() const override {
-        _client.update(nss(),
-                       BSON("_id" << 0),
-                       BSON("$set" << BSON("a"
-                                           << "bcd")));
+        _client.update(nss(), BSON("_id" << 0), BSON("$set" << BSON("a" << "bcd")));
     }
     void check() const override {
         ASSERT_EQUALS(1, count());

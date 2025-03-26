@@ -409,9 +409,7 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
             sharded_agg_helpers::checkIfEligibleForExchange(operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
-        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(),
-                          BSON("x"
-                               << "hashed"));
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("x" << "hashed"));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
         const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
         const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().value();
@@ -516,26 +514,17 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
     const OID epoch = OID::gen();
     const Timestamp timestamp = Timestamp(1);
     ShardKeyPattern shardKey(BSON("word" << 1));
-    loadRoutingTable(kTestTargetNss,
-                     epoch,
-                     timestamp,
-                     shardKey,
-                     makeChunks(UUID::gen(),
-                                epoch,
-                                timestamp,
-                                {{ChunkRange{BSON("word" << MINKEY),
-                                             BSON("word"
-                                                  << "hello")},
-                                  ShardId("0")},
-                                 {ChunkRange{BSON("word"
-                                                  << "hello"),
-                                             BSON("word"
-                                                  << "world")},
-                                  ShardId("1")},
-                                 {ChunkRange{BSON("word"
-                                                  << "world"),
-                                             BSON("word" << MAXKEY)},
-                                  ShardId("1")}}));
+    loadRoutingTable(
+        kTestTargetNss,
+        epoch,
+        timestamp,
+        shardKey,
+        makeChunks(UUID::gen(),
+                   epoch,
+                   timestamp,
+                   {{ChunkRange{BSON("word" << MINKEY), BSON("word" << "hello")}, ShardId("0")},
+                    {ChunkRange{BSON("word" << "hello"), BSON("word" << "world")}, ShardId("1")},
+                    {ChunkRange{BSON("word" << "world"), BSON("word" << MAXKEY)}, ShardId("1")}}));
 
     // As an example of a pipeline that might replace a map reduce, imagine that we are performing a
     // word count, and the shards part of the pipeline tokenized some text field of each document
@@ -571,12 +560,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
         ASSERT_EQ(consumerIds.size(), 3UL);
 
         ASSERT_BSONOBJ_EQ(boundaries[0], BSON("_id" << MINKEY));
-        ASSERT_BSONOBJ_EQ(boundaries[1],
-                          BSON("_id"
-                               << "hello"));
-        ASSERT_BSONOBJ_EQ(boundaries[2],
-                          BSON("_id"
-                               << "world"));
+        ASSERT_BSONOBJ_EQ(boundaries[1], BSON("_id" << "hello"));
+        ASSERT_BSONOBJ_EQ(boundaries[2], BSON("_id" << "world"));
         ASSERT_BSONOBJ_EQ(boundaries[3], BSON("_id" << MAXKEY));
 
         ASSERT_EQ(consumerIds[0], 0);

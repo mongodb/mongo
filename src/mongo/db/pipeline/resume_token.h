@@ -91,7 +91,7 @@ struct ResumeTokenData {
           txnOpIndex(txnOpIndexIn),
           fromInvalidate(fromInvalidate),
           uuid(uuidIn),
-          eventIdentifier(std::move(eventIdentifierIn)){};
+          eventIdentifier(std::move(eventIdentifierIn)) {};
 
     bool operator==(const ResumeTokenData& other) const;
     bool operator!=(const ResumeTokenData& other) const {

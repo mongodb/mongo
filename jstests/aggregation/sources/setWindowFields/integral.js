@@ -2,6 +2,7 @@
  * Test the behavior of $integral.
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
+
 import {documentBounds} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db.setWindowFields_integral;

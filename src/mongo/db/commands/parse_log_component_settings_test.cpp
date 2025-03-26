@@ -71,8 +71,7 @@ TEST(Flat, Numeric) {
 }
 
 TEST(Flat, FailNonNumeric) {
-    BSONObj input = BSON("verbosity"
-                         << "not a number");
+    BSONObj input = BSON("verbosity" << "not a number");
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 
@@ -176,8 +175,7 @@ TEST(Nested, Numeric) {
 }
 
 TEST(Nested, FailNonNumeric) {
-    BSONObj input = BSON("accessControl" << BSON("verbosity"
-                                                 << "Not a number"));
+    BSONObj input = BSON("accessControl" << BSON("verbosity" << "Not a number"));
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 
@@ -312,8 +310,7 @@ TEST(Multi, FailBadComponent) {
 
 TEST(DeeplyNested, FailFast) {
     BSONObj input =
-        BSON("storage" << BSON("this" << BSON("is" << BSON("nested" << BSON("too"
-                                                                            << "deeply")))));
+        BSON("storage" << BSON("this" << BSON("is" << BSON("nested" << BSON("too" << "deeply")))));
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 
@@ -323,8 +320,7 @@ TEST(DeeplyNested, FailFast) {
 }
 
 TEST(DeeplyNested, FailLast) {
-    BSONObj input = BSON("storage" << BSON("journal" << BSON("No Such Component"
-                                                             << "bad")));
+    BSONObj input = BSON("storage" << BSON("journal" << BSON("No Such Component" << "bad")));
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 

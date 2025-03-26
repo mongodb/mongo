@@ -140,7 +140,7 @@ CollectionState::CollectionState(CollectionOptions collectionOptions_,
     : collectionOptions(std::move(collectionOptions_)),
       indexSpecs(std::move(indexSpecs_)),
       dataHash(std::move(dataHash_)),
-      exists(true){};
+      exists(true) {};
 
 bool operator==(const CollectionState& lhs, const CollectionState& rhs) {
     if (!lhs.exists || !rhs.exists) {
@@ -460,9 +460,8 @@ template OplogEntry IdempotencyTest::update<int>(int _id, const BSONObj& obj);
 template OplogEntry IdempotencyTest::update<const char*>(char const* _id, const BSONObj& obj);
 
 BSONObj makeInsertApplyOpsEntry(const NamespaceString& nss, const UUID& uuid, const BSONObj& doc) {
-    return BSON("op"
-                << "i"
-                << "ns" << nss.toString_forTest() << "ui" << uuid << "o" << doc);
+    return BSON("op" << "i"
+                     << "ns" << nss.toString_forTest() << "ui" << uuid << "o" << doc);
 }
 }  // namespace repl
 }  // namespace mongo

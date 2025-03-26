@@ -44,7 +44,7 @@ namespace mongo {
 class DeferredDropRecordStore : public TemporaryRecordStore {
 public:
     DeferredDropRecordStore(std::unique_ptr<RecordStore> rs, StorageEngine* storageEngine)
-        : TemporaryRecordStore(std::move(rs)), _storageEngine(storageEngine){};
+        : TemporaryRecordStore(std::move(rs)), _storageEngine(storageEngine) {};
     ~DeferredDropRecordStore() override;
 
 protected:

@@ -124,8 +124,7 @@ TEST(PlanRankerTest, DistinctBonus) {
     ASSERT_EQ(distinctScore, ixscanScore);
 
     // Now we change to an aggregation context (simulate $groupByDistinct rewrite case).
-    auto groupBson = BSON("$group" << BSON("_id"
-                                           << "someKey"));
+    auto groupBson = BSON("$group" << BSON("_id" << "someKey"));
     cq->setCqPipeline(
         {DocumentSourceGroup::createFromBson(groupBson.firstElement(), cq->getExpCtx())}, true);
 

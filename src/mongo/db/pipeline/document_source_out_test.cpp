@@ -109,15 +109,13 @@ TEST_F(DocumentSourceOutTest, FailsToParseIncorrectType) {
 }
 
 TEST_F(DocumentSourceOutTest, AcceptsStringArgument) {
-    BSONObj spec = BSON("$out"
-                        << "some_collection");
+    BSONObj spec = BSON("$out" << "some_collection");
     auto outStage = createOutStage(spec);
     ASSERT_EQ(outStage->getOutputNs().coll(), "some_collection");
 }
 
 TEST_F(DocumentSourceOutTest, SerializeToString) {
-    BSONObj spec = BSON("$out"
-                        << "some_collection");
+    BSONObj spec = BSON("$out" << "some_collection");
     auto outStage = createOutStage(spec);
     auto serialized = outStage->serialize().getDocument();
     ASSERT_EQ(serialized["$out"]["coll"].getStringData(), "some_collection");
@@ -190,8 +188,7 @@ TEST_F(DocumentSourceOutServerlessTest,
         NamespaceString::createNamespaceString_forTest(tenantId, "test", "testColl");
     std::vector<BSONObj> pipeline;
 
-    auto stageSpec = BSON("$out"
-                          << "some_collection");
+    auto stageSpec = BSON("$out" << "some_collection");
     auto liteParsedLookup =
         DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement(), LiteParserOptions{});
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
@@ -202,10 +199,9 @@ TEST_F(DocumentSourceOutServerlessTest,
 
     // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
     // into different dbs.
-    stageSpec = BSON("$out" << BSON("db"
-                                    << "target_db"
-                                    << "coll"
-                                    << "some_collection"));
+    stageSpec = BSON("$out" << BSON("db" << "target_db"
+                                         << "coll"
+                                         << "some_collection"));
     liteParsedLookup =
         DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement(), LiteParserOptions{});
     namespaceSet = liteParsedLookup->getInvolvedNamespaces();

@@ -63,7 +63,7 @@ struct OpNodeStorage<T, 0> {};
 namespace detail {
 template <typename Tree, typename Ref>
 requires(!std::is_reference_v<Tree>)  //
-    class TreeCursor;
+class TreeCursor;
 }  // namespace detail
 
 /**
@@ -76,20 +76,22 @@ class OpFixedArity : public OpNodeStorage<Slot, Arity> {
 
     template <typename Tree, typename Ref>
     requires(!std::is_reference_v<Tree>)  //
-        friend class detail::TreeCursor;
+    friend class detail::TreeCursor;
 
 public:
     template <typename... Ts>
-    requires(sizeof...(Ts) == Arity) OpFixedArity(Ts&&... vals)
-        : Base({std::forward<Ts>(vals)...}) {}
+    requires(sizeof...(Ts) == Arity)
+    OpFixedArity(Ts&&... vals) : Base({std::forward<Ts>(vals)...}) {}
 
     template <int I>
-    requires(I >= 0 && I < Arity) auto& get() noexcept {
+    requires(I >= 0 && I < Arity)
+    auto& get() noexcept {
         return this->_nodes[I];
     }
 
     template <int I>
-    requires(I >= 0 && I < Arity) const auto& get() const noexcept {
+    requires(I >= 0 && I < Arity)
+    const auto& get() const noexcept {
         return this->_nodes[I];
     }
 
@@ -294,7 +296,7 @@ auto unpackResults(size_t dynamicArity,
  */
 template <typename Tree, typename Ref>
 requires(!std::is_reference_v<Tree>)  //
-    class TreeCursor {
+class TreeCursor {
 public:
     // Represents one-past-the-end.
     TreeCursor() {}

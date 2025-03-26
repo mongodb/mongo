@@ -178,10 +178,9 @@ TEST(ClientMetadataTest, TestRequiredOnlyFields) {
 
 // Positive: test with app_name spelled wrong fields
 TEST(ClientMetadataTest, TestWithAppNameSpelledWrong) {
-    ASSERT_DOC_OK(kApplication << BSON("extra"
-                                       << "1")
-                               << kDriver << BSON(kName << "n1" << kVersion << "v1")
-                               << kOperatingSystem << BSON(kType << kUnknown));
+    ASSERT_DOC_OK(kApplication << BSON("extra" << "1") << kDriver
+                               << BSON(kName << "n1" << kVersion << "v1") << kOperatingSystem
+                               << BSON(kType << kUnknown));
 }
 
 // Positive: test with empty application document

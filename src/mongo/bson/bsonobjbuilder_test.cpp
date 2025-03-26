@@ -200,10 +200,9 @@ TEST(BSONObjBuilderTest, ResumeBuilding) {
     }
     auto obj = BSONObj(b.buf());
     ASSERT_BSONOBJ_EQ(obj,
-                      BSON("a"
-                           << "b"
-                           << "c"
-                           << "d"));
+                      BSON("a" << "b"
+                               << "c"
+                               << "d"));
 }
 
 TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
@@ -211,9 +210,7 @@ TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
     // build a trivial object.
     {
         BSONObjBuilder firstBuilder(b);
-        firstBuilder.append("ll",
-                            BSON("f" << BSON("cc"
-                                             << "dd")));
+        firstBuilder.append("ll", BSON("f" << BSON("cc" << "dd")));
     }
     // add a complex field
     {
@@ -221,10 +218,7 @@ TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
         secondBuilder.append("a", BSON("c" << 3));
     }
     auto obj = BSONObj(b.buf());
-    ASSERT_BSONOBJ_EQ(obj,
-                      BSON("ll" << BSON("f" << BSON("cc"
-                                                    << "dd"))
-                                << "a" << BSON("c" << 3)));
+    ASSERT_BSONOBJ_EQ(obj, BSON("ll" << BSON("f" << BSON("cc" << "dd")) << "a" << BSON("c" << 3)));
 }
 
 TEST(BSONObjBuilderTest, ResetToEmptyResultsInEmptyObj) {

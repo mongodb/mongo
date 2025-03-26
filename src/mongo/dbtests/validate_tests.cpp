@@ -476,10 +476,9 @@ public:
             commitTransaction();
         }
 
-        auto status = createIndexFromSpec(BSON("name"
-                                               << "a"
-                                               << "key" << BSON("a" << 1) << "v"
-                                               << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << "a"
+                                                      << "key" << BSON("a" << 1) << "v"
+                                                      << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -537,10 +536,9 @@ public:
             commitTransaction();
         }
 
-        auto status = createIndexFromSpec(BSON("name"
-                                               << "a"
-                                               << "key" << BSON("a" << 1) << "v"
-                                               << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << "a"
+                                                      << "key" << BSON("a" << 1) << "v"
+                                                      << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -675,10 +673,9 @@ public:
         lockDb(MODE_X);
 
         // Create multi-key index.
-        auto status = createIndexFromSpec(BSON("name"
-                                               << "multikey_index"
-                                               << "key" << BSON("a.b" << 1) << "v"
-                                               << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << "multikey_index"
+                                                      << "key" << BSON("a.b" << 1) << "v"
+                                                      << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -738,11 +735,10 @@ public:
         }
 
         // Create a sparse index.
-        auto status = createIndexFromSpec(BSON("name"
-                                               << "sparse_index"
-                                               << "key" << BSON("a" << 1) << "v"
-                                               << static_cast<int>(kIndexVersion) << "background"
-                                               << false << "sparse" << true));
+        auto status = createIndexFromSpec(
+            BSON("name" << "sparse_index"
+                        << "key" << BSON("a" << 1) << "v" << static_cast<int>(kIndexVersion)
+                        << "background" << false << "sparse" << true));
 
         ASSERT_OK(status);
         releaseDb();
@@ -796,12 +792,11 @@ public:
         }
 
         // Create a partial index.
-        auto status = createIndexFromSpec(BSON("name"
-                                               << "partial_index"
-                                               << "key" << BSON("a" << 1) << "v"
-                                               << static_cast<int>(kIndexVersion) << "background"
-                                               << false << "partialFilterExpression"
-                                               << BSON("a" << BSON("$gt" << 1))));
+        auto status = createIndexFromSpec(
+            BSON("name" << "partial_index"
+                        << "key" << BSON("a" << 1) << "v" << static_cast<int>(kIndexVersion)
+                        << "background" << false << "partialFilterExpression"
+                        << BSON("a" << BSON("$gt" << 1))));
 
         ASSERT_OK(status);
         releaseDb();
@@ -849,24 +844,16 @@ public:
         }
 
         // Create a partial geo index that indexes the document. This should return an error.
-        ASSERT_NOT_OK(createIndexFromSpec(BSON("name"
-                                               << "partial_index"
-                                               << "key"
-                                               << BSON("x"
-                                                       << "2dsphere")
-                                               << "v" << static_cast<int>(kIndexVersion)
-                                               << "partialFilterExpression"
-                                               << BSON("a" << BSON("$eq" << 2)))));
+        ASSERT_NOT_OK(createIndexFromSpec(BSON(
+            "name" << "partial_index"
+                   << "key" << BSON("x" << "2dsphere") << "v" << static_cast<int>(kIndexVersion)
+                   << "partialFilterExpression" << BSON("a" << BSON("$eq" << 2)))));
 
         // Create a partial geo index that does not index the document.
-        auto status = createIndexFromSpec(BSON("name"
-                                               << "partial_index"
-                                               << "key"
-                                               << BSON("x"
-                                                       << "2dsphere")
-                                               << "v" << static_cast<int>(kIndexVersion)
-                                               << "partialFilterExpression"
-                                               << BSON("a" << BSON("$eq" << 1))));
+        auto status = createIndexFromSpec(BSON(
+            "name" << "partial_index"
+                   << "key" << BSON("x" << "2dsphere") << "v" << static_cast<int>(kIndexVersion)
+                   << "partialFilterExpression" << BSON("a" << BSON("$eq" << 1))));
         ASSERT_OK(status);
         releaseDb();
         ensureValidateWorked();
@@ -913,16 +900,14 @@ public:
 
         // Create two compound indexes, one forward and one reverse, to test
         // validate()'s index direction parsing.
-        auto status = createIndexFromSpec(BSON("name"
-                                               << "compound_index_1"
-                                               << "key" << BSON("a" << 1 << "b" << -1) << "v"
-                                               << static_cast<int>(kIndexVersion)));
+        auto status = createIndexFromSpec(BSON("name" << "compound_index_1"
+                                                      << "key" << BSON("a" << 1 << "b" << -1) << "v"
+                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
 
-        status = createIndexFromSpec(BSON("name"
-                                          << "compound_index_2"
-                                          << "key" << BSON("a" << -1 << "b" << 1) << "v"
-                                          << static_cast<int>(kIndexVersion)));
+        status = createIndexFromSpec(BSON("name" << "compound_index_2"
+                                                 << "key" << BSON("a" << -1 << "b" << 1) << "v"
+                                                 << static_cast<int>(kIndexVersion)));
 
         ASSERT_OK(status);
         releaseDb();
@@ -4441,19 +4426,15 @@ public:
 
 
         // Insert documents.
-        auto firstDoc = BSON("_id"
-                             << "1000000000000"
-                             << "a" << 1);
-        auto secondDoc = BSON("_id"
-                              << "2000000000000"
-                              << "a" << 1);
+        auto firstDoc = BSON("_id" << "1000000000000"
+                                   << "a" << 1);
+        auto secondDoc = BSON("_id" << "2000000000000"
+                                    << "a" << 1);
         if (falsePositiveCase) {
-            firstDoc = BSON("_id"
-                            << "1"
-                            << "a" << 10000001);
-            secondDoc = BSON("_id"
-                             << "2"
-                             << "a" << 10000002);
+            firstDoc = BSON("_id" << "1"
+                                  << "a" << 10000001);
+            secondDoc = BSON("_id" << "2"
+                                   << "a" << 10000002);
         }
         OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);

@@ -288,7 +288,7 @@ BatchedInsertContext::BatchedInsertContext(
       stripeNumber(stripeNumber),
       options(options),
       stats(stats),
-      measurementsTimesAndIndices(measurementsTimesAndIndices){};
+      measurementsTimesAndIndices(measurementsTimesAndIndices) {};
 
 BSONObj getMetadata(BucketCatalog& catalog, const BucketId& bucketId) {
     auto const& stripe = *catalog.stripes[internal::getStripeNumber(catalog, bucketId)];

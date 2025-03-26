@@ -245,9 +245,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeOpenNonExisting) {
 // copies of a pipe-specific BSONObj, and everything in each pipe fits into a single read buffer.
 TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
     const int kObjsPerPipe = 50;
-    std::vector<BSONObj> bsonObjs[kNumPipes] = {{BSON("a" << 1)},
-                                                {BSON("zed"
-                                                      << "two")}};
+    std::vector<BSONObj> bsonObjs[kNumPipes] = {{BSON("a" << 1)}, {BSON("zed" << "two")}};
 
     // Create two pipes. The first has only "a" objects and the second has only "zed" objects.
     stdx::thread pipeThreads[kNumPipes];
@@ -318,20 +316,13 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
 // few million bsons to and from each pipe.
 TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
     const std::vector<BSONObj> bsonObjs = {
-        BSON("One"
-             << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
-        BSON("Twofer"
-             << "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-        BSON("field3"
-             << "THREE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"),
-        BSON("four hundred forty-four"
-             << "444444444444444444444444444444444444444444444444444444"),
-        BSON("5"
-             << "five five five five five five five five five five five five five five five"),
-        BSON("Sixx"
-             << "6666666666666666666666666666666666666666666666666666666666666666666666666"),
-        BSON("Lucky_Seven"
-             << "777777777777777777777777777777777777777777777777777777777777777777"),
+        BSON("One" << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+        BSON("Twofer" << "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+        BSON("field3" << "THREE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"),
+        BSON("four hundred forty-four" << "444444444444444444444444444444444444444444444444444444"),
+        BSON("5" << "five five five five five five five five five five five five five five five"),
+        BSON("Sixx" << "6666666666666666666666666666666666666666666666666666666666666666666666666"),
+        BSON("Lucky_Seven" << "777777777777777777777777777777777777777777777777777777777777777777"),
     };
     const int numObjs = bsonObjs.size();
 

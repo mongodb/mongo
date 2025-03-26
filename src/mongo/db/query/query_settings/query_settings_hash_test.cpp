@@ -62,8 +62,7 @@ TEST(QuerySettingsHashTest, QuerySettingsHashExcludesComment) {
 
     auto hashA = mongo::query_settings::hash(settings);
 
-    auto commentObj = BSON("reason for reject"
-                           << "don't want this query to be used on classic...");
+    auto commentObj = BSON("reason for reject" << "don't want this query to be used on classic...");
     auto comment = Comment::parseFromBSON(commentObj.firstElement());
     settings.setComment(comment);
     auto hashB = mongo::query_settings::hash(settings);

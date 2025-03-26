@@ -111,8 +111,7 @@ BSONObj buildCommand() {
     commandReplyBob.append("ok", 1.0);
     BSONObjBuilder cursorBuilder;
     BSONArrayBuilder a(cursorBuilder.subarrayStart("firstBatch"));
-    a.append(BSON("Foo"
-                  << "Bar"));
+    a.append(BSON("Foo" << "Bar"));
     a.done();
 
     cursorBuilder.appendNumber("id", 1);

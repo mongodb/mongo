@@ -231,9 +231,8 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
     // at the moment so we reparse here. Note that the reduce function signature expects 2
     // arguments, the first being the key and the second being the array of values to reduce.
     auto reduceObj =
-        BSON("args" << BSON_ARRAY("$_id" << BSON_ARRAY("$value"
-                                                       << "$$new.value"))
-                    << "body" << reduceCode << "lang" << ExpressionFunction::kJavaScript);
+        BSON("args" << BSON_ARRAY("$_id" << BSON_ARRAY("$value" << "$$new.value")) << "body"
+                    << reduceCode << "lang" << ExpressionFunction::kJavaScript);
 
     auto reduceSpec = BSON(DocumentSourceProject::kStageName << BSON(
                                "value" << BSON(ExpressionFunction::kExpressionName << reduceObj)));
@@ -241,9 +240,8 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
 
     // Build finalize $project stage if given.
     if (finalizeCode && finalizeCode->hasCode()) {
-        auto finalizeObj = BSON("args" << BSON_ARRAY("$_id"
-                                                     << "$value")
-                                       << "body" << finalizeCode->getCode().value() << "lang"
+        auto finalizeObj = BSON("args" << BSON_ARRAY("$_id" << "$value") << "body"
+                                       << finalizeCode->getCode().value() << "lang"
                                        << ExpressionFunction::kJavaScript);
         auto finalizeSpec =
             BSON(DocumentSourceProject::kStageName

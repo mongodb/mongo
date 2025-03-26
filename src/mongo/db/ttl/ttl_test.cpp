@@ -1174,9 +1174,7 @@ TEST_F(SkipInvalidTTLTest, TTLNonNumericExpireAfterSeconds) {
 TEST_F(SkipInvalidTTLTest, TTLSpecialIndexType) {
     // An index not of type IndexType::INDEX_BTREE isn't permitted for TTL expiration.
     runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key"
-                         << BSON("foo"
-                                 << "hashed")
-                         << "name"
+                         << BSON("foo" << "hashed") << "name"
                          << "hashedIndex"
                          << "expireAfterSeconds" << 10));
 }

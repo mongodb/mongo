@@ -53,9 +53,8 @@ TEST(ExtractBSON, ExtractOpTimeField) {
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractOpTimeField(obj, "c", &opTime));
 
     // Missing timestamp field.
-    obj = BSON("a" << BSON("ts"
-                           << "notATimestamp"
-                           << "t" << 2LL));
+    obj = BSON("a" << BSON("ts" << "notATimestamp"
+                                << "t" << 2LL));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractOpTimeField(obj, "a", &opTime));
     // Wrong typed timestamp field.
     obj = BSON("a" << BSON("t" << 2LL));

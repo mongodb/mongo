@@ -40,7 +40,7 @@ while (hugeStr.length < 2 * 1024 * 1024) {
 coll.find({a: hugeStr}).itcount();
 var results = coll.getDB().system.profile.find().toArray();
 assertContainsTruncatedCommand(results,
-                               /filter: { a: "a+\.\.\." }//* string value is truncated*/,
+                               /filter: { a: "a+\.\.\." }/ /* string value is truncated*/,
                                "Document corresponding to 'find' command not found.");
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
@@ -53,7 +53,7 @@ assert.commandWorked(coll.update({a: hugeStr}, {}));
 var results = coll.getDB().system.profile.find().toArray();
 assertContainsTruncatedCommand(
     results,
-    /^{ q: { a: "a+\.\.\." }, u: {}, multi: false, upsert: false }$//* string value is truncated*/,
+    /^{ q: { a: "a+\.\.\." }, u: {}, multi: false, upsert: false }$/ /* string value is truncated*/,
     "Document corresponding to 'update' command not found.");
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
@@ -66,7 +66,7 @@ assert.commandWorked(coll.update({}, {a: hugeStr}));
 var results = coll.getDB().system.profile.find().toArray();
 assertContainsTruncatedCommand(
     results,
-    /^{ q: {}, u: { a: "a+\.\.\." }, multi: false, upsert: false }$//* string value is truncated*/,
+    /^{ q: {}, u: { a: "a+\.\.\." }, multi: false, upsert: false }$/ /* string value is truncated*/,
     "Document corresponding to 'update' command not found.");
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
@@ -83,7 +83,7 @@ coll.find(doc).itcount();
 var results = coll.getDB().system.profile.find().toArray();
 assertContainsTruncatedCommand(
     results,
-    /filter: { a0: 1\.0, a1: .*\.\.\.$//* query object itself is truncated*/,
+    /filter: { a0: 1\.0, a1: .*\.\.\.$/ /* query object itself is truncated*/,
     "Document corresponding to 'find' command not found.");
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));

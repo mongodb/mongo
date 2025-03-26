@@ -145,9 +145,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
 
     auto sideWrites = getSideWritesTableContents(std::move(interceptor));
     ASSERT_EQ(1, sideWrites.size());
-    ASSERT_BSONOBJ_EQ(BSON("op"
-                           << "i"
-                           << "key" << serializedKeyString),
+    ASSERT_BSONOBJ_EQ(BSON("op" << "i"
+                                << "key" << serializedKeyString),
                       sideWrites[0]);
 }
 }  // namespace

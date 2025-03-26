@@ -50,8 +50,7 @@ namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("db.coll");
 const BSONObj kKeyPattern = BSON("a" << 1);
-const BSONObj kDefaultCollation = BSON("locale"
-                                       << "fr_CA");
+const BSONObj kDefaultCollation = BSON("locale" << "fr_CA");
 
 TEST(ShardCollectionType, FromBSONEmptyShardKeyFails) {
     ASSERT_THROWS_CODE(

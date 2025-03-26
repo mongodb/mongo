@@ -134,7 +134,7 @@ using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
  */
 class PlanStageTestFixture : public CatalogTestFixture {
 public:
-    PlanStageTestFixture(bool enableYield = true) : _enableYield(enableYield){};
+    PlanStageTestFixture(bool enableYield = true) : _enableYield(enableYield) {};
 
     void setUp() override {
         CatalogTestFixture::setUp();

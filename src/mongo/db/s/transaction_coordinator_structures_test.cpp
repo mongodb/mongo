@@ -50,9 +50,8 @@ TEST(CoordinatorCommitDecisionTest, SerializeCommitHasTimestampAndNoAbortStatus)
 
     auto obj = decision.toBSON();
 
-    ASSERT_BSONOBJ_EQ(BSON("decision"
-                           << "commit"
-                           << "commitTimestamp" << Timestamp(100, 200)),
+    ASSERT_BSONOBJ_EQ(BSON("decision" << "commit"
+                                      << "commitTimestamp" << Timestamp(100, 200)),
                       obj);
 }
 
@@ -61,13 +60,12 @@ TEST(CoordinatorCommitDecisionTest, SerializeAbortHasNoTimestampAndAbortStatus) 
     decision.setAbortStatus(Status(ErrorCodes::InternalError, "Test error"));
 
     auto obj = decision.toBSON();
-    auto expectedObj = BSON("decision"
-                            << "abort"
-                            << "abortStatus"
-                            << BSON("code" << 1 << "codeName"
-                                           << "InternalError"
-                                           << "errmsg"
-                                           << "Test error"));
+    auto expectedObj = BSON("decision" << "abort"
+                                       << "abortStatus"
+                                       << BSON("code" << 1 << "codeName"
+                                                      << "InternalError"
+                                                      << "errmsg"
+                                                      << "Test error"));
 
     ASSERT_BSONOBJ_EQ(expectedObj, obj);
 

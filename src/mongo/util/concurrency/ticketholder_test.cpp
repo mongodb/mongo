@@ -141,7 +141,7 @@ private:
  */
 class TicketHolderTest::Stats {
 public:
-    Stats(TicketHolder* holder) : _holder(holder){};
+    Stats(TicketHolder* holder) : _holder(holder) {};
 
     long long operator[](StringData field) const {
         BSONObjBuilder bob;

@@ -314,9 +314,8 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
 
     // If the test fails we want to ensure the checkpoint thread shuts down to avoid accessing the
     // storage engine during shutdown.
-    ON_BLOCK_EXIT([&] {
-        checkpointer->shutdown({ErrorCodes::ShutdownInProgress, "Test finished"});
-    });
+    ON_BLOCK_EXIT(
+        [&] { checkpointer->shutdown({ErrorCodes::ShutdownInProgress, "Test finished"}); });
 
     auto opCtxPtr = _makeOperationContext();
     // The initial data timestamp has to be set to take stable checkpoints. The first stable

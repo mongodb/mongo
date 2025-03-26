@@ -47,7 +47,7 @@ public:
         : RecoverableShardingDDLCoordinator(service, "ConvertToCappedCoordinator", initialStateDoc),
           _request(_doc.getShardsvrConvertToCappedRequest()),
           _critSecReason(BSON("convertToCapped" << NamespaceStringUtil::serialize(
-                                  nss(), SerializationContext::stateDefault()))){};
+                                  nss(), SerializationContext::stateDefault()))) {};
 
     void checkIfOptionsConflict(const BSONObj& doc) const override {
         const auto otherDoc = ConvertToCappedCoordinatorDocument::parse(

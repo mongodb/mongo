@@ -106,7 +106,7 @@ public:
      */
     struct Buffer {
     public:
-        Buffer(const NamespaceString& nss) : _nss(nss){};
+        Buffer(const NamespaceString& nss) : _nss(nss) {};
 
         const NamespaceString& getNss() const {
             return _nss;

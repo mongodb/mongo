@@ -760,9 +760,8 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                     // committed snapshot is dropped after a force reconfig that changes the config
                     // content or a safe reconfig that changes writeConcernMajorityJournalDefault.
                     WriteUnitOfWork wuow(opCtx);
-                    auto msgObj = BSON("msg"
-                                       << "Reconfig set"
-                                       << "version" << config["version"]);
+                    auto msgObj = BSON("msg" << "Reconfig set"
+                                             << "version" << config["version"]);
                     _service->getOpObserver()->onOpMessage(opCtx, msgObj);
                     wuow.commit();
                 }

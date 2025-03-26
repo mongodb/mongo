@@ -753,15 +753,12 @@ TEST(Future_MoveOnly, Success_unordered_set) {
 }
 
 TEST(Future_MoveOnly, Success_pair) {
-    FUTURE_SUCCESS_TEST(
-        [] {
-            return std::pair<Widget, Widget>{1, 1};
-        },
-        [](auto&& fut) {
-            auto&& pair = fut.get();
-            ASSERT_EQ(pair.first, Widget(1));
-            ASSERT_EQ(pair.second, Widget(1));
-        });
+    FUTURE_SUCCESS_TEST([] { return std::pair<Widget, Widget>{1, 1}; },
+                        [](auto&& fut) {
+                            auto&& pair = fut.get();
+                            ASSERT_EQ(pair.first, Widget(1));
+                            ASSERT_EQ(pair.second, Widget(1));
+                        });
 }
 
 TEST(Future_MoveOnly, Success_map) {

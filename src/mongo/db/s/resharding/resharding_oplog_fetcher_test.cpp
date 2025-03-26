@@ -429,8 +429,7 @@ public:
                         _opCtx,
                         dataColl.getCollection()->ns(),
                         dataColl.getCollection()->uuid(),
-                        BSON("msg"
-                             << "other noop"),
+                        BSON("msg" << "other noop"),
                         boost::none /* o2 */,
                         boost::none,
                         boost::none,
@@ -444,22 +443,18 @@ public:
         repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
 
         // Disable the failpoint.
-        setGlobalFailPoint("addDestinedRecipient",
-                           BSON("mode"
-                                << "off"));
+        setGlobalFailPoint("addDestinedRecipient", BSON("mode" << "off"));
     }
 
     void assertUsedApplyOpsToBatchInsert(NamespaceString nss, int numApplyOpsOplogEntries) {
         ASSERT_EQ(0,
                   itcount(NamespaceString::kRsOplogNamespace,
-                          BSON("op"
-                               << "i"
-                               << "ns" << nss.ns_forTest())));
+                          BSON("op" << "i"
+                                    << "ns" << nss.ns_forTest())));
         ASSERT_EQ(numApplyOpsOplogEntries,
                   itcount(NamespaceString::kRsOplogNamespace,
-                          BSON("o.applyOps.op"
-                               << "i"
-                               << "o.applyOps.ns" << nss.ns_forTest())));
+                          BSON("o.applyOps.op" << "i"
+                                               << "o.applyOps.ns" << nss.ns_forTest())));
     }
 
     long long currentOpFetchedCount() const {

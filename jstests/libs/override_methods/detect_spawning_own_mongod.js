@@ -23,7 +23,7 @@ import {
     kOverrideConstructor as kOverrideConstructorForRST
 } from "jstests/libs/replsettest.js";
 
-ShardingTest[kOverrideConstructorForST] = class NoSpawnShardingTest extends ShardingTest {
+ShardingTest[kOverrideConstructorForST] = class NoSpawnShardingTest extends ShardingTest{
     constructor() {
         throw new Error("Detected ShardingTest() call in js test from passthrough suite. " +
                         "Consider moving the test to one of the jstests/noPassthrough/, " +
@@ -31,7 +31,7 @@ ShardingTest[kOverrideConstructorForST] = class NoSpawnShardingTest extends Shar
     }
 };
 
-ReplSetTest[kOverrideConstructorForRST] = class NoSpawnReplSetTest extends ReplSetTest {
+ReplSetTest[kOverrideConstructorForRST] = class NoSpawnReplSetTest extends ReplSetTest{
     constructor(opts) {
         if (typeof opts !== 'string' && !(opts instanceof String)) {
             throw new Error("Detected ReplSetTest() call in js test from passthrough suite. " +

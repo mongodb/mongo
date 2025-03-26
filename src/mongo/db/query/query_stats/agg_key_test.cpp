@@ -185,8 +185,7 @@ TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutComment) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
     AggregateCommandRequest acrWithComment(kDefaultTestNss.nss());
     acrWithComment.setPipeline(rawPipeline);
-    expCtx->getOperationContext()->setComment(BSON("comment"
-                                                   << " foo"));
+    expCtx->getOperationContext()->setComment(BSON("comment" << " foo"));
     auto pipelineWithComment = Pipeline::parse(rawPipeline, expCtx);
     auto aggShape =
         std::make_unique<query_shape::AggCmdShape>(acrWithComment,

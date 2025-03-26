@@ -298,8 +298,8 @@ private:
 
 // Deduction Guides
 template <typename T>
-requires(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>) SemiFuture(T)
-->SemiFuture<T>;
+requires(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>)
+SemiFuture(T) -> SemiFuture<T>;
 template <typename T>
 SemiFuture(StatusWith<T>) -> SemiFuture<T>;
 
@@ -369,8 +369,8 @@ public:
      * TODO decide how to handle func throwing.
      */
     template <typename Func>
-    requires(future_details::isCallableExactR<void, Func, StatusOrStatusWith<T>>) void getAsync(
-        Func&& func) && noexcept {
+    requires(future_details::isCallableExactR<void, Func, StatusOrStatusWith<T>>)
+    void getAsync(Func&& func) && noexcept {
         std::move(this->_impl).getAsync(std::forward<Func>(func));
     }
 
@@ -410,7 +410,8 @@ public:
      * are handled.)
      */
     template <typename Func>
-    requires(future_details::isCallable<Func, T>) auto then(Func&& func) && noexcept {
+    requires(future_details::isCallable<Func, T>)
+    auto then(Func&& func) && noexcept {
         return wrap<Func, T>(std::move(this->_impl).then(std::forward<Func>(func)));
     }
 
@@ -422,8 +423,8 @@ public:
      * and Futurey returns are handled.)
      */
     template <typename Func>
-    requires(future_details::isCallable<Func, StatusOrStatusWith<T>>) auto onCompletion(
-        Func&& func) && noexcept {
+    requires(future_details::isCallable<Func, StatusOrStatusWith<T>>)
+    auto onCompletion(Func&& func) && noexcept {
         return wrap<Func, Status>(std::move(this->_impl).onCompletion(std::forward<Func>(func)));
     }
 
@@ -441,7 +442,8 @@ public:
      * Statusy and Futurey returns are handled.)
      */
     template <typename Func>
-    requires(future_details::isCallableR<T, Func, Status>) auto onError(Func&& func) && noexcept {
+    requires(future_details::isCallableR<T, Func, Status>)
+    auto onError(Func&& func) && noexcept {
         return wrap<Func, Status>(std::move(this->_impl).onError(std::forward<Func>(func)));
     }
 
@@ -453,7 +455,8 @@ public:
      * Statusy and Futurey returns are handled.)
      */
     template <ErrorCodes::Error code, typename Func>
-    requires(future_details::isCallableR<T, Func, Status>) auto onError(Func&& func) && noexcept {
+    requires(future_details::isCallableR<T, Func, Status>)
+    auto onError(Func&& func) && noexcept {
         return wrap<Func, Status>(
             std::move(this->_impl).template onError<code>(std::forward<Func>(func)));
     }
@@ -466,8 +469,8 @@ public:
      * Statusy and Futurey returns are handled.)
      */
     template <ErrorCategory category, typename Func>
-    requires(future_details::isCallableR<T, Func, Status>) auto onErrorCategory(
-        Func&& func) && noexcept {
+    requires(future_details::isCallableR<T, Func, Status>)
+    auto onErrorCategory(Func&& func) && noexcept {
         return wrap<Func, Status>(
             std::move(this->_impl).template onErrorCategory<category>(std::forward<Func>(func)));
     }
@@ -493,8 +496,8 @@ public:
      * The callback takes a const T& and must return void.
      */
     template <typename Func>
-    requires(future_details::isCallableExactR<void, Func, const T>) Future<T> tap(
-        Func&& func) && noexcept {
+    requires(future_details::isCallableExactR<void, Func, const T>)
+    Future<T> tap(Func&& func) && noexcept {
         return Future<T>(std::move(this->_impl).tap(std::forward<Func>(func)));
     }
 
@@ -506,8 +509,8 @@ public:
      * The callback takes a non-OK Status and must return void.
      */
     template <typename Func>
-    requires(future_details::isCallableExactR<void, Func, const Status>) Future<T> tapError(
-        Func&& func) && noexcept {
+    requires(future_details::isCallableExactR<void, Func, const Status>)
+    Future<T> tapError(Func&& func) && noexcept {
         return Future<T>(std::move(this->_impl).tapError(std::forward<Func>(func)));
     }
 
@@ -521,7 +524,7 @@ public:
      */
     template <typename Func>
     requires(future_details::isCallableExactR<void, Func, const StatusOrStatusWith<T>>)
-        Future<T> tapAll(Func&& func) && noexcept {
+    Future<T> tapAll(Func&& func) && noexcept {
         return Future<T>(std::move(this->_impl).tapAll(std::forward<Func>(func)));
     }
 
@@ -550,8 +553,8 @@ private:
 
 // Deduction Guides
 template <typename T>
-requires(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>) Future(T)
-->Future<T>;
+requires(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>)
+Future(T) -> Future<T>;
 template <typename T>
 Future(StatusWith<T>) -> Future<T>;
 
@@ -634,8 +637,8 @@ public:
      * \see `Future<T>::getAsync()`.
      */
     template <typename Func>
-    requires(future_details::isCallableExactR<void, Func, StatusOrStatusWith<T>>) void getAsync(
-        Func&& func) && noexcept {
+    requires(future_details::isCallableExactR<void, Func, StatusOrStatusWith<T>>)
+    void getAsync(Func&& func) && noexcept {
         static_assert(std::is_void_v<decltype(func(std::declval<StatusOrStatusWith<T>>()))>,
                       "func passed to getAsync must return void");
 
@@ -655,14 +658,15 @@ public:
     }
 
     template <typename Func>
-    requires(future_details::isCallable<Func, T>) auto then(Func&& func) && noexcept {
+    requires(future_details::isCallable<Func, T>)
+    auto then(Func&& func) && noexcept {
         return mongo::ExecutorFuture(
             std::move(_exec), std::move(this->_impl).then(wrapCB<T>(std::forward<Func>(func))));
     }
 
     template <typename Func>
-    requires(future_details::isCallable<Func, StatusOrStatusWith<T>>) auto onCompletion(
-        Func&& func) && noexcept {
+    requires(future_details::isCallable<Func, StatusOrStatusWith<T>>)
+    auto onCompletion(Func&& func) && noexcept {
         return mongo::ExecutorFuture(
             std::move(_exec),
             std::move(this->_impl)
@@ -671,7 +675,7 @@ public:
 
     template <typename Func>
     requires(future_details::isCallableR<T, Func, Status>)
-        ExecutorFuture<T> onError(Func&& func) && noexcept {
+    ExecutorFuture<T> onError(Func&& func) && noexcept {
         return mongo::ExecutorFuture(
             std::move(_exec),
             std::move(this->_impl).onError(wrapCB<Status>(std::forward<Func>(func))));
@@ -679,7 +683,7 @@ public:
 
     template <ErrorCodes::Error code, typename Func>
     requires(future_details::isCallableR<T, Func, Status>)
-        ExecutorFuture<T> onError(Func&& func) && noexcept {
+    ExecutorFuture<T> onError(Func&& func) && noexcept {
         return mongo::ExecutorFuture(
             std::move(_exec),
             std::move(this->_impl)
@@ -688,7 +692,7 @@ public:
 
     template <ErrorCategory category, typename Func>
     requires(future_details::isCallableR<T, Func, Status>)
-        ExecutorFuture<T> onErrorCategory(Func&& func) && noexcept {
+    ExecutorFuture<T> onErrorCategory(Func&& func) && noexcept {
         return mongo::ExecutorFuture(
             std::move(_exec),
             std::move(this->_impl)
@@ -747,13 +751,12 @@ private:
 // Deduction Guides
 template <typename T>
 requires(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>)
-    ExecutorFuture(ExecutorPtr, T)
-->ExecutorFuture<T>;
+ExecutorFuture(ExecutorPtr, T) -> ExecutorFuture<T>;
 template <typename T>
 ExecutorFuture(ExecutorPtr, future_details::FutureImpl<T>) -> ExecutorFuture<T>;
 template <typename T>
 ExecutorFuture(ExecutorPtr, StatusWith<T>) -> ExecutorFuture<T>;
-ExecutorFuture(ExecutorPtr)->ExecutorFuture<void>;
+ExecutorFuture(ExecutorPtr) -> ExecutorFuture<void>;
 
 /** Constructor tag (see the corresponding `Promise` constructor). */
 struct NonNullPromiseTag {};
@@ -827,7 +830,8 @@ public:
      * ErrorCodes::BrokenPromise.
      */
     template <typename Func>
-    requires(future_details::isCallableR<T, Func, void>) void setWith(Func&& func) noexcept {
+    requires(future_details::isCallableR<T, Func, void>)
+    void setWith(Func&& func) noexcept {
         setFrom(Future<void>::makeReady().then(std::forward<Func>(func)));
     }
     /**
@@ -854,15 +858,17 @@ public:
 
     // Use emplaceValue(Args&&...) instead.
     template <int...>
-    requires(!std::is_void_v<T>) void setFrom(T_unless_void val) noexcept = delete;
+    requires(!std::is_void_v<T>)
+    void setFrom(T_unless_void val) noexcept = delete;
 
     // Use setError(Status) instead.
     template <int...>
-    requires(!std::is_void_v<T>) void setFrom(Status) noexcept = delete;
+    requires(!std::is_void_v<T>)
+    void setFrom(Status) noexcept = delete;
 
     template <typename... Args>
-    requires std::is_constructible_v<T, Args...> ||
-        (std::is_void_v<T> && sizeof...(Args) == 0) void emplaceValue(Args&&... args) noexcept {
+    requires std::is_constructible_v<T, Args...> || (std::is_void_v<T> && sizeof...(Args) == 0)
+    void emplaceValue(Args&&... args) noexcept {
         setImpl([&](boost::intrusive_ptr<SharedStateT>&& sharedState) {
             sharedState->emplaceValue(std::forward<Args>(args)...);
         });
@@ -1059,8 +1065,8 @@ private:
 
 // Deduction Guides
 template <typename T>
-requires(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>) SharedSemiFuture(T)
-->SharedSemiFuture<T>;
+requires(!isStatusOrStatusWith<T> && !future_details::isFutureLike<T>)
+SharedSemiFuture(T) -> SharedSemiFuture<T>;
 template <typename T>
 SharedSemiFuture(StatusWith<T>) -> SharedSemiFuture<T>;
 
@@ -1113,7 +1119,8 @@ public:
     }
 
     template <typename Func>
-    requires(future_details::isCallableR<T, Func, void>) void setWith(Func&& func) noexcept {
+    requires(future_details::isCallableR<T, Func, void>)
+    void setWith(Func&& func) noexcept {
         setFrom(Future<void>::makeReady().then(std::forward<Func>(func)));
     }
 
@@ -1138,16 +1145,17 @@ public:
 
     // Use emplaceValue(Args&&...) instead.
     template <int...>
-    requires(!std::is_void_v<T>) void setFrom(T_unless_void val) noexcept = delete;
+    requires(!std::is_void_v<T>)
+    void setFrom(T_unless_void val) noexcept = delete;
 
     // Use setError(Status) instead.
     template <int...>
-    requires(!std::is_void_v<T>) void setFrom(Status) noexcept = delete;
+    requires(!std::is_void_v<T>)
+    void setFrom(Status) noexcept = delete;
 
     template <typename... Args>
-    requires(std::is_constructible_v<T, Args...> ||
-             (std::is_void_v<T> &&
-              sizeof...(Args) == 0)) void emplaceValue(Args&&... args) noexcept {
+    requires(std::is_constructible_v<T, Args...> || (std::is_void_v<T> && sizeof...(Args) == 0))
+    void emplaceValue(Args&&... args) noexcept {
         invariant(!std::exchange(_haveCompleted, true));
         _sharedState->emplaceValue(std::forward<Args>(args)...);
     }
@@ -1239,7 +1247,7 @@ auto makeReadyFutureWith(Func&& func) -> Future<FutureContinuationResult<Func&&>
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
 
 //
 // Implementations of methods that couldn't be defined in the class due to ordering requirements.

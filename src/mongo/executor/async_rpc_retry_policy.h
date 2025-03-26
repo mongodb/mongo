@@ -77,8 +77,7 @@ public:
     }
 
     BSONObj toBSON() const final {
-        return BSON("retryPolicyType"
-                    << "NeverRetryPolicy");
+        return BSON("retryPolicyType" << "NeverRetryPolicy");
     }
 };
 

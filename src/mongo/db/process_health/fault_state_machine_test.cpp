@@ -376,9 +376,8 @@ TEST_F(FaultManagerTest, DNSHealthCheckWithBadHostNameFailsAndGoodHostNameSucces
     auto serverParam =
         ServerParameterSet::getNodeParameterSet()->get<PeriodicHealthCheckIntervalsServerParameter>(
             "healthMonitoringIntervals");
-    auto bsonOBj = BSON("values" << BSON_ARRAY(BSON("type"
-                                                    << "dns"
-                                                    << "interval" << 1000)));
+    auto bsonOBj = BSON("values" << BSON_ARRAY(BSON("type" << "dns"
+                                                           << "interval" << 1000)));
     const BSONObj newParameterObj = BSON("key" << bsonOBj);
     auto element = newParameterObj.getField("key");
     uassertStatusOK(serverParam->set(element, boost::none));
@@ -386,29 +385,20 @@ TEST_F(FaultManagerTest, DNSHealthCheckWithBadHostNameFailsAndGoodHostNameSucces
     registerHealthObserver<DnsHealthObserver>();
     globalFailPointRegistry()
         .find("dnsHealthObserverFp")
-        ->setMode(FailPoint::alwaysOn,
-                  0,
-                  BSON("hostname"
-                       << "yahoo.com"));
+        ->setMode(FailPoint::alwaysOn, 0, BSON("hostname" << "yahoo.com"));
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     assertSoon([this]() { return manager().getFaultState() == FaultState::kOk; });
 
     globalFailPointRegistry()
         .find("dnsHealthObserverFp")
-        ->setMode(FailPoint::alwaysOn,
-                  0,
-                  BSON("hostname"
-                       << "badhostname.invalid"));
+        ->setMode(FailPoint::alwaysOn, 0, BSON("hostname" << "badhostname.invalid"));
     sleepFor(Seconds(1));
     assertSoon([this]() { return manager().getFaultState() == FaultState::kTransientFault; });
 
     globalFailPointRegistry()
         .find("dnsHealthObserverFp")
-        ->setMode(FailPoint::alwaysOn,
-                  0,
-                  BSON("hostname"
-                       << "yahoo.com"));
+        ->setMode(FailPoint::alwaysOn, 0, BSON("hostname" << "yahoo.com"));
     assertSoon([this]() { return manager().getFaultState() == FaultState::kOk; });
 }
 

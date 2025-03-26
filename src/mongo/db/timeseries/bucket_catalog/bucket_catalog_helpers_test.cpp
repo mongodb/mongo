@@ -204,10 +204,9 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) 
                                kNss.dbName(),
                                BSON("create" << kNss.coll() << "timeseries"
                                              << BSON("timeField" << _timeField) << "collation"
-                                             << BSON("locale"
-                                                     << "en_US"
-                                                     << "caseFirst"
-                                                     << "lower"))));
+                                             << BSON("locale" << "en_US"
+                                                              << "caseFirst"
+                                                              << "lower"))));
 
     AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
@@ -230,10 +229,9 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) 
                                kNss.dbName(),
                                BSON("create" << kNss.coll() << "timeseries"
                                              << BSON("timeField" << _timeField) << "collation"
-                                             << BSON("locale"
-                                                     << "en_US"
-                                                     << "caseFirst"
-                                                     << "upper"))));
+                                             << BSON("locale" << "en_US"
+                                                              << "caseFirst"
+                                                              << "upper"))));
 
     AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();

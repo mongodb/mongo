@@ -10,7 +10,7 @@
 			"--header-insertion=never",
 		],
 		"clangd.checkUpdates": true,
-		"clang-format.executable": "/opt/mongodbtoolchain/v4/bin/clang-format",
+		"clang-format.executable": "/opt/mongodbtoolchain/v5/bin/clang-format",
 		"clang-tidy.executable": "buildscripts/clang_tidy_vscode.py",
 		"editor.codeActionsOnSave": {
 			"source.fixAll.eslint": "explicit"

@@ -138,14 +138,12 @@ void setUpObservers(ServiceContext* serviceContext,
 void BM_OnUpdate(benchmark::State& state, const char* nss) {
     CollectionMock coll(NamespaceString::createNamespaceString_forTest(nss));
     CollectionPtr collptr(&coll);
-    CollectionUpdateArgs cuArgs(BSON("_id"
-                                     << "whatever"
-                                     << "stmtid"
-                                     << "oldstuff"));
-    cuArgs.update = BSON("_id"
-                         << "whatever"
-                         << "stmtid"
-                         << "whateverelse");
+    CollectionUpdateArgs cuArgs(BSON("_id" << "whatever"
+                                           << "stmtid"
+                                           << "oldstuff"));
+    cuArgs.update = BSON("_id" << "whatever"
+                               << "stmtid"
+                               << "whateverelse");
     OplogUpdateEntryArgs args(&cuArgs, collptr);
     OpObserverRegistry registry;
     auto* serviceContext = setupServiceContext();
@@ -186,10 +184,9 @@ void BM_OnInserts(benchmark::State& state, const char* nss) {
     MONGO_COMPILER_DIAGNOSTIC_PUSH
     MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
     std::vector<InsertStatement> statements(1,
-                                            InsertStatement(BSON("_id"
-                                                                 << "whatever"
-                                                                 << "key"
-                                                                 << "value")));
+                                            InsertStatement(BSON("_id" << "whatever"
+                                                                       << "key"
+                                                                       << "value")));
     MONGO_COMPILER_DIAGNOSTIC_POP
     OpObserverRegistry registry;
     auto* serviceContext = setupServiceContext();
@@ -234,10 +231,9 @@ BENCHMARK(BM_OnInserts_System)->MinTime(10.0);
 void BM_onDelete(benchmark::State& state, const char* nss) {
     CollectionMock coll(NamespaceString::createNamespaceString_forTest(nss));
     CollectionPtr collptr(&coll);
-    BSONObj const doc = BSON("_id"
-                             << "whatever"
-                             << "key"
-                             << "value");
+    BSONObj const doc = BSON("_id" << "whatever"
+                                   << "key"
+                                   << "value");
     const auto& documentKey = getDocumentKey(collptr, doc);
     OplogDeleteEntryArgs deleteArgs;
     OpObserverRegistry registry;

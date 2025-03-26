@@ -576,10 +576,7 @@ TEST(JsonStringTest, CodeTests) {
 
 TEST(JsonStringTest, CodeWScopeTests) {
     BSONObjBuilder b;
-    b.appendCodeWScope("x",
-                       "function(arg){ var string = \"\\n\"; return x; }",
-                       BSON("x"
-                            << "1"));
+    b.appendCodeWScope("x", "function(arg){ var string = \"\\n\"; return x; }", BSON("x" << "1"));
 
     checkJsonStringEach({{b.done(),
                           "{ \"x\" : "
@@ -880,9 +877,7 @@ TEST(FromJsonTest, BinDataTypes) {
     for (const auto& ts : specs) {
         if (ts.bdt == Column) {
             BSONColumnBuilder cb;
-            cb.append(BSON("a"
-                           << "abc")
-                          .getField("a"));
+            cb.append(BSON("a" << "abc").getField("a"));
             BSONBinData columnData = cb.finalize();
             checkEquivalence(fmt::sprintf(R"({ "a" : { "$binary" : "%s", "$type" : "%02x" } })",
                                           base64::encode(columnData.data, columnData.length),

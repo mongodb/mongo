@@ -109,7 +109,7 @@ public:
         : _collAcq(collAcq),
           _allowShardKeyUpdatesWithoutFullShardKeyInQuery(allowShardKeyUpdatesWithoutFullKey),
           _isMulti(isMulti),
-          _canonicalQuery(cq){};
+          _canonicalQuery(cq) {};
 
     /**
      * Performs checks on whether the existing or new shard key fields would change the owning

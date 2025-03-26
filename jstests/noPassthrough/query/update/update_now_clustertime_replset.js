@@ -126,18 +126,17 @@ for (let result of results) {
 }
 
 // Test that we can explain() an update command that uses $$NOW and $$CLUSTER_TIME.
-assert.commandWorked(
-    coll.explain().update(
-        {
-            $expr: {
-                $and: [
-                    {$lt: ["$_id", {$min: [_idMidpoint, "$$NOW"]}]},
-                    {$gt: ["$$CLUSTER_TIME", "$insertClusterTime"]}
-                ]
-            }
-        },
-        [{$addFields: {explainDoesNotWrite1: "$$NOW", explainDoesNotWrite2: "$$CLUSTER_TIME"}}],
-        {multi: true}));
+assert.commandWorked(coll.explain().update(
+    {
+        $expr: {
+            $and: [
+                {$lt: ["$_id", {$min: [_idMidpoint, "$$NOW"]}]},
+                {$gt: ["$$CLUSTER_TIME", "$insertClusterTime"]}
+            ]
+        }
+    },
+    [{$addFields: {explainDoesNotWrite1: "$$NOW", explainDoesNotWrite2: "$$CLUSTER_TIME"}}],
+    {multi: true}));
 
 // Test that $$NOW and $$CLUSTER_TIME can be used when issuing updates via the Bulk API, and
 // remain constant across all updates within a single bulk operation.

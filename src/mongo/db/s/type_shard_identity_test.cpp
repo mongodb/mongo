@@ -42,12 +42,11 @@ namespace {
 
 TEST(ShardIdentityType, RoundTrip) {
     auto clusterId(OID::gen());
-    auto doc = BSON("_id"
-                    << "shardIdentity"
-                    << "shardName"
-                    << "s1"
-                    << "clusterId" << clusterId << "configsvrConnectionString"
-                    << "test/a:123");
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "shardName"
+                          << "s1"
+                          << "clusterId" << clusterId << "configsvrConnectionString"
+                          << "test/a:123");
 
     auto result = ShardIdentityType::fromShardIdentityDocument(doc);
     ASSERT_OK(result.getStatus());
@@ -61,45 +60,41 @@ TEST(ShardIdentityType, RoundTrip) {
 }
 
 TEST(ShardIdentityType, ParseMissingId) {
-    auto doc = BSON("configsvrConnectionString"
-                    << "test/a:123"
-                    << "shardName"
-                    << "s1"
-                    << "clusterId" << OID::gen());
+    auto doc = BSON("configsvrConnectionString" << "test/a:123"
+                                                << "shardName"
+                                                << "s1"
+                                                << "clusterId" << OID::gen());
 
     auto result = ShardIdentityType::fromShardIdentityDocument(doc);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(ShardIdentityType, ParseMissingConfigsvrConnString) {
-    auto doc = BSON("_id"
-                    << "shardIdentity"
-                    << "shardName"
-                    << "s1"
-                    << "clusterId" << OID::gen());
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "shardName"
+                          << "s1"
+                          << "clusterId" << OID::gen());
 
     auto result = ShardIdentityType::fromShardIdentityDocument(doc);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(ShardIdentityType, ParseMissingShardName) {
-    auto doc = BSON("_id"
-                    << "shardIdentity"
-                    << "configsvrConnectionString"
-                    << "test/a:123"
-                    << "clusterId" << OID::gen());
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "configsvrConnectionString"
+                          << "test/a:123"
+                          << "clusterId" << OID::gen());
 
     auto result = ShardIdentityType::fromShardIdentityDocument(doc);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(ShardIdentityType, ParseMissingClusterId) {
-    auto doc = BSON("_id"
-                    << "shardIdentity"
-                    << "configsvrConnectionString"
-                    << "test/a:123"
-                    << "shardName"
-                    << "s1");
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "configsvrConnectionString"
+                          << "test/a:123"
+                          << "shardName"
+                          << "s1");
 
     auto result = ShardIdentityType::fromShardIdentityDocument(doc);
     ASSERT_NOT_OK(result.getStatus());
@@ -107,13 +102,12 @@ TEST(ShardIdentityType, ParseMissingClusterId) {
 
 TEST(ShardIdentityType, InvalidConnectionString) {
     auto clusterId(OID::gen());
-    auto doc = BSON("_id"
-                    << "shardIdentity"
-                    << "configsvrConnectionString"
-                    << "test/,,,"
-                    << "shardName"
-                    << "s1"
-                    << "clusterId" << clusterId);
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "configsvrConnectionString"
+                          << "test/,,,"
+                          << "shardName"
+                          << "s1"
+                          << "clusterId" << clusterId);
 
     ASSERT_EQ(ErrorCodes::FailedToParse,
               ShardIdentityType::fromShardIdentityDocument(doc).getStatus());
@@ -121,13 +115,12 @@ TEST(ShardIdentityType, InvalidConnectionString) {
 
 TEST(ShardIdentityType, NonReplSetConnectionString) {
     auto clusterId(OID::gen());
-    auto doc = BSON("_id"
-                    << "shardIdentity"
-                    << "configsvrConnectionString"
-                    << "local:123"
-                    << "shardName"
-                    << "s1"
-                    << "clusterId" << clusterId);
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "configsvrConnectionString"
+                          << "local:123"
+                          << "shardName"
+                          << "s1"
+                          << "clusterId" << clusterId);
 
     ASSERT_EQ(ErrorCodes::UnsupportedFormat,
               ShardIdentityType::fromShardIdentityDocument(doc).getStatus());
@@ -135,8 +128,7 @@ TEST(ShardIdentityType, NonReplSetConnectionString) {
 
 TEST(ShardIdentityType, CreateUpdateObject) {
     auto updateObj = ShardIdentityType::createConfigServerUpdateObject("test/a:1,b:2");
-    auto expectedObj = BSON("$set" << BSON("configsvrConnectionString"
-                                           << "test/a:1,b:2"));
+    auto expectedObj = BSON("$set" << BSON("configsvrConnectionString" << "test/a:1,b:2"));
     ASSERT_BSONOBJ_EQ(expectedObj, updateObj);
 }
 

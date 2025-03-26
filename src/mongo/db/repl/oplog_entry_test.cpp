@@ -144,10 +144,9 @@ TEST(OplogEntryTest, ApplyOpsNotInSession) {
                   << "ns"
                   << "admin.$cmd"
                   << "wall" << Date_t() << "o"
-                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
-                                                        << "o" << BSON("_id" << 1)))));
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1)))));
     auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
     ASSERT_TRUE(applyOpsEntry.isCommand());
     ASSERT_FALSE(applyOpsEntry.isInTransaction());
@@ -167,10 +166,9 @@ TEST(OplogEntryTest, ApplyOpsSingleEntryTransaction) {
                   << "ns"
                   << "admin.$cmd"
                   << "wall" << Date_t() << "o"
-                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
-                                                        << "o" << BSON("_id" << 1))))
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1))))
                   << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
                   << StmtId(0) << "prevOpTime" << OpTime());
     auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
@@ -192,10 +190,9 @@ TEST(OplogEntryTest, ApplyOpsStartMultiEntryTransaction) {
                   << "ns"
                   << "admin.$cmd"
                   << "wall" << Date_t() << "o"
-                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
-                                                        << "o" << BSON("_id" << 1)))
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1)))
                                      << "partialTxn" << true)
                   << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
                   << StmtId(0) << "prevOpTime" << OpTime());
@@ -218,10 +215,9 @@ TEST(OplogEntryTest, ApplyOpsMiddleMultiEntryTransaction) {
                   << "ns"
                   << "admin.$cmd"
                   << "wall" << Date_t() << "o"
-                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
-                                                        << "o" << BSON("_id" << 1)))
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1)))
                                      << "partialTxn" << true)
                   << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
                   << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1));
@@ -244,10 +240,9 @@ TEST(OplogEntryTest, ApplyOpsEndMultiEntryTransaction) {
                   << "ns"
                   << "admin.$cmd"
                   << "wall" << Date_t() << "o"
-                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
-                                                        << "o" << BSON("_id" << 1))))
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1))))
                   << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
                   << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1));
     auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
@@ -269,10 +264,9 @@ TEST(OplogEntryTest, ApplyOpsFirstOrOnlyRetryableWrite) {
                   << "ns"
                   << "admin.$cmd"
                   << "wall" << Date_t() << "o"
-                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
-                                                        << "o" << BSON("_id" << 1))))
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1))))
                   << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
                   << StmtId(0) << "prevOpTime" << OpTime() << "multiOpType" << 1);
     auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
@@ -294,10 +288,9 @@ TEST(OplogEntryTest, ApplyOpsSubsequentRetryableWrite) {
                   << "ns"
                   << "admin.$cmd"
                   << "wall" << Date_t() << "o"
-                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
-                                                        << "o" << BSON("_id" << 1))))
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1))))
                   << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
                   << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1) << "multiOpType" << 1);
     auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
@@ -496,12 +489,10 @@ TEST(OplogEntryTest, ConvertMutableOplogEntryToReplOperation) {
 
 TEST(OplogEntryTest, StatementIDParseAndSerialization) {
     UnorderedFieldsBSONObjComparator bsonCompare;
-    const BSONObj oplogEntryWithNoStmtId = BSON("op"
-                                                << "c"
-                                                << "ns" << nss.ns_forTest() << "o"
-                                                << BSON("_id" << 1) << "v" << 2 << "ts"
-                                                << Timestamp(0, 0) << "t" << 0LL << "wall"
-                                                << Date_t());
+    const BSONObj oplogEntryWithNoStmtId =
+        BSON("op" << "c"
+                  << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "v" << 2 << "ts"
+                  << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t());
 
     auto oplogEntryBaseNoStmtId =
         OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithNoStmtId);
@@ -511,12 +502,10 @@ TEST(OplogEntryTest, StatementIDParseAndSerialization) {
         << "Did not round trip: " << oplogEntryWithNoStmtId << " should be equal to "
         << rtOplogEntryWithNoStmtId;
 
-    const BSONObj oplogEntryWithOneStmtId = BSON("op"
-                                                 << "c"
-                                                 << "ns" << nss.ns_forTest() << "o"
-                                                 << BSON("_id" << 1) << "v" << 2 << "ts"
-                                                 << Timestamp(0, 0) << "t" << 0LL << "wall"
-                                                 << Date_t() << "stmtId" << 99);
+    const BSONObj oplogEntryWithOneStmtId =
+        BSON("op" << "c"
+                  << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "v" << 2 << "ts"
+                  << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t() << "stmtId" << 99);
     auto oplogEntryBaseOneStmtId =
         OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithOneStmtId);
     ASSERT_EQ(oplogEntryBaseOneStmtId.getStatementIds(), std::vector<StmtId>{99});
@@ -527,13 +516,11 @@ TEST(OplogEntryTest, StatementIDParseAndSerialization) {
     // Statement id should be NumberInt, not NumberLong or some other numeric.
     ASSERT_EQ(rtOplogEntryWithOneStmtId["stmtId"].type(), NumberInt);
 
-    const BSONObj oplogEntryWithMultiStmtId = BSON("op"
-                                                   << "c"
-                                                   << "ns" << nss.ns_forTest() << "o"
-                                                   << BSON("_id" << 1) << "v" << 2 << "ts"
-                                                   << Timestamp(0, 0) << "t" << 0LL << "wall"
-                                                   << Date_t() << "stmtId"
-                                                   << BSON_ARRAY(101 << 102 << 103));
+    const BSONObj oplogEntryWithMultiStmtId =
+        BSON("op" << "c"
+                  << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "v" << 2 << "ts"
+                  << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t() << "stmtId"
+                  << BSON_ARRAY(101 << 102 << 103));
     auto oplogEntryBaseMultiStmtId =
         OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithMultiStmtId);
     ASSERT_EQ(oplogEntryBaseMultiStmtId.getStatementIds(), (std::vector<StmtId>{101, 102, 103}));
@@ -545,12 +532,10 @@ TEST(OplogEntryTest, StatementIDParseAndSerialization) {
     ASSERT_EQ(rtOplogEntryWithMultiStmtId["stmtId"]["0"].type(), NumberInt);
 
     // A non-canonical entry with an empty stmtId array.
-    const BSONObj oplogEntryWithEmptyStmtId = BSON("op"
-                                                   << "c"
-                                                   << "ns" << nss.ns_forTest() << "o"
-                                                   << BSON("_id" << 1) << "v" << 2 << "ts"
-                                                   << Timestamp(0, 0) << "t" << 0LL << "wall"
-                                                   << Date_t() << "stmtId" << BSONArray());
+    const BSONObj oplogEntryWithEmptyStmtId = BSON(
+        "op" << "c"
+             << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "v" << 2 << "ts"
+             << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t() << "stmtId" << BSONArray());
 
     auto oplogEntryBaseEmptyStmtId =
         OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithEmptyStmtId);
@@ -562,12 +547,10 @@ TEST(OplogEntryTest, StatementIDParseAndSerialization) {
         << rtOplogEntryWithEmptyStmtId;
 
     // A non-canonical entry with a singleton stmtId array.
-    const BSONObj oplogEntryWithSingletonStmtId = BSON("op"
-                                                       << "c"
-                                                       << "ns" << nss.ns_forTest() << "o"
-                                                       << BSON("_id" << 1) << "v" << 2 << "ts"
-                                                       << Timestamp(0, 0) << "t" << 0LL << "wall"
-                                                       << Date_t() << "stmtId" << BSON_ARRAY(99));
+    const BSONObj oplogEntryWithSingletonStmtId = BSON(
+        "op" << "c"
+             << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "v" << 2 << "ts"
+             << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t() << "stmtId" << BSON_ARRAY(99));
 
     auto oplogEntryBaseSingletonStmtId =
         OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithSingletonStmtId);

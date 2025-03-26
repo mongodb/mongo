@@ -53,7 +53,6 @@ constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
 const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
                                                               "Authentication failed.");
 
-const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id"
-                                                                << "authSchema");
+const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id" << "authSchema");
 
 }  // namespace mongo

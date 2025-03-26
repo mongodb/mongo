@@ -183,7 +183,7 @@ private:
 
 class DbChecker {
 public:
-    DbChecker(DbCheckCollectionInfo info) : _info(info){};
+    DbChecker(DbCheckCollectionInfo info) : _info(info) {};
 
     /**
      * Runs dbCheck on the collection specified in the DbCheckCollectionInfo struct.

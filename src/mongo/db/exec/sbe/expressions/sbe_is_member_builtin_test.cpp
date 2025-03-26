@@ -93,17 +93,11 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberArraySet) {
 
     auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeArraySet(BSON_ARRAY("foo"
-                                                   << "bar")),
-                           true);
+    runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY("foo" << "bar")), true);
 
     std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeArraySet(BSON_ARRAY("foo"
-                                                   << "bar")),
-                           false);
+    runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY("foo" << "bar")), false);
 
     // Test that isMember can find composite values.
     auto [arrTag, arrVal] = makeArray(BSON_ARRAY(2 << 3));
@@ -157,17 +151,11 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberArray) {
 
     auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeArray(BSON_ARRAY("foo"
-                                                << "bar")),
-                           true);
+    runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY("foo" << "bar")), true);
 
     std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeArray(BSON_ARRAY("foo"
-                                                << "bar")),
-                           false);
+    runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY("foo" << "bar")), false);
 
     // Test that isMember can find composite values.
     auto [arrTag, arrVal] = makeArray(BSON_ARRAY(2 << 3));
@@ -222,17 +210,11 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberBSONArray) {
 
     auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeBsonArray(BSON_ARRAY("foo"
-                                                    << "bar")),
-                           true);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY("foo" << "bar")), true);
 
     std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeBsonArray(BSON_ARRAY("foo"
-                                                    << "bar")),
-                           false);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY("foo" << "bar")), false);
 
     // Test that isMember can find composite values.
     auto [arrTag, arrVal] = makeArray(BSON_ARRAY(2 << 3));

@@ -204,8 +204,7 @@ TEST_F(ConfigInitializationTest, InitClusterMultipleVersionDocs) {
 
     ASSERT_OK(insertToConfigCollection(operationContext(),
                                        NamespaceString::kConfigVersionNamespace,
-                                       BSON("_id"
-                                            << "a second document")));
+                                       BSON("_id" << "a second document")));
 
     ASSERT_EQ(ErrorCodes::TooManyMatchingDocuments,
               ShardingCatalogManager::get(operationContext())

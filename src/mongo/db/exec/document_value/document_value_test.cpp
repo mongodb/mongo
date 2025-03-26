@@ -385,8 +385,7 @@ TEST(DocumentGetFieldNonCaching, TraverseArray) {
 }
 
 TEST(DocumentSize, ApproximateSizeIsSnapshotted) {
-    const auto rawBson = BSON("field"
-                              << "value");
+    const auto rawBson = BSON("field" << "value");
     const Document document{rawBson};
     const auto noCacheSize = document.getApproximateSize();
 
@@ -611,15 +610,9 @@ public:
         assertComparison(-1, BSON("a" << 1), BSON("a" << 2));
         assertComparison(-1, BSON("a" << 1 << "b" << 1), BSON("a" << 1 << "b" << 2));
         // numbers sort before strings
-        assertComparison(-1,
-                         BSON("a" << 1),
-                         BSON("a"
-                              << "foo"));
+        assertComparison(-1, BSON("a" << 1), BSON("a" << "foo"));
         // numbers sort before strings, even if keys compare otherwise
-        assertComparison(-1,
-                         BSON("b" << 1),
-                         BSON("a"
-                              << "foo"));
+        assertComparison(-1, BSON("b" << 1), BSON("a" << "foo"));
         // null before number, even if keys compare otherwise
         assertComparison(-1, BSON("z" << BSONNULL), BSON("a" << 1));
     }
@@ -897,8 +890,7 @@ TEST(MetaFields, SearchHighlightsBasic) {
 
     // Setting the search highlights field should work as expected.
     MutableDocument docBuilder;
-    Value highlights = DOC_ARRAY("a"_sd
-                                 << "b"_sd);
+    Value highlights = DOC_ARRAY("a"_sd << "b"_sd);
     docBuilder.metadata().setSearchHighlights(highlights);
     Document doc = docBuilder.freeze();
     ASSERT_TRUE(doc.metadata().hasSearchHighlights());
@@ -906,9 +898,8 @@ TEST(MetaFields, SearchHighlightsBasic) {
 
     // Setting the searchHighlights twice should keep the second value.
     MutableDocument docBuilder2;
-    Value otherHighlights = DOC_ARRAY("snippet1"_sd
-                                      << "snippet2"_sd
-                                      << "snippet3"_sd);
+    Value otherHighlights = DOC_ARRAY("snippet1"_sd << "snippet2"_sd
+                                                    << "snippet3"_sd);
     docBuilder2.metadata().setSearchHighlights(highlights);
     docBuilder2.metadata().setSearchHighlights(otherHighlights);
     Document doc2 = docBuilder2.freeze();
@@ -922,8 +913,7 @@ TEST(MetaFields, SearchScoreDetailsBasic) {
 
     // Setting the searchScoreDetails field should work as expected.
     MutableDocument docBuilder;
-    BSONObj details = BSON("scoreDetails"
-                           << "foo");
+    BSONObj details = BSON("scoreDetails" << "foo");
     docBuilder.metadata().setSearchScoreDetails(details);
     Document doc = docBuilder.freeze();
     ASSERT_TRUE(doc.metadata().hasSearchScoreDetails());
@@ -931,8 +921,7 @@ TEST(MetaFields, SearchScoreDetailsBasic) {
 
     // Setting the searchScoreDetails twice should keep the second value.
     MutableDocument docBuilder2;
-    BSONObj otherDetails = BSON("scoreDetails"
-                                << "bar");
+    BSONObj otherDetails = BSON("scoreDetails" << "bar");
     docBuilder2.metadata().setSearchScoreDetails(details);
     docBuilder2.metadata().setSearchScoreDetails(otherDetails);
     Document doc2 = docBuilder2.freeze();
@@ -980,10 +969,8 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
                  << "$searchHighlights"
                  << "foo"
                  << "h" << 1 << "$indexKey" << BSON("y" << 1) << "$searchScoreDetails"
-                 << BSON("scoreDetails"
-                         << "foo")
-                 << "$searchSortValues" << BSON("a" << 1) << "$vectorSearchScore" << 6.7 << "$score"
-                 << 8.1));
+                 << BSON("scoreDetails" << "foo") << "$searchSortValues" << BSON("a" << 1)
+                 << "$vectorSearchScore" << 6.7 << "$score" << 8.1));
 
     MutableDocument destination{};
     destination.copyMetaDataFrom(source);
@@ -997,9 +984,7 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
     ASSERT_EQ(result.metadata().getSearchScore(), 5.4);
     ASSERT_VALUE_EQ(result.metadata().getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(result.metadata().getIndexKey(), BSON("y" << 1));
-    ASSERT_BSONOBJ_EQ(result.metadata().getSearchScoreDetails(),
-                      BSON("scoreDetails"
-                           << "foo"));
+    ASSERT_BSONOBJ_EQ(result.metadata().getSearchScoreDetails(), BSON("scoreDetails" << "foo"));
     ASSERT_BSONOBJ_EQ(result.metadata().getSearchSortValues(), BSON("a" << 1));
     ASSERT_EQ(result.metadata().getVectorSearchScore(), 6.7);
     ASSERT_EQ(result.metadata().getScore(), 8.1);
@@ -1063,10 +1048,8 @@ TEST_F(SerializationTest, MetaSerializationNoVals) {
     docBuilder.metadata().setTextScore(10.0);
     docBuilder.metadata().setRandVal(20.0);
     docBuilder.metadata().setSearchScore(30.0);
-    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
-                                                        << "def"_sd));
-    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
-                                                     << "foo"));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd));
+    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     docBuilder.metadata().setVectorSearchScore(40.0);
     docBuilder.metadata().setScore(60.0);
     assertRoundTrips(docBuilder.freeze());
@@ -1078,11 +1061,9 @@ TEST_F(SerializationTest, MetaSerializationWithVals) {
     docBuilder.metadata().setTextScore(10.0);
     docBuilder.metadata().setRandVal(20.0);
     docBuilder.metadata().setSearchScore(30.0);
-    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
-                                                        << "def"_sd));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd));
     docBuilder.metadata().setIndexKey(BSON("key" << 42));
-    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
-                                                     << "foo"));
+    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     docBuilder.metadata().setVectorSearchScore(40.0);
     docBuilder.metadata().setScore(60.0);
     assertRoundTrips(docBuilder.freeze());
@@ -1105,10 +1086,8 @@ TEST(MetaFields, ToAndFromBson) {
     docBuilder.metadata().setTextScore(10.0);
     docBuilder.metadata().setRandVal(20.0);
     docBuilder.metadata().setSearchScore(30.0);
-    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
-                                                        << "def"_sd));
-    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
-                                                     << "foo"));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd));
+    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     docBuilder.metadata().setSearchSortValues(BSON("a" << 42));
     docBuilder.metadata().setVectorSearchScore(40.0);
     docBuilder.metadata().setScore(60.0);
@@ -1118,11 +1097,9 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_EQ(20, obj[Document::metaFieldRandVal].numberLong());
     ASSERT_EQ(30.0, obj[Document::metaFieldSearchScore].Double());
     ASSERT_BSONOBJ_EQ(obj[Document::metaFieldSearchHighlights].embeddedObject(),
-                      BSON_ARRAY("abc"_sd
-                                 << "def"_sd));
+                      BSON_ARRAY("abc"_sd << "def"_sd));
     ASSERT_BSONOBJ_EQ(obj[Document::metaFieldSearchScoreDetails].Obj(),
-                      BSON("scoreDetails"
-                           << "foo"));
+                      BSON("scoreDetails" << "foo"));
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), obj[Document::metaFieldSearchSortValues].Obj());
     ASSERT_EQ(40.0, obj[Document::metaFieldVectorSearchScore].Double());
     ASSERT_EQ(60.0, obj[Document::metaFieldScore].Double());
@@ -1131,9 +1108,7 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_TRUE(fromBson.metadata().hasRandVal());
     ASSERT_EQ(10.0, fromBson.metadata().getTextScore());
     ASSERT_EQ(20, fromBson.metadata().getRandVal());
-    ASSERT_BSONOBJ_EQ(BSON("scoreDetails"
-                           << "foo"),
-                      fromBson.metadata().getSearchScoreDetails());
+    ASSERT_BSONOBJ_EQ(BSON("scoreDetails" << "foo"), fromBson.metadata().getSearchScoreDetails());
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), fromBson.metadata().getSearchSortValues());
     ASSERT_EQ(40.0, fromBson.metadata().getVectorSearchScore());
     ASSERT_EQ(60.0, fromBson.metadata().getScore());
@@ -1243,15 +1218,13 @@ TEST(MetaFields, TrivialConvertibilityMetadataModified) {
 
 TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {
     MutableDocument docBuilder;
-    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
-                                                        << "def"_sd));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd));
     const size_t smallMetadataDocSize = docBuilder.freeze().getApproximateSize();
 
     // The second document has a larger "search highlights" object.
     MutableDocument docBuilder2;
-    docBuilder2.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
-                                                         << "def"_sd
-                                                         << "ghijklmnop"_sd));
+    docBuilder2.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd
+                                                                  << "ghijklmnop"_sd));
     Document doc2 = docBuilder2.freeze();
     const size_t bigMetadataDocSize = doc2.getApproximateSize();
     ASSERT_GT(bigMetadataDocSize, smallMetadataDocSize);
@@ -2320,15 +2293,9 @@ public:
 
         // Undefined / null with other types.
         assertComparison(-1, undefined, BSON("" << 1));
-        assertComparison(-1,
-                         undefined,
-                         BSON(""
-                              << "bar"));
+        assertComparison(-1, undefined, BSON("" << "bar"));
         assertComparison(-1, BSON("" << BSONNULL), BSON("" << -1));
-        assertComparison(-1,
-                         BSON("" << BSONNULL),
-                         BSON(""
-                              << "bar"));
+        assertComparison(-1, BSON("" << BSONNULL), BSON("" << "bar"));
 
         // Numeric types.
         assertComparison(0, 5, 5LL);
@@ -2345,10 +2312,7 @@ public:
 
         // strings compare between numbers and objects
         assertComparison(1, "abc", 90);
-        assertComparison(-1,
-                         "abc",
-                         BSON("a"
-                              << "b"));
+        assertComparison(-1, "abc", BSON("a" << "b"));
 
         // String comparison.
         assertComparison(-1, "", "a");

@@ -120,14 +120,9 @@ TEST(JSONPointerTest, NestedFieldsWithEscapeCharacters) {
 TEST(JSONPointerTest, ArrayTraversalTest) {
     auto arrBottom = BSON_ARRAY(0 << 1 << 2 << 3 << 4 << 5);
     auto arrTop = BSON_ARRAY(6 << 7 << 8 << 9 << 10);
-    auto bsonArray = BSON_ARRAY(BSON("builder0"
-                                     << "value0")
-                                << BSON("builder1"
-                                        << "value1")
-                                << BSON("builder2"
-                                        << "value2")
-                                << BSON("builder3"
-                                        << "value3"));
+    auto bsonArray = BSON_ARRAY(BSON("builder0" << "value0")
+                                << BSON("builder1" << "value1") << BSON("builder2" << "value2")
+                                << BSON("builder3" << "value3"));
     auto topLevel = BSON("transit" << BSON("arrBottom" << arrBottom) << "arrTop" << arrTop
                                    << "toBSONArray" << bsonArray);
     assertPointerEvaluatesTo("/transit/arrBottom/0", topLevel, "0", 0);
@@ -137,12 +132,10 @@ TEST(JSONPointerTest, ArrayTraversalTest) {
 }
 
 TEST(JSONPointerTest, NumericFieldName) {
-    auto topLevel = BSON("2"
-                         << "text"
-                         << "3"
-                         << BSON_ARRAY("first"
-                                       << "second"
-                                       << "third"));
+    auto topLevel = BSON("2" << "text"
+                             << "3"
+                             << BSON_ARRAY("first" << "second"
+                                                   << "third"));
     assertPointerEvaluatesTo("/2", topLevel, "2", "text");
     assertPointerEvaluatesTo("/3/1", topLevel, "1", "second");
 }
@@ -157,8 +150,7 @@ TEST(JSONPointerTest, DashCharacterBehavior) {
 }
 
 TEST(JSONPointerTest, ToStringParsesToSamePointer) {
-    auto small = BSON("top" << BSON("fi~eld"
-                                    << "second"));
+    auto small = BSON("top" << BSON("fi~eld" << "second"));
     JSONPointer pointer{"/top/fi~0eld"};
     auto reclaimedString = pointer.toString();
     JSONPointer secondPointer{reclaimedString};

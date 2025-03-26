@@ -49,8 +49,7 @@ static const auto kAlwaysIncludedIndex =
 void dropCollections(DBClientConnection* const conn,
                      const std::string& dbName,
                      const std::vector<std::string>& collections) {
-    auto cmd = BSON("drop"
-                    << "");
+    auto cmd = BSON("drop" << "");
     for (const auto& collName : collections) {
         auto bob = BSONObjBuilder{};
         bob.append("drop", collName);

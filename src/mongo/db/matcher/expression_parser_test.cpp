@@ -228,25 +228,22 @@ TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithOptionsNotInline) {
 }
 
 TEST(MatchExpressionParserTest, RegexDoesNotParseSuccessfullyWithMultipleOptions) {
-    auto query = BSON("a" << BSON("$options"
-                                  << "s"
-                                  << "$regex" << BSONRegEx("/myRegex/", "i")));
+    auto query = BSON("a" << BSON("$options" << "s"
+                                             << "$regex" << BSONRegEx("/myRegex/", "i")));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
 }
 
 TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithOptionsFirst) {
-    auto query = BSON("a" << BSON("$options"
-                                  << "s"
-                                  << "$regex" << BSONRegEx("/myRegex/", "")));
+    auto query = BSON("a" << BSON("$options" << "s"
+                                             << "$regex" << BSONRegEx("/myRegex/", "")));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
 }
 
 TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithOptionsFirstEmptyOptions) {
-    auto query = BSON("a" << BSON("$options"
-                                  << ""
-                                  << "$regex" << BSONRegEx("/myRegex/", "")));
+    auto query = BSON("a" << BSON("$options" << ""
+                                             << "$regex" << BSONRegEx("/myRegex/", "")));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
 }
@@ -539,10 +536,8 @@ TEST(MatchExpressionParserTest, BitwiseOperators) {
 
 TEST(InternalBinDataSubTypeMatchExpressionTest, InvalidSubTypeDoesNotParse) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query1 = BSON("a" << BSON("$_internalSchemaBinDataSubType"
-                                   << "foo"));
-    auto query2 = BSON("a" << BSON("$_internalSchemaBinDataSubType"
-                                   << "5"));
+    auto query1 = BSON("a" << BSON("$_internalSchemaBinDataSubType" << "foo"));
+    auto query2 = BSON("a" << BSON("$_internalSchemaBinDataSubType" << "5"));
     auto statusWith1 = MatchExpressionParser::parse(query1, expCtx);
     auto statusWith2 = MatchExpressionParser::parse(query2, expCtx);
     ASSERT_NOT_OK(statusWith1.getStatus());
@@ -561,14 +556,12 @@ TEST(InternalBinDataSubTypeMatchExpressionTest, InvalidNumericalSubTypeDoesNotPa
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, InvalidArgumentDoesNotParse) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_EQ(MatchExpressionParser::parse(BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                                            << "bar")),
-                                           expCtx)
+    ASSERT_EQ(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << "bar")), expCtx)
                   .getStatus(),
               ErrorCodes::BadValue);
-    ASSERT_EQ(MatchExpressionParser::parse(BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                                            << "0")),
-                                           expCtx)
+    ASSERT_EQ(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << "0")), expCtx)
                   .getStatus(),
               ErrorCodes::BadValue);
 }

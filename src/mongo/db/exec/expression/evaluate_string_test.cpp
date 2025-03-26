@@ -680,10 +680,9 @@ TEST(ExpressionTrimTest, TrimComparisonsShouldNotRespectCollation) {
     expCtx.setCollator(std::move(caseInsensitive));
 
     auto trim = Expression::parseExpression(&expCtx,
-                                            BSON("$trim" << BSON("input"
-                                                                 << "xxXXxx"
-                                                                 << "chars"
-                                                                 << "x")),
+                                            BSON("$trim" << BSON("input" << "xxXXxx"
+                                                                         << "chars"
+                                                                         << "x")),
                                             expCtx.variablesParseState);
 
     ASSERT_VALUE_EQ(trim->evaluate({}, &expCtx.variables), Value("XX"_sd));

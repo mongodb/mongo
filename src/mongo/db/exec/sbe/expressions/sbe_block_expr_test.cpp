@@ -817,8 +817,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, BlockFillTypeTest) {
-    auto fill = makeObject(BSON("a"
-                                << "replacement for arrays"));
+    auto fill = makeObject(BSON("a" << "replacement for arrays"));
     value::ValueGuard fillGuard{fill.first, fill.second};
 
     value::HeterogeneousBlock block;
@@ -2608,7 +2607,9 @@ TEST_F(SBEBlockExpressionTest, ValueBlockAddHeterogeneousTest) {
             EPrimBinary::add, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
     }
 
-    { testBlockBlockArithmeticOp(EPrimBinary::add, fnName, nullptr, &leftBlock, &rightBlock); }
+    {
+        testBlockBlockArithmeticOp(EPrimBinary::add, fnName, nullptr, &leftBlock, &rightBlock);
+    }
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockAddMonoBlockTest) {
@@ -2682,7 +2683,9 @@ TEST_F(SBEBlockExpressionTest, ValueBlockAddScalarTest) {
             EPrimBinary::add, fnName, bitsetBlock.get(), &block, makeInt32(100));
     }
 
-    { testBlockScalarArithmeticOp(EPrimBinary::add, fnName, nullptr, &block, makeInt32(100)); }
+    {
+        testBlockScalarArithmeticOp(EPrimBinary::add, fnName, nullptr, &block, makeInt32(100));
+    }
 
     {
         value::MonoBlock monoBlock(7, value::TypeTags::NumberInt32, value::bitcastFrom<int>(100));
@@ -2742,7 +2745,9 @@ TEST_F(SBEBlockExpressionTest, ValueBlockSubHeterogeneousTest) {
         testBlockBlockArithmeticOp(
             EPrimBinary::sub, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
     }
-    { testBlockBlockArithmeticOp(EPrimBinary::sub, fnName, nullptr, &leftBlock, &rightBlock); }
+    {
+        testBlockBlockArithmeticOp(EPrimBinary::sub, fnName, nullptr, &leftBlock, &rightBlock);
+    }
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockSubMonoBlockTest) {
@@ -2816,7 +2821,9 @@ TEST_F(SBEBlockExpressionTest, ValueBlockSubScalarTest) {
             EPrimBinary::sub, fnName, bitsetBlock.get(), &block, makeInt32(100));
     }
 
-    { testBlockScalarArithmeticOp(EPrimBinary::sub, fnName, nullptr, &block, makeInt32(100)); }
+    {
+        testBlockScalarArithmeticOp(EPrimBinary::sub, fnName, nullptr, &block, makeInt32(100));
+    }
 
     {
         value::MonoBlock monoBlock(7, value::TypeTags::NumberInt32, value::bitcastFrom<int>(100));
@@ -2871,7 +2878,9 @@ TEST_F(SBEBlockExpressionTest, ValueBlockMultHeterogeneousTest) {
             EPrimBinary::mul, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
     }
 
-    { testBlockBlockArithmeticOp(EPrimBinary::mul, fnName, nullptr, &leftBlock, &rightBlock); }
+    {
+        testBlockBlockArithmeticOp(EPrimBinary::mul, fnName, nullptr, &leftBlock, &rightBlock);
+    }
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockMultMonoBlockTest) {
@@ -2945,7 +2954,9 @@ TEST_F(SBEBlockExpressionTest, ValueBlockMultScalarTest) {
             EPrimBinary::mul, fnName, bitsetBlock.get(), &block, makeInt32(100));
     }
 
-    { testBlockScalarArithmeticOp(EPrimBinary::mul, fnName, nullptr, &block, makeInt32(100)); }
+    {
+        testBlockScalarArithmeticOp(EPrimBinary::mul, fnName, nullptr, &block, makeInt32(100));
+    }
 
     {
         value::MonoBlock monoBlock(7, value::TypeTags::NumberInt32, value::bitcastFrom<int>(100));
@@ -3006,7 +3017,9 @@ TEST_F(SBEBlockExpressionTest, ValueBlockDivHeterogeneousTest) {
             EPrimBinary::div, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
     }
 
-    { testBlockBlockArithmeticOp(EPrimBinary::div, fnName, nullptr, &leftBlock, &rightBlock); }
+    {
+        testBlockBlockArithmeticOp(EPrimBinary::div, fnName, nullptr, &leftBlock, &rightBlock);
+    }
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockDivMonoBlockTest) {
@@ -4592,15 +4605,12 @@ TEST_F(SBEBlockExpressionTest, BlockGetSortKey) {
 
 
         auto block = std::make_unique<value::HeterogeneousBlock>();
-        block->push_back(makeArray(BSON_ARRAY("19"
-                                              << "28"
-                                              << "37")));
-        block->push_back(makeArray(BSON_ARRAY("42"
-                                              << "26"
-                                              << "35")));
-        block->push_back(makeArray(BSON_ARRAY("35"
-                                              << "51"
-                                              << "44")));
+        block->push_back(makeArray(BSON_ARRAY("19" << "28"
+                                                   << "37")));
+        block->push_back(makeArray(BSON_ARRAY("42" << "26"
+                                                   << "35")));
+        block->push_back(makeArray(BSON_ARRAY("35" << "51"
+                                                   << "44")));
 
         blockAccessor.reset(value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(block.get()));

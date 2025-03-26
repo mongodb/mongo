@@ -106,22 +106,18 @@ TEST_F(MeasurementMapTest, IterationBasic) {
     std::vector<BSONElement> elems;
 
     // Insert measurement 1.
-    BSONObj m1_time = BSON("time" << BSON("0" << BSON("$date"
-                                                      << "2022-06-06T15:34:30.000Z")));
+    BSONObj m1_time = BSON("time" << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z")));
     elems.emplace_back(m1_time.getField("time"));
-    BSONObj m1_a = BSON("a" << BSON("0"
-                                    << "1"));
+    BSONObj m1_a = BSON("a" << BSON("0" << "1"));
     elems.emplace_back(m1_a.getField("a"));
     measurementMap.insertOne(elems);
 
     elems.clear();
 
     // Insert measurement 2.
-    BSONObj m2_time = BSON("time" << BSON("0" << BSON("$date"
-                                                      << "2022-06-06T15:34:31.000Z")));
+    BSONObj m2_time = BSON("time" << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z")));
     elems.emplace_back(m2_time.getField("time"));
-    BSONObj m2_a = BSON("a" << BSON("0"
-                                    << "5"));
+    BSONObj m2_a = BSON("a" << BSON("0" << "5"));
     elems.emplace_back(m2_a.getField("a"));
     measurementMap.insertOne(elems);
     invariant(measurementMap.numFields() == 2);
@@ -196,24 +192,18 @@ TEST_F(MeasurementMapTest, InitBuilders) {
     BSONBinData timeBinary = timeColumn.finalize();
 
     BSONColumnBuilder f1Column;
-    BSONObj f1m1 = BSON("0"
-                        << "1");
-    BSONObj f1m2 = BSON("1"
-                        << "2");
-    BSONObj f1m3 = BSON("2"
-                        << "3");
+    BSONObj f1m1 = BSON("0" << "1");
+    BSONObj f1m2 = BSON("1" << "2");
+    BSONObj f1m3 = BSON("2" << "3");
     f1Column.append(f1m1.firstElement());
     f1Column.append(f1m2.firstElement());
     f1Column.append(f1m3.firstElement());
     BSONBinData f1Binary = f1Column.finalize();
 
     BSONColumnBuilder f2Column;
-    BSONObj f2m1 = BSON("0"
-                        << "1");
-    BSONObj f2m2 = BSON("1"
-                        << "1");
-    BSONObj f2m3 = BSON("2"
-                        << "1");
+    BSONObj f2m1 = BSON("0" << "1");
+    BSONObj f2m2 = BSON("1" << "1");
+    BSONObj f2m3 = BSON("2" << "1");
     f2Column.append(f2m1.firstElement());
     f2Column.append(f2m2.firstElement());
     f2Column.append(f2m3.firstElement());
@@ -235,22 +225,18 @@ TEST_F(MeasurementMapTest, ContainsField) {
     std::vector<BSONElement> elems;
 
     // Insert measurement 1.
-    BSONObj m1_time = BSON("time" << BSON("0" << BSON("$date"
-                                                      << "2022-06-06T15:34:30.000Z")));
+    BSONObj m1_time = BSON("time" << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z")));
     elems.emplace_back(m1_time.getField("time"));
-    BSONObj m1_a = BSON("a" << BSON("0"
-                                    << "1"));
+    BSONObj m1_a = BSON("a" << BSON("0" << "1"));
     elems.emplace_back(m1_a.getField("a"));
     measurementMap.insertOne(elems);
 
     elems.clear();
 
     // Insert measurement 2.
-    BSONObj m2_time = BSON("time" << BSON("0" << BSON("$date"
-                                                      << "2022-06-06T15:34:31.000Z")));
+    BSONObj m2_time = BSON("time" << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z")));
     elems.emplace_back(m2_time.getField("time"));
-    BSONObj m2_a = BSON("a" << BSON("0"
-                                    << "5"));
+    BSONObj m2_a = BSON("a" << BSON("0" << "5"));
     elems.emplace_back(m2_a.getField("a"));
     measurementMap.insertOne(elems);
 

@@ -105,8 +105,7 @@ TEST_F(ExpressionUUIDTest, Basic) {
 
 TEST_F(ExpressionUUIDTest, ParseError) {
     auto expCtx = getExpCtx();
-    BSONObj spec = BSON("$uuid" << BSON("some"
-                                        << "argument"));
+    BSONObj spec = BSON("$uuid" << BSON("some" << "argument"));
     ASSERT_THROWS_CODE_AND_WHAT(
         Expression::parseExpression(getExpCtxRaw(), spec, expCtx->variablesParseState),
         AssertionException,

@@ -4969,136 +4969,138 @@ const plotEmbeddings = [
  *     "fullplot" and "title" has no ties.
  */
 export function getMovieData() {
-    const data = [
-        {
-            "_id": 0,
-            "title": "It's a Mad, Mad, Mad, Mad World",
-            "genres": ["Action", "Adventure", "Comedy"],
-            "plot_embedding": plotEmbeddings[0],
-            "fullplot":
-                "After a long prison sentence Smiler Grogan is heading at high speed to a California park where he hid $350,000 from a job 15 years previously. He accidentally careens over a cliff in view of four cars whose occupants go down to help. The dying Grogan gives details of where the money is buried and when the witnesses fail to agree on sharing the cash, a crazy chase develops across the state."
-        },
-        {
-            "_id": 1,
-            "title": "Battle for the Planet of the Apes",
-            "genres": ["Action", "Sci-Fi"],
-            "plot_embedding": plotEmbeddings[1],
-            "fullplot":
-                "After conquering the oppressive humans in \"Conquest for the Planet of the Apes\", Caesar must now keep the peace among the humans and apes. Gorilla General Aldo views things differently, and tries to cause an ape civil war. In the meantime, other human survivors learn of the ape city, and decide they want to take back civilization for themselves, thus setting the stage of warring ape factions and humans."
-        },
-        {
-            "_id": 2,
-            "title": "King Kong Lives",
-            "genres": ["Action", "Adventure", "Horror"],
-            "plot_embedding": plotEmbeddings[2],
-            "fullplot":
-                "A giant ape King Kong, which was shot and fell off the World Trade Center tower, appears to be alive, but is in coma for 10 years and desperately needs a blood transfusion in order to have an artificial heart implanted. Suddenly, in the rainforest, another gigantic ape is found - this time a female. She is brought to the USA, and the heart is successfully implanted. But then King Kong, having sensed the female ape, breaks loose."
-        },
-        {
-            "_id": 3,
-            "title": "Rise of the Planet of the Apes",
-            "genres": ["Action", "Drama", "Sci-Fi"],
-            "plot_embedding": plotEmbeddings[3],
-            "fullplot":
-                "At the story's heart is Caesar (Andy Serkis), a chimpanzee who gains human-like intelligence and emotions from an experimental drug. Raised like a child by the drug's creator, Will Rodman (James Franco) and a primatologist Caroline Aranha (Freida Pinto), Caesar ultimately finds himself taken from the humans he loves and imprisoned in an ape sanctuary in San Bruno. Seeking justice for his fellow inmates, Caesar gives the fellow apes the same drug that he inherited. He then assembles a simian army and escapes the sanctuary - putting man and ape on a collision course that could change the planet forever."
-        },
-        {
-            "_id": 4,
-            "title": "King Kong",
-            "genres": ["Adventure", "Fantasy", "Horror"],
-            "plot_embedding": plotEmbeddings[4],
-            "fullplot":
-                "An expedition of the \"Petrox\" company, is exploring in search of petrol. A strange island where they arrive is the home of a giant ape, King Kong, that is captured by the expedition in order to make money exhibiting it to the world. When in the U.S. the huge gorilla becomes restless, trying to return home..."
-        },
-        {
-            "_id": 5,
-            "title": "George of the Jungle",
-            "genres": ["Action", "Adventure", "Comedy"],
-            "plot_embedding": plotEmbeddings[5],
-            "fullplot":
-                "Baby George got into a plane crash in a jungle, stayed alive and was adopted by a wise ape. Ursula Stanhope, US noble woman is saved from death on safari by grown-up George, and he takes her to jungle to live with him. He slowly learns a rules of human relationships, while Ursula's lover Lyle is looking for her and the one who took her. After they are found, Ursula takes George to the USA."
-        },
-        {
-            "_id": 6,
-            "title": "Tarzan the Ape Man",
-            "genres": ["Action", "Adventure", "Romance"],
-            "plot_embedding": plotEmbeddings[6],
-            "fullplot":
-                "James Parker and Harry Holt are on an expedition in Africa in search of the elephant burial grounds that will provide enough ivory to make them rich. Parker's beautiful young daughter Jane arrives unexpectedly to join them. Harry is obviously attracted to Jane and he does his best to help protect her from all the dangers that they experience in the jungle. Jane is terrified when Tarzan and his ape friends first abduct her, but when she returns to her father's expedition she has second thoughts about leaving Tarzan. After the expedition is captured by a tribe of violent dwarfs, Jane sends Cheetah to bring Tarzan to rescue them..."
-        },
-        {
-            "_id": 7,
-            "title": "Abraham Lincoln: Vampire Hunter",
-            "genres": ["Action", "Fantasy", "Horror"],
-            "plot_embedding": plotEmbeddings[7],
-            "fullplot":
-                "At the age of 9, Abraham Lincoln witnesses his mother being killed by a vampire, Jack Barts. Some 10 years later, he unsuccessfully tries to eliminate Barts but in the process makes the acquaintance of Henry Sturgess who teaches him how to fight and what is required to kill a vampire. The quid pro quo is that Abe will kill only those vampires that Henry directs him to. Abe relocates to Springfield where he gets a job as a store clerk while he studies the law and kills vampires by night. He also meets and eventually marries the pretty Mary Todd. Many years later as President of the United States, he comes to realize that vampires are fighting with the Confederate forces. As a result he mounts his own campaign to defeat them."
-        },
-        {
-            "_id": 8,
-            "title": "The Son of Kong",
-            "genres": ["Adventure", "Comedy", "Fantasy"],
-            "plot_embedding": plotEmbeddings[8],
-            "fullplot":
-                "After the disastrous results of his last expedition, Carl Denham leaves New York aboard a ship to escape all the trouble. After a mutiny, he and a few companions are left behind on Skull island, where they meet a smaller relative of King Kong and make friends with him."
-        },
-        {
-            "_id": 9,
-            "title": "Planet of the Apes",
-            "genres": ["Action", "Adventure", "Sci-Fi"],
-            "plot_embedding": plotEmbeddings[9],
-            "fullplot":
-                "It is the year 2029: Astronaut Leo Davidson boards a pod cruiser on a Space Station for a \"routine\" reconnaissance mission. But an abrupt detour through a space time wormhole lands him on a strange planet where talking apes rule over the human race. With the help of a sympathetic chimpanzee activist named Ari and a small band of human rebels, Leo leads the effort to evade the advancing Gorilla Army led by General Thade and his most trusted warrior Attar. Now the race is on to reach a sacred temple within the planet's Forbidden Zone to discover the shocking secrets of mankind's past - and the key to its future."
-        },
-        {
-            "_id": 10,
-            "title": "Dawn of the Planet of the Apes",
-            "genres": ["Action", "Drama", "Sci-Fi"],
-            "plot_embedding": plotEmbeddings[10],
-            "fullplot":
-                "A growing nation of genetically evolved apes led by Caesar is threatened by a band of human survivors of the devastating virus unleashed a decade earlier. They reach a fragile peace, but it proves short-lived, as both sides are brought to the brink of a war that will determine who will emerge as Earth's dominant species."
-        },
-        {
-            "_id": 11,
-            "title": "Kung Fu Panda",
-            "genres": ["Animation", "Action", "Adventure"],
-            "plot_embedding": plotEmbeddings[11],
-            "fullplot":
-                "It's the story about a lazy, irreverent slacker panda, named Po, who is the biggest fan of Kung Fu around...which doesn't exactly come in handy while working every day in his family's noodle shop. Unexpectedly chosen to fulfill an ancient prophecy, Po's dreams become reality when he joins the world of Kung Fu and studies alongside his idols, the legendary Furious Five -- Tigress, Crane, Mantis, Viper and Monkey -- under the leadership of their guru, Master Shifu. But before they know it, the vengeful and treacherous snow leopard Tai Lung is headed their way, and it's up to Po to defend everyone from the oncoming threat. Can he turn his dreams of becoming a Kung Fu master into reality? Po puts his heart - and his girth - into the task, and the unlikely hero ultimately finds that his greatest weaknesses turn out to be his greatest strengths."
-        },
-        {
-            "_id": 12,
-            "title": "Hatari!",
-            "genres": ["Action", "Adventure", "Drama"],
-            "plot_embedding": plotEmbeddings[12],
-            "fullplot":
-                "John Wayne and his ensemble cast cavort over the African landscape filling orders from zoos for wild animals. Bruce Cabot plays \"the Indian\", a womanizing sharpshooter who is gored by a rhino in the opening scenes of the film. This becomes a running theme through the movie; their bad luck in catching rhinos, and provides the climactic ending chase. While Bruce is in the hospital, Elsa Martinelli shows up as a woman photographer from a Swiss zoo, and John wants to send her packing. She strongarms the Duke into letting her stay by promising that her zoo will buy most of their animals this season if she's allowed to go along on the hunts and take photos. Hardy Kruger, Gerard Blain, Michelle Girardon and Valentin de Vargas round out the group. They traipse over the African landscape capturing animals; Elsa also has a running gag where she collects baby elephants as the movie goes along. In the end she's acquired three of them."
-        },
-        {
-            "_id": 13,
-            "title": "Journey to the Center of the Earth",
-            "genres": ["Action", "Adventure", "Family"],
-            "plot_embedding": plotEmbeddings[13],
-            "fullplot":
-                "Professor Trevor Anderson receives his teenager nephew Sean Anderson. He will spend ten days with his uncle while his mother, Elizabeth, prepares to move to Canada. She gives a box to Trevor that belonged to his missing brother, Max, and Trevor finds a book with references to the last journey of his brother. He decides to follow the steps of Max with Sean and they travel to Iceland, where they meet the guide Hannah èsgeirsson. While climbing a mountain, there is a thunderstorm and they protect themselves in a cave. However, a lightening collapses the entrance and the trio is trapped in the cave. They seek an exit and falls in a hole, discovering a lost world in the center of the Earth."
-        },
-        {
-            "_id": 14,
-            "title": "Beauty and the Beast",
-            "genres": ["Fantasy", "Romance"],
-            "plot_embedding": plotEmbeddings[14],
-            "fullplot":
-                "An unexpected romance blooms after the the youngest daughter of a merchant who has fallen on hard times offers herself to the mysterious beast to which her father has become indebted."
-        },
-        {
-            "_id": 15,
-            "title": "Titanic",
-            "genres": ["Action", "Drama", "History"],
-            "plot_embedding": plotEmbeddings[15],
-            "fullplot":
-                "The plot focuses on the romances of two couples upon the doomed ship's maiden voyage. Isabella Paradine (Catherine Zeta-Jones) is a wealthy woman mourning the loss of her aunt, who reignites a romance with former flame Wynn Park (Peter Gallagher). Meanwhile, a charming ne'er-do-well named Jamie Perse (Mike Doyle) steals a ticket for the ship, and falls for a sweet innocent Irish girl on board. But their romance is threatened by the villainous Simon Doonan (Tim Curry), who has discovered about the ticket and makes Jamie his unwilling accomplice, as well as having sinister plans for the girl."
-        }
-    ];
+    const
+        data =
+            [
+                {
+                    "_id": 0,
+                    "title": "It's a Mad, Mad, Mad, Mad World",
+                    "genres": ["Action", "Adventure", "Comedy"],
+                    "plot_embedding": plotEmbeddings[0],
+                    "fullplot":
+                        "After a long prison sentence Smiler Grogan is heading at high speed to a California park where he hid $350,000 from a job 15 years previously. He accidentally careens over a cliff in view of four cars whose occupants go down to help. The dying Grogan gives details of where the money is buried and when the witnesses fail to agree on sharing the cash, a crazy chase develops across the state."
+                },
+                {
+                    "_id": 1,
+                    "title": "Battle for the Planet of the Apes",
+                    "genres": ["Action", "Sci-Fi"],
+                    "plot_embedding": plotEmbeddings[1],
+                    "fullplot":
+                        "After conquering the oppressive humans in \"Conquest for the Planet of the Apes\", Caesar must now keep the peace among the humans and apes. Gorilla General Aldo views things differently, and tries to cause an ape civil war. In the meantime, other human survivors learn of the ape city, and decide they want to take back civilization for themselves, thus setting the stage of warring ape factions and humans."
+                },
+                {
+                    "_id": 2,
+                    "title": "King Kong Lives",
+                    "genres": ["Action", "Adventure", "Horror"],
+                    "plot_embedding": plotEmbeddings[2],
+                    "fullplot":
+                        "A giant ape King Kong, which was shot and fell off the World Trade Center tower, appears to be alive, but is in coma for 10 years and desperately needs a blood transfusion in order to have an artificial heart implanted. Suddenly, in the rainforest, another gigantic ape is found - this time a female. She is brought to the USA, and the heart is successfully implanted. But then King Kong, having sensed the female ape, breaks loose."
+                },
+                {
+                    "_id": 3,
+                    "title": "Rise of the Planet of the Apes",
+                    "genres": ["Action", "Drama", "Sci-Fi"],
+                    "plot_embedding": plotEmbeddings[3],
+                    "fullplot":
+                        "At the story's heart is Caesar (Andy Serkis), a chimpanzee who gains human-like intelligence and emotions from an experimental drug. Raised like a child by the drug's creator, Will Rodman (James Franco) and a primatologist Caroline Aranha (Freida Pinto), Caesar ultimately finds himself taken from the humans he loves and imprisoned in an ape sanctuary in San Bruno. Seeking justice for his fellow inmates, Caesar gives the fellow apes the same drug that he inherited. He then assembles a simian army and escapes the sanctuary - putting man and ape on a collision course that could change the planet forever."
+                },
+                {
+                    "_id": 4,
+                    "title": "King Kong",
+                    "genres": ["Adventure", "Fantasy", "Horror"],
+                    "plot_embedding": plotEmbeddings[4],
+                    "fullplot":
+                        "An expedition of the \"Petrox\" company, is exploring in search of petrol. A strange island where they arrive is the home of a giant ape, King Kong, that is captured by the expedition in order to make money exhibiting it to the world. When in the U.S. the huge gorilla becomes restless, trying to return home..."
+                },
+                {
+                    "_id": 5,
+                    "title": "George of the Jungle",
+                    "genres": ["Action", "Adventure", "Comedy"],
+                    "plot_embedding": plotEmbeddings[5],
+                    "fullplot":
+                        "Baby George got into a plane crash in a jungle, stayed alive and was adopted by a wise ape. Ursula Stanhope, US noble woman is saved from death on safari by grown-up George, and he takes her to jungle to live with him. He slowly learns a rules of human relationships, while Ursula's lover Lyle is looking for her and the one who took her. After they are found, Ursula takes George to the USA."
+                },
+                {
+                    "_id": 6,
+                    "title": "Tarzan the Ape Man",
+                    "genres": ["Action", "Adventure", "Romance"],
+                    "plot_embedding": plotEmbeddings[6],
+                    "fullplot":
+                        "James Parker and Harry Holt are on an expedition in Africa in search of the elephant burial grounds that will provide enough ivory to make them rich. Parker's beautiful young daughter Jane arrives unexpectedly to join them. Harry is obviously attracted to Jane and he does his best to help protect her from all the dangers that they experience in the jungle. Jane is terrified when Tarzan and his ape friends first abduct her, but when she returns to her father's expedition she has second thoughts about leaving Tarzan. After the expedition is captured by a tribe of violent dwarfs, Jane sends Cheetah to bring Tarzan to rescue them..."
+                },
+                {
+                    "_id": 7,
+                    "title": "Abraham Lincoln: Vampire Hunter",
+                    "genres": ["Action", "Fantasy", "Horror"],
+                    "plot_embedding": plotEmbeddings[7],
+                    "fullplot":
+                        "At the age of 9, Abraham Lincoln witnesses his mother being killed by a vampire, Jack Barts. Some 10 years later, he unsuccessfully tries to eliminate Barts but in the process makes the acquaintance of Henry Sturgess who teaches him how to fight and what is required to kill a vampire. The quid pro quo is that Abe will kill only those vampires that Henry directs him to. Abe relocates to Springfield where he gets a job as a store clerk while he studies the law and kills vampires by night. He also meets and eventually marries the pretty Mary Todd. Many years later as President of the United States, he comes to realize that vampires are fighting with the Confederate forces. As a result he mounts his own campaign to defeat them."
+                },
+                {
+                    "_id": 8,
+                    "title": "The Son of Kong",
+                    "genres": ["Adventure", "Comedy", "Fantasy"],
+                    "plot_embedding": plotEmbeddings[8],
+                    "fullplot":
+                        "After the disastrous results of his last expedition, Carl Denham leaves New York aboard a ship to escape all the trouble. After a mutiny, he and a few companions are left behind on Skull island, where they meet a smaller relative of King Kong and make friends with him."
+                },
+                {
+                    "_id": 9,
+                    "title": "Planet of the Apes",
+                    "genres": ["Action", "Adventure", "Sci-Fi"],
+                    "plot_embedding": plotEmbeddings[9],
+                    "fullplot":
+                        "It is the year 2029: Astronaut Leo Davidson boards a pod cruiser on a Space Station for a \"routine\" reconnaissance mission. But an abrupt detour through a space time wormhole lands him on a strange planet where talking apes rule over the human race. With the help of a sympathetic chimpanzee activist named Ari and a small band of human rebels, Leo leads the effort to evade the advancing Gorilla Army led by General Thade and his most trusted warrior Attar. Now the race is on to reach a sacred temple within the planet's Forbidden Zone to discover the shocking secrets of mankind's past - and the key to its future."
+                },
+                {
+                    "_id": 10,
+                    "title": "Dawn of the Planet of the Apes",
+                    "genres": ["Action", "Drama", "Sci-Fi"],
+                    "plot_embedding": plotEmbeddings[10],
+                    "fullplot":
+                        "A growing nation of genetically evolved apes led by Caesar is threatened by a band of human survivors of the devastating virus unleashed a decade earlier. They reach a fragile peace, but it proves short-lived, as both sides are brought to the brink of a war that will determine who will emerge as Earth's dominant species."
+                },
+                {
+                    "_id": 11,
+                    "title": "Kung Fu Panda",
+                    "genres": ["Animation", "Action", "Adventure"],
+                    "plot_embedding": plotEmbeddings[11],
+                    "fullplot":
+                        "It's the story about a lazy, irreverent slacker panda, named Po, who is the biggest fan of Kung Fu around...which doesn't exactly come in handy while working every day in his family's noodle shop. Unexpectedly chosen to fulfill an ancient prophecy, Po's dreams become reality when he joins the world of Kung Fu and studies alongside his idols, the legendary Furious Five -- Tigress, Crane, Mantis, Viper and Monkey -- under the leadership of their guru, Master Shifu. But before they know it, the vengeful and treacherous snow leopard Tai Lung is headed their way, and it's up to Po to defend everyone from the oncoming threat. Can he turn his dreams of becoming a Kung Fu master into reality? Po puts his heart - and his girth - into the task, and the unlikely hero ultimately finds that his greatest weaknesses turn out to be his greatest strengths."
+                },
+                {
+                    "_id": 12,
+                    "title": "Hatari!",
+                    "genres": ["Action", "Adventure", "Drama"],
+                    "plot_embedding": plotEmbeddings[12],
+                    "fullplot":
+                        "John Wayne and his ensemble cast cavort over the African landscape filling orders from zoos for wild animals. Bruce Cabot plays \"the Indian\", a womanizing sharpshooter who is gored by a rhino in the opening scenes of the film. This becomes a running theme through the movie; their bad luck in catching rhinos, and provides the climactic ending chase. While Bruce is in the hospital, Elsa Martinelli shows up as a woman photographer from a Swiss zoo, and John wants to send her packing. She strongarms the Duke into letting her stay by promising that her zoo will buy most of their animals this season if she's allowed to go along on the hunts and take photos. Hardy Kruger, Gerard Blain, Michelle Girardon and Valentin de Vargas round out the group. They traipse over the African landscape capturing animals; Elsa also has a running gag where she collects baby elephants as the movie goes along. In the end she's acquired three of them."
+                },
+                {
+                    "_id": 13,
+                    "title": "Journey to the Center of the Earth",
+                    "genres": ["Action", "Adventure", "Family"],
+                    "plot_embedding": plotEmbeddings[13],
+                    "fullplot":
+                        "Professor Trevor Anderson receives his teenager nephew Sean Anderson. He will spend ten days with his uncle while his mother, Elizabeth, prepares to move to Canada. She gives a box to Trevor that belonged to his missing brother, Max, and Trevor finds a book with references to the last journey of his brother. He decides to follow the steps of Max with Sean and they travel to Iceland, where they meet the guide Hannah èsgeirsson. While climbing a mountain, there is a thunderstorm and they protect themselves in a cave. However, a lightening collapses the entrance and the trio is trapped in the cave. They seek an exit and falls in a hole, discovering a lost world in the center of the Earth."
+                },
+                {
+                    "_id": 14,
+                    "title": "Beauty and the Beast",
+                    "genres": ["Fantasy", "Romance"],
+                    "plot_embedding": plotEmbeddings[14],
+                    "fullplot":
+                        "An unexpected romance blooms after the the youngest daughter of a merchant who has fallen on hard times offers herself to the mysterious beast to which her father has become indebted."
+                },
+                {
+                    "_id": 15,
+                    "title": "Titanic",
+                    "genres": ["Action", "Drama", "History"],
+                    "plot_embedding": plotEmbeddings[15],
+                    "fullplot":
+                        "The plot focuses on the romances of two couples upon the doomed ship's maiden voyage. Isabella Paradine (Catherine Zeta-Jones) is a wealthy woman mourning the loss of her aunt, who reignites a romance with former flame Wynn Park (Peter Gallagher). Meanwhile, a charming ne'er-do-well named Jamie Perse (Mike Doyle) steals a ticket for the ship, and falls for a sweet innocent Irish girl on board. But their romance is threatened by the villainous Simon Doonan (Tim Curry), who has discovered about the ticket and makes Jamie his unwilling accomplice, as well as having sinister plans for the girl."
+                }
+            ];
     return data;
 }
 

@@ -231,7 +231,9 @@ public:
 private:
     void _workerBody(bool isReader) {
         // Initialize thread-local state for all worker threads, regardless of what they do next.
-        { auto readLock = _rwMutex.readLock(); }
+        {
+            auto readLock = _rwMutex.readLock();
+        }
 
         if (_pendingThreads.subtractAndFetch(1) == 0) {
             _pendingThreads.notifyAll();

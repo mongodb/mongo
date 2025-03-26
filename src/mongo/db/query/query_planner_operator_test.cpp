@@ -226,16 +226,14 @@ TEST_F(QueryPlannerTest, CanProduceCoveredSortPlanWhenSortOrderDifferentThanInde
 // $eq can use a hashed index because it looks for values of type regex;
 // it doesn't evaluate the regex itself.
 TEST_F(QueryPlannerTest, EqCanUseHashedIndexWithRegex) {
-    addIndex(BSON("a"
-                  << "hashed"));
+    addIndex(BSON("a" << "hashed"));
     runQuery(fromjson("{a: {$eq: /abc/}}"));
     ASSERT_EQUALS(getNumSolutions(), 2U);
 }
 
 TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndex) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
-    addIndex(BSON("a"
-                  << "hashed"));
+    addIndex(BSON("a" << "hashed"));
     runQuery(fromjson("{$expr: {$eq: ['$a', 1]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
@@ -245,8 +243,7 @@ TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndex) {
 
 TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndexWithRegex) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
-    addIndex(BSON("a"
-                  << "hashed"));
+    addIndex(BSON("a" << "hashed"));
     runQuery(fromjson("{$expr: {$eq: ['$a', /abc/]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
@@ -679,8 +676,7 @@ TEST_F(QueryPlannerTest, BasicSort) {
 }
 
 TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSort) {
-    addIndex(BSON("x"
-                  << "hashed"));
+    addIndex(BSON("x" << "hashed"));
     runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
 
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -690,8 +686,7 @@ TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSort) {
 }
 
 TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSortWithIndexablePred) {
-    addIndex(BSON("x"
-                  << "hashed"));
+    addIndex(BSON("x" << "hashed"));
     runQuerySortProj(BSON("x" << BSON("$in" << BSON_ARRAY(0 << 1))), BSON("x" << 1), BSONObj());
 
     ASSERT_EQUALS(getNumSolutions(), 2U);

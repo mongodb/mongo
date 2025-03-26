@@ -53,16 +53,14 @@ TEST(MapReduceParseTest, failedParse) {
     auto ctx = IDLParserContext("mapReduce");
     // Missing fields.
     ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
-                                                 BSON(""
-                                                      << ""
-                                                      << "$db"
-                                                      << "db")),
+                                                 BSON("" << ""
+                                                         << "$db"
+                                                         << "db")),
                   DBException);
     ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
-                                                 BSON("mapReduce"
-                                                      << "foo"
-                                                      << "$db"
-                                                      << "db")),
+                                                 BSON("mapReduce" << "foo"
+                                                                  << "$db"
+                                                                  << "db")),
                   DBException);
     ASSERT_THROWS(
         MapReduceCommandRequest::parse(ctx,
@@ -72,191 +70,171 @@ TEST(MapReduceParseTest, failedParse) {
         DBException);
 
     // Extra fields.
-    ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
-                                                 BSON("mapReduce"
-                                                      << "theSource"
-                                                      << "map" << mapJavascript << "reduce"
-                                                      << reduceJavascript << "out"
-                                                      << BSON("inline" << 1) << "alloy"
-                                                      << "chromium steel"
-                                                      << "$db"
-                                                      << "db")),
+    ASSERT_THROWS(MapReduceCommandRequest::parse(
+                      ctx,
+                      BSON("mapReduce" << "theSource"
+                                       << "map" << mapJavascript << "reduce" << reduceJavascript
+                                       << "out" << BSON("inline" << 1) << "alloy"
+                                       << "chromium steel"
+                                       << "$db"
+                                       << "db")),
                   DBException);
     ASSERT_THROWS(MapReduceCommandRequest::parse(
                       ctx,
-                      BSON("mapReduce"
-                           << "theSource"
-                           << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
-                           << BSON("inline" << 1 << "notinline" << 0) << "$db"
-                           << "db")),
+                      BSON("mapReduce" << "theSource"
+                                       << "map" << mapJavascript << "reduce" << reduceJavascript
+                                       << "out" << BSON("inline" << 1 << "notinline" << 0) << "$db"
+                                       << "db")),
                   DBException);
 }
 
 TEST(MapReduceParseTest, failsToParseCodeWithScope) {
     auto ctx = IDLParserContext("mapReduce");
 
-    ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
-                                                 BSON("mapReduce"
-                                                      << "theSource"
-                                                      << "map" << mapJavascript << "reduce"
-                                                      << BSONCodeWScope("var x = 3", BSONObj())
-                                                      << "out" << BSON("inline" << 1) << "$db"
-                                                      << "db")),
-                  DBException);
-    ASSERT_THROWS(MapReduceCommandRequest::parse(
-                      ctx,
-                      BSON("mapReduce"
-                           << "theSource"
-                           << "map" << BSONCodeWScope("var x = 3", BSONObj()) << "reduce"
-                           << reduceJavascript << "out" << BSON("inline" << 1) << "$db"
-                           << "db")),
-                  DBException);
+    ASSERT_THROWS(
+        MapReduceCommandRequest::parse(ctx,
+                                       BSON("mapReduce" << "theSource"
+                                                        << "map" << mapJavascript << "reduce"
+                                                        << BSONCodeWScope("var x = 3", BSONObj())
+                                                        << "out" << BSON("inline" << 1) << "$db"
+                                                        << "db")),
+        DBException);
+    ASSERT_THROWS(
+        MapReduceCommandRequest::parse(
+            ctx,
+            BSON("mapReduce" << "theSource"
+                             << "map" << BSONCodeWScope("var x = 3", BSONObj()) << "reduce"
+                             << reduceJavascript << "out" << BSON("inline" << 1) << "$db"
+                             << "db")),
+        DBException);
 }
 
 TEST(MapReduceParseTest, parseOutputTypes) {
     auto ctx = IDLParserContext("mapReduce");
 
     MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out" << BSON("inline" << 1) << "$db"
-                                        << "db"));
+                                   BSON("mapReduce" << "theSource"
+                                                    << "map" << mapJavascript << "reduce"
+                                                    << reduceJavascript << "out"
+                                                    << BSON("inline" << 1) << "$db"
+                                                    << "db"));
     MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out"
-                                        << "theSink"
-                                        << "$db"
-                                        << "db"));
+                                   BSON("mapReduce" << "theSource"
+                                                    << "map" << mapJavascript << "reduce"
+                                                    << reduceJavascript << "out"
+                                                    << "theSink"
+                                                    << "$db"
+                                                    << "db"));
     MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out"
-                                        << BSON("replace"
-                                                << "theSink"
-                                                << "db"
-                                                << "myDb")
-                                        << "$db"
-                                        << "db"));
+                                   BSON("mapReduce" << "theSource"
+                                                    << "map" << mapJavascript << "reduce"
+                                                    << reduceJavascript << "out"
+                                                    << BSON("replace" << "theSink"
+                                                                      << "db"
+                                                                      << "myDb")
+                                                    << "$db"
+                                                    << "db"));
     MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out"
-                                        << BSON("merge"
-                                                << "theSink")
-                                        << "$db"
-                                        << "db"));
+                                   BSON("mapReduce" << "theSource"
+                                                    << "map" << mapJavascript << "reduce"
+                                                    << reduceJavascript << "out"
+                                                    << BSON("merge" << "theSink") << "$db"
+                                                    << "db"));
     MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out"
-                                        << BSON("reduce"
-                                                << "theSink"
-                                                << "db"
-                                                << "myDb"
-                                                << "sharded" << true)
-                                        << "$db"
-                                        << "db"));
+                                   BSON("mapReduce" << "theSource"
+                                                    << "map" << mapJavascript << "reduce"
+                                                    << reduceJavascript << "out"
+                                                    << BSON("reduce" << "theSink"
+                                                                     << "db"
+                                                                     << "myDb"
+                                                                     << "sharded" << true)
+                                                    << "$db"
+                                                    << "db"));
     ASSERT(true);
 }
 
 TEST(MapReduceParseTest, parseAllOptionalFields) {
     auto ctx = IDLParserContext("mapReduce");
 
-    MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out" << BSON("inline" << 1) << "query"
-                                        << BSON("author"
-                                                << "dave")
-                                        << "sort" << BSON("bottlecaps" << 1) << "collation"
-                                        << BSON("locale"
-                                                << "zh@collation=pinyin")
-                                        << "limit" << 86 << "finalize" << finalizeJavascript
-                                        << "scope" << BSON("global" << initJavascript) << "verbose"
-                                        << false << "bypassDocumentValidation" << true
-                                        << "writeConcern"
-                                        << BSON("w" << 1 << "j" << false << "wtimeout" << 1498)
-                                        << "$db"
-                                        << "db"));
+    MapReduceCommandRequest::parse(
+        ctx,
+        BSON("mapReduce" << "theSource"
+                         << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                         << BSON("inline" << 1) << "query" << BSON("author" << "dave") << "sort"
+                         << BSON("bottlecaps" << 1) << "collation"
+                         << BSON("locale" << "zh@collation=pinyin") << "limit" << 86 << "finalize"
+                         << finalizeJavascript << "scope" << BSON("global" << initJavascript)
+                         << "verbose" << false << "bypassDocumentValidation" << true
+                         << "writeConcern" << BSON("w" << 1 << "j" << false << "wtimeout" << 1498)
+                         << "$db"
+                         << "db"));
 }
 
 TEST(MapReduceParseTest, deprecatedOptions) {
     auto ctx = IDLParserContext("mapReduce");
     // jsMode can be true or false
     MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out" << BSON("inline" << 1) << "$db"
-                                        << "db"
-                                        << "jsMode" << true));
+                                   BSON("mapReduce" << "theSource"
+                                                    << "map" << mapJavascript << "reduce"
+                                                    << reduceJavascript << "out"
+                                                    << BSON("inline" << 1) << "$db"
+                                                    << "db"
+                                                    << "jsMode" << true));
     MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out" << BSON("inline" << 1) << "$db"
-                                        << "db"
-                                        << "jsMode" << false));
+                                   BSON("mapReduce" << "theSource"
+                                                    << "map" << mapJavascript << "reduce"
+                                                    << reduceJavascript << "out"
+                                                    << BSON("inline" << 1) << "$db"
+                                                    << "db"
+                                                    << "jsMode" << false));
     // nonAtomic can be true but not false
     MapReduceCommandRequest::parse(ctx,
-                                   BSON("mapReduce"
-                                        << "theSource"
-                                        << "map" << mapJavascript << "reduce" << reduceJavascript
-                                        << "out"
-                                        << BSON("reduce"
-                                                << "theSink"
-                                                << "db"
-                                                << "myDb"
-                                                << "nonAtomic" << true)
-                                        << "$db"
-                                        << "db"));
-    ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
-                                                 BSON("mapReduce"
-                                                      << "theSource"
-                                                      << "map" << mapJavascript << "reduce"
-                                                      << reduceJavascript << "out"
-                                                      << BSON("reduce"
-                                                              << "theSink"
-                                                              << "db"
-                                                              << "myDb"
-                                                              << "nonAtomic" << false)
-                                                      << "$db"
-                                                      << "db")),
-                  DBException);
-    ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
-                                                 BSON("mapReduce"
-                                                      << "theSource"
-                                                      << "map" << mapJavascript << "reduce"
-                                                      << reduceJavascript << "out"
-                                                      << BSON("reduce"
-                                                              << "theSink"
-                                                              << "db"
-                                                              << "myDb"
-                                                              << "nonAtomic" << false)
-                                                      << "$db"
-                                                      << "db")),
-                  DBException);
+                                   BSON("mapReduce" << "theSource"
+                                                    << "map" << mapJavascript << "reduce"
+                                                    << reduceJavascript << "out"
+                                                    << BSON("reduce" << "theSink"
+                                                                     << "db"
+                                                                     << "myDb"
+                                                                     << "nonAtomic" << true)
+                                                    << "$db"
+                                                    << "db"));
+    ASSERT_THROWS(
+        MapReduceCommandRequest::parse(ctx,
+                                       BSON("mapReduce" << "theSource"
+                                                        << "map" << mapJavascript << "reduce"
+                                                        << reduceJavascript << "out"
+                                                        << BSON("reduce" << "theSink"
+                                                                         << "db"
+                                                                         << "myDb"
+                                                                         << "nonAtomic" << false)
+                                                        << "$db"
+                                                        << "db")),
+        DBException);
+    ASSERT_THROWS(
+        MapReduceCommandRequest::parse(ctx,
+                                       BSON("mapReduce" << "theSource"
+                                                        << "map" << mapJavascript << "reduce"
+                                                        << reduceJavascript << "out"
+                                                        << BSON("reduce" << "theSink"
+                                                                         << "db"
+                                                                         << "myDb"
+                                                                         << "nonAtomic" << false)
+                                                        << "$db"
+                                                        << "db")),
+        DBException);
     // out.sharded cannot be false
-    ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
-                                                 BSON("mapReduce"
-                                                      << "theSource"
-                                                      << "map" << mapJavascript << "reduce"
-                                                      << reduceJavascript << "out"
-                                                      << BSON("reduce"
-                                                              << "theSink"
-                                                              << "db"
-                                                              << "myDb"
-                                                              << "sharded" << false)
-                                                      << "$db"
-                                                      << "db")),
-                  DBException);
+    ASSERT_THROWS(
+        MapReduceCommandRequest::parse(ctx,
+                                       BSON("mapReduce" << "theSource"
+                                                        << "map" << mapJavascript << "reduce"
+                                                        << reduceJavascript << "out"
+                                                        << BSON("reduce" << "theSink"
+                                                                         << "db"
+                                                                         << "myDb"
+                                                                         << "sharded" << false)
+                                                        << "$db"
+                                                        << "db")),
+        DBException);
 }
 
 }  // namespace

@@ -75,20 +75,17 @@ public:
         operationContext()->setTxnNumber(txnNum);
         repl::ReadConcernArgs readConcernArgs;
         ASSERT_OK(readConcernArgs.initialize(
-            BSON("insert"
-                 << "test" << repl::ReadConcernArgs::kReadConcernFieldName
-                 << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
-                         << LogicalTime(Timestamp(3, 1)).asTimestamp()
-                         << repl::ReadConcernArgs::kLevelFieldName << "snapshot"))));
+            BSON("insert" << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                          << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                  << LogicalTime(Timestamp(3, 1)).asTimestamp()
+                                  << repl::ReadConcernArgs::kLevelFieldName << "snapshot"))));
         repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
 
         auto txnRouter = TransactionRouter::get(operationContext());
         txnRouter.beginOrContinueTxn(
             operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                          ShardId{"0"},
-                                          BSON("insert"
-                                               << "test"));
+        txnRouter.attachTxnFieldsIfNeeded(
+            operationContext(), ShardId{"0"}, BSON("insert" << "test"));
     }
 
     void mockConfigServerQueries(NamespaceString _nss, OID epoch, Timestamp timestamp) {

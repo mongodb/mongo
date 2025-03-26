@@ -6,7 +6,6 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardTargetingTest} from "jstests/libs/shard_targeting_util.js";
-
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});

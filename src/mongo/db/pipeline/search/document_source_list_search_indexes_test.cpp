@@ -44,15 +44,13 @@ TEST_F(ListSearchIndexesTest, ShouldParseWithIdNameOrEmptyObject) {
     auto expCtx = getExpCtx();
 
     // Test parsing with an 'id' field
-    auto specObj = BSON("$listSearchIndexes" << BSON("id"
-                                                     << "indexID"));
+    auto specObj = BSON("$listSearchIndexes" << BSON("id" << "indexID"));
     intrusive_ptr<DocumentSource> result =
         DocumentSourceListSearchIndexes::createFromBson(specObj.firstElement(), expCtx);
     ASSERT(dynamic_cast<DocumentSourceListSearchIndexes*>(result.get()));
 
     // Test parsing with an 'name' field.
-    specObj = BSON("$listSearchIndexes" << BSON("name"
-                                                << "indexName"));
+    specObj = BSON("$listSearchIndexes" << BSON("name" << "indexName"));
     result = DocumentSourceListSearchIndexes::createFromBson(specObj.firstElement(), expCtx);
     ASSERT(dynamic_cast<DocumentSourceListSearchIndexes*>(result.get()));
 
@@ -66,8 +64,7 @@ TEST_F(ListSearchIndexesTest, ShouldFailToParse) {
     auto expCtx = getExpCtx();
 
     // Test parsing with an unknown field.
-    auto specObj = BSON("$listSearchIndexes" << BSON("unknown"
-                                                     << "unknownValue"));
+    auto specObj = BSON("$listSearchIndexes" << BSON("unknown" << "unknownValue"));
     ASSERT_THROWS_CODE(
         DocumentSourceListSearchIndexes::createFromBson(specObj.firstElement(), getExpCtx()),
         AssertionException,
@@ -83,8 +80,7 @@ TEST_F(ListSearchIndexesTest, ShouldFailToParse) {
 
 TEST_F(ListSearchIndexesTest, RedactsNameFieldCorrectly) {
     auto expCtx = getExpCtx();
-    auto specObj = BSON("$listSearchIndexes" << BSON("name"
-                                                     << "indexName"));
+    auto specObj = BSON("$listSearchIndexes" << BSON("name" << "indexName"));
     auto docSource =
         DocumentSourceListSearchIndexes::createFromBson(specObj.firstElement(), expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -98,8 +94,7 @@ TEST_F(ListSearchIndexesTest, RedactsNameFieldCorrectly) {
 
 TEST_F(ListSearchIndexesTest, RedactsIDFieldCorrectly) {
     auto expCtx = getExpCtx();
-    auto specObj = BSON("$listSearchIndexes" << BSON("id"
-                                                     << "indexID"));
+    auto specObj = BSON("$listSearchIndexes" << BSON("id" << "indexID"));
     auto docSource =
         DocumentSourceListSearchIndexes::createFromBson(specObj.firstElement(), expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

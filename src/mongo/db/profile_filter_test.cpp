@@ -151,8 +151,7 @@ TEST_F(ProfileFilterTest, FilterOnNestedField) {
 }
 
 TEST_F(ProfileFilterTest, FilterOnOptionalField) {
-    auto filterExpr = BSON("replanReason"
-                           << "a good reason");
+    auto filterExpr = BSON("replanReason" << "a good reason");
 
     ProfileFilterImpl profileFilter{filterExpr};
 
@@ -166,8 +165,7 @@ TEST_F(ProfileFilterTest, FilterOnOptionalField) {
 }
 
 TEST_F(ProfileFilterTest, FilterOnUnavailableField) {
-    auto filterExpr = BSON("notAnOpDebugField"
-                           << "some value");
+    auto filterExpr = BSON("notAnOpDebugField" << "some value");
     ASSERT_THROWS_CODE(ProfileFilterImpl{filterExpr}, DBException, 4910200);
 }
 

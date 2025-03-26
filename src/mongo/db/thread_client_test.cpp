@@ -45,7 +45,9 @@ class ThreadClientTest : public unittest::Test, public ScopedGlobalServiceContex
 
 TEST_F(ThreadClientTest, TestNoAssignment) {
     ASSERT_FALSE(haveClient());
-    { ThreadClient tc(getThreadName(), getGlobalServiceContext()->getService()); }
+    {
+        ThreadClient tc(getThreadName(), getGlobalServiceContext()->getService());
+    }
     ASSERT_FALSE(haveClient());
 }
 
@@ -87,7 +89,9 @@ TEST_F(ThreadClientTest, TestAlternativeClientRegion) {
 
     ServiceContext::UniqueClient swapClient =
         getGlobalServiceContext()->getService()->makeClient("swapClient");
-    { AlternativeClientRegion altRegion(swapClient); }
+    {
+        AlternativeClientRegion altRegion(swapClient);
+    }
 
     ASSERT_TRUE(haveClient());
 }

@@ -243,12 +243,9 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, ShouldRemoveOnlyExpiredDocument
     const auto opCtx = operationContext();
     dropAndRecreateChangeCollection(opCtx, _tenantId);
 
-    const BSONObj firstExpired = BSON("_id"
-                                      << "firstExpired");
-    const BSONObj secondExpired = BSON("_id"
-                                       << "secondExpired");
-    const BSONObj notExpired = BSON("_id"
-                                    << "notExpired");
+    const BSONObj firstExpired = BSON("_id" << "firstExpired");
+    const BSONObj secondExpired = BSON("_id" << "secondExpired");
+    const BSONObj notExpired = BSON("_id" << "notExpired");
 
     insertDocumentToChangeCollection(opCtx, _tenantId, firstExpired);
     clockSource()->advance(Hours(1));

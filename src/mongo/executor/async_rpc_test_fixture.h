@@ -75,8 +75,7 @@ public:
     }
 
     BSONObj toBSON() const final {
-        return BSON("retryPolicyType"
-                    << "TestRetryPolicy");
+        return BSON("retryPolicyType" << "TestRetryPolicy");
     }
 
     void setMaxNumRetries(int maxRetries) {

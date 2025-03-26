@@ -312,8 +312,7 @@ protected:
     }
 };
 
-const BSONObj kVectorClockQuery = BSON("_id"
-                                       << "vectorClockState");
+const BSONObj kVectorClockQuery = BSON("_id" << "vectorClockState");
 
 TEST_F(VectorClockPersistenceTest, PrimaryPersistVectorClockDocument) {
     auto sc = getServiceContext();
@@ -383,10 +382,9 @@ TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithIllegalVectorClockDocument)
     ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 0);
     DBDirectClient client(opCtx);
     client.insert(NamespaceString::kVectorClockNamespace,
-                  BSON("_id"
-                       << "vectorClockState"
-                       << "IllegalKey"
-                       << "IllegalValue"));
+                  BSON("_id" << "vectorClockState"
+                             << "IllegalKey"
+                             << "IllegalValue"));
 
     vc->recoverDirect(opCtx);
 

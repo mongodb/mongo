@@ -45,7 +45,7 @@ public:
     CloneAuthoritativeMetadataCoordinator(ShardingDDLCoordinatorService* service,
                                           const BSONObj& initialStateDoc)
         : RecoverableShardingDDLCoordinator(
-              service, "CloneAuthoritativeMetadataCoordinator", initialStateDoc){};
+              service, "CloneAuthoritativeMetadataCoordinator", initialStateDoc) {};
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 

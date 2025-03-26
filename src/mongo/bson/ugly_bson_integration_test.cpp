@@ -53,9 +53,9 @@ TEST_F(UglyBSONFixture, DuplicateFields) {
     ON_BLOCK_EXIT([] { OpMsgBuilder::disableDupeFieldCheck_forTest.store(false); });
 
     assertCommandFailsOnServer(DatabaseName::kAdmin,
-                               BSON("insert"
-                                    << "test"
-                                    << "documents" << BSONArray() << "documents" << BSONArray()),
+                               BSON("insert" << "test"
+                                             << "documents" << BSONArray() << "documents"
+                                             << BSONArray()),
                                ErrorCodes::IDLDuplicateField);
 }
 

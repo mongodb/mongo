@@ -505,18 +505,16 @@ TEST_F(FindAndModifyRetryability, BasicUpsertReturnNew) {
     auto insertOplog = makeOplogEntry(repl::OpTime(),             // optime
                                       repl::OpTypeEnum::kInsert,  // op type
                                       kNs,                        // namespace
-                                      BSON("_id"
-                                           << "ID value"
-                                           << "x" << 1));  // o
+                                      BSON("_id" << "ID value"
+                                                 << "x" << 1));  // o
 
     auto result = parseOplogEntryForFindAndModify(opCtx(), request, insertOplog).toBSON();
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"
                            << BSON("n" << 1 << "updatedExisting" << false << "upserted"
                                        << "ID value")
                            << "value"
-                           << BSON("_id"
-                                   << "ID value"
-                                   << "x" << 1)),
+                           << BSON("_id" << "ID value"
+                                         << "x" << 1)),
                       result);
 }
 
@@ -529,9 +527,8 @@ TEST_F(FindAndModifyRetryability, BasicUpsertReturnOld) {
     auto insertOplog = makeOplogEntry(repl::OpTime(),             // optime
                                       repl::OpTypeEnum::kInsert,  // op type
                                       kNs,                        // namespace
-                                      BSON("_id"
-                                           << "ID value"
-                                           << "x" << 1));  // o
+                                      BSON("_id" << "ID value"
+                                                 << "x" << 1));  // o
 
     auto result = parseOplogEntryForFindAndModify(opCtx(), request, insertOplog).toBSON();
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"

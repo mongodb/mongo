@@ -54,8 +54,12 @@ public:
 };
 
 TEST_F(WriteRarelyRWMutexTest, ReaderAndWriteCleanup) {
-    { auto readLock = rwMutex.readLock(); }
-    { auto writeLock = rwMutex.writeLock(); }
+    {
+        auto readLock = rwMutex.readLock();
+    }
+    {
+        auto writeLock = rwMutex.writeLock();
+    }
     auto readLock = rwMutex.readLock();
 }
 

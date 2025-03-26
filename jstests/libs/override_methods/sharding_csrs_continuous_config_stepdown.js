@@ -25,8 +25,8 @@ const {ReplSetTestWithContinuousPrimaryStepdown, ShardingTestWithContinuousPrima
                                  });
 
 ReplSetTest[kOverrideConstructorForRST] = ReplSetTestWithContinuousPrimaryStepdown;
-ShardingTest[kOverrideConstructorForST] =
-    class ShardingTestWithContinuousFailover extends ShardingTestWithContinuousPrimaryStepdown {
+ShardingTest[kOverrideConstructorForST] = class ShardingTestWithContinuousFailover extends
+ShardingTestWithContinuousPrimaryStepdown{
     constructor(params) {
         super(params);
         // Set the feature on the test configuration; this will allow js tests to selectively

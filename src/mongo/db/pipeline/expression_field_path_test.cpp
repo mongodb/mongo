@@ -333,9 +333,7 @@ public:
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression =
             ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
-        ASSERT_BSONOBJ_BINARY_EQ(BSON("foo"
-                                      << "$a.b.c"),
-                                 BSON("foo" << expression->serialize()));
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("foo" << "$a.b.c"), BSON("foo" << expression->serialize()));
     }
 };
 

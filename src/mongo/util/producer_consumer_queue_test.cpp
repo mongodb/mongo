@@ -233,7 +233,7 @@ private:
         __VA_ARGS__(name##CB{});                \
     }                                           \
     template <typename Helper>                  \
-    void name##CB::operator()(Helper&& helper)
+    void name##CB::operator()(Helper && helper)
 
 PRODUCER_CONSUMER_QUEUE_TEST(basicPushPop, runPermutations<false, false>) {
     typename Helper::template ProducerConsumerQueue<MoveOnly> pcq{};

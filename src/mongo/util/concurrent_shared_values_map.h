@@ -157,7 +157,7 @@ public:
     }
 
 private:
-    ConcurrentSharedValuesMap(std::shared_ptr<Map> otherMap) : _map(std::move(otherMap)){};
+    ConcurrentSharedValuesMap(std::shared_ptr<Map> otherMap) : _map(std::move(otherMap)) {};
 
     // shared_ptr in order to allow lock-free reads of the values.
     std::shared_ptr<Map> _map;

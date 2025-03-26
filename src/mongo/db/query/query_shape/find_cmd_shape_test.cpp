@@ -294,8 +294,7 @@ TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
         findCommandRequest->setFilter(BSON("a" << 1));
         findCommandRequest->setSort(BSON("b" << 1));
         findCommandRequest->setProjection(BSON("c" << 1));
-        findCommandRequest->setCollation(BSON("locale"
-                                              << "en_US"));
+        findCommandRequest->setCollation(BSON("locale" << "en_US"));
         findCommandRequest->setMin(BSON("d" << 1));
         findCommandRequest->setMax(BSON("d" << 9));
         findCommandRequest->setLet(BSON("e" << 1));

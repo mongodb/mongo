@@ -286,10 +286,10 @@ public:
      *  is called for 'key'.
      */
     template <typename KeyType>
-    requires(IsComparable<KeyType>&& std::is_constructible_v<Key, KeyType>)
-        SharedSemiFuture<ValueHandle> acquireAsync(const KeyType& key,
-                                                   CacheCausalConsistency causalConsistency,
-                                                   LookupArgs&&... lookupArgs) {
+    requires(IsComparable<KeyType> && std::is_constructible_v<Key, KeyType>)
+    SharedSemiFuture<ValueHandle> acquireAsync(const KeyType& key,
+                                               CacheCausalConsistency causalConsistency,
+                                               LookupArgs&&... lookupArgs) {
 
         // Fast path
         if (auto cachedValue = _cache.get(key, causalConsistency))
@@ -330,8 +330,8 @@ public:
     }
 
     template <typename KeyType>
-    requires(IsComparable<KeyType>&& std::is_constructible_v<Key, KeyType>)
-        SharedSemiFuture<ValueHandle> acquireAsync(const KeyType& key, LookupArgs&&... lookupArgs) {
+    requires(IsComparable<KeyType> && std::is_constructible_v<Key, KeyType>)
+    SharedSemiFuture<ValueHandle> acquireAsync(const KeyType& key, LookupArgs&&... lookupArgs) {
         return acquireAsync(
             key, CacheCausalConsistency::kLatestCached, std::forward<LookupArgs>(lookupArgs)...);
     }
@@ -343,18 +343,18 @@ public:
      *  This is a potentially blocking method.
      */
     template <typename KeyType>
-    requires IsComparable<KeyType> ValueHandle acquire(OperationContext* opCtx,
-                                                       const KeyType& key,
-                                                       CacheCausalConsistency causalConsistency,
-                                                       LookupArgs&&... lookupArgs) {
+    requires IsComparable<KeyType>
+    ValueHandle acquire(OperationContext* opCtx,
+                        const KeyType& key,
+                        CacheCausalConsistency causalConsistency,
+                        LookupArgs&&... lookupArgs) {
         return acquireAsync(key, causalConsistency, std::forward<LookupArgs>(lookupArgs)...)
             .get(opCtx);
     }
 
     template <typename KeyType>
-    requires IsComparable<KeyType> ValueHandle acquire(OperationContext* opCtx,
-                                                       const KeyType& key,
-                                                       LookupArgs&&... lookupArgs) {
+    requires IsComparable<KeyType>
+    ValueHandle acquire(OperationContext* opCtx, const KeyType& key, LookupArgs&&... lookupArgs) {
         return acquire(opCtx,
                        key,
                        CacheCausalConsistency::kLatestCached,
@@ -369,7 +369,8 @@ public:
      * in-progress keys or keys whose time in store is newer than what is currently cached.
      */
     template <typename KeyType>
-    requires IsComparable<KeyType> ValueHandle peekLatestCached(const KeyType& key) {
+    requires IsComparable<KeyType>
+    ValueHandle peekLatestCached(const KeyType& key) {
         return {_cache.get(key, CacheCausalConsistency::kLatestCached)};
     }
 

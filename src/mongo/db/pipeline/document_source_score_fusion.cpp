@@ -130,8 +130,7 @@ BSONObj findScorePath(const Pipeline& pipeline) {
         std::any_of(sources.begin(), sources.end(), hybrid_scoring_util::isScoreStage)) {
         // The "score" metadata field works as an alias for all 3 metadata score fields:
         // searchScore, vectorSearchScore, score.
-        scorePath = BSON("$meta"
-                         << "score");
+        scorePath = BSON("$meta" << "score");
     } else {
         // Scores are saved as "score" on documents outputted by $rankFusion and $scoreFusion
         // stages.
@@ -196,10 +195,8 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
  */
 boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return DocumentSourceReplaceRoot::createFromBson(BSON("$replaceWith" << BSON("docs"
-                                                                                 << "$$ROOT"))
-                                                         .firstElement(),
-                                                     expCtx);
+    return DocumentSourceReplaceRoot::createFromBson(
+        BSON("$replaceWith" << BSON("docs" << "$$ROOT")).firstElement(), expCtx);
 }
 
 /**
@@ -286,9 +283,7 @@ BSONObj groupEachScore(
     {
         BSONObjBuilder groupBob(bob.subobjStart("$group"_sd));
         groupBob.append("_id", "$docs._id");
-        groupBob.append("docs",
-                        BSON("$first"
-                             << "$docs"));
+        groupBob.append("docs", BSON("$first" << "$docs"));
 
         for (auto pipeline_it = pipelines.begin(); pipeline_it != pipelines.end(); pipeline_it++) {
             const auto& pipelineName = pipeline_it->first;
@@ -433,9 +428,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
         DocumentSourceGroup::createFromBson(groupEachScore(inputPipelines).firstElement(), expCtx);
     auto setScoreMeta = buildSetScoreStage(expCtx, inputPipelines, combination);
 
-    const SortPattern sortingPattern{BSON("score" << BSON("$meta"
-                                                          << "score")
-                                                  << "_id" << 1),
+    const SortPattern sortingPattern{BSON("score" << BSON("$meta" << "score") << "_id" << 1),
                                      expCtx};
     auto sort = DocumentSourceSort::create(expCtx, sortingPattern);
 

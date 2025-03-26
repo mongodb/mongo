@@ -55,7 +55,7 @@ struct ExtraDataForServerParameter {
 class SpecializedClusterServerParameterData {
 public:
     SpecializedClusterServerParameterData()
-        : _clusterParameterTime(), _strData("default"), _intData(30){};
+        : _clusterParameterTime(), _strData("default"), _intData(30) {};
 
     SpecializedClusterServerParameterData(const std::string& newStrData, std::uint32_t newIntData)
         : _strData(newStrData), _intData(newIntData) {}

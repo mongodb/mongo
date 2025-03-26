@@ -226,10 +226,8 @@ std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSO
 
 TEST(InternalSchemaCondMatchExpressionTest, AcceptsObjectsThatMatch) {
     auto conditionQuery = BSON("age" << BSON("$lt" << 18));
-    auto thenQuery = BSON("job"
-                          << "student");
-    auto elseQuery = BSON("job"
-                          << "engineer");
+    auto thenQuery = BSON("job" << "student");
+    auto elseQuery = BSON("job" << "engineer");
     auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
 
     ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 15, job: 'student'}")));
@@ -240,10 +238,8 @@ TEST(InternalSchemaCondMatchExpressionTest, AcceptsObjectsThatMatch) {
 
 TEST(InternalSchemaCondMatchExpressionTest, RejectsObjectsThatDontMatch) {
     auto conditionQuery = BSON("age" << BSON("$lt" << 18));
-    auto thenQuery = BSON("job"
-                          << "student");
-    auto elseQuery = BSON("job"
-                          << "engineer");
+    auto thenQuery = BSON("job" << "student");
+    auto elseQuery = BSON("job" << "engineer");
     auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
 
     ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 21, job: 'student'}")));
@@ -267,10 +263,8 @@ TEST(InternalSchemaCondMatchExpressionTest, EmptyMatchAlwaysUsesThenBranch) {
 
 TEST(InternalSchemaCondMatchExpressionTest, AppliesToSubobjectsViaObjectMatch) {
     auto conditionQuery = fromjson("{team: {$in: ['server', 'engineering']}}");
-    auto thenQuery = BSON("subteam"
-                          << "query");
-    auto elseQuery = BSON("interests"
-                          << "query optimization");
+    auto thenQuery = BSON("subteam" << "query");
+    auto elseQuery = BSON("interests" << "query optimization");
 
     InternalSchemaObjectMatchExpression objMatch(
         "job"_sd, createCondMatchExpression(conditionQuery, thenQuery, elseQuery));
@@ -308,16 +302,11 @@ TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesScalarElements) {
     ASSERT_TRUE(exec::matcher::matchesBSON(&eqNumberOperand, BSON("a" << 5.0)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eqNumberOperand, BSON("a" << 6)));
 
-    BSONObj stringOperand = BSON("a"
-                                 << "str");
+    BSONObj stringOperand = BSON("a" << "str");
 
     InternalSchemaEqMatchExpression eqStringOperand("a"_sd, stringOperand["a"]);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eqStringOperand,
-                                           BSON("a"
-                                                << "str")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eqStringOperand,
-                                            BSON("a"
-                                                 << "string")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eqStringOperand, BSON("a" << "str")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eqStringOperand, BSON("a" << "string")));
 }
 
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesArrayElement) {
@@ -504,9 +493,7 @@ TEST(InternalSchemaMaxItemsMatchExpression, RejectsNonArrayElements) {
 
     ASSERT(!exec::matcher::matchesBSON(&maxItems, BSON("a" << BSONObj())));
     ASSERT(!exec::matcher::matchesBSON(&maxItems, BSON("a" << 1)));
-    ASSERT(!exec::matcher::matchesBSON(&maxItems,
-                                       BSON("a"
-                                            << "string")));
+    ASSERT(!exec::matcher::matchesBSON(&maxItems, BSON("a" << "string")));
 }
 
 TEST(InternalSchemaMaxItemsMatchExpression, RejectsArraysWithTooManyElements) {
@@ -561,34 +548,22 @@ TEST(InternalSchemaMaxLengthMatchExpression, RejectsNonStringElements) {
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsStringsWithTooManyChars) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength,
-                                            BSON("a"
-                                                 << "abc")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength,
-                                            BSON("a"
-                                                 << "abcd")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "abc")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "abcd")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, AcceptsStringsWithLessThanOrEqualToMax) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
-                                           BSON("a"
-                                                << "ab")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
-                                           BSON("a"
-                                                << "a")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
-                                           BSON("a"
-                                                << "")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "ab")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "a")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, MaxLengthZeroAllowsEmptyString) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 0);
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
-                                           BSON("a"
-                                                << "")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNull) {
@@ -648,15 +623,9 @@ TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
 TEST(InternalSchemaMaxLengthMatchExpression, NestedArraysWorkWithDottedPaths) {
     InternalSchemaMaxLengthMatchExpression maxLength("a.b"_sd, 2);
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
-                                           BSON("a" << BSON("b"
-                                                            << "a"))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
-                                           BSON("a" << BSON("b"
-                                                            << "ab"))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength,
-                                            BSON("a" << BSON("b"
-                                                             << "abc"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSON("b" << "a"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSON("b" << "ab"))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSON("b" << "abc"))));
 }
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, RejectsObjectsWithTooManyElements) {
@@ -712,9 +681,7 @@ TEST(InternalSchemaMinItemsMatchExpression, RejectsNonArrayElements) {
 
     ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << BSONObj())));
     ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << 1)));
-    ASSERT(!exec::matcher::matchesBSON(&minItems,
-                                       BSON("a"
-                                            << "string")));
+    ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << "string")));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, RejectsArraysWithTooFewElements) {
@@ -768,34 +735,22 @@ TEST(InternalSchemaMinLengthMatchExpression, RejectsNonStringElements) {
 TEST(InternalSchemaMinLengthMatchExpression, RejectsStringsWithTooFewChars) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength,
-                                            BSON("a"
-                                                 << "")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength,
-                                            BSON("a"
-                                                 << "a")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << "")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << "a")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, AcceptsStringWithAtLeastMinChars) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
-                                           BSON("a"
-                                                << "ab")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
-                                           BSON("a"
-                                                << "abc")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
-                                           BSON("a"
-                                                << "abcde")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << "ab")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << "abc")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << "abcde")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, MinLengthZeroAllowsEmptyString) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 0);
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
-                                           BSON("a"
-                                                << "")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << "")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsNull) {
@@ -855,15 +810,9 @@ TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
 TEST(InternalSchemaMinLengthMatchExpression, NestedFieldsWorkWithDottedPaths) {
     InternalSchemaMinLengthMatchExpression minLength("a.b"_sd, 2);
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
-                                           BSON("a" << BSON("b"
-                                                            << "ab"))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
-                                           BSON("a" << BSON("b"
-                                                            << "abc"))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength,
-                                            BSON("a" << BSON("b"
-                                                             << "a"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSON("b" << "ab"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSON("b" << "abc"))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSON("b" << "a"))));
 }
 
 TEST(InternalSchemaMinPropertiesMatchExpression, RejectsObjectsWithTooFewElements) {
@@ -924,17 +873,13 @@ TEST(InternalSchemaObjectMatchExpression, RejectsNonObjectElements) {
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << 1)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
-                                            BSON("a"
-                                                 << "string")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << "string")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON_ARRAY(BSONNULL))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, RejectsObjectsThatDontMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto subExpr = MatchExpressionParser::parse(BSON("b" << BSON("$type"
-                                                                 << "string")),
-                                                expCtx);
+    auto subExpr = MatchExpressionParser::parse(BSON("b" << BSON("$type" << "string")), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
@@ -945,45 +890,33 @@ TEST(InternalSchemaObjectMatchExpression, RejectsObjectsThatDontMatch) {
 
 TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto subExpr = MatchExpressionParser::parse(BSON("b" << BSON("$type"
-                                                                 << "string")),
-                                                expCtx);
+    auto subExpr = MatchExpressionParser::parse(BSON("b" << BSON("$type" << "string")), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
+    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << "string"))));
     ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
-                                           BSON("a" << BSON("b"
-                                                            << "string"))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
-                                           BSON("a" << BSON("b"
-                                                            << "string"
-                                                            << "c" << 1))));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(&objMatch,
-                                   BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b"
-                                                                                 << "string")))));
+                                           BSON("a" << BSON("b" << "string"
+                                                                << "c" << 1))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        &objMatch, BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b" << "string")))));
     ASSERT_TRUE(
         exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << BSON_ARRAY("string")))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, DottedPathAcceptsObjectsThatMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto subExpr = MatchExpressionParser::parse(BSON("b.c.d" << BSON("$type"
-                                                                     << "string")),
-                                                expCtx);
+    auto subExpr = MatchExpressionParser::parse(BSON("b.c.d" << BSON("$type" << "string")), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
-                                            BSON("a" << BSON("d"
-                                                             << "string"))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("d" << "string"))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
                                             BSON("a" << BSON("b" << BSON("c" << BSON("d" << 1))))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
-                                           BSON("a" << BSON("b" << BSON("c" << BSON("d"
-                                                                                    << "foo"))))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        &objMatch, BSON("a" << BSON("b" << BSON("c" << BSON("d" << "foo"))))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, EmptyMatchAcceptsAllObjects) {
@@ -994,13 +927,9 @@ TEST(InternalSchemaObjectMatchExpression, EmptyMatchAcceptsAllObjects) {
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << 1)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
-                                            BSON("a"
-                                                 << "string")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << "string")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSONObj())));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
-                                           BSON("a" << BSON("b"
-                                                            << "string"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << "string"))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON_ARRAY(BSONObj()))));
 }
 
@@ -1060,9 +989,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, RejectsNonArrays) {
     InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
     ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << 1)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << BSONObj())));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems,
-                                            BSON("foo"
-                                                 << "string")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << "string")));
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesEmptyArray) {
@@ -1196,8 +1123,7 @@ TEST(InternalSchemaXorOp, MatchesSingleElement) {
     BSONObj match1 = BSON("a" << 4);
     BSONObj match2 = BSON("b" << 10);
     BSONObj noMatch1 = BSON("a" << 8);
-    BSONObj noMatch2 = BSON("c"
-                            << "x");
+    BSONObj noMatch2 = BSON("c" << "x");
 
     ASSERT_TRUE(exec::matcher::matchesSingleElement(expr.getValue().get(), match1.firstElement()));
     ASSERT_TRUE(exec::matcher::matchesSingleElement(expr.getValue().get(), match2.firstElement()));
@@ -1398,15 +1324,9 @@ TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesIntegerArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "ab")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesLongArgument) {
@@ -1415,15 +1335,9 @@ TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesLongArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "ab")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDoubleArgumentAsInteger) {
@@ -1432,15 +1346,9 @@ TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDoubleArgumentAsIn
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "ab")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDecimalArgumentAsInteger) {
@@ -1449,15 +1357,9 @@ TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDecimalArgumentAsI
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "ab")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "abc")));
 }
 
 //
@@ -1469,15 +1371,9 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesIntegerArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "ab")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesLongArgument) {
@@ -1486,15 +1382,9 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesLongArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "ab")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesDoubleArgumentAsInteger) {
@@ -1503,15 +1393,9 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesDoubleArgumentAsIn
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "ab")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthorrectlyParsesDecimalArgumentAsInteger) {
@@ -1520,15 +1404,9 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthorrectlyParsesDecimalArgumentAsIn
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "ab")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, CondParsesThreeMatchExpressions) {
@@ -1710,8 +1588,7 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotMatchShortBinData) {
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleTypeAlias) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                  << "string"));
+    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << "string"));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;

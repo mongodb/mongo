@@ -57,9 +57,7 @@ OperationContext* opCtx = nullptr;
 TEST(RouterStageRemoveMetadataFieldsTest, RemovesMetaDataFields) {
     auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 4 << "$sortKey" << 1 << "b" << 3));
-    mockStage->queueResult(BSON("$sortKey" << BSON("" << 3) << "c"
-                                           << BSON("d"
-                                                   << "foo")));
+    mockStage->queueResult(BSON("$sortKey" << BSON("" << 3) << "c" << BSON("d" << "foo")));
     mockStage->queueResult(BSON("a" << 3));
     mockStage->queueResult(BSON("a" << 3 << "$randVal" << 4 << "$sortKey" << 2));
     mockStage->queueResult(
@@ -78,9 +76,7 @@ TEST(RouterStageRemoveMetadataFieldsTest, RemovesMetaDataFields) {
     auto secondResult = sortKeyStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
-    ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(),
-                      BSON("c" << BSON("d"
-                                       << "foo")));
+    ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("c" << BSON("d" << "foo")));
 
     auto thirdResult = sortKeyStage->next();
     ASSERT_OK(thirdResult.getStatus());

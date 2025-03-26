@@ -137,11 +137,10 @@ RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
     : RecoverableShardingDDLCoordinator(
           service, "RefineCollectionShardKeyCoordinator", initialState),
       _request(_doc.getRefineCollectionShardKeyRequest()),
-      _critSecReason(BSON("command"
-                          << "refineCollectionShardKey"
-                          << "ns"
-                          << NamespaceStringUtil::serialize(
-                                 nss(), SerializationContext::stateDefault()))) {}
+      _critSecReason(BSON("command" << "refineCollectionShardKey"
+                                    << "ns"
+                                    << NamespaceStringUtil::serialize(
+                                           nss(), SerializationContext::stateDefault()))) {}
 
 void RefineCollectionShardKeyCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two refine collections on the same namespace, then the arguments must be the same.

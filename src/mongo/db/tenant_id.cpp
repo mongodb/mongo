@@ -75,7 +75,7 @@ void TenantId::serializeToBSON(BSONArrayBuilder* builder) const {
 }
 
 template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<<TenantId>(TenantId value) {
+BSONObjBuilder& BSONObjBuilderValueStream::operator<< <TenantId>(TenantId value) {
     value.serializeToBSON(_fieldName, _builder);
     _fieldName = StringData();
     return *_builder;

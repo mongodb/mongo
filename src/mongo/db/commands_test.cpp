@@ -212,16 +212,14 @@ TEST_F(ParseNsOrUUID, FailWrongType) {
 }
 
 TEST_F(ParseNsOrUUID, FailEmptyDbName) {
-    auto cmd = BSON("query"
-                    << "coll");
+    auto cmd = BSON("query" << "coll");
     ASSERT_THROWS_CODE(CommandHelpers::parseNsOrUUID(DatabaseName(), cmd),
                        DBException,
                        ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ParseNsOrUUID, FailInvalidDbName) {
-    auto cmd = BSON("query"
-                    << "coll");
+    auto cmd = BSON("query" << "coll");
     ASSERT_THROWS_CODE(CommandHelpers::parseNsOrUUID(
                            DatabaseName::createDatabaseName_forTest(boost::none, "test.coll"), cmd),
                        DBException,
@@ -229,8 +227,7 @@ TEST_F(ParseNsOrUUID, FailInvalidDbName) {
 }
 
 TEST_F(ParseNsOrUUID, FailInvalidCollectionNameContainsDollar) {
-    auto cmd = BSON("query"
-                    << "$coll");
+    auto cmd = BSON("query" << "$coll");
     ASSERT_THROWS_CODE(CommandHelpers::parseNsOrUUID(
                            DatabaseName::createDatabaseName_forTest(boost::none, "test"), cmd),
                        DBException,
@@ -238,16 +235,14 @@ TEST_F(ParseNsOrUUID, FailInvalidCollectionNameContainsDollar) {
 }
 
 TEST_F(ParseNsOrUUID, ParseValidColl) {
-    auto cmd = BSON("query"
-                    << "coll");
+    auto cmd = BSON("query" << "coll");
     auto parsedNss = CommandHelpers::parseNsOrUUID(
         DatabaseName::createDatabaseName_forTest(boost::none, "test"), cmd);
     ASSERT_EQ(parsedNss.nss(), NamespaceString::createNamespaceString_forTest("test.coll"));
 }
 
 TEST_F(ParseNsOrUUID, ParseValidCollLocalOpLogDollarMain) {
-    auto cmd = BSON("query"
-                    << "oplog.$main");
+    auto cmd = BSON("query" << "oplog.$main");
     auto parsedNss = CommandHelpers::parseNsOrUUID(
         DatabaseName::createDatabaseName_forTest(
             boost::none, NamespaceString::kLocalOplogDollarMain.db(omitTenant)),
@@ -301,17 +296,15 @@ public:
                                << scram::Secrets<SHA256Block>::generateCredentials(
                                       "a", saslGlobalParams.scramSHA256IterationCount.load()));
 
-        BSONObj userDoc = BSON("_id"_sd
-                               << "test.varun"_sd
-                               << "user"_sd
-                               << "varun"
-                               << "db"_sd
-                               << "test"
-                               << "credentials"_sd << credentials << "roles"_sd
-                               << BSON_ARRAY(BSON("role"_sd
-                                                  << "readWrite"_sd
-                                                  << "db"_sd
-                                                  << "test"_sd)));
+        BSONObj userDoc = BSON("_id"_sd << "test.varun"_sd
+                                        << "user"_sd
+                                        << "varun"
+                                        << "db"_sd
+                                        << "test"
+                                        << "credentials"_sd << credentials << "roles"_sd
+                                        << BSON_ARRAY(BSON("role"_sd << "readWrite"_sd
+                                                                     << "db"_sd
+                                                                     << "test"_sd)));
 
         auto opCtx = _client->makeOperationContext();
         ASSERT_OK(_mockBackend->insertUserDocument(opCtx.get(), userDoc, {}));
@@ -594,8 +587,7 @@ public:
         };
         [&]<int... i>(std::integer_sequence<int, i...>) {
             (populateOneCommand(std::type_identity<TrivialNopCommand<i>>{}), ...);
-        }
-        (std::make_integer_sequence<int, count>{});
+        }(std::make_integer_sequence<int, count>{});
         return typesAdded;
     }
 };
@@ -643,8 +635,7 @@ public:
         };
         [&]<int... i>(std::integer_sequence<int, i...>) {
             (populateOneCommand(std::type_identity<TrivialNopCommand<i>>{}), ...);
-        }
-        (std::make_integer_sequence<int, 3>{});
+        }(std::make_integer_sequence<int, 3>{});
         return typesAdded;
     }
 

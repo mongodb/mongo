@@ -112,7 +112,7 @@ protected:
     // it is not, the exception will be propagated up and fail the sync attempt entirely.
     class BaseClonerStage {
     public:
-        BaseClonerStage(std::string name) : _name(name){};
+        BaseClonerStage(std::string name) : _name(name) {};
 
         virtual AfterStageBehavior run() = 0;
 

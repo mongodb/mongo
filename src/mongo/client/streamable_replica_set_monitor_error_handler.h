@@ -75,7 +75,7 @@ protected:
 
 class SdamErrorHandler final : public StreamableReplicaSetMonitorErrorHandler {
 public:
-    explicit SdamErrorHandler(std::string setName) : _setName(std::move(setName)){};
+    explicit SdamErrorHandler(std::string setName) : _setName(std::move(setName)) {};
 
     ErrorActions computeErrorActions(const HostAndPort& host,
                                      const Status& status,

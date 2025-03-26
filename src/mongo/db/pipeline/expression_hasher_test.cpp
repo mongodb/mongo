@@ -120,31 +120,27 @@ public:
             // Test date expressions/
             ExpressionDateFromString::parseExpression(
                 &ctx,
-                BSON("$dateFromString" << BSON("dateString"
-                                               << "2017-07"
-                                               << "format"
-                                               << "%Y-%m-%d")),
+                BSON("$dateFromString" << BSON("dateString" << "2017-07"
+                                                            << "format"
+                                                            << "%Y-%m-%d")),
                 ctx.variablesParseState),
             ExpressionDateFromString::parseExpression(
                 &ctx,
-                BSON("$dateFromString" << BSON("dateString"
-                                               << "2017-07-14 -0400"
-                                               << "timezone"
-                                               << "GMT")),
+                BSON("$dateFromString" << BSON("dateString" << "2017-07-14 -0400"
+                                                            << "timezone"
+                                                            << "GMT")),
                 ctx.variablesParseState),
             ExpressionDateFromString::parseExpression(
                 &ctx,
-                BSON("$dateFromString" << BSON("dateString"
-                                               << "Day 7 Week 53 Year 2017"
-                                               << "format"
-                                               << "Day %u Week %V Year %G")),
+                BSON("$dateFromString" << BSON("dateString" << "Day 7 Week 53 Year 2017"
+                                                            << "format"
+                                                            << "Day %u Week %V Year %G")),
                 ctx.variablesParseState),
             ExpressionDateFromString::parseExpression(
                 &ctx,
-                BSON("$dateFromString" << BSON("dateString"
-                                               << "2017-07-14 -0400"
-                                               << "timezone"
-                                               << "-08:00")),
+                BSON("$dateFromString" << BSON("dateString" << "2017-07-14 -0400"
+                                                            << "timezone"
+                                                            << "-08:00")),
                 ctx.variablesParseState),
             // Test field path expressions.
             ExpressionFieldPath::createPathFromString(&ctx, "foo.bar", ctx.variablesParseState),

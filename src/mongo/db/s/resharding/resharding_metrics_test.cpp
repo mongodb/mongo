@@ -154,9 +154,7 @@ public:
                   kTestNamespace.toString_forTest());
         ASSERT_EQ(originalCommand.getObjectField("key").woCompare(kShardKey), 0);
         ASSERT_EQ(originalCommand.getStringField("unique"), "false");
-        ASSERT_EQ(originalCommand.getObjectField("collation")
-                      .woCompare(BSON("locale"
-                                      << "simple")),
+        ASSERT_EQ(originalCommand.getObjectField("collation").woCompare(BSON("locale" << "simple")),
                   0);
         ASSERT_EQ(report.getIntField("totalOperationTimeElapsedSecs"), kRunningTime.count());
     }

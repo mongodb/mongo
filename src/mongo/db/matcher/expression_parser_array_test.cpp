@@ -71,8 +71,7 @@ TEST(MatchExpressionParserArrayTest, SizeTooLarge) {
 }
 
 TEST(MatchExpressionParserArrayTest, SizeAsString) {
-    BSONObj query = BSON("x" << BSON("$size"
-                                     << "a"));
+    BSONObj query = BSON("x" << BSON("$size" << "a"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_FALSE(result.isOK());

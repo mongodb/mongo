@@ -217,7 +217,7 @@ static_assert(
  * A sub-class used for commmands without any specific key components, such as count and distinct.
  */
 struct EmptyCmdComponents : public SpecificKeyComponents {
-    EmptyCmdComponents(){};
+    EmptyCmdComponents() {};
 
     std::size_t size() const override {
         return sizeof(EmptyCmdComponents);

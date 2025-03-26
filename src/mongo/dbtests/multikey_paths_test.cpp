@@ -179,9 +179,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
 
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     createIndex(collection(),
-                BSON("name"
-                     << "a_1_b_1"
-                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
+                BSON("name" << "a_1_b_1"
+                            << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     assertMultikeyPaths(collection(), keyPattern, {MultikeyComponents{}, {0U}});
@@ -209,9 +208,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
 
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     createIndex(collection(),
-                BSON("name"
-                     << "a_1_b_1"
-                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
+                BSON("name" << "a_1_b_1"
+                            << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     assertMultikeyPaths(collection(), keyPattern, {{0U}, {0U}});
@@ -220,9 +218,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
 TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     createIndex(collection(),
-                BSON("name"
-                     << "a_1_b_1"
-                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
+                BSON("name" << "a_1_b_1"
+                            << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     AutoGetCollection collection(_opCtx.get(), _nss, MODE_IX);
@@ -257,9 +254,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
 TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     createIndex(collection(),
-                BSON("name"
-                     << "a_1_b_1"
-                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
+                BSON("name" << "a_1_b_1"
+                            << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
     AutoGetCollection collection(_opCtx.get(), _nss, MODE_IX);
 
@@ -304,9 +300,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
 TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     createIndex(collection(),
-                BSON("name"
-                     << "a_1_b_1"
-                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
+                BSON("name" << "a_1_b_1"
+                            << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
     AutoGetCollection collection(_opCtx.get(), _nss, MODE_IX);
 
@@ -358,9 +353,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
 TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     createIndex(collection(),
-                BSON("name"
-                     << "a_1_b_1"
-                     << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
+                BSON("name" << "a_1_b_1"
+                            << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
     AutoGetCollection collection(_opCtx.get(), _nss, MODE_IX);
 
@@ -397,16 +391,14 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
 TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
     BSONObj keyPatternAB = BSON("a" << 1 << "b" << 1);
     createIndex(collection(),
-                BSON("name"
-                     << "a_1_b_1"
-                     << "key" << keyPatternAB << "v" << static_cast<int>(kIndexVersion)))
+                BSON("name" << "a_1_b_1"
+                            << "key" << keyPatternAB << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     BSONObj keyPatternAC = BSON("a" << 1 << "c" << 1);
     createIndex(collection(),
-                BSON("name"
-                     << "a_1_c_1"
-                     << "key" << keyPatternAC << "v" << static_cast<int>(kIndexVersion)))
+                BSON("name" << "a_1_c_1"
+                            << "key" << keyPatternAC << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     AutoGetCollection collection(_opCtx.get(), _nss, MODE_IX);

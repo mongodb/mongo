@@ -120,15 +120,13 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationNoQuery) {
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS().value_or(0), 0u);
 
     std::vector<BSONObj> expectedPipeline{
-        BSON("$replaceRoot" << BSON(
-                 "newRoot" << BSON("_internalUnwoundArray" << BSON("$_internalFindAllValuesAtPath"
-                                                                   << "x")))),
-        BSON("$unwind" << BSON("path"
-                               << "$_internalUnwoundArray"
-                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$replaceRoot" << BSON("newRoot"
+                                    << BSON("_internalUnwoundArray"
+                                            << BSON("$_internalFindAllValuesAtPath" << "x")))),
+        BSON("$unwind" << BSON("path" << "$_internalUnwoundArray"
+                                      << "preserveNullAndEmptyArrays" << true)),
         BSON("$group" << BSON("_id" << BSONNULL << "distinct"
-                                    << BSON("$addToSet"
-                                            << "$_internalUnwoundArray")))};
+                                    << BSON("$addToSet" << "$_internalUnwoundArray")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
@@ -161,15 +159,13 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationDottedPathNoQuery) {
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS().value_or(0), 0u);
 
     std::vector<BSONObj> expectedPipeline{
-        BSON("$replaceRoot" << BSON(
-                 "newRoot" << BSON("_internalUnwoundArray" << BSON("$_internalFindAllValuesAtPath"
-                                                                   << "x.y.z")))),
-        BSON("$unwind" << BSON("path"
-                               << "$_internalUnwoundArray"
-                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$replaceRoot" << BSON("newRoot"
+                                    << BSON("_internalUnwoundArray"
+                                            << BSON("$_internalFindAllValuesAtPath" << "x.y.z")))),
+        BSON("$unwind" << BSON("path" << "$_internalUnwoundArray"
+                                      << "preserveNullAndEmptyArrays" << true)),
         BSON("$group" << BSON("_id" << BSONNULL << "distinct"
-                                    << BSON("$addToSet"
-                                            << "$_internalUnwoundArray")))};
+                                    << BSON("$addToSet" << "$_internalUnwoundArray")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
@@ -178,21 +174,14 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationDottedPathNoQuery) {
 }
 
 TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
-    auto rawCmd = BSON("distinct"
-                       << "testcoll"
-                       << "key"
-                       << "x"
-                       << "hint" << BSON("b" << 5) << "collation"
-                       << BSON("locale"
-                               << "en_US")
-                       << "readConcern"
-                       << BSON("level"
-                               << "linearizable")
-                       << "$queryOptions"
-                       << BSON("readPreference"
-                               << "secondary")
-                       << "maxTimeMS" << 100 << "$db"
-                       << "testdb");
+    auto rawCmd =
+        BSON("distinct" << "testcoll"
+                        << "key"
+                        << "x"
+                        << "hint" << BSON("b" << 5) << "collation" << BSON("locale" << "en_US")
+                        << "readConcern" << BSON("level" << "linearizable") << "$queryOptions"
+                        << BSON("readPreference" << "secondary") << "maxTimeMS" << 100 << "$db"
+                        << "testdb");
     auto pdc = bsonToParsedDistinct(expCtx, rawCmd);
     auto canonicalQuery =
         parsed_distinct_command::parseCanonicalQuery(expCtx, std::move(pdc), nullptr);
@@ -209,29 +198,23 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
                   aggregation_request_helper::kDefaultBatchSize),
               aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()),
-                      BSON("locale"
-                           << "en_US"));
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSON("locale" << "en_US"));
     ASSERT_BSONOBJ_EQ(
         ar.getValue().getReadConcern().value_or(repl::ReadConcernArgs()).toBSONInner(),
-        BSON("level"
-             << "linearizable"));
+        BSON("level" << "linearizable"));
     ASSERT_BSONOBJ_EQ(ar.getValue().getUnwrappedReadPref().value_or(BSONObj()),
-                      BSON("readPreference"
-                           << "secondary"));
+                      BSON("readPreference" << "secondary"));
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS().value_or(0), 100u);
     ASSERT_BSONOBJ_EQ(ar.getValue().getHint().value_or(BSONObj()), fromjson("{ b : 5 }"));
 
     std::vector<BSONObj> expectedPipeline{
-        BSON("$replaceRoot" << BSON(
-                 "newRoot" << BSON("_internalUnwoundArray" << BSON("$_internalFindAllValuesAtPath"
-                                                                   << "x")))),
-        BSON("$unwind" << BSON("path"
-                               << "$_internalUnwoundArray"
-                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$replaceRoot" << BSON("newRoot"
+                                    << BSON("_internalUnwoundArray"
+                                            << BSON("$_internalFindAllValuesAtPath" << "x")))),
+        BSON("$unwind" << BSON("path" << "$_internalUnwoundArray"
+                                      << "preserveNullAndEmptyArrays" << true)),
         BSON("$group" << BSON("_id" << BSONNULL << "distinct"
-                                    << BSON("$addToSet"
-                                            << "$_internalUnwoundArray")))};
+                                    << BSON("$addToSet" << "$_internalUnwoundArray")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
@@ -265,15 +248,13 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithQuery) {
 
     std::vector<BSONObj> expectedPipeline{
         BSON("$match" << BSON("z" << 7)),
-        BSON("$replaceRoot" << BSON(
-                 "newRoot" << BSON("_internalUnwoundArray" << BSON("$_internalFindAllValuesAtPath"
-                                                                   << "y")))),
-        BSON("$unwind" << BSON("path"
-                               << "$_internalUnwoundArray"
-                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$replaceRoot" << BSON("newRoot"
+                                    << BSON("_internalUnwoundArray"
+                                            << BSON("$_internalFindAllValuesAtPath" << "y")))),
+        BSON("$unwind" << BSON("path" << "$_internalUnwoundArray"
+                                      << "preserveNullAndEmptyArrays" << true)),
         BSON("$group" << BSON("_id" << BSONNULL << "distinct"
-                                    << BSON("$addToSet"
-                                            << "$_internalUnwoundArray")))};
+                                    << BSON("$addToSet" << "$_internalUnwoundArray")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
@@ -302,15 +283,13 @@ TEST_F(CanonicalDistinctTest, ExplainNotIncludedWhenConvertingToAggregationComma
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 
     std::vector<BSONObj> expectedPipeline{
-        BSON("$replaceRoot" << BSON(
-                 "newRoot" << BSON("_internalUnwoundArray" << BSON("$_internalFindAllValuesAtPath"
-                                                                   << "x")))),
-        BSON("$unwind" << BSON("path"
-                               << "$_internalUnwoundArray"
-                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$replaceRoot" << BSON("newRoot"
+                                    << BSON("_internalUnwoundArray"
+                                            << BSON("$_internalFindAllValuesAtPath" << "x")))),
+        BSON("$unwind" << BSON("path" << "$_internalUnwoundArray"
+                                      << "preserveNullAndEmptyArrays" << true)),
         BSON("$group" << BSON("_id" << BSONNULL << "distinct"
-                                    << BSON("$addToSet"
-                                            << "$_internalUnwoundArray")))};
+                                    << BSON("$addToSet" << "$_internalUnwoundArray")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),

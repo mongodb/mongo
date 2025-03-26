@@ -520,7 +520,7 @@ template <typename FutureLike,
           typename Value = typename FutureLike::value_type,
           typename ResultVector = std::vector<Value>>
 requires(!std::is_void_v<Value> && future_util_details::isFutureOrExecutorFuture<FutureLike>)
-    SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
+SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
     invariant(futures.size() > 0, future_util_details::kWhenAllSucceedEmptyInputInvariantMsg);
 
     // A structure used to share state between the input futures.
@@ -581,8 +581,8 @@ requires(!std::is_void_v<Value> && future_util_details::isFutureOrExecutorFuture
  * SemiFuture<void> instead of SemiFuture<std::vector<T>>.
  */
 template <typename FutureLike, typename Value = typename FutureLike::value_type>
-requires(std::is_void_v<Value>&& future_util_details::isFutureOrExecutorFuture<FutureLike>)
-    SemiFuture<void> whenAllSucceed(std::vector<FutureLike>&& futures) {
+requires(std::is_void_v<Value> && future_util_details::isFutureOrExecutorFuture<FutureLike>)
+SemiFuture<void> whenAllSucceed(std::vector<FutureLike>&& futures) {
     invariant(futures.size() > 0, future_util_details::kWhenAllSucceedEmptyInputInvariantMsg);
 
     // A structure used to share state between the input futures.

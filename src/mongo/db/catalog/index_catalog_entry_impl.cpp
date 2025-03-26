@@ -318,59 +318,57 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
         return {ErrorCodes::SnapshotUnavailable, "index not visible in side transaction"};
     }
 
-    writeConflictRetry(
-        opCtx, "set index multikey", collection->ns(), [&] {
-            WriteUnitOfWork wuow(opCtx);
+    writeConflictRetry(opCtx, "set index multikey", collection->ns(), [&] {
+        WriteUnitOfWork wuow(opCtx);
 
-            // If we have a prepare optime for recovery, then we always use that. This is safe since
-            // the prepare timestamp is always <= the commit timestamp of a transaction, which
-            // satisfies the correctness requirement for multikey writes i.e. they must occur at or
-            // before the first write that set the multikey flag. This only occurs when
-            // reconstructing prepared transactions, and not during replication recovery oplog
-            // application.
-            auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
-            if (!recoveryPrepareOpTime.isNull()) {
-                // We might replay a prepared transaction behind the oldest timestamp during initial
-                // sync or behind the stable timestamp during rollback. During initial sync, we
-                // may not have a stable timestamp. Therefore, we need to round up
-                // the multi-key write timestamp to the max of the three so that we don't write
-                // behind the oldest/stable timestamp. This code path is only hit during initial
-                // sync/recovery when reconstructing prepared transactions, and so we don't expect
-                // the oldest/stable timestamp to advance concurrently.
-                //
-                // WiredTiger disallows committing at the stable timestamp to avoid confusion during
-                // checkpoints, to overcome that we allow setting the timestamp slightly after the
-                // prepared timestamp of the original transaction. This is currently not an issue as
-                // the index metadata state is read from in-memory cache and this is modifying the
-                // state on-disk from the _mdb_catalog document. To put in other words, multikey
-                // doesn't go backwards. This would be a problem if we move to a versioned catalog
-                // world as a different transaction could choose an earlier timestamp (i.e. the
-                // original transaction timestamp) and encounter an invalid system state where the
-                // document that enables multikey hasn't enabled it yet but is present in the
-                // collection. In other words, the index is not set for multikey but there is
-                // already data present that relies on it.
-                auto status = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(std::max(
-                    {recoveryPrepareOpTime.getTimestamp(),
-                     opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
-                     opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() + 1}));
-                fassert(31164, status);
-            } else {
-                // If there is no recovery prepare OpTime, then this node must be a primary. We
-                // write a noop oplog entry to get a properly ordered timestamp.
-                invariant(opCtx->writesAreReplicated());
+        // If we have a prepare optime for recovery, then we always use that. This is safe since
+        // the prepare timestamp is always <= the commit timestamp of a transaction, which
+        // satisfies the correctness requirement for multikey writes i.e. they must occur at or
+        // before the first write that set the multikey flag. This only occurs when
+        // reconstructing prepared transactions, and not during replication recovery oplog
+        // application.
+        auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
+        if (!recoveryPrepareOpTime.isNull()) {
+            // We might replay a prepared transaction behind the oldest timestamp during initial
+            // sync or behind the stable timestamp during rollback. During initial sync, we
+            // may not have a stable timestamp. Therefore, we need to round up
+            // the multi-key write timestamp to the max of the three so that we don't write
+            // behind the oldest/stable timestamp. This code path is only hit during initial
+            // sync/recovery when reconstructing prepared transactions, and so we don't expect
+            // the oldest/stable timestamp to advance concurrently.
+            //
+            // WiredTiger disallows committing at the stable timestamp to avoid confusion during
+            // checkpoints, to overcome that we allow setting the timestamp slightly after the
+            // prepared timestamp of the original transaction. This is currently not an issue as
+            // the index metadata state is read from in-memory cache and this is modifying the
+            // state on-disk from the _mdb_catalog document. To put in other words, multikey
+            // doesn't go backwards. This would be a problem if we move to a versioned catalog
+            // world as a different transaction could choose an earlier timestamp (i.e. the
+            // original transaction timestamp) and encounter an invalid system state where the
+            // document that enables multikey hasn't enabled it yet but is present in the
+            // collection. In other words, the index is not set for multikey but there is
+            // already data present that relies on it.
+            auto status = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(std::max(
+                {recoveryPrepareOpTime.getTimestamp(),
+                 opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
+                 opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() + 1}));
+            fassert(31164, status);
+        } else {
+            // If there is no recovery prepare OpTime, then this node must be a primary. We
+            // write a noop oplog entry to get a properly ordered timestamp.
+            invariant(opCtx->writesAreReplicated());
 
-                auto msg = BSON("msg"
-                                << "Setting index to multikey"
-                                << "coll"
-                                << NamespaceStringUtil::serializeForCatalog(collection->ns())
-                                << "index" << _descriptor.indexName());
-                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msg);
-            }
+            auto msg =
+                BSON("msg" << "Setting index to multikey"
+                           << "coll" << NamespaceStringUtil::serializeForCatalog(collection->ns())
+                           << "index" << _descriptor.indexName());
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msg);
+        }
 
-            _catalogSetMultikey(opCtx, collection, multikeyPaths);
+        _catalogSetMultikey(opCtx, collection, multikeyPaths);
 
-            wuow.commit();
-        });
+        wuow.commit();
+    });
 
     return Status::OK();
 }

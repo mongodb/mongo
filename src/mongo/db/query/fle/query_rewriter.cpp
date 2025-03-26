@@ -51,7 +51,7 @@ namespace mongo::fle {
 class ExpressionRewriter {
 public:
     ExpressionRewriter(QueryRewriter* queryRewriter, const ExpressionToRewriteMap& exprRewrites)
-        : queryRewriter(queryRewriter), exprRewrites(exprRewrites){};
+        : queryRewriter(queryRewriter), exprRewrites(exprRewrites) {};
 
     std::unique_ptr<Expression> postVisit(Expression* exp) {
         if (auto rewriteEntry = exprRewrites.find(typeid(*exp));

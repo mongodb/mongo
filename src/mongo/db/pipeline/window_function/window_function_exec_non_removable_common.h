@@ -71,7 +71,7 @@ public:
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kDefaultSequential),
                              memTracker),
           _input(std::move(input)),
-          _upperDocumentBound(upperDocumentBound){};
+          _upperDocumentBound(upperDocumentBound) {};
 
     Value getNext(boost::optional<Document> current = boost::none) final {
         if (!_initialized) {

@@ -118,7 +118,7 @@ private:
     }
 
     struct JITBSONObjBuilderStackFrame {
-        JITBSONObjBuilderStackFrame(StringData subObjectName) : name(subObjectName){};
+        JITBSONObjBuilderStackFrame(StringData subObjectName) : name(subObjectName) {};
         StringData name;
         std::unique_ptr<BSONObjBuilder> builder{nullptr};
         std::vector<BSONElement> stash;

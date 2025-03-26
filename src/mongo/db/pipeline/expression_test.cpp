@@ -192,9 +192,7 @@ private:
 TEST(ExpressionConstantTest, ConstantOfValueMissingSerializesToRemoveSystemVar) {
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value());
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("field"
-                                  << "$$REMOVE"),
-                             BSON("field" << expression->serialize()));
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << "$$REMOVE"), BSON("field" << expression->serialize()));
 }
 
 TEST(ExpressionConstantTest, ConstantRedaction) {
@@ -659,9 +657,7 @@ TEST(ParseExpression, ShouldRejectUnknownExpression) {
 }
 
 TEST(ParseExpression, ShouldRejectExpressionArgumentsWhichAreNotInArray) {
-    ASSERT_THROWS(parseExpression(BSON("$strcasecmp"
-                                       << "foo")),
-                  AssertionException);
+    ASSERT_THROWS(parseExpression(BSON("$strcasecmp" << "foo")), AssertionException);
 }
 
 TEST(ParseExpression, ShouldRejectExpressionWithWrongNumberOfArguments) {
@@ -679,8 +675,7 @@ TEST(ParseExpression, ShouldRejectExpressionIfItsNotTheOnlyField) {
 }
 
 TEST(ParseExpression, ShouldParseExpressionWithMultipleArguments) {
-    auto resultExpression = parseExpression(BSON("$strcasecmp" << BSON_ARRAY("foo"
-                                                                             << "FOO")));
+    auto resultExpression = parseExpression(BSON("$strcasecmp" << BSON_ARRAY("foo" << "FOO")));
     auto strCaseCmpExpression = dynamic_cast<ExpressionStrcasecmp*>(resultExpression.get());
     ASSERT_TRUE(strCaseCmpExpression);
     vector<Value> arguments = {Value(Document{{"$const", "foo"_sd}}),
@@ -754,24 +749,21 @@ intrusive_ptr<Expression> parseOperand(BSONObj specification) {
 }
 
 TEST(ParseOperand, ShouldRecognizeFieldPath) {
-    auto resultExpression = parseOperand(BSON(""
-                                              << "$field"));
+    auto resultExpression = parseOperand(BSON("" << "$field"));
     auto fieldPathExpression = dynamic_cast<ExpressionFieldPath*>(resultExpression.get());
     ASSERT_TRUE(fieldPathExpression);
     ASSERT_VALUE_EQ(fieldPathExpression->serialize(), Value("$field"_sd));
 }
 
 TEST(ParseOperand, ShouldRecognizeStringLiteral) {
-    auto resultExpression = parseOperand(BSON(""
-                                              << "foo"));
+    auto resultExpression = parseOperand(BSON("" << "foo"));
     auto constantExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
     ASSERT_TRUE(constantExpression);
     ASSERT_VALUE_EQ(constantExpression->serialize(), Value(Document{{"$const", "foo"_sd}}));
 }
 
 TEST(ParseOperand, ShouldRecognizeNestedArray) {
-    auto resultExpression = parseOperand(BSON("" << BSON_ARRAY("foo"
-                                                               << "$field")));
+    auto resultExpression = parseOperand(BSON("" << BSON_ARRAY("foo" << "$field")));
     auto arrayExpression = dynamic_cast<ExpressionArray*>(resultExpression.get());
     ASSERT_TRUE(arrayExpression);
     vector<Value> expectedSerializedArray = {Value(Document{{"$const", "foo"_sd}}),
@@ -804,18 +796,14 @@ TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectly) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
     auto expression = ExpressionFieldPath::parse(&expCtx, "$$REMOVE", vps);
-    ASSERT_BSONOBJ_EQ(BSON("foo"
-                           << "$$REMOVE"),
-                      BSON("foo" << expression->serialize()));
+    ASSERT_BSONOBJ_EQ(BSON("foo" << "$$REMOVE"), BSON("foo" << expression->serialize()));
 }
 
 TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyWithTrailingPath) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
     auto expression = ExpressionFieldPath::parse(&expCtx, "$$REMOVE.a.b", vps);
-    ASSERT_BSONOBJ_EQ(BSON("foo"
-                           << "$$REMOVE.a.b"),
-                      BSON("foo" << expression->serialize()));
+    ASSERT_BSONOBJ_EQ(BSON("foo" << "$$REMOVE.a.b"), BSON("foo" << expression->serialize()));
 }
 
 TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyAfterOptimization) {
@@ -824,9 +812,7 @@ TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyAfterOptimization) {
     auto expression = ExpressionFieldPath::parse(&expCtx, "$$REMOVE.a.b", vps);
     auto optimizedExpression = expression->optimize();
     ASSERT(dynamic_cast<ExpressionConstant*>(optimizedExpression.get()));
-    ASSERT_BSONOBJ_EQ(BSON("foo"
-                           << "$$REMOVE"),
-                      BSON("foo" << optimizedExpression->serialize()));
+    ASSERT_BSONOBJ_EQ(BSON("foo" << "$$REMOVE"), BSON("foo" << optimizedExpression->serialize()));
 }
 
 }  // namespace BuiltinRemoveVariable
@@ -1167,8 +1153,7 @@ namespace ExpressionToHashedIndexKeyTest {
 
 TEST(ExpressionToHashedIndexKeyTest, DoesAddInputDependencies) {
     auto expCtx = ExpressionContextForTest{};
-    const BSONObj obj = BSON("$toHashedIndexKey"
-                             << "$someValue");
+    const BSONObj obj = BSON("$toHashedIndexKey" << "$someValue");
     auto expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
 
     DepsTracker deps;
@@ -1619,10 +1604,9 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
-    BSONObj expressionBSON = BSON("$getField" << BSON("field"
-                                                      << "a"
-                                                      << "input"
-                                                      << "$b"));
+    BSONObj expressionBSON = BSON("$getField" << BSON("field" << "a"
+                                                              << "input"
+                                                              << "$b"));
 
     auto expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1630,8 +1614,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Test the shorthand syntax.
-    expressionBSON = BSON("$getField"
-                          << "a");
+    expressionBSON = BSON("$getField" << "a");
 
     expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1639,8 +1622,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Test a field with '.' characters.
-    expressionBSON = BSON("$getField"
-                          << "a.b.c");
+    expressionBSON = BSON("$getField" << "a.b.c");
 
     expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1655,8 +1637,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Test a field with a '$' character.
-    expressionBSON = BSON("$getField"
-                          << "a.$b.c");
+    expressionBSON = BSON("$getField" << "a.$b.c");
 
     expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1671,8 +1652,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Test a field with a trailing '.' character (invalid FieldPath).
-    expressionBSON = BSON("$getField"
-                          << "a.b.c.");
+    expressionBSON = BSON("$getField" << "a.b.c.");
 
     expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1693,12 +1673,11 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
     VariablesParseState vps = expCtx.variablesParseState;
 
     // Test that a set field redacts properly.
-    BSONObj expressionBSON = BSON("$setField" << BSON("field"
-                                                      << "a"
-                                                      << "input"
-                                                      << "$b"
-                                                      << "value"
-                                                      << "$c"));
+    BSONObj expressionBSON = BSON("$setField" << BSON("field" << "a"
+                                                              << "input"
+                                                              << "$b"
+                                                              << "value"
+                                                              << "$c"));
     auto expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1713,9 +1692,9 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Object as input.
-    expressionBSON = BSON("$setField" << BSON("field"
-                                              << "a"
-                                              << "input" << BSON("a" << true) << "value" << 10));
+    expressionBSON =
+        BSON("$setField" << BSON("field" << "a"
+                                         << "input" << BSON("a" << true) << "value" << 10));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1730,10 +1709,9 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Nested object as input.
-    expressionBSON =
-        BSON("$setField" << BSON("field"
-                                 << "a"
-                                 << "input" << BSON("a" << BSON("b" << 5)) << "value" << 10));
+    expressionBSON = BSON("$setField" << BSON("field" << "a"
+                                                      << "input" << BSON("a" << BSON("b" << 5))
+                                                      << "value" << 10));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1748,12 +1726,9 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Object with field path in input.
-    expressionBSON = BSON("$setField" << BSON("field"
-                                              << "a"
-                                              << "input"
-                                              << BSON("a"
-                                                      << "$field")
-                                              << "value" << 10));
+    expressionBSON =
+        BSON("$setField" << BSON("field" << "a"
+                                         << "input" << BSON("a" << "$field") << "value" << 10));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1770,14 +1745,9 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Object with field path in value.
-    expressionBSON = BSON("$setField" << BSON("field"
-                                              << "a"
-                                              << "input"
-                                              << BSON("a"
-                                                      << "b")
-                                              << "value"
-                                              << BSON("c"
-                                                      << "$d")));
+    expressionBSON = BSON("$setField" << BSON("field" << "a"
+                                                      << "input" << BSON("a" << "b") << "value"
+                                                      << BSON("c" << "$d")));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1794,10 +1764,10 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
         BSON("field" << expression->serialize(options)));
 
     // Array as input.
-    expressionBSON = BSON("$setField" << BSON("field"
-                                              << "a"
-                                              << "input" << BSON("a" << BSON_ARRAY(3 << 4 << 5))
-                                              << "value" << 10));
+    expressionBSON =
+        BSON("$setField" << BSON("field" << "a"
+                                         << "input" << BSON("a" << BSON_ARRAY(3 << 4 << 5))
+                                         << "value" << 10));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1817,13 +1787,11 @@ TEST(ExpressionSetFieldTest, SetFieldSerializesCorrectly) {
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: {\"field\": \"foo\", \"input\": {a: 1}, \"value\": 24}}");
     auto expression = ExpressionSetField::parse(&expCtx, expr.firstElement(), vps);
-    ASSERT_BSONOBJ_EQ(
-        BSON("ignoredField" << BSON("$setField"
-                                    << BSON("field" << BSON("$const"
-                                                            << "foo")
-                                                    << "input" << BSON("a" << BSON("$const" << 1))
-                                                    << "value" << BSON("$const" << 24)))),
-        BSON("ignoredField" << expression->serialize()));
+    ASSERT_BSONOBJ_EQ(BSON("ignoredField" << BSON(
+                               "$setField" << BSON("field" << BSON("$const" << "foo") << "input"
+                                                           << BSON("a" << BSON("$const" << 1))
+                                                           << "value" << BSON("$const" << 24)))),
+                      BSON("ignoredField" << expression->serialize()));
 }
 
 TEST(ExpressionSetFieldTest, SetFieldRejectsNullCharInFieldArgument) {

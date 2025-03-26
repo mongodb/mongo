@@ -6,8 +6,7 @@
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {assertChangeStreamEventEq} from "jstests/libs/query/change_stream_util.js";
-import {assertNoChanges} from "jstests/libs/query/change_stream_util.js";
+import {assertChangeStreamEventEq, assertNoChanges} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {isTimestamp} from "jstests/libs/timestamp_util.js";
 

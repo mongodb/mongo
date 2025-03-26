@@ -39,7 +39,7 @@ namespace mongo {
 namespace process_health {
 class TestHealthObserver : public HealthObserverBase {
 public:
-    TestHealthObserver(ServiceContext* svcCtx) : HealthObserverBase(svcCtx){};
+    TestHealthObserver(ServiceContext* svcCtx) : HealthObserverBase(svcCtx) {};
 
 protected:
     FaultFacetType getType() const override {

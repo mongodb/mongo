@@ -93,11 +93,9 @@ TEST(InternalSchemaCondMatchExpressionTest, EquivalentReturnsCorrectResults) {
 }
 
 TEST(InternalSchemaCondMatchExpressionTest, EquivalentToClone) {
-    auto conditionQuery = BSON("likes"
-                               << "cats");
+    auto conditionQuery = BSON("likes" << "cats");
     auto thenQuery = BSON("pets" << BSON("$lte" << 1));
-    auto elseQuery = BSON("interests"
-                          << "dogs");
+    auto elseQuery = BSON("interests" << "dogs");
     auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
     auto clone = cond->clone();
     ASSERT_TRUE(cond->equivalent(clone.get()));

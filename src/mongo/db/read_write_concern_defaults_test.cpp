@@ -808,30 +808,27 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     ASSERT_THROWS_CODE(
         _rwcd.generateNewCWRWCToBeSavedOnDisk(
             operationContext(),
-            repl::ReadConcernArgs::fromBSONThrows(BSON("level"
-                                                       << "local"
-                                                       << "afterOpTime" << repl::OpTime())),
+            repl::ReadConcernArgs::fromBSONThrows(BSON("level" << "local"
+                                                               << "afterOpTime" << repl::OpTime())),
             boost::none),
         AssertionException,
         ErrorCodes::BadValue);
-    ASSERT_THROWS_CODE(
-        _rwcd.generateNewCWRWCToBeSavedOnDisk(
-            operationContext(),
-            repl::ReadConcernArgs::fromBSONThrows(BSON("level"
-                                                       << "local"
-                                                       << "afterClusterTime" << Timestamp(1, 2))),
-            boost::none),
-        AssertionException,
-        ErrorCodes::BadValue);
-    ASSERT_THROWS_CODE(
-        _rwcd.generateNewCWRWCToBeSavedOnDisk(
-            operationContext(),
-            repl::ReadConcernArgs::fromBSONThrows(BSON("level"
-                                                       << "snapshot"
-                                                       << "atClusterTime" << Timestamp(1, 2))),
-            boost::none),
-        AssertionException,
-        ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
+                           operationContext(),
+                           repl::ReadConcernArgs::fromBSONThrows(BSON("level" << "local"
+                                                                              << "afterClusterTime"
+                                                                              << Timestamp(1, 2))),
+                           boost::none),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
+                           operationContext(),
+                           repl::ReadConcernArgs::fromBSONThrows(BSON("level" << "snapshot"
+                                                                              << "atClusterTime"
+                                                                              << Timestamp(1, 2))),
+                           boost::none),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,

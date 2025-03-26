@@ -190,7 +190,7 @@ StatusWith<BSONArray> getRawAuthenticationRestrictions(const BSONArray& arr);
 
 
 template <>
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<<ClientSourceRestriction>(
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<< <ClientSourceRestriction>(
     ClientSourceRestriction value) {
     BSONObjBuilder b;
     value.appendToBuilder(&b);
@@ -200,7 +200,7 @@ inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<<ClientSourceRestric
 }
 
 template <>
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<<ServerAddressRestriction>(
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<< <ServerAddressRestriction>(
     ServerAddressRestriction value) {
     BSONObjBuilder b;
     value.appendToBuilder(&b);

@@ -273,7 +273,7 @@ class EstimateBase {
 public:
     EstimateBase() = delete;
 
-    constexpr EstimateBase(EstimationSource s) : _source(s){};
+    constexpr EstimateBase(EstimationSource s) : _source(s) {};
 
     /**
      * Merge this estimate with another one - used in operators that combine two estimates.

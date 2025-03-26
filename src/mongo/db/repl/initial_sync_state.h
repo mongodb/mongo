@@ -43,7 +43,7 @@ namespace repl {
  */
 struct InitialSyncState {
     InitialSyncState(std::unique_ptr<AllDatabaseCloner> cloner)
-        : allDatabaseCloner(std::move(cloner)){};
+        : allDatabaseCloner(std::move(cloner)) {};
 
     std::unique_ptr<AllDatabaseCloner>
         allDatabaseCloner;                 // Cloner for all databases included in initial sync.

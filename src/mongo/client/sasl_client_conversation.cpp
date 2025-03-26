@@ -31,6 +31,6 @@
 
 namespace mongo {
 
-SaslClientConversation::~SaslClientConversation(){};
+SaslClientConversation::~SaslClientConversation() {};
 
 }  // namespace mongo

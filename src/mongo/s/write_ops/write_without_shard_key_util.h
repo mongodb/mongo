@@ -49,8 +49,7 @@ namespace write_without_shard_key {
 
 // Used as a "dummy" target document for constructing explain responses for single writes without
 // shard key.
-const BSONObj targetDocForExplain = BSON("_id"
-                                         << "WriteWithoutShardKey");
+const BSONObj targetDocForExplain = BSON("_id" << "WriteWithoutShardKey");
 
 /**
  * Uses updateDriver to produce the document to insert. Only use when {upsert: true}.

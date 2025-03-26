@@ -609,8 +609,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomHashExchangeNConsumer) {
 
     ExchangeSpec spec;
     spec.setPolicy(ExchangePolicyEnum::kKeyRange);
-    spec.setKey(BSON("a"
-                     << "hashed"));
+    spec.setKey(BSON("a" << "hashed"));
     spec.setBoundaries(boundaries);
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
@@ -652,113 +651,99 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomHashExchangeNConsumer) {
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectNoConsumers) {
-    BSONObj spec = BSON("policy"
-                        << "broadcast"
-                        << "consumers" << 0);
+    BSONObj spec = BSON("policy" << "broadcast"
+                                 << "consumers" << 0);
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50901);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKey) {
-    BSONObj spec = BSON("policy"
-                        << "broadcast"
-                        << "consumers" << 1 << "key" << BSON("a" << 2));
+    BSONObj spec = BSON("policy" << "broadcast"
+                                 << "consumers" << 1 << "key" << BSON("a" << 2));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50896);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyHashExpected) {
-    BSONObj spec = BSON("policy"
-                        << "broadcast"
-                        << "consumers" << 1 << "key"
-                        << BSON("a"
-                                << "nothash"));
+    BSONObj spec = BSON("policy" << "broadcast"
+                                 << "consumers" << 1 << "key" << BSON("a" << "nothash"));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50895);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyWrongType) {
-    BSONObj spec = BSON("policy"
-                        << "broadcast"
-                        << "consumers" << 1 << "key" << BSON("a" << true));
+    BSONObj spec = BSON("policy" << "broadcast"
+                                 << "consumers" << 1 << "key" << BSON("a" << true));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50897);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyEmpty) {
-    BSONObj spec = BSON("policy"
-                        << "broadcast"
-                        << "consumers" << 1 << "key" << BSON("" << 1));
+    BSONObj spec = BSON("policy" << "broadcast"
+                                 << "consumers" << 1 << "key" << BSON("" << 1));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 40352);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundaries) {
-    BSONObj spec = BSON("policy"
-                        << "keyRange"
-                        << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
-                        << BSON_ARRAY(BSON("a" << MAXKEY) << BSON("a" << MINKEY)) << "consumerIds"
-                        << BSON_ARRAY(0));
+    BSONObj spec = BSON("policy" << "keyRange"
+                                 << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
+                                 << BSON_ARRAY(BSON("a" << MAXKEY) << BSON("a" << MINKEY))
+                                 << "consumerIds" << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50893);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMin) {
-    BSONObj spec = BSON("policy"
-                        << "keyRange"
-                        << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
-                        << BSON_ARRAY(BSON("a" << 0) << BSON("a" << MAXKEY)) << "consumerIds"
-                        << BSON_ARRAY(0));
+    BSONObj spec = BSON("policy" << "keyRange"
+                                 << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
+                                 << BSON_ARRAY(BSON("a" << 0) << BSON("a" << MAXKEY))
+                                 << "consumerIds" << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50958);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMax) {
-    BSONObj spec = BSON("policy"
-                        << "keyRange"
-                        << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
-                        << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << 0)) << "consumerIds"
-                        << BSON_ARRAY(0));
+    BSONObj spec = BSON("policy" << "keyRange"
+                                 << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
+                                 << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << 0))
+                                 << "consumerIds" << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50959);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesAndConsumerIds) {
-    BSONObj spec = BSON("policy"
-                        << "keyRange"
-                        << "consumers" << 2 << "key" << BSON("a" << 1) << "boundaries"
-                        << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY)) << "consumerIds"
-                        << BSON_ARRAY(0 << 1));
+    BSONObj spec = BSON("policy" << "keyRange"
+                                 << "consumers" << 2 << "key" << BSON("a" << 1) << "boundaries"
+                                 << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
+                                 << "consumerIds" << BSON_ARRAY(0 << 1));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50900);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidPolicyBoundaries) {
-    BSONObj spec = BSON("policy"
-                        << "roundrobin"
-                        << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
-                        << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY)) << "consumerIds"
-                        << BSON_ARRAY(0));
+    BSONObj spec = BSON("policy" << "roundrobin"
+                                 << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
+                                 << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
+                                 << "consumerIds" << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50899);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidConsumerIds) {
-    BSONObj spec = BSON("policy"
-                        << "keyRange"
-                        << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
-                        << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY)) << "consumerIds"
-                        << BSON_ARRAY(1));
+    BSONObj spec = BSON("policy" << "keyRange"
+                                 << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
+                                 << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
+                                 << "consumerIds" << BSON_ARRAY(1));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50894);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidMissingKeys) {
-    BSONObj spec = BSON("policy"
-                        << "keyRange"
-                        << "consumers" << 1 << "boundaries"
-                        << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY)) << "consumerIds"
-                        << BSON_ARRAY(0));
+    BSONObj spec = BSON("policy" << "keyRange"
+                                 << "consumers" << 1 << "boundaries"
+                                 << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
+                                 << "consumerIds" << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50967);
 }

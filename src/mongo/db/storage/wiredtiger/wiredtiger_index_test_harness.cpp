@@ -127,8 +127,7 @@ public:
 
         if (partial) {
             auto partialBSON =
-                BSON(IndexDescriptor::kPartialFilterExprFieldName.toString() << BSON(""
-                                                                                     << ""));
+                BSON(IndexDescriptor::kPartialFilterExprFieldName.toString() << BSON("" << ""));
             spec = spec.addField(partialBSON.firstElement());
         }
 

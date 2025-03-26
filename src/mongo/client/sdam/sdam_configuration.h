@@ -45,7 +45,7 @@
 namespace mongo::sdam {
 class SdamConfiguration {
 public:
-    SdamConfiguration() : SdamConfiguration(boost::none){};
+    SdamConfiguration() : SdamConfiguration(boost::none) {};
 
     /**
      * Initialize the TopologyDescription. This constructor may uassert if the provided

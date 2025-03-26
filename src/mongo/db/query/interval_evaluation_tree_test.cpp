@@ -221,16 +221,10 @@ TEST_F(IntervalEvaluationTreeTest, TranslateToEval) {
         {BSON("$elemMatch" << BSON("$lt" << 10 << "$gt" << 1)),
          "(intersect (eval $lt #0) (eval $gt #1))"},
         {BSON("$in" << BSON_ARRAY(5 << 10 << 15)), "(eval $in #0)"},
-        {BSON("$regex"
-              << "aaa"),
-         "(eval $regex #0)"},
+        {BSON("$regex" << "aaa"), "(eval $regex #0)"},
         // TODO SERVER-64776: fix the $type test cases below
-        {BSON("$type"
-              << "int"),
-         "(const [nan.0, inf.0])"},
-        {BSON("$type" << BSON_ARRAY("string"
-                                    << "double")),
-         "(const [nan.0, inf.0] [\"\", {}))"},
+        {BSON("$type" << "int"), "(const [nan.0, inf.0])"},
+        {BSON("$type" << BSON_ARRAY("string" << "double")), "(const [nan.0, inf.0] [\"\", {}))"},
     };
 
     assertMany(testCases);
@@ -249,12 +243,8 @@ TEST_F(IntervalEvaluationTreeTest, TranslateToConst) {
         {fromjson("{$in: [/alpha/i, 101]}"), "(const [101, 101] [\"\", {}) [/alpha/i, /alpha/i])"},
         {BSON("$eq" << BSONNULL), "(const [null, null])"},
         {fromjson("{$not: {$in: [null, []]}}"), "(const [MinKey, null) (null, []) ([], MaxKey])"},
-        {BSON("$type"
-              << "array"),
-         "(const [MinKey, MaxKey])"},
-        {BSON("$type" << BSON_ARRAY("int"
-                                    << "array")),
-         "(const [MinKey, MaxKey])"},
+        {BSON("$type" << "array"), "(const [MinKey, MaxKey])"},
+        {BSON("$type" << BSON_ARRAY("int" << "array")), "(const [MinKey, MaxKey])"},
         {BSON("$gt" << BSONNULL), "(const)"},
         {BSON("$_internalExprEq" << 4), "(const [4, 4])"},
         {BSON("$_internalExprGt" << 4), "(const (4, MaxKey])"},

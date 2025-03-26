@@ -567,7 +567,7 @@ public:
     /**
      * Sets whether the executor needs to return owned data.
      */
-    virtual void setReturnOwnedData(bool returnOwnedData){};
+    virtual void setReturnOwnedData(bool returnOwnedData) {};
 
     /** TODO: SERVER-76397 Remove this once we use acquisitions everywhere.
      *

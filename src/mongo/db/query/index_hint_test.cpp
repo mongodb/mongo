@@ -61,8 +61,7 @@ TEST(IndexHint, BadHintType) {
 }
 
 TEST(IndexHint, ShouldRejectHintAsArray) {
-    BSONObj arrayHint = BSON("hint" << BSON_ARRAY("invalid"
-                                                  << "hint"));
+    BSONObj arrayHint = BSON("hint" << BSON_ARRAY("invalid" << "hint"));
     ASSERT_THROWS_CODE(
         IndexHint::parse(arrayHint.firstElement()), AssertionException, ErrorCodes::FailedToParse);
 }

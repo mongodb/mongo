@@ -254,8 +254,7 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsIfEvalAndDataArgumentsNotProvided)
     // Data argument missing.
     BSONObjBuilder noData;
     noData.append("$_internalJsReduce",
-                  BSON("eval"
-                       << "function(key, values) { return Array.sum(values); };"));
+                  BSON("eval" << "function(key, values) { return Array.sum(values); };"));
     assertParsingFailsWithCode(getExpCtx(), noData.obj().getField("$_internalJsReduce"), 31349);
 
     // Eval argument missing.
@@ -335,8 +334,7 @@ TEST_F(MapReduceFixture, AccumulatorJs) {
     // require that the first thing called after the constructor must be StartNewGroup(), which
     // requires a const Value containing an array (of what?). BSON_ARRAY cannot construct an empty
     // array.
-    const Value valAaaBbb{BSON_ARRAY("Aaa_"
-                                     << "Bbb_")};
+    const Value valAaaBbb{BSON_ARRAY("Aaa_" << "Bbb_")};
     acc.startNewGroup(valAaaBbb);
 
     // Process a string input. Should uassert that the input must be an array when 'merging'
@@ -346,8 +344,7 @@ TEST_F(MapReduceFixture, AccumulatorJs) {
 
     // Process an array input, which must be const. Should succeed. This will be queued in
     // 'AccumulateorJs::_pendingCalls' until getValue() is called.
-    const Value valYyyZzz{BSON_ARRAY("Yyy_"
-                                     << "Zzz_")};
+    const Value valYyyZzz{BSON_ARRAY("Yyy_" << "Zzz_")};
     acc.processInternal(valYyyZzz, false /* merging */);
 
     // Call reduceMemoryConcuptionIfAble() while 'AccumulateorJs::_pendingCalls' is non-empty. This

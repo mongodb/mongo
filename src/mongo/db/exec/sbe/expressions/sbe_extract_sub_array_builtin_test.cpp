@@ -227,10 +227,9 @@ TEST_F(SBEBuiltinExtractSubArrayTest, NotArray) {
 
 TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
     {
-        auto array = makeArray(BSON_ARRAY("Item#1"
-                                          << "Item#2"
-                                          << "Item#3"
-                                          << "Item#4"));
+        auto array = makeArray(BSON_ARRAY("Item#1" << "Item#2"
+                                                   << "Item#3"
+                                                   << "Item#4"));
 
         // Use 'extractSubArray' to create a stack owned array and extract object from it, then test
         // if 'getElement' can return the value with correct memory management.

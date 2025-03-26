@@ -73,8 +73,7 @@ private:
 class PeriodicRunnerImplTest : public PeriodicRunnerImplTestNoSetup {
 public:
     auto makeStoppedJob() {
-        PeriodicRunner::PeriodicJob job(
-            "job", [](Client* client) {}, Seconds{1}, false);
+        PeriodicRunner::PeriodicJob job("job", [](Client* client) {}, Seconds{1}, false);
         auto jobAnchor = runner().makeJob(std::move(job));
         jobAnchor.start();
         jobAnchor.stop();

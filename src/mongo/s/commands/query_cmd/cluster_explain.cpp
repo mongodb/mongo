@@ -92,8 +92,8 @@ bool appendToArrayIfRoom(BSONArrayBuilder* arrayBuilder, const BSONElement& toAp
     // Unless 'arrayBuilder' has already exceeded the max BSON user size, add a warning
     // indicating that data has been truncated.
     if (arrayBuilder->len() < BSONObjMaxUserSize) {
-        arrayBuilder->append(BSON("warning"
-                                  << "output truncated due to nearing BSON max user size"));
+        arrayBuilder->append(
+            BSON("warning" << "output truncated due to nearing BSON max user size"));
     }
 
     return false;

@@ -50,7 +50,7 @@ public:
           maxCacheOverflowFileSizeGBDeprecated(0),
           liveRestoreThreads(0),
           liveRestoreReadSizeMB(0),
-          useIndexPrefixCompression(false){};
+          useIndexPrefixCompression(false) {};
 
     Status store(const optionenvironment::Environment& params);
 

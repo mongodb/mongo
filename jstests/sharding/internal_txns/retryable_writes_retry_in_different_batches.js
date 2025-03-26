@@ -97,18 +97,14 @@ function runUpdateTestRetryStatementsSeparately(db, coll, makeSessionOptionsFunc
 
     assert.commandWorked(coll.insert([{_id: 1, x: 0}, {_id: 2, x: 0}]));
 
-    const [initialRes] = runCommandsWithSessionOpts(db,
-                                                    [
-                                                        {
-                                                            update: kCollName,
-                                                            updates: [
-                                                                {q: {_id: 1}, u: {$inc: {x: 1}}},
-                                                                {q: {_id: 2}, u: {$inc: {x: 1}}}
-                                                            ],
-                                                            stmtIds: [stmtId1, stmtId2]
-                                                        }
-                                                    ],
-                                                    initialSessionOpts);
+    const [initialRes] = runCommandsWithSessionOpts(
+        db,
+        [{
+            update: kCollName,
+            updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}, {q: {_id: 2}, u: {$inc: {x: 1}}}],
+            stmtIds: [stmtId1, stmtId2]
+        }],
+        initialSessionOpts);
     const [retryRes1, retryRes2] = runCommandsWithSessionOpts(
         db,
         [
@@ -207,18 +203,14 @@ function runUpdateTestRetryWithAdditionalStatement(db, coll, makeSessionOptionsF
         db,
         [{update: kCollName, updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}], stmtIds: [stmtId1]}],
         initialSessionOpts);
-    const [retryRes] = runCommandsWithSessionOpts(db,
-                                                  [
-                                                      {
-                                                          update: kCollName,
-                                                          updates: [
-                                                              {q: {_id: 1}, u: {$inc: {x: 1}}},
-                                                              {q: {_id: 2}, u: {$inc: {x: 1}}}
-                                                          ],
-                                                          stmtIds: [stmtId1, stmtId2]
-                                                      }
-                                                  ],
-                                                  retrySessionOpts);
+    const [retryRes] = runCommandsWithSessionOpts(
+        db,
+        [{
+            update: kCollName,
+            updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}, {q: {_id: 2}, u: {$inc: {x: 1}}}],
+            stmtIds: [stmtId1, stmtId2]
+        }],
+        retrySessionOpts);
 
     assert.eq(initialRes.nModified, 1);
     assert(!initialRes.hasOwnProperty("retriedStmtIds"));

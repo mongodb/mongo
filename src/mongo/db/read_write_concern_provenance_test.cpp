@@ -113,8 +113,7 @@ DEATH_TEST(ReadWriteConcernProvenanceTest,
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseAbsentElement) {
-    BSONObj obj = BSON("something"
-                       << "else");
+    BSONObj obj = BSON("something" << "else");
     auto provenance =
         ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj);
     ASSERT_FALSE(provenance.hasSource());
@@ -129,16 +128,14 @@ TEST(ReadWriteConcernProvenanceTest, ParseNonString) {
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseValidSource) {
-    BSONObj obj = BSON("provenance"
-                       << "clientSupplied");
+    BSONObj obj = BSON("provenance" << "clientSupplied");
     auto provenance =
         ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj);
     ASSERT_TRUE(ReadWriteConcernProvenance::Source::clientSupplied == provenance.getSource());
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseInvalidSource) {
-    BSONObj obj = BSON("provenance"
-                       << "foobar");
+    BSONObj obj = BSON("provenance" << "foobar");
     ASSERT_THROWS_CODE(
         ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj),
         DBException,
@@ -156,9 +153,7 @@ TEST(ReadWriteConcernProvenanceTest, SerializeSet) {
     ReadWriteConcernProvenance provenance(ReadWriteConcernProvenance::Source::clientSupplied);
     BSONObjBuilder builder;
     provenance.serialize(&builder);
-    ASSERT_BSONOBJ_EQ(BSON("provenance"
-                           << "clientSupplied"),
-                      builder.obj());
+    ASSERT_BSONOBJ_EQ(BSON("provenance" << "clientSupplied"), builder.obj());
 }
 
 }  // namespace

@@ -733,9 +733,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort
 
     const auto generateCmd = [reason](const UUID& uuid, const std::string& address) {
         return BSON("voteAbortIndexBuild" << uuid << "hostAndPort" << address << "reason" << reason
-                                          << "writeConcern"
-                                          << BSON("w"
-                                                  << "majority"));
+                                          << "writeConcern" << BSON("w" << "majority"));
     };
 
     const auto checkVoteAbortIndexCmdDone = [](const BSONObj& response,
@@ -826,8 +824,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
 
     const auto generateCmd = [](const UUID& uuid, const std::string& address) {
         return BSON("voteCommitIndexBuild" << uuid << "hostAndPort" << address << "writeConcern"
-                                           << BSON("w"
-                                                   << "majority"));
+                                           << BSON("w" << "majority"));
     };
 
     const auto checkVoteCommitIndexCmdSucceeded = [](const BSONObj& response,

@@ -254,8 +254,7 @@ AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(Opera
            }
        }
     })");
-    const BSONObj countStage = BSON("$count"
-                                    << "totalCount");
+    const BSONObj countStage = BSON("$count" << "totalCount");
 
     auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
 

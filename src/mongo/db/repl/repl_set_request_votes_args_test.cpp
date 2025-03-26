@@ -64,14 +64,12 @@ TEST(ReplSetRequestVotesArgs, CorrectReplSetRequestVotesArgs) {
 
 TEST(ReplSetRequestVotesArgs, InitializeWrongTypesForTerm) {
     ReplSetRequestVotesArgs args;
-    BSONObj initializerObj = BSON("term"
-                                  << "1"
-                                  << "candidateIndex" << 1 << "configVersion" << 1 << "configTerm"
-                                  << 1 << "setName"
-                                  << "test"
-                                  << "dryRun" << true << "lastAppliedOpTime"
-                                  << OpTime(Timestamp(50), 1) << "lastWrittenOpTime"
-                                  << OpTime(Timestamp(50), 1));
+    BSONObj initializerObj = BSON(
+        "term" << "1"
+               << "candidateIndex" << 1 << "configVersion" << 1 << "configTerm" << 1 << "setName"
+               << "test"
+               << "dryRun" << true << "lastAppliedOpTime" << OpTime(Timestamp(50), 1)
+               << "lastWrittenOpTime" << OpTime(Timestamp(50), 1));
     Status result = args.initialize(initializerObj);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
 }
@@ -184,11 +182,10 @@ TEST(ReplSetRequestVotesResponse, CorrectReplSetRequestVotesResponse) {
 
 TEST(ReplSetRequestVotesResponse, InitializeWrongTypesForTerm) {
     ReplSetRequestVotesResponse args;
-    BSONObj initializerObj = BSON("term"
-                                  << "1"
-                                  << "reason"
-                                  << "hi"
-                                  << "voteGranted" << true);
+    BSONObj initializerObj = BSON("term" << "1"
+                                         << "reason"
+                                         << "hi"
+                                         << "voteGranted" << true);
     Status result = args.initialize(initializerObj);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
 }

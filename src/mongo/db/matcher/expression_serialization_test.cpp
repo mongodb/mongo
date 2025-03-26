@@ -616,10 +616,8 @@ std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSO
 TEST(SerializeInternalSchema, CondMatchRedactsCorrectly) {
     auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto conditionQuery = BSON("age" << BSON("$lt" << 18));
-    auto thenQuery = BSON("job"
-                          << "student");
-    auto elseQuery = BSON("job"
-                          << "engineer");
+    auto thenQuery = BSON("job" << "student");
+    auto elseQuery = BSON("job" << "engineer");
     auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
     BSONObjBuilder bob;
     cond->serialize(&bob, opts);

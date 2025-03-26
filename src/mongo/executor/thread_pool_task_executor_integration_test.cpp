@@ -449,14 +449,13 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
         getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
     auto opCtx = failCmdClient->makeOperationContext();
 
-    auto configureFailpointCmd = BSON("configureFailPoint"
-                                      << "failCommand"
-                                      << "mode"
-                                      << "alwaysOn"
-                                      << "data"
-                                      << BSON("errorCode" << ErrorCodes::CommandFailed
-                                                          << "failCommands"
-                                                          << BSON_ARRAY("isMaster")));
+    auto configureFailpointCmd =
+        BSON("configureFailPoint" << "failCommand"
+                                  << "mode"
+                                  << "alwaysOn"
+                                  << "data"
+                                  << BSON("errorCode" << ErrorCodes::CommandFailed << "failCommands"
+                                                      << BSON_ARRAY("isMaster")));
     RemoteCommandRequest failCmd(unittest::getFixtureConnectionString().getServers().front(),
                                  DatabaseName::kAdmin,
                                  configureFailpointCmd,
@@ -474,10 +473,9 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
     ASSERT_EQ(counters._failed, 0);
 
     ON_BLOCK_EXIT([&] {
-        auto stopFpCmd = BSON("configureFailPoint"
-                              << "failCommand"
-                              << "mode"
-                              << "off");
+        auto stopFpCmd = BSON("configureFailPoint" << "failCommand"
+                                                   << "mode"
+                                                   << "off");
         RemoteCommandRequest stopFpRequest(
             unittest::getFixtureConnectionString().getServers().front(),
             DatabaseName::kAdmin,

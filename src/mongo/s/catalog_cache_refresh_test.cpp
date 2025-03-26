@@ -233,10 +233,9 @@ TEST_F(CatalogCacheRefreshTest, DatabaseBSONCorrupted) {
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     // Return a corrupted database entry
-    expectFindSendBSONObjVector(kConfigHostAndPort,
-                                {BSON(
-                                    "BadValue"
-                                    << "This value should not be in a database config document")});
+    expectFindSendBSONObjVector(
+        kConfigHostAndPort,
+        {BSON("BadValue" << "This value should not be in a database config document")});
 
     try {
         auto cri = *future.default_timed_get();
@@ -269,8 +268,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
     // Return a corrupted collection entry
     expectFindSendBSONObjVector(
         kConfigHostAndPort,
-        {BSON("BadValue"
-              << "This value should not be in a collection config document")});
+        {BSON("BadValue" << "This value should not be in a collection config document")});
 
     try {
         auto cri = *future.default_timed_get();
@@ -372,13 +370,12 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
                       {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                       {"0"});
-        return std::vector<BSONObj>{/* collection */
-                                    coll.toBSON(),
-                                    /* chunks */
-                                    coll.toBSON().addFields(
-                                        BSON("chunks" << chunk1.toConfigBSON())),
-                                    BSON("BadValue"
-                                         << "This value should not be in a chunk config document")};
+        return std::vector<BSONObj>{
+            /* collection */
+            coll.toBSON(),
+            /* chunks */
+            coll.toBSON().addFields(BSON("chunks" << chunk1.toConfigBSON())),
+            BSON("BadValue" << "This value should not be in a chunk config document")};
     }());
 
     try {

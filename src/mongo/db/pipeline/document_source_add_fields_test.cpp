@@ -86,9 +86,8 @@ TEST_F(AddFieldsTest, ShouldKeepUnspecifiedFieldsReplaceExistingFieldsAndAddNewF
 }
 
 TEST_F(AddFieldsTest, ShouldSerializeAndParse) {
-    auto addFields = DocumentSourceAddFields::create(BSON("a" << BSON("$const"
-                                                                      << "new")),
-                                                     getExpCtx());
+    auto addFields =
+        DocumentSourceAddFields::create(BSON("a" << BSON("$const" << "new")), getExpCtx());
     ASSERT(addFields->getSourceName() == DocumentSourceAddFields::kStageName);
     vector<Value> serializedArray;
     addFields->serializeToArray(serializedArray);
@@ -100,10 +99,8 @@ TEST_F(AddFieldsTest, ShouldSerializeAndParse) {
 }
 
 TEST_F(AddFieldsTest, SetAliasShouldSerializeAndParse) {
-    auto setStage = DocumentSourceAddFields::create(BSON("a" << BSON("$const"
-                                                                     << "new")),
-                                                    getExpCtx(),
-                                                    DocumentSourceAddFields::kAliasNameSet);
+    auto setStage = DocumentSourceAddFields::create(
+        BSON("a" << BSON("$const" << "new")), getExpCtx(), DocumentSourceAddFields::kAliasNameSet);
     ASSERT(setStage->getSourceName() == DocumentSourceAddFields::kAliasNameSet);
     vector<Value> serializedArray;
     setStage->serializeToArray(serializedArray);
@@ -126,8 +123,7 @@ TEST_F(AddFieldsTest, ShouldOptimizeInnerExpressions) {
 }
 
 TEST_F(AddFieldsTest, ShouldErrorOnNonObjectSpec) {
-    BSONObj spec = BSON("$addFields"
-                        << "foo");
+    BSONObj spec = BSON("$addFields" << "foo");
     BSONElement specElement = spec.firstElement();
     ASSERT_THROWS_CODE(DocumentSourceAddFields::createFromBson(specElement, getExpCtx()),
                        AssertionException,
@@ -200,9 +196,7 @@ TEST_F(AddFieldsTest, ShouldPropagatePauses) {
 }
 
 TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
-    auto addFields = DocumentSourceAddFields::create(BSON("fieldToAdd"
-                                                          << "$$REMOVE"),
-                                                     getExpCtx());
+    auto addFields = DocumentSourceAddFields::create(BSON("fieldToAdd" << "$$REMOVE"), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(Document{{"existingField", 1}}, getExpCtx());
     addFields->setSource(mock.get());
 
@@ -214,9 +208,7 @@ TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
 }
 
 TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
-    auto addFields = DocumentSourceAddFields::create(BSON("b"
-                                                          << "$$ROOT"),
-                                                     getExpCtx());
+    auto addFields = DocumentSourceAddFields::create(BSON("b" << "$$ROOT"), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}}, getExpCtx());
     addFields->setSource(mock.get());
 
@@ -228,9 +220,7 @@ TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
 }
 
 TEST_F(AddFieldsTest, AddFieldsWithCurrentSystemVariableAddsRootAsSubDoc) {
-    auto addFields = DocumentSourceAddFields::create(BSON("b"
-                                                          << "$$CURRENT"),
-                                                     getExpCtx());
+    auto addFields = DocumentSourceAddFields::create(BSON("b" << "$$CURRENT"), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}}, getExpCtx());
     addFields->setSource(mock.get());
 
@@ -274,12 +264,10 @@ TEST_F(AddFieldsTest, CannotAddNestedDocumentExceedingDepthLimit) {
 }
 
 TEST_F(AddFieldsTest, TestModifiedPaths) {
-    auto addFields =
-        DocumentSourceAddFields::create(BSON("a" << BSON("$concat" << BSON_ARRAY("$b"
-                                                                                 << "$c"))
-                                                 << "x"
-                                                 << "$y"),
-                                        getExpCtx());
+    auto addFields = DocumentSourceAddFields::create(
+        BSON("a" << BSON("$concat" << BSON_ARRAY("$b" << "$c")) << "x"
+                 << "$y"),
+        getExpCtx());
 
     auto modifiedPaths = addFields->getModifiedPaths();
 

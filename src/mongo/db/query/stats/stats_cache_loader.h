@@ -56,7 +56,7 @@ public:
     virtual SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
                                                const StatsPathString& statsPath) = 0;
 
-    virtual void setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats){};
+    virtual void setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats) {};
 
     virtual ~StatsCacheLoader() {}
 

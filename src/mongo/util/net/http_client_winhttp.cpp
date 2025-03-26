@@ -344,8 +344,7 @@ public:
     }
 
     BSONObj getServerStatus() final {
-        return BSON("type"
-                    << "winhttp");
+        return BSON("type" << "winhttp");
     }
 
 } provider;

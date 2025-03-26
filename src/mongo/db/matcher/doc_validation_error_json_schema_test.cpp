@@ -560,10 +560,9 @@ TEST(JSONSchemaValidation, NoTopLevelObjectTypeRejectsAllDocuments) {
         "       'a': {'properties': "
         "           {'b': {'minimum': 1}}}}}}");
     BSONObj document = fromjson("{'a': {'b': 1}}");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$jsonSchema"
-                                 << "specifiedAs" << query << "reason"
-                                 << "expression always evaluates to false");
+    BSONObj expectedError = BSON("operatorName" << "$jsonSchema"
+                                                << "specifiedAs" << query << "reason"
+                                                << "expression always evaluates to false");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1387,8 +1386,7 @@ TEST(JSONSchemaValidation, EncryptWithSubtypeFailsBecauseNotEncrypted) {
     BSONObj query = fromjson(
         "{'$jsonSchema':"
         "{bsonType: 'object', properties: {a: {encrypt: {bsonType: 'number'}}}}}");
-    BSONObj document = BSON("a"
-                            << "foo");
+    BSONObj document = BSON("a" << "foo");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
         "     'schemaRulesNotSatisfied': ["

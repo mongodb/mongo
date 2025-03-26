@@ -120,7 +120,7 @@ struct AbortResult {
  */
 class TransactionClient {
 public:
-    virtual ~TransactionClient(){};
+    virtual ~TransactionClient() {};
 
     /**
      * Called by the transaction that owns this transaction client to install hooks for attaching

@@ -67,7 +67,7 @@ public:
 
     ServiceLiaisonImpl(GetOpenCursorsFn getOpenCursorsFn, KillCursorsFn killCursorsFn)
         : _getOpenCursorsFn(std::move(getOpenCursorsFn)),
-          _killCursorsFn(std::move(killCursorsFn)){};
+          _killCursorsFn(std::move(killCursorsFn)) {};
 
     LogicalSessionIdSet getActiveOpSessions() const override;
     LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) const override;

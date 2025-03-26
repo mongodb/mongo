@@ -164,7 +164,7 @@ private:
     void _reset();
 
     // Increment member `counter` by `n`, resetting all counters if it was > 2^60.
-    void _checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::*counter, int n);
+    void _checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::* counter, int n);
 
     CacheExclusive<AtomicWord<long long>> _insert;
     CacheExclusive<AtomicWord<long long>> _query;

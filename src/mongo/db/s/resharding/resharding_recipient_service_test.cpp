@@ -258,7 +258,7 @@ public:
         return makeReadyFutureWith([] {}).semi();
     };
 
-    void startOplogApplication() override{};
+    void startOplogApplication() override {};
 
     SharedSemiFuture<void> awaitCloningDone() override {
         return makeReadyFutureWith([] {}).share();
@@ -514,12 +514,11 @@ public:
         coordinatorDoc.setCommonReshardingMetadata(recipientDoc.getCommonReshardingMetadata());
 
         std::vector<DonorShardEntry> donorShards;
-        std::transform(recipientDoc.getDonorShards().begin(),
-                       recipientDoc.getDonorShards().end(),
-                       std::back_inserter(donorShards),
-                       [](auto donorShard) {
-                           return DonorShardEntry{donorShard.getShardId(), {}};
-                       });
+        std::transform(
+            recipientDoc.getDonorShards().begin(),
+            recipientDoc.getDonorShards().end(),
+            std::back_inserter(donorShards),
+            [](auto donorShard) { return DonorShardEntry{donorShard.getShardId(), {}}; });
         coordinatorDoc.setDonorShards(donorShards);
 
         std::vector<RecipientShardEntry> recipientShards;

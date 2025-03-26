@@ -152,14 +152,12 @@ TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
     BSONObjBuilder resultBuilder;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "foo");
-    auto innerCmdObj =
-        BSON("op"
-             << "c"
-             << "ns" << nss.getCommandNS().ns_forTest() << "o" << BSON("create" << nss.coll()));
-    auto innerApplyOpsObj = BSON("op"
-                                 << "c"
+    auto innerCmdObj = BSON("op" << "c"
                                  << "ns" << nss.getCommandNS().ns_forTest() << "o"
-                                 << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
+                                 << BSON("create" << nss.coll()));
+    auto innerApplyOpsObj = BSON("op" << "c"
+                                      << "ns" << nss.getCommandNS().ns_forTest() << "o"
+                                      << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
     auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
 
     ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), cmdObj, mode, &resultBuilder));
@@ -171,13 +169,11 @@ TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
 BSONObj makeApplyOpsWithInsertOperation(const NamespaceString& nss,
                                         const boost::optional<UUID>& uuid,
                                         const BSONObj& documentToInsert) {
-    auto insertOp = uuid ? BSON("op"
-                                << "i"
-                                << "ns" << nss.ns_forTest() << "o" << documentToInsert << "ui"
-                                << *uuid)
-                         : BSON("op"
-                                << "i"
-                                << "ns" << nss.ns_forTest() << "o" << documentToInsert);
+    auto insertOp = uuid
+        ? BSON("op" << "i"
+                    << "ns" << nss.ns_forTest() << "o" << documentToInsert << "ui" << *uuid)
+        : BSON("op" << "i"
+                    << "ns" << nss.ns_forTest() << "o" << documentToInsert);
     return BSON("applyOps" << BSON_ARRAY(insertOp));
 }
 
@@ -253,8 +249,8 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     ASSERT_OK(applyOps(
         opCtx.get(), nss.dbName(), cmdObj, OplogApplication::Mode::kInitialSync, &resultBuilder));
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("oplogApplicationMode"
-                                                                      << "InitialSync"))));
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("oplogApplicationMode" << "InitialSync"))));
 
     auto docToInsert1 = BSON("_id" << 1);
     cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, docToInsert1);
@@ -262,8 +258,8 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     ASSERT_OK(applyOps(
         opCtx.get(), nss.dbName(), cmdObj, OplogApplication::Mode::kSecondary, &resultBuilder));
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("oplogApplicationMode"
-                                                                      << "Secondary"))));
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("oplogApplicationMode" << "Secondary"))));
 
     stopCapturingLogMessages();
 }
@@ -304,11 +300,10 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsTypeMismatchIfNotCommand) {
 }
 
 TEST_F(ApplyOpsTest, ExtractOperationsReturnsCommandNotSupportedIfNotApplyOpsCommand) {
-    ASSERT_THROWS_CODE(ApplyOps::extractOperations(makeOplogEntry(OpTypeEnum::kCommand,
-                                                                  BSON("create"
-                                                                       << "t"))),
-                       DBException,
-                       ErrorCodes::CommandNotSupported);
+    ASSERT_THROWS_CODE(
+        ApplyOps::extractOperations(makeOplogEntry(OpTypeEnum::kCommand, BSON("create" << "t"))),
+        DBException,
+        ErrorCodes::CommandNotSupported);
 }
 
 TEST_F(ApplyOpsTest, ExtractOperationsReturnsEmptyArrayIfApplyOpsContainsNoOperations) {
@@ -320,22 +315,19 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsEmptyArrayIfApplyOpsContainsNoOpera
 TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps) {
     NamespaceString ns1 = NamespaceString::createNamespaceString_forTest("test.a");
     auto ui1 = UUID::gen();
-    auto op1 = BSON("op"
-                    << "i"
-                    << "ns" << ns1.ns_forTest() << "ui" << ui1 << "o" << BSON("_id" << 1));
+    auto op1 = BSON("op" << "i"
+                         << "ns" << ns1.ns_forTest() << "ui" << ui1 << "o" << BSON("_id" << 1));
 
     NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("test.b");
     auto ui2 = UUID::gen();
-    auto op2 = BSON("op"
-                    << "i"
-                    << "ns" << ns2.ns_forTest() << "ui" << ui2 << "o" << BSON("_id" << 2));
+    auto op2 = BSON("op" << "i"
+                         << "ns" << ns2.ns_forTest() << "ui" << ui2 << "o" << BSON("_id" << 2));
 
     NamespaceString ns3 = NamespaceString::createNamespaceString_forTest("test.c");
     auto ui3 = UUID::gen();
-    auto op3 = BSON("op"
-                    << "u"
-                    << "ns" << ns3.ns_forTest() << "ui" << ui3 << "b" << true << "o"
-                    << BSON("x" << 1) << "o2" << BSON("_id" << 3));
+    auto op3 = BSON("op" << "u"
+                         << "ns" << ns3.ns_forTest() << "ui" << ui3 << "b" << true << "o"
+                         << BSON("x" << 1) << "o2" << BSON("_id" << 3));
 
     auto oplogEntry =
         makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2 << op3)));
@@ -395,16 +387,14 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
 TEST_F(ApplyOpsTest, ExtractOperationsFromApplyOpsMultiStmtIds) {
     NamespaceString ns1 = NamespaceString::createNamespaceString_forTest("test.a");
     auto ui1 = UUID::gen();
-    auto op1 = BSON("op"
-                    << "i"
-                    << "ns" << ns1.ns_forTest() << "ui" << ui1 << "o" << BSON("_id" << 1));
+    auto op1 = BSON("op" << "i"
+                         << "ns" << ns1.ns_forTest() << "ui" << ui1 << "o" << BSON("_id" << 1));
 
     NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("test.b");
     auto ui2 = UUID::gen();
-    auto op2 = BSON("op"
-                    << "u"
-                    << "ns" << ns2.ns_forTest() << "ui" << ui2 << "b" << true << "o"
-                    << BSON("x" << 1) << "o2" << BSON("_id" << 2));
+    auto op2 = BSON("op" << "u"
+                         << "ns" << ns2.ns_forTest() << "ui" << ui2 << "b" << true << "o"
+                         << BSON("x" << 1) << "o2" << BSON("_id" << 2));
 
     auto oplogEntry =
         makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2)), {0, 1});
@@ -451,24 +441,22 @@ TEST_F(ApplyOpsTest, ExtractOperationsFromApplyOpsMultiStmtIds) {
 TEST_F(ApplyOpsTest, ExtractOperationsIsUpsertDependsOnOperationAndAlwaysUpsert) {
     NamespaceString ns1 = NamespaceString::createNamespaceString_forTest("test.a");
     auto ui1 = UUID::gen();
-    auto op1 = BSON("op"
-                    << "u"
-                    << "ns" << ns1.ns_forTest() << "ui" << ui1 << "o"
-                    << BSON("$set" << BSON("a" << 1)) << "o2" << BSON("_id" << 1));
+    auto op1 = BSON("op" << "u"
+                         << "ns" << ns1.ns_forTest() << "ui" << ui1 << "o"
+                         << BSON("$set" << BSON("a" << 1)) << "o2" << BSON("_id" << 1));
 
     NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("test.b");
     auto ui2 = UUID::gen();
-    auto op2 = BSON("op"
-                    << "u"
-                    << "ns" << ns2.ns_forTest() << "ui" << ui2 << "o"
-                    << BSON("$set" << BSON("a" << 2)) << "o2" << BSON("_id" << 2) << "b" << false);
+    auto op2 =
+        BSON("op" << "u"
+                  << "ns" << ns2.ns_forTest() << "ui" << ui2 << "o"
+                  << BSON("$set" << BSON("a" << 2)) << "o2" << BSON("_id" << 2) << "b" << false);
 
     NamespaceString ns3 = NamespaceString::createNamespaceString_forTest("test.c");
     auto ui3 = UUID::gen();
-    auto op3 = BSON("op"
-                    << "u"
-                    << "ns" << ns3.ns_forTest() << "ui" << ui3 << "b" << true << "o"
-                    << BSON("$set" << BSON("a" << 3)) << "o2" << BSON("_id" << 3));
+    auto op3 = BSON("op" << "u"
+                         << "ns" << ns3.ns_forTest() << "ui" << ui3 << "b" << true << "o"
+                         << BSON("$set" << BSON("a" << 3)) << "o2" << BSON("_id" << 3));
 
     // AlwayUpsert defaults to false.
     auto oplogEntry =
@@ -539,10 +527,9 @@ TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
     options.uuid = UUID::gen();
     ASSERT_OK(_storage->createCollection(opCtx.get(), nss, options));
 
-    auto dropDatabaseOp = BSON("op"
-                               << "c"
-                               << "ns" << nss.getCommandNS().ns_forTest() << "o"
-                               << BSON("dropDatabase" << 1));
+    auto dropDatabaseOp =
+        BSON("op" << "c"
+                  << "ns" << nss.getCommandNS().ns_forTest() << "o" << BSON("dropDatabase" << 1));
 
     auto dropDatabaseCmdObj = BSON("applyOps" << BSON_ARRAY(dropDatabaseOp));
     BSONObjBuilder resultBuilder;

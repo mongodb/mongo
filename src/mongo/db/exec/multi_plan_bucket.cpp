@@ -98,9 +98,10 @@ boost::optional<MultiPlanTokens> MultiPlanBucket::getTokens(size_t requestedToke
     }
 
     while (_tokens < requestedTokens &&
-           _cv.wait_for(guard, _yieldingTimeout, [this, requestedTokens] {
-               return _tokens >= requestedTokens;
-           }) == false) {
+           _cv.wait_for(
+               guard,
+               _yieldingTimeout,
+               [this, requestedTokens] { return _tokens >= requestedTokens; }) == false) {
         // Multidocument transactions do not yield.
         if (!inMultiDocumentTransaction) {
             guard.unlock();  // unlock the mutex to avoid deadlocks during yielding

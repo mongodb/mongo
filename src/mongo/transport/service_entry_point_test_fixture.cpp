@@ -393,9 +393,8 @@ void ServiceEntryPointTestFixture::testReadConcernClientSuppliedLevelNotAllowed(
     bool exceptionLogged) {
     // We supply a majority read concern, but the Command object does not support anything
     // non-local, so the ServiceEntryPoint throws.
-    const auto cmdBSON = BSON(TestCmdSucceeds::kCommandName << 1 << "readConcern"
-                                                            << BSON("level"
-                                                                    << "majority"));
+    const auto cmdBSON =
+        BSON(TestCmdSucceeds::kCommandName << 1 << "readConcern" << BSON("level" << "majority"));
     runCommandTestWithResponse(
         cmdBSON,
         nullptr,
@@ -410,9 +409,8 @@ void ServiceEntryPointTestFixture::testReadConcernClientSuppliedLevelNotAllowed(
 
 void ServiceEntryPointTestFixture::testReadConcernClientSuppliedAllowed() {
     // Supplying a local read concern in the request.
-    const auto cmdBSON = BSON(TestCmdSucceeds::kCommandName << 1 << "readConcern"
-                                                            << BSON("level"
-                                                                    << "local"));
+    const auto cmdBSON =
+        BSON(TestCmdSucceeds::kCommandName << 1 << "readConcern" << BSON("level" << "local"));
     auto opCtx = makeOperationContext();
     auto dbResponse = runCommandTestWithResponse(cmdBSON, opCtx.get());
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx.get());
@@ -423,10 +421,8 @@ void ServiceEntryPointTestFixture::testReadConcernClientSuppliedAllowed() {
 
 void ServiceEntryPointTestFixture::testReadConcernExtractedOnException() {
     // Even if we throw an exception during the command, read concern is still extracted.
-    const auto cmdBSON =
-        BSON(TestCmdFailsRunInvocationWithException::kCommandName << 1 << "readConcern"
-                                                                  << BSON("level"
-                                                                          << "local"));
+    const auto cmdBSON = BSON(TestCmdFailsRunInvocationWithException::kCommandName
+                              << 1 << "readConcern" << BSON("level" << "local"));
     auto opCtx = makeOperationContext();
     auto dbResponse = runCommandTestWithResponse(
         cmdBSON, opCtx.get(), Status(ErrorCodes::InternalError, "Test command failure exception."));
@@ -498,17 +494,14 @@ void ServiceEntryPointTestFixture::testExhaustCommandNextInvocationSet() {
 
 void ServiceEntryPointTestFixture::testWriteConcernClientSpecified() {
     // Test client supplied write concerns.
-    const auto wcObj = BSON("w"
-                            << "majority"
-                            << "wtimeout" << 30);
+    const auto wcObj = BSON("w" << "majority"
+                                << "wtimeout" << 30);
     const auto cmdBSON =
         BSON(TestCmdSupportsWriteConcern::kCommandName << 1 << "writeConcern" << wcObj);
     auto opCtx = makeOperationContext();
     auto msg = constructMessage(cmdBSON, opCtx.get());
     // ServiceEntryPoint will add the provenance based on the source.
-    auto wcObjWithProv = wcObj.addField(BSON("provenance"
-                                             << "clientSupplied")
-                                            .firstElement());
+    auto wcObjWithProv = wcObj.addField(BSON("provenance" << "clientSupplied").firstElement());
     auto expectedWC = makeWriteConcernOptions(wcObjWithProv);
     TestCmdSupportsWriteConcern::setExpectedWriteConcern(expectedWC);
     runCommandTestWithResponse(cmdBSON, opCtx.get());
@@ -528,9 +521,8 @@ void ServiceEntryPointTestFixture::testWriteConcernClientUnspecifiedWithDefault(
     //   * In the router and replica set cases, a cluster-wide default write concern applies
     //   * In the shard server case, an implicit default applies.
     auto opCtx = makeOperationContext();
-    auto defaultWCObj = BSON("w"
-                             << "majority"
-                             << "wtimeout" << 500);
+    auto defaultWCObj = BSON("w" << "majority"
+                                 << "wtimeout" << 500);
     setDefaultWriteConcern(opCtx.get(), defaultWCObj);
     if (expectClusterDefault) {
         runWriteConcernTestExpectClusterDefault(opCtx.get());
@@ -558,9 +550,8 @@ void ServiceEntryPointTestFixture::runWriteConcernTestExpectClusterDefault(
     // Construct default WC with provenance added.
     auto defaultWCObj =
         ReadWriteConcernDefaults::get(opCtx->getService()).getDefaultWriteConcern(opCtx)->toBSON();
-    auto defaultWCObjWithProv = defaultWCObj.addField(BSON("provenance"
-                                                           << "customDefault")
-                                                          .firstElement());
+    auto defaultWCObjWithProv =
+        defaultWCObj.addField(BSON("provenance" << "customDefault").firstElement());
     auto defaultWCWithProv = makeWriteConcernOptions(defaultWCObjWithProv);
     TestCmdSupportsWriteConcern::setExpectedWriteConcern(defaultWCWithProv);
 

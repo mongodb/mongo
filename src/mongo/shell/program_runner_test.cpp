@@ -54,21 +54,19 @@ protected:
 
 TEST_F(ProgramRunnerTestFixture, ArgumentEscaping) {
 #ifdef _WIN32
-    BSONObj args = BSON_ARRAY("cmd.exe"
-                              << "/C"
-                              << "echo"
-                              << "Hello, \"World\"!"
-                              << "Argument with spaces"
-                              << "!@#$%^&*\\");
+    BSONObj args = BSON_ARRAY("cmd.exe" << "/C"
+                                        << "echo"
+                                        << "Hello, \"World\"!"
+                                        << "Argument with spaces"
+                                        << "!@#$%^&*\\");
 
     std::string expected =
         "\"Hello, \\\"World\\\"!\" \"Argument with spaces\" \"!@#$%^&*\\\\\"\r\n";
 
 #else
-    BSONObj args = BSON_ARRAY("echo"
-                              << "Hello, \"World\"!"
-                              << "Argument with spaces"
-                              << "!@#$%^&*\\");
+    BSONObj args = BSON_ARRAY("echo" << "Hello, \"World\"!"
+                                     << "Argument with spaces"
+                                     << "!@#$%^&*\\");
 
     std::string expected = "Hello, \"World\"! Argument with spaces !@#$%^&*\\\n";
 #endif

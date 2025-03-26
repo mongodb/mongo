@@ -123,8 +123,7 @@ public:
             // secondaries can be aware of this txn.
             DBDirectClient client(opCtx);
             client.update(NamespaceString::kServerConfigurationNamespace,
-                          BSON("_id"
-                               << "RemoveTagsMetadataStats"),
+                          BSON("_id" << "RemoveTagsMetadataStats"),
                           BSON("$inc" << BSON("count" << 1)),
                           true /* upsert */,
                           false /* multi */);

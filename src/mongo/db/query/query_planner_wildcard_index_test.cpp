@@ -985,9 +985,7 @@ TEST_F(QueryPlannerWildcardTest, ChooseWildcardIndexHintByName) {
     addWildcardIndex(BSON("$**" << 1), {}, {}, {}, nullCollator, wildcard);
     addIndex(BSON("x" << 1));
 
-    runQueryHint(fromjson("{x: {$eq: 1}}"),
-                 BSON("$hint"
-                      << "wildcard"));
+    runQueryHint(fromjson("{x: {$eq: 1}}"), BSON("$hint" << "wildcard"));
 
     assertNumSolutions(1U);
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");

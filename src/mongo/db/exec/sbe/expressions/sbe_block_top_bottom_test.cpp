@@ -1004,9 +1004,9 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNHomogeneousTest) {
     };
 
     auto runTest = [this]<bool HomogeneousBitset = false>(
-        std::vector<std::unique_ptr<value::ValueBlock>> & keyBlocks,
-        std::vector<std::unique_ptr<value::ValueBlock>> & valBlocks,
-        std::vector<bool> bitset) {
+                       std::vector<std::unique_ptr<value::ValueBlock>>& keyBlocks,
+                       std::vector<std::unique_ptr<value::ValueBlock>>& valBlocks,
+                       std::vector<bool> bitset) {
         std::vector<int> sortDirections{-1 /* descending */, 1 /* ascending */};
         for (int32_t sd : sortDirections) {
             SortSpec sortSpec{BSON("sortField" << sd)};

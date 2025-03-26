@@ -280,24 +280,16 @@ TEST(ValueComparatorTest, UnorderedMapOfValueRespectsCollation) {
 TEST(ValueComparatorTest, ComparingCodeWScopeShouldNotRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const ValueComparator comparator(&collator);
-    const Value val1{BSONCodeWScope("js code",
-                                    BSON("foo"
-                                         << "bar"))};
-    const Value val2{BSONCodeWScope("js code",
-                                    BSON("foo"
-                                         << "not bar"))};
+    const Value val1{BSONCodeWScope("js code", BSON("foo" << "bar"))};
+    const Value val2{BSONCodeWScope("js code", BSON("foo" << "not bar"))};
     ASSERT_TRUE(comparator.evaluate(val1 != val2));
 }
 
 TEST(ValueComparatorTest, HashingCodeWScopeShouldNotRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const ValueComparator comparator(&collator);
-    const Value val1{BSONCodeWScope("js code",
-                                    BSON("foo"
-                                         << "bar"))};
-    const Value val2{BSONCodeWScope("js code",
-                                    BSON("foo"
-                                         << "not bar"))};
+    const Value val1{BSONCodeWScope("js code", BSON("foo" << "bar"))};
+    const Value val2{BSONCodeWScope("js code", BSON("foo" << "not bar"))};
     ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
 }
 

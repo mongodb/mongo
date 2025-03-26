@@ -590,15 +590,12 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithNonretriableErr
 
 TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
     std::vector<UUID> providedOpKeys = {UUID::gen(), UUID::gen()};
-    auto cmdObj0 = BSON("find"
-                        << "testcoll"
-                        << "clientOperationKey" << providedOpKeys[0]);
-    auto cmdObj1 = BSON("find"
-                        << "testcoll"
-                        << "clientOperationKey" << providedOpKeys[1]);
-    auto cmdObj2 = BSON("find"
-                        << "testcoll"
-                        << "clientOperationKey" << providedOpKeys[1]);
+    auto cmdObj0 = BSON("find" << "testcoll"
+                               << "clientOperationKey" << providedOpKeys[0]);
+    auto cmdObj1 = BSON("find" << "testcoll"
+                               << "clientOperationKey" << providedOpKeys[1]);
+    auto cmdObj2 = BSON("find" << "testcoll"
+                               << "clientOperationKey" << providedOpKeys[1]);
     std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj0}, {kTestShardIds[1], cmdObj1}, {kTestShardIds[2], cmdObj2}};
 

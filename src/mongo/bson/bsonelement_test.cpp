@@ -298,10 +298,7 @@ TEST(BSONElement, IsNaN) {
     ASSERT_FALSE(BSON("" << Decimal128{"9223372036854775808.5"}).firstElement().isNaN());
     ASSERT_FALSE(BSON("" << Decimal128{"-9223372036854775809.99"}).firstElement().isNaN());
     ASSERT_FALSE(BSON("" << 12345LL).firstElement().isNaN());
-    ASSERT_FALSE(BSON(""
-                      << "foo")
-                     .firstElement()
-                     .isNaN());
+    ASSERT_FALSE(BSON("" << "foo").firstElement().isNaN());
 }
 
 TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsNegative) {
@@ -332,14 +329,12 @@ TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongRejectsTooLargeNegati
 }
 
 TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsString) {
-    BSONObj query = BSON(""
-                         << "1");
+    BSONObj query = BSON("" << "1");
     ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());
 }
 
 TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongRejectsString) {
-    BSONObj query = BSON(""
-                         << "1");
+    BSONObj query = BSON("" << "1");
     ASSERT_NOT_OK(query.firstElement().parseIntegerElementToLong());
 }
 

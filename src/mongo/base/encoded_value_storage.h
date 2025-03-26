@@ -36,7 +36,7 @@
 namespace mongo {
 
 struct ZeroInitTag_t {
-    ZeroInitTag_t(){};
+    ZeroInitTag_t() {};
 };
 
 const ZeroInitTag_t kZeroInitTag;

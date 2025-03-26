@@ -158,8 +158,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScoreDetails) {
     auto expressionMeta =
         ExpressionMeta::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
 
-    auto details = BSON("scoreDetails"
-                        << "foo");
+    auto details = BSON("scoreDetails" << "foo");
     MutableDocument doc;
     doc.metadata().setSearchScoreDetails(details);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);

@@ -1,6 +1,9 @@
 import {anyEq} from "jstests/aggregation/extras/utils.js";
-import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
-import {getCollectionName, isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
+import {
+    getCollectionName,
+    getExplainCommand,
+    isTimeSeriesCollection
+} from "jstests/libs/cmd_object_utils.js";
 import {
     everyWinningPlan,
     formatQueryPlanner,

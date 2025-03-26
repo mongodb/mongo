@@ -172,13 +172,11 @@ TEST_F(EqualityPredicateRewriteTest, Equality_NoFFP_Expr) {
 
 TEST_F(EqualityPredicateRewriteTest, In_NoFFP_Match) {
     auto input = makeInExpr("name",
-                            BSON_ARRAY("harry"
-                                       << "ron"
-                                       << "hermione"));
+                            BSON_ARRAY("harry" << "ron"
+                                               << "hermione"));
     auto expected = makeInExpr("name",
-                               BSON_ARRAY("harry"
-                                          << "ron"
-                                          << "hermione"));
+                               BSON_ARRAY("harry" << "ron"
+                                                  << "hermione"));
 
     auto result = _predicate.rewrite(input.get());
     ASSERT(result == nullptr);

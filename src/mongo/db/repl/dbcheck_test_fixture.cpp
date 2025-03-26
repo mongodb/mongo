@@ -172,8 +172,7 @@ void DbCheckTest::insertExtraIndexKeys(OperationContext* opCtx,
                                        int numDocs,
                                        const std::vector<std::string>& fieldNames) {
     FailPointEnableBlock skipIndexFp("skipUnindexingDocumentWhenDeleted",
-                                     BSON("indexName"
-                                          << "a_1"));
+                                     BSON("indexName" << "a_1"));
     // Insert then delete docs. The failpoint will cause the docs' keystrings to remain in the index
     // table, creating dangling keystrings.
     insertDocs(opCtx, startIDNum, numDocs, fieldNames);

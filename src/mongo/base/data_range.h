@@ -73,9 +73,9 @@ protected:
 
     template <typename T>
     static constexpr bool isContiguousContainerOfByteLike =  //
-        stdx::is_detected_v<SizeOp, T>&&                     //
-            stdx::is_detected_v<DataOp, T>&&                 //
-                isByte<stdx::detected_t<ValueTypeOp, T>>;
+        stdx::is_detected_v<SizeOp, T> &&                    //
+        stdx::is_detected_v<DataOp, T> &&                    //
+        isByte<stdx::detected_t<ValueTypeOp, T>>;
 
 public:
     using byte_type = char;

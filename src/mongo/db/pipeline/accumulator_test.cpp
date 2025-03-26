@@ -2150,13 +2150,9 @@ Document parseAndSerializeAccumRepresentative(
 }
 
 TEST(Accumulators, SerializeWithRedaction) {
-    auto jsReduce =
-        BSON("$accumulator" << BSON("init"
-                                    << "function() {}"
-                                    << "accumulateArgs"
-                                    << BSON_ARRAY("$a"
-                                                  << "$b")
-                                    << "accumulate"
+    auto jsReduce = BSON("$accumulator" << BSON(
+                             "init" << "function() {}"
+                                    << "accumulateArgs" << BSON_ARRAY("$a" << "$b") << "accumulate"
                                     << "function(state, str1, str2) {return str1 + str2;}"
                                     << "merge"
                                     << "function(s1, s2) {return s1 || s2;}"
@@ -2217,8 +2213,7 @@ TEST(Accumulators, SerializeWithRedaction) {
         R"({"$sum":["$HASH<a>","?number","?number",{"$sum":"?array<?number>"}]})",
         actual);
 
-    auto mergeObjs = BSON("$mergeObjects" << BSON_ARRAY("$a" << BSON("b"
-                                                                     << "null")));
+    auto mergeObjs = BSON("$mergeObjects" << BSON_ARRAY("$a" << BSON("b" << "null")));
     actual =
         parseAndSerializeAccum(mergeObjs.firstElement(),
                                &genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
@@ -2226,17 +2221,15 @@ TEST(Accumulators, SerializeWithRedaction) {
         R"({"$mergeObjects":["$HASH<a>","?object"]})",
         actual);
 
-    auto push = BSON("$push" << BSON("$eq" << BSON_ARRAY("$str"
-                                                         << "str2")));
+    auto push = BSON("$push" << BSON("$eq" << BSON_ARRAY("$str" << "str2")));
     actual = parseAndSerializeAccum(push.firstElement(),
                                     &genericParseSingleExpressionAccumulator<AccumulatorPush>);
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"$push":{"$eq":["$HASH<str>","?string"]}})",
         actual);
 
-    auto top = BSON("$top" << BSON("output"
-                                   << "$b"
-                                   << "sortBy" << BSON("sales" << 1)));
+    auto top = BSON("$top" << BSON("output" << "$b"
+                                            << "sortBy" << BSON("sales" << 1)));
     actual = parseAndSerializeAccum(
         top.firstElement(), &AccumulatorTopBottomN<TopBottomSense::kTop, true>::parseTopBottomN);
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
@@ -2273,11 +2266,11 @@ TEST(Accumulators, SerializeWithRedaction) {
         })",
         actual);
 
-    auto internalJsReduce = BSON(
-        "$_internalJsReduce" << BSON("data"
-                                     << "$emits"
-                                     << "eval"
-                                     << "function(key, values) {\n return Array.sum(values);\n"));
+    auto internalJsReduce =
+        BSON("$_internalJsReduce" << BSON(
+                 "data" << "$emits"
+                        << "eval"
+                        << "function(key, values) {\n return Array.sum(values);\n"));
     actual = parseAndSerializeAccum(internalJsReduce.firstElement(),
                                     &AccumulatorInternalJsReduce::parseInternalJsReduce);
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
@@ -2309,10 +2302,9 @@ TEST(AccumulatorsToExpression, SerializeWithRedaction) {
         R"({"$maxN":{"n":"?number","input":"?array<?number>"}})",
         actual.getDocument());
 
-    auto firstN = BSON("$firstN" << BSON("input"
-                                         << "$sales"
-                                         << "n"
-                                         << "\'string\'"));
+    auto firstN = BSON("$firstN" << BSON("input" << "$sales"
+                                                 << "n"
+                                                 << "\'string\'"));
     using FirstLastSense = AccumulatorFirstLastN::Sense;
     actual = parseAndSerializeAccumExpr(
         firstN, &AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>);

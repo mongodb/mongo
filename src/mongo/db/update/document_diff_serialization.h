@@ -170,7 +170,7 @@ enum class NodeType {
  * Base class to represents a node in the diff tree.
  */
 struct Node {
-    virtual ~Node(){};
+    virtual ~Node() {};
     virtual NodeType type() const = 0;
 };
 
@@ -253,7 +253,7 @@ public:
     private:
         size_t _size;
     };
-    InternalNode(size_t size = 0) : sizeTracker(size){};
+    InternalNode(size_t size = 0) : sizeTracker(size) {};
 
     // Returns an unowned pointer to the newly added child.
     virtual Node* addChild(StringData fieldName, std::unique_ptr<Node> node) = 0;
@@ -275,7 +275,7 @@ public:
     using ModificationEntries = std::vector<std::pair<StringData, E>>;
 
     DocumentSubDiffNode(size_t size = 0)
-        : InternalNode(size + doc_diff::kSizeOfEmptyDocumentDiffBuilder){};
+        : InternalNode(size + doc_diff::kSizeOfEmptyDocumentDiffBuilder) {};
 
     Node* addChild(StringData fieldName, std::unique_ptr<Node> node) override;
 
@@ -347,7 +347,7 @@ private:
  */
 class DocumentInsertionNode : public InternalNode {
 public:
-    DocumentInsertionNode() : InternalNode(0){};
+    DocumentInsertionNode() : InternalNode(0) {};
 
     Node* addChild(StringData fieldName, std::unique_ptr<Node> node) override {
         invariant(node->type() == NodeType::kInsert || node->type() == NodeType::kDocumentInsert);
@@ -389,7 +389,7 @@ private:
  */
 class ArrayNode : public InternalNode {
 public:
-    ArrayNode() : InternalNode(doc_diff::kSizeOfEmptyArrayDiffBuilder){};
+    ArrayNode() : InternalNode(doc_diff::kSizeOfEmptyArrayDiffBuilder) {};
 
     Node* addChild(size_t idx, std::unique_ptr<Node> node) {
         sizeTracker.addEntry(1 /* modification type */ +

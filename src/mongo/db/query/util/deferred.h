@@ -149,7 +149,8 @@ public:
 
     // Move construction requires both the initialiser and cached value type to be
     // move constructible.
-    Deferred(Deferred&& other) requires move_constructible
+    Deferred(Deferred&& other)
+    requires move_constructible
         : _initializer(std::move(other._initializer)) {
         if (other.isInitialized()) {
             new (&_data._value) T(std::move(other._data._value));
@@ -162,7 +163,9 @@ public:
 
     Deferred& operator=(const Deferred& other) = delete;
 
-    Deferred& operator=(Deferred&& other) requires move_assignable {
+    Deferred& operator=(Deferred&& other)
+    requires move_assignable
+    {
         std::swap(_initializer, other._initializer);
         if (other.isInitialized()) {
             if (isInitialized()) {

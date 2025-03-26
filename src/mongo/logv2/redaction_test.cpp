@@ -130,9 +130,7 @@ TEST(RedactBSONTest, BasicBSON) {
                    BSONStringPair(BSON("" << 1), "{ : \"###\" }"),
                    BSONStringPair(BSON("a" << 1), "{ a: \"###\" }"),
                    BSONStringPair(BSON("a" << 1.0), "{ a: \"###\" }"),
-                   BSONStringPair(BSON("a"
-                                       << "a"),
-                                  "{ a: \"###\" }"),
+                   BSONStringPair(BSON("a" << "a"), "{ a: \"###\" }"),
                    BSONStringPair(BSON("a" << 1 << "b"
                                            << "str"),
                                   "{ a: \"###\", b: \"###\" }"),

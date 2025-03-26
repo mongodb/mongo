@@ -62,10 +62,9 @@ protected:
         // ClusterServerParameterRefresher. This FCV reference should exist across binary versions.
         _fcv = multiversion::GenericFCV::kLatest;
         _clusterParameterDocs.insert({"maxIncomingConnections",
-                                      BSON("_id"
-                                           << "maxIncomingConnections"
-                                           << "value" << 3000 << "type"
-                                           << "int")});
+                                      BSON("_id" << "maxIncomingConnections"
+                                                 << "value" << 3000 << "type"
+                                                 << "int")});
     }
 
     void mockFCVAndClusterParametersResponses() {
@@ -76,9 +75,8 @@ protected:
             return BSON(
                 "ok" << 1 << "cursor"
                      << BSON("firstBatch"
-                             << BSON_ARRAY(BSON("_id"
-                                                << "featureCompatibilityVersion"
-                                                << "version" << multiversion::toString(_fcv)))
+                             << BSON_ARRAY(BSON("_id" << "featureCompatibilityVersion"
+                                                      << "version" << multiversion::toString(_fcv)))
                              << "atClusterTime" << atClusterTime << "id" << 0LL << "ns"
                              << NamespaceString::kServerConfigurationNamespace.toString_forTest()));
         });

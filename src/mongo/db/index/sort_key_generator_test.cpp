@@ -173,18 +173,15 @@ TEST(SortKeyGeneratorTest, SortKeyGenerationForInvalidPath) {
 }
 
 TEST(SortKeyGeneratorTest, SortPatternComponentWithStringUasserts) {
-    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a"
-                                                    << "foo"),
-                                               nullptr),
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << "foo"), nullptr),
                                 AssertionException,
                                 15974,
                                 "Illegal key in $sort specification: a: \"foo\"");
 }
 
 TEST(SortKeyGeneratorTest, SortPatternComponentWhoseObjectHasMultipleKeysUasserts) {
-    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                                << "textScore"
-                                                                << "extra" << 1)),
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta" << "textScore"
+                                                                        << "extra" << 1)),
                                                nullptr),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
@@ -192,18 +189,15 @@ TEST(SortKeyGeneratorTest, SortPatternComponentWhoseObjectHasMultipleKeysUassert
 }
 
 TEST(SortKeyGeneratorTest, SortPatternComponentWithNonMetaObjectSortUasserts) {
-    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$unknown"
-                                                                << "textScore")),
-                                               nullptr),
-                                AssertionException,
-                                17312,
-                                "$meta is the only expression supported by $sort right now");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        makeSortKeyGen(BSON("a" << BSON("$unknown" << "textScore")), nullptr),
+        AssertionException,
+        17312,
+        "$meta is the only expression supported by $sort right now");
 }
 
 TEST(SortKeyGeneratorTest, SortPatternComponentWithUnknownMetaKeywordUasserts) {
-    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                                << "unknown")),
-                                               nullptr),
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta" << "unknown")), nullptr),
                                 AssertionException,
                                 31138,
                                 "Illegal $meta sort: $meta: \"unknown\"");
@@ -217,45 +211,37 @@ TEST(SortKeyGeneratorTest, SortPatternComponentWithNonStringMetaKeywordUasserts)
 }
 
 TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchHighlightsMetaKeywordUasserts) {
-    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                                << "searchHighlights")),
-                                               nullptr),
-                                AssertionException,
-                                31138,
-                                "Illegal $meta sort: $meta: \"searchHighlights\"");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        makeSortKeyGen(BSON("a" << BSON("$meta" << "searchHighlights")), nullptr),
+        AssertionException,
+        31138,
+        "Illegal $meta sort: $meta: \"searchHighlights\"");
 }
 
 TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchScoreDetailsMetaKeywordUasserts) {
-    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                                << "searchScoreDetails")),
-                                               nullptr),
-                                AssertionException,
-                                31138,
-                                "Illegal $meta sort: $meta: \"searchScoreDetails\"");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        makeSortKeyGen(BSON("a" << BSON("$meta" << "searchScoreDetails")), nullptr),
+        AssertionException,
+        31138,
+        "Illegal $meta sort: $meta: \"searchScoreDetails\"");
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForTextScoreMetaSort) {
-    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                      << "textScore")),
-                                     nullptr);
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "textScore")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldTextScore << 1.5)));
     ASSERT_VALUE_EQ(sortKey, Value{1.5});
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForRandValMetaSort) {
-    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                      << "randVal")),
-                                     nullptr);
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "randVal")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldRandVal << 0.3)));
     ASSERT_VALUE_EQ(sortKey, Value{0.3});
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForGeoDistanceSort) {
-    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                      << "geoNearDistance")),
-                                     nullptr);
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "geoNearDistance")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldGeoNearDistance << 10.3)));
     ASSERT_VALUE_EQ(sortKey, Value{10.3});
@@ -263,9 +249,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForGeoDistanceSort) {
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                      << "searchScore")),
-                                     nullptr);
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "searchScore")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldSearchScore << 10.3)));
     ASSERT_VALUE_EQ(sortKey, Value{10.3});
@@ -273,9 +257,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForVectorSearchScoreSort) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                      << "vectorSearchScore")),
-                                     nullptr);
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "vectorSearchScore")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldVectorSearchScore << 10.3)));
     ASSERT_VALUE_EQ(sortKey, Value{10.3});
@@ -422,10 +404,9 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyStateW
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), &collator);
     setRecordIdAndIdx(BSON("a" << 1 << "b" << 1),
-                      BSON(""
-                           << "string1"
-                           << ""
-                           << "string2"));
+                      BSON("" << "string1"
+                              << ""
+                              << "string2"));
     auto sortKey = sortKeyGen->computeSortKey(member());
     ASSERT_VALUE_EQ(Value("1gnirts"_sd), sortKey);
 }

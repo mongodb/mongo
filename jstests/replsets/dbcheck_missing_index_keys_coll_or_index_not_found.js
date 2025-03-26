@@ -153,12 +153,9 @@ function indexDropAfterFirstBatch() {
 
 // Test with integer index entries (1, 2, 3, etc.), single character string entries ("1",
 // "2", "3", etc.), and long string entries ("1aaaaaaaaaa")
-[null,
- "",
- "aaaaaaaaaa"]
-    .forEach((docSuffix) => {
-        dbCheckDuringIndexBuild(docSuffix);
-    });
+[null, "", "aaaaaaaaaa"].forEach((docSuffix) => {
+    dbCheckDuringIndexBuild(docSuffix);
+});
 
 indexDropAfterFirstBatch();
 

@@ -482,9 +482,7 @@ void CursorEstablisher::killOpOnShards(ServiceContext* srvCtx,
  */
 BSONObj appendReadPreferenceNearest(BSONObj cmdObj) {
     BSONObjBuilder cmdWithReadPrefBob(std::move(cmdObj));
-    cmdWithReadPrefBob.append("$readPreference",
-                              BSON("mode"
-                                   << "nearest"));
+    cmdWithReadPrefBob.append("$readPreference", BSON("mode" << "nearest"));
     return cmdWithReadPrefBob.obj();
 }
 
@@ -588,9 +586,7 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
     // primary or secondary.
     BSONObjBuilder newCmd(std::move(cmdObj));
     appendOpKey(opKey, &newCmd);
-    newCmd.append("$readPreference",
-                  BSON("mode"
-                       << "nearest"));
+    newCmd.append("$readPreference", BSON("mode" << "nearest"));
 
     executor::AsyncMulticaster::Options options;
     options.maxConcurrency = internalQueryAggMulticastMaxConcurrency;

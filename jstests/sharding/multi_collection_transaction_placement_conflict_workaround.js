@@ -499,11 +499,9 @@ const st = new ShardingTest({mongos: 1, shards: 2});
             cmdResponse, [ErrorCodes.SnapshotUnavailable, ErrorCodes.StaleChunkHistory]);
     }
 
-    ['find',
-     'aggregate']
-        .forEach(command => {
-            runTest(command);
-        });
+    ['find', 'aggregate'].forEach(command => {
+        runTest(command);
+    });
 }
 
 st.stop();

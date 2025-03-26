@@ -264,20 +264,17 @@ class NonConstantZero : public OptimizeBase {
 /** An expression with two field paths and '1'. */
 class NonConstantNonConstantOne : public OptimizeBase {
     BSONObj spec() override {
-        return BSON("$and" << BSON_ARRAY("$a"
-                                         << "$b" << 1));
+        return BSON("$and" << BSON_ARRAY("$a" << "$b" << 1));
     }
     BSONObj expectedOptimized() override {
-        return BSON("$and" << BSON_ARRAY("$a"
-                                         << "$b"));
+        return BSON("$and" << BSON_ARRAY("$a" << "$b"));
     }
 };
 
 /** An expression with two field paths and '0'. */
 class NonConstantNonConstantZero : public OptimizeBase {
     BSONObj spec() override {
-        return BSON("$and" << BSON_ARRAY("$a"
-                                         << "$b" << 0));
+        return BSON("$and" << BSON_ARRAY("$a" << "$b" << 0));
     }
     BSONObj expectedOptimized() override {
         return BSON("$const" << false);
@@ -311,8 +308,7 @@ class Nested : public OptimizeBase {
                                            << "$b"));
     }
     BSONObj expectedOptimized() override {
-        return BSON("$and" << BSON_ARRAY("$a"
-                                         << "$b"));
+        return BSON("$and" << BSON_ARRAY("$a" << "$b"));
     }
 };
 

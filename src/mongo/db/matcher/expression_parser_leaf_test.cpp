@@ -66,8 +66,7 @@ namespace mongo {
 using std::string;
 
 TEST(MatchExpressionParserLeafTest, NullCollation) {
-    BSONObj query = BSON("x"
-                         << "string");
+    BSONObj query = BSON("x" << "string");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -78,8 +77,7 @@ TEST(MatchExpressionParserLeafTest, NullCollation) {
 
 
 TEST(MatchExpressionParserLeafTest, Collation) {
-    BSONObj query = BSON("x"
-                         << "string");
+    BSONObj query = BSON("x" << "string");
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -99,8 +97,7 @@ TEST(MatchExpressionParserLeafTest, SimpleEQUndefined) {
 }
 
 TEST(MatchExpressionParserLeafTest, EQNullCollation) {
-    BSONObj query = BSON("x" << BSON("$eq"
-                                     << "string"));
+    BSONObj query = BSON("x" << BSON("$eq" << "string"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -111,8 +108,7 @@ TEST(MatchExpressionParserLeafTest, EQNullCollation) {
 
 
 TEST(MatchExpressionParserLeafTest, EQCollation) {
-    BSONObj query = BSON("x" << BSON("$eq"
-                                     << "string"));
+    BSONObj query = BSON("x" << BSON("$eq" << "string"));
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -125,8 +121,7 @@ TEST(MatchExpressionParserLeafTest, EQCollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, GTNullCollation) {
-    BSONObj query = BSON("x" << BSON("$gt"
-                                     << "abc"));
+    BSONObj query = BSON("x" << BSON("$gt" << "abc"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -137,8 +132,7 @@ TEST(MatchExpressionParserLeafTest, GTNullCollation) {
 
 
 TEST(MatchExpressionParserLeafTest, GTCollation) {
-    BSONObj query = BSON("x" << BSON("$gt"
-                                     << "abc"));
+    BSONObj query = BSON("x" << BSON("$gt" << "abc"));
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -151,8 +145,7 @@ TEST(MatchExpressionParserLeafTest, GTCollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, LTNullCollation) {
-    BSONObj query = BSON("x" << BSON("$lt"
-                                     << "abc"));
+    BSONObj query = BSON("x" << BSON("$lt" << "abc"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -163,8 +156,7 @@ TEST(MatchExpressionParserLeafTest, LTNullCollation) {
 
 
 TEST(MatchExpressionParserLeafTest, LTCollation) {
-    BSONObj query = BSON("x" << BSON("$lt"
-                                     << "abc"));
+    BSONObj query = BSON("x" << BSON("$lt" << "abc"));
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -177,8 +169,7 @@ TEST(MatchExpressionParserLeafTest, LTCollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, GTENullCollation) {
-    BSONObj query = BSON("x" << BSON("$gte"
-                                     << "abc"));
+    BSONObj query = BSON("x" << BSON("$gte" << "abc"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -189,8 +180,7 @@ TEST(MatchExpressionParserLeafTest, GTENullCollation) {
 
 
 TEST(MatchExpressionParserLeafTest, GTECollation) {
-    BSONObj query = BSON("x" << BSON("$gte"
-                                     << "abc"));
+    BSONObj query = BSON("x" << BSON("$gte" << "abc"));
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -203,8 +193,7 @@ TEST(MatchExpressionParserLeafTest, GTECollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, LTENullCollation) {
-    BSONObj query = BSON("x" << BSON("$lte"
-                                     << "abc"));
+    BSONObj query = BSON("x" << BSON("$lte" << "abc"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -215,8 +204,7 @@ TEST(MatchExpressionParserLeafTest, LTENullCollation) {
 
 
 TEST(MatchExpressionParserLeafTest, LTECollation) {
-    BSONObj query = BSON("x" << BSON("$lte"
-                                     << "abc"));
+    BSONObj query = BSON("x" << BSON("$lte" << "abc"));
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -229,8 +217,7 @@ TEST(MatchExpressionParserLeafTest, LTECollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, NENullCollation) {
-    BSONObj query = BSON("x" << BSON("$ne"
-                                     << "string"));
+    BSONObj query = BSON("x" << BSON("$ne" << "string"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -243,8 +230,7 @@ TEST(MatchExpressionParserLeafTest, NENullCollation) {
 
 
 TEST(MatchExpressionParserLeafTest, NECollation) {
-    BSONObj query = BSON("x" << BSON("$ne"
-                                     << "string"));
+    BSONObj query = BSON("x" << BSON("$ne" << "string"));
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -353,8 +339,7 @@ TEST(MatchExpressionParserLeafTest, ModFloatTruncate) {
 }
 
 TEST(MatchExpressionParserLeafTest, IdCollation) {
-    BSONObj query = BSON("$id"
-                         << "string");
+    BSONObj query = BSON("$id" << "string");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -364,8 +349,7 @@ TEST(MatchExpressionParserLeafTest, IdCollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, IdNullCollation) {
-    BSONObj query = BSON("$id"
-                         << "string");
+    BSONObj query = BSON("$id" << "string");
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -378,8 +362,7 @@ TEST(MatchExpressionParserLeafTest, IdNullCollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, RefCollation) {
-    BSONObj query = BSON("$ref"
-                         << "coll");
+    BSONObj query = BSON("$ref" << "coll");
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -392,8 +375,7 @@ TEST(MatchExpressionParserLeafTest, RefCollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, DbCollation) {
-    BSONObj query = BSON("$db"
-                         << "db");
+    BSONObj query = BSON("$db" << "db");
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -430,16 +412,14 @@ TEST(MatchExpressionParserLeafTest, INCollation) {
 
 TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
     // missing $id
-    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
-                                                              << "coll"))));
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref" << "coll"))));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     result = MatchExpressionParser::parse(query, expCtx);
 
     // second field is not $id
-    query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
-                                                      << "coll"
-                                                      << "$foo" << 1))));
+    query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref" << "coll"
+                                                             << "$foo" << 1))));
     result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
@@ -451,9 +431,8 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
     ASSERT_NOT_OK(result.getStatus());
 
     // missing $id and $ref field
-    query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$db"
-                                                      << "test"
-                                                      << "foo" << 3))));
+    query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$db" << "test"
+                                                            << "foo" << 3))));
     result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
@@ -541,10 +520,9 @@ TEST(MatchExpressionParserLeafTest, NINCollation) {
 }
 
 TEST(MatchExpressionParserLeafTest, RegexBad) {
-    BSONObj query = BSON("x" << BSON("$regex"
-                                     << "abc"
-                                     << "$optionas"
-                                     << "i"));
+    BSONObj query = BSON("x" << BSON("$regex" << "abc"
+                                              << "$optionas"
+                                              << "i"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
@@ -558,13 +536,11 @@ TEST(MatchExpressionParserLeafTest, RegexBad) {
     result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
-    query = BSON("x" << BSON("$optionas"
-                             << "i"));
+    query = BSON("x" << BSON("$optionas" << "i"));
     result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
-    query = BSON("x" << BSON("$options"
-                             << "i"));
+    query = BSON("x" << BSON("$options" << "i"));
     result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }

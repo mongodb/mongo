@@ -412,10 +412,8 @@ boost::intrusive_ptr<DocumentSource> addScoreField(
  * This has the effect of storing the unmodified user's document in the path '$docs'.
  */
 boost::intrusive_ptr<DocumentSource> nestUserDocs(const auto& expCtx) {
-    return DocumentSourceReplaceRoot::createFromBson(BSON("$replaceWith" << BSON("docs"
-                                                                                 << "$$ROOT"))
-                                                         .firstElement(),
-                                                     expCtx);
+    return DocumentSourceReplaceRoot::createFromBson(
+        BSON("$replaceWith" << BSON("docs" << "$$ROOT")).firstElement(), expCtx);
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
@@ -451,9 +449,7 @@ BSONObj groupEachScore(
     {
         BSONObjBuilder groupBob(bob.subobjStart("$group"_sd));
         groupBob.append("_id", "$docs._id");
-        groupBob.append("docs",
-                        BSON("$first"
-                             << "$docs"));
+        groupBob.append("docs", BSON("$first" << "$docs"));
 
         for (auto it = pipelines.begin(); it != pipelines.end(); it++) {
             const auto& pipelineName = it->first;

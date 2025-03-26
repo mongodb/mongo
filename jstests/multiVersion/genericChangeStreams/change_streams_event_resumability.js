@@ -4,6 +4,7 @@
  */
 
 import "jstests/multiVersion/libs/multi_cluster.js";
+
 import {
     assertCreateCollection,
     assertDropCollection

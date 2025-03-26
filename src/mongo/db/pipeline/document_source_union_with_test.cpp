@@ -282,9 +282,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                        16436);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
-            BSON("$unionWith" << BSON("coll" << BSON("not"
-                                                     << "string")
-                                             << "pipeline"
+            BSON("$unionWith" << BSON("coll" << BSON("not" << "string") << "pipeline"
                                              << BSON_ARRAY(BSON("$addFields" << BSON("a" << 3)))))
                 .firstElement(),
             getExpCtx()),
@@ -299,8 +297,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                        ErrorCodes::TypeMismatch);
     ASSERT_THROWS_CODE(DocumentSourceUnionWith::createFromBson(
                            BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline"
-                                                            << BSON("not"
-                                                                    << "string")))
+                                                            << BSON("not" << "string")))
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
@@ -354,11 +351,8 @@ TEST_F(DocumentSourceUnionWithTest, ReturnEOFAfterBeingDisposed) {
 
 TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsFullDoc) {
     auto expCtx = getExpCtx();
-    const auto replaceRoot =
-        DocumentSourceReplaceRoot::createFromBson(BSON("$replaceRoot" << BSON("newRoot"
-                                                                              << "$b"))
-                                                      .firstElement(),
-                                                  expCtx);
+    const auto replaceRoot = DocumentSourceReplaceRoot::createFromBson(
+        BSON("$replaceRoot" << BSON("newRoot" << "$b")).firstElement(), expCtx);
     const auto unionWith = make_intrusive<DocumentSourceUnionWith>(
         expCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx));
 
@@ -374,11 +368,8 @@ TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsFullDoc) {
 TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsReferencedFieldsBeforeUnion) {
     auto expCtx = getExpCtx();
 
-    const auto replaceRoot =
-        DocumentSourceReplaceRoot::createFromBson(BSON("$replaceRoot" << BSON("newRoot"
-                                                                              << "$b"))
-                                                      .firstElement(),
-                                                  expCtx);
+    const auto replaceRoot = DocumentSourceReplaceRoot::createFromBson(
+        BSON("$replaceRoot" << BSON("newRoot" << "$b")).firstElement(), expCtx);
     const auto unionWith = make_intrusive<DocumentSourceUnionWith>(
         expCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx));
 
@@ -695,8 +686,7 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
         NamespaceString::createNamespaceString_forTest(tenantId, "test", "testColl");
     std::vector<BSONObj> pipeline;
 
-    auto stageSpec = BSON("$unionWith"
-                          << "some_coll");
+    auto stageSpec = BSON("$unionWith" << "some_coll");
     auto liteParsedLookup = DocumentSourceUnionWith::LiteParsed::parse(
         nss, stageSpec.firstElement(), LiteParserOptions{});
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
@@ -705,9 +695,8 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
               namespaceSet.count(
                   NamespaceString::createNamespaceString_forTest(tenantId, "test", "some_coll")));
 
-    stageSpec = BSON("$unionWith" << BSON("coll"
-                                          << "some_coll"
-                                          << "pipeline" << BSONArray()));
+    stageSpec = BSON("$unionWith" << BSON("coll" << "some_coll"
+                                                 << "pipeline" << BSONArray()));
     liteParsedLookup = DocumentSourceUnionWith::LiteParsed::parse(
         nss, stageSpec.firstElement(), LiteParserOptions{});
     namespaceSet = liteParsedLookup->getInvolvedNamespaces();
@@ -729,8 +718,7 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
     expCtx->setResolvedNamespaces(
         ResolvedNamespaceMap{{unionWithNs, {unionWithNs, std::vector<BSONObj>()}}});
 
-    auto spec = BSON("$unionWith"
-                     << "some_coll");
+    auto spec = BSON("$unionWith" << "some_coll");
     auto unionWithStage = DocumentSourceUnionWith::createFromBson(spec.firstElement(), expCtx);
     auto pipeline =
         Pipeline::create({DocumentSourceMock::createForTest(expCtx), unionWithStage}, expCtx);
@@ -738,9 +726,8 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
     ASSERT_EQ(involvedNssSet.size(), 1UL);
     ASSERT_EQ(1ul, involvedNssSet.count(unionWithNs));
 
-    spec = BSON("$unionWith" << BSON("coll"
-                                     << "some_coll"
-                                     << "pipeline" << BSONArray()));
+    spec = BSON("$unionWith" << BSON("coll" << "some_coll"
+                                            << "pipeline" << BSONArray()));
     unionWithStage = DocumentSourceUnionWith::createFromBson(spec.firstElement(), expCtx);
     pipeline =
         Pipeline::create({DocumentSourceMock::createForTest(expCtx), unionWithStage}, expCtx);

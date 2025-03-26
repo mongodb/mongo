@@ -87,7 +87,7 @@ public:
  */
 class FixedTargeter : public Targeter {
 public:
-    FixedTargeter(HostAndPort host) : _host(host){};
+    FixedTargeter(HostAndPort host) : _host(host) {};
 
     SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
         std::vector<HostAndPort> hostList{_host};

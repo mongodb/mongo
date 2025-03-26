@@ -60,7 +60,7 @@ public:
         bool rewriteProvidesExactMatchPredicate = false;
     };
 
-    BucketLevelComparisonPredicateGeneratorBase(Params params) : _params(std::move(params)){};
+    BucketLevelComparisonPredicateGeneratorBase(Params params) : _params(std::move(params)) {};
     virtual ~BucketLevelComparisonPredicateGeneratorBase() {}
 
     virtual Output generateTimeFieldPredicate(const ComparisonMatchExpressionBase* matchExpr,
@@ -87,7 +87,7 @@ class DefaultBucketLevelComparisonPredicateGenerator final
     : public BucketLevelComparisonPredicateGeneratorBase {
 public:
     DefaultBucketLevelComparisonPredicateGenerator(Params params)
-        : BucketLevelComparisonPredicateGeneratorBase(std::move(params)){};
+        : BucketLevelComparisonPredicateGeneratorBase(std::move(params)) {};
 
     Output generateTimeFieldPredicate(const ComparisonMatchExpressionBase* matchExpr,
                                       StringData minPathStringData,
@@ -106,7 +106,7 @@ class FixedBucketsLevelComparisonPredicateGenerator final
     : public BucketLevelComparisonPredicateGeneratorBase {
 public:
     FixedBucketsLevelComparisonPredicateGenerator(Params params)
-        : BucketLevelComparisonPredicateGeneratorBase(std::move(params)){};
+        : BucketLevelComparisonPredicateGeneratorBase(std::move(params)) {};
 
     Output generateTimeFieldPredicate(const ComparisonMatchExpressionBase* matchExpr,
                                       StringData minPathStringData,

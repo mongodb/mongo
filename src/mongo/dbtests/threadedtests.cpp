@@ -69,7 +69,7 @@ public:
         validate();
     }
 
-    virtual ~ThreadedTest(){};  // not necessary, but makes compilers happy
+    virtual ~ThreadedTest() {};  // not necessary, but makes compilers happy
 
 private:
     void launch_subthreads(int remaining) {

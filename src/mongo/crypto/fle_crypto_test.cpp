@@ -1292,9 +1292,8 @@ void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmIn
 
     TestKeyVault keyVault;
 
-    auto inputDoc = BSON("plainText"
-                         << "sample"
-                         << "encrypted" << element);
+    auto inputDoc = BSON("plainText" << "sample"
+                                     << "encrypted" << element);
 
     auto buf = generatePlaceholder(element, opType, algorithm);
     BSONObjBuilder builder;
@@ -1337,9 +1336,8 @@ void roundTripMultiencrypted(BSONObj doc1,
 
     TestKeyVault keyVault;
 
-    auto inputDoc = BSON("plainText"
-                         << "sample"
-                         << "encrypted1" << element1 << "encrypted2" << element2);
+    auto inputDoc = BSON("plainText" << "sample"
+                                     << "encrypted1" << element1 << "encrypted2" << element2);
 
     auto buf1 = generatePlaceholder(element1, operation1, Fle2AlgorithmInt::kEquality, indexKeyId);
     auto buf2 = generatePlaceholder(element2, operation2, Fle2AlgorithmInt::kEquality, indexKey2Id);
@@ -1368,9 +1366,8 @@ TEST_F(ServiceContextTest, FLE_EDC_PrintTest) {
 
     TestKeyVault keyVault;
 
-    auto inputDoc = BSON("plainText"
-                         << "sample"
-                         << "encrypted" << element);
+    auto inputDoc = BSON("plainText" << "sample"
+                                     << "encrypted" << element);
 
     {
         auto buf = generatePlaceholder(element, Operation::kInsert, Fle2AlgorithmInt::kEquality);
@@ -1398,9 +1395,7 @@ TEST_F(ServiceContextTest, FLE_EDC_PrintTest) {
 
 TEST_F(ServiceContextTest, FLE_EDC_Allowed_Types) {
     const std::vector<std::pair<BSONObj, BSONType>> universallyAllowedObjects{
-        {BSON("sample"
-              << "value123"),
-         String},
+        {BSON("sample" << "value123"), String},
         {BSON("sample" << BSONBinData(
                   testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
          BinData},
@@ -1417,16 +1412,11 @@ TEST_F(ServiceContextTest, FLE_EDC_Allowed_Types) {
     const std::vector<std::pair<BSONObj, BSONType>> unindexedAllowedObjects{
         {BSON("sample" << 123.456), NumberDouble},
         {BSON("sample" << Decimal128()), NumberDecimal},
-        {BSON("sample" << BSON("nested"
-                               << "value")),
-         Object},
+        {BSON("sample" << BSON("nested" << "value")), Object},
         {BSON("sample" << BSON_ARRAY(1 << 23)), Array},
         {BSON("sample" << BSONDBRef("value1", OID())), DBRef},
         {BSON("sample" << BSONSymbol("value")), Symbol},
-        {BSON("sample" << BSONCodeWScope("value",
-                                         BSON("code"
-                                              << "something"))),
-         CodeWScope},
+        {BSON("sample" << BSONCodeWScope("value", BSON("code" << "something"))), CodeWScope},
     };
 
 
@@ -1501,19 +1491,15 @@ TEST_F(ServiceContextTest, FLE_EDC_Disallowed_Types) {
 
     illegalBSONType(BSON("sample" << MINKEY), MinKey, Fle2AlgorithmInt::kEquality);
 
-    illegalBSONType(BSON("sample" << BSON("nested"
-                                          << "value")),
-                    Object,
-                    Fle2AlgorithmInt::kEquality);
+    illegalBSONType(
+        BSON("sample" << BSON("nested" << "value")), Object, Fle2AlgorithmInt::kEquality);
     illegalBSONType(BSON("sample" << BSON_ARRAY(1 << 23)), Array, Fle2AlgorithmInt::kEquality);
 
     illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kEquality);
     illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kUnindexed);
     illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kEquality);
     illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kUnindexed);
-    illegalBSONType(BSON("sample" << BSONCodeWScope("value",
-                                                    BSON("code"
-                                                         << "something"))),
+    illegalBSONType(BSON("sample" << BSONCodeWScope("value", BSON("code" << "something"))),
                     CodeWScope,
                     Fle2AlgorithmInt::kEquality);
     illegalBSONType(BSON("sample" << MAXKEY), MaxKey, Fle2AlgorithmInt::kEquality);
@@ -1527,9 +1513,7 @@ void illegalRangeBSONType(BSONObj doc, BSONType type) {
 TEST_F(ServiceContextTest, FLE_EDC_Range_Disallowed_Types) {
 
     const std::vector<std::pair<BSONObj, BSONType>> disallowedObjects{
-        {BSON("sample"
-              << "value123"),
-         String},
+        {BSON("sample" << "value123"), String},
         {BSON("sample" << BSONBinData(
                   testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
          BinData},
@@ -1539,16 +1523,11 @@ TEST_F(ServiceContextTest, FLE_EDC_Range_Disallowed_Types) {
         {BSON("sample" << BSONRegEx("value1", "value2")), RegEx},
         {BSON("sample" << Timestamp()), bsonTimestamp},
         {BSON("sample" << BSONCode("value")), Code},
-        {BSON("sample" << BSON("nested"
-                               << "value")),
-         Object},
+        {BSON("sample" << BSON("nested" << "value")), Object},
         {BSON("sample" << BSON_ARRAY(1 << 23)), Array},
         {BSON("sample" << BSONDBRef("value1", OID())), DBRef},
         {BSON("sample" << BSONSymbol("value")), Symbol},
-        {BSON("sample" << BSONCodeWScope("value",
-                                         BSON("code"
-                                              << "something"))),
-         CodeWScope},
+        {BSON("sample" << BSONCodeWScope("value", BSON("code" << "something"))), CodeWScope},
         {BSON("sample" << MINKEY), MinKey},
         {BSON("sample" << MAXKEY), MaxKey},
     };
@@ -1648,9 +1627,8 @@ void disallowedEqualityPayloadType(BSONType type) {
     TestKeyVault keyVault;
 
 
-    auto inputDoc = BSON("plainText"
-                         << "sample"
-                         << "encrypted" << element);
+    auto inputDoc = BSON("plainText" << "sample"
+                                     << "encrypted" << element);
 
     auto buf = generatePlaceholder(element, Operation::kInsert);
     BSONObjBuilder builder;
@@ -2235,8 +2213,7 @@ static std::vector<ServerDerivedFromDataToken> collectServerDerivedFromDataToken
 
 // Tests round trip unparse/parse of FLE2IndexedTextEncryptedValue
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
-    auto doc = BSON("sample"
-                    << "ssssssssss");
+    auto doc = BSON("sample" << "ssssssssss");
 
     EDCServerPayloadInfo payload;
     auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
@@ -2322,8 +2299,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
 
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_EmptySubstringSuffixPrefixSets) {
     // test all of substring+suffix+prefix token sets empty
-    auto doc = BSON("sample"
-                    << "ssssssssss");
+    auto doc = BSON("sample" << "ssssssssss");
     EDCServerPayloadInfo payload;
     auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
     payload.counts = std::vector<uint64_t>(1);
@@ -2342,8 +2318,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_EmptySubstring
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
-    auto doc = BSON("sample"
-                    << "ssssssssss");
+    auto doc = BSON("sample" << "ssssssssss");
 
     EDCServerPayloadInfo payload;
     auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
@@ -2448,8 +2423,7 @@ TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_CompatibleType) {
 
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
     auto inputDoc = BSON(kSafeContent << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
 
@@ -2482,8 +2456,7 @@ TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_IncompatibleType) {
 
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
 
     auto buf = generatePlaceholder(element, Operation::kInsert);
@@ -2711,8 +2684,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_BadSchema) {
     EncryptionInformation ei;
     ei.setType(1);
 
-    ei.setSchema(BSON("a"
-                      << "b"));
+    ei.setSchema(BSON("a" << "b"));
 
     auto obj = ei.toBSON();
 
@@ -2749,8 +2721,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_MissingStateCollection) {
 TEST_F(ServiceContextTest, IndexedFields_FetchTwoLevels) {
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
     auto inputDoc = BSON(kSafeContent << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
 
@@ -2797,8 +2768,7 @@ TEST_F(ServiceContextTest, IndexedFields_FetchTwoLevels) {
 TEST_F(ServiceContextTest, IndexedFields_DuplicateIndexKeyIds) {
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
     auto inputDoc = BSON(kSafeContent << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
 
@@ -2896,8 +2866,7 @@ TEST_F(ServiceContextTest, EDC_UnindexedEncryptDecrypt) {
     TestKeyVault keyVault;
     FLEUserKeyAndId userKey = keyVault.getUserKeyById(indexKey2Id);
 
-    auto inputDoc = BSON("a"
-                         << "sample");
+    auto inputDoc = BSON("a" << "sample");
     auto element = inputDoc.firstElement();
     auto const elementData =
         std::vector<uint8_t>(element.value(), element.value() + element.valuesize());
@@ -2925,8 +2894,7 @@ TEST_F(ServiceContextTest, EDC_NonMatchingSchema) {
 
     BSONObjBuilder builder;
     builder.append("plainText", "sample");
-    auto doc = BSON("a"
-                    << "not really a secret");
+    auto doc = BSON("a" << "not really a secret");
     auto element = doc.firstElement();
     auto buf = generatePlaceholder(element, Operation::kInsert);
     builder.appendBinData("not-encrypted", buf.size(), BinDataType::Encrypt, buf.data());
@@ -3012,8 +2980,7 @@ BSONObj encryptUpdateDocument(BSONObj obj, FLEKeyVault* keyVault) {
 TEST_F(ServiceContextTest, FLE_Update_Basic) {
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
     auto buf = generatePlaceholder(element, Operation::kInsert);
     auto inputDoc = BSON(
@@ -3045,8 +3012,7 @@ TEST_F(ServiceContextTest, FLE_Update_Empty) {
 TEST_F(ServiceContextTest, FLE_Update_BadPush) {
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
 
     auto buf = generatePlaceholder(element, Operation::kInsert);
@@ -3059,8 +3025,7 @@ TEST_F(ServiceContextTest, FLE_Update_BadPush) {
 TEST_F(ServiceContextTest, FLE_Update_PushToSafeContent) {
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
 
     auto buf = generatePlaceholder(element, Operation::kInsert);
@@ -3073,8 +3038,7 @@ TEST_F(ServiceContextTest, FLE_Update_PushToSafeContent) {
 TEST_F(ServiceContextTest, FLE_Update_PushToOtherfield) {
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
 
     auto buf = generatePlaceholder(element, Operation::kInsert);
@@ -3178,8 +3142,7 @@ TEST_F(ServiceContextTest, FLE_Update_GetRemovedTags) {
 TEST_F(ServiceContextTest, FLE_Update_GenerateUpdateToRemoveTags) {
     TestKeyVault keyVault;
 
-    auto doc = BSON("value"
-                    << "123456");
+    auto doc = BSON("value" << "123456");
     auto element = doc.firstElement();
     auto buf = generatePlaceholder(element, Operation::kInsert);
 
@@ -3262,10 +3225,8 @@ TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTest) {
 }
 
 TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTestInvalidType) {
-    ASSERT_THROWS_CODE(CompactionHelpers::parseCompactionTokens(BSON("foo"
-                                                                     << "bar")),
-                       DBException,
-                       6346801);
+    ASSERT_THROWS_CODE(
+        CompactionHelpers::parseCompactionTokens(BSON("foo" << "bar")), DBException, 6346801);
 }
 
 TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTestInvalidSubType) {
@@ -3575,8 +3536,10 @@ TEST_F(ServiceContextTest, RangeTest_Double_Bounds_Precision) {
         ASSERT_EQ(_ost.max, 18446744073709551615ULL);    \
         ASSERT_EQ(_ost.value, z);                        \
     }
-#define ASSERT_EIBB_ERROR(v, ub, lb, prc, code) \
-    { ASSERT_THROWS_CODE(getTypeInfoDouble((v), lb, ub, prc), DBException, code); }
+#define ASSERT_EIBB_ERROR(v, ub, lb, prc, code)                                     \
+    {                                                                               \
+        ASSERT_THROWS_CODE(getTypeInfoDouble((v), lb, ub, prc), DBException, code); \
+    }
 
     ASSERT_EIBB(0, 1, -1, 3, 1000);
     ASSERT_EIBB(0, 1, -1E5, 3, 100000000);
@@ -5708,8 +5671,10 @@ TEST_F(EdgeTestFixture, canUsePrecisionMode) {
         ASSERT_EQ(expected_bits_out, bits_out);                          \
     }
 
-#define CAN_USE_PRECISION_MODE_ERRORS(lb, ub, prc, code) \
-    { ASSERT_THROWS_CODE(canUsePrecisionMode(lb, ub, prc, nullptr), DBException, code); }
+#define CAN_USE_PRECISION_MODE_ERRORS(lb, ub, prc, code)                                  \
+    {                                                                                     \
+        ASSERT_THROWS_CODE(canUsePrecisionMode(lb, ub, prc, nullptr), DBException, code); \
+    }
 
     /**
      * Test Cases: (min, max, precision) -> (bool, bits_out)

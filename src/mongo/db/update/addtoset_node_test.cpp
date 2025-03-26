@@ -106,10 +106,9 @@ TEST(AddToSetNodeTest, InitSucceedsWithArray) {
 TEST(AddToSetNodeTest, InitFailsWhenArgumentIsInvalidBSONArray) {
     // Create our invalid array by creating a BSONObj with non contiguous array indexes that is then
     // passed to the BSONArray ctor.
-    BSONObj updateArrAsObj = BSON("0"
-                                  << "foo"
-                                  << "2"
-                                  << "bar");
+    BSONObj updateArrAsObj = BSON("0" << "foo"
+                                      << "2"
+                                      << "bar");
     BSONArray updateArr(updateArrAsObj);
 
     auto update = BSON("$addToSet" << BSON("fieldName" << BSON("$each" << updateArr)));

@@ -201,11 +201,9 @@ private:
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
     dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
-    addIndex(BSON("a"
-                  << "2d"
-                  << "b" << 1));
-    addIndex(BSON("a"
-                  << "2d"));
+    addIndex(BSON("a" << "2d"
+                      << "b" << 1));
+    addIndex(BSON("a" << "2d"));
 
     BSONObj query = fromjson(
         "{$or: [{a: {$geoWithin: {$centerSphere: [[0,0],10]}}},"

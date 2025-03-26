@@ -102,8 +102,7 @@ Value DocumentSourceSample::serialize(const SerializationOptions& opts) const {
 }
 
 namespace {
-const BSONObj randSortSpec = BSON("$rand" << BSON("$meta"
-                                                  << "randVal"));
+const BSONObj randSortSpec = BSON("$rand" << BSON("$meta" << "randVal"));
 }  // namespace
 
 intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(

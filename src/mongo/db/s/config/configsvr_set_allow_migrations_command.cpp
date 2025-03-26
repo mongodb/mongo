@@ -139,8 +139,7 @@ public:
             // protect against older requests with old txnNumbers.
             DBDirectClient client(opCtx);
             client.update(NamespaceString::kServerConfigurationNamespace,
-                          BSON("_id"
-                               << "SetAllowMigrationsStats"),
+                          BSON("_id" << "SetAllowMigrationsStats"),
                           BSON("$inc" << BSON("count" << 1)),
                           true /* upsert */,
                           false /* multi */);

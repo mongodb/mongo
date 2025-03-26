@@ -296,17 +296,14 @@ public:
         }
         {
             BSONObj k = BSON("x" << 1);
-            ASSERT(!k.isPrefixOf(BSON("x"
-                                      << "hi"),
-                                 eltCmp));
+            ASSERT(!k.isPrefixOf(BSON("x" << "hi"), eltCmp));
             ASSERT(k.isPrefixOf(BSON("x" << 1 << "a"
                                          << "hi"),
                                 eltCmp));
         }
         {
             BSONObj k = BSON("x" << 1);
-            MONGO_verify(k.isFieldNamePrefixOf(BSON("x"
-                                                    << "hi")));
+            MONGO_verify(k.isFieldNamePrefixOf(BSON("x" << "hi")));
             MONGO_verify(!k.isFieldNamePrefixOf(BSON("a" << 1)));
         }
     }
@@ -367,84 +364,58 @@ public:
 class MultiKeySortOrder : public Base {
 public:
     void run() {
-        ASSERT(BSON("x"
-                    << "a")
-                   .woCompare(BSON("x"
-                                   << "b")) < 0);
-        ASSERT(BSON("x"
-                    << "b")
-                   .woCompare(BSON("x"
-                                   << "a")) > 0);
+        ASSERT(BSON("x" << "a").woCompare(BSON("x" << "b")) < 0);
+        ASSERT(BSON("x" << "b").woCompare(BSON("x" << "a")) > 0);
 
-        ASSERT(BSON("x"
-                    << "a"
-                    << "y"
-                    << "a")
-                   .woCompare(BSON("x"
-                                   << "a"
-                                   << "y"
-                                   << "b")) < 0);
-        ASSERT(BSON("x"
-                    << "a"
-                    << "y"
-                    << "a")
-                   .woCompare(BSON("x"
-                                   << "b"
-                                   << "y"
-                                   << "a")) < 0);
-        ASSERT(BSON("x"
-                    << "a"
-                    << "y"
-                    << "a")
-                   .woCompare(BSON("x"
-                                   << "b")) < 0);
+        ASSERT(BSON("x" << "a"
+                        << "y"
+                        << "a")
+                   .woCompare(BSON("x" << "a"
+                                       << "y"
+                                       << "b")) < 0);
+        ASSERT(BSON("x" << "a"
+                        << "y"
+                        << "a")
+                   .woCompare(BSON("x" << "b"
+                                       << "y"
+                                       << "a")) < 0);
+        ASSERT(BSON("x" << "a"
+                        << "y"
+                        << "a")
+                   .woCompare(BSON("x" << "b")) < 0);
 
-        ASSERT(BSON("x"
-                    << "c")
-                   .woCompare(BSON("x"
-                                   << "b"
-                                   << "y"
-                                   << "h")) > 0);
-        ASSERT(BSON("x"
-                    << "b"
-                    << "y"
-                    << "b")
-                   .woCompare(BSON("x"
-                                   << "c")) < 0);
+        ASSERT(BSON("x" << "c")
+                   .woCompare(BSON("x" << "b"
+                                       << "y"
+                                       << "h")) > 0);
+        ASSERT(BSON("x" << "b"
+                        << "y"
+                        << "b")
+                   .woCompare(BSON("x" << "c")) < 0);
 
         BSONObj key = BSON("x" << 1 << "y" << 1);
 
-        ASSERT(dps::compareObjectsAccordingToSort(BSON("x"
-                                                       << "c"),
-                                                  BSON("x"
-                                                       << "b"
-                                                       << "y"
-                                                       << "h"),
+        ASSERT(dps::compareObjectsAccordingToSort(BSON("x" << "c"),
+                                                  BSON("x" << "b"
+                                                           << "y"
+                                                           << "h"),
                                                   key) > 0);
-        ASSERT(BSON("x"
-                    << "b"
-                    << "y"
-                    << "b")
-                   .woCompare(BSON("x"
-                                   << "c"),
-                              key) < 0);
+        ASSERT(BSON("x" << "b"
+                        << "y"
+                        << "b")
+                   .woCompare(BSON("x" << "c"), key) < 0);
 
         key = BSON("" << 1 << "" << 1);
 
-        ASSERT(dps::compareObjectsAccordingToSort(BSON(""
-                                                       << "c"),
-                                                  BSON(""
-                                                       << "b"
-                                                       << ""
-                                                       << "h"),
+        ASSERT(dps::compareObjectsAccordingToSort(BSON("" << "c"),
+                                                  BSON("" << "b"
+                                                          << ""
+                                                          << "h"),
                                                   key) > 0);
-        ASSERT(BSON(""
-                    << "b"
-                    << ""
-                    << "b")
-                   .woCompare(BSON(""
-                                   << "c"),
-                              key) < 0);
+        ASSERT(BSON("" << "b"
+                       << ""
+                       << "b")
+                   .woCompare(BSON("" << "c"), key) < 0);
 
         {
             BSONObjBuilder b;
@@ -452,33 +423,27 @@ public:
             b.appendNull("");
             BSONObj o = b.obj();
             ASSERT(dps::compareObjectsAccordingToSort(o,
-                                                      BSON(""
-                                                           << "b"
-                                                           << ""
-                                                           << "h"),
+                                                      BSON("" << "b"
+                                                              << ""
+                                                              << "h"),
                                                       key) > 0);
-            ASSERT(dps::compareObjectsAccordingToSort(BSON(""
-                                                           << "b"
-                                                           << ""
-                                                           << "h"),
+            ASSERT(dps::compareObjectsAccordingToSort(BSON("" << "b"
+                                                              << ""
+                                                              << "h"),
                                                       o,
                                                       key) < 0);
         }
 
-        ASSERT(BSON(""
-                    << "a")
-                   .woCompare(BSON(""
-                                   << "a"
-                                   << ""
-                                   << "c")) < 0);
+        ASSERT(BSON("" << "a").woCompare(BSON("" << "a"
+                                                 << ""
+                                                 << "c")) < 0);
         {
             BSONObjBuilder b;
             b.append("", "a");
             b.appendNull("");
-            ASSERT(b.obj().woCompare(BSON(""
-                                          << "a"
-                                          << ""
-                                          << "c")) < 0);  // SERVER-282
+            ASSERT(b.obj().woCompare(BSON("" << "a"
+                                             << ""
+                                             << "c")) < 0);  // SERVER-282
         }
     }
 };
@@ -1140,16 +1105,14 @@ class LabelBasic : public LabelBase {
 
 class LabelShares : public LabelBase {
     BSONObj expected() override {
-        return BSON("z"
-                    << "q"
-                    << "a" << (BSON("$gt" << 1)) << "x"
-                    << "p");
+        return BSON("z" << "q"
+                        << "a" << (BSON("$gt" << 1)) << "x"
+                        << "p");
     }
     BSONObj actual() override {
-        return BSON("z"
-                    << "q"
-                    << "a" << GT << 1 << "x"
-                    << "p");
+        return BSON("z" << "q"
+                        << "a" << GT << 1 << "x"
+                        << "p");
     }
 };
 
@@ -1165,20 +1128,18 @@ class LabelDouble : public LabelBase {
 
 class LabelDoubleShares : public LabelBase {
     BSONObj expected() override {
-        return BSON("z"
-                    << "q"
-                    << "a"
-                    << (BSON("$gt" << 1 << "$lte"
-                                   << "x"))
-                    << "x"
-                    << "p");
+        return BSON("z" << "q"
+                        << "a"
+                        << (BSON("$gt" << 1 << "$lte"
+                                       << "x"))
+                        << "x"
+                        << "p");
     }
     BSONObj actual() override {
-        return BSON("z"
-                    << "q"
-                    << "a" << GT << 1 << LTE << "x"
-                    << "x"
-                    << "p");
+        return BSON("z" << "q"
+                        << "a" << GT << 1 << LTE << "x"
+                        << "x"
+                        << "p");
     }
 };
 
@@ -1193,24 +1154,22 @@ class LabelSize : public LabelBase {
 
 class LabelMulti : public LabelBase {
     BSONObj expected() override {
-        return BSON("z"
-                    << "q"
-                    << "a"
-                    << BSON("$gt" << 1 << "$lte"
-                                  << "x")
-                    << "b"
-                    << BSON("$ne" << 1 << "$ne"
-                                  << "f"
-                                  << "$ne" << 22.3)
-                    << "x"
-                    << "p");
+        return BSON("z" << "q"
+                        << "a"
+                        << BSON("$gt" << 1 << "$lte"
+                                      << "x")
+                        << "b"
+                        << BSON("$ne" << 1 << "$ne"
+                                      << "f"
+                                      << "$ne" << 22.3)
+                        << "x"
+                        << "p");
     }
     BSONObj actual() override {
-        return BSON("z"
-                    << "q"
-                    << "a" << GT << 1 << LTE << "x"
-                    << "b" << NE << 1 << NE << "f" << NE << 22.3 << "x"
-                    << "p");
+        return BSON("z" << "q"
+                        << "a" << GT << 1 << LTE << "x"
+                        << "b" << NE << 1 << NE << "f" << NE << 22.3 << "x"
+                        << "p");
     }
 };
 class LabelishOr : public LabelBase {
@@ -1220,14 +1179,12 @@ class LabelishOr : public LabelBase {
                                         << BSON("b" << BSON("$ne" << 1 << "$ne"
                                                                   << "f"
                                                                   << "$ne" << 22.3))
-                                        << BSON("x"
-                                                << "p")));
+                                        << BSON("x" << "p")));
     }
     BSONObj actual() override {
         return BSON(OR(BSON("a" << GT << 1 << LTE << "x"),
                        BSON("b" << NE << 1 << NE << "f" << NE << 22.3),
-                       BSON("x"
-                            << "p")));
+                       BSON("x" << "p")));
     }
 };
 
@@ -1644,15 +1601,12 @@ struct BSONArrayBuilderTest {
 struct ArrayMacroTest {
     void run() {
         BSONArray arr = BSON_ARRAY("hello" << 1
-                                           << BSON("foo" << BSON_ARRAY("bar"
-                                                                       << "baz"
-                                                                       << "qux")));
-        BSONObj obj = BSON("0"
-                           << "hello"
-                           << "1" << 1 << "2"
-                           << BSON("foo" << BSON_ARRAY("bar"
-                                                       << "baz"
-                                                       << "qux")));
+                                           << BSON("foo" << BSON_ARRAY("bar" << "baz"
+                                                                             << "qux")));
+        BSONObj obj = BSON("0" << "hello"
+                               << "1" << 1 << "2"
+                               << BSON("foo" << BSON_ARRAY("bar" << "baz"
+                                                                 << "qux")));
 
         ASSERT_BSONOBJ_EQ(arr, obj);
         ASSERT_EQUALS(arr["2"].type(), Object);
@@ -1682,10 +1636,9 @@ public:
             // cout << "time: " << tm << endl;
         }
 
-        BSONObj o2 = BSON("2"
-                          << "a"
-                          << "11"
-                          << "b");
+        BSONObj o2 = BSON("2" << "a"
+                              << "11"
+                              << "b");
         BSONObjIteratorSorted i2(o2);
         // First field in sorted order should be "11" due use of a lexical comparison.
         ASSERT_EQUALS("11", std::string(i2.next().fieldName()));
@@ -1754,40 +1707,32 @@ public:
         good("{a : { oo: [ {'\\\\$good':1}, {good:1}] }}");
 
         // DBRef stuff -- json parser can't handle this yet
-        good(BSON("a" << BSON("$ref"
-                              << "coll"
-                              << "$id" << 1)));
-        good(BSON("a" << BSON("$ref"
-                              << "coll"
-                              << "$id" << 1 << "$db"
-                              << "a")));
-        good(BSON("a" << BSON("$ref"
-                              << "coll"
-                              << "$id" << 1 << "stuff" << 1)));
-        good(BSON("a" << BSON("$ref"
-                              << "coll"
-                              << "$id" << 1 << "$db"
-                              << "a"
-                              << "stuff" << 1)));
+        good(BSON("a" << BSON("$ref" << "coll"
+                                     << "$id" << 1)));
+        good(BSON("a" << BSON("$ref" << "coll"
+                                     << "$id" << 1 << "$db"
+                                     << "a")));
+        good(BSON("a" << BSON("$ref" << "coll"
+                                     << "$id" << 1 << "stuff" << 1)));
+        good(BSON("a" << BSON("$ref" << "coll"
+                                     << "$id" << 1 << "$db"
+                                     << "a"
+                                     << "stuff" << 1)));
 
         bad(BSON("a" << BSON("$ref" << 1 << "$id" << 1)));
         bad(BSON("a" << BSON("$ref" << 1 << "$id" << 1 << "$db"
                                     << "a")));
-        bad(BSON("a" << BSON("$ref"
-                             << "coll"
-                             << "$id" << 1 << "$db" << 1)));
-        bad(BSON("a" << BSON("$ref"
-                             << "coll")));
-        bad(BSON("a" << BSON("$ref"
-                             << "coll"
-                             << "$db"
-                             << "db")));
+        bad(BSON("a" << BSON("$ref" << "coll"
+                                    << "$id" << 1 << "$db" << 1)));
+        bad(BSON("a" << BSON("$ref" << "coll")));
+        bad(BSON("a" << BSON("$ref" << "coll"
+                                    << "$db"
+                                    << "db")));
         bad(BSON("a" << BSON("$id" << 1)));
         bad(BSON("a" << BSON("$id" << 1 << "$ref"
                                    << "coll")));
-        bad(BSON("a" << BSON("$ref"
-                             << "coll"
-                             << "$id" << 1 << "$hater" << 1)));
+        bad(BSON("a" << BSON("$ref" << "coll"
+                                    << "$id" << 1 << "$hater" << 1)));
     }
 };
 

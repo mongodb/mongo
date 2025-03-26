@@ -173,16 +173,13 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
         boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
-    auto doc = BSON("key3"
-                    << "abc"
-                    << "key" << 3 << "_id"
-                    << "hello"
-                    << "key2" << true);
+    auto doc = BSON("key3" << "abc"
+                           << "key" << 3 << "_id"
+                           << "hello"
+                           << "key2" << true);
 
     // Check that an order for deletion from an unsharded collection extracts just the "_id" field
-    ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(),
-                      BSON("_id"
-                           << "hello"));
+    ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(), BSON("_id" << "hello"));
 }
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
@@ -199,11 +196,10 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     // The order of fields in `doc` deliberately does not match the shard key
-    auto doc = BSON("key3"
-                    << "abc"
-                    << "key" << 100 << "_id"
-                    << "hello"
-                    << "key2" << true);
+    auto doc = BSON("key3" << "abc"
+                           << "key" << 100 << "_id"
+                           << "hello"
+                           << "key2" << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
     ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(),
@@ -242,8 +238,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     // Push a CollectionMetadata with a shard key "_id", hashed.
-    const auto metadata{makeAMetadata(BSON("_id"
-                                           << "hashed"))};
+    const auto metadata{makeAMetadata(BSON("_id" << "hashed"))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
     ScopedSetShardRole scopedSetShardRole{
@@ -259,9 +254,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
                            << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
-    ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(),
-                      BSON("_id"
-                           << "hello"));
+    ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(), BSON("_id" << "hello"));
 }
 
 TEST_F(DocumentKeyStateTest, CheckDBVersion) {
@@ -288,8 +281,7 @@ TEST_F(DocumentKeyStateTest, CheckDBVersion) {
     updateArgs.stmtIds = {kUninitializedStmtId};
     updateArgs.updatedDoc = BSON("_id" << 1 << "data"
                                        << "y");
-    updateArgs.update = BSON("$set" << BSON("data"
-                                            << "y"));
+    updateArgs.update = BSON("$set" << BSON("data" << "y"));
     OplogUpdateEntryArgs update(&updateArgs, *autoColl);
 
     // OpObserver calls

@@ -51,16 +51,14 @@ using namespace mongo;
 
 TEST(CollatorFactoryICUTest, LocaleStringParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ("en_US", collator.getValue()->getSpec().getLocale());
 }
 
 TEST(CollatorFactoryICUTest, SimpleLocaleReturnsNullPointer) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "simple"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "simple"));
     ASSERT_OK(collator.getStatus());
     ASSERT_TRUE(collator.getValue() == nullptr);
 }
@@ -74,72 +72,64 @@ TEST(CollatorFactoryICUTest, LocaleFieldNotAStringFailsToParse) {
 
 TEST(CollatorFactoryICUTest, UnrecognizedLocaleFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "garbage"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "garbage"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleEmptyStringDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << ""));
+    auto collator = factory.makeFromBSON(BSON("locale" << ""));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LongLocaleFieldDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LongLocaleFieldWithKeywordsDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US@xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=y"));
+    auto collator =
+        factory.makeFromBSON(BSON("locale" << "en_US@xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=y"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleRootDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "root"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "root"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleRootCanonicalizedDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "ROOT@collation=search"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "ROOT@collation=search"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithOneComponentAndTrailingUnderscoreDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithTwoComponentsAndTrailingUnderscoreDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US_"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US_"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithTwoTrailingUnderscoresDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en__"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en__"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
@@ -147,248 +137,211 @@ TEST(CollatorFactoryICUTest, LocaleWithTwoTrailingUnderscoresDisallowed) {
 
 TEST(CollatorFactoryICUTest, LocaleWithLeadingUnderscoreDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "_en"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "_en"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithWithTwoComponentsAndLeadingUnderscoreDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "_en_US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "_en_US"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithTwoLeadingUnderscoresDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "__en"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "__en"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithExtraEmptyComponentDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en__US_POSIX"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en__US_POSIX"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithExtraNonEmptyComponentDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_Comp_US_POSIX"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_Comp_US_POSIX"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithUnrecognizedTwoLetterBaseNameDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "xx_US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "xx_US"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithUnrecognizedTwoLetterCountryCodeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_ZZ"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_ZZ"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithInvalidThreeLetterCountryCodeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_USX"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_USX"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithValidThreeLetterCountryCodeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_USA"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_USA"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithUnrecognizedFourLetterScriptCodeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "zh_Blah"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "zh_Blah"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithFiveLetterSecondComponentDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "zh_Blahh"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "zh_Blahh"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithUnrecognizedVariantCode) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US_FOO"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US_FOO"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithMissingCountryCodeAndUnrecognizedVariantCode) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en__FOO"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en__FOO"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithValidVariantButMissingCountryCodeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en__POSIX"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en__POSIX"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithValidKeywordButNoLanguageDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "@collation=phonebook"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "@collation=phonebook"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithHyphenSeparatingLanguageAndCountryDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en-US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en-US"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithHyphenSeparatingCountryAndVariantDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US-POSIX"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US-POSIX"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithLowercaseCountryCodeDisallwed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_us"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_us"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithMixedCaseCountryCodeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_uS"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_uS"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithLowercaseCountryCodeAndVariantDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_us_posix"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_us_posix"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithUpperCaseScriptCodeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "zh_HANT"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "zh_HANT"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithUpperCaseLanguageCodeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "ZH_hant"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "ZH_hant"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithKeywordStringWithoutAValueDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "de@collation"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "de@collation"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleKeywordStringWithExcessTrailingSemicolonDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "de@collation=phonebook;"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "de@collation=phonebook;"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleKeywordStringWithExcessLeadingSemicolonDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "de@;collation=phonebook"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "de@;collation=phonebook"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, TaiwanLocaleWithCollationStrokeDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "zh_TW@collation=stroke"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "zh_TW@collation=stroke"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, LocaleWithValidLanguageCountryAndVariantAllowed) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "en_US_POSIX"))
-                  .getStatus());
+    ASSERT_OK(factory.makeFromBSON(BSON("locale" << "en_US_POSIX")).getStatus());
 }
 
 TEST(CollatorFactoryICUTest, USLocaleWithCollationPhonebookDisallowed) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US@collation=phonebook"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US@collation=phonebook"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, GermanLocaleWithCollationPhonebookAllowed) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "de@collation=phonebook"))
-                  .getStatus());
+    ASSERT_OK(factory.makeFromBSON(BSON("locale" << "de@collation=phonebook")).getStatus());
 }
 
 TEST(CollatorFactoryICUTest, ChineseTraditionalLocaleWithCollationPinyinAllowed) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "zh_Hant@collation=pinyin"))
-                  .getStatus());
+    ASSERT_OK(factory.makeFromBSON(BSON("locale" << "zh_Hant@collation=pinyin")).getStatus());
 }
 
 TEST(CollatorFactoryICUTest, LocaleStringCannotContainNullByte) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US\0"_sd));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US\0"_sd));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
@@ -401,10 +354,9 @@ TEST(CollatorFactoryICUTest, MissingLocaleStringFailsToParse) {
 }
 
 TEST(CollatorFactoryICUTest, UnknownSpecFieldFailsToParse) {
-    BSONObj spec = BSON("locale"
-                        << "en_US"
-                        << "unknown"
-                        << "field");
+    BSONObj spec = BSON("locale" << "en_US"
+                                 << "unknown"
+                                 << "field");
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(spec);
     ASSERT_NOT_OK(collator.getStatus());
@@ -412,8 +364,7 @@ TEST(CollatorFactoryICUTest, UnknownSpecFieldFailsToParse) {
 
 TEST(CollatorFactoryICUTest, DefaultsSetSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"));
     ASSERT_OK(collator.getStatus());
     ASSERT_FALSE(collator.getValue()->getSpec().getCaseLevel());
     ASSERT_EQ(static_cast<int>(CollationCaseFirstEnum::kOff),
@@ -431,36 +382,32 @@ TEST(CollatorFactoryICUTest, DefaultsSetSuccessfully) {
 
 TEST(CollatorFactoryICUTest, LanguageDependentDefaultsSetSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "fr_CA"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "fr_CA"));
     ASSERT_OK(collator.getStatus());
     ASSERT_TRUE(collator.getValue()->getSpec().getBackwards());
 }
 
 TEST(CollatorFactoryICUTest, CaseLevelFalseParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseLevel" << false));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseLevel" << false));
     ASSERT_OK(collator.getStatus());
     ASSERT_FALSE(collator.getValue()->getSpec().getCaseLevel());
 }
 
 TEST(CollatorFactoryICUTest, CaseLevelTrueParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseLevel" << true));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseLevel" << true));
     ASSERT_OK(collator.getStatus());
     ASSERT_TRUE(collator.getValue()->getSpec().getCaseLevel());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstOffParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "off"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "off"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationCaseFirstEnum::kOff),
               static_cast<int>(collator.getValue()->getSpec().getCaseFirst()));
@@ -468,10 +415,9 @@ TEST(CollatorFactoryICUTest, CaseFirstOffParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, CaseFirstUpperParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "upper"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "upper"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationCaseFirstEnum::kUpper),
               static_cast<int>(collator.getValue()->getSpec().getCaseFirst()));
@@ -479,10 +425,9 @@ TEST(CollatorFactoryICUTest, CaseFirstUpperParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, CaseFirstLowerParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "lower"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "lower"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationCaseFirstEnum::kLower),
               static_cast<int>(collator.getValue()->getSpec().getCaseFirst()));
@@ -490,9 +435,8 @@ TEST(CollatorFactoryICUTest, CaseFirstLowerParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, PrimaryStrengthParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 1));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationStrength::kPrimary),
               collator.getValue()->getSpec().getStrength());
@@ -500,9 +444,8 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, SecondaryStrengthParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 2));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 2));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationStrength::kSecondary),
               collator.getValue()->getSpec().getStrength());
@@ -510,9 +453,8 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, TertiaryStrengthParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 3));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 3));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationStrength::kTertiary),
               collator.getValue()->getSpec().getStrength());
@@ -520,9 +462,8 @@ TEST(CollatorFactoryICUTest, TertiaryStrengthParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, QuaternaryStrengthParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 4));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 4));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationStrength::kQuaternary),
               collator.getValue()->getSpec().getStrength());
@@ -530,9 +471,8 @@ TEST(CollatorFactoryICUTest, QuaternaryStrengthParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, IdenticalStrengthParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 5));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 5));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationStrength::kIdentical),
               collator.getValue()->getSpec().getStrength());
@@ -540,28 +480,25 @@ TEST(CollatorFactoryICUTest, IdenticalStrengthParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, NumericOrderingFalseParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "numericOrdering" << false));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "numericOrdering" << false));
     ASSERT_OK(collator.getStatus());
     ASSERT_FALSE(collator.getValue()->getSpec().getNumericOrdering());
 }
 
 TEST(CollatorFactoryICUTest, NumericOrderingTrueParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "numericOrdering" << true));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "numericOrdering" << true));
     ASSERT_OK(collator.getStatus());
     ASSERT_TRUE(collator.getValue()->getSpec().getNumericOrdering());
 }
 
 TEST(CollatorFactoryICUTest, AlternateNonIgnorableParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "alternate"
-                                              << "non-ignorable"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "alternate"
+                                                       << "non-ignorable"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationAlternateEnum::kNonIgnorable),
               static_cast<int>(collator.getValue()->getSpec().getAlternate()));
@@ -569,10 +506,9 @@ TEST(CollatorFactoryICUTest, AlternateNonIgnorableParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, AlternateShiftedParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "alternate"
-                                              << "shifted"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "alternate"
+                                                       << "shifted"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationAlternateEnum::kShifted),
               static_cast<int>(collator.getValue()->getSpec().getAlternate()));
@@ -580,10 +516,9 @@ TEST(CollatorFactoryICUTest, AlternateShiftedParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, MaxVariablePunctParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "maxVariable"
-                                              << "punct"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "maxVariable"
+                                                       << "punct"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationMaxVariableEnum::kPunct),
               static_cast<int>(collator.getValue()->getSpec().getMaxVariable()));
@@ -591,10 +526,9 @@ TEST(CollatorFactoryICUTest, MaxVariablePunctParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, MaxVariableSpaceParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "maxVariable"
-                                              << "space"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "maxVariable"
+                                                       << "space"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationMaxVariableEnum::kSpace),
               static_cast<int>(collator.getValue()->getSpec().getMaxVariable()));
@@ -602,45 +536,40 @@ TEST(CollatorFactoryICUTest, MaxVariableSpaceParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, NormalizationFalseParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "normalization" << false));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "normalization" << false));
     ASSERT_OK(collator.getStatus());
     ASSERT_FALSE(collator.getValue()->getSpec().getNormalization());
 }
 
 TEST(CollatorFactoryICUTest, NormalizationTrueParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "normalization" << true));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "normalization" << true));
     ASSERT_OK(collator.getStatus());
     ASSERT_TRUE(collator.getValue()->getSpec().getNormalization());
 }
 
 TEST(CollatorFactoryICUTest, BackwardsFalseParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "backwards" << false));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "backwards" << false));
     ASSERT_OK(collator.getStatus());
     ASSERT_FALSE(collator.getValue()->getSpec().getBackwards());
 }
 
 TEST(CollatorFactoryICUTest, BackwardsTrueParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "backwards" << true));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "backwards" << true));
     ASSERT_OK(collator.getStatus());
     ASSERT_TRUE(collator.getValue()->getSpec().getBackwards());
 }
 
 TEST(CollatorFactoryICUTest, LongStrengthFieldParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 1LL));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 1LL));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationStrength::kPrimary),
               collator.getValue()->getSpec().getStrength());
@@ -648,9 +577,8 @@ TEST(CollatorFactoryICUTest, LongStrengthFieldParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, DoubleStrengthFieldParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 1.0));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 1.0));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(static_cast<int>(CollationStrength::kPrimary),
               collator.getValue()->getSpec().getStrength());
@@ -658,188 +586,168 @@ TEST(CollatorFactoryICUTest, DoubleStrengthFieldParsesSuccessfully) {
 
 TEST(CollatorFactoryICUTest, NonBooleanCaseLevelFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseLevel"
-                                              << "garbage"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseLevel"
+                                                       << "garbage"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, NonStringCaseFirstFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst" << 1));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, InvalidStringCaseFirstFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "invalid"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "invalid"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, NonNumberStrengthFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength"
-                                              << "garbage"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength"
+                                                       << "garbage"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, TooLargeStrengthFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 2147483648LL));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 2147483648LL));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus().code(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, FractionalStrengthFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 0.5));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 0.5));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, NegativeStrengthFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << -1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << -1));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus().code(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, InvalidIntegerStrengthFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 6));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 6));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus().code(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, NonBoolNumericOrderingFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "numericOrdering"
-                                              << "garbage"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "numericOrdering"
+                                                       << "garbage"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, NonStringAlternateFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "alternate" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "alternate" << 1));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, InvalidStringAlternateFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "alternate"
-                                              << "invalid"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "alternate"
+                                                       << "invalid"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, NonStringMaxVariableFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "maxVariable" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "maxVariable" << 1));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, InvalidStringMaxVariableFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "maxVariable"
-                                              << "invalid"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "maxVariable"
+                                                       << "invalid"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CollatorFactoryICUTest, NonBoolNormalizationFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "normalization"
-                                              << "garbage"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "normalization"
+                                                       << "garbage"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, NonBoolBackwardsFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "backwards"
-                                              << "garbage"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "backwards"
+                                                       << "garbage"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, VersionFieldParsesSuccessfully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "version"
-                                              << "57.1"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "version"
+                                                       << "57.1"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ("57.1", *collator.getValue()->getSpec().getVersion());
 }
 
 TEST(CollatorFactoryICUTest, VersionFieldPopulatedWhenOmitted) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ("57.1", *collator.getValue()->getSpec().getVersion());
 }
 
 TEST(CollatorFactoryICUTest, NonStringVersionFieldFailsToParse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "version" << 3));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "version" << 3));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(CollatorFactoryICUTest, UnknownCollatorVersionResultsInIncompatibleCollationVersionError) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "version"
-                                              << "unknownVersion"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "version"
+                                                       << "unknownVersion"));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::IncompatibleCollationVersion);
 }
 
 TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparesStringsCorrectlyEnUS) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"));
     ASSERT_OK(collator.getStatus());
 
     ASSERT_LT(collator.getValue()->compare("ab", "ba"), 0);
@@ -851,9 +759,8 @@ TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparesStringsCorrectlyEnUS) {
 
 TEST(CollatorFactoryICUTest, PrimaryStrengthCollatorIgnoresCaseAndAccents) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 1));
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
@@ -863,9 +770,8 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthCollatorIgnoresCaseAndAccents) {
 
 TEST(CollatorFactoryICUTest, SecondaryStrengthCollatorsIgnoresCaseButNotAccents) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 2));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 2));
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
@@ -875,9 +781,8 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthCollatorsIgnoresCaseButNotAccents)
 
 TEST(CollatorFactoryICUTest, TertiaryStrengthCollatorConsidersCaseAndAccents) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 3));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 3));
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
@@ -887,9 +792,8 @@ TEST(CollatorFactoryICUTest, TertiaryStrengthCollatorConsidersCaseAndAccents) {
 
 TEST(CollatorFactoryICUTest, PrimaryStrengthCaseLevelTrue) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 1 << "caseLevel" << true));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 1 << "caseLevel" << true));
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
@@ -900,10 +804,9 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthCaseLevelTrue) {
 TEST(CollatorFactoryICUTest, PrimaryStrengthCaseLevelTrueCaseFirstUpper) {
     CollatorFactoryICU factory;
     auto collator =
-        factory.makeFromBSON(BSON("locale"
-                                  << "en_US"
-                                  << "strength" << 1 << "caseLevel" << true << "caseFirst"
-                                  << "upper"));
+        factory.makeFromBSON(BSON("locale" << "en_US"
+                                           << "strength" << 1 << "caseLevel" << true << "caseFirst"
+                                           << "upper"));
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
@@ -914,37 +817,33 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthCaseLevelTrueCaseFirstUpper) {
 TEST(CollatorFactoryICUTest, TertiaryStrengthCaseLevelTrueCaseFirstUpper) {
     CollatorFactoryICU factory;
     auto collator =
-        factory.makeFromBSON(BSON("locale"
-                                  << "en_US"
-                                  << "strength" << 3 << "caseLevel" << true << "caseFirst"
-                                  << "upper"));
+        factory.makeFromBSON(BSON("locale" << "en_US"
+                                           << "strength" << 3 << "caseLevel" << true << "caseFirst"
+                                           << "upper"));
     ASSERT_OK(collator.getStatus());
     ASSERT_LT(collator.getValue()->compare("A", "a"), 0);
 }
 
 TEST(CollatorFactoryICUTest, NumericOrderingFalse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"));
     ASSERT_OK(collator.getStatus());
     ASSERT_GT(collator.getValue()->compare("2", "10"), 0);
 }
 
 TEST(CollatorFactoryICUTest, NumericOrderingTrue) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "numericOrdering" << true));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "numericOrdering" << true));
     ASSERT_OK(collator.getStatus());
     ASSERT_LT(collator.getValue()->compare("2", "10"), 0);
 }
 
 TEST(CollatorFactoryICUTest, PrimaryStrengthAlternateShifted) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 1 << "alternate"
-                                              << "shifted"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 1 << "alternate"
+                                                       << "shifted"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(collator.getValue()->compare("a b", "ab"), 0);
     ASSERT_EQ(collator.getValue()->compare("a-b", "ab"), 0);
@@ -952,10 +851,9 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthAlternateShifted) {
 
 TEST(CollatorFactoryICUTest, QuaternaryStrengthAlternateShifted) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 4 << "alternate"
-                                              << "shifted"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 4 << "alternate"
+                                                       << "shifted"));
     ASSERT_OK(collator.getStatus());
     ASSERT_LT(collator.getValue()->compare("a b", "ab"), 0);
     ASSERT_LT(collator.getValue()->compare("a-b", "ab"), 0);
@@ -963,12 +861,11 @@ TEST(CollatorFactoryICUTest, QuaternaryStrengthAlternateShifted) {
 
 TEST(CollatorFactoryICUTest, PrimaryStrengthAlternateShiftedMaxVariableSpace) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 1 << "alternate"
-                                              << "shifted"
-                                              << "maxVariable"
-                                              << "space"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 1 << "alternate"
+                                                       << "shifted"
+                                                       << "maxVariable"
+                                                       << "space"));
     ASSERT_OK(collator.getStatus());
     ASSERT_EQ(collator.getValue()->compare("a b", "ab"), 0);
     ASSERT_LT(collator.getValue()->compare("a-b", "ab"), 0);
@@ -976,9 +873,8 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthAlternateShiftedMaxVariableSpace) {
 
 TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsFalse) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 2));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 2));
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
@@ -987,9 +883,8 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsFalse) {
 
 TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsTrue) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "strength" << 2 << "backwards" << true));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "strength" << 2 << "backwards" << true));
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
@@ -998,8 +893,7 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsTrue) {
 
 TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"));
     ASSERT_OK(collator.getStatus());
     const auto comparisonKeyAB = collator.getValue()->getComparisonKey("ab");
     const auto comparisonKeyABB = collator.getValue()->getComparisonKey("abb");
@@ -1018,117 +912,104 @@ TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
 
 TEST(CollatorFactoryICUTest, BackwardsTrueWithStrengthOneFails) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "backwards" << true << "strength" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "backwards" << true << "strength" << 1));
     ASSERT_NOT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, BackwardsTrueWithStrengthTwoSucceeds) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "backwards" << true << "strength" << 2));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "backwards" << true << "strength" << 2));
     ASSERT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthThreeSucceeds) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "lower"
-                                              << "strength" << 3));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "lower"
+                                                       << "strength" << 3));
     ASSERT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthThreeSucceeds) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "upper"
-                                              << "strength" << 3));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "upper"
+                                                       << "strength" << 3));
     ASSERT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstLowerWithCaseLevelSucceeds) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "lower"
-                                              << "caseLevel" << true << "strength" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "lower"
+                                                       << "caseLevel" << true << "strength" << 1));
     ASSERT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstUpperWithCaseLevelSucceeds) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "upper"
-                                              << "caseLevel" << true << "strength" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "upper"
+                                                       << "caseLevel" << true << "strength" << 1));
     ASSERT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstOffWithStrengthOneSucceeds) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "off"
-                                              << "strength" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "off"
+                                                       << "strength" << 1));
     ASSERT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthOneFails) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "lower"
-                                              << "strength" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "lower"
+                                                       << "strength" << 1));
     ASSERT_NOT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthTwoFails) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "lower"
-                                              << "strength" << 2));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "lower"
+                                                       << "strength" << 2));
     ASSERT_NOT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthOneFails) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "upper"
-                                              << "strength" << 1));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "upper"
+                                                       << "strength" << 1));
     ASSERT_NOT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthTwoFails) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US"
-                                              << "caseFirst"
-                                              << "upper"
-                                              << "strength" << 2));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US"
+                                                       << "caseFirst"
+                                                       << "upper"
+                                                       << "strength" << 2));
     ASSERT_NOT_OK(collator.getStatus());
 }
 
 TEST(CollatorFactoryICUTest, GermanPhonebookCollatoHasExpectedComparisonSemantics) {
     CollatorFactoryICU factory;
-    auto dictionaryCollator = factory.makeFromBSON(BSON("locale"
-                                                        << "de"));
+    auto dictionaryCollator = factory.makeFromBSON(BSON("locale" << "de"));
     ASSERT_OK(dictionaryCollator.getStatus());
-    auto phonebookCollator = factory.makeFromBSON(BSON("locale"
-                                                       << "de@collation=phonebook"));
+    auto phonebookCollator = factory.makeFromBSON(BSON("locale" << "de@collation=phonebook"));
     ASSERT_OK(phonebookCollator.getStatus());
 
     StringData withoutAccent("of");
@@ -1140,28 +1021,20 @@ TEST(CollatorFactoryICUTest, GermanPhonebookCollatoHasExpectedComparisonSemantic
 
 TEST(CollatorFactoryICUTest, AliasNoForNorwegianBokmalLocaleNotSupported) {
     CollatorFactoryICU factory;
-    ASSERT_NOT_OK(factory
-                      .makeFromBSON(BSON("locale"
-                                         << "no"))
-                      .getStatus());
+    ASSERT_NOT_OK(factory.makeFromBSON(BSON("locale" << "no")).getStatus());
 }
 
 TEST(CollatorFactoryICUTest, TraditionalSpanishAliasNotSupported) {
     CollatorFactoryICU factory;
-    ASSERT_NOT_OK(factory
-                      .makeFromBSON(BSON("locale"
-                                         << "es__TRADITIONAL"))
-                      .getStatus());
+    ASSERT_NOT_OK(factory.makeFromBSON(BSON("locale" << "es__TRADITIONAL")).getStatus());
 }
 
 TEST(CollatorFactoryICUTest, InvalidIdPrefixedLocaleFailsGracefully) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "x_test"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "x_test"));
     ASSERT_NOT_OK(collator.getStatus());
 
-    collator = factory.makeFromBSON(BSON("locale"
-                                         << "I-test"));
+    collator = factory.makeFromBSON(BSON("locale" << "I-test"));
     ASSERT_NOT_OK(collator.getStatus());
 }
 

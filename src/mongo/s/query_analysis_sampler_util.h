@@ -62,7 +62,7 @@ namespace analyze_shard_key {
 
 struct TargetedSampleId {
 public:
-    TargetedSampleId(UUID sampleId, ShardId shardId) : _sampleId(sampleId), _shardId(shardId){};
+    TargetedSampleId(UUID sampleId, ShardId shardId) : _sampleId(sampleId), _shardId(shardId) {};
 
     bool isFor(ShardEndpoint endpoint) const {
         return _shardId == endpoint.shardName;

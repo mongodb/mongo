@@ -286,11 +286,9 @@ TEST_F(SbeShardKeyExpressionTest, NestedShardKeyPattern) {
 }
 
 TEST_F(SbeShardKeyExpressionTest, HashedShardKeyPattern) {
-    runShardKeyExpressionTest(BSON("a"
-                                   << "hashed"),
-                              {BSON("a" << 10 << "b" << 20),
-                               BSON("b" << 20),
-                               BSON("a" << BSON("b" << 20))});
+    runShardKeyExpressionTest(
+        BSON("a" << "hashed"),
+        {BSON("a" << 10 << "b" << 20), BSON("b" << 20), BSON("a" << BSON("b" << 20))});
 }
 
 }  // namespace mongo

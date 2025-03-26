@@ -18,6 +18,7 @@
  */
 
 import "jstests/libs/override_methods/retry_on_killed_session.js";
+
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig

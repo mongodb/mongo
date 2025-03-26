@@ -60,8 +60,7 @@ TEST(MatchExpressionParserSchemaTest, UniqueItemsFailsToParseNonTrueArguments) {
     auto expr = MatchExpressionParser::parse(queryIntArgument, expCtx);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
-    auto queryStringArgument = BSON("x" << BSON("$_internalSchemaUniqueItems"
-                                                << ""));
+    auto queryStringArgument = BSON("x" << BSON("$_internalSchemaUniqueItems" << ""));
     expr = MatchExpressionParser::parse(queryStringArgument, expCtx);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
@@ -80,8 +79,7 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchOnlyAcceptsAnObjectArgument) {
     auto result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 
-    query = BSON("a" << BSON("$_internalSchemaObjectMatch"
-                             << "string"));
+    query = BSON("a" << BSON("$_internalSchemaObjectMatch" << "string"));
     result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 
@@ -102,14 +100,12 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchSubExprRejectsPathlessOperators
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthFailsToParseNonIntegerArguments) {
-    auto queryStringArgument = BSON("x" << BSON("$_internalSchemaMinLength"
-                                                << "abc"));
+    auto queryStringArgument = BSON("x" << BSON("$_internalSchemaMinLength" << "abc"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(queryStringArgument, expCtx);
     ASSERT_NOT_OK(expr.getStatus());
 
-    auto queryEmptyStringArgument = BSON("x" << BSON("$_internalSchemaMinLength"
-                                                     << ""));
+    auto queryEmptyStringArgument = BSON("x" << BSON("$_internalSchemaMinLength" << ""));
     expr = MatchExpressionParser::parse(queryEmptyStringArgument, expCtx);
     ASSERT_NOT_OK(expr.getStatus());
 
@@ -127,14 +123,12 @@ TEST(MatchExpressionParserSchemaTest, MinLengthFailsToParseNonIntegerArguments) 
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthFailsToParseNonIntegerArguments) {
-    auto queryStringArgument = BSON("x" << BSON("$_internalSchemaMaxLength"
-                                                << "abc"));
+    auto queryStringArgument = BSON("x" << BSON("$_internalSchemaMaxLength" << "abc"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(queryStringArgument, expCtx);
     ASSERT_NOT_OK(expr.getStatus());
 
-    auto queryEmptyStringArgument = BSON("x" << BSON("$_internalSchemaMaxLength"
-                                                     << ""));
+    auto queryEmptyStringArgument = BSON("x" << BSON("$_internalSchemaMaxLength" << ""));
     expr = MatchExpressionParser::parse(queryEmptyStringArgument, expCtx);
     ASSERT_NOT_OK(expr.getStatus());
 
@@ -285,8 +279,7 @@ TEST(MatchExpressionParserSchemaTest, InternalTypeFailsToParseOnTypeMismatch) {
 }
 
 TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseNumberAlias) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaType"
-                                     << "number"));
+    BSONObj query = BSON("x" << BSON("$_internalSchemaType" << "number"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
@@ -297,8 +290,7 @@ TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseNumberAlias) {
 }
 
 TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseLongAlias) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaType"
-                                     << "long"));
+    BSONObj query = BSON("x" << BSON("$_internalSchemaType" << "long"));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());

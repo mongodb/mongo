@@ -343,8 +343,7 @@ protected:
 
     std::function<void()> _buildPhaseHandler(const Phase& newPhase,
                                              std::function<void()>&& handlerFn) {
-        return _buildPhaseHandler(
-            newPhase, []() { return true; }, std::move(handlerFn));
+        return _buildPhaseHandler(newPhase, []() { return true; }, std::move(handlerFn));
     }
 
     std::function<void()> _buildPhaseHandler(const Phase& newPhase,

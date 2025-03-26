@@ -147,9 +147,8 @@ TEST_F(DocumentSourceSetMetadataTest, ErrorsIfExpressionDoesntMatchNumericMetaFi
     })");
 
     Document inputDoc = Document{{"foo",
-                                  BSON_ARRAY("a"
-                                             << "b"
-                                             << "c")}};
+                                  BSON_ARRAY("a" << "b"
+                                                 << "c")}};
     auto stage = DocumentSourceSetMetadata::createFromBson(spec.firstElement(), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
     stage->setSource(mock.get());

@@ -728,8 +728,7 @@ void ReshardingDonorService::DonorStateMachine::
             oplog.setNss(_metadata.getSourceNss());
             oplog.setOpType(repl::OpTypeEnum::kNoop);
             oplog.setUuid(_metadata.getSourceUUID());
-            oplog.setObject(BSON("msg"
-                                 << "Created temporary resharding collection"));
+            oplog.setObject(BSON("msg" << "Created temporary resharding collection"));
             oplog.setObject2(changeEvent.toBSON());
             oplog.setFromMigrate(true);
             oplog.setOpTime(OplogSlot());

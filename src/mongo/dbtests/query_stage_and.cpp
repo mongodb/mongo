@@ -702,8 +702,7 @@ public:
         // This is subtle and confusing.  We couldn't extract any keys from the elements with
         // 'foo' in them so we would normally index them with the "nothing found" key.  We don't
         // want to include that in our scan.
-        params.bounds.endKey = BSON(""
-                                    << "");
+        params.bounds.endKey = BSON("" << "");
         params.bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr));

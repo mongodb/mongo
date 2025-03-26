@@ -227,7 +227,7 @@ private:
 
 template <typename T, typename... Ts>
 requires std::is_same_v<T, ExtensionsCallbackNoop> || std::is_same_v<T, ExtensionsCallbackReal>
-    std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
+std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
     return std::make_unique<T>(std::forward<Ts>(args)...);
 }
 

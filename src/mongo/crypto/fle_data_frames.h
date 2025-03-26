@@ -117,7 +117,7 @@ public:
         _data[17] = static_cast<uint8_t>(type);
     }
 
-    FLEEncryptionFrame() : _plaintext(ConstDataRange(nullptr, 0)){};
+    FLEEncryptionFrame() : _plaintext(ConstDataRange(nullptr, 0)) {};
 
     ConstDataRange get() const& {
         return ConstDataRange(_data);

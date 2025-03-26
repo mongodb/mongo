@@ -142,7 +142,7 @@ public:
 
     class OplogFetcherRestartDecision {
     public:
-        OplogFetcherRestartDecision(){};
+        OplogFetcherRestartDecision() {};
 
         virtual ~OplogFetcherRestartDecision() = 0;
 
@@ -160,13 +160,13 @@ public:
 
     class OplogFetcherRestartDecisionDefault : public OplogFetcherRestartDecision {
     public:
-        OplogFetcherRestartDecisionDefault(std::size_t maxRestarts) : _maxRestarts(maxRestarts){};
+        OplogFetcherRestartDecisionDefault(std::size_t maxRestarts) : _maxRestarts(maxRestarts) {};
 
         bool shouldContinue(OplogFetcher* fetcher, Status status) final;
 
         void fetchSuccessful(OplogFetcher* fetcher) final;
 
-        ~OplogFetcherRestartDecisionDefault() override{};
+        ~OplogFetcherRestartDecisionDefault() override {};
 
     private:
         // Restarts since the last successful oplog query response.

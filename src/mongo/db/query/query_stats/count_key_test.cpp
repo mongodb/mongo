@@ -149,8 +149,7 @@ TEST_F(CountKeyTest, CountMaxTimeMSKey) {
 
 // Test that the comment parameter is included in the key.
 TEST_F(CountKeyTest, CountCommentKey) {
-    const auto comment = BSON("comment"
-                              << "hello");
+    const auto comment = BSON("comment" << "hello");
     expCtx->getOperationContext()->setComment(comment);
     const auto key = std::make_unique<CountKey>(expCtx,
                                                 *parsedRequest,

@@ -118,10 +118,7 @@ public:
                         int numElements,
                         Timestamp timestampToUse) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
-        const auto correctedSize = dataLength -
-            BSON("x"
-                 << "")
-                .objsize();
+        const auto correctedSize = dataLength - BSON("x" << "").objsize();
         invariant(correctedSize >= 0);
         const auto objToInsert = BSON("x" << std::string(correctedSize, 'a'));
         WriteUnitOfWork wuow(opCtx);
@@ -148,7 +145,7 @@ public:
               0 /* leftoverRecordsBytes */,
               minBytesPerMarker,
               Microseconds(0),
-              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
+              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {};
     MONGO_COMPILER_DIAGNOSTIC_POP
 
     void setExpirePartialMarker(bool value) {
@@ -178,7 +175,7 @@ public:
               0 /* leftoverRecordsBytes */,
               minBytesPerMarker,
               Microseconds(0),
-              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
+              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {};
 
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override {

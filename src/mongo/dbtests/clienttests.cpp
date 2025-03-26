@@ -202,10 +202,7 @@ public:
             NamespaceString::createNamespaceString_forTest("unittests.clienttests.create");
         db.createCollection(nss);
         BSONObj info;
-        ASSERT(db.runCommand(nss.dbName(),
-                             BSON("collstats"
-                                  << "clienttests.create"),
-                             info));
+        ASSERT(db.runCommand(nss.dbName(), BSON("collstats" << "clienttests.create"), info));
     }
 };
 

@@ -711,8 +711,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     }
 
     {
-        BSONObj doc = BSON("i"
-                           << "updated");
+        BSONObj doc = BSON("i" << "updated");
 
         StorageWriteTransaction txn(ru);
         for (int i = 0; i < numRecords; i += 10) {

@@ -418,8 +418,7 @@ TEST(checkAndScrubInvalidUTF8, SimpleCodeWScope) {
 
     // The invalid code is in the BSONObj of the CodeWScope, not the codeStr.
     std::string validCode2 = "var x;";
-    BSONObj invalidCodeObj1 = BSON("x"
-                                   << "\xf8\x80\x80\x80\x80");
+    BSONObj invalidCodeObj1 = BSON("x" << "\xf8\x80\x80\x80\x80");
 
     BSONObj invalidCodeWScopeWithEmptyField2 =
         makeBSONCodeWScopeObject("", validCode2, invalidCodeObj1);
@@ -431,8 +430,7 @@ TEST(checkAndScrubInvalidUTF8, SimpleCodeWScope) {
 
     // The invalid code is both in the codeStr and BSONObj of the CodeWScope.
     std::string invalidCode2 = "var x; print('\xc3\x28');";
-    BSONObj invalidCodeObj2 = BSON("x"
-                                   << "\xde\xa0\x80");
+    BSONObj invalidCodeObj2 = BSON("x" << "\xde\xa0\x80");
     BSONObj invalidCodeWScopeWithEmptyField3 =
         makeBSONCodeWScopeObject("", invalidCode2, invalidCodeObj2);
     scrubAndAssertUTF8Valid(invalidCodeWScopeWithEmptyField3);
@@ -528,13 +526,11 @@ TEST(checkAndScrubInvalidUTF8, SimpleArrays) {
 TEST(checkAndScrubInvalidUTF8, DoesNotScrubNestedValidUTF8) {
     // Tests that there isn't scrubbing of nested valid UTF-8.
     // {a: "😊"}
-    BSONObj oneNest = BSON("a"
-                           << "😊");
+    BSONObj oneNest = BSON("a" << "😊");
     unchangedBSONInput(oneNest);
 
     // {c: {'rewind': "こんにちは"}}
-    BSONObj twoNest = BSON("c" << BSON("rewind"
-                                       << "こんにちは"));
+    BSONObj twoNest = BSON("c" << BSON("rewind" << "こんにちは"));
     unchangedBSONInput(twoNest);
 
     // Test valid BSONCode.
@@ -559,16 +555,11 @@ TEST(checkAndScrubInvalidUTF8, DoesNotScrubNestedValidUTF8) {
 }
 
 // Used for NestedInvalidUTF8[...] tests, declared globally because of the mixedBag# tests.
-BSONObj oneNestInvalid = BSON("a"
-                              << "\xc2");
-BSONObj oneNestFieldNameInvalid = BSON("\xde\xa0\x80"
-                                       << "talk talk");
-BSONObj twoNestInvalid1 = BSON("c" << BSON("\x80"
-                                           << "\xff\x80\x80\x80\x80\x80\x80\x80"));
-BSONObj twoNestInvalid2 = BSON("\xc3\x28" << BSON("\xf0\x9d\xdc\x80 "
-                                                  << "B2B"));
-BSONObj invalidNestedCode = BSON("code" << BSON("code1"
-                                                << "(function(){\xe2\x28\xa1})());"));
+BSONObj oneNestInvalid = BSON("a" << "\xc2");
+BSONObj oneNestFieldNameInvalid = BSON("\xde\xa0\x80" << "talk talk");
+BSONObj twoNestInvalid1 = BSON("c" << BSON("\x80" << "\xff\x80\x80\x80\x80\x80\x80\x80"));
+BSONObj twoNestInvalid2 = BSON("\xc3\x28" << BSON("\xf0\x9d\xdc\x80 " << "B2B"));
+BSONObj invalidNestedCode = BSON("code" << BSON("code1" << "(function(){\xe2\x28\xa1})());"));
 std::string invalidCode1 = "(\xc2 function(){print(x);})();";
 BSONObj validCodeObj1 = BSON("x" << 1);
 BSONObj invalidCodeWScope1 = makeBSONCodeWScopeObject("codeWScope1", invalidCode1, validCodeObj1);
@@ -577,14 +568,12 @@ BSONObj invalidCodeObj1 = makeBSONCodeObject("codeSnippet1", "(function(){\xe2\x
 BSONObj invalidCodeObj2 = makeBSONCodeObject("codeSnippet2", "var x = \xde\xa0\x80;");
 
 std::string validCode1 = "var y;";
-BSONObj invalidCodeObj3 = BSON("y"
-                               << "\xe0");
+BSONObj invalidCodeObj3 = BSON("y" << "\xe0");
 BSONObj invalidCodeWScope2 = makeBSONCodeWScopeObject("codeWScope2", validCode1, invalidCodeObj3);
 
 // The invalid code is both in the codeStr and BSONObj of the CodeWScope.
 std::string invalidCode2 = "var x; print('\xc0\x80');";
-BSONObj invalidCodeObj4 = BSON("x"
-                               << "\xe0\x80\x80");
+BSONObj invalidCodeObj4 = BSON("x" << "\xe0\x80\x80");
 BSONObj invalidCodeWScope3 = makeBSONCodeWScopeObject("codeWScope3", invalidCode2, invalidCodeObj4);
 
 TEST(checkAndScrubInvalidUTF8, SimpleNestedInvalidUTF8) {
@@ -690,8 +679,7 @@ TEST(checkAndScrubInvalidUTF8, NestedInvalidMixedBag) {
     // {c: {"\x80": "\xff\x80\x80\x80\x80\x80\x80\x80"}},
     // {"codeWScope3": BSONCodeWScope{"var x; print('\xc0\x80');", (x:\xe0\x80\x80")}}
     // ]}
-    auto validStringObj = BSON("fiona"
-                               << "apple");
+    auto validStringObj = BSON("fiona" << "apple");
     BSONObj mixedBag4 = makeBSONArrayObject<BSONObj>("mixedBag4",
                                                      {
                                                          intObj,

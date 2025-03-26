@@ -505,97 +505,83 @@ TEST(RedactionVector, SingleHyphen) {
 }
 
 TEST(RedactionBSON, Strings) {
-    BSONObj obj = BSON("firstarg"
-                       << "not a password"
-                       << "test.config.opt16"
-                       << "this password should be censored"
-                       << "test.config.opt16depr"
-                       << "this password should be censored"
-                       << "middlearg"
-                       << "also not a password"
-                       << "test.config.opt16depr2"
-                       << "this password should also be censored"
-                       << "lastarg" << false);
+    BSONObj obj = BSON("firstarg" << "not a password"
+                                  << "test.config.opt16"
+                                  << "this password should be censored"
+                                  << "test.config.opt16depr"
+                                  << "this password should be censored"
+                                  << "middlearg"
+                                  << "also not a password"
+                                  << "test.config.opt16depr2"
+                                  << "this password should also be censored"
+                                  << "lastarg" << false);
 
-    BSONObj res = BSON("firstarg"
-                       << "not a password"
-                       << "test.config.opt16"
-                       << "<password>"
-                       << "test.config.opt16depr"
-                       << "<password>"
-                       << "middlearg"
-                       << "also not a password"
-                       << "test.config.opt16depr2"
-                       << "<password>"
-                       << "lastarg" << false);
+    BSONObj res = BSON("firstarg" << "not a password"
+                                  << "test.config.opt16"
+                                  << "<password>"
+                                  << "test.config.opt16depr"
+                                  << "<password>"
+                                  << "middlearg"
+                                  << "also not a password"
+                                  << "test.config.opt16depr2"
+                                  << "<password>"
+                                  << "lastarg" << false);
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);
 }
 
 TEST(RedactionBSON, Arrays) {
-    BSONObj obj = BSON("firstarg"
-                       << "not a password"
-                       << "test.config.opt16"
-                       << BSON_ARRAY("first censored password"
-                                     << "next censored password")
-                       << "test.config.opt16depr"
-                       << BSON_ARRAY("first censored password"
-                                     << "next censored password")
-                       << "middlearg"
-                       << "also not a password"
-                       << "test.config.opt16depr2"
-                       << BSON_ARRAY("first censored password"
-                                     << "next censored password")
-                       << "lastarg" << false);
+    BSONObj obj =
+        BSON("firstarg" << "not a password"
+                        << "test.config.opt16"
+                        << BSON_ARRAY("first censored password" << "next censored password")
+                        << "test.config.opt16depr"
+                        << BSON_ARRAY("first censored password" << "next censored password")
+                        << "middlearg"
+                        << "also not a password"
+                        << "test.config.opt16depr2"
+                        << BSON_ARRAY("first censored password" << "next censored password")
+                        << "lastarg" << false);
 
-    BSONObj res = BSON("firstarg"
-                       << "not a password"
-                       << "test.config.opt16"
-                       << BSON_ARRAY("<password>"
-                                     << "<password>")
-                       << "test.config.opt16depr"
-                       << BSON_ARRAY("<password>"
-                                     << "<password>")
-                       << "middlearg"
-                       << "also not a password"
-                       << "test.config.opt16depr2"
-                       << BSON_ARRAY("<password>"
-                                     << "<password>")
-                       << "lastarg" << false);
+    BSONObj res =
+        BSON("firstarg" << "not a password"
+                        << "test.config.opt16" << BSON_ARRAY("<password>" << "<password>")
+                        << "test.config.opt16depr" << BSON_ARRAY("<password>" << "<password>")
+                        << "middlearg"
+                        << "also not a password"
+                        << "test.config.opt16depr2" << BSON_ARRAY("<password>" << "<password>")
+                        << "lastarg" << false);
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);
 }
 
 TEST(RedactionBSON, SubObjects) {
-    BSONObj obj = BSON("firstarg"
-                       << "not a password"
-                       << "test"
-                       << BSON("config" << BSON("opt16" << BSON_ARRAY("first censored password"
-                                                                      << "next censored password")
-                                                        << "opt16"
-                                                        << "should be censored too"
-                                                        << "opt16depr"
-                                                        << BSON_ARRAY("first censored password"
-                                                                      << "next censored password")
-                                                        << "opt16depr"
-                                                        << "should be censored too"))
-                       << "lastarg" << false);
+    BSONObj obj = BSON(
+        "firstarg" << "not a password"
+                   << "test"
+                   << BSON("config" << BSON(
+                               "opt16"
+                               << BSON_ARRAY("first censored password" << "next censored password")
+                               << "opt16"
+                               << "should be censored too"
+                               << "opt16depr"
+                               << BSON_ARRAY("first censored password" << "next censored password")
+                               << "opt16depr"
+                               << "should be censored too"))
+                   << "lastarg" << false);
 
-    BSONObj res = BSON("firstarg"
-                       << "not a password"
-                       << "test"
-                       << BSON("config" << BSON("opt16" << BSON_ARRAY("<password>"
-                                                                      << "<password>")
-                                                        << "opt16"
-                                                        << "<password>"
-                                                        << "opt16depr"
-                                                        << BSON_ARRAY("<password>"
-                                                                      << "<password>")
-                                                        << "opt16depr"
-                                                        << "<password>"))
-                       << "lastarg" << false);
+    BSONObj res = BSON(
+        "firstarg" << "not a password"
+                   << "test"
+                   << BSON("config" << BSON(
+                               "opt16" << BSON_ARRAY("<password>" << "<password>") << "opt16"
+                                       << "<password>"
+                                       << "opt16depr" << BSON_ARRAY("<password>" << "<password>")
+                                       << "opt16depr"
+                                       << "<password>"))
+                   << "lastarg" << false);
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);

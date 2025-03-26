@@ -508,8 +508,7 @@ BSONObj replMonitorStats(const BSONObj& a, void* data) {
     auto name = a.firstElement().valueStringDataSafe();
     auto rsm = ReplicaSetMonitor::get(name.toString());
     if (!rsm) {
-        return BSON(""
-                    << "no ReplSetMonitor exists by that name");
+        return BSON("" << "no ReplSetMonitor exists by that name");
     }
 
     BSONObjBuilder result;

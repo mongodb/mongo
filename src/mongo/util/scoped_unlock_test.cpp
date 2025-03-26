@@ -43,7 +43,9 @@ TEST(ScopedUnlockTest, Relocked) {
     stdx::mutex mutex;
     stdx::unique_lock lk(mutex);
 
-    { ScopedUnlock scopedUnlock(lk); }
+    {
+        ScopedUnlock scopedUnlock(lk);
+    }
 
     ASSERT(lk.owns_lock()) << "ScopedUnlock should relock on destruction";
 }

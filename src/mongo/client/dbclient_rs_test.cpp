@@ -594,10 +594,9 @@ protected:
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(BSON("_id" << member->getId().getData() << "host" << host
                                                  << "tags"
-                                                 << BSON("dc"
-                                                         << "ny"
-                                                         << "p"
-                                                         << "1")));
+                                                 << BSON("dc" << "ny"
+                                                              << "p"
+                                                              << "1")));
                 _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
             }
 
@@ -610,12 +609,11 @@ protected:
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(BSON("_id" << member->getId().getData() << "host" << host
                                                  << "tags"
-                                                 << BSON("dc"
-                                                         << "sf"
-                                                         << "s"
-                                                         << "1"
-                                                         << "group"
-                                                         << "1")));
+                                                 << BSON("dc" << "sf"
+                                                              << "s"
+                                                              << "1"
+                                                              << "group"
+                                                              << "1")));
                 _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
             }
 
@@ -626,12 +624,11 @@ protected:
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(BSON("_id" << member->getId().getData() << "host" << host
                                                  << "tags"
-                                                 << BSON("dc"
-                                                         << "ma"
-                                                         << "s"
-                                                         << "2"
-                                                         << "group"
-                                                         << "1")));
+                                                 << BSON("dc" << "ma"
+                                                              << "s"
+                                                              << "2"
+                                                              << "group"
+                                                              << "1")));
                 _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
             }
 
@@ -642,10 +639,9 @@ protected:
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(BSON("_id" << member->getId().getData() << "host" << host
                                                  << "tags"
-                                                 << BSON("dc"
-                                                         << "eu"
-                                                         << "s"
-                                                         << "3")));
+                                                 << BSON("dc" << "eu"
+                                                              << "s"
+                                                              << "3")));
                 _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
             }
 
@@ -656,10 +652,9 @@ protected:
                     oldConfig.findMemberByHostAndPort(HostAndPort(host));
                 membersBuilder.append(BSON("_id" << member->getId().getData() << "host" << host
                                                  << "tags"
-                                                 << BSON("dc"
-                                                         << "jp"
-                                                         << "s"
-                                                         << "4")));
+                                                 << BSON("dc" << "jp"
+                                                              << "s"
+                                                              << "4")));
                 _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
             }
 

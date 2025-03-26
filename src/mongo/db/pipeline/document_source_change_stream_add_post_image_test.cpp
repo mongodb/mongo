@@ -105,8 +105,7 @@ public:
 TEST_F(DocumentSourceChangeStreamAddPostImageTest,
        CannotCreateStageFromBsonWithUnrecognizedFullDocumentMode) {
     auto expCtx = getExpCtx();
-    auto spec = BSON("$changeStream: " << BSON("fullDocument"
-                                               << "banana"));
+    auto spec = BSON("$changeStream: " << BSON("fullDocument" << "banana"));
     ASSERT_THROWS_CODE(
         DocumentSourceChangeStreamAddPostImage::createFromBson(spec.firstElement(), expCtx),
         AssertionException,

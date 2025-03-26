@@ -129,8 +129,7 @@ TEST(TimeseriesIndexSchemaConversionTest, EmptyTimeseriesIndexSpecInvalid) {
 // {$hint: 'abc'} is invalid.
 TEST(TimeseriesIndexSchemaConversionTest, HintTimeseriesIndexSpecInvalid) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
-    BSONObj timeseriesIndexSpec = BSON("$hint"
-                                       << "abc");
+    BSONObj timeseriesIndexSpec = BSON("$hint" << "abc");
 
     ASSERT_NOT_OK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(timeseriesOptions,
                                                                             timeseriesIndexSpec));
@@ -407,10 +406,8 @@ TEST(TimeseriesIndexSchemaConversionTest, MixedCompoundMeasurementIndexSpecConve
 // {a: "2sphere"} <=> {data.a: "2dsphere_bucket"}
 TEST(TimeseriesIndexSchemaConversionTest, 2dsphereMeasurementIndexSpecConversion) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
-    BSONObj timeseriesIndexSpec = BSON("a"
-                                       << "2dsphere");
-    BSONObj bucketsIndexSpec = BSON("data.a"
-                                    << "2dsphere_bucket");
+    BSONObj timeseriesIndexSpec = BSON("a" << "2dsphere");
+    BSONObj bucketsIndexSpec = BSON("data.a" << "2dsphere_bucket");
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }

@@ -192,8 +192,7 @@ TEST(ReplSetWriteConcernModeDefinitions, NegativeConstraint) {
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, ModesMustBeObject) {
-    auto writeConcernModes = BSON("modes"
-                                  << "stringIsBad");
+    auto writeConcernModes = BSON("modes" << "stringIsBad");
     ASSERT_THROWS(
         ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement()),
         ExceptionFor<ErrorCodes::TypeMismatch>);
@@ -203,18 +202,16 @@ TEST(ReplSetWriteConcernModeDefinitions, ModesMustBeObject) {
         ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement()),
         ExceptionFor<ErrorCodes::TypeMismatch>);
 
-    writeConcernModes = BSON("modes" << BSON_ARRAY("a"
-                                                   << "b"
-                                                   << "c"));
+    writeConcernModes = BSON("modes" << BSON_ARRAY("a" << "b"
+                                                       << "c"));
     ASSERT_THROWS(
         ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement()),
         ExceptionFor<ErrorCodes::TypeMismatch>);
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, ConstraintsMustBeNumbers) {
-    auto writeConcernModes = BSON("modes" << BSON("wc1" << BSON("tag1"
-                                                                << "1"
-                                                                << "tag2" << 2)
+    auto writeConcernModes = BSON("modes" << BSON("wc1" << BSON("tag1" << "1"
+                                                                       << "tag2" << 2)
                                                         << "wc2" << BSON("tag3" << 3)));
     ASSERT_THROWS(
         ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement()),

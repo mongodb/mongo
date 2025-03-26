@@ -124,13 +124,11 @@ struct S2KeyGeneratorTest : public unittest::Test {
     long long getCellID(int x, int y, bool multiPoint = false) {
         BSONObj obj;
         if (multiPoint) {
-            obj = BSON("a" << BSON("type"
-                                   << "MultiPoint"
-                                   << "coordinates" << BSON_ARRAY(BSON_ARRAY(x << y))));
+            obj = BSON("a" << BSON("type" << "MultiPoint"
+                                          << "coordinates" << BSON_ARRAY(BSON_ARRAY(x << y))));
         } else {
-            obj = BSON("a" << BSON("type"
-                                   << "Point"
-                                   << "coordinates" << BSON_ARRAY(x << y)));
+            obj = BSON("a" << BSON("type" << "Point"
+                                          << "coordinates" << BSON_ARRAY(x << y)));
         }
         BSONObj keyPattern = fromjson("{a: '2dsphere'}");
         BSONObj infoObj = fromjson("{key: {a: '2dsphere'}, '2dsphereIndexVersion': 3}");
@@ -327,9 +325,8 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
                              Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
-                                      BSON(""
-                                           << "gnirts"
-                                           << "" << getCellID(0, 0)),
+                                      BSON("" << "gnirts"
+                                              << "" << getCellID(0, 0)),
                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
@@ -359,10 +356,9 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
                              Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
-                                      BSON(""
-                                           << "gnirts"
-                                           << "" << getCellID(0, 0) << ""
-                                           << "2gnirts"),
+                                      BSON("" << "gnirts"
+                                              << "" << getCellID(0, 0) << ""
+                                              << "2gnirts"),
                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
@@ -540,9 +536,7 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
                              Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
-                                      BSON("" << getCellID(0, 0) << ""
-                                              << BSON("c"
-                                                      << "gnirts")),
+                                      BSON("" << getCellID(0, 0) << "" << BSON("c" << "gnirts")),
                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 

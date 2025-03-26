@@ -183,8 +183,7 @@ TEST(MigrationSecondaryThrottleOptions, IgnoreWriteConcernWhenSecondaryThrottleO
     MigrationSecondaryThrottleOptions options =
         assertGet(MigrationSecondaryThrottleOptions::createFromCommand(
             BSON("someOtherField" << 1 << "_secondaryThrottle" << false << "writeConcern"
-                                  << BSON("w"
-                                          << "majority"))));
+                                  << BSON("w" << "majority"))));
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff, options.getSecondaryThrottle());
     ASSERT(!options.isWriteConcernSpecified());
 }
@@ -192,9 +191,7 @@ TEST(MigrationSecondaryThrottleOptions, IgnoreWriteConcernWhenSecondaryThrottleO
 TEST(MigrationSecondaryThrottleOptions, IgnoreWriteConcernWhenSecondaryThrottleAbsent) {
     MigrationSecondaryThrottleOptions options =
         assertGet(MigrationSecondaryThrottleOptions::createFromCommand(
-            BSON("someOtherField" << 1 << "writeConcern"
-                                  << BSON("w"
-                                          << "majority"))));
+            BSON("someOtherField" << 1 << "writeConcern" << BSON("w" << "majority"))));
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault, options.getSecondaryThrottle());
     ASSERT(!options.isWriteConcernSpecified());
 }

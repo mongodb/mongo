@@ -93,8 +93,7 @@ TEST_F(SBECoerceToStringTest, BasicCoerceToString) {
     runAndAssertExpression(compiledExpr.get(), "42.2130000000000");
 
     // BSONString test.
-    auto bsonString = BSON("string"
-                           << "hello");
+    auto bsonString = BSON("string" << "hello");
     auto bsonStringVal = value::bitcastFrom<const char*>(bsonString["string"].value());
     coerceToStringAccessor.reset(value::TypeTags::bsonString, bsonStringVal);
     runAndAssertExpression(compiledExpr.get(), "hello");

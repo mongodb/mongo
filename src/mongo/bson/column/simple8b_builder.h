@@ -44,9 +44,8 @@ namespace mongo {
  * Concept for writing 64bit simple8b blocks via a callback.
  */
 template <class F>
-concept Simple8bBlockWriter = requires(F&& f) {
-    std::invoke(std::forward<F>(f), std::declval<uint64_t>());
-};
+concept Simple8bBlockWriter =
+    requires(F&& f) { std::invoke(std::forward<F>(f), std::declval<uint64_t>()); };
 
 /**
  * Simple8bBuilder compresses a series of integers into chains of 64 bit Simple8b blocks.

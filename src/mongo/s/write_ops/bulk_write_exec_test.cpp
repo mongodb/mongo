@@ -1485,8 +1485,7 @@ TEST_F(BulkWriteOpTest, BatchItemRefGetLet) {
     BulkWriteCommandRequest request({BulkWriteUpdateOp(0, BSON("x" << 1), BSON("x" << 2))},
                                     {NamespaceInfoEntry(nss)});
 
-    BSONObj expected{BSON("key"
-                          << "value")};
+    BSONObj expected{BSON("key" << "value")};
     request.setLet(expected);
 
     BulkWriteOp bulkWriteOp(_opCtx, request);
@@ -6393,12 +6392,8 @@ TEST(BulkWriteTest, getApproximateSize) {
     item = BulkWriteReplyItem{0, Status{ErrorCodes::ExceededMemoryLimit, reason}};
     ASSERT_EQUALS(item.getApproximateSize(), item.serialize().objsize());
 
-    DuplicateKeyErrorInfo extra{BSON("key" << 1),
-                                BSON("value" << 1),
-                                BSON("collation"
-                                     << "simple"),
-                                {},
-                                boost::none};
+    DuplicateKeyErrorInfo extra{
+        BSON("key" << 1), BSON("value" << 1), BSON("collation" << "simple"), {}, boost::none};
     BSONObjBuilder builder;
     extra.serialize(&builder);
     int extraSize = builder.obj().objsize();

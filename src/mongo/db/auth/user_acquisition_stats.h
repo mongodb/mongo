@@ -59,7 +59,7 @@ class UserAcquisitionStats {
 public:
     UserAcquisitionStats()
         : _userCacheAccessStats(UserCacheAccessStats()),
-          _ldapOperationStats(LDAPOperationStats()){};
+          _ldapOperationStats(LDAPOperationStats()) {};
     ~UserAcquisitionStats() = default;
 
     /**

@@ -248,33 +248,23 @@ const BSONObj& getOperationTypeRewriteExpressionBSON() {
          */
 
         // Cases for handling CRUD events.
-        opCases.push_back(BSON("case" << BSON("$eq" << BSON_ARRAY("$op"
-                                                                  << "i"))
-                                      << "then"
+        opCases.push_back(BSON("case" << BSON("$eq" << BSON_ARRAY("$op" << "i")) << "then"
                                       << "insert"));
-        opCases.push_back(
-            BSON("case" << BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$op"
-                                                                              << "u"))
-                                                     << BSON("$eq" << BSON_ARRAY("$o._id"
-                                                                                 << "$$REMOVE"))))
-                        << "then"
-                        << "update"));
-        opCases.push_back(
-            BSON("case" << BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$op"
-                                                                              << "u"))
-                                                     << BSON("$ne" << BSON_ARRAY("$o._id"
-                                                                                 << "$$REMOVE"))))
-                        << "then"
-                        << "replace"));
-        opCases.push_back(BSON("case" << BSON("$eq" << BSON_ARRAY("$op"
-                                                                  << "d"))
-                                      << "then"
+        opCases.push_back(BSON(
+            "case" << BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$op" << "u")) << BSON(
+                                                    "$eq" << BSON_ARRAY("$o._id" << "$$REMOVE"))))
+                   << "then"
+                   << "update"));
+        opCases.push_back(BSON(
+            "case" << BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$op" << "u")) << BSON(
+                                                    "$ne" << BSON_ARRAY("$o._id" << "$$REMOVE"))))
+                   << "then"
+                   << "replace"));
+        opCases.push_back(BSON("case" << BSON("$eq" << BSON_ARRAY("$op" << "d")) << "then"
                                       << "delete"));
 
         // Cases for handling command events.
-        opCases.push_back(BSON("case" << BSON("$ne" << BSON_ARRAY("$op"
-                                                                  << "c"))
-                                      << "then"
+        opCases.push_back(BSON("case" << BSON("$ne" << BSON_ARRAY("$op" << "c")) << "then"
                                       << "$$REMOVE"));
 
         constexpr std::array<std::pair<StringData, StringData>, 10> kCommandOpCases = {
@@ -367,12 +357,8 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
     // we evaluate the predicate against a non-existent field to see whether it matches.
     if (exec::matcher::matchesSingleElement(predicate, {})) {
         auto nonCRUDCase = MatchExpressionParser::parseAndNormalize(
-            backingBsonObjs.emplace_back(BSON("$nor" << BSON_ARRAY(BSON("op"
-                                                                        << "i")
-                                                                   << BSON("op"
-                                                                           << "u")
-                                                                   << BSON("op"
-                                                                           << "d")))),
+            backingBsonObjs.emplace_back(BSON(
+                "$nor" << BSON_ARRAY(BSON("op" << "i") << BSON("op" << "u") << BSON("op" << "d")))),
             expCtx);
         rewrittenPredicate->add(std::move(nonCRUDCase));
     }
@@ -408,17 +394,15 @@ boost::intrusive_ptr<Expression> exprRewriteDocumentKey(
     auto deletePath = cloneWithSubstitution(expr, {{"documentKey", "o"}})
                           ->getFieldPathWithoutCurrentPrefix()
                           .fullPathWithPrefix();
-    auto deleteFilter = BSON("case" << BSON("$eq" << BSON_ARRAY("$op"
-                                                                << "d"))
-                                    << "then" << deletePath);
+    auto deleteFilter =
+        BSON("case" << BSON("$eq" << BSON_ARRAY("$op" << "d")) << "then" << deletePath);
     opCases.push_back(std::move(deleteFilter));
 
     // Cases for 'insert', 'update' and 'replace'.
     auto insertUpdateAndReplacePath = cloneWithSubstitution(expr, {{"documentKey", "o2"}})
                                           ->getFieldPathWithoutCurrentPrefix()
                                           .fullPathWithPrefix();
-    auto insertFilter = BSON("case" << BSON("$in" << BSON_ARRAY("$op" << BSON_ARRAY("i"
-                                                                                    << "u")))
+    auto insertFilter = BSON("case" << BSON("$in" << BSON_ARRAY("$op" << BSON_ARRAY("i" << "u")))
                                     << "then" << insertUpdateAndReplacePath);
     opCases.push_back(std::move(insertFilter));
 
@@ -489,11 +473,9 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
 
     auto insertOrReplaceOpFilter = MatchExpressionParser::parseAndNormalize(
         backingBsonObjs.emplace_back(
-            BSON("$or" << BSON_ARRAY(BSON("op"
-                                          << "i")
-                                     << BSON("op"
-                                             << "u"
-                                             << "o._id" << BSON("$exists" << true))))),
+            BSON("$or" << BSON_ARRAY(BSON("op" << "i")
+                                     << BSON("op" << "u"
+                                                  << "o._id" << BSON("$exists" << true))))),
         expCtx);
     insertOrReplaceCase->add(std::move(insertOrReplaceOpFilter));
 
@@ -509,12 +491,8 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
         rewrittenPredicate->add(std::move(deleteCase));
 
         auto nonCRUDCase = MatchExpressionParser::parseAndNormalize(
-            backingBsonObjs.emplace_back(BSON("$nor" << BSON_ARRAY(BSON("op"
-                                                                        << "i")
-                                                                   << BSON("op"
-                                                                           << "u")
-                                                                   << BSON("op"
-                                                                           << "d")))),
+            backingBsonObjs.emplace_back(BSON(
+                "$nor" << BSON_ARRAY(BSON("op" << "i") << BSON("op" << "u") << BSON("op" << "d")))),
             expCtx);
         rewrittenPredicate->add(std::move(nonCRUDCase));
     }
@@ -712,11 +690,9 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
     if (exec::matcher::matchesSingleElement(predicate, {})) {
         auto nonUpdateCase = MatchExpressionParser::parseAndNormalize(
             backingBsonObjs.emplace_back(
-                BSON("$or" << BSON_ARRAY(BSON("op" << BSON("$ne"
-                                                           << "u"))
-                                         << BSON("op"
-                                                 << "u"
-                                                 << "o._id" << BSON("$exists" << true))))),
+                BSON("$or" << BSON_ARRAY(BSON("op" << BSON("$ne" << "u"))
+                                         << BSON("op" << "u"
+                                                      << "o._id" << BSON("$exists" << true))))),
             expCtx);
         finalPredicate = std::make_unique<OrMatchExpression>(std::move(finalPredicate), nullptr);
         finalPredicate->add(std::move(nonUpdateCase));
@@ -897,16 +873,14 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                 BSONObj exprDbOrCollName = [&]() -> BSONObj {
                     // If the query is on 'coll' and we have a collName field, use it as-is.
                     if (fieldName == "coll" && collNameField) {
-                        return BSON(""
-                                    << "$$oplogField");
+                        return BSON("" << "$$oplogField");
                     }
 
                     // Otherwise, we need to split apart a full ns string. Find the separator.
                     // Return 0 if input is null in order to prevent throwing in $substrBytes.
-                    BSONObj exprDotPos = BSON(
-                        "$ifNull" << BSON_ARRAY(BSON("$indexOfBytes" << BSON_ARRAY("$$oplogField"
-                                                                                   << "."))
-                                                << 0));
+                    BSONObj exprDotPos =
+                        BSON("$ifNull" << BSON_ARRAY(
+                                 BSON("$indexOfBytes" << BSON_ARRAY("$$oplogField" << ".")) << 0));
 
                     // If the query is on 'db', return everything up to the separator.
                     if (fieldName == "db") {
@@ -1048,9 +1022,7 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
     // Create the final namespace filter for CRUD operations, i.e. {op: {$ne: 'c'}}.
     auto crudNsFilter = std::make_unique<AndMatchExpression>();
     crudNsFilter->add(MatchExpressionParser::parseAndNormalize(
-        backingBsonObjs.emplace_back(BSON("op" << BSON("$ne"
-                                                       << "c"))),
-        expCtx));
+        backingBsonObjs.emplace_back(BSON("op" << BSON("$ne" << "c"))), expCtx));
     crudNsFilter->add(std::move(crudNsRewrite));
 
     //
@@ -1131,10 +1103,8 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
 
     // Create the final namespace filter for {op: 'c'} operations.
     auto cmdNsFilter = std::make_unique<AndMatchExpression>();
-    cmdNsFilter->add(
-        MatchExpressionParser::parseAndNormalize(backingBsonObjs.emplace_back(BSON("op"
-                                                                                   << "c")),
-                                                 expCtx));
+    cmdNsFilter->add(MatchExpressionParser::parseAndNormalize(
+        backingBsonObjs.emplace_back(BSON("op" << "c")), expCtx));
     cmdNsFilter->add(std::move(cmdCases));
 
     //
@@ -1158,11 +1128,10 @@ const BSONObj& getNSCollRewriteExpressionBSON() {
         // Helper function to extract the collection name from a given field, using the known
         // $$dbName.
         auto getCollFromNSField = [](StringData fieldName) -> BSONObj {
-            return BSON("$substrBytes"
-                        << BSON_ARRAY(fieldName << BSON("$add" << BSON_ARRAY(BSON("$strLenBytes"
-                                                                                  << "$$dbName")
-                                                                             << 1))
-                                                << -1));
+            return BSON("$substrBytes" << BSON_ARRAY(
+                            fieldName
+                            << BSON("$add" << BSON_ARRAY(BSON("$strLenBytes" << "$$dbName") << 1))
+                            << -1));
         };
 
 
@@ -1176,23 +1145,20 @@ const BSONObj& getNSCollRewriteExpressionBSON() {
         collCases.reserve(12);
 
         // Cases for handling CRUD events.
-        collCases.push_back(BSON("case" << BSON("$in" << BSON_ARRAY("$op" << BSON_ARRAY("i"
-                                                                                        << "u"
-                                                                                        << "d")))
-                                        << "then" << getCollFromNSField("$ns")));
+        collCases.push_back(BSON("case"
+                                 << BSON("$in" << BSON_ARRAY("$op" << BSON_ARRAY("i" << "u"
+                                                                                     << "d")))
+                                 << "then" << getCollFromNSField("$ns")));
 
         // Cases for handling command events.
-        collCases.push_back(BSON("case" << BSON("$ne" << BSON_ARRAY("$op"
-                                                                    << "c"))
-                                        << "then"
+        collCases.push_back(BSON("case" << BSON("$ne" << BSON_ARRAY("$op" << "c")) << "then"
                                         << "$$REMOVE"));
-        collCases.push_back(BSON("case" << BSON("$ne" << BSON_ARRAY("$o.dropDatabase"
-                                                                    << "$$REMOVE"))
-                                        << "then"
-                                        << "$$REMOVE"));
-        collCases.push_back(BSON("case" << BSON("$ne" << BSON_ARRAY("$o.renameCollection"
-                                                                    << "$$REMOVE"))
-                                        << "then" << getCollFromNSField("$o.renameCollection")));
+        collCases.push_back(
+            BSON("case" << BSON("$ne" << BSON_ARRAY("$o.dropDatabase" << "$$REMOVE")) << "then"
+                        << "$$REMOVE"));
+        collCases.push_back(BSON("case"
+                                 << BSON("$ne" << BSON_ARRAY("$o.renameCollection" << "$$REMOVE"))
+                                 << "then" << getCollFromNSField("$o.renameCollection")));
 
         // All following commands are handled in the same way.
         constexpr std::array<StringData, 8> kCommandCases = {
@@ -1252,22 +1218,21 @@ boost::intrusive_ptr<Expression> exprRewriteNs(
     // expression which will make '$$dbName' available to all subsequent expressions. Note that we
     // do not yet complete the 'in' part of the $let, since this depends on the exact fieldPath.
     auto buildDbNameLetExpression = [](const auto& expr) -> BSONObj {
-        return BSON("$let" << BSON(
-                        "vars" << BSON("dbName" << BSON("$substrBytes" << BSON_ARRAY(
-                                                            "$ns" << 0
-                                                                  << BSON("$indexOfBytes"
-                                                                          << BSON_ARRAY("$ns"
-                                                                                        << ".")))))
-                               << "in" << expr));
+        return BSON(
+            "$let" << BSON(
+                "vars" << BSON("dbName" << BSON(
+                                   "$substrBytes" << BSON_ARRAY(
+                                       "$ns" << 0
+                                             << BSON("$indexOfBytes" << BSON_ARRAY("$ns" << ".")))))
+                       << "in" << expr));
     };
 
     // If the expression is on "ns.db", then we can simply complete and return the $let immediately.
     if (fieldPath.getPathLength() == 2 && fieldPath.getFieldName(1) == "db") {
-        return Expression::parseExpression(expCtx.get(),
-                                           buildDbNameLetExpression(BSON(""
-                                                                         << "$$dbName")
-                                                                        .firstElement()),
-                                           expCtx->variablesParseState);
+        return Expression::parseExpression(
+            expCtx.get(),
+            buildDbNameLetExpression(BSON("" << "$$dbName").firstElement()),
+            expCtx->variablesParseState);
     }
 
     // Otherwise, we need to compute the collection name for this event. This is done with large
@@ -1278,9 +1243,9 @@ boost::intrusive_ptr<Expression> exprRewriteNs(
     // '$ns.coll' and we can just return the 'collExpr' $switch we constructed above.
     BSONObj rewrittenExpr = [&]() {
         if (fieldPath.getPathLength() == 1) {
-            return buildDbNameLetExpression(BSON("db"
-                                                 << "$$dbName"
-                                                 << "coll" << getNSCollRewriteExpressionBSON()));
+            return buildDbNameLetExpression(BSON("db" << "$$dbName"
+                                                      << "coll"
+                                                      << getNSCollRewriteExpressionBSON()));
         }
         return buildDbNameLetExpression(getNSCollRewriteExpressionBSON());
     }();
@@ -1306,10 +1271,9 @@ std::unique_ptr<MatchExpression> matchRewriteTo(
             predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kRenameTargetNssField);
 
     if (auto rewriteTo = matchRewriteGenericNamespace(expCtx, predicate, "o.to"_sd)) {
-        auto andRewriteTo = std::make_unique<AndMatchExpression>(
-            MatchExpressionParser::parseAndNormalize(backingBsonObjs.emplace_back(BSON("op"
-                                                                                       << "c")),
-                                                     expCtx));
+        auto andRewriteTo =
+            std::make_unique<AndMatchExpression>(MatchExpressionParser::parseAndNormalize(
+                backingBsonObjs.emplace_back(BSON("op" << "c")), expCtx));
         andRewriteTo->add(std::move(rewriteTo));
         return andRewriteTo;
     }
@@ -1338,28 +1302,24 @@ boost::intrusive_ptr<Expression> exprRewriteTo(
     auto buildCollNameExpression = []() -> BSONObj {
         return BSON(
             "$substrBytes" << BSON_ARRAY(
-                "$o.to" << BSON("$add" << BSON_ARRAY(BSON("$indexOfBytes" << BSON_ARRAY("$o.to"
-                                                                                        << "."))
-                                                     << 1))
+                "$o.to" << BSON("$add" << BSON_ARRAY(
+                                    BSON("$indexOfBytes" << BSON_ARRAY("$o.to" << ".")) << 1))
                         << -1));
     };
 
     // Expression to extract the db component from the 'to' field.
     auto buildDbNameExpression = []() -> BSONObj {
-        return BSON("$substrBytes"
-                    << BSON_ARRAY("$o.to" << 0
-                                          << BSON("$indexOfBytes" << BSON_ARRAY("$o.to"
-                                                                                << "."))));
+        return BSON("$substrBytes" << BSON_ARRAY(
+                        "$o.to" << 0 << BSON("$indexOfBytes" << BSON_ARRAY("$o.to" << "."))));
     };
 
     auto buildCondRenameExpression = [&](const auto& expr) -> BSONObj {
-        return BSON("$cond" << BSON("if" << BSON("$and" << BSON_ARRAY(
-                                                     BSON("$eq" << BSON_ARRAY("$op"
-                                                                              << "c"))
-                                                     << BSON("$ne" << BSON_ARRAY("$o.to"
-                                                                                 << "$$REMOVE"))))
-                                         << "then" << expr << "else"
-                                         << "$$REMOVE"));
+        return BSON(
+            "$cond" << BSON(
+                "if" << BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$op" << "c")) << BSON(
+                                                      "$ne" << BSON_ARRAY("$o.to" << "$$REMOVE"))))
+                     << "then" << expr << "else"
+                     << "$$REMOVE"));
     };
 
     BSONObj condRename;
@@ -1407,14 +1367,10 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocumentBeforeChange(
     }
 
     // Only an update or a delete can possibly match a predicate on fullDocumentBeforeChange.
-    auto updatePred = std::make_unique<AndMatchExpression>(
-        MatchExpressionParser::parseAndNormalize(backingBsonObjs.emplace_back(BSON("op"
-                                                                                   << "u")),
-                                                 expCtx));
-    auto deletePred = std::make_unique<AndMatchExpression>(
-        MatchExpressionParser::parseAndNormalize(backingBsonObjs.emplace_back(BSON("op"
-                                                                                   << "d")),
-                                                 expCtx));
+    auto updatePred = std::make_unique<AndMatchExpression>(MatchExpressionParser::parseAndNormalize(
+        backingBsonObjs.emplace_back(BSON("op" << "u")), expCtx));
+    auto deletePred = std::make_unique<AndMatchExpression>(MatchExpressionParser::parseAndNormalize(
+        backingBsonObjs.emplace_back(BSON("op" << "d")), expCtx));
 
     // If the predicate is on the _id field, we can apply it to the documentKey in the oplog.
     /* Example:

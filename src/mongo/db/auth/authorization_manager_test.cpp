@@ -169,30 +169,26 @@ public:
 
 TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     ASSERT_OK(mockBackend->insertUserDocument(opCtx.get(),
-                                              BSON("_id"
-                                                   << "admin.v2read"
-                                                   << "user"
-                                                   << "v2read"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials" << credentials << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "read"
-                                                                      << "db"
-                                                                      << "test"))),
+                                              BSON("_id" << "admin.v2read"
+                                                         << "user"
+                                                         << "v2read"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials" << credentials << "roles"
+                                                         << BSON_ARRAY(BSON("role" << "read"
+                                                                                   << "db"
+                                                                                   << "test"))),
                                               BSONObj()));
     ASSERT_OK(mockBackend->insertUserDocument(opCtx.get(),
-                                              BSON("_id"
-                                                   << "admin.v2cluster"
-                                                   << "user"
-                                                   << "v2cluster"
-                                                   << "db"
-                                                   << "admin"
-                                                   << "credentials" << credentials << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "clusterAdmin"
-                                                                      << "db"
-                                                                      << "admin"))),
+                                              BSON("_id" << "admin.v2cluster"
+                                                         << "user"
+                                                         << "v2cluster"
+                                                         << "db"
+                                                         << "admin"
+                                                         << "credentials" << credentials << "roles"
+                                                         << BSON_ARRAY(BSON("role" << "clusterAdmin"
+                                                                                   << "db"
+                                                                                   << "admin"))),
                                               BSONObj()));
 
     auto swu = authzManager->acquireUser(
@@ -276,29 +272,25 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
 
 // Tests SERVER-21535, unrecognized actions should be ignored rather than causing errors.
 TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
-    ASSERT_OK(mockBackend->insertUserDocument(opCtx.get(),
-                                              BSON("_id"
-                                                   << "admin.myUser"
-                                                   << "user"
-                                                   << "myUser"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials" << credentials << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "myRole"
-                                                                      << "db"
-                                                                      << "test"))
-                                                   << "inheritedPrivileges"
-                                                   << BSON_ARRAY(BSON("resource"
-                                                                      << BSON("db"
-                                                                              << "test"
-                                                                              << "collection"
-                                                                              << "")
-                                                                      << "actions"
-                                                                      << BSON_ARRAY("find"
-                                                                                    << "fakeAction"
-                                                                                    << "insert")))),
-                                              BSONObj()));
+    ASSERT_OK(mockBackend->insertUserDocument(
+        opCtx.get(),
+        BSON("_id" << "admin.myUser"
+                   << "user"
+                   << "myUser"
+                   << "db"
+                   << "test"
+                   << "credentials" << credentials << "roles"
+                   << BSON_ARRAY(BSON("role" << "myRole"
+                                             << "db"
+                                             << "test"))
+                   << "inheritedPrivileges"
+                   << BSON_ARRAY(BSON("resource" << BSON("db" << "test"
+                                                              << "collection"
+                                                              << "")
+                                                 << "actions"
+                                                 << BSON_ARRAY("find" << "fakeAction"
+                                                                      << "insert")))),
+        BSONObj()));
 
     auto swu = authzManager->acquireUser(
         opCtx.get(), std::make_unique<UserRequestGeneral>(UserName("myUser", "test"), boost::none));
@@ -326,48 +318,40 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
 
     // Insert one user on db test and two users on db $external.
     BSONObj externalCredentials = BSON("external" << true);
-    std::vector<BSONObj> userDocs{BSON("_id"
-                                       << "admin.v2read"
-                                       << "user"
-                                       << "v2read"
-                                       << "db"
-                                       << "test"
-                                       << "credentials" << credentials << "roles"
-                                       << BSON_ARRAY(BSON("role"
-                                                          << "read"
-                                                          << "db"
-                                                          << "test"))),
-                                  BSON("_id"
-                                       << "admin.v2externalOne"
-                                       << "user"
-                                       << "v2externalOne"
-                                       << "db"
-                                       << "$external"
-                                       << "credentials" << externalCredentials << "roles"
-                                       << BSON_ARRAY(BSON("role"
-                                                          << "read"
-                                                          << "db"
-                                                          << "test"))),
-                                  BSON("_id"
-                                       << "admin.v2externalTwo"
-                                       << "user"
-                                       << "v2externalTwo"
-                                       << "db"
-                                       << "$external"
-                                       << "credentials" << externalCredentials << "roles"
-                                       << BSON_ARRAY(BSON("role"
-                                                          << "read"
-                                                          << "db"
-                                                          << "test")))};
+    std::vector<BSONObj> userDocs{BSON("_id" << "admin.v2read"
+                                             << "user"
+                                             << "v2read"
+                                             << "db"
+                                             << "test"
+                                             << "credentials" << credentials << "roles"
+                                             << BSON_ARRAY(BSON("role" << "read"
+                                                                       << "db"
+                                                                       << "test"))),
+                                  BSON("_id" << "admin.v2externalOne"
+                                             << "user"
+                                             << "v2externalOne"
+                                             << "db"
+                                             << "$external"
+                                             << "credentials" << externalCredentials << "roles"
+                                             << BSON_ARRAY(BSON("role" << "read"
+                                                                       << "db"
+                                                                       << "test"))),
+                                  BSON("_id" << "admin.v2externalTwo"
+                                             << "user"
+                                             << "v2externalTwo"
+                                             << "db"
+                                             << "$external"
+                                             << "credentials" << externalCredentials << "roles"
+                                             << BSON_ARRAY(BSON("role" << "read"
+                                                                       << "db"
+                                                                       << "test")))};
 
-    std::vector<BSONObj> initialRoles{BSON("role"
-                                           << "read"
-                                           << "db"
-                                           << "test")};
-    std::vector<BSONObj> updatedRoles{BSON("role"
-                                           << "readWrite"
-                                           << "db"
-                                           << "test")};
+    std::vector<BSONObj> initialRoles{BSON("role" << "read"
+                                                  << "db"
+                                                  << "test")};
+    std::vector<BSONObj> updatedRoles{BSON("role" << "readWrite"
+                                                  << "db"
+                                                  << "test")};
 
     for (const auto& userDoc : userDocs) {
         ASSERT_OK(mockBackend->insertUserDocument(opCtx.get(), userDoc, BSONObj()));
@@ -453,36 +437,32 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
 }
 
 TEST_F(AuthorizationManagerTest, testAuthzBackendResolveRoles) {
-    BSONObj innerCustomRole{BSON("_id"
-                                 << "admin.innerTestRole"
-                                 << "db"
-                                 << "admin"
-                                 << "role"
-                                 << "innerTestRole"
-                                 << "roles"
-                                 << BSON_ARRAY(BSON("db"
-                                                    << "test"
-                                                    << "role"
-                                                    << "read")))};
-    BSONObj middleCustomRole{BSON("_id"
-                                  << "admin.middleTestRole"
-                                  << "db"
-                                  << "admin"
-                                  << "role"
-                                  << "middleTestRole"
-                                  << "roles" << BSON_ARRAY(innerCustomRole))};
-    BSONObj outerCustomRole{BSON("_id"
-                                 << "admin.outerTestRole"
-                                 << "db"
-                                 << "admin"
-                                 << "role"
-                                 << "outerTestRole"
-                                 << "roles" << BSON_ARRAY(middleCustomRole) << "privileges"
-                                 << BSON_ARRAY(BSON("resource" << BSON("cluster" << true)
-                                                               << "actions"
-                                                               << BSON_ARRAY("shutdown")))
-                                 << "authenticationRestrictions"
-                                 << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("127.0.0.1/8"))))};
+    BSONObj innerCustomRole{BSON("_id" << "admin.innerTestRole"
+                                       << "db"
+                                       << "admin"
+                                       << "role"
+                                       << "innerTestRole"
+                                       << "roles"
+                                       << BSON_ARRAY(BSON("db" << "test"
+                                                               << "role"
+                                                               << "read")))};
+    BSONObj middleCustomRole{BSON("_id" << "admin.middleTestRole"
+                                        << "db"
+                                        << "admin"
+                                        << "role"
+                                        << "middleTestRole"
+                                        << "roles" << BSON_ARRAY(innerCustomRole))};
+    BSONObj outerCustomRole{
+        BSON("_id" << "admin.outerTestRole"
+                   << "db"
+                   << "admin"
+                   << "role"
+                   << "outerTestRole"
+                   << "roles" << BSON_ARRAY(middleCustomRole) << "privileges"
+                   << BSON_ARRAY(BSON("resource" << BSON("cluster" << true) << "actions"
+                                                 << BSON_ARRAY("shutdown")))
+                   << "authenticationRestrictions"
+                   << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("127.0.0.1/8"))))};
     std::vector<BSONObj> customRoleDocuments{innerCustomRole, middleCustomRole, outerCustomRole};
 
     for (const auto& roleDoc : customRoleDocuments) {

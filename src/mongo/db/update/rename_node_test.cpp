@@ -474,9 +474,7 @@ TEST_F(RenameNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFa
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    auto updated = BSON("a" << BSON("$ref"
-                                    << "c")
-                            << "b" << 0);
+    auto updated = BSON("a" << BSON("$ref" << "c") << "b" << 0);
     ASSERT_EQUALS(updated, doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 

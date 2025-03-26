@@ -292,7 +292,7 @@ private:
         // Constructs an empty StringView.
         StringView() = default;
 
-        StringView(std::size_t offset, std::size_t len) : offset(offset), len(len){};
+        StringView(std::size_t offset, std::size_t len) : offset(offset), len(len) {};
 
         StringData toStringData(const std::string& viewInto) const {
             return {viewInto.c_str() + offset, len};

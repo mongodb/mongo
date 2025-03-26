@@ -102,8 +102,7 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
     expectGetDatabase(kOutNss);
 
     // Testing the collection options are propagated.
-    const BSONObj collectionOptions = BSON("validationLevel"
-                                           << "moderate");
+    const BSONObj collectionOptions = BSON("validationLevel" << "moderate");
     const BSONObj listCollectionsResponse = BSON("name" << kOutNss.coll() << "type"
                                                         << "collection"
                                                         << "options" << collectionOptions);

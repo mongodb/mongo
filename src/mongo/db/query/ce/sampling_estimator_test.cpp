@@ -723,17 +723,11 @@ TEST_F(SamplingEstimatorTest, MatchElementAgainstIntervals) {
     // Test empty and NULL field.
     list.intervals.clear();
     list.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
-    ASSERT_FALSE(SamplingEstimatorForTesting::matches(list,
-                                                      BSON("val"
-                                                           << "")
-                                                          .firstElement()));
+    ASSERT_FALSE(SamplingEstimatorForTesting::matches(list, BSON("val" << "").firstElement()));
     ASSERT_TRUE(SamplingEstimatorForTesting::matches(list, BSON("val" << BSONNULL).firstElement()));
 
     list.intervals.push_back(IndexBoundsBuilder::allValues());
-    ASSERT_TRUE(SamplingEstimatorForTesting::matches(list,
-                                                     BSON("val"
-                                                          << "")
-                                                         .firstElement()));
+    ASSERT_TRUE(SamplingEstimatorForTesting::matches(list, BSON("val" << "").firstElement()));
 }
 
 TEST_F(SamplingEstimatorTest, IndexKeysGenerationTest) {

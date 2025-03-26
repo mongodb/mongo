@@ -391,8 +391,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromQRWithCollation) {
     auto opCtx = serviceContext.makeOperationContext();
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setCollation(BSON("locale"
-                                   << "reverse"));
+    findCommand->setCollation(BSON("locale" << "reverse"));
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
@@ -420,8 +419,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
-    findCommand->setCollation(BSON("locale"
-                                   << "reverse"));
+    findCommand->setCollation(BSON("locale" << "reverse"));
     auto baseCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
@@ -456,8 +454,7 @@ TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
 
     unique_ptr<CollatorInterface> collator =
         assertGet(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                      ->makeFromBSON(BSON("locale"
-                                          << "reverse")));
+                      ->makeFromBSON(BSON("locale" << "reverse")));
     cq->setCollator(std::move(collator));
 
     ASSERT(cq->getCollator());

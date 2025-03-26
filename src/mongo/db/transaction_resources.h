@@ -199,7 +199,7 @@ struct AcquiredCollection : AcquiredBase {
                              std::move(locksRequirements),
                              boost::none,
                              boost::none,
-                             std::move(collectionPtr)){};
+                             std::move(collectionPtr)) {};
 
     boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;

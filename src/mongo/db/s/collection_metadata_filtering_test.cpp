@@ -180,9 +180,9 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
         ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)));
     };
 
-    BSONObj readConcern = BSON("readConcern" << BSON("level"
-                                                     << "snapshot"
-                                                     << "atClusterTime" << Timestamp(100, 0)));
+    BSONObj readConcern =
+        BSON("readConcern" << BSON("level" << "snapshot"
+                                           << "atClusterTime" << Timestamp(100, 0)));
 
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
@@ -211,9 +211,9 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
         ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)));
     };
 
-    BSONObj readConcern = BSON("readConcern" << BSON("level"
-                                                     << "snapshot"
-                                                     << "atClusterTime" << Timestamp(50, 0)));
+    BSONObj readConcern =
+        BSON("readConcern" << BSON("level" << "snapshot"
+                                           << "atClusterTime" << Timestamp(50, 0)));
 
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
@@ -250,9 +250,9 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
                            ErrorCodes::StaleChunkHistory);
     };
 
-    BSONObj readConcern = BSON("readConcern" << BSON("level"
-                                                     << "snapshot"
-                                                     << "atClusterTime" << Timestamp(10, 0)));
+    BSONObj readConcern =
+        BSON("readConcern" << BSON("level" << "snapshot"
+                                           << "atClusterTime" << Timestamp(10, 0)));
 
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));

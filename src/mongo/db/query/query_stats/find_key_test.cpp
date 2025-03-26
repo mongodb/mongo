@@ -105,8 +105,7 @@ TEST_F(FindKeyTest, SizeOfFindKeyWithAndWithoutComment) {
     auto opCtx = makeOperationContext();
     auto fcrWithComment = std::make_unique<FindCommandRequest>(kDefaultTestNss);
     fcrWithComment->setFilter(query.getOwned());
-    opCtx->setComment(BSON("comment"
-                           << " foo"));
+    opCtx->setComment(BSON("comment" << " foo"));
     auto expCtxWithComment =
         ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrWithComment).build();
     auto parsedFindWithComment =

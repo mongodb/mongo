@@ -144,8 +144,7 @@ protected:
 private:
     const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.foo");
     const std::string _shardKey = "x";
-    const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x"
-                                                                  << "hashed"));
+    const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x" << "hashed"));
 };
 
 // Confirm the highest minFetchTimestamp is properly computed.
@@ -273,25 +272,20 @@ TEST(ReshardingUtilTest, AssertDonorOplogIdSerialization) {
 
 TEST_F(ReshardingUtilTest, ValidateIndexSpecsMatch) {
     // 1. Source has index, Recipient has none.
-    validateIndexes(BSON("name"
-                         << "test"),
-                    BSONObj(),
-                    (ErrorCodes::Error)9365601);
+    validateIndexes(BSON("name" << "test"), BSONObj(), (ErrorCodes::Error)9365601);
 
     // 2. Collation subField difference.
     auto sourceSpec = BSON("key" << BSON("field" << 1) << "name"
                                  << "indexName"
                                  << "v" << 3 << "collation"
-                                 << BSON("locale"
-                                         << "en"
-                                         << "strength" << 2));
+                                 << BSON("locale" << "en"
+                                                  << "strength" << 2));
 
     auto recipientSpec = BSON("key" << BSON("field" << 1) << "name"
                                     << "indexName"
                                     << "v" << 3 << "collation"
-                                    << BSON("locale"
-                                            << "en"
-                                            << "strength" << 3));
+                                    << BSON("locale" << "en"
+                                                     << "strength" << 3));
     validateIndexes(sourceSpec, recipientSpec, (ErrorCodes::Error)9365602);
 
     // 3. Collation simple vs non-simple.
@@ -302,9 +296,8 @@ TEST_F(ReshardingUtilTest, ValidateIndexSpecsMatch) {
     recipientSpec = BSON("key" << BSON("field" << 1) << "name"
                                << "indexName"
                                << "v" << 3 << "collation"
-                               << BSON("locale"
-                                       << "en"
-                                       << "strength" << 2));
+                               << BSON("locale" << "en"
+                                                << "strength" << 2));
     validateIndexes(sourceSpec, recipientSpec, (ErrorCodes::Error)9365602);
 
     // 4. Different field ordering.
@@ -322,18 +315,16 @@ TEST_F(ReshardingUtilTest, ValidateIndexSpecsMatch) {
                                      BSON("key" << BSON("field" << 1) << "name"
                                                 << "indexName"
                                                 << "v" << 3 << "collation"
-                                                << BSON("locale"
-                                                        << "en"
-                                                        << "strength" << 2))};
+                                                << BSON("locale" << "en"
+                                                                 << "strength" << 2))};
     std::vector<BSONObj> recipientSpecs{BSON("key" << BSON("field_2" << 1) << "name"
                                                    << "indexName_2"
                                                    << "v" << 3),
                                         BSON("key" << BSON("field" << 1) << "name"
                                                    << "indexName"
                                                    << "v" << 3 << "collation"
-                                                   << BSON("locale"
-                                                           << "en"
-                                                           << "strength" << 2))};
+                                                   << BSON("locale" << "en"
+                                                                    << "strength" << 2))};
 
     validateIndexes(sourceSpecs, recipientSpecs, ErrorCodes::OK);
 
@@ -344,9 +335,8 @@ TEST_F(ReshardingUtilTest, ValidateIndexSpecsMatch) {
     std::vector<BSONObj> recipientSpecs2{BSON("key" << BSON("field" << 1) << "name"
                                                     << "indexName"
                                                     << "v" << 3 << "collation"
-                                                    << BSON("locale"
-                                                            << "en"
-                                                            << "strength" << 2)),
+                                                    << BSON("locale" << "en"
+                                                                     << "strength" << 2)),
                                          BSON("key" << BSON("field2" << 1) << "name"
                                                     << "indexName_2"
                                                     << "v" << 3)};
@@ -371,8 +361,7 @@ TEST_F(ReshardingUtilTest, SetNumSamplesPerChunkThroughConfigsvrReshardCollectio
     ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
     configsvrReshardCollection.setDbName(nss().dbName());
     configsvrReshardCollection.setUnique(true);
-    const auto collationObj = BSON("locale"
-                                   << "en_US");
+    const auto collationObj = BSON("locale" << "en_US");
     configsvrReshardCollection.setCollation(collationObj);
     configsvrReshardCollection.setNumInitialChunks(numInitialChunks);
 

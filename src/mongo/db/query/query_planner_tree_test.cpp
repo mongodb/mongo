@@ -1152,8 +1152,7 @@ TEST_F(QueryPlannerTest, InWithSortAndLimitTrailingField) {
 }
 
 TEST_F(QueryPlannerTest, InCantUseHashedIndexWithRegex) {
-    addIndex(BSON("a"
-                  << "hashed"));
+    addIndex(BSON("a" << "hashed"));
     runQuery(fromjson("{a: {$in: [/abc/]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
 }
@@ -2580,9 +2579,8 @@ TEST_F(QueryPlannerTest, TotalPossibleLockstepOrEnumerationReachesTheOrLimit) {
         orBuilder.append(BSON("b" << i << "c" << i));
     }
 
-    auto cmd = BSON("find"
-                    << "testns"
-                    << "filter" << BSON("a" << 1 << "$or" << orBuilder.arr()));
+    auto cmd = BSON("find" << "testns"
+                           << "filter" << BSON("a" << 1 << "$or" << orBuilder.arr()));
 
     // Ensure that the query runs fine.
     runQueryAsCommand(cmd);

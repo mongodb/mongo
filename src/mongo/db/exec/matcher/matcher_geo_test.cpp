@@ -118,13 +118,11 @@ private:
 TEST_F(InternalBucketGeoWithinExpression, BoxPolygonOverlap) {
     auto expr = getDummyBucketGeoExpr();
 
-    auto obj = createBucketObj(BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(0 << 0)))
+    auto obj = createBucketObj(BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(0 << 0)))
                                    .firstElement(),
-                               BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(5 << 5)))
+                               BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(5 << 5)))
                                    .firstElement());
 
     ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
@@ -133,13 +131,11 @@ TEST_F(InternalBucketGeoWithinExpression, BoxPolygonOverlap) {
 TEST_F(InternalBucketGeoWithinExpression, ShouldFilterOutBucketDisjoint) {
     auto expr = getDummyBucketGeoExpr();
 
-    auto obj = createBucketObj(BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(10 << 10)))
+    auto obj = createBucketObj(BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(10 << 10)))
                                    .firstElement(),
-                               BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(20 << 20)))
+                               BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(20 << 20)))
                                    .firstElement());
 
     ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), obj));
@@ -157,13 +153,11 @@ TEST_F(InternalBucketGeoWithinExpression, ShouldFilterOutBucketDisjointLegacyPoi
 TEST_F(InternalBucketGeoWithinExpression, ContainsAllPointsInTheBucket) {
     auto expr = getDummyBucketGeoExpr();
 
-    auto obj = createBucketObj(BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(1 << 1)))
+    auto obj = createBucketObj(BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(1 << 1)))
                                    .firstElement(),
-                               BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(3 << 3)))
+                               BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(3 << 3)))
                                    .firstElement());
 
     ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
@@ -181,13 +175,11 @@ TEST_F(InternalBucketGeoWithinExpression, ContainsAllPointsInTheBucketLegacy) {
 TEST_F(InternalBucketGeoWithinExpression, BBoxContainsWithinRegion) {
     auto expr = getDummyBucketGeoExpr();
 
-    auto obj = createBucketObj(BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(-3 << -3)))
+    auto obj = createBucketObj(BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(-3 << -3)))
                                    .firstElement(),
-                               BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(10 << 10)))
+                               BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(10 << 10)))
                                    .firstElement());
 
     ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
@@ -205,13 +197,11 @@ TEST_F(InternalBucketGeoWithinExpression, BBoxContainsWithinRegionLegacy) {
 TEST_F(InternalBucketGeoWithinExpression, BBoxIntersectsWithinRegion) {
     auto expr = getDummyBucketGeoExpr();
 
-    auto obj = createBucketObj(BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(3 << 3)))
+    auto obj = createBucketObj(BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(3 << 3)))
                                    .firstElement(),
-                               BSON("loc" << BSON("type"
-                                                  << "Point"
-                                                  << "coordinates" << BSON_ARRAY(10 << 10)))
+                               BSON("loc" << BSON("type" << "Point"
+                                                         << "coordinates" << BSON_ARRAY(10 << 10)))
                                    .firstElement());
 
     ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
@@ -229,14 +219,13 @@ TEST_F(InternalBucketGeoWithinExpression, BBoxIntersectsWithinRegionLegacy) {
 TEST_F(InternalBucketGeoWithinExpression, BigBBoxContainsWithinRegion) {
     auto expr = getDummyBucketGeoExpr();
 
-    auto obj = createBucketObj(BSON("loc" << BSON("type"
-                                                  << "Point"
+    auto obj =
+        createBucketObj(BSON("loc" << BSON("type" << "Point"
                                                   << "coordinates" << BSON_ARRAY(-179 << -89)))
-                                   .firstElement(),
-                               BSON("loc" << BSON("type"
-                                                  << "Point"
+                            .firstElement(),
+                        BSON("loc" << BSON("type" << "Point"
                                                   << "coordinates" << BSON_ARRAY(179 << 89)))
-                                   .firstElement());
+                            .firstElement());
 
     // This big spherical bounding box should contain the prime meridian(0° longitude) instead of
     // the anti-meridian(180° longitude).
@@ -246,16 +235,14 @@ TEST_F(InternalBucketGeoWithinExpression, BigBBoxContainsWithinRegion) {
 TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointType) {
     auto expr = getDummyBucketGeoExpr();
 
-    auto obj =
-        createBucketObj(BSON("loc" << BSON("type"
-                                           << "Point"
-                                           << "coordinates" << BSON_ARRAY(1 << 1)))
-                            .firstElement(),
-                        BSON("loc" << BSON("type"
-                                           << "LineString"
-                                           << "coordinates"
-                                           << BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3))))
-                            .firstElement());
+    auto obj = createBucketObj(
+        BSON("loc" << BSON("type" << "Point"
+                                  << "coordinates" << BSON_ARRAY(1 << 1)))
+            .firstElement(),
+        BSON("loc" << BSON("type" << "LineString"
+                                  << "coordinates"
+                                  << BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3))))
+            .firstElement());
 
     ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
 }

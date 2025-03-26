@@ -11,11 +11,9 @@
 
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {
+    ImplicitlyShardAccessCollSettings,
     setTestMayRunDropInParallel,
     ShardingOverrideCommon
-} from "jstests/libs/override_methods/shard_collection_util.js";
-import {
-    ImplicitlyShardAccessCollSettings
 } from "jstests/libs/override_methods/shard_collection_util.js";
 
 // Expose settings for this override on `globalThis`

@@ -193,9 +193,9 @@ public:
         size_t collIndex = 0;
         // Create the 'querySettingsClusterParamValue' as BSON.
         for (const auto& [initialIndexHintSpecs, expectedIndexHintSpecs] : listOfIndexHintSpecs) {
-            QueryInstance representativeQuery = BSON("find"
-                                                     << "coll_" + std::to_string(collIndex) << "$db"
-                                                     << "foo");
+            QueryInstance representativeQuery =
+                BSON("find" << "coll_" + std::to_string(collIndex) << "$db"
+                            << "foo");
             bob.append(makeQueryShapeConfiguration(makeQuerySettings(initialIndexHintSpecs),
                                                    representativeQuery,
                                                    opCtx(),
@@ -221,10 +221,9 @@ public:
 
     void assertSanitizeInvalidIndexHints(const IndexHintSpecs& initialSpec,
                                          const IndexHintSpecs& expectedSpec) {
-        QueryInstance query = BSON("find"
-                                   << "exampleColl"
-                                   << "$db"
-                                   << "foo");
+        QueryInstance query = BSON("find" << "exampleColl"
+                                          << "$db"
+                                          << "foo");
         auto initSettings = makeQueryShapeConfiguration(makeQuerySettings(initialSpec),
                                                         query,
                                                         opCtx(),
@@ -244,10 +243,9 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsClusterParameterSerialization) {
     // Set query shape configuration.
     QuerySettings settings;
     settings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
-    QueryInstance query = BSON("find"
-                               << "exampleColl"
-                               << "$db"
-                               << "foo");
+    QueryInstance query = BSON("find" << "exampleColl"
+                                      << "$db"
+                                      << "foo");
     auto config = makeQueryShapeConfiguration(settings, query, opCtx(), /* tenantId */ boost::none);
     LogicalTime clusterParameterTime(Timestamp(113, 59));
     manager().setQueryShapeConfigurations(
@@ -425,9 +423,7 @@ TEST_F(QuerySettingsManagerTest, SetValidClusterParameterAndAssertResultIsSaniti
 TEST_F(QuerySettingsManagerTest, SetClusterParameterAndAssertResultIsSanitized) {
     IndexHintSpecs initialIndexHintSpec{
         IndexHintSpec(makeNsSpec("testCollA"_sd),
-                      {IndexHint(BSON("a" << 1.0)),
-                       IndexHint(BSON("b"
-                                      << "-1.0"))}),
+                      {IndexHint(BSON("a" << 1.0)), IndexHint(BSON("b" << "-1.0"))}),
         IndexHintSpec(makeNsSpec("testCollB"_sd),
                       {IndexHint(BSON("a" << 2)), IndexHint(BSONObj{})})};
     IndexHintSpecs expectedIndexHintSpec{
@@ -465,9 +461,8 @@ TEST_F(QuerySettingsManagerTest, SetClusterParameterAndAssertResultIsSanitizedMu
         IndexHintSpec(makeNsSpec("testCollC"_sd),
                       {IndexHint(BSON("a" << 1 << "$natural" << 1)), IndexHint(BSONObj{})}),
         IndexHintSpec(makeNsSpec("testCollD"_sd),
-                      {IndexHint(BSON("b"
-                                      << "some-string"
-                                      << "a" << 1)),
+                      {IndexHint(BSON("b" << "some-string"
+                                          << "a" << 1)),
                        IndexHint(BSONObj{})})};
 
     ASSERT_THROWS_CODE(
@@ -491,18 +486,16 @@ TEST_F(QuerySettingsManagerTest, SetClusterParameterInvalidQSSanitization) {
         IndexHintSpec(makeNsSpec("testCollC"_sd),
                       {IndexHint(BSON("a" << 1 << "$natural" << 1)), IndexHint(BSONObj{})}),
         IndexHintSpec(makeNsSpec("testCollD"_sd),
-                      {IndexHint(BSON("b"
-                                      << "some-string"
-                                      << "a" << 1))})};
+                      {IndexHint(BSON("b" << "some-string"
+                                          << "a" << 1))})};
     const auto querySettings = makeQuerySettings(initialIndexHintSpec, false);
     ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 9646001);
 
     // Create the 'querySettingsClusterParamValue' as BSON.
     const auto config = makeQueryShapeConfiguration(querySettings,
-                                                    BSON("find"
-                                                         << "bar"
-                                                         << "$db"
-                                                         << "foo"),
+                                                    BSON("find" << "bar"
+                                                                << "$db"
+                                                                << "foo"),
                                                     opCtx(),
                                                     /* tenantId */ boost::none);
     // Assert that parsing after transforming invalid settings (if any) works.

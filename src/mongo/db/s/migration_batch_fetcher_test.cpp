@@ -138,15 +138,13 @@ protected:
     }
 
     static BSONObj getTerminalBsonObj() {
-        return BSON("Status"
-                    << "OK"
-                    << "ok" << 1 << "objects" << createEmptyCloneArray());
+        return BSON("Status" << "OK"
+                             << "ok" << 1 << "objects" << createEmptyCloneArray());
     }
 
     static BSONObj getBatchBsonObj() {
-        return BSON("Status"
-                    << "OK"
-                    << "ok" << 1 << "objects" << createDocumentsToCloneArray());
+        return BSON("Status" << "OK"
+                             << "ok" << 1 << "objects" << createDocumentsToCloneArray());
     }
 
 private:

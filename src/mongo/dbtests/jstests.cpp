@@ -300,8 +300,7 @@ public:
     void run() {
         std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
-        BSONObj o = BSON("foo"
-                         << "bar");
+        BSONObj o = BSON("foo" << "bar");
         s->setObject("a.b", o);
         ASSERT(s->getObject("a").isEmpty());
 
@@ -1396,9 +1395,7 @@ public:
         // Check a few elementary objects
         check(s, BSON("" << 1));
         check(s, BSON("" << 10.0));
-        check(s,
-              BSON(""
-                   << "Shardy"));
+        check(s, BSON("" << "Shardy"));
         check(s, BSON("" << BSON_ARRAY(1 << 2 << 3)));
         check(s, BSON("" << mongo::jstNULL));
         check(s, BSON("" << mongo::BSONObj()));

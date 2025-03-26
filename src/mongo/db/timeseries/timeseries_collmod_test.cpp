@@ -71,8 +71,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModCommandTranslation) {
     collModTimeseries.setGranularity(BucketGranularityEnum::Seconds);
     auto testNss = NamespaceString::createNamespaceString_forTest("test.curColl");
     CollMod collModCmd(testNss);
-    collModCmd.setValidator(BSON("a"
-                                 << "1"));
+    collModCmd.setValidator(BSON("a" << "1"));
     collModCmd.setValidationLevel(ValidationLevelEnum::strict);
     collModCmd.setValidationAction(ValidationActionEnum::errorAndLog);
     collModCmd.setViewOn("test.view"_sd);
@@ -91,9 +90,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModCommandTranslation) {
         timeseries::makeTimeseriesBucketsCollModCommand(timeseriesOptions, collModCmd);
 
     ASSERT(collModBuckets);
-    ASSERT((*collModBuckets->getValidator())
-               .binaryEqual(BSON("a"
-                                 << "1")));
+    ASSERT((*collModBuckets->getValidator()).binaryEqual(BSON("a" << "1")));
     ASSERT_EQ(*(collModBuckets->getValidationLevel()), ValidationLevelEnum::strict);
     ASSERT_EQ(*(collModBuckets->getValidationAction()), ValidationActionEnum::errorAndLog);
     ASSERT_EQ(collModBuckets->getViewOn(), "test.view"_sd);
@@ -163,9 +160,8 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModViewTranslation) {
 
     ASSERT(collModView);
     ASSERT((*collModView->getPipeline())[0].binaryEqual(
-        BSON("$_internalUnpackBucket" << BSON("timeField"
-                                              << "t"
-                                              << "bucketMaxSpanSeconds" << 86400))));
+        BSON("$_internalUnpackBucket" << BSON("timeField" << "t"
+                                                          << "bucketMaxSpanSeconds" << 86400))));
 }
 
 // Checks that view translation is skipped if the command does not have a timeseries mod
@@ -265,9 +261,8 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndV
                          ->lookupViewWithoutValidatingDurable(opCtx.get(), testNss);
     ASSERT(viewPrior);
     ASSERT(viewPrior->pipeline()[0].binaryEqual(
-        BSON("$_internalUnpackBucket" << BSON("timeField"
-                                              << "t"
-                                              << "bucketMaxSpanSeconds" << 100))));
+        BSON("$_internalUnpackBucket" << BSON("timeField" << "t"
+                                                          << "bucketMaxSpanSeconds" << 100))));
 
     auto status = timeseries::processCollModCommandWithTimeSeriesTranslation(
         opCtx.get(), testNss, collModCmd, true, nullptr);
@@ -277,9 +272,8 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndV
     ASSERT(viewAfter);
     // A bucket granularity of minutes results in the pipeline being updated to 86400 seconds.
     ASSERT(viewAfter->pipeline()[0].binaryEqual(
-        BSON("$_internalUnpackBucket" << BSON("timeField"
-                                              << "t"
-                                              << "bucketMaxSpanSeconds" << 86400))));
+        BSON("$_internalUnpackBucket" << BSON("timeField" << "t"
+                                                          << "bucketMaxSpanSeconds" << 86400))));
 
     // View translation is successful if this function returns OK.
     ASSERT_OK(status);

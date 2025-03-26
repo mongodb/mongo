@@ -36,21 +36,18 @@ assertIndexResults(coll, {a: {$elemMatch: {$not: {$exists: false}}}}, false, 3);
 assertIndexResults(coll, {a: {$elemMatch: {$gt: 0, $not: {$exists: false}}}}, false, 1);
 
 // $geo within $elemMatch should not attempt to use a non-geo index.
-assertIndexResults(coll,
-                   {
-                       a: {
-                           $elemMatch: {
-                               $geoWithin: {
-                                   $geometry: {
-                                       type: "Polygon",
-                                       coordinates: [[[0, 0], [0, 1], [1, 0], [0, 0]]]
-                                   }
-                               }
-                           }
-                       }
-                   },
-                   false,
-                   1);
+assertIndexResults(
+    coll,
+    {
+        a: {
+            $elemMatch: {
+                $geoWithin:
+                    {$geometry: {type: "Polygon", coordinates: [[[0, 0], [0, 1], [1, 0], [0, 0]]]}}
+            }
+        }
+    },
+    false,
+    1);
 
 // $in with a null value within $elemMatch should use a sparse index.
 assertIndexResults(coll, {a: {$elemMatch: {$in: [null]}}}, true, 1);

@@ -107,8 +107,7 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto msgObj = BSON("msg"
-                       << "hello, world!");
+    auto msgObj = BSON("msg" << "hello, world!");
 
     // Write to the oplog.
     OpTime opTime;

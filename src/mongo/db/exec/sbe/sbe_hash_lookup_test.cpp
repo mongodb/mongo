@@ -110,7 +110,7 @@ public:
 
         prepareAndEvalStageWithReopen(ctx.get(), stream, slotNames, lookupStage.get());
     }  // runVariation
-};     // class HashLookupStageTest
+};  // class HashLookupStageTest
 
 TEST_F(HashLookupStageTest, BasicTests) {
     unittest::GoldenTestContext gctx(&goldenTestConfigSbe);

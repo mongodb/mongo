@@ -159,8 +159,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateDottedEqualsToNullMultiKeyShouldBuildIne
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildOneIntervalForHashedIndex) {
-    BSONObj indexPattern = BSON("a"
-                                << "hashed");
+    BSONObj indexPattern = BSON("a" << "hashed");
     auto testIndex = buildSimpleIndexEntry(indexPattern);
     testIndex.type = IndexType::INDEX_HASHED;
 

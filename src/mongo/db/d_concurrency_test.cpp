@@ -1342,7 +1342,9 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                     ASSERT(shard_role_details::getLocker(clients[threadId].second.get())
                                ->isReadLocked());
                 } else if (i % 7 == 5) {
-                    { Lock::DBLock r(clients[threadId].second.get(), fooDb, MODE_S); }
+                    {
+                        Lock::DBLock r(clients[threadId].second.get(), fooDb, MODE_S);
+                    }
                     {
                         Lock::DBLock r(clients[threadId].second.get(),
                                        DatabaseName::createDatabaseName_forTest(boost::none, "bar"),
@@ -1368,7 +1370,9 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                                        ->isDbLockedForMode(localDb, MODE_S));
                         } else if (q == 1) {
                             // test locking local only -- with no preceding lock
-                            { Lock::DBLock x(clients[threadId].second.get(), localDb, MODE_S); }
+                            {
+                                Lock::DBLock x(clients[threadId].second.get(), localDb, MODE_S);
+                            }
 
                             Lock::DBLock x(clients[threadId].second.get(), localDb, MODE_X);
 
@@ -1420,8 +1424,12 @@ TEST_F(DConcurrencyTestFixture, Stress) {
         thread.join();
 
     auto newClients = makeKClientsWithLockers(2);
-    { Lock::GlobalWrite w(newClients[0].second.get()); }
-    { Lock::GlobalRead r(newClients[1].second.get()); }
+    {
+        Lock::GlobalWrite w(newClients[0].second.get());
+    }
+    {
+        Lock::GlobalRead r(newClients[1].second.get());
+    }
 }
 
 TEST_F(DConcurrencyTestFixture, StressPartitioned) {
@@ -1475,8 +1483,12 @@ TEST_F(DConcurrencyTestFixture, StressPartitioned) {
         thread.join();
 
     auto newClients = makeKClientsWithLockers(2);
-    { Lock::GlobalWrite w(newClients[0].second.get()); }
-    { Lock::GlobalRead r(newClients[1].second.get()); }
+    {
+        Lock::GlobalWrite w(newClients[0].second.get());
+    }
+    {
+        Lock::GlobalRead r(newClients[1].second.get());
+    }
 }
 
 TEST_F(DConcurrencyTestFixture, ResourceMutexLabels) {

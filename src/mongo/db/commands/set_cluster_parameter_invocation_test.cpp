@@ -62,7 +62,7 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 // Mocks
 class MockParameterService : public ServerParameterService {
 public:
-    MockParameterService(std::function<ServerParameter*(StringData)> get) : _getMock(get){};
+    MockParameterService(std::function<ServerParameter*(StringData)> get) : _getMock(get) {};
 
     ServerParameter* get(StringData parameterName) override {
         return _getMock(parameterName);
@@ -197,8 +197,7 @@ TEST(SetClusterParameterCommand, SucceedsWithObjectParameter) {
 
     BSONObjBuilder testCmdBson;
 
-    BSONObj subObj = BSON("ok"
-                          << "hello_there");
+    BSONObj subObj = BSON("ok" << "hello_there");
     testCmdBson.append("testCmd"_sd, subObj);
 
     BSONObj obj = testCmdBson.obj();
@@ -206,8 +205,7 @@ TEST(SetClusterParameterCommand, SucceedsWithObjectParameter) {
     SetClusterParameterInvocation fixture(std::move(mpsPtr), dbServiceMock);
 
     OperationContext spyCtx(clientPtr, 1234);
-    spyCtx.setWriteConcern(WriteConcernOptions::deserializerForIDL(BSON("w"
-                                                                        << "majority")));
+    spyCtx.setWriteConcern(WriteConcernOptions::deserializerForIDL(BSON("w" << "majority")));
     SetClusterParameter testCmd(obj);
 
     fixture.invoke(&spyCtx, testCmd, boost::none, boost::none, kMajorityWriteConcern);
@@ -255,9 +253,7 @@ TEST(SetClusterParameterCommand, ThrowsWhenServerParameterValidationFails) {
     Client* clientPtr = client.get();
 
     BSONObjBuilder testCmdBson;
-    testCmdBson << "testCommand"
-                << BSON("ok"
-                        << "someval");
+    testCmdBson << "testCommand" << BSON("ok" << "someval");
 
     BSONObj obj = testCmdBson.obj();
 
@@ -286,9 +282,7 @@ TEST(SetClusterParameterCommand, ThrowsWhenDBUpdateFails) {
     Client* clientPtr = client.get();
 
     BSONObjBuilder testCmdBson;
-    testCmdBson << "testCommand"
-                << BSON("ok"
-                        << "someval");
+    testCmdBson << "testCommand" << BSON("ok" << "someval");
 
     BSONObj obj = testCmdBson.obj();
 
@@ -318,9 +312,7 @@ TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
     Client* clientPtr = client.get();
 
     BSONObjBuilder testCmdBson;
-    testCmdBson << "testCommand"
-                << BSON("ok"
-                        << "someval");
+    testCmdBson << "testCommand" << BSON("ok" << "someval");
 
     BSONObj obj = testCmdBson.obj();
 
@@ -349,9 +341,7 @@ TEST(SetClusterParameterCommand, TenantIdPassesThrough) {
     Client* clientPtr = client.get();
 
     BSONObjBuilder testCmdBson;
-    testCmdBson << "testCommand"
-                << BSON("ok"
-                        << "someval");
+    testCmdBson << "testCommand" << BSON("ok" << "someval");
 
     BSONObj obj = testCmdBson.obj();
 

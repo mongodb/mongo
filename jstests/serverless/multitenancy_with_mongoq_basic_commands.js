@@ -697,7 +697,9 @@ const tokenDB = tokenConn.getDB(kDbName);
 
 // Test dbCheck command.
 // This should fail since dbCheck is not supporting using a security token.
-{ assert.commandFailedWithCode(tokenDB.runCommand({dbCheck: kCollName}), ErrorCodes.Unauthorized); }
+{
+    assert.commandFailedWithCode(tokenDB.runCommand({dbCheck: kCollName}), ErrorCodes.Unauthorized);
+}
 
 primary._setSecurityToken(undefined);
 

@@ -247,9 +247,8 @@ protected:
 
     BSONObj makeNonEmptyCollation() {
         int strength = _getRandomInt(5) + 1;
-        return BSON("locale"
-                    << "en_US"
-                    << "strength" << strength);
+        return BSON("locale" << "en_US"
+                             << "strength" << strength);
     }
 
     BSONObj makeLetParameters() {
@@ -535,8 +534,7 @@ protected:
     const BSONObj let = BSON("x" << 1);
     // Test with EncryptionInformation to verify that QueryAnalysisWriter does not persist the
     // WriteCommandRequestBase fields, especially this sensitive field.
-    const EncryptionInformation encryptionInformation{BSON("foo"
-                                                           << "bar")};
+    const EncryptionInformation encryptionInformation{BSON("foo" << "bar")};
 
 private:
     int32_t _getRandomInt(int32_t max) {

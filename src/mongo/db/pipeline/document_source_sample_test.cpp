@@ -220,17 +220,12 @@ public:
 
 TEST_F(InvalidSampleSpec, NonObject) {
     ASSERT_THROWS_CODE(createSample(BSON("$sample" << 1)), AssertionException, 28745);
-    ASSERT_THROWS_CODE(createSample(BSON("$sample"
-                                         << "string")),
-                       AssertionException,
-                       28745);
+    ASSERT_THROWS_CODE(createSample(BSON("$sample" << "string")), AssertionException, 28745);
 }
 
 TEST_F(InvalidSampleSpec, NonNumericSize) {
-    ASSERT_THROWS_CODE(createSample(createSpec(BSON("size"
-                                                    << "string"))),
-                       AssertionException,
-                       28746);
+    ASSERT_THROWS_CODE(
+        createSample(createSpec(BSON("size" << "string"))), AssertionException, 28746);
 }
 
 TEST_F(InvalidSampleSpec, NegativeSize) {

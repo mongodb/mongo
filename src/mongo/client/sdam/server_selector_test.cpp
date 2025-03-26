@@ -69,35 +69,26 @@ public:
     static inline const OID kOidOne{"000000000000000000000001"};
 
     struct TagSets {
-        static inline const auto eastProduction = BSON("dc"
-                                                       << "east"
+        static inline const auto eastProduction = BSON("dc" << "east"
+                                                            << "usage"
+                                                            << "production");
+        static inline const auto westProduction = BSON("dc" << "west"
+                                                            << "usage"
+                                                            << "production");
+        static inline const auto northTest = BSON("dc" << "north"
                                                        << "usage"
-                                                       << "production");
-        static inline const auto westProduction = BSON("dc"
-                                                       << "west"
-                                                       << "usage"
-                                                       << "production");
-        static inline const auto northTest = BSON("dc"
-                                                  << "north"
-                                                  << "usage"
-                                                  << "test");
-        static inline const auto northProduction = BSON("dc"
-                                                        << "north"
-                                                        << "usage"
-                                                        << "production");
-        static inline const auto production = BSON("usage"
-                                                   << "production");
+                                                       << "test");
+        static inline const auto northProduction = BSON("dc" << "north"
+                                                             << "usage"
+                                                             << "production");
+        static inline const auto production = BSON("usage" << "production");
 
-        static inline const auto test = BSON("usage"
-                                             << "test");
+        static inline const auto test = BSON("usage" << "test");
 
-        static inline const auto integration = BSON("usage"
-                                                    << "integration");
+        static inline const auto integration = BSON("usage" << "integration");
 
-        static inline const auto primary = BSON("tag"
-                                                << "primary");
-        static inline const auto secondary = BSON("tag"
-                                                  << "secondary");
+        static inline const auto primary = BSON("tag" << "primary");
+        static inline const auto secondary = BSON("tag" << "secondary");
 
         static inline const auto emptySet = TagSet{BSONArray(BSONObj())};
         static inline const auto eastOrWestProductionSet =

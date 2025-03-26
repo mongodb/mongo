@@ -75,8 +75,7 @@ using DocumentSourceFacetTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectNonObjectSpec) {
     auto ctx = getExpCtx();
-    auto spec = BSON("$facet"
-                     << "string");
+    auto spec = BSON("$facet" << "string");
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 
@@ -134,42 +133,37 @@ TEST_F(DocumentSourceFacetTest, ShouldSucceedWhenNamespaceIsCollectionless) {
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectFacetsContainingAnOutStage) {
     auto ctx = getExpCtx();
-    auto spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$out"
-                                                             << "out_collection"))));
+    auto spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$out" << "out_collection"))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 
-    spec =
-        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$skip" << 1) << BSON("$out"
-                                                                           << "out_collection"))));
+    spec = BSON("$facet" << BSON(
+                    "a" << BSON_ARRAY(BSON("$skip" << 1) << BSON("$out" << "out_collection"))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 
-    spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$out"
-                                                        << "out_collection")
-                                                   << BSON("$skip" << 1))));
+    spec = BSON("$facet" << BSON(
+                    "a" << BSON_ARRAY(BSON("$out" << "out_collection") << BSON("$skip" << 1))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectFacetsContainingAMergeStage) {
     auto ctx = getExpCtx();
-    auto spec =
-        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into"
-                                                                      << "merge_collection")))));
+    auto spec = BSON(
+        "$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into" << "merge_collection")))));
+    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                  AssertionException);
+
+    spec = BSON("$facet" << BSON(
+                    "a" << BSON_ARRAY(BSON("$skip" << 1)
+                                      << BSON("$merge" << BSON("into" << "merge_collection")))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 
     spec =
-        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$skip" << 1)
-                                                << BSON("$merge" << BSON("into"
-                                                                         << "merge_collection")))));
-    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
-                  AssertionException);
-
-    spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into"
-                                                                         << "merge_collection"))
-                                                   << BSON("$skip" << 1))));
+        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into" << "merge_collection"))
+                                                << BSON("$skip" << 1))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 }

@@ -94,10 +94,9 @@ TEST(JSONSchemaObjectKeywordTest, FailsToParseIfParticularPropertyIsNotAnObject)
 }
 
 TEST(JSONSchemaObjectKeywordTest, FailsToParseIfKeywordIsDuplicated) {
-    BSONObj schema = BSON("type"
-                          << "object"
-                          << "type"
-                          << "object");
+    BSONObj schema = BSON("type" << "object"
+                                 << "type"
+                                 << "object");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 }
@@ -656,8 +655,7 @@ TEST(JSONSchemaObjectKeywordTest, UnsupportedKeywordsFailNicely) {
                            "$jsonSchema keyword 'id' is not currently supported");
 
     result = JSONSchemaParser::parse(new ExpressionContextForTest(),
-                                     BSON("$ref"
-                                          << "#/definitions/positiveInt"));
+                                     BSON("$ref" << "#/definitions/positiveInt"));
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword '$ref' is not currently supported");
 
@@ -937,8 +935,7 @@ TEST(JSONSchemaObjectKeywordTest, FailsToParseUnsupportedKeywordsWhenIgnoreUnkno
                            "$jsonSchema keyword 'id' is not currently supported");
 
     result = JSONSchemaParser::parse(new ExpressionContextForTest(),
-                                     BSON("$ref"
-                                          << "#/definitions/positiveInt"),
+                                     BSON("$ref" << "#/definitions/positiveInt"),
                                      allowedFeatures,
                                      ignoreUnknownKeywords);
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),

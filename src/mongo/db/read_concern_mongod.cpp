@@ -582,9 +582,7 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
             opCtx, "waitForLinearizableReadConcern", NamespaceString::kRsOplogNamespace, [&opCtx] {
                 WriteUnitOfWork uow(opCtx);
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-                    opCtx,
-                    BSON("msg"
-                         << "linearizable read"));
+                    opCtx, BSON("msg" << "linearizable read"));
                 uow.commit();
             });
     }

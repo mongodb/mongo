@@ -225,15 +225,12 @@ std::pair<std::vector<BSONObj>, std::vector<BSONObj>> makeChunkAndTagUpdatesForR
     // Both the chunks and tags updates share the base of this $set modifier.
     auto extendMinAndMaxModifier = BSON(
         "min"
-        << BSON("$arrayToObject" << BSON("$concatArrays" << BSON_ARRAY(BSON("$objectToArray"
-                                                                            << "$min")
-                                                                       << literalMinObject)))
+        << BSON("$arrayToObject" << BSON("$concatArrays" << BSON_ARRAY(
+                                             BSON("$objectToArray" << "$min") << literalMinObject)))
         << "max"
         << BSON("$let" << BSON(
                     "vars"
-                    << BSON("maxAsArray" << BSON("$objectToArray"
-                                                 << "$max"))
-                    << "in"
+                    << BSON("maxAsArray" << BSON("$objectToArray" << "$max")) << "in"
                     << BSON("$arrayToObject" << BSON(
                                 "$concatArrays" << BSON_ARRAY(
                                     "$$maxAsArray"

@@ -78,12 +78,11 @@ public:
 
     std::vector<std::tuple<void*, size_t, size_t>> upstreamAllocations;
     std::vector<std::tuple<void*, size_t, size_t>> upstreamDeallocations;
-    MockResource<> mockResource{[&](void* p, size_t sz, size_t al) {
-                                    upstreamAllocations.push_back({p, sz, al});
-                                },
-                                [&](void* p, size_t sz, size_t al) {
-                                    upstreamDeallocations.push_back({p, sz, al});
-                                }};
+    MockResource<> mockResource{
+        [&](void* p, size_t sz, size_t al) { upstreamAllocations.push_back({p, sz, al}); },
+        [&](void* p, size_t sz, size_t al) {
+            upstreamDeallocations.push_back({p, sz, al});
+        }};
 };
 
 TEST_F(MonotonicBufferResourceTest, UpstreamAllocationsReduced) {
@@ -147,8 +146,7 @@ template <size_t N, typename F>
 void templateForEachSize(F f) {
     [&]<size_t... I>(std::index_sequence<I...>) {
         (f(std::integral_constant<size_t, I>{}), ...);
-    }
-    (std::make_index_sequence<N>{});
+    }(std::make_index_sequence<N>{});
 }
 
 template <typename Sequence>

@@ -58,7 +58,7 @@ public:
     TicketHolderManager(std::unique_ptr<TicketHolder> readTicketHolder,
                         std::unique_ptr<TicketHolder> writeTicketHolder);
 
-    virtual ~TicketHolderManager(){};
+    virtual ~TicketHolderManager() {};
 
     static Status updateWriteMaxQueueDepth(std::int32_t newWriteMaxQueueDepth);
     static Status updateReadMaxQueueDepth(std::int32_t newReadMaxQueueDepth);

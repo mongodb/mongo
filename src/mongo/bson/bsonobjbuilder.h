@@ -566,7 +566,7 @@ public:
      */
     template <typename Map>
     requires std::is_convertible_v<decltype(std::declval<Map>().begin()->first), StringData>
-        Derived& append(StringData fieldName, const Map& map) {
+    Derived& append(StringData fieldName, const Map& map) {
         typename std::remove_reference<Derived>::type bob;
         for (auto&& [k, v] : map) {
             bob.append(k, v);

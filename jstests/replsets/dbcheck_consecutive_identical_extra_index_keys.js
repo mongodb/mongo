@@ -1110,77 +1110,75 @@ function identicalKeysChangedBeforeHashing(collOpts) {
     resetNumMaxIdenticalKeys();
 }
 
-[{},
- {clusteredIndex: {key: {_id: 1}, unique: true}}]
-    .forEach(collOpts => {
-        [null /* no errors */,
-         "skipUnindexingDocumentWhenDeleted", /* recordNotFound and inconsistent batch errors are
-                                               * caught
-                                               */
-         "skipUpdatingIndexDocument" /* recordDoesNotMatch errors are caught.*/]
-            .forEach((failpoint) => {
-                // Check maxIdenticalKeys > numDocs > batch/snapshot size - all keys should be
-                // checked in one batch/snapshot.
-                onlyIdenticalKeys(11 /*numDocs*/,
-                                  10 /*batchSize*/,
-                                  5 /*snapshotSize*/,
-                                  defaultNumMaxIdenticalKeys,
-                                  collOpts,
-                                  failpoint);
+[{}, {clusteredIndex: {key: {_id: 1}, unique: true}}].forEach(collOpts => {
+    [null /* no errors */,
+     "skipUnindexingDocumentWhenDeleted", /* recordNotFound and inconsistent batch errors are
+                                           * caught
+                                           */
+     "skipUpdatingIndexDocument" /* recordDoesNotMatch errors are caught.*/]
+        .forEach((failpoint) => {
+            // Check maxIdenticalKeys > numDocs > batch/snapshot size - all keys should be
+            // checked in one batch/snapshot.
+            onlyIdenticalKeys(11 /*numDocs*/,
+                              10 /*batchSize*/,
+                              5 /*snapshotSize*/,
+                              defaultNumMaxIdenticalKeys,
+                              collOpts,
+                              failpoint);
 
-                // numDocs > maxIdenticalKeys > batch/snapshotsize - should only check up to
-                // numMaxIdenticalKeys.
-                onlyIdenticalKeys(20 /*numDocs*/,
-                                  5 /*batchSize*/,
-                                  6 /*snapshotSize*/,
-                                  7 /*numMaxIdenticalKeys*/,
-                                  collOpts,
-                                  failpoint);
+            // numDocs > maxIdenticalKeys > batch/snapshotsize - should only check up to
+            // numMaxIdenticalKeys.
+            onlyIdenticalKeys(20 /*numDocs*/,
+                              5 /*batchSize*/,
+                              6 /*snapshotSize*/,
+                              7 /*numMaxIdenticalKeys*/,
+                              collOpts,
+                              failpoint);
 
-                // Simple tests with distinct keys before and after identical keys.
-                // Tests nIdenticalDocs < numMaxIdenticalKeys, batchSize < snapshotSize.
-                simpleIdenticalKeysInMiddleOfColl(11 /*nIdenticalDocs*/,
-                                                  1 /*batchSize*/,
-                                                  2 /*snapshotSize*/,
-                                                  defaultNumMaxIdenticalKeys,
-                                                  collOpts,
-                                                  failpoint);
-                // Tests nIdenticalDocs > numMaxIdenticalKeys, batchSize == snapshotSize.
-                simpleIdenticalKeysInMiddleOfColl(20 /*nIdenticalDocs*/,
-                                                  5 /*batchSize*/,
-                                                  5 /*snapshotSize*/,
-                                                  6 /*numMaxIdenticalKeys*/,
-                                                  collOpts,
-                                                  failpoint);
-                // Tests nIdenticalDocs > numMaxIdenticalKeys, batchSize > snapshotSize.
-                simpleIdenticalKeysInMiddleOfColl(20 /*nIdenticalDocs*/,
-                                                  5 /*batchSize*/,
-                                                  2 /*snapshotSize*/,
-                                                  6 /*numMaxIdenticalKeys*/,
-                                                  collOpts,
-                                                  failpoint);
+            // Simple tests with distinct keys before and after identical keys.
+            // Tests nIdenticalDocs < numMaxIdenticalKeys, batchSize < snapshotSize.
+            simpleIdenticalKeysInMiddleOfColl(11 /*nIdenticalDocs*/,
+                                              1 /*batchSize*/,
+                                              2 /*snapshotSize*/,
+                                              defaultNumMaxIdenticalKeys,
+                                              collOpts,
+                                              failpoint);
+            // Tests nIdenticalDocs > numMaxIdenticalKeys, batchSize == snapshotSize.
+            simpleIdenticalKeysInMiddleOfColl(20 /*nIdenticalDocs*/,
+                                              5 /*batchSize*/,
+                                              5 /*snapshotSize*/,
+                                              6 /*numMaxIdenticalKeys*/,
+                                              collOpts,
+                                              failpoint);
+            // Tests nIdenticalDocs > numMaxIdenticalKeys, batchSize > snapshotSize.
+            simpleIdenticalKeysInMiddleOfColl(20 /*nIdenticalDocs*/,
+                                              5 /*batchSize*/,
+                                              2 /*snapshotSize*/,
+                                              6 /*numMaxIdenticalKeys*/,
+                                              collOpts,
+                                              failpoint);
 
-                // Identical keys at the end of the batch/snapshot size result in batch/snapshot
-                // limit getting ignored.
-                identicalKeysAtEndOfBatch(collOpts, failpoint);
+            // Identical keys at the end of the batch/snapshot size result in batch/snapshot
+            // limit getting ignored.
+            identicalKeysAtEndOfBatch(collOpts, failpoint);
 
-                // Batch/snapshot size >= nDocs, numMaxIdenticalKeys is ignored.
-                allKeysInOneBatch(collOpts, failpoint);
+            // Batch/snapshot size >= nDocs, numMaxIdenticalKeys is ignored.
+            allKeysInOneBatch(collOpts, failpoint);
 
-                // Testing that nConsecutiveIdenticalIndexKeysSeenAtEnd is reset when encountering a
-                // new distinct key.
-                nConsecutiveIdenticalIndexKeysSeenAtEndIsReset(collOpts, failpoint);
-            });
+            // Testing that nConsecutiveIdenticalIndexKeysSeenAtEnd is reset when encountering a
+            // new distinct key.
+            nConsecutiveIdenticalIndexKeysSeenAtEndIsReset(collOpts, failpoint);
+        });
 
-        hashingExtraIdenticalIndexKeysOnPrimary(collOpts);
-        hashingExtraIdenticalIndexKeysOnSecondary(collOpts);
-        hashingExtraIdenticalIndexKeysOnSecondaryMiddleOfBatch(collOpts);
-        identicalKeysChangedBeforeHashing(collOpts);
-        extraIdenticalIndexKeysOnSecondaryBeyondMax(collOpts);
+    hashingExtraIdenticalIndexKeysOnPrimary(collOpts);
+    hashingExtraIdenticalIndexKeysOnSecondary(collOpts);
+    hashingExtraIdenticalIndexKeysOnSecondaryMiddleOfBatch(collOpts);
+    identicalKeysChangedBeforeHashing(collOpts);
+    extraIdenticalIndexKeysOnSecondaryBeyondMax(collOpts);
 
-        // TODO SERVER-93406: Uncomment this test.
-        // extraDistinctIndexKeysOnSecondaryBeyondMax(collOpts);
-    });
+    // TODO SERVER-93406: Uncomment this test.
+    // extraDistinctIndexKeysOnSecondaryBeyondMax(collOpts);
+});
 
 replSet.stopSet(undefined /* signal */,
                 false /* forRestart */,

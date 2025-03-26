@@ -58,11 +58,10 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenOverlappingPoin
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
 
-    auto mock =
-        DocumentSourceMock::createForTest(DOC("loc" << DOC("type"
-                                                           << "Point"_sd
-                                                           << "coordinates" << DOC_ARRAY(1 << 1))),
-                                          getExpCtx());
+    auto mock = DocumentSourceMock::createForTest(
+        DOC("loc" << DOC("type" << "Point"_sd
+                                << "coordinates" << DOC_ARRAY(1 << 1))),
+        getExpCtx());
 
     geoDist->setSource(mock.get());
     auto next = geoDist->getNext();
@@ -86,11 +85,10 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, SphericalDistanceBetweenTwoPoi
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
 
-    auto mock =
-        DocumentSourceMock::createForTest(DOC("loc" << DOC("type"
-                                                           << "Point"_sd
-                                                           << "coordinates" << DOC_ARRAY(0 << 0))),
-                                          getExpCtx());
+    auto mock = DocumentSourceMock::createForTest(
+        DOC("loc" << DOC("type" << "Point"_sd
+                                << "coordinates" << DOC_ARRAY(0 << 0))),
+        getExpCtx());
 
     geoDist->setSource(mock.get());
     auto next = geoDist->getNext();

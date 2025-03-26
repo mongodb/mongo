@@ -57,10 +57,9 @@ namespace {
 TEST(BulkWriteCommandModifier, AddInsert) {
     BSONArray insertArray = BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1));
 
-    BSONObj origInsertRequestObj = BSON("insert"
-                                        << "test"
-                                        << "documents" << insertArray << "writeConcern"
-                                        << BSON("w" << 1) << "ordered" << true);
+    BSONObj origInsertRequestObj = BSON("insert" << "test"
+                                                 << "documents" << insertArray << "writeConcern"
+                                                 << BSON("w" << 1) << "ordered" << true);
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
@@ -126,12 +125,11 @@ TEST(BulkWriteCommandModifier, InsertWithShardVersion) {
     const Timestamp timestamp(2, 2);
     const Timestamp majorAndMinor(1, 2);
 
-    BSONObj origInsertRequestObj = BSON("insert"
-                                        << "test"
-                                        << "documents" << insertArray << "writeConcern"
-                                        << BSON("w" << 1) << "ordered" << true << "shardVersion"
-                                        << BSON("e" << epoch << "t" << timestamp << "v"
-                                                    << majorAndMinor));
+    BSONObj origInsertRequestObj =
+        BSON("insert" << "test"
+                      << "documents" << insertArray << "writeConcern" << BSON("w" << 1) << "ordered"
+                      << true << "shardVersion"
+                      << BSON("e" << epoch << "t" << timestamp << "v" << majorAndMinor));
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
@@ -157,8 +155,7 @@ TEST(BulkWriteCommandModifier, AddUpdate) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
-    const BSONObj collation = BSON("locale"
-                                   << "en_US");
+    const BSONObj collation = BSON("locale" << "en_US");
     const BSONObj arrayFilter = BSON("i" << 0);
     const BSONObj sort = BSON("a" << 1);
     for (bool upsert : {false, true}) {
@@ -201,8 +198,7 @@ TEST(BulkWriteCommandModifier, AddOpUpdate) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
-    const BSONObj collation = BSON("locale"
-                                   << "en_US");
+    const BSONObj collation = BSON("locale" << "en_US");
     const BSONObj arrayFilter = BSON("i" << 0);
     const BSONObj sort = BSON("a" << 1);
 
@@ -250,8 +246,7 @@ TEST(BulkWriteCommandModifier, AddUpdateOps) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
-    const BSONObj collation = BSON("locale"
-                                   << "en_US");
+    const BSONObj collation = BSON("locale" << "en_US");
     const BSONObj arrayFilter = BSON("i" << 0);
     const BSONObj sort = BSON("a" << 1);
 
@@ -316,8 +311,7 @@ TEST(CommandWriteOpsParsers, BulkWriteUpdateWithPipeline) {
 TEST(BulkWriteCommandModifier, AddDelete) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
-    const BSONObj collation = BSON("locale"
-                                   << "en_US");
+    const BSONObj collation = BSON("locale" << "en_US");
     for (bool multi : {false, true}) {
         auto rawDelete =
             BSON("q" << query << "limit" << (multi ? 0 : 1) << "collation" << collation);
@@ -349,8 +343,7 @@ TEST(BulkWriteCommandModifier, AddDelete) {
 TEST(BulkWriteCommandModifier, AddOpDelete) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
-    const BSONObj collation = BSON("locale"
-                                   << "en_US");
+    const BSONObj collation = BSON("locale" << "en_US");
 
     auto delOp = write_ops::DeleteOpEntry();
     delOp.setCollation(collation);
@@ -383,8 +376,7 @@ TEST(BulkWriteCommandModifier, AddOpDelete) {
 TEST(BulkWriteCommandModifier, AddDeleteOps) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
-    const BSONObj collation = BSON("locale"
-                                   << "en_US");
+    const BSONObj collation = BSON("locale" << "en_US");
     for (bool multi : {false, true}) {
         BulkWriteCommandRequest request;
         BulkWriteCommandModifier builder(&request);
@@ -412,8 +404,7 @@ TEST(BulkWriteCommandModifier, TestMultiOpsSameNs) {
     docs.emplace_back(BSON("b" << 1));
 
     const BSONObj query = BSON("x" << 1);
-    const BSONObj collation = BSON("locale"
-                                   << "en_US");
+    const BSONObj collation = BSON("locale" << "en_US");
 
     BulkWriteCommandRequest request;
     BulkWriteCommandModifier builder(&request);
@@ -454,8 +445,7 @@ TEST(BulkWriteCommandModifier, TestMultiOpsDifferentNs) {
     docs.emplace_back(BSON("b" << 1));
 
     const BSONObj query = BSON("x" << 1);
-    const BSONObj collation = BSON("locale"
-                                   << "en_US");
+    const BSONObj collation = BSON("locale" << "en_US");
 
     BulkWriteCommandRequest request;
     BulkWriteCommandModifier builder(&request);

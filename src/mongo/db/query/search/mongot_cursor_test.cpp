@@ -137,8 +137,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
 
 
@@ -218,8 +217,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
 
             // Mock lookup id metrics as batches are processed.
@@ -307,8 +305,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
@@ -375,8 +372,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
@@ -443,8 +439,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
@@ -510,8 +505,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
@@ -593,8 +587,7 @@ public:
         CursorId cursorId = 1;
         RemoteCommandRequest rcr(HostAndPort("localhost"),
                                  DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                 BSON("search"
-                                      << "foo"),
+                                 BSON("search" << "foo"),
                                  opCtx.get());
         // Use NeedAll bounds to trigger pre-fetching for all batches.
         auto tec = makeMongotCursor(
@@ -644,8 +637,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
             // Use the default mongot cursor behavior, which should only start pre-fetching after
             // the third batch is received.
@@ -707,8 +699,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
 
             // Mock lookup id metrics as batches are processed.

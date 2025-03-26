@@ -788,13 +788,13 @@ std::vector<BSONObj> AuthorizationBackendLocal::performNoPrivilegeNoRestrictions
     pipeline.push_back(BSON("$sort" << BSON("user" << 1 << "db" << 1)));
 
     // Rewrite the credentials object into an array of its fieldnames.
-    pipeline.push_back(BSON(
-        "$addFields" << BSON("mechanisms" << BSON("$map" << BSON("input" << BSON("$objectToArray"
-                                                                                 << "$credentials")
-                                                                         << "as"
-                                                                         << "cred"
-                                                                         << "in"
-                                                                         << "$$cred.k")))));
+    pipeline.push_back(
+        BSON("$addFields" << BSON(
+                 "mechanisms" << BSON(
+                     "$map" << BSON("input" << BSON("$objectToArray" << "$credentials") << "as"
+                                            << "cred"
+                                            << "in"
+                                            << "$$cred.k")))));
 
     // Authentication restrictions are only rendered in the single user case.
     BSONArrayBuilder fieldsToRemoveBuilder;

@@ -117,7 +117,7 @@ public:
           // TODO SERVER-98563 I think we can remove the sortBy here in favor of {$meta: "sortKey"}
           // also.
           _iterator(expCtx.get(), pSource, &_memoryTracker, std::move(partitionBy), _sortBy),
-          _sbeCompatibility(sbeCompatibility){};
+          _sbeCompatibility(sbeCompatibility) {};
 
     GetModPathsReturn getModifiedPaths() const final {
         OrderedPathSet outputPaths;

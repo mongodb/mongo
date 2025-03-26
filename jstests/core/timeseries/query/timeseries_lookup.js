@@ -16,20 +16,21 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-TimeseriesTest.run((insert) => {
-    const testDB = db.getSiblingDB(jsTestName());
-    assert.commandWorked(testDB.dropDatabase());
-    const timeFieldName = "time";
-    const tagFieldName = "tag";
-    const collOptions = [null, {timeseries: {timeField: timeFieldName, metaField: tagFieldName}}];
-    const numHosts = 10;
-    const numDocs = 200;
+TimeseriesTest.run(
+    (insert) => {
+        const testDB = db.getSiblingDB(jsTestName());
+        assert.commandWorked(testDB.dropDatabase());
+        const timeFieldName = "time";
+        const tagFieldName = "tag";
+        const collOptions =
+            [null, {timeseries: {timeField: timeFieldName, metaField: tagFieldName}}];
+        const numHosts = 10;
+        const numDocs = 200;
 
-    Random.setRandomSeed();
-    const hosts = TimeseriesTest.generateHosts(numHosts);
+        Random.setRandomSeed();
+        const hosts = TimeseriesTest.generateHosts(numHosts);
 
-    let
-        testFunc = function(collAOption, collBOption) {
+        let testFunc = function(collAOption, collBOption) {
             // Prepare two time-series collections.
             const collA = testDB.getCollection("a");
             const collB = testDB.getCollection("b");
@@ -235,19 +236,19 @@ TimeseriesTest.run((insert) => {
             assert.eq(numHosts, results.length, results);
         };
 
-    // Exhaust the combinations of non-time-series and time-series collections for inner and outer
-    // $lookup collections.
-    collOptions.forEach(function(collAOption) {
-        collOptions.forEach(function(collBOption) {
-            if (collAOption == null && collBOption == null) {
-                // Normal $lookup call, both inner and outer collections are non-time-series
-                // collections.
-                return;
-            }
-            testFunc(collAOption, collBOption);
+        // Exhaust the combinations of non-time-series and time-series collections for inner and
+        // outer $lookup collections.
+        collOptions.forEach(function(collAOption) {
+            collOptions.forEach(function(collBOption) {
+                if (collAOption == null && collBOption == null) {
+                    // Normal $lookup call, both inner and outer collections are non-time-series
+                    // collections.
+                    return;
+                }
+                testFunc(collAOption, collBOption);
+            });
         });
     });
-});
 
 {
     // Test that we get the right results for $lookup on a timeseries collection with an internal

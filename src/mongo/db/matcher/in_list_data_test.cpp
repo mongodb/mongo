@@ -80,8 +80,7 @@ void assertFirstOfEachTypeReturnsReferredElements(
 // Verifies 'getFirstOfEachType(false)' behavior on InListData state transitions.
 TEST(InListData, GetFirstOfEachTypeOnStateTransitions) {
     InListData inListElements;
-    auto elementArrayObj = BSON("attr" << BSON_ARRAY("a"
-                                                     << "b" << 1 << 2));
+    auto elementArrayObj = BSON("attr" << BSON_ARRAY("a" << "b" << 1 << 2));
     auto elementArray = elementArrayObj["attr"].Obj();
     std::vector<BSONElement> elements;
     elementArray.elems(elements);
@@ -144,8 +143,7 @@ TEST(InListData, GetFirstOfEachTypeOnStateTransitions) {
 TEST(InListData, GetFirstOfEachTypeSortedAndDeduped) {
     InListData inListElements;
 
-    auto elementArrayObj = BSON("attr" << BSON_ARRAY("b"
-                                                     << "a" << 2 << 1));
+    auto elementArrayObj = BSON("attr" << BSON_ARRAY("b" << "a" << 2 << 1));
     const auto elementArray = elementArrayObj["attr"].Obj();
     ASSERT_OK(inListElements.setElementsArray(elementArray));
     const bool kGetSortedAndDeduped = true;
@@ -154,9 +152,8 @@ TEST(InListData, GetFirstOfEachTypeSortedAndDeduped) {
     assertFirstOfEachTypeReturnsReferredElements(inListElements, {3, 1}, kGetSortedAndDeduped);
 
     // Verify that correct results are returned when the element list is sorted and deduplicated.
-    auto objWithSortedElements = BSON("attr" << BSON_ARRAY("a"
-                                                           << "b"
-                                                           << "c"));
+    auto objWithSortedElements = BSON("attr" << BSON_ARRAY("a" << "b"
+                                                               << "c"));
     ASSERT_OK(inListElements.setElementsArray(objWithSortedElements["attr"].Obj()));
     assertFirstOfEachTypeReturnsReferredElements(inListElements, {0}, kGetSortedAndDeduped);
 }

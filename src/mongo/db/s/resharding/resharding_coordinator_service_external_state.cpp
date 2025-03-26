@@ -275,8 +275,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
     const Timestamp& cloneTimestamp,
     const std::map<ShardId, ShardVersion>& shardVersions) {
     std::vector<BSONObj> pipeline;
-    pipeline.push_back(BSON("$count"
-                            << "count"));
+    pipeline.push_back(BSON("$count" << "count"));
     AggregateCommandRequest aggRequest(nss, pipeline);
     BSONObj hint = BSON("_id" << 1);
     aggRequest.setHint(hint);
@@ -377,9 +376,8 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
     //        ...
     //    }
     // }
-    pipeline.push_back(BSON("$project" << BSON("_id" << 0 << "documentsCopied"
-                                                     << BSON("$arrayToObject"
-                                                             << "$pairs"))));
+    pipeline.push_back(BSON(
+        "$project" << BSON("_id" << 0 << "documentsCopied" << BSON("$arrayToObject" << "$pairs"))));
 
     AggregateCommandRequest aggRequest(NamespaceString::kRecipientReshardingResumeDataNamespace,
                                        pipeline);

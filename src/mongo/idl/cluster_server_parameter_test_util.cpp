@@ -61,8 +61,7 @@ const TenantId ClusterServerParameterTestBase::kTenantId =
     TenantId(OID("123456789012345678901234"_sd));
 
 void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId) {
-    const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
-                                                                   << "majority"));
+    const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w" << "majority"));
 
     auto uniqueOpCtx = cc().makeOperationContext();
     auto* opCtx = uniqueOpCtx.get();

@@ -241,8 +241,7 @@ protected:
     constexpr static int64_t kOldestTimeLeft = 3000;
     const NamespaceString kTestNamespace =
         NamespaceString::createNamespaceString_forTest("test.source");
-    const BSONObj kTestCommand = BSON("command"
-                                      << "test");
+    const BSONObj kTestCommand = BSON("command" << "test");
 
     virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() {
         return std::make_unique<ShardingDataTransformCumulativeMetrics>(

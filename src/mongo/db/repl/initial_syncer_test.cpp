@@ -156,10 +156,9 @@ using LockGuard = stdx::lock_guard<stdx::mutex>;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
-const BSONObj kListDatabasesFailPointData = BSON("cloner"
-                                                 << "AllDatabaseCloner"
-                                                 << "stage"
-                                                 << "listDatabases");
+const BSONObj kListDatabasesFailPointData = BSON("cloner" << "AllDatabaseCloner"
+                                                          << "stage"
+                                                          << "listDatabases");
 
 BSONObj makeListDatabasesResponse(std::vector<std::string> databaseNames);
 BSONObj makeRollbackCheckerResponse(int rollbackId);
@@ -424,8 +423,7 @@ protected:
         // Default behavior for all tests using this mock.
         _mock->defaultExpect("replSetGetRBID", makeRollbackCheckerResponse(1));
         _mock->defaultExpect(
-            BSON("find"
-                 << "transactions"),
+            BSON("find" << "transactions"),
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
 
         // Usually we're just skipping the cloners in this test, so we provide an empty list
@@ -477,14 +475,12 @@ protected:
         dataReplicatorExternalState->setCurrentTerm(1LL);
         dataReplicatorExternalState->setLastCommittedOpTime(_myLastOpTime);
         {
-            ReplSetConfig config(
-                ReplSetConfig::parse(BSON("_id"
-                                          << "myset"
-                                          << "version" << 1 << "protocolVersion" << 1 << "members"
-                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                   << "localhost:12345"))
-                                          << "settings"
-                                          << BSON("electionTimeoutMillis" << 10000))));
+            ReplSetConfig config(ReplSetConfig::parse(
+                BSON("_id" << "myset"
+                           << "version" << 1 << "protocolVersion" << 1 << "members"
+                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                    << "localhost:12345"))
+                           << "settings" << BSON("electionTimeoutMillis" << 10000))));
             dataReplicatorExternalState->setReplSetConfigResult(config);
         }
         _externalState = dataReplicatorExternalState.get();
@@ -680,8 +676,7 @@ OplogEntry makeOplogEntry(int t,
     BSONObj oField = BSON("_id" << t << "a" << t);
     if (opType == OpTypeEnum::kCommand) {
         // Insert an arbitrary command name so that the oplog entry is valid.
-        oField = BSON("dropIndexes"
-                      << "a_1");
+        oField = BSON("dropIndexes" << "a_1");
     }
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),                             // optime
                               opType,                                                 // op type
@@ -1828,15 +1823,13 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError_Mock
 
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
     // This is what we want to test.
     _mock
-        ->expect(BSON("find"
-                      << "system.version"),
+        ->expect(BSON("find" << "system.version"),
                  RemoteCommandResponse::make_forTest(
                      Status(ErrorCodes::OperationFailed, "find command failed at sync source")))
         .times(1);
@@ -1897,8 +1890,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsFCVFetcherOnShutdown) {
 
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -1923,15 +1915,13 @@ TEST_F(InitialSyncerTest, InitialSyncerResendsFindCommandIfFCVFetcherReturnsRetr
 
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
     // Respond to the first FCV attempt with a retriable error.
     _mock
-        ->expect(BSON("find"
-                      << "system.version"),
+        ->expect(BSON("find" << "system.version"),
                  RemoteCommandResponse::make_forTest(
                      Status(ErrorCodes::HostUnreachable, "host unreachable network error")))
         .times(1);
@@ -1959,8 +1949,7 @@ void InitialSyncerTest::runInitialSyncWithBadFCVResponse(std::vector<BSONObj> do
 
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -1987,9 +1976,7 @@ TEST_F(InitialSyncerTest,
     FeatureCompatibilityVersionDocument fcvDoc;
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
     fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
-    auto docs = {fcvDoc.toBSON(),
-                 BSON("_id"
-                      << "other")};
+    auto docs = {fcvDoc.toBSON(), BSON("_id" << "other")};
     runInitialSyncWithBadFCVResponse(docs, ErrorCodes::TooManyMatchingDocuments);
 }
 
@@ -2027,8 +2014,7 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
 
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -2068,8 +2054,7 @@ TEST_F(
     // Only respond to oplog queries twice to block the initial syncer on getting stopTimestamp.
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -2189,8 +2174,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
 
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -2229,8 +2213,7 @@ TEST_F(InitialSyncerTest,
 
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -2278,8 +2261,7 @@ TEST_F(
 
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -2322,8 +2304,7 @@ TEST_F(
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -2370,8 +2351,7 @@ TEST_F(InitialSyncerTest,
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -2396,8 +2376,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBothOplogFetcherAndAllDatabaseClon
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     _mock
         ->expect(
-            BSON("find"
-                 << "oplog.rs"),
+            BSON("find" << "oplog.rs"),
             makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
         .times(2);
 
@@ -2484,14 +2463,12 @@ TEST_F(InitialSyncerTest,
         MockNetwork::InSequence seq(*_mock);
         _mock
             ->expect(
-                BSON("find"
-                     << "oplog.rs"),
+                BSON("find" << "oplog.rs"),
                 makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
             .times(1);
 
         _mock
-            ->expect(BSON("find"
-                          << "oplog.rs"),
+            ->expect(BSON("find" << "oplog.rs"),
                      RemoteCommandResponse::make_forTest(
                          Status(ErrorCodes::OperationFailed,
                                 "Oplog entry fetcher associated with the stopTimestamp failed")))
@@ -2815,9 +2792,8 @@ TEST_F(
         }
 
         // Oplog entry associated with the stopTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({BSON("ts"
-                                                             << "not a timestamp"
-                                                             << "t" << 1LL)});
+        processSuccessfulLastOplogEntryFetcherResponse({BSON("ts" << "not a timestamp"
+                                                                  << "t" << 1LL)});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
         // setting the completion status.
@@ -4965,10 +4941,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
         auto collectionClonerFailPoint = globalFailPointRegistry().find("hangAfterClonerStage");
         auto timesEntered = collectionClonerFailPoint->setMode(FailPoint::alwaysOn,
                                                                0,
-                                                               BSON("cloner"
-                                                                    << "CollectionCloner"
-                                                                    << "stage"
-                                                                    << "count"));
+                                                               BSON("cloner" << "CollectionCloner"
+                                                                             << "stage"
+                                                                             << "count"));
         ON_BLOCK_EXIT(
             [collectionClonerFailPoint]() { collectionClonerFailPoint->setMode(FailPoint::off); });
 

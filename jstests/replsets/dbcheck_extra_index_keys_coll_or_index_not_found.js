@@ -524,26 +524,24 @@ function indexDropAfterFirstBatch(docSuffix, collOpts) {
     checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 }
 
-[{},
- {clusteredIndex: {key: {_id: 1}, unique: true}}]
-    .forEach(collOpts => {
-        // Test with integer index entries (1, 2, 3, etc.), single character string entries ("1",
-        // "2", "3", etc.), and long string entries ("1aaaaaaaaaa")
-        [null, "", "aaaaaaaaaa"].forEach((docSuffix) => {
-            indexNotFoundBeforeDbCheck(docSuffix, collOpts);
-            indexNotFoundDuringHashing(docSuffix, collOpts);
-            indexNotFoundDuringReverseLookup(docSuffix, collOpts);
-            collNotFoundBeforeDbCheck(docSuffix, collOpts);
-            collNotFoundDuringHashing(docSuffix, collOpts);
-            collNotFoundDuringReverseLookup(docSuffix, collOpts);
-            allIndexKeysNotFoundDuringReverseLookup(10, docSuffix, collOpts);
-            dbCheckDuringIndexBuild(docSuffix, collOpts);
-            indexDropAfterFirstBatch(docSuffix, collOpts);
-        });
-
-        keysChangedBeforeHashing(collOpts);
-        keyNotFoundDuringReverseLookup(10, collOpts);
+[{}, {clusteredIndex: {key: {_id: 1}, unique: true}}].forEach(collOpts => {
+    // Test with integer index entries (1, 2, 3, etc.), single character string entries ("1",
+    // "2", "3", etc.), and long string entries ("1aaaaaaaaaa")
+    [null, "", "aaaaaaaaaa"].forEach((docSuffix) => {
+        indexNotFoundBeforeDbCheck(docSuffix, collOpts);
+        indexNotFoundDuringHashing(docSuffix, collOpts);
+        indexNotFoundDuringReverseLookup(docSuffix, collOpts);
+        collNotFoundBeforeDbCheck(docSuffix, collOpts);
+        collNotFoundDuringHashing(docSuffix, collOpts);
+        collNotFoundDuringReverseLookup(docSuffix, collOpts);
+        allIndexKeysNotFoundDuringReverseLookup(10, docSuffix, collOpts);
+        dbCheckDuringIndexBuild(docSuffix, collOpts);
+        indexDropAfterFirstBatch(docSuffix, collOpts);
     });
+
+    keysChangedBeforeHashing(collOpts);
+    keyNotFoundDuringReverseLookup(10, collOpts);
+});
 
 replSet.stopSet(undefined /* signal */,
                 false /* forRestart */,

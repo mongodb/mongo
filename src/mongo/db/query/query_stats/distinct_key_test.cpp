@@ -159,8 +159,7 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctComplex) {
         })");
     // For this test, the comment must be set individually outside of the original command BSON
     // because it is not set when being parsed into a DistinctCommandRequest.
-    expCtx->getOperationContext()->setComment(BSON("comment"
-                                                   << "hello"));
+    expCtx->getOperationContext()->setComment(BSON("comment" << "hello"));
 
     auto key = makeDistinctKeyFromQuery(distinct, expCtx);
     auto keyBSON =

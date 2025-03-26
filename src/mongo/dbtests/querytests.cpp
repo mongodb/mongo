@@ -280,9 +280,8 @@ public:
         DBDirectClient cl(&_opCtx);
         BSONObj info;
         bool ok = cl.runCommand(nss().dbName(),
-                                BSON("godinsert"
-                                     << "querytests"
-                                     << "obj" << BSONObj()),
+                                BSON("godinsert" << "querytests"
+                                                 << "obj" << BSONObj()),
                                 info);
         ASSERT(ok);
 
@@ -670,9 +669,8 @@ public:
 
         BSONObj info;
         _client.runCommand(_nss.dbName(),
-                           BSON("create"
-                                << "querytests.TailableQueryOnId"
-                                << "capped" << true << "size" << 8192),
+                           BSON("create" << "querytests.TailableQueryOnId"
+                                         << "capped" << true << "size" << 8192),
                            info);
         insertA(_nss, 0);
         insertA(_nss, 1);
@@ -784,10 +782,9 @@ public:
         insertOplogDocument(&_opCtx, Timestamp(1000, 2), ns);
 
         BSONObj explainCmdObj =
-            BSON("explain" << BSON("find"
-                                   << "oplog.querytests.OplogScanGtTsExplain"
-                                   << "filter" << BSON("ts" << GT << Timestamp(1000, 1)) << "hint"
-                                   << BSON("$natural" << 1))
+            BSON("explain" << BSON("find" << "oplog.querytests.OplogScanGtTsExplain"
+                                          << "filter" << BSON("ts" << GT << Timestamp(1000, 1))
+                                          << "hint" << BSON("$natural" << 1))
                            << "verbosity"
                            << "executionStats");
 
@@ -1231,9 +1228,7 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        _client.insert(_nss,
-                       BSON("i"
-                            << "a"));
+        _client.insert(_nss, BSON("i" << "a"));
         ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("i" << 1)));
         ASSERT_EQUALS(1U, _client.count(_nss, fromjson("{i:{$in:['a']}}")));
     }
@@ -1253,14 +1248,8 @@ public:
         _client.insert(_nss, fromjson("{foo:{bar:['spam','eggs']}}"));
         _client.insert(_nss, fromjson("{bar:['spam']}"));
         _client.insert(_nss, fromjson("{bar:['spam','eggs']}"));
-        ASSERT_EQUALS(2U,
-                      _client.count(_nss,
-                                    BSON("bar"
-                                         << "spam")));
-        ASSERT_EQUALS(2U,
-                      _client.count(_nss,
-                                    BSON("foo.bar"
-                                         << "spam")));
+        ASSERT_EQUALS(2U, _client.count(_nss, BSON("bar" << "spam")));
+        ASSERT_EQUALS(2U, _client.count(_nss, BSON("foo.bar" << "spam")));
     }
 
 private:
@@ -1371,19 +1360,9 @@ public:
             b.appendSymbol("x", "eliot");
             ASSERT_EQUALS(17, _client.findOne(nss(), b.obj())["z"].number());
         }
-        ASSERT_EQUALS(17,
-                      _client
-                          .findOne(nss(),
-                                   BSON("x"
-                                        << "eliot"))["z"]
-                          .number());
+        ASSERT_EQUALS(17, _client.findOne(nss(), BSON("x" << "eliot"))["z"].number());
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("x" << 1)));
-        ASSERT_EQUALS(17,
-                      _client
-                          .findOne(nss(),
-                                   BSON("x"
-                                        << "eliot"))["z"]
-                          .number());
+        ASSERT_EQUALS(17, _client.findOne(nss(), BSON("x" << "eliot"))["z"].number());
     }
 };
 
@@ -1554,9 +1533,8 @@ public:
 
         BSONObj info;
         _client.runCommand(DatabaseName::kLocal,
-                           BSON("create"
-                                << "oplog.querytests.findingstart"
-                                << "capped" << true << "size" << 4096),
+                           BSON("create" << "oplog.querytests.findingstart"
+                                         << "capped" << true << "size" << 4096),
                            info);
         // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
         // testing, so the oplog may already exist on the test node; in this case, trying to create
@@ -1620,9 +1598,8 @@ public:
 
         BSONObj info;
         _client.runCommand(DatabaseName::kLocal,
-                           BSON("create"
-                                << "oplog.querytests.findingstart"
-                                << "capped" << true << "size" << 4096),
+                           BSON("create" << "oplog.querytests.findingstart"
+                                         << "capped" << true << "size" << 4096),
                            info);
         // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
         // testing, so the oplog may already exist on the test node; in this case, trying to create
@@ -1687,9 +1664,8 @@ public:
 
         BSONObj info;
         _client.runCommand(DatabaseName::kLocal,
-                           BSON("create"
-                                << "oplog.querytests.findingstart"
-                                << "capped" << true << "size" << 4096),
+                           BSON("create" << "oplog.querytests.findingstart"
+                                         << "capped" << true << "size" << 4096),
                            info);
         // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
         // testing, so the oplog may already exist on the test node; in this case, trying to create

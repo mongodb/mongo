@@ -236,7 +236,7 @@ class RemoteCommandRetryScheduler::RetryPolicyForCategory final
 public:
     RetryPolicyForCategory(std::size_t maximumAttempts, Milliseconds maximumResponseElapsedTotal)
         : _maximumAttempts(maximumAttempts),
-          _maximumResponseElapsedTotal(maximumResponseElapsedTotal){};
+          _maximumResponseElapsedTotal(maximumResponseElapsedTotal) {};
 
     std::size_t getMaximumAttempts() const override {
         return _maximumAttempts;

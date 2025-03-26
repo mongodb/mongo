@@ -45,7 +45,7 @@ public:
     static constexpr auto code = ErrorCodes::TxnRetryCounterTooOld;
 
     explicit TxnRetryCounterTooOldInfo(const TxnRetryCounter txnRetryCounter)
-        : _txnRetryCounter(txnRetryCounter){};
+        : _txnRetryCounter(txnRetryCounter) {};
 
     const auto& getTxnRetryCounter() const {
         return _txnRetryCounter;

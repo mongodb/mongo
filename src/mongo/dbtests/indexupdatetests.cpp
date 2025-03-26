@@ -183,10 +183,9 @@ public:
         MultiIndexBlock indexer;
         indexer.ignoreUniqueConstraint();
 
-        const BSONObj spec = BSON("name"
-                                  << "a"
-                                  << "key" << BSON("a" << 1) << "v"
-                                  << static_cast<int>(kIndexVersion) << "unique" << true);
+        const BSONObj spec = BSON("name" << "a"
+                                         << "key" << BSON("a" << 1) << "v"
+                                         << static_cast<int>(kIndexVersion) << "unique" << true);
 
         ScopeGuard abortOnExit([&] {
             indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
@@ -240,10 +239,10 @@ public:
             AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
             MultiIndexBlock indexer;
 
-            const BSONObj spec = BSON("name"
-                                      << "a"
-                                      << "key" << BSON("a" << 1) << "v"
-                                      << static_cast<int>(kIndexVersion) << "unique" << true);
+            const BSONObj spec =
+                BSON("name" << "a"
+                            << "key" << BSON("a" << 1) << "v" << static_cast<int>(kIndexVersion)
+                            << "unique" << true);
             ScopeGuard abortOnExit([&] {
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
@@ -400,10 +399,9 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
 class SimpleCompoundIndex : public IndexBuildBase {
 public:
     SimpleCompoundIndex() {
-        ASSERT_OK(createIndex(BSON("name"
-                                   << "x"
-                                   << "key" << BSON("x" << 1 << "y" << 1) << "v"
-                                   << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndex(BSON("name" << "x"
+                                          << "key" << BSON("x" << 1 << "y" << 1) << "v"
+                                          << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -412,21 +410,19 @@ public:
     void run() {
         // Cannot have same key spec with an option different from the existing one.
         ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
-                      createIndex(BSON("name"
-                                       << "x"
-                                       << "key" << BSON("x" << 1 << "y" << 1) << "storageEngine"
-                                       << BSON("wiredTiger" << BSONObj()) << "v"
-                                       << static_cast<int>(kIndexVersion))));
+                      createIndex(BSON("name" << "x"
+                                              << "key" << BSON("x" << 1 << "y" << 1)
+                                              << "storageEngine" << BSON("wiredTiger" << BSONObj())
+                                              << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
 class SameSpecSameOptions : public SimpleCompoundIndex {
 public:
     void run() {
-        ASSERT_OK(createIndex(BSON("name"
-                                   << "x"
-                                   << "key" << BSON("x" << 1 << "y" << 1) << "v"
-                                   << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndex(BSON("name" << "x"
+                                          << "key" << BSON("x" << 1 << "y" << 1) << "v"
+                                          << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -435,10 +431,9 @@ public:
     void run() {
         // Cannot create a different index with the same name as the existing one.
         ASSERT_EQUALS(ErrorCodes::IndexKeySpecsConflict,
-                      createIndex(BSON("name"
-                                       << "x"
-                                       << "key" << BSON("y" << 1 << "x" << 1) << "v"
-                                       << static_cast<int>(kIndexVersion))));
+                      createIndex(BSON("name" << "x"
+                                              << "key" << BSON("y" << 1 << "x" << 1) << "v"
+                                              << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -448,13 +443,10 @@ public:
 class ComplexIndex : public IndexBuildBase {
 public:
     ComplexIndex() {
-        ASSERT_OK(createIndex(BSON("name"
-                                   << "super"
-                                   << "unique" << 1 << "sparse" << true << "expireAfterSeconds"
-                                   << 3600 << "key"
-                                   << BSON("superIdx"
-                                           << "2d")
-                                   << "v" << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndex(BSON(
+            "name" << "super"
+                   << "unique" << 1 << "sparse" << true << "expireAfterSeconds" << 3600 << "key"
+                   << BSON("superIdx" << "2d") << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -465,13 +457,10 @@ public:
         // the original. This will throw an IndexOptionsConflict as the index already exists under
         // another name.
         ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
-                      createIndex(BSON("name"
-                                       << "super2"
-                                       << "expireAfterSeconds" << 3600 << "sparse" << true
-                                       << "unique" << 1 << "key"
-                                       << BSON("superIdx"
-                                               << "2d")
-                                       << "v" << static_cast<int>(kIndexVersion))));
+                      createIndex(BSON("name" << "super2"
+                                              << "expireAfterSeconds" << 3600 << "sparse" << true
+                                              << "unique" << 1 << "key" << BSON("superIdx" << "2d")
+                                              << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -480,13 +469,10 @@ public:
     void run() {
         // Exactly the same specs with the existing one, only specified in a different order than
         // the original, but with the same name.
-        ASSERT_OK(createIndex(BSON("name"
-                                   << "super"
-                                   << "expireAfterSeconds" << 3600 << "sparse" << true << "unique"
-                                   << 1 << "key"
-                                   << BSON("superIdx"
-                                           << "2d")
-                                   << "v" << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndex(BSON("name" << "super"
+                                          << "expireAfterSeconds" << 3600 << "sparse" << true
+                                          << "unique" << 1 << "key" << BSON("superIdx" << "2d")
+                                          << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -496,40 +482,32 @@ public:
 class SameSpecDifferentUnique : public ComplexIndex {
 public:
     void run() {
-        ASSERT_OK(createIndex(BSON("name"
-                                   << "super2"
-                                   << "unique" << false << "sparse" << true << "expireAfterSeconds"
-                                   << 3600 << "key"
-                                   << BSON("superIdx"
-                                           << "2d")
-                                   << "v" << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndex(BSON(
+            "name" << "super2"
+                   << "unique" << false << "sparse" << true << "expireAfterSeconds" << 3600 << "key"
+                   << BSON("superIdx" << "2d") << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
 class SameSpecDifferentSparse : public ComplexIndex {
 public:
     void run() {
-        ASSERT_OK(createIndex(BSON("name"
-                                   << "super3"
-                                   << "unique" << 1 << "sparse" << false << "expireAfterSeconds"
-                                   << 3600 << "key"
-                                   << BSON("superIdx"
-                                           << "2d")
-                                   << "v" << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndex(BSON(
+            "name" << "super3"
+                   << "unique" << 1 << "sparse" << false << "expireAfterSeconds" << 3600 << "key"
+                   << BSON("superIdx" << "2d") << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
 class SameSpecDifferentTTL : public ComplexIndex {
 public:
     void run() {
-        ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
-                      createIndex(BSON("name"
-                                       << "super4"
-                                       << "unique" << 1 << "sparse" << true << "expireAfterSeconds"
-                                       << 2400 << "key"
-                                       << BSON("superIdx"
-                                               << "2d")
-                                       << "v" << static_cast<int>(kIndexVersion))));
+        ASSERT_EQUALS(
+            ErrorCodes::IndexOptionsConflict,
+            createIndex(BSON("name" << "super4"
+                                    << "unique" << 1 << "sparse" << true << "expireAfterSeconds"
+                                    << 2400 << "key" << BSON("superIdx" << "2d") << "v"
+                                    << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -564,19 +542,17 @@ public:
                 createIndex(_createSpec(BSON(storageEngineName << BSON("configString" << 1)))));
 
             // Valid 'wiredTiger' configuration.
-            ASSERT_OK(createIndex(
-                _createSpec(BSON(storageEngineName << BSON("configString"
-                                                           << "block_compressor=zlib")))));
+            ASSERT_OK(createIndex(_createSpec(
+                BSON(storageEngineName << BSON("configString" << "block_compressor=zlib")))));
         }
     }
 
 protected:
     template <typename T>
     BSONObj _createSpec(T storageEngineValue) {
-        return BSON("name"
-                    << "super2"
-                    << "key" << BSON("a" << 1) << "v" << static_cast<int>(kIndexVersion)
-                    << "storageEngine" << storageEngineValue);
+        return BSON("name" << "super2"
+                           << "key" << BSON("a" << 1) << "v" << static_cast<int>(kIndexVersion)
+                           << "storageEngine" << storageEngineValue);
     }
 };
 
@@ -602,8 +578,7 @@ public:
         DBDirectClient client(opCtx.get());
         client.dropCollection(_nss);
         IndexSpec indexSpec;
-        indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
-                                                                  << "fr")));
+        indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale" << "fr")));
         client.createIndex(_nss, indexSpec);
 
         auto response = client.insertAcknowledged(_nss, {BSON("a" << BSONSymbol("mySymbol"))});
@@ -636,8 +611,7 @@ public:
         DBDirectClient client(opCtx.get());
         client.dropCollection(_nss);
         IndexSpec indexSpec;
-        indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
-                                                                  << "fr")));
+        indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale" << "fr")));
         client.createIndex(_nss, indexSpec);
 
         auto response = client.insertAcknowledged(
@@ -654,8 +628,7 @@ public:
         DBDirectClient client(opCtx.get());
         client.dropCollection(_nss);
         IndexSpec indexSpec;
-        indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
-                                                                  << "fr")));
+        indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale" << "fr")));
         client.createIndex(_nss, indexSpec);
 
         auto response = client.insertAcknowledged(
@@ -674,8 +647,7 @@ public:
         client.insert(_nss, BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol"))));
         ASSERT_EQUALS(client.count(_nss), 1U);
         IndexSpec indexSpec;
-        indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
-                                                                  << "fr")));
+        indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale" << "fr")));
         ASSERT_THROWS_CODE(client.createIndex(_nss, indexSpec),
                            AssertionException,
                            ErrorCodes::CannotBuildIndexKeys);
@@ -691,11 +663,8 @@ public:
         BSONObj cmdResult;
         ASSERT_TRUE(
             client.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "unittests"),
-                              BSON("create"
-                                   << "indexupdate"
-                                   << "collation"
-                                   << BSON("locale"
-                                           << "fr")),
+                              BSON("create" << "indexupdate"
+                                            << "collation" << BSON("locale" << "fr")),
                               cmdResult));
         IndexSpec indexSpec;
         indexSpec.addKey("a");

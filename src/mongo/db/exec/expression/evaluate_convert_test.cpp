@@ -85,14 +85,12 @@ using EvaluateConvertTest = AggregationContextFixture;
 TEST_F(EvaluateConvertTest, ConvertToBinDataWithNonNumericSubtypeFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << BSON("type"
-                                                << "binData"
-                                                << "subtype"
-                                                << "newUUID")
-                                        << "format" << toStringData(BinDataFormat::kUuid)));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << BSON("type" << "binData"
+                                                               << "subtype"
+                                                               << "newUUID")
+                                                << "format" << toStringData(BinDataFormat::kUuid)));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document input{{"path1", "abc"_sd}};
@@ -109,11 +107,10 @@ TEST_F(EvaluateConvertTest, ConvertToBinDataWithNonNumericSubtypeFails) {
 TEST_F(EvaluateConvertTest, ConvertToBinDataWithInvalidUtf8Fails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "binData"
-                                        << "format" << toStringData(BinDataFormat::kUtf8)));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "binData"
+                                                << "format" << toStringData(BinDataFormat::kUtf8)));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document input{{"path1", "\xE2\x82"_sd}};
@@ -128,11 +125,10 @@ TEST_F(EvaluateConvertTest, ConvertToBinDataWithInvalidUtf8Fails) {
 TEST_F(EvaluateConvertTest, ConvertToStringWithInvalidUtf8BinDataFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"
-                                        << "format" << toStringData(BinDataFormat::kUtf8)));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"
+                                                << "format" << toStringData(BinDataFormat::kUtf8)));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto invalidUtf8 = "\xE2\x82";
@@ -153,12 +149,11 @@ TEST_F(EvaluateConvertTest, ConvertToBinDataWithOutOfBoundsSubtypeFails) {
     auto expCtx = getExpCtx();
 
     auto assertFailsWithOutOfBoundsSubtype = [&](int subtypeValue) {
-        auto spec = BSON("$convert" << BSON("input"
-                                            << "$path1"
+        auto spec =
+            BSON("$convert" << BSON("input" << "$path1"
                                             << "to"
-                                            << BSON("type"
-                                                    << "binData"
-                                                    << "subtype" << subtypeValue)
+                                            << BSON("type" << "binData"
+                                                           << "subtype" << subtypeValue)
                                             << "format" << toStringData(BinDataFormat::kBase64)));
         auto convertExp =
             Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
@@ -182,12 +177,11 @@ TEST_F(EvaluateConvertTest, ConvertToBinDataWithOutOfBoundsSubtypeFails) {
 TEST_F(EvaluateConvertTest, ConvertToBinDataWithNumericNonIntegerSubtypeFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
+    auto spec =
+        BSON("$convert" << BSON("input" << "$path1"
                                         << "to"
-                                        << BSON("type"
-                                                << "binData"
-                                                << "subtype" << 1.5)
+                                        << BSON("type" << "binData"
+                                                       << "subtype" << 1.5)
                                         << "format" << toStringData(BinDataFormat::kBase64)));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
@@ -205,11 +199,10 @@ TEST_F(EvaluateConvertTest, ConvertToBinDataWithNumericNonIntegerSubtypeFails) {
 TEST_F(EvaluateConvertTest, InvalidTypeNameFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "dinosaur"
-                                        << "onError" << 0));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "dinosaur"
+                                                << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
@@ -224,9 +217,8 @@ TEST_F(EvaluateConvertTest, InvalidTypeNameFails) {
 TEST_F(EvaluateConvertTest, NonIntegralTypeFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to" << 3.6 << "onError" << 0));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to" << 3.6 << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
@@ -243,12 +235,9 @@ TEST_F(EvaluateConvertTest, NonIntegralTypeFails) {
 TEST_F(EvaluateConvertTest, NonStringNonNumericalTypeFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << BSON("dinosaur"
-                                                << "Tyrannosaurus rex")
-                                        << "onError" << 0));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to" << BSON("dinosaur" << "Tyrannosaurus rex")
+                                                << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
@@ -265,9 +254,8 @@ TEST_F(EvaluateConvertTest, NonStringNonNumericalTypeFails) {
 TEST_F(EvaluateConvertTest, InvalidNumericTargetTypeFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to" << 100 << "onError" << 0));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to" << 100 << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
@@ -285,9 +273,8 @@ TEST_F(EvaluateConvertTest, InvalidNumericTargetTypeFails) {
 TEST_F(EvaluateConvertTest, NegativeNumericTargetTypeFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to" << -2 << "onError" << 0));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to" << -2 << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
@@ -340,9 +327,8 @@ TEST_F(EvaluateConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvide
         auto inputValue = conversion.first;
         auto toValue = conversion.second;
 
-        auto spec = BSON("$convert" << BSON("input"
-                                            << "$path1"
-                                            << "to" << toValue));
+        auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                    << "to" << toValue));
 
         Document input{{"path1", inputValue}};
 
@@ -363,10 +349,9 @@ TEST_F(EvaluateConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvide
         auto inputValue = conversion.first;
         auto toValue = conversion.second;
 
-        auto spec = BSON("$convert" << BSON("input"
-                                            << "$path1"
-                                            << "to" << toValue << "onError"
-                                            << "X"));
+        auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                    << "to" << toValue << "onError"
+                                                    << "X"));
 
         Document input{{"path1", inputValue}};
 
@@ -381,10 +366,9 @@ TEST_F(EvaluateConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvide
 TEST_F(EvaluateConvertTest, ConvertNullishInput) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document nullInput{{"path1", BSONNULL}};
@@ -399,14 +383,13 @@ TEST_F(EvaluateConvertTest, ConvertNullishInput) {
 TEST_F(EvaluateConvertTest, ConvertNullishInputWithOnNull) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"
-                                        << "onNull"
-                                        << "B)"
-                                        << "onError"
-                                        << "Should not be used here"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"
+                                                << "onNull"
+                                                << "B)"
+                                                << "onError"
+                                                << "Should not be used here"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document nullInput{{"path1", BSONNULL}};
@@ -421,14 +404,13 @@ TEST_F(EvaluateConvertTest, ConvertNullishInputWithOnNull) {
 TEST_F(EvaluateConvertTest, NullishToReturnsNull) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "inputString"
-                                        << "to"
-                                        << "$path1"
-                                        << "onNull"
-                                        << "Should not be used here"
-                                        << "onError"
-                                        << "Also should not be used"));
+    auto spec = BSON("$convert" << BSON("input" << "inputString"
+                                                << "to"
+                                                << "$path1"
+                                                << "onNull"
+                                                << "Should not be used here"
+                                                << "onError"
+                                                << "Also should not be used"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document nullInput{{"path1", BSONNULL}};
@@ -455,10 +437,9 @@ TEST_F(EvaluateConvertTest, NullInputOverridesNullTo) {
 TEST_F(EvaluateConvertTest, DoubleIdentityConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "double"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "double"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document doubleInput{{"path1", 2.4}};
@@ -485,10 +466,9 @@ TEST_F(EvaluateConvertTest, DoubleIdentityConversion) {
 TEST_F(EvaluateConvertTest, BoolIdentityConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueBoolInput{{"path1", true}};
@@ -503,10 +483,9 @@ TEST_F(EvaluateConvertTest, BoolIdentityConversion) {
 TEST_F(EvaluateConvertTest, StringIdentityConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document stringInput{{"path1", "More cowbell"_sd}};
@@ -517,10 +496,9 @@ TEST_F(EvaluateConvertTest, StringIdentityConversion) {
 TEST_F(EvaluateConvertTest, ObjectIdIdentityConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "objectId"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "objectId"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document oidInput{{"path1", OID("0123456789abcdef01234567")}};
@@ -532,10 +510,9 @@ TEST_F(EvaluateConvertTest, ObjectIdIdentityConversion) {
 TEST_F(EvaluateConvertTest, DateIdentityConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "date"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "date"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document dateInput{{"path1", Date_t{}}};
@@ -546,10 +523,9 @@ TEST_F(EvaluateConvertTest, DateIdentityConversion) {
 TEST_F(EvaluateConvertTest, IntIdentityConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document intInput{{"path1", int{123}}};
@@ -560,10 +536,9 @@ TEST_F(EvaluateConvertTest, IntIdentityConversion) {
 TEST_F(EvaluateConvertTest, LongIdentityConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document longInput{{"path1", 123LL}};
@@ -574,10 +549,9 @@ TEST_F(EvaluateConvertTest, LongIdentityConversion) {
 TEST_F(EvaluateConvertTest, DecimalIdentityConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "decimal"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "decimal"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document decimalInput{{"path1", Decimal128("2.4")}};
@@ -619,27 +593,23 @@ TEST_F(EvaluateConvertTest, ConvertToBinDataWithDefaultSubtypeSucceeds) {
     };
 
     // Test with a type string as the 'to' value.
-    assertSucceedsWithDefaultSubtype(BSON("$convert" << BSON("input"
-                                                             << "$path1"
-                                                             << "to"
-                                                             << "binData")));
+    assertSucceedsWithDefaultSubtype(BSON("$convert" << BSON("input" << "$path1"
+                                                                     << "to"
+                                                                     << "binData")));
 
     // Test with an object without 'subtype' field as the 'to' value.
-    assertSucceedsWithDefaultSubtype(BSON("$convert" << BSON("input"
-                                                             << "$path1"
-                                                             << "to"
-                                                             << BSON("type"
-                                                                     << "binData"))));
+    assertSucceedsWithDefaultSubtype(
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData"))));
 }
 
 TEST_F(EvaluateConvertTest, BinDataToBinDataConversionSameSubtype) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << BSON("type"
-                                                << "binData"
+    auto spec = BSON("$convert" << BSON(
+                         "input" << "$path1"
+                                 << "to"
+                                 << BSON("type" << "binData"
                                                 << "subtype" << static_cast<int>(BinDataGeneral))));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
@@ -655,12 +625,11 @@ TEST_F(EvaluateConvertTest, BinDataToBinDataConversionSameSubtype) {
 TEST_F(EvaluateConvertTest, BinDataToBinDataConversionDifferentSubtypesFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
+    auto spec =
+        BSON("$convert" << BSON("input" << "$path1"
                                         << "to"
-                                        << BSON("type"
-                                                << "binData"
-                                                << "subtype" << static_cast<int>(newUUID))));
+                                        << BSON("type" << "binData"
+                                                       << "subtype" << static_cast<int>(newUUID))));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     std::string data = "(^_^)";
@@ -682,13 +651,12 @@ TEST_F(EvaluateConvertTest, BinDataToBinDataConversionDifferentSubtypesFails) {
 TEST_F(EvaluateConvertTest, Base64StringToNonUUIDBinDataConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << BSON("type"
-                                                << "binData"
-                                                << "subtype" << static_cast<int>(BinDataGeneral))
-                                        << "format" << toStringData(BinDataFormat::kBase64)));
+    auto spec = BSON(
+        "$convert" << BSON("input" << "$path1"
+                                   << "to"
+                                   << BSON("type" << "binData"
+                                                  << "subtype" << static_cast<int>(BinDataGeneral))
+                                   << "format" << toStringData(BinDataFormat::kBase64)));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     const std::string data{"(^_^)"};
@@ -703,13 +671,12 @@ TEST_F(EvaluateConvertTest, Base64StringToNonUUIDBinDataConversion) {
 TEST_F(EvaluateConvertTest, UUIDStringToNonUUIDBinDataConversionFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << BSON("type"
-                                                << "binData"
-                                                << "subtype" << static_cast<int>(BinDataGeneral))
-                                        << "format" << toStringData(BinDataFormat::kUuid)));
+    auto spec = BSON(
+        "$convert" << BSON("input" << "$path1"
+                                   << "to"
+                                   << BSON("type" << "binData"
+                                                  << "subtype" << static_cast<int>(BinDataGeneral))
+                                   << "format" << toStringData(BinDataFormat::kUuid)));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     const std::string uuidString{"867dee52-c331-484e-92d1-c56479b8e67e"};
@@ -728,8 +695,7 @@ TEST_F(EvaluateConvertTest, UUIDStringToNonUUIDBinDataConversionFails) {
 TEST_F(EvaluateConvertTest, InvalidStringToUUIDBinDataConversionFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$toUUID"
-                     << "$path1");
+    auto spec = BSON("$toUUID" << "$path1");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     // The input string is not a valid UUID string.
@@ -747,10 +713,9 @@ TEST_F(EvaluateConvertTest, InvalidStringToUUIDBinDataConversionFails) {
 TEST_F(EvaluateConvertTest, BinDataToStringConversionWithoutFormatFails) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     const std::string data{"(^_^)"};
@@ -771,8 +736,7 @@ TEST_F(EvaluateConvertTest, BinDataToStringConversionWithoutFormatFails) {
 TEST_F(EvaluateConvertTest, StringToUUIDBinDataConversion) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$toUUID"
-                     << "$path1");
+    auto spec = BSON("$toUUID" << "$path1");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     const auto uuid = UUID::gen();
@@ -794,28 +758,23 @@ TEST_F(EvaluateConvertTest, UUIDStringRoundTripConversion) {
 
     const Value stringValue{"867dee52-c331-484e-92d1-c56479b8e67e"_sd};
 
-    const auto binDataValue = evalWithValueOnPath(BSON("$toUUID"
-                                                       << "$path1"),
-                                                  stringValue);
+    const auto binDataValue = evalWithValueOnPath(BSON("$toUUID" << "$path1"), stringValue);
 
-    const auto roundTripStringValue = evalWithValueOnPath(BSON("$toString"
-                                                               << "$path1"),
-                                                          binDataValue);
+    const auto roundTripStringValue =
+        evalWithValueOnPath(BSON("$toString" << "$path1"), binDataValue);
     ASSERT_VALUE_EQ(stringValue, roundTripStringValue);
 
-    const auto roundTripBinDataValue = evalWithValueOnPath(BSON("$toUUID"
-                                                                << "$path1"),
-                                                           roundTripStringValue);
+    const auto roundTripBinDataValue =
+        evalWithValueOnPath(BSON("$toUUID" << "$path1"), roundTripStringValue);
     ASSERT_VALUE_EQ(binDataValue, roundTripBinDataValue);
 }
 
 TEST_F(EvaluateConvertTest, ConvertDateToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     // All date inputs evaluate as true.
@@ -827,10 +786,9 @@ TEST_F(EvaluateConvertTest, ConvertDateToBool) {
 TEST_F(EvaluateConvertTest, ConvertIntToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueIntInput{{"path1", int{1}}};
@@ -845,10 +803,9 @@ TEST_F(EvaluateConvertTest, ConvertIntToBool) {
 TEST_F(EvaluateConvertTest, ConvertLongToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueLongInput{{"path1", -1LL}};
@@ -863,10 +820,9 @@ TEST_F(EvaluateConvertTest, ConvertLongToBool) {
 TEST_F(EvaluateConvertTest, ConvertDoubleToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueDoubleInput{{"path1", 2.4}};
@@ -893,10 +849,9 @@ TEST_F(EvaluateConvertTest, ConvertDoubleToBool) {
 TEST_F(EvaluateConvertTest, ConvertDecimalToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueDecimalInput{{"path1", Decimal128(5)}};
@@ -935,10 +890,9 @@ TEST_F(EvaluateConvertTest, ConvertDecimalToBool) {
 TEST_F(EvaluateConvertTest, ConvertStringToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document stringInput{{"path1", "str"_sd}};
@@ -953,10 +907,9 @@ TEST_F(EvaluateConvertTest, ConvertStringToBool) {
 TEST_F(EvaluateConvertTest, ConvertObjectIdToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document oidInput{{"path1", OID("59E8A8D8FEDCBA9876543210")}};
@@ -967,10 +920,9 @@ TEST_F(EvaluateConvertTest, ConvertObjectIdToBool) {
 TEST_F(EvaluateConvertTest, ConvertMinKeyToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document minKeyInput{{"path1", MINKEY}};
@@ -981,10 +933,9 @@ TEST_F(EvaluateConvertTest, ConvertMinKeyToBool) {
 TEST_F(EvaluateConvertTest, ConvertObjectToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document objectInput{{"path1", Document{{"foo", 1}}}};
@@ -995,10 +946,9 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBool) {
 TEST_F(EvaluateConvertTest, ConvertArrayToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document arrayInput{{"path1", BSON_ARRAY(1)}};
@@ -1009,10 +959,9 @@ TEST_F(EvaluateConvertTest, ConvertArrayToBool) {
 TEST_F(EvaluateConvertTest, ConvertBinDataToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     char data[] = "(^_^)";
@@ -1024,10 +973,9 @@ TEST_F(EvaluateConvertTest, ConvertBinDataToBool) {
 TEST_F(EvaluateConvertTest, ConvertRegexToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document regexInput{{"path1", BSONRegEx("ab*a"_sd)}};
@@ -1038,10 +986,9 @@ TEST_F(EvaluateConvertTest, ConvertRegexToBool) {
 TEST_F(EvaluateConvertTest, ConvertDBRefToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document refInput{{"path1", BSONDBRef("db.coll"_sd, OID("aaaaaaaaaaaaaaaaaaaaaaaa"))}};
@@ -1052,10 +999,9 @@ TEST_F(EvaluateConvertTest, ConvertDBRefToBool) {
 TEST_F(EvaluateConvertTest, ConvertCodeToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document codeInput{{"path1", BSONCode("print('Hello world!');"_sd)}};
@@ -1066,10 +1012,9 @@ TEST_F(EvaluateConvertTest, ConvertCodeToBool) {
 TEST_F(EvaluateConvertTest, ConvertSymbolToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document symbolInput{{"path1", BSONSymbol("print"_sd)}};
@@ -1080,10 +1025,9 @@ TEST_F(EvaluateConvertTest, ConvertSymbolToBool) {
 TEST_F(EvaluateConvertTest, ConvertCodeWScopeToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document codeWScopeInput{
@@ -1095,10 +1039,9 @@ TEST_F(EvaluateConvertTest, ConvertCodeWScopeToBool) {
 TEST_F(EvaluateConvertTest, ConvertTimestampToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document timestampInput{{"path1", Timestamp()}};
@@ -1109,10 +1052,9 @@ TEST_F(EvaluateConvertTest, ConvertTimestampToBool) {
 TEST_F(EvaluateConvertTest, ConvertMaxKeyToBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "bool"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "bool"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document maxKeyInput{{"path1", MAXKEY}};
@@ -1123,10 +1065,9 @@ TEST_F(EvaluateConvertTest, ConvertMaxKeyToBool) {
 TEST_F(EvaluateConvertTest, ConvertNumericToDouble) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "double"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "double"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document intInput{{"path1", int{1}}};
@@ -1186,10 +1127,9 @@ TEST_F(EvaluateConvertTest, ConvertNumericToDouble) {
 TEST_F(EvaluateConvertTest, ConvertDateToDouble) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "double"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "double"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123)}};
@@ -1207,10 +1147,9 @@ TEST_F(EvaluateConvertTest, ConvertDateToDouble) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToDouble) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "double"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "double"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document overflowInput{{"path1", Decimal128("1e309")}};
@@ -1235,12 +1174,11 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToDouble) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToDoubleWithOnError) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "double"
-                                        << "onError"
-                                        << "X"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "double"
+                                                << "onError"
+                                                << "X"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document overflowInput{{"path1", Decimal128("1e309")}};
@@ -1255,10 +1193,9 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToDoubleWithOnError) {
 TEST_F(EvaluateConvertTest, ConvertNumericToDecimal) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "decimal"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "decimal"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document intInput{{"path1", int{1}}};
@@ -1310,10 +1247,9 @@ TEST_F(EvaluateConvertTest, ConvertNumericToDecimal) {
 TEST_F(EvaluateConvertTest, ConvertDateToDecimal) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "decimal"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "decimal"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123)}};
@@ -1330,10 +1266,9 @@ TEST_F(EvaluateConvertTest, ConvertDateToDecimal) {
 TEST_F(EvaluateConvertTest, ConvertDoubleToInt) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", 1.0}};
@@ -1371,10 +1306,9 @@ TEST_F(EvaluateConvertTest, ConvertDoubleToInt) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDoubleToInt) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     int maxInt = std::numeric_limits<int>::max();
@@ -1434,12 +1368,11 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDoubleToInt) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDoubleToIntWithOnError) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"
-                                        << "onError"
-                                        << "X"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"
+                                                << "onError"
+                                                << "X"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     int maxInt = std::numeric_limits<int>::max();
@@ -1472,10 +1405,9 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDoubleToIntWithOnError) {
 TEST_F(EvaluateConvertTest, ConvertDoubleToLong) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", 1.0}};
@@ -1517,10 +1449,9 @@ TEST_F(EvaluateConvertTest, ConvertDoubleToLong) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDoubleToLong) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     double overflowLong = BSONElement::kLongLongMaxPlusOneAsDouble;
@@ -1578,12 +1509,11 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDoubleToLong) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDoubleToLongWithOnError) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"
-                                        << "onError"
-                                        << "X"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"
+                                                << "onError"
+                                                << "X"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     double overflowLong = BSONElement::kLongLongMaxPlusOneAsDouble;
@@ -1614,10 +1544,9 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDoubleToLongWithOnError) {
 TEST_F(EvaluateConvertTest, ConvertDecimalToInt) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", Decimal128("1.0")}};
@@ -1655,10 +1584,9 @@ TEST_F(EvaluateConvertTest, ConvertDecimalToInt) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToInt) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     int maxInt = std::numeric_limits<int>::max();
@@ -1723,12 +1651,11 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToInt) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToIntWithOnError) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"
-                                        << "onError"
-                                        << "X"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"
+                                                << "onError"
+                                                << "X"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     int maxInt = std::numeric_limits<int>::max();
@@ -1763,10 +1690,9 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToIntWithOnError) {
 TEST_F(EvaluateConvertTest, ConvertDecimalToLong) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", Decimal128("1.0")}};
@@ -1804,10 +1730,9 @@ TEST_F(EvaluateConvertTest, ConvertDecimalToLong) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToLong) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     long long maxVal = std::numeric_limits<long long>::max();
@@ -1873,12 +1798,11 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToLong) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToLongWithOnError) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"
-                                        << "onError"
-                                        << "X"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"
+                                                << "onError"
+                                                << "X"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     long long maxVal = std::numeric_limits<long long>::max();
@@ -1914,10 +1838,9 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsDecimalToLongWithOnError) {
 TEST_F(EvaluateConvertTest, ConvertDateToLong) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123LL)}};
@@ -1928,10 +1851,9 @@ TEST_F(EvaluateConvertTest, ConvertDateToLong) {
 TEST_F(EvaluateConvertTest, ConvertIntToLong) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", 1}};
@@ -1952,10 +1874,9 @@ TEST_F(EvaluateConvertTest, ConvertIntToLong) {
 TEST_F(EvaluateConvertTest, ConvertLongToInt) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", 1}};
@@ -1976,10 +1897,9 @@ TEST_F(EvaluateConvertTest, ConvertLongToInt) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsLongToInt) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     long long maxInt = std::numeric_limits<int>::max();
@@ -2006,12 +1926,11 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsLongToInt) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsLongToIntWithOnError) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"
-                                        << "onError"
-                                        << "X"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"
+                                                << "onError"
+                                                << "X"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     long long maxInt = std::numeric_limits<int>::max();
@@ -2028,10 +1947,9 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsLongToIntWithOnError) {
 TEST_F(EvaluateConvertTest, ConvertBoolToInt) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "int"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document boolFalse{{"path1", false}};
@@ -2046,10 +1964,9 @@ TEST_F(EvaluateConvertTest, ConvertBoolToInt) {
 TEST_F(EvaluateConvertTest, ConvertBoolToLong) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "long"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "long"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document boolFalse{{"path1", false}};
@@ -2064,10 +1981,9 @@ TEST_F(EvaluateConvertTest, ConvertBoolToLong) {
 TEST_F(EvaluateConvertTest, ConvertNumberToDate) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "date"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "date"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document longInput{{"path1", 0LL}};
@@ -2096,10 +2012,9 @@ TEST_F(EvaluateConvertTest, ConvertNumberToDate) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsNumberToDate) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "date"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "date"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document doubleOverflowInput{{"path1", 1.0e100}};
@@ -2212,12 +2127,11 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsNumberToDate) {
 TEST_F(EvaluateConvertTest, ConvertOutOfBoundsNumberToDateWithOnError) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "date"
-                                        << "onError"
-                                        << "X"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "date"
+                                                << "onError"
+                                                << "X"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     // Int is explicitly disallowed for date conversions. Clients must use 64-bit long instead.
@@ -2279,10 +2193,9 @@ TEST_F(EvaluateConvertTest, ConvertOutOfBoundsNumberToDateWithOnError) {
 TEST_F(EvaluateConvertTest, ConvertObjectIdToDate) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "date"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "date"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document oidInput{{"path1", OID("59E8A8D8FEDCBA9876543210")}};
@@ -2294,10 +2207,9 @@ TEST_F(EvaluateConvertTest, ConvertObjectIdToDate) {
 TEST_F(EvaluateConvertTest, ConvertTimestampToDate) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "date"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "date"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document timestampInput{{"path1", Timestamp(1508419800, 1)}};
@@ -3217,10 +3129,9 @@ TEST_F(EvaluateConvertTest, ConvertStringToDateWithOnNull) {
 TEST_F(EvaluateConvertTest, FormatDouble) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", 0.0}};
@@ -3290,10 +3201,9 @@ TEST_F(EvaluateConvertTest, FormatDouble) {
 TEST_F(EvaluateConvertTest, FormatObjectId) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", OID("000000000000000000000000")}};
@@ -3310,10 +3220,9 @@ TEST_F(EvaluateConvertTest, FormatObjectId) {
 TEST_F(EvaluateConvertTest, FormatBool) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueInput{{"path1", true}};
@@ -3328,10 +3237,9 @@ TEST_F(EvaluateConvertTest, FormatBool) {
 TEST_F(EvaluateConvertTest, FormatDate) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document epochInput{{"path1", Date_t::fromMillisSinceEpoch(0LL)}};
@@ -3348,10 +3256,9 @@ TEST_F(EvaluateConvertTest, FormatDate) {
 TEST_F(EvaluateConvertTest, FormatInt) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", int{0}}};
@@ -3370,10 +3277,9 @@ TEST_F(EvaluateConvertTest, FormatInt) {
 TEST_F(EvaluateConvertTest, FormatLong) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", 0LL}};
@@ -3394,10 +3300,9 @@ TEST_F(EvaluateConvertTest, FormatLong) {
 TEST_F(EvaluateConvertTest, FormatDecimal) {
     auto expCtx = getExpCtx();
 
-    auto spec = BSON("$convert" << BSON("input"
-                                        << "$path1"
-                                        << "to"
-                                        << "string"));
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", Decimal128("0")}};
@@ -3933,8 +3838,7 @@ using EvaluateConvertShortcutTest = AggregationContextFixture;
 TEST_F(EvaluateConvertShortcutTest, AcceptsSingleArgumentInArrayOrByItself) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toInt"
-                        << "1");
+    BSONObj spec = BSON("$toInt" << "1");
     auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
 
@@ -3952,8 +3856,7 @@ TEST_F(EvaluateConvertShortcutTest, AcceptsSingleArgumentInArrayOrByItself) {
 TEST_F(EvaluateConvertShortcutTest, ConvertsToInts) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toInt"
-                        << "1");
+    BSONObj spec = BSON("$toInt" << "1");
     auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -3963,8 +3866,7 @@ TEST_F(EvaluateConvertShortcutTest, ConvertsToInts) {
 TEST_F(EvaluateConvertShortcutTest, ConvertsBinDataToInts) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toInt"
-                        << "$path1");
+    BSONObj spec = BSON("$toInt" << "$path1");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convertExp.get()));
 
@@ -3978,8 +3880,7 @@ TEST_F(EvaluateConvertShortcutTest, ConvertsBinDataToInts) {
 TEST_F(EvaluateConvertShortcutTest, ConvertsBinDataToLongs) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toLong"
-                        << "$path1");
+    BSONObj spec = BSON("$toLong" << "$path1");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convertExp.get()));
 
@@ -3993,8 +3894,7 @@ TEST_F(EvaluateConvertShortcutTest, ConvertsBinDataToLongs) {
 TEST_F(EvaluateConvertShortcutTest, ConvertsBinDataToDoubles) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toDouble"
-                        << "$path1");
+    BSONObj spec = BSON("$toDouble" << "$path1");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convertExp.get()));
 
@@ -4016,8 +3916,7 @@ TEST_F(EvaluateConvertShortcutTest, ConvertsBinDataToDoubles) {
 TEST_F(EvaluateConvertShortcutTest, ConvertsToLongs) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toLong"
-                        << "1");
+    BSONObj spec = BSON("$toLong" << "1");
     auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -4027,8 +3926,7 @@ TEST_F(EvaluateConvertShortcutTest, ConvertsToLongs) {
 TEST_F(EvaluateConvertShortcutTest, ConvertsToDoubles) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toDouble"
-                        << "1");
+    BSONObj spec = BSON("$toDouble" << "1");
     auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -4038,8 +3936,7 @@ TEST_F(EvaluateConvertShortcutTest, ConvertsToDoubles) {
 TEST_F(EvaluateConvertShortcutTest, ConvertsToDecimals) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toDecimal"
-                        << "1");
+    BSONObj spec = BSON("$toDecimal" << "1");
     auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -4098,8 +3995,7 @@ TEST_F(EvaluateConvertShortcutTest, ReturnsNullOnNullishInput) {
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(BSONNULL), BSONType::jstNULL);
 
-    spec = BSON("$toInt"
-                << "$missing");
+    spec = BSON("$toInt" << "$missing");
     convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -4109,16 +4005,14 @@ TEST_F(EvaluateConvertShortcutTest, ReturnsNullOnNullishInput) {
 TEST_F(EvaluateConvertShortcutTest, ThrowsOnConversionFailure) {
     auto expCtx = getExpCtx();
 
-    BSONObj spec = BSON("$toInt"
-                        << "not an int");
+    BSONObj spec = BSON("$toInt" << "not an int");
     auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_THROWS_CODE(convert->evaluate({}, &expCtx->variables),
                        AssertionException,
                        ErrorCodes::ConversionFailure);
 
-    spec = BSON("$toObjectId"
-                << "not all hex values");
+    spec = BSON("$toObjectId" << "not all hex values");
     convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_THROWS_CODE(convert->evaluate({}, &expCtx->variables),

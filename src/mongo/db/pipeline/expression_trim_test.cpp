@@ -69,10 +69,8 @@ TEST(ExpressionTrimParsingTest, ThrowsIfSpecIsNotAnObject) {
     ASSERT_THROWS(Expression::parseExpression(
                       &expCtx, BSON("$ltrim" << BSONNULL), expCtx.variablesParseState),
                   AssertionException);
-    ASSERT_THROWS(Expression::parseExpression(&expCtx,
-                                              BSON("$rtrim"
-                                                   << "string"),
-                                              expCtx.variablesParseState),
+    ASSERT_THROWS(Expression::parseExpression(
+                      &expCtx, BSON("$rtrim" << "string"), expCtx.variablesParseState),
                   AssertionException);
 }
 
@@ -83,8 +81,7 @@ TEST(ExpressionTrimParsingTest, ThrowsIfSpecDoesNotSpecifyInput) {
                       &expCtx, BSON("$trim" << BSONObj()), expCtx.variablesParseState),
                   AssertionException);
     ASSERT_THROWS(Expression::parseExpression(&expCtx,
-                                              BSON("$ltrim" << BSON("chars"
-                                                                    << "xyz")),
+                                              BSON("$ltrim" << BSON("chars" << "xyz")),
                                               expCtx.variablesParseState),
                   AssertionException);
 }
@@ -96,27 +93,23 @@ TEST(ExpressionTrimParsingTest, ThrowsIfSpecContainsUnrecognizedField) {
                       &expCtx, BSON("$trim" << BSON("other" << 1)), expCtx.variablesParseState),
                   AssertionException);
     ASSERT_THROWS(Expression::parseExpression(&expCtx,
-                                              BSON("$ltrim" << BSON("chars"
-                                                                    << "xyz"
-                                                                    << "other" << 1)),
+                                              BSON("$ltrim" << BSON("chars" << "xyz"
+                                                                            << "other" << 1)),
                                               expCtx.variablesParseState),
                   AssertionException);
     ASSERT_THROWS(Expression::parseExpression(&expCtx,
-                                              BSON("$rtrim" << BSON("input"
-                                                                    << "$x"
-                                                                    << "chars"
-                                                                    << "xyz"
-                                                                    << "other" << 1)),
+                                              BSON("$rtrim" << BSON("input" << "$x"
+                                                                            << "chars"
+                                                                            << "xyz"
+                                                                            << "other" << 1)),
                                               expCtx.variablesParseState),
                   AssertionException);
 }
 
 TEST(ExpressionTrimTest, DoesOptimizeToConstantWithNoChars) {
     auto expCtx = ExpressionContextForTest{};
-    auto trim = Expression::parseExpression(&expCtx,
-                                            BSON("$trim" << BSON("input"
-                                                                 << " abc ")),
-                                            expCtx.variablesParseState);
+    auto trim = Expression::parseExpression(
+        &expCtx, BSON("$trim" << BSON("input" << " abc ")), expCtx.variablesParseState);
     auto optimized = trim->optimize();
     auto constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
@@ -125,8 +118,7 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithNoChars) {
     // Test that it optimizes to a constant if the input also optimizes to a constant.
     trim = Expression::parseExpression(
         &expCtx,
-        BSON("$trim" << BSON("input" << BSON("$concat" << BSON_ARRAY(" "
-                                                                     << "abc ")))),
+        BSON("$trim" << BSON("input" << BSON("$concat" << BSON_ARRAY(" " << "abc ")))),
         expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
@@ -137,10 +129,9 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithNoChars) {
 TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
     auto expCtx = ExpressionContextForTest{};
     auto trim = Expression::parseExpression(&expCtx,
-                                            BSON("$trim" << BSON("input"
-                                                                 << " abc "
-                                                                 << "chars"
-                                                                 << " ")),
+                                            BSON("$trim" << BSON("input" << " abc "
+                                                                         << "chars"
+                                                                         << " ")),
                                             expCtx.variablesParseState);
     auto optimized = trim->optimize();
     auto constant = dynamic_cast<ExpressionConstant*>(optimized.get());
@@ -150,9 +141,9 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
     // Test that it optimizes to a constant if the chars argument optimizes to a constant.
     trim = Expression::parseExpression(
         &expCtx,
-        BSON("$trim" << BSON("input"
-                             << "  abc "
-                             << "chars" << BSON("$substrCP" << BSON_ARRAY("  " << 1 << 1)))),
+        BSON("$trim" << BSON("input" << "  abc "
+                                     << "chars"
+                                     << BSON("$substrCP" << BSON_ARRAY("  " << 1 << 1)))),
         expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
@@ -162,9 +153,7 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
     // Test that it optimizes to a constant if both arguments optimize to a constant.
     trim = Expression::parseExpression(
         &expCtx,
-        BSON("$trim" << BSON("input" << BSON("$concat" << BSON_ARRAY(" "
-                                                                     << "abc "))
-                                     << "chars"
+        BSON("$trim" << BSON("input" << BSON("$concat" << BSON_ARRAY(" " << "abc ")) << "chars"
                                      << BSON("$substrCP" << BSON_ARRAY("  " << 1 << 1)))),
         expCtx.variablesParseState);
     optimized = trim->optimize();
@@ -177,20 +166,17 @@ TEST(ExpressionTrimTest, DoesNotOptimizeToConstantWithFieldPaths) {
     auto expCtx = ExpressionContextForTest{};
 
     // 'input' is field path.
-    auto trim = Expression::parseExpression(&expCtx,
-                                            BSON("$trim" << BSON("input"
-                                                                 << "$inputField")),
-                                            expCtx.variablesParseState);
+    auto trim = Expression::parseExpression(
+        &expCtx, BSON("$trim" << BSON("input" << "$inputField")), expCtx.variablesParseState);
     auto optimized = trim->optimize();
     auto constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_FALSE(constant);
 
     // 'chars' is field path.
     trim = Expression::parseExpression(&expCtx,
-                                       BSON("$trim" << BSON("input"
-                                                            << " abc "
-                                                            << "chars"
-                                                            << "$secondInput")),
+                                       BSON("$trim" << BSON("input" << " abc "
+                                                                    << "chars"
+                                                                    << "$secondInput")),
                                        expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
@@ -198,10 +184,9 @@ TEST(ExpressionTrimTest, DoesNotOptimizeToConstantWithFieldPaths) {
 
     // Both are field paths.
     trim = Expression::parseExpression(&expCtx,
-                                       BSON("$trim" << BSON("input"
-                                                            << "$inputField"
-                                                            << "chars"
-                                                            << "$secondInput")),
+                                       BSON("$trim" << BSON("input" << "$inputField"
+                                                                    << "chars"
+                                                                    << "$secondInput")),
                                        expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
@@ -211,10 +196,8 @@ TEST(ExpressionTrimTest, DoesNotOptimizeToConstantWithFieldPaths) {
 TEST(ExpressionTrimTest, DoesAddInputDependencies) {
     auto expCtx = ExpressionContextForTest{};
 
-    auto trim = Expression::parseExpression(&expCtx,
-                                            BSON("$trim" << BSON("input"
-                                                                 << "$inputField")),
-                                            expCtx.variablesParseState);
+    auto trim = Expression::parseExpression(
+        &expCtx, BSON("$trim" << BSON("input" << "$inputField")), expCtx.variablesParseState);
     DepsTracker deps;
     expression::addDependencies(trim.get(), &deps);
     ASSERT_EQ(deps.fields.count("inputField"), 1u);
@@ -225,10 +208,9 @@ TEST(ExpressionTrimTest, DoesAddCharsDependencies) {
     auto expCtx = ExpressionContextForTest{};
 
     auto trim = Expression::parseExpression(&expCtx,
-                                            BSON("$trim" << BSON("input"
-                                                                 << "$inputField"
-                                                                 << "chars"
-                                                                 << "$$CURRENT.a")),
+                                            BSON("$trim" << BSON("input" << "$inputField"
+                                                                         << "chars"
+                                                                         << "$$CURRENT.a")),
                                             expCtx.variablesParseState);
     DepsTracker deps;
     expression::addDependencies(trim.get(), &deps);
@@ -240,10 +222,8 @@ TEST(ExpressionTrimTest, DoesAddCharsDependencies) {
 TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
     auto expCtx = ExpressionContextForTest{};
 
-    auto trim = Expression::parseExpression(&expCtx,
-                                            BSON("$trim" << BSON("input"
-                                                                 << " abc ")),
-                                            expCtx.variablesParseState);
+    auto trim = Expression::parseExpression(
+        &expCtx, BSON("$trim" << BSON("input" << " abc ")), expCtx.variablesParseState);
     ASSERT_VALUE_EQ(
         trim->serialize(),
         trim->serialize(SerializationOptions{
@@ -259,10 +239,9 @@ TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
 
     // Use $ltrim, and specify the 'chars' option.
     trim = Expression::parseExpression(&expCtx,
-                                       BSON("$ltrim" << BSON("input"
-                                                             << "$inputField"
-                                                             << "chars"
-                                                             << "$$CURRENT.a")),
+                                       BSON("$ltrim" << BSON("input" << "$inputField"
+                                                                     << "chars"
+                                                                     << "$$CURRENT.a")),
                                        expCtx.variablesParseState);
     ASSERT_VALUE_EQ(
         trim->serialize(),

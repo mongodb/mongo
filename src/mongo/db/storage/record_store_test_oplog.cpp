@@ -108,8 +108,7 @@ TEST(RecordStoreTestHarness, SeekOplog) {
         }
         {
             StorageWriteTransaction txn(ru);
-            BSONObj obj = BSON("ts"
-                               << "not a Timestamp");
+            BSONObj obj = BSON("ts" << "not a Timestamp");
             ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp())
                           .getStatus(),
                       ErrorCodes::BadValue);

@@ -423,10 +423,7 @@ void CollectionCloner::runQuery() {
     if (_collectionOptions.recordIdsReplicated) {
         // The below projection returns a stream of documents in the format
         // {r: <recordId>, d: <original document>}.
-        auto projection = BSON("_id" << 0 << "r"
-                                     << BSON("$meta"
-                                             << "recordId")
-                                     << "d"
+        auto projection = BSON("_id" << 0 << "r" << BSON("$meta" << "recordId") << "d"
                                      << "$$ROOT");
         findCmd.setProjection(std::move(projection));
     }

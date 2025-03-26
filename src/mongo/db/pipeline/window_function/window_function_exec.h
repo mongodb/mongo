@@ -88,7 +88,7 @@ public:
 
 protected:
     WindowFunctionExec(PartitionAccessor iter, SimpleMemoryUsageTracker* memTracker)
-        : _iter(iter), _memTracker(memTracker){};
+        : _iter(iter), _memTracker(memTracker) {};
 
     PartitionAccessor _iter;
     SimpleMemoryUsageTracker* _memTracker;

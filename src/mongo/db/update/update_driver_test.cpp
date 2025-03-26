@@ -116,10 +116,9 @@ TEST(Parse, ParseUpdateWithPipelineAndVariables) {
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     const auto variables = BSON("var1" << 1 << "var2"
                                        << "foo");
-    auto updateObj = BSON("u" << BSON_ARRAY(BSON("$set" << BSON("a"
-                                                                << "$$var1"
-                                                                << "b"
-                                                                << "$$var2"))));
+    auto updateObj = BSON("u" << BSON_ARRAY(BSON("$set" << BSON("a" << "$$var1"
+                                                                    << "b"
+                                                                    << "$$var2"))));
     ASSERT_DOES_NOT_THROW(driver.parse(updateObj["u"], arrayFilters, variables));
     ASSERT_TRUE(driver.type() == UpdateDriver::UpdateType::kPipeline);
 }

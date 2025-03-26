@@ -157,7 +157,7 @@ struct TLSCredentials {
     SSLParams::CertificateSelector tlsClusterCertificateSelector;
 #endif
 
-    TLSCredentials() : tlsCipherConfig(kSSLCipherConfigDefault){};
+    TLSCredentials() : tlsCipherConfig(kSSLCipherConfigDefault) {};
 };
 
 struct ClusterConnection {

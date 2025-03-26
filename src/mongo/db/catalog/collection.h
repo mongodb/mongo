@@ -858,7 +858,7 @@ private:
     void _releaseCollectionIfInSnapshot();
 #else
     ConsistentCollection(OperationContext* opCtx, const Collection* collection)
-        : _collection(collection){};
+        : _collection(collection) {};
 #endif
 };
 

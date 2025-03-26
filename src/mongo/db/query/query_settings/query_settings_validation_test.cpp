@@ -152,11 +152,11 @@ TEST_F(QuerySettingsValidationTestFixture,
                                         << BSON_ARRAY(BSON(stage.toString() << BSONObj())));
             }
 
-            return BSON("aggregate"
-                        << "testColl"
-                        << "$db"
-                        << "testColl"
-                        << "pipeline" << BSON_ARRAY(BSON(stage.toString() << BSONObj())));
+            return BSON("aggregate" << "testColl"
+                                    << "$db"
+                                    << "testColl"
+                                    << "pipeline"
+                                    << BSON_ARRAY(BSON(stage.toString() << BSONObj())));
         }();
 
         assertInvalidQueryAndQuerySettingsCombination(

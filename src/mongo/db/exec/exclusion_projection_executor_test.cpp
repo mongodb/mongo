@@ -385,8 +385,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     inputDocBuilder.metadata().setRecordId(RecordId{6});
     inputDocBuilder.metadata().setIndexKey(BSON("foo" << 7));
     inputDocBuilder.metadata().setSortKey(Value{Document{{"bar", 8}}}, true);
-    inputDocBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
-                                                          << "foo"));
+    inputDocBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     inputDocBuilder.metadata().setVectorSearchScore(9.0);
     inputDocBuilder.metadata().setScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();

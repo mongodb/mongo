@@ -125,7 +125,7 @@ public:
 
     virtual Value serialize() const = 0;
 
-    virtual void setCollator(const CollatorInterface* collator){};
+    virtual void setCollator(const CollatorInterface* collator) {};
 
     virtual bool getCheckExistenceForDiffInsertOperations() const {
         return false;

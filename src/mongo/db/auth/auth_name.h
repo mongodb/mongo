@@ -204,7 +204,7 @@ public:
     class Impl {
     public:
         Impl() = default;
-        virtual ~Impl(){};
+        virtual ~Impl() {};
         std::unique_ptr<Impl> clone() const {
             return std::unique_ptr<Impl>(doClone());
         }

@@ -258,40 +258,31 @@ TEST_F(SBEMinNMaxNTest, MinNStringTest) {
                                   Op::kRemove,
                                   Op::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues =
-        {makeArray(BSON_ARRAY("fu")),
-         makeArray(BSON_ARRAY("ev"
-                              << "fu")),
-         makeArray(BSON_ARRAY("dw"
-                              << "ev"
-                              << "fu")),
-         makeArray(BSON_ARRAY("cx"
-                              << "dw"
-                              << "ev"
-                              << "fu")),
-         makeArray(BSON_ARRAY("by"
-                              << "cx"
-                              << "dw"
-                              << "ev")),
-         makeArray(BSON_ARRAY("az"
-                              << "by"
-                              << "cx"
-                              << "dw")),
-         makeArray(BSON_ARRAY("az"
-                              << "by"
-                              << "cx"
-                              << "dw")),
-         makeArray(BSON_ARRAY("az"
-                              << "by"
-                              << "cx"
-                              << "dw")),
-         makeArray(BSON_ARRAY("az"
-                              << "by"
-                              << "cx")),
-         makeArray(BSON_ARRAY("az"
-                              << "by")),
-         makeArray(BSON_ARRAY("az")),
-         makeArray(BSONArrayBuilder().arr())};
+    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+        makeArray(BSON_ARRAY("fu")),
+        makeArray(BSON_ARRAY("ev" << "fu")),
+        makeArray(BSON_ARRAY("dw" << "ev"
+                                  << "fu")),
+        makeArray(BSON_ARRAY("cx" << "dw"
+                                  << "ev"
+                                  << "fu")),
+        makeArray(BSON_ARRAY("by" << "cx"
+                                  << "dw"
+                                  << "ev")),
+        makeArray(BSON_ARRAY("az" << "by"
+                                  << "cx"
+                                  << "dw")),
+        makeArray(BSON_ARRAY("az" << "by"
+                                  << "cx"
+                                  << "dw")),
+        makeArray(BSON_ARRAY("az" << "by"
+                                  << "cx"
+                                  << "dw")),
+        makeArray(BSON_ARRAY("az" << "by"
+                                  << "cx")),
+        makeArray(BSON_ARRAY("az" << "by")),
+        makeArray(BSON_ARRAY("az")),
+        makeArray(BSONArrayBuilder().arr())};
 
     runAndAssertExpression<false>(true, 4, inputValues, operations, expValues);
 }
@@ -319,40 +310,31 @@ TEST_F(SBEMinNMaxNTest, MaxNStringTest) {
                                   Op::kRemove,
                                   Op::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues =
-        {makeArray(BSON_ARRAY("fu")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev"
-                              << "dw")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev"
-                              << "dw"
-                              << "cx")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev"
-                              << "dw"
-                              << "cx")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev"
-                              << "dw"
-                              << "cx")),
-         makeArray(BSON_ARRAY("ev"
-                              << "dw"
-                              << "cx"
-                              << "by")),
-         makeArray(BSON_ARRAY("dw"
-                              << "cx"
-                              << "by"
-                              << "az")),
-         makeArray(BSON_ARRAY("cx"
-                              << "by"
-                              << "az")),
-         makeArray(BSON_ARRAY("by"
-                              << "az")),
-         makeArray(BSON_ARRAY("az")),
-         makeArray(BSONArrayBuilder().arr())};
+    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+        makeArray(BSON_ARRAY("fu")),
+        makeArray(BSON_ARRAY("fu" << "ev")),
+        makeArray(BSON_ARRAY("fu" << "ev"
+                                  << "dw")),
+        makeArray(BSON_ARRAY("fu" << "ev"
+                                  << "dw"
+                                  << "cx")),
+        makeArray(BSON_ARRAY("fu" << "ev"
+                                  << "dw"
+                                  << "cx")),
+        makeArray(BSON_ARRAY("fu" << "ev"
+                                  << "dw"
+                                  << "cx")),
+        makeArray(BSON_ARRAY("ev" << "dw"
+                                  << "cx"
+                                  << "by")),
+        makeArray(BSON_ARRAY("dw" << "cx"
+                                  << "by"
+                                  << "az")),
+        makeArray(BSON_ARRAY("cx" << "by"
+                                  << "az")),
+        makeArray(BSON_ARRAY("by" << "az")),
+        makeArray(BSON_ARRAY("az")),
+        makeArray(BSONArrayBuilder().arr())};
 
     runAndAssertExpression<false>(false, 4.0, inputValues, operations, expValues);
 }
@@ -380,40 +362,31 @@ TEST_F(SBEMinNMaxNTest, MinNStringCollationTest) {
                                   Op::kRemove,
                                   Op::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues =
-        {makeArray(BSON_ARRAY("fu")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev"
-                              << "dw")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev"
-                              << "dw"
-                              << "cx")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev"
-                              << "dw"
-                              << "cx")),
-         makeArray(BSON_ARRAY("fu"
-                              << "ev"
-                              << "dw"
-                              << "cx")),
-         makeArray(BSON_ARRAY("ev"
-                              << "dw"
-                              << "cx"
-                              << "by")),
-         makeArray(BSON_ARRAY("dw"
-                              << "cx"
-                              << "by"
-                              << "az")),
-         makeArray(BSON_ARRAY("cx"
-                              << "by"
-                              << "az")),
-         makeArray(BSON_ARRAY("by"
-                              << "az")),
-         makeArray(BSON_ARRAY("az")),
-         makeArray(BSONArrayBuilder().arr())};
+    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+        makeArray(BSON_ARRAY("fu")),
+        makeArray(BSON_ARRAY("fu" << "ev")),
+        makeArray(BSON_ARRAY("fu" << "ev"
+                                  << "dw")),
+        makeArray(BSON_ARRAY("fu" << "ev"
+                                  << "dw"
+                                  << "cx")),
+        makeArray(BSON_ARRAY("fu" << "ev"
+                                  << "dw"
+                                  << "cx")),
+        makeArray(BSON_ARRAY("fu" << "ev"
+                                  << "dw"
+                                  << "cx")),
+        makeArray(BSON_ARRAY("ev" << "dw"
+                                  << "cx"
+                                  << "by")),
+        makeArray(BSON_ARRAY("dw" << "cx"
+                                  << "by"
+                                  << "az")),
+        makeArray(BSON_ARRAY("cx" << "by"
+                                  << "az")),
+        makeArray(BSON_ARRAY("by" << "az")),
+        makeArray(BSON_ARRAY("az")),
+        makeArray(BSONArrayBuilder().arr())};
 
     runAndAssertExpression<true>(true, 4, inputValues, operations, expValues);
 }
@@ -441,40 +414,31 @@ TEST_F(SBEMinNMaxNTest, MaxNStringCollationTest) {
                                   Op::kRemove,
                                   Op::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues =
-        {makeArray(BSON_ARRAY("fu")),
-         makeArray(BSON_ARRAY("ev"
-                              << "fu")),
-         makeArray(BSON_ARRAY("dw"
-                              << "ev"
-                              << "fu")),
-         makeArray(BSON_ARRAY("cx"
-                              << "dw"
-                              << "ev"
-                              << "fu")),
-         makeArray(BSON_ARRAY("by"
-                              << "cx"
-                              << "dw"
-                              << "ev")),
-         makeArray(BSON_ARRAY("az"
-                              << "by"
-                              << "cx"
-                              << "dw")),
-         makeArray(BSON_ARRAY("az"
-                              << "by"
-                              << "cx"
-                              << "dw")),
-         makeArray(BSON_ARRAY("az"
-                              << "by"
-                              << "cx"
-                              << "dw")),
-         makeArray(BSON_ARRAY("az"
-                              << "by"
-                              << "cx")),
-         makeArray(BSON_ARRAY("az"
-                              << "by")),
-         makeArray(BSON_ARRAY("az")),
-         makeArray(BSONArrayBuilder().arr())};
+    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+        makeArray(BSON_ARRAY("fu")),
+        makeArray(BSON_ARRAY("ev" << "fu")),
+        makeArray(BSON_ARRAY("dw" << "ev"
+                                  << "fu")),
+        makeArray(BSON_ARRAY("cx" << "dw"
+                                  << "ev"
+                                  << "fu")),
+        makeArray(BSON_ARRAY("by" << "cx"
+                                  << "dw"
+                                  << "ev")),
+        makeArray(BSON_ARRAY("az" << "by"
+                                  << "cx"
+                                  << "dw")),
+        makeArray(BSON_ARRAY("az" << "by"
+                                  << "cx"
+                                  << "dw")),
+        makeArray(BSON_ARRAY("az" << "by"
+                                  << "cx"
+                                  << "dw")),
+        makeArray(BSON_ARRAY("az" << "by"
+                                  << "cx")),
+        makeArray(BSON_ARRAY("az" << "by")),
+        makeArray(BSON_ARRAY("az")),
+        makeArray(BSONArrayBuilder().arr())};
 
     runAndAssertExpression<true>(false, 4.0, inputValues, operations, expValues);
 }

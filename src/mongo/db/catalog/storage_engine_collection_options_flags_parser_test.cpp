@@ -42,8 +42,7 @@ static BSONObj addExtraFields(const BSONObj& storageEngineOptions) {
     auto wtObj = storageEngineOptions[kWiredTigerEngineName].Obj();
     return storageEngineOptions.addFields(BSON("dummy1"
                                                << "value1" << kWiredTigerEngineName
-                                               << wtObj.addFields(BSON("dummy2"
-                                                                       << "value2"))));
+                                               << wtObj.addFields(BSON("dummy2" << "value2"))));
 }
 
 TEST(StorageEngineFlagsParserTest, GetEmptyOptionalWhenNoWiredTigerConfigString) {

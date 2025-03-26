@@ -243,14 +243,12 @@ function testSecondaryOnly(collOpts) {
     checkHealthLog(secondary.getDB("local").system.healthlog, errQuery, 1);
 }
 
-[{},
- {clusteredIndex: {key: {_id: 1}, unique: true}}]
-    .forEach(collOpts => {
-        testMultipleMissingKeys(collOpts);
-        testMultipleDocsOneInconsistency(collOpts);
-        testNoInconsistencies(collOpts);
-        testPrimaryOnly(collOpts);
-        testSecondaryOnly(collOpts);
-    });
+[{}, {clusteredIndex: {key: {_id: 1}, unique: true}}].forEach(collOpts => {
+    testMultipleMissingKeys(collOpts);
+    testMultipleDocsOneInconsistency(collOpts);
+    testNoInconsistencies(collOpts);
+    testPrimaryOnly(collOpts);
+    testSecondaryOnly(collOpts);
+});
 
 replSet.stopSet();

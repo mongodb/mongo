@@ -68,8 +68,7 @@ namespace {
 void writeNoopEntryLocal(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     client.update(NamespaceString::kServerConfigurationNamespace,
-                  BSON("_id"
-                       << "AddShardStats"),
+                  BSON("_id" << "AddShardStats"),
                   BSON("$inc" << BSON("count" << 1)),
                   true /* upsert */,
                   false /* multi */);

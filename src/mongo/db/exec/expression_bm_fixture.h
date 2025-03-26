@@ -48,7 +48,7 @@ private:
     static constexpr int32_t kSeed = 1;
 
 public:
-    ExpressionBenchmarkFixture() : random(kSeed){};
+    ExpressionBenchmarkFixture() : random(kSeed) {};
 
     void benchmarkExpression(BSONObj expressionSpec, benchmark::State& benchmarkState);
 

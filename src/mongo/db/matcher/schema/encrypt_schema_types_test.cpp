@@ -52,8 +52,7 @@ namespace mongo {
 namespace {
 
 TEST(EncryptSchemaTest, KeyIDTypePointerTest) {
-    auto tempObj = BSON("pointer"
-                        << "/pointer/pointing");
+    auto tempObj = BSON("pointer" << "/pointer/pointing");
     auto elem = tempObj["pointer"];
     auto keyid = EncryptSchemaKeyId::parseFromBSON(elem);
     ASSERT(keyid.type() == EncryptSchemaKeyId::Type::kJSONPointer);
@@ -80,9 +79,7 @@ DEATH_TEST(EncryptSchemaTest, KeyIDPointerToBSON, "tassert") {
 
     pointerKeyID.serializeToBSON("pointer", &builder);
     auto resultObj = builder.obj();
-    ASSERT_BSONOBJ_EQ(resultObj,
-                      BSON("pointer"
-                           << "/pointer"));
+    ASSERT_BSONOBJ_EQ(resultObj, BSON("pointer" << "/pointer"));
     BSONElement pointer = resultObj["pointer"];
     ASSERT(pointer);
     ASSERT_EQ(pointer.type(), BSONType::String);
@@ -119,12 +116,11 @@ DEATH_TEST(EncryptSchemaTest, KeyIDArrayToBSON, "tassert") {
 }
 
 TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
-    BSONObj encryptInfoBSON = BSON("bsonType"
-                                   << "int"
-                                   << "algorithm"
-                                   << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
-                                   << "keyId"
-                                   << "/pointer");
+    BSONObj encryptInfoBSON = BSON("bsonType" << "int"
+                                              << "algorithm"
+                                              << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+                                              << "keyId"
+                                              << "/pointer");
     IDLParserContext ctxt("encrypt");
     auto encryptInfo = EncryptionInfo::parse(ctxt, encryptInfoBSON);
     MatcherTypeSet resultMatcherSet;
@@ -140,8 +136,7 @@ TEST(EncryptSchemaTest, WrongTypeFailsParse) {
     BSONObj encryptInfoBSON = BSON("keyId" << 2);
     IDLParserContext ctxt("encrypt");
     ASSERT_THROWS_CODE(EncryptionInfo::parse(ctxt, encryptInfoBSON), DBException, 51085);
-    encryptInfoBSON = BSON("algorithm"
-                           << "garbage");
+    encryptInfoBSON = BSON("algorithm" << "garbage");
     ASSERT_THROWS_CODE(
         EncryptionInfo::parse(ctxt, encryptInfoBSON), DBException, ErrorCodes::BadValue);
 }

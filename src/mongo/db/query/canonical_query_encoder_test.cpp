@@ -447,10 +447,9 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
 
     // Test that only valid regex flags contribute to the plan cache key encoding.
     testComputeKey(gctx,
-                   BSON("a" << BSON("$regex"
-                                    << "abc"
-                                    << "$options"
-                                    << "imxsu")),
+                   BSON("a" << BSON("$regex" << "abc"
+                                             << "$options"
+                                             << "imxsu")),
                    {},
                    {});
     testComputeKey(gctx, "{a: /abc/im}", "{}", "{}");

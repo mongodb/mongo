@@ -297,11 +297,10 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
         }
 
         auto coords = nearExpr.centroid->crs == SPHERE
-            ? BSON("near" << BSON("type"
-                                  << "Point"
-                                  << "coordinates"
-                                  << BSON_ARRAY(nearExpr.centroid->oldPoint.x
-                                                << nearExpr.centroid->oldPoint.y)))
+            ? BSON("near" << BSON("type" << "Point"
+                                         << "coordinates"
+                                         << BSON_ARRAY(nearExpr.centroid->oldPoint.x
+                                                       << nearExpr.centroid->oldPoint.y)))
             : BSON("near" << BSON_ARRAY(nearExpr.centroid->oldPoint.x
                                         << nearExpr.centroid->oldPoint.y));
         tassert(5860220, "", coords.firstElement().isABSONObj());

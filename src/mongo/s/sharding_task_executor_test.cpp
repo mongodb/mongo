@@ -122,12 +122,11 @@ TEST_F(ShardingTaskExecutorTest, MissingLsidAddsLsidInCommand) {
 
     NetworkInterfaceMock::InNetworkGuard ing(_network);
 
-    const RemoteCommandRequest request(HostAndPort("localhost", 27017),
-                                       DatabaseName::createDatabaseName_forTest(boost::none,
-                                                                                "mydb"),
-                                       BSON("whatsUp"
-                                            << "doc"),
-                                       operationContext());
+    const RemoteCommandRequest request(
+        HostAndPort("localhost", 27017),
+        DatabaseName::createDatabaseName_forTest(boost::none, "mydb"),
+        BSON("whatsUp" << "doc"),
+        operationContext());
 
     TaskExecutor::CallbackHandle cbHandle =
         unittest::assertGet(getExecutor()->scheduleRemoteCommand(

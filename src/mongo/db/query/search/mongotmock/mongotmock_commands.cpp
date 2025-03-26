@@ -46,10 +46,8 @@ using mongotmock::getMongotMockState;
 using mongotmock::MongotMockStateGuard;
 
 
-const BSONObj placeholderCmd = BSON("placeholder"
-                                    << "expected");
-const BSONObj placeholderResponse = BSON("placeholder"
-                                         << "response");
+const BSONObj placeholderCmd = BSON("placeholder" << "expected");
+const BSONObj placeholderResponse = BSON("placeholder" << "response");
 
 void assertGivenCommandMatchesExpectedCommand(BSONObj givenCmd, BSONObj expectedCmd) {
     uassert(31086,

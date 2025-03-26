@@ -81,30 +81,21 @@ TEST(Metadata, UpconvertValidMetadata) {
     checkUpconvert(BSON("ping" << 1), 0, BSON("ping" << 1));
 
     // Readpref wrapped in $queryOptions
-    checkUpconvert(BSON("pang"
-                        << "pong"
-                        << "$queryOptions"
-                        << BSON("$readPreference" << BSON("mode"
-                                                          << "nearest"
-                                                          << "tags"
-                                                          << BSON("rack"
-                                                                  << "city")))),
-                   0,
-                   BSON("pang"
-                        << "pong"
-                        << "$readPreference"
-                        << BSON("mode"
-                                << "nearest"
-                                << "tags"
-                                << BSON("rack"
-                                        << "city"))));
+    checkUpconvert(
+        BSON("pang" << "pong"
+                    << "$queryOptions"
+                    << BSON("$readPreference" << BSON("mode" << "nearest"
+                                                             << "tags" << BSON("rack" << "city")))),
+        0,
+        BSON("pang" << "pong"
+                    << "$readPreference"
+                    << BSON("mode" << "nearest"
+                                   << "tags" << BSON("rack" << "city"))));
 }
 
 TEST(Metadata, UpconvertDuplicateReadPreference) {
-    auto secondaryReadPref = BSON("mode"
-                                  << "secondary");
-    auto nearestReadPref = BSON("mode"
-                                << "nearest");
+    auto secondaryReadPref = BSON("mode" << "secondary");
+    auto nearestReadPref = BSON("mode" << "nearest");
 
     BSONObjBuilder bob;
     bob.append("$queryOptions", BSON("$readPreference" << secondaryReadPref));

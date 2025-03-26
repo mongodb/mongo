@@ -367,20 +367,14 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
 
     // Unknown CSP record fails
     assertFailsOnlyCPNamespace(
-        [this](const auto& nss) {
-            doInserts(nss,
-                      {BSON("_id"
-                            << "ignored")});
-        },
-        boost::none);
+        [this](const auto& nss) { doInserts(nss, {BSON("_id" << "ignored")}); }, boost::none);
 
     // Unknown CSP and not unknown CSP fails, multi-insert.
     assertFailsOnlyCPNamespace(
         [this](const auto& nss) {
-            doInserts(nss,
-                      {makeClusterParametersDoc(LogicalTime(), 456, "yellow"),
-                       BSON("_id"
-                            << "ignored")});
+            doInserts(
+                nss,
+                {makeClusterParametersDoc(LogicalTime(), 456, "yellow"), BSON("_id" << "ignored")});
         },
         boost::none);
 

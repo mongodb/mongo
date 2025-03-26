@@ -10,8 +10,8 @@ import {
     ShardingTest
 } from "jstests/libs/shardingtest.js";
 
-ReplSetTest[kOverrideConstructorForRST] =
-    class MultitenantChangeStreamReplSetTest extends ReplSetTest {
+ReplSetTest[kOverrideConstructorForRST] = class MultitenantChangeStreamReplSetTest extends
+ReplSetTest{
     constructor(opts) {
         // Setup the 'serverless' environment if the 'opts' is not a connection string, ie. the
         // replica-set does not already exist and the replica-set is not part of the sharded
@@ -65,8 +65,8 @@ ReplSetTest[kOverrideConstructorForRST] =
     }
 };
 
-ShardingTest[kOverrideConstructorForST] =
-    class MultitenantChangeStreamShardingTest extends ShardingTest {
+ShardingTest[kOverrideConstructorForST] = class MultitenantChangeStreamShardingTest extends
+ShardingTest{
     constructor(params) {
         super(params);
 

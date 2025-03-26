@@ -102,9 +102,7 @@ public:
         auto filterObj = filter.getDocument().toBson().firstElement();
         ASSERT_TRUE(keyHashes.contains(filterObj.fieldNameStringData()));
         if (shouldValidateFilterDataType) {
-            ASSERT_BSONOBJ_EQ(filterObj.Obj(),
-                              BSON("$eq"
-                                   << "?number"));
+            ASSERT_BSONOBJ_EQ(filterObj.Obj(), BSON("$eq" << "?number"));
         }
 
         ASSERT_EQ(keyHashes.find(filterObj.fieldNameStringData())->second,
@@ -356,9 +354,7 @@ TEST_F(DocumentSourceQueryStatsTest, DataTypeHashConsistency) {
     // at this first parse-and-serialize step.)
     auto& queryStatsStore = setUpQueryStatsStore();
     queryStatsStore.put(0, QueryStatsEntry{makeFindKeyFromQuery(BSON("number" << 5))});
-    queryStatsStore.put(1,
-                        QueryStatsEntry{makeFindKeyFromQuery(BSON("string"
-                                                                  << "hello"))});
+    queryStatsStore.put(1, QueryStatsEntry{makeFindKeyFromQuery(BSON("string" << "hello"))});
     queryStatsStore.put(
         2, QueryStatsEntry{makeFindKeyFromQuery(BSON("obj" << BSON("c" << BSONObj())))});
     queryStatsStore.put(

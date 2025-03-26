@@ -1327,9 +1327,7 @@ TEST_F(CachePlanSelectionTest, EqualityIndexScanWithTrailingFields) {
 //
 
 TEST_F(CachePlanSelectionTest, Basic2DSphereNonNear) {
-    addIndex(BSON("a"
-                  << "2dsphere"),
-             "a_2dsphere");
+    addIndex(BSON("a" << "2dsphere"), "a_2dsphere");
     BSONObj query;
 
     query = fromjson(
@@ -1344,9 +1342,7 @@ TEST_F(CachePlanSelectionTest, Basic2DSphereNonNear) {
 }
 
 TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNear) {
-    addIndex(BSON("a"
-                  << "2dsphere"),
-             "a_2dsphere");
+    addIndex(BSON("a" << "2dsphere"), "a_2dsphere");
     BSONObj query;
 
     query = fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}");
@@ -1387,12 +1383,8 @@ TEST_F(CachePlanSelectionTest, TwoDSphereNoGeoPred) {
 }
 
 TEST_F(CachePlanSelectionTest, Or2DSphereNonNear) {
-    addIndex(BSON("a"
-                  << "2dsphere"),
-             "a_2dsphere");
-    addIndex(BSON("b"
-                  << "2dsphere"),
-             "b_2dsphere");
+    addIndex(BSON("a" << "2dsphere"), "a_2dsphere");
+    addIndex(BSON("b" << "2dsphere"), "b_2dsphere");
     BSONObj query = fromjson(
         "{$or: [ {a: {$geoIntersects: {$geometry: {type: 'Point', coordinates: [10.0, 10.0]}}}},"
         " {b: {$geoWithin: { $centerSphere: [[ 10, 20 ], 0.01 ] } }} ]}");
@@ -1407,9 +1399,8 @@ TEST_F(CachePlanSelectionTest, Or2DSphereNonNear) {
 // Regression test for SERVER-24320. Tests that the PlanCacheIndexTree has the same sort order as
 // the MatchExpression used to generate the plan cache key.
 TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
-    addIndex(BSON("a"
-                  << "2dsphere"
-                  << "b" << 1),
+    addIndex(BSON("a" << "2dsphere"
+                      << "b" << 1),
              "a_2dsphere_b_2dsphere");
 
     BSONObj query = fromjson(
@@ -1729,9 +1720,7 @@ TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionWithNonMultikeyIndexCanI
 //
 
 TEST_F(CachePlanSelectionTest, GeoNear2DNotCached) {
-    addIndex(BSON("a"
-                  << "2d"),
-             "a_2d");
+    addIndex(BSON("a" << "2d"), "a_2d");
     runQuery(fromjson("{a: {$near: [0,0], $maxDistance:0.3 }}"));
     assertNotCached("{geoNear2d: {a: '2d'}}");
 }
@@ -1775,9 +1764,7 @@ TEST_F(CachePlanSelectionTest, HintValidNotCached) {
 //
 
 TEST_F(CachePlanSelectionTest, Basic2DNonNearNotCached) {
-    addIndex(BSON("a"
-                  << "2d"),
-             "a_2d");
+    addIndex(BSON("a" << "2d"), "a_2d");
     BSONObj query;
 
     // Polygon
@@ -1802,12 +1789,8 @@ TEST_F(CachePlanSelectionTest, Basic2DNonNearNotCached) {
 }
 
 TEST_F(CachePlanSelectionTest, Or2DNonNearNotCached) {
-    addIndex(BSON("a"
-                  << "2d"),
-             "a_2d");
-    addIndex(BSON("b"
-                  << "2d"),
-             "b_2d");
+    addIndex(BSON("a" << "2d"), "a_2d");
+    addIndex(BSON("b" << "2d"), "b_2d");
     BSONObj query = fromjson(
         "{$or: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
         " {b : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}");
@@ -1829,12 +1812,10 @@ TEST_F(CachePlanSelectionTest, MatchingCollation) {
         fromjson("{find: 'testns', filter: {x: 'foo'}, collation: {locale: 'mock_reverse_string'}, "
                  "'$db': 'test'}"));
 
-    assertPlanCacheRecoversSolution(BSON("x"
-                                         << "bar"),
+    assertPlanCacheRecoversSolution(BSON("x" << "bar"),
                                     BSONObj(),
                                     BSONObj(),
-                                    BSON("locale"
-                                         << "mock_reverse_string"),
+                                    BSON("locale" << "mock_reverse_string"),
                                     "{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
 }
 

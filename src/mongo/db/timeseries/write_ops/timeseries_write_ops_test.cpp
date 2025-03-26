@@ -63,11 +63,10 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
     NamespaceString ns =
         NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "ts");
     auto opCtx = operationContext();
-    ASSERT_OK(createCollection(opCtx,
-                               ns.dbName(),
-                               BSON("create" << ns.coll() << "timeseries"
-                                             << BSON("timeField"
-                                                     << "time"))));
+    ASSERT_OK(createCollection(
+        opCtx,
+        ns.dbName(),
+        BSON("create" << ns.coll() << "timeseries" << BSON("timeField" << "time"))));
 
     // We're going to insert a compressed bucket and ensure we can successfully decompress it via a
     // transform update using performAtomicTimeseriesWrites.
@@ -129,11 +128,10 @@ TEST_F(TimeseriesWriteOpsTest, TimeseriesWritesMismatchedUUID) {
     // Ordered
     auto opCtx = operationContext();
     auto ns = NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "ts");
-    ASSERT_OK(createCollection(opCtx,
-                               ns.dbName(),
-                               BSON("create" << ns.coll() << "timeseries"
-                                             << BSON("timeField"
-                                                     << "time"))));
+    ASSERT_OK(createCollection(
+        opCtx,
+        ns.dbName(),
+        BSON("create" << ns.coll() << "timeseries" << BSON("timeField" << "time"))));
 
     auto insertCommandReq = write_ops::InsertCommandRequest(ns.makeTimeseriesBucketsNamespace());
     insertCommandReq.setCollectionUUID(UUID::gen());

@@ -126,8 +126,7 @@ TEST(ExpressionAllAnyElementsTest, FalseViaInt) {
 
 TEST(ExpressionAllAnyElementsTest, Null) {
     runTest(DOC("input" << DOC_ARRAY(BSONNULL) << "error"
-                        << DOC_ARRAY("$allElementsTrue"_sd
-                                     << "$anyElementTrue"_sd)));
+                        << DOC_ARRAY("$allElementsTrue"_sd << "$anyElementTrue"_sd)));
 }
 
 }  // namespace all_any_elements

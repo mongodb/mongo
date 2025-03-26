@@ -47,7 +47,7 @@ static const NamespaceString kDefaultTestNss =
 
 
 struct DummyShapeSpecificComponents : public query_shape::CmdSpecificShapeComponents {
-    DummyShapeSpecificComponents(){};
+    DummyShapeSpecificComponents() {};
     void HashValue(absl::HashState state) const override {}
     size_t size() const final {
         return sizeof(DummyShapeSpecificComponents);
@@ -74,7 +74,7 @@ public:
 };
 
 struct DummyKeyComponents : public SpecificKeyComponents {
-    DummyKeyComponents(){};
+    DummyKeyComponents() {};
 
     void HashValue(absl::HashState state) const override {}
     size_t size() const override {
@@ -98,7 +98,7 @@ public:
         return components;
     };
     void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                         const SerializationOptions& opts) const override{};
+                                         const SerializationOptions& opts) const override {};
     DummyKeyComponents components;
 };
 class UniversalKeyTest : public ServiceContextTest {};

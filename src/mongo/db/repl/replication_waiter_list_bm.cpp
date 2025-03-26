@@ -211,14 +211,13 @@ public:
     }
 
     void startCoordForConfigBM() {
-        BSONObj configObj = BSON("_id"
-                                 << "mySet"
-                                 << "version" << 1 << "members"
-                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                          << "node1:12345")
-                                               << BSON("_id" << 2 << "host"
-                                                             << "node2:12345"))
-                                 << "protocolVersion" << 1);
+        BSONObj configObj = BSON("_id" << "mySet"
+                                       << "version" << 1 << "members"
+                                       << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                << "node1:12345")
+                                                     << BSON("_id" << 2 << "host"
+                                                                   << "node2:12345"))
+                                       << "protocolVersion" << 1);
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
     }
 

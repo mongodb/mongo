@@ -198,8 +198,7 @@ AggregateCommandRequest asAggregateCommandRequest(const CountCommandRequest& cou
     if (auto limit = countCommand.getLimit()) {
         pipeline.push_back(BSON("$limit" << limit.value()));
     }
-    pipeline.push_back(BSON("$count"
-                            << "count"));
+    pipeline.push_back(BSON("$count" << "count"));
     result.setPipeline(std::move(pipeline));
 
 

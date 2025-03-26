@@ -49,19 +49,15 @@ namespace mongo {
     } while (0)
 
 const Date_t kDate = Date_t::now();
-const std::vector<BSONObj> kField1Elements = {BSON("logLevel" << 2),
-                                              BSON("auditSomething" << false),
-                                              BSON("tlsMode"
-                                                   << "disabled"),
-                                              BSON("featureFlagToaster"
-                                                   << BSON("value" << true << "version"
-                                                                   << "4.4")),
-                                              BSON("authMechs" << BSON_ARRAY("scram"
-                                                                             << "x509"))};
-const std::vector<BSONObj> kField2Elements = {BSON("enableSomething" << true),
-                                              BSON("delaySeconds" << 400),
-                                              BSON("someName"
-                                                   << "foobar")};
+const std::vector<BSONObj> kField1Elements = {
+    BSON("logLevel" << 2),
+    BSON("auditSomething" << false),
+    BSON("tlsMode" << "disabled"),
+    BSON("featureFlagToaster" << BSON("value" << true << "version"
+                                              << "4.4")),
+    BSON("authMechs" << BSON_ARRAY("scram" << "x509"))};
+const std::vector<BSONObj> kField2Elements = {
+    BSON("enableSomething" << true), BSON("delaySeconds" << 400), BSON("someName" << "foobar")};
 
 BSONObj buildSample(
     bool multiservice,
@@ -263,8 +259,7 @@ TEST(FTDCMetadataCompressorTest, TestReconstruction) {
 
     // -- third delta
     field1Elements.at(1) =
-        BSON(field1Elements.at(1).firstElementFieldNameStringData() << BSON("foo"
-                                                                            << "bar"));
+        BSON(field1Elements.at(1).firstElementFieldNameStringData() << BSON("foo" << "bar"));
     field2Elements.at(0) = BSON(field2Elements.at(0).firstElementFieldNameStringData() << true);
     samples.push_back(buildSample(multiservice, field1Elements, field2Elements));
 

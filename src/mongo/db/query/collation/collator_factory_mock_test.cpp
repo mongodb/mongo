@@ -41,8 +41,7 @@ using namespace mongo;
 
 TEST(CollatorFactoryMockTest, CollatorFactoryMockReturnsNullCollatorIfLocaleSimple) {
     CollatorFactoryMock factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "simple"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "simple"));
     ASSERT_OK(collator.getStatus());
     ASSERT_FALSE(collator.getValue());
 }

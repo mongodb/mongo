@@ -53,11 +53,11 @@ namespace mongo::inline_memory {
 class NewDeleteResource {
 public:
     void* allocate(size_t sz, size_t al = alignof(std::max_align_t)) {
-        return ::operator new (sz, std::align_val_t{al});
+        return ::operator new(sz, std::align_val_t{al});
     }
 
     void deallocate(void* p, size_t sz, size_t al) {
-        ::operator delete (p, sz, std::align_val_t{al});
+        ::operator delete(p, sz, std::align_val_t{al});
     }
 
     /** Stateless, so all instances are equal to each other. */

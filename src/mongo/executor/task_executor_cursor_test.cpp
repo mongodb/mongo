@@ -136,9 +136,8 @@ public:
      * Ensure we work for a single simple batch
      */
     void SingleBatchWorksTest() {
-        const auto findCmd = BSON("find"
-                                  << "test"
-                                  << "batchSize" << 2);
+        const auto findCmd = BSON("find" << "test"
+                                         << "batchSize" << 2);
         const CursorId cursorId = 0;
 
         RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -163,10 +162,9 @@ public:
      * Ensure the firstBatch can be read correctly when multiple cursors are returned.
      */
     void MultipleCursorsSingleBatchSucceedsTest() {
-        const auto aggCmd = BSON("aggregate"
-                                 << "test"
-                                 << "pipeline"
-                                 << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+        const auto aggCmd =
+            BSON("aggregate" << "test"
+                             << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
 
         RemoteCommandRequest rcr(HostAndPort("localhost"),
                                  DatabaseName::createDatabaseName_forTest(boost::none, "test"),
@@ -204,17 +202,16 @@ public:
     void ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructedTest() {
         auto lsid = makeLogicalSessionIdForTest();
         opCtx->setLogicalSessionId(lsid);
-        const auto aggCmd = BSON("aggregate"
-                                 << "test"
-                                 << "pipeline"
-                                 << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+        const auto aggCmd =
+            BSON("aggregate" << "test"
+                             << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
         RemoteCommandRequest rcr(HostAndPort("localhost"),
                                  DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                                  aggCmd,
                                  opCtx.get());
         auto tec = makeTec(rcr);
-        auto expected = BSON("aggregate"
-                             << "test"
+        auto expected =
+            BSON("aggregate" << "test"
                              << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true))
                              << "lsid" << lsid.toBSON());
         ASSERT_BSONOBJ_EQ(expected,
@@ -248,10 +245,9 @@ public:
      * without impacting/canceling work on other TaskExecutorCursors. See SERVER-93583 for details.
      */
     void CancelTECWhileSharedPCTEInUse() {
-        const auto aggCmd = BSON("aggregate"
-                                 << "test"
-                                 << "pipeline"
-                                 << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+        const auto aggCmd =
+            BSON("aggregate" << "test"
+                             << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
 
         std::vector<size_t> cursorIds{1, 2};
         RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -295,9 +291,8 @@ public:
 
         // Next, a killCursor command is scheduled by the destructor of the first TEC (AFTER
         // successful completion of its outstanding operations) to ensure we don't leak that cursor.
-        ASSERT_BSONOBJ_EQ(BSON("killCursors"
-                               << "test"
-                               << "cursors" << BSON_ARRAY((int)cursorIds[0])),
+        ASSERT_BSONOBJ_EQ(BSON("killCursors" << "test"
+                                             << "cursors" << BSON_ARRAY((int)cursorIds[0])),
                           scheduleSuccessfulKillCursorResponse(cursorIds[0]));
 
         // Finally, schedule EOF on the second cursor.
@@ -312,10 +307,9 @@ public:
     }
 
     void MultipleCursorsGetMoreWorksTest() {
-        const auto aggCmd = BSON("aggregate"
-                                 << "test"
-                                 << "pipeline"
-                                 << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+        const auto aggCmd =
+            BSON("aggregate" << "test"
+                             << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
 
         std::vector<size_t> cursorIds{1, 2};
         RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -387,9 +381,8 @@ public:
      * Ensure we work if find fails (and that we receive the error code it failed with)
      */
     void FailureInFindTest() {
-        const auto findCmd = BSON("find"
-                                  << "test"
-                                  << "batchSize" << 2);
+        const auto findCmd = BSON("find" << "test"
+                                         << "batchSize" << 2);
 
         RemoteCommandRequest rcr(HostAndPort("localhost"),
                                  DatabaseName::createDatabaseName_forTest(boost::none, "test"),
@@ -408,9 +401,8 @@ public:
      * Ensure multiple batches works correctly
      */
     void MultipleBatchesWorksTest() {
-        const auto findCmd = BSON("find"
-                                  << "test"
-                                  << "batchSize" << 2);
+        const auto findCmd = BSON("find" << "test"
+                                         << "batchSize" << 2);
         CursorId cursorId = 1;
 
         RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -460,9 +452,8 @@ public:
      * Ensure we allow empty firstBatch.
      */
     void EmptyFirstBatchTest() {
-        const auto findCmd = BSON("find"
-                                  << "test"
-                                  << "batchSize" << 2);
+        const auto findCmd = BSON("find" << "test"
+                                         << "batchSize" << 2);
         const auto getMoreCmd = BSON("getMore" << 1LL << "collection"
                                                << "test"
                                                << "batchSize" << 3);
@@ -499,9 +490,8 @@ public:
      * Ensure we allow any empty non-initial batch.
      */
     void EmptyNonInitialBatchTest() {
-        const auto findCmd = BSON("find"
-                                  << "test"
-                                  << "batchSize" << 2);
+        const auto findCmd = BSON("find" << "test"
+                                         << "batchSize" << 2);
         const auto getMoreCmd = BSON("getMore" << 1LL << "collection"
                                                << "test"
                                                << "batchSize" << 3);
@@ -558,8 +548,7 @@ public:
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
                                      DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search"
-                                          << "foo"),
+                                     BSON("search" << "foo"),
                                      opCtx.get());
 
             // Construction of the TaskExecutorCursor enqueues a request in the
@@ -672,9 +661,8 @@ TEST_F(PinnedConnDefaultTaskExecutorCursorTestFixture, FailureInFind) {
  * the connection to send killCursors.
  */
 TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, EarlyReturnKillsCursor) {
-    const auto findCmd = BSON("find"
-                              << "test"
-                              << "batchSize" << 2);
+    const auto findCmd = BSON("find" << "test"
+                                     << "batchSize" << 2);
     const CursorId cursorId = 1;
 
     RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -694,9 +682,8 @@ TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, EarlyReturnKillsCursor) {
     }
 
 
-    ASSERT_BSONOBJ_EQ(BSON("killCursors"
-                           << "test"
-                           << "cursors" << BSON_ARRAY(1)),
+    ASSERT_BSONOBJ_EQ(BSON("killCursors" << "test"
+                                         << "cursors" << BSON_ARRAY(1)),
                       scheduleSuccessfulKillCursorResponse(1));
 }
 
@@ -732,9 +719,8 @@ TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, LsidIsPassed) {
     auto lsid = makeLogicalSessionIdForTest();
     opCtx->setLogicalSessionId(lsid);
 
-    const auto findCmd = BSON("find"
-                              << "test"
-                              << "batchSize" << 1);
+    const auto findCmd = BSON("find" << "test"
+                                     << "batchSize" << 1);
     const CursorId cursorId = 1;
 
     RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -746,9 +732,8 @@ TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, LsidIsPassed) {
     tec = makeTec(rcr, /*batchSize*/ 1);
 
     // lsid in the first batch
-    ASSERT_BSONOBJ_EQ(BSON("find"
-                           << "test"
-                           << "batchSize" << 1 << "lsid" << lsid.toBSON()),
+    ASSERT_BSONOBJ_EQ(BSON("find" << "test"
+                                  << "batchSize" << 1 << "lsid" << lsid.toBSON()),
                       scheduleSuccessfulCursorResponse("firstBatch", 1, 1, cursorId));
 
     ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
@@ -762,9 +747,8 @@ TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, LsidIsPassed) {
     tec.reset();
 
     // lsid in the killcursor
-    ASSERT_BSONOBJ_EQ(BSON("killCursors"
-                           << "test"
-                           << "cursors" << BSON_ARRAY(1) << "lsid" << lsid.toBSON()),
+    ASSERT_BSONOBJ_EQ(BSON("killCursors" << "test"
+                                         << "cursors" << BSON_ARRAY(1) << "lsid" << lsid.toBSON()),
                       scheduleSuccessfulKillCursorResponse(1));
 
     ASSERT_FALSE(hasReadyRequests());

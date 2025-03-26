@@ -1301,9 +1301,8 @@ void ReshardingRecipientService::RecipientStateMachine::_writeStrictConsistencyO
         oplog.setOpType(repl::OpTypeEnum::kNoop);
         oplog.setNss(_metadata.getTempReshardingNss());
         oplog.setUuid(_metadata.getReshardingUUID());
-        oplog.setObject(BSON("msg"
-                             << "The temporary resharding collection now has a "
-                                "strictly consistent view of the data"));
+        oplog.setObject(BSON("msg" << "The temporary resharding collection now has a "
+                                      "strictly consistent view of the data"));
         oplog.setObject2(changeEvent.toBSON());
         oplog.setFromMigrate(true);
         oplog.setOpTime(OplogSlot());

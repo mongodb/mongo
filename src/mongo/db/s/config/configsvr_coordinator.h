@@ -137,8 +137,9 @@ protected:
      * multiple threads can read it.
      */
     template <typename Func>
-    void _updateStateDocumentWith(OperationContext* opCtx, Func&& updateF) requires(
-        std::is_invocable_r_v<void, Func, StateDoc&>) {
+    void _updateStateDocumentWith(OperationContext* opCtx, Func&& updateF)
+    requires(std::is_invocable_r_v<void, Func, StateDoc&>)
+    {
         auto newDoc = _doc;
 
         updateF(newDoc);
@@ -159,7 +160,8 @@ protected:
      */
     template <typename Func>
     auto _evalStateDocumentThreadSafe(Func&& evalF) const
-        requires(std::is_invocable_v<Func, const StateDoc&>) {
+    requires(std::is_invocable_v<Func, const StateDoc&>)
+    {
         stdx::lock_guard lk{_docMutex};
         return evalF(_doc);
     }
@@ -188,8 +190,9 @@ protected:
     }
 
     template <typename Func>
-    auto _buildPhaseHandler(const Phase& newPhase,
-                            Func&& handlerFn) requires(std::is_invocable_r_v<void, Func>) {
+    auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn)
+    requires(std::is_invocable_r_v<void, Func>)
+    {
         return [=, this] {
             const auto& currPhase = _doc.getPhase();
 

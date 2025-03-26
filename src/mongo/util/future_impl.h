@@ -240,8 +240,8 @@ inline constexpr bool isCallableR =
 
 // Like isCallableR, but doesn't unwrap the result type.
 template <typename Ret, typename Func, typename Arg>
-inline constexpr bool isCallableExactR = (isCallable<Func, Arg> &&
-                                          std::is_same_v<FriendlyInvokeResult<Func, Arg>, Ret>);
+inline constexpr bool isCallableExactR =
+    (isCallable<Func, Arg> && std::is_same_v<FriendlyInvokeResult<Func, Arg>, Ret>);
 
 /**
  * call() normalizes arguments to hide the FakeVoid shenanigans from users of Futures.
@@ -1426,5 +1426,5 @@ inline FutureImpl<void> FutureImpl<T>::ignoreValue() && noexcept {
     return std::move(*this).then([](auto&&) {});
 }
 
-}  // namespace future_details
+}  // namespace MONGO_MOD_PRIVATE future_details
 }  // namespace mongo

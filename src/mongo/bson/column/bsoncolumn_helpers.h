@@ -159,7 +159,7 @@ concept Materializer = requires(T& t,
     {
         T::compare(
             typename T::Element(), typename T::Element(), (const StringDataComparator*)nullptr)
-        } -> std::same_as<int>;
+    } -> std::same_as<int>;
 };
 
 /**

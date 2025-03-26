@@ -285,9 +285,8 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithHashedPrefi
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
 
-    auto cri = prepare(BSON("a.b"
-                            << "hashed"
-                            << "c.d" << 1),
+    auto cri = prepare(BSON("a.b" << "hashed"
+                                  << "c.d" << 1),
                        splitPoints);
 
     auto findChunk = [&](BSONElement elem) {
@@ -487,9 +486,8 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithHashedPrefi
     // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
-    auto cri = prepare(BSON("a.b"
-                            << "hashed"
-                            << "c.d" << 1),
+    auto cri = prepare(BSON("a.b" << "hashed"
+                                  << "c.d" << 1),
                        splitPoints);
 
     auto findChunk = [&](BSONElement elem) {

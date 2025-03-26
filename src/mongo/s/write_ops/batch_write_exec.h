@@ -81,8 +81,8 @@ public:
 };
 
 struct HostOpTime {
-    HostOpTime(repl::OpTime ot, OID e) : opTime(ot), electionId(e){};
-    HostOpTime(){};
+    HostOpTime(repl::OpTime ot, OID e) : opTime(ot), electionId(e) {};
+    HostOpTime() {};
     repl::OpTime opTime;
     OID electionId;
 };

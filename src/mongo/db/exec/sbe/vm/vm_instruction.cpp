@@ -176,7 +176,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // dateTruncImm
 
     -1,  // valueBlockApplyLambda
-};       // int Instruction::stackOffset
+};  // int Instruction::stackOffset
 
 
 MONGO_COMPILER_NORETURN void reportSwapFailure();

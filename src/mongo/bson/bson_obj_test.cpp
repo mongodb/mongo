@@ -655,9 +655,8 @@ TEST(Looping, Cpp17StructuredBindings) {
 TEST(BSONObj, getFieldsWithEmbeddedNull) {
     // Test that getField() returns an eoo element when the field name contains an embedded null.
     // This should never happen, but we want to make sure we handle it correctly.
-    BSONObj obj = BSON(""
-                       << "foo"_sd
-                       << "bar" << 9 << "baz" << 4.5);
+    BSONObj obj = BSON("" << "foo"_sd
+                          << "bar" << 9 << "baz" << 4.5);
     ASSERT_TRUE(obj.getField("\0"_sd).eoo());
     ASSERT_TRUE(obj.getField("ba\0r"_sd).eoo());
     ASSERT_TRUE(obj.getField("baz\0"_sd).eoo());

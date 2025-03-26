@@ -109,7 +109,7 @@ public:
 
         prepareAndEvalStageWithReopen(ctx.get(), stream, slotNames, lookupStage.get());
     }  // runVariation
-};     // HashLookupUnwindStageTest
+};  // HashLookupUnwindStageTest
 
 TEST_F(HashLookupUnwindStageTest, BasicTests) {
     unittest::GoldenTestContext gctx(&goldenTestConfigSbe);

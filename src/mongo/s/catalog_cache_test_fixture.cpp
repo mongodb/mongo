@@ -344,9 +344,7 @@ ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoSha
 ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsHash(
     NamespaceString nss) {
 
-    return loadRoutingTableWithTwoChunksAndTwoShardsImpl(nss,
-                                                         BSON("_id"
-                                                              << "hashed"));
+    return loadRoutingTableWithTwoChunksAndTwoShardsImpl(nss, BSON("_id" << "hashed"));
 }
 
 ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsImpl(

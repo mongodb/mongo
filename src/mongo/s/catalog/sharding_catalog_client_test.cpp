@@ -635,14 +635,12 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        auto status =
-            catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                           "dropUser",
-                                                           DatabaseName::createDatabaseName_forTest(
-                                                               boost::none, "test"),
-                                                           BSON("dropUser"
-                                                                << "test"),
-                                                           &responseBuilder);
+        auto status = catalogClient()->runUserManagementWriteCommand(
+            operationContext(),
+            "dropUser",
+            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+            BSON("dropUser" << "test"),
+            &responseBuilder);
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::UserNotFound, status);
     });
@@ -651,13 +649,11 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
         ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                       request.dbname);
         // Since no write concern was sent we will add w:majority
-        ASSERT_BSONOBJ_EQ(BSON("dropUser"
-                               << "test"
-                               << "writeConcern"
-                               << BSON("w"
-                                       << "majority"
-                                       << "wtimeout" << 0)
-                               << "maxTimeMS" << 30000),
+        ASSERT_BSONOBJ_EQ(BSON("dropUser" << "test"
+                                          << "writeConcern"
+                                          << BSON("w" << "majority"
+                                                      << "wtimeout" << 0)
+                                          << "maxTimeMS" << 30000),
                           request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -676,15 +672,13 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConce
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONObjBuilder responseBuilder;
-    auto status =
-        catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                       "dropUser",
-                                                       DatabaseName::createDatabaseName_forTest(
-                                                           boost::none, "test"),
-                                                       BSON("dropUser"
-                                                            << "test"
-                                                            << "writeConcern" << BSON("w" << 2)),
-                                                       &responseBuilder);
+    auto status = catalogClient()->runUserManagementWriteCommand(
+        operationContext(),
+        "dropUser",
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+        BSON("dropUser" << "test"
+                        << "writeConcern" << BSON("w" << 2)),
+        &responseBuilder);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, status);
     ASSERT_STRING_CONTAINS(status.reason(), "Invalid replication write concern");
@@ -694,32 +688,27 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
     // Tests that if you send a w:1 write concern it gets replaced with w:majority
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future =
-        launchAsync([this] {
-            BSONObjBuilder responseBuilder;
-            auto status =
-                catalogClient()->runUserManagementWriteCommand(
-                    operationContext(),
-                    "dropUser",
-                    DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                    BSON("dropUser"
-                         << "test"
-                         << "writeConcern" << BSON("w" << 1 << "wtimeout" << 30)),
-                    &responseBuilder);
-            ASSERT_NOT_OK(status);
-            ASSERT_EQUALS(ErrorCodes::UserNotFound, status);
-        });
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        auto status = catalogClient()->runUserManagementWriteCommand(
+            operationContext(),
+            "dropUser",
+            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+            BSON("dropUser" << "test"
+                            << "writeConcern" << BSON("w" << 1 << "wtimeout" << 30)),
+            &responseBuilder);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::UserNotFound, status);
+    });
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                       request.dbname);
-        ASSERT_BSONOBJ_EQ(BSON("dropUser"
-                               << "test"
-                               << "writeConcern"
-                               << BSON("w"
-                                       << "majority"
-                                       << "wtimeout" << 30)
-                               << "maxTimeMS" << 30000),
+        ASSERT_BSONOBJ_EQ(BSON("dropUser" << "test"
+                                          << "writeConcern"
+                                          << BSON("w" << "majority"
+                                                      << "wtimeout" << 30)
+                                          << "maxTimeMS" << 30000),
                           request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -739,14 +728,12 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        auto status =
-            catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                           "dropUser",
-                                                           DatabaseName::createDatabaseName_forTest(
-                                                               boost::none, "test"),
-                                                           BSON("dropUser"
-                                                                << "test"),
-                                                           &responseBuilder);
+        auto status = catalogClient()->runUserManagementWriteCommand(
+            operationContext(),
+            "dropUser",
+            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+            BSON("dropUser" << "test"),
+            &responseBuilder);
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status);
     });
@@ -772,14 +759,12 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        auto status =
-            catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                           "dropUser",
-                                                           DatabaseName::createDatabaseName_forTest(
-                                                               boost::none, "test"),
-                                                           BSON("dropUser"
-                                                                << "test"),
-                                                           &responseBuilder);
+        auto status = catalogClient()->runUserManagementWriteCommand(
+            operationContext(),
+            "dropUser",
+            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+            BSON("dropUser" << "test"),
+            &responseBuilder);
         ASSERT_OK(status);
     });
 
@@ -801,13 +786,11 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
         ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                       request.dbname);
         // Since no write concern was sent we will add w:majority
-        ASSERT_BSONOBJ_EQ(BSON("dropUser"
-                               << "test"
-                               << "writeConcern"
-                               << BSON("w"
-                                       << "majority"
-                                       << "wtimeout" << 0)
-                               << "maxTimeMS" << 30000),
+        ASSERT_BSONOBJ_EQ(BSON("dropUser" << "test"
+                                          << "writeConcern"
+                                          << BSON("w" << "majority"
+                                                      << "wtimeout" << 0)
+                                          << "maxTimeMS" << 30000),
                           request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);

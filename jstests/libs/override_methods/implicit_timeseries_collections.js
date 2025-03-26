@@ -5,8 +5,8 @@
  * removed when calling any find methods.
  */
 
-import {sysCollNamePrefix} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {
+    sysCollNamePrefix,
     transformIndexHintsForTimeseriesCollection
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";

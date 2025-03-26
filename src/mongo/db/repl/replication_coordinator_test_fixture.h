@@ -103,10 +103,9 @@ public:
     }
 
     static BSONObj configWithMembers(int version, long long term, BSONArray members) {
-        return BSON("_id"
-                    << "mySet"
-                    << "protocolVersion" << 1 << "version" << version << "term" << term << "members"
-                    << members);
+        return BSON("_id" << "mySet"
+                          << "protocolVersion" << 1 << "version" << version << "term" << term
+                          << "members" << members);
     }
 
 protected:

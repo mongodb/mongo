@@ -315,13 +315,12 @@ public:
         _oplogEntries.reserve(totalOps);
 
         for (int idx = 0; idx < totalOps; ++idx) {
-            auto op =
-                BSON("op"
-                     << "i"
-                     << "ns"
-                     << "foo.bar"
-                     << "ui" << _foobarUUID << "o" << makeDoc(idx, entrySize) << "ts"
-                     << Timestamp(1, idx) << "t" << term1 << "v" << 2 << "wall" << Date_t::now());
+            auto op = BSON("op" << "i"
+                                << "ns"
+                                << "foo.bar"
+                                << "ui" << _foobarUUID << "o" << makeDoc(idx, entrySize) << "ts"
+                                << Timestamp(1, idx) << "t" << term1 << "v" << 2 << "wall"
+                                << Date_t::now());
             // Size of the BSON obj will be 146 + entrySize bytes
             _oplogEntries.emplace_back(op);
         }

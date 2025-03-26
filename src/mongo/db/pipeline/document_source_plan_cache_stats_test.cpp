@@ -256,13 +256,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsImmediateEOFWithEmptyPlanCache) 
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingMatch) {
     std::vector<BSONObj> stats{BSONObj(),
-                               BSON("foo"
-                                    << "bar"),
-                               BSON("foo"
-                                    << "baz"),
-                               BSON("foo"
-                                    << "bar"
-                                    << "match" << true)};
+                               BSON("foo" << "bar"),
+                               BSON("foo" << "baz"),
+                               BSON("foo" << "bar"
+                                          << "match" << true)};
     getExpCtx()->setMongoProcessInterface(
         std::make_shared<PlanCacheStatsMongoProcessInterface>(stats));
 
@@ -273,23 +270,18 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingM
     pipeline->optimizePipeline();
 
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "bar"
-                           << "host"
-                           << "testHostName"));
+                      BSON("foo" << "bar"
+                                 << "host"
+                                 << "testHostName"));
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "bar"
-                           << "match" << true << "host"
-                           << "testHostName"));
+                      BSON("foo" << "bar"
+                                 << "match" << true << "host"
+                                 << "testHostName"));
     ASSERT(!pipeline->getNext());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsHostNameWhenNotFromMongos) {
-    std::vector<BSONObj> stats{BSON("foo"
-                                    << "bar"),
-                               BSON("foo"
-                                    << "baz")};
+    std::vector<BSONObj> stats{BSON("foo" << "bar"), BSON("foo" << "baz")};
     getExpCtx()->setMongoProcessInterface(
         std::make_shared<PlanCacheStatsMongoProcessInterface>(stats));
 
@@ -297,23 +289,18 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsHostNameWhenNotFromMongos) {
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "bar"
-                           << "host"
-                           << "testHostName"));
+                      BSON("foo" << "bar"
+                                 << "host"
+                                 << "testHostName"));
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "baz"
-                           << "host"
-                           << "testHostName"));
+                      BSON("foo" << "baz"
+                                 << "host"
+                                 << "testHostName"));
     ASSERT(!pipeline->getNext());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) {
-    std::vector<BSONObj> stats{BSON("foo"
-                                    << "bar"),
-                               BSON("foo"
-                                    << "baz")};
+    std::vector<BSONObj> stats{BSON("foo" << "bar"), BSON("foo" << "baz")};
     getExpCtx()->setMongoProcessInterface(
         std::make_shared<PlanCacheStatsMongoProcessInterface>(stats));
     getExpCtx()->setFromRouter(true);
@@ -322,19 +309,17 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) 
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "bar"
-                           << "host"
-                           << "testHostName"
-                           << "shard"
-                           << "testShardName"));
+                      BSON("foo" << "bar"
+                                 << "host"
+                                 << "testHostName"
+                                 << "shard"
+                                 << "testShardName"));
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "baz"
-                           << "host"
-                           << "testHostName"
-                           << "shard"
-                           << "testShardName"));
+                      BSON("foo" << "baz"
+                                 << "host"
+                                 << "testHostName"
+                                 << "shard"
+                                 << "testShardName"));
     ASSERT(!pipeline->getNext());
 }
 

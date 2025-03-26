@@ -295,7 +295,7 @@ private:
 
     // Method used to notify the implementation of a new marker being created. Implementations are
     // free to implement this however they see fit by overriding it. By default this is a no-op.
-    virtual void _notifyNewMarkerCreation(){};
+    virtual void _notifyNewMarkerCreation() {};
 
     // Minimum number of bytes the marker being filled should contain before it gets added to the
     // deque of collection markers.

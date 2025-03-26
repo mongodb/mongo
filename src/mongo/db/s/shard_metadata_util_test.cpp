@@ -184,8 +184,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
 
     ChunkVersion maxCollPlacementVersion{{OID::gen(), Timestamp(1, 1)}, {0, 0}};
     const KeyPattern keyPattern{BSON("a" << 1)};
-    const BSONObj defaultCollation{BSON("locale"
-                                        << "fr_CA")};
+    const BSONObj defaultCollation{BSON("locale" << "fr_CA")};
     const UUID uuid = UUID::gen();
 };
 

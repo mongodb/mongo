@@ -4047,10 +4047,10 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
 }
 
 ParsedFindEqualityPayload::ParsedFindEqualityPayload(BSONElement fleFindPayload)
-    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload)){};
+    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload)) {};
 
 ParsedFindEqualityPayload::ParsedFindEqualityPayload(const Value& fleFindPayload)
-    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload)){};
+    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload)) {};
 
 ParsedFindEqualityPayload::ParsedFindEqualityPayload(ConstDataRange cdr) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
@@ -4071,10 +4071,10 @@ ParsedFindEqualityPayload::ParsedFindEqualityPayload(ConstDataRange cdr) {
 }
 
 ParsedFindRangePayload::ParsedFindRangePayload(BSONElement fleFindPayload)
-    : ParsedFindRangePayload(binDataToCDR(fleFindPayload)){};
+    : ParsedFindRangePayload(binDataToCDR(fleFindPayload)) {};
 
 ParsedFindRangePayload::ParsedFindRangePayload(const Value& fleFindPayload)
-    : ParsedFindRangePayload(binDataToCDR(fleFindPayload)){};
+    : ParsedFindRangePayload(binDataToCDR(fleFindPayload)) {};
 
 ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
@@ -4239,7 +4239,7 @@ QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryTyp
 
 EncryptedPredicateEvaluatorV2::EncryptedPredicateEvaluatorV2(
     std::vector<ServerZerosEncryptionToken> zerosTokens)
-    : _zerosDecryptionTokens(std::move(zerosTokens)){};
+    : _zerosDecryptionTokens(std::move(zerosTokens)) {};
 
 bool EncryptedPredicateEvaluatorV2::evaluate(
     Value fieldValue,

@@ -113,8 +113,7 @@ TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
 // Test that storePossibleCursor() passes up the command response if it is not recognized as a
 // cursor response.
 TEST_F(StorePossibleCursorTest, PassesUpCommandResultIfItDoesNotDescribeACursor) {
-    BSONObj notACursorObj = BSON("not"
-                                 << "cursor");
+    BSONObj notACursorObj = BSON("not" << "cursor");
     auto outgoingCursorResponse = storePossibleCursor(opCtx(),
                                                       shardId,
                                                       hostAndPort,

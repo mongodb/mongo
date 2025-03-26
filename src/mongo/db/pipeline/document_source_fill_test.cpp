@@ -57,8 +57,7 @@ TEST_F(DocumentSourceFillTest, FillOnlyMethodsDesugarsCorrectly) {
 
     // Fill with method desugars as expected. Note that linear fill requires a sort order, so we'll
     // test that separately.
-    fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method"
-                                                                         << "locf"))));
+    fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method" << "locf"))));
     stages = document_source_fill::createFromBson(fillSpec.firstElement(), getExpCtx());
     expectedStages = fromjson(R"({
          "$_internalSetWindowFields": { "output": { "valToFill": { "$locf": "$valToFill" } } }
@@ -68,8 +67,7 @@ TEST_F(DocumentSourceFillTest, FillOnlyMethodsDesugarsCorrectly) {
 }
 
 TEST_F(DocumentSourceFillTest, FillWithSortDesugarsCorrectly) {
-    auto fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method"
-                                                                              << "linear"))
+    auto fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method" << "linear"))
                                                   << "sortBy" << BSON("val" << 1)));
     auto stages = document_source_fill::createFromBson(fillSpec.firstElement(), getExpCtx());
     auto expectedStageOne = fromjson(R"({
@@ -117,17 +115,14 @@ TEST_F(DocumentSourceFillTest, FillWithPartitionsDesugarsCorrectly) {
                   expectedExclusion.toString());
     };
 
-    auto fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method"
-                                                                              << "linear"))
+    auto fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method" << "linear"))
                                                   << "sortBy" << BSON("val" << 1) << "partitionBy"
                                                   << "$$ROOT"));
     test(fillSpec, "\"$$ROOT\"");
 
-    fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method"
-                                                                         << "linear"))
+    fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method" << "linear"))
                                              << "sortBy" << BSON("val" << 1) << "partitionBy"
-                                             << BSON("part"
-                                                     << "$part")));
+                                             << BSON("part" << "$part")));
     test(fillSpec, R"({ $expr: { part: "$part" } })");
 }
 
@@ -145,10 +140,9 @@ TEST_F(DocumentSourceFillTest, OptimizedOutParamsAreStillValidated) {
                        16410);
 
     // Invalid sortBy with validation performed in document_source_set_window_fields.
-    fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method"
-                                                                         << "linear"))
-                                             << "sortBy" << BSON("$val" << 1) << "partitionBy"
-                                             << BSON("valid" << 1)));
+    fillSpec =
+        BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method" << "linear")) << "sortBy"
+                                      << BSON("$val" << 1) << "partitionBy" << BSON("valid" << 1)));
     ASSERT_THROWS_CODE(document_source_fill::createFromBson(fillSpec.firstElement(), getExpCtx()),
                        AssertionException,
                        16410);
@@ -162,10 +156,9 @@ TEST_F(DocumentSourceFillTest, OptimizedOutParamsAreStillValidated) {
                        ErrorCodes::InvalidPipelineOperator);
 
     // Invalid partitionBy with validation performed in document_source_set_window_fields.
-    fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method"
-                                                                         << "locf"))
-                                             << "sortBy" << BSON("val" << 1) << "partitionBy"
-                                             << BSON("$bogus" << 1)));
+    fillSpec =
+        BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method" << "locf")) << "sortBy"
+                                      << BSON("val" << 1) << "partitionBy" << BSON("$bogus" << 1)));
     ASSERT_THROWS_CODE(document_source_fill::createFromBson(fillSpec.firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::InvalidPipelineOperator);
@@ -179,8 +172,7 @@ TEST_F(DocumentSourceFillTest, OptimizedOutParamsAreStillValidated) {
                        16872);
 
     // Invalid partitionByField with validated performed in document_source_set_window_fields.
-    fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method"
-                                                                         << "locf"))
+    fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("method" << "locf"))
                                              << "sortBy" << BSON("val" << 1) << "partitionBy"
                                              << "$"));
     ASSERT_THROWS_CODE(document_source_fill::createFromBson(fillSpec.firstElement(), getExpCtx()),
@@ -190,8 +182,7 @@ TEST_F(DocumentSourceFillTest, OptimizedOutParamsAreStillValidated) {
     // Fully validated expression should only have 1 stage when not using output.foo.method
     fillSpec = BSON("$fill" << BSON("output" << BSON("valToFill" << BSON("value" << 1)) << "sortBy"
                                              << BSON("val.foo" << 1) << "partitionBy"
-                                             << BSON("valid"
-                                                     << "$valid")));
+                                             << BSON("valid" << "$valid")));
     auto stages = document_source_fill::createFromBson(fillSpec.firstElement(), getExpCtx());
     ASSERT_EQ(stages.size(), 1);
 }

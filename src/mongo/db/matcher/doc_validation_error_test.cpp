@@ -109,12 +109,12 @@ namespace {
 TEST(GenerateValidationError, FailingDocumentId) {
     BSONObj query = BSON("a" << BSON("$eq" << 2));
     BSONObj document = BSON("a" << 1 << "_id" << 10);
-    BSONObj expectedError = BSON("failingDocumentId" << 10 << "details"
-                                                     << BSON("operatorName"
-                                                             << "$eq"
-                                                             << "specifiedAs" << query << "reason"
-                                                             << "comparison failed"
-                                                             << "consideredValue" << 1));
+    BSONObj expectedError =
+        BSON("failingDocumentId" << 10 << "details"
+                                 << BSON("operatorName" << "$eq"
+                                                        << "specifiedAs" << query << "reason"
+                                                        << "comparison failed"
+                                                        << "consideredValue" << 1));
     ASSERT_BSONOBJ_EQ(
         doc_validation_error::generateValidationError(query, document, false /* shouldThrow */),
         expectedError);
@@ -172,54 +172,49 @@ void verifyTruncatedError(const BSONObj& query,
 TEST(ComparisonMatchExpression, BasicEq) {
     BSONObj query = BSON("a" << BSON("$eq" << 2));
     BSONObj document = BSON("a" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$eq"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValue" << 1);
+    BSONObj expectedError = BSON("operatorName" << "$eq"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValue" << 1);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, EqMissingPath) {
     BSONObj query = BSON("a" << BSON("$eq" << 2));
     BSONObj document = BSON("b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$eq"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$eq"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, EqImplicitArrayTraversal) {
     BSONObj query = BSON("a" << BSON("$eq" << 2));
     BSONObj document = BSON("a" << BSON_ARRAY(3 << 4 << 5));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$eq"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
+    BSONObj expectedError = BSON("operatorName" << "$eq"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, EqImplicitArrayTraversalNestedDocumentSingleElement) {
     BSONObj query = BSON("a.b" << BSON("$eq" << 2));
     BSONObj document = BSON("a" << BSON_ARRAY(BSON("b" << 3)));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$eq"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValue" << 3);
+    BSONObj expectedError = BSON("operatorName" << "$eq"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValue" << 3);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, EqImplicitArrayTraversalNestedDocument) {
     BSONObj query = BSON("a.b" << BSON("$eq" << 2));
     BSONObj document = BSON("a" << BSON_ARRAY(BSON("b" << 3) << BSON("b" << 4) << BSON("b" << 5)));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$eq"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
+    BSONObj expectedError = BSON("operatorName" << "$eq"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -227,33 +222,31 @@ TEST(ComparisonMatchExpression, EqImplicitArrayTraversalNestedArrays) {
     BSONObj query = BSON("a.b" << BSON("$eq" << 0));
     BSONObj document =
         BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(1 << 2)) << BSON("b" << BSON_ARRAY(3 << 4))));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$eq"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
+    BSONObj expectedError =
+        BSON("operatorName" << "$eq"
+                            << "specifiedAs" << query << "reason"
+                            << "comparison failed"
+                            << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, EqEmptyArray) {
     BSONObj query = BSON("a" << BSON("$eq" << BSON_ARRAY(1 << 2)));
     BSONObj document = BSON("a" << BSONArray{});
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$eq"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSONArray{});
+    BSONObj expectedError = BSON("operatorName" << "$eq"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << BSONArray{});
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, EqNoOperator) {
     BSONObj query = BSON("a" << 2);
     BSONObj document = BSON("a" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$eq"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValue" << 1);
+    BSONObj expectedError = BSON("operatorName" << "$eq"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValue" << 1);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -261,22 +254,20 @@ TEST(ComparisonMatchExpression, EqNoOperator) {
 TEST(ComparisonMatchExpression, BasicNe) {
     BSONObj query = BSON("a" << BSON("$ne" << 2));
     BSONObj document = BSON("a" << 2);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$ne"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison succeeded"
-                                 << "consideredValue" << 2);
+    BSONObj expectedError = BSON("operatorName" << "$ne"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison succeeded"
+                                                << "consideredValue" << 2);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, NeImplicitArrayTraversal) {
     BSONObj query = BSON("a" << BSON("$ne" << 2));
     BSONObj document = BSON("a" << BSON_ARRAY(1 << 2 << 3));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$ne"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison succeeded"
-                                 << "consideredValues" << BSON_ARRAY(1 << 2 << 3));
+    BSONObj expectedError = BSON("operatorName" << "$ne"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison succeeded"
+                                                << "consideredValues" << BSON_ARRAY(1 << 2 << 3));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -284,32 +275,29 @@ TEST(ComparisonMatchExpression, NeImplicitArrayTraversal) {
 TEST(ComparisonMatchExpression, BasicLt) {
     BSONObj query = BSON("a" << BSON("$lt" << 0));
     BSONObj document = BSON("a" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$lt"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValue" << 1);
+    BSONObj expectedError = BSON("operatorName" << "$lt"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValue" << 1);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, LtMissingPath) {
     BSONObj query = BSON("a" << BSON("$lt" << 0));
     BSONObj document = BSON("b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$lt"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$lt"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, LtImplicitArrayTraversal) {
     BSONObj query = BSON("a" << BSON("$lt" << 0));
     BSONObj document = BSON("a" << BSON_ARRAY(3 << 4 << 5));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$lt"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
+    BSONObj expectedError = BSON("operatorName" << "$lt"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -317,32 +305,29 @@ TEST(ComparisonMatchExpression, LtImplicitArrayTraversal) {
 TEST(ComparisonMatchExpression, BasicLte) {
     BSONObj query = BSON("a" << BSON("$lte" << 0));
     BSONObj document = BSON("a" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$lte"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValue" << 1);
+    BSONObj expectedError = BSON("operatorName" << "$lte"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValue" << 1);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, LteMissingPath) {
     BSONObj query = BSON("a" << BSON("$lte" << 0));
     BSONObj document = BSON("b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$lte"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$lte"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, LteImplicitArrayTraversal) {
     BSONObj query = BSON("a" << BSON("$lte" << 0));
     BSONObj document = BSON("a" << BSON_ARRAY(3 << 4 << 5));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$lte"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
+    BSONObj expectedError = BSON("operatorName" << "$lte"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -350,32 +335,29 @@ TEST(ComparisonMatchExpression, LteImplicitArrayTraversal) {
 TEST(ComparisonMatchExpression, BasicGt) {
     BSONObj query = BSON("a" << BSON("$gt" << 3));
     BSONObj document = BSON("a" << 0);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$gt"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValue" << 0);
+    BSONObj expectedError = BSON("operatorName" << "$gt"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValue" << 0);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, GtMissingPath) {
     BSONObj query = BSON("a" << BSON("$gt" << 3));
     BSONObj document = BSON("b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$gt"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$gt"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, GtImplicitArrayTraversal) {
     BSONObj query = BSON("a" << BSON("$gt" << 3));
     BSONObj document = BSON("a" << BSON_ARRAY(0 << 1 << 2));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$gt"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
+    BSONObj expectedError = BSON("operatorName" << "$gt"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -383,43 +365,39 @@ TEST(ComparisonMatchExpression, GtImplicitArrayTraversal) {
 TEST(ComparisonMatchExpression, BasicGte) {
     BSONObj query = BSON("a" << BSON("$gte" << 3));
     BSONObj document = BSON("a" << 0);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$gte"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValue" << 0);
+    BSONObj expectedError = BSON("operatorName" << "$gte"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValue" << 0);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, GteMissingPath) {
     BSONObj query = BSON("a" << BSON("$gte" << 3));
     BSONObj document = BSON("b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$gte"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$gte"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, GteImplicitArrayTraversal) {
     BSONObj query = BSON("a" << BSON("$gte" << 3));
     BSONObj document = BSON("a" << BSON_ARRAY(0 << 1 << 2));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$gte"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
+    BSONObj expectedError = BSON("operatorName" << "$gte"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, GteImplicitArrayTraversalEmptyArray) {
     BSONObj query = BSON("a" << BSON("$gte" << 3));
     BSONObj document = BSON("a" << BSONArray());
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$gte"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << BSONArray{});
+    BSONObj expectedError = BSON("operatorName" << "$gte"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << BSONArray{});
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -427,21 +405,19 @@ TEST(ComparisonMatchExpression, GteImplicitArrayTraversalEmptyArray) {
 TEST(ComparisonMatchExpression, BasicIn) {
     BSONObj query = BSON("a" << BSON("$in" << BSON_ARRAY(1 << 2 << 3)));
     BSONObj document = BSON("a" << 4);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$in"
-                                 << "specifiedAs" << query << "reason"
-                                 << "no matching value found in array"
-                                 << "consideredValue" << 4);
+    BSONObj expectedError = BSON("operatorName" << "$in"
+                                                << "specifiedAs" << query << "reason"
+                                                << "no matching value found in array"
+                                                << "consideredValue" << 4);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, InMissingPath) {
     BSONObj query = BSON("a" << BSON("$in" << BSON_ARRAY(1 << 2 << 3)));
     BSONObj document = BSON("b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$in"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$in"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -450,11 +426,11 @@ TEST(ComparisonMatchExpression, InNestedDocumentsAndArrays) {
         BSON("a.b" << BSON("$in" << BSON_ARRAY(5 << 6 << 7 << BSON_ARRAY(2 << 3 << 4))));
     BSONObj document =
         BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(1 << 2)) << BSON("b" << BSON_ARRAY(3 << 4))));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$in"
-                                 << "specifiedAs" << query << "reason"
-                                 << "no matching value found in array"
-                                 << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
+    BSONObj expectedError =
+        BSON("operatorName" << "$in"
+                            << "specifiedAs" << query << "reason"
+                            << "no matching value found in array"
+                            << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -462,11 +438,10 @@ TEST(ComparisonMatchExpression, InNestedDocumentsAndArrays) {
 TEST(ComparisonMatchExpression, BasicNin) {
     BSONObj query = BSON("a" << BSON("$nin" << BSON_ARRAY(1 << 2 << 3)));
     BSONObj document = BSON("a" << 3);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$nin"
-                                 << "specifiedAs" << query << "reason"
-                                 << "matching value found in array"
-                                 << "consideredValue" << 3);
+    BSONObj expectedError = BSON("operatorName" << "$nin"
+                                                << "specifiedAs" << query << "reason"
+                                                << "matching value found in array"
+                                                << "consideredValue" << 3);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -474,11 +449,11 @@ TEST(ComparisonMatchExpression, NinNestedDocumentsAndArrays) {
     BSONObj query = BSON("a.b" << BSON("$nin" << BSON_ARRAY(1 << BSON_ARRAY(2 << 3 << 4))));
     BSONObj document =
         BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(1 << 2)) << BSON("b" << BSON_ARRAY(3 << 4))));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$nin"
-                                 << "specifiedAs" << query << "reason"
-                                 << "matching value found in array"
-                                 << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
+    BSONObj expectedError =
+        BSON("operatorName" << "$nin"
+                            << "specifiedAs" << query << "reason"
+                            << "matching value found in array"
+                            << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -486,28 +461,24 @@ TEST(ComparisonMatchExpression, NinNestedDocumentsAndArrays) {
 TEST(ComparisonMatchExpression, InAcceptsRegex) {
     BSONObj query = BSON(
         "a" << BSON("$in" << BSON_ARRAY(BSONRegEx("^v") << BSONRegEx("^b") << BSONRegEx("^c"))));
-    BSONObj document = BSON("a"
-                            << "Validation");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$in"
-                                 << "specifiedAs" << query << "reason"
-                                 << "no matching value found in array"
-                                 << "consideredValue"
-                                 << "Validation");
+    BSONObj document = BSON("a" << "Validation");
+    BSONObj expectedError = BSON("operatorName" << "$in"
+                                                << "specifiedAs" << query << "reason"
+                                                << "no matching value found in array"
+                                                << "consideredValue"
+                                                << "Validation");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ComparisonMatchExpression, NinAcceptsRegex) {
     BSONObj query = BSON(
         "a" << BSON("$nin" << BSON_ARRAY(BSONRegEx("^v") << BSONRegEx("^b") << BSONRegEx("^c"))));
-    BSONObj document = BSON("a"
-                            << "berry");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$nin"
-                                 << "specifiedAs" << query << "reason"
-                                 << "matching value found in array"
-                                 << "consideredValue"
-                                 << "berry");
+    BSONObj document = BSON("a" << "berry");
+    BSONObj expectedError = BSON("operatorName" << "$nin"
+                                                << "specifiedAs" << query << "reason"
+                                                << "matching value found in array"
+                                                << "consideredValue"
+                                                << "berry");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -517,16 +488,16 @@ TEST(LogicalMatchExpression, BasicAnd) {
     BSONObj failingClause = BSON("a" << BSON("$lt" << 10));
     BSONObj query = BSON("$and" << BSON_ARRAY(BSON("b" << BSON("$gt" << 0)) << failingClause));
     BSONObj document = BSON("a" << 11 << "b" << 2);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$and"
-                                 << "clausesNotSatisfied"
-                                 << BSON_ARRAY(BSON("index" << 1 << "details"
-                                                            << BSON("operatorName"
-                                                                    << "$lt"
-                                                                    << "specifiedAs"
-                                                                    << failingClause << "reason"
-                                                                    << "comparison failed"
-                                                                    << "consideredValue" << 11))));
+    BSONObj expectedError =
+        BSON("operatorName" << "$and"
+                            << "clausesNotSatisfied"
+                            << BSON_ARRAY(BSON("index"
+                                               << 1 << "details"
+                                               << BSON("operatorName"
+                                                       << "$lt"
+                                                       << "specifiedAs" << failingClause << "reason"
+                                                       << "comparison failed"
+                                                       << "consideredValue" << 11))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -534,16 +505,16 @@ TEST(LogicalMatchExpression, ImplicitAnd) {
     BSONObj failingClause = BSON("a" << BSON("$lt" << 10));
     BSONObj query = BSON("a" << BSON("$gt" << 0 << "$lt" << 10));
     BSONObj document = BSON("a" << 11);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$and"
-                                 << "clausesNotSatisfied"
-                                 << BSON_ARRAY(BSON("index" << 1 << "details"
-                                                            << BSON("operatorName"
-                                                                    << "$lt"
-                                                                    << "specifiedAs"
-                                                                    << failingClause << "reason"
-                                                                    << "comparison failed"
-                                                                    << "consideredValue" << 11))));
+    BSONObj expectedError =
+        BSON("operatorName" << "$and"
+                            << "clausesNotSatisfied"
+                            << BSON_ARRAY(BSON("index"
+                                               << 1 << "details"
+                                               << BSON("operatorName"
+                                                       << "$lt"
+                                                       << "specifiedAs" << failingClause << "reason"
+                                                       << "comparison failed"
+                                                       << "consideredValue" << 11))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -552,22 +523,22 @@ TEST(LogicalMatchExpression, AndMultipleFailingClauses) {
     BSONObj secondFailingClause = BSON("a" << BSON("$gt" << 20));
     BSONObj query = BSON("$and" << BSON_ARRAY(firstFailingClause << secondFailingClause));
     BSONObj document = BSON("a" << 15);
-    BSONObj expectedError = BSON(
-        "operatorName"
-        << "$and"
-        << "clausesNotSatisfied"
-        << BSON_ARRAY(BSON("index" << 0 << "details"
-                                   << BSON("operatorName"
-                                           << "$lt"
-                                           << "specifiedAs" << firstFailingClause << "reason"
-                                           << "comparison failed"
-                                           << "consideredValue" << 15))
-                      << BSON("index" << 1 << "details"
-                                      << BSON("operatorName"
-                                              << "$gt"
-                                              << "specifiedAs" << secondFailingClause << "reason"
-                                              << "comparison failed"
-                                              << "consideredValue" << 15))));
+    BSONObj expectedError =
+        BSON("operatorName"
+             << "$and"
+             << "clausesNotSatisfied"
+             << BSON_ARRAY(BSON("index" << 0 << "details"
+                                        << BSON("operatorName" << "$lt"
+                                                               << "specifiedAs"
+                                                               << firstFailingClause << "reason"
+                                                               << "comparison failed"
+                                                               << "consideredValue" << 15))
+                           << BSON("index" << 1 << "details"
+                                           << BSON("operatorName" << "$gt"
+                                                                  << "specifiedAs"
+                                                                  << secondFailingClause << "reason"
+                                                                  << "comparison failed"
+                                                                  << "consideredValue" << 15))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -589,16 +560,16 @@ TEST(LogicalMatchExpression, BasicOr) {
     BSONObj failingClause = BSON("a" << BSON("$lt" << 10));
     BSONObj query = BSON("$or" << BSON_ARRAY(failingClause));
     BSONObj document = BSON("a" << 11);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$or"
-                                 << "clausesNotSatisfied"
-                                 << BSON_ARRAY(BSON("index" << 0 << "details"
-                                                            << BSON("operatorName"
-                                                                    << "$lt"
-                                                                    << "specifiedAs"
-                                                                    << failingClause << "reason"
-                                                                    << "comparison failed"
-                                                                    << "consideredValue" << 11))));
+    BSONObj expectedError =
+        BSON("operatorName" << "$or"
+                            << "clausesNotSatisfied"
+                            << BSON_ARRAY(BSON("index"
+                                               << 0 << "details"
+                                               << BSON("operatorName"
+                                                       << "$lt"
+                                                       << "specifiedAs" << failingClause << "reason"
+                                                       << "comparison failed"
+                                                       << "consideredValue" << 11))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -607,22 +578,22 @@ TEST(LogicalMatchExpression, OrMultipleFailingClauses) {
     BSONObj secondFailingClause = BSON("a" << BSON("$gt" << 20));
     BSONObj query = BSON("$or" << BSON_ARRAY(firstFailingClause << secondFailingClause));
     BSONObj document = BSON("a" << 15);
-    BSONObj expectedError = BSON(
-        "operatorName"
-        << "$or"
-        << "clausesNotSatisfied"
-        << BSON_ARRAY(BSON("index" << 0 << "details"
-                                   << BSON("operatorName"
-                                           << "$lt"
-                                           << "specifiedAs" << firstFailingClause << "reason"
-                                           << "comparison failed"
-                                           << "consideredValue" << 15))
-                      << BSON("index" << 1 << "details"
-                                      << BSON("operatorName"
-                                              << "$gt"
-                                              << "specifiedAs" << secondFailingClause << "reason"
-                                              << "comparison failed"
-                                              << "consideredValue" << 15))));
+    BSONObj expectedError =
+        BSON("operatorName"
+             << "$or"
+             << "clausesNotSatisfied"
+             << BSON_ARRAY(BSON("index" << 0 << "details"
+                                        << BSON("operatorName" << "$lt"
+                                                               << "specifiedAs"
+                                                               << firstFailingClause << "reason"
+                                                               << "comparison failed"
+                                                               << "consideredValue" << 15))
+                           << BSON("index" << 1 << "details"
+                                           << BSON("operatorName" << "$gt"
+                                                                  << "specifiedAs"
+                                                                  << secondFailingClause << "reason"
+                                                                  << "comparison failed"
+                                                                  << "consideredValue" << 15))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -633,15 +604,15 @@ TEST(LogicalMatchExpression, BasicNor) {
     BSONObj query = BSON("$nor" << BSON_ARRAY(firstClause << secondFailingClause));
     BSONObj document = BSON("a" << 9 << "b" << 9);
     BSONObj expectedError =
-        BSON("operatorName"
-             << "$nor"
-             << "clausesSatisfied"
-             << BSON_ARRAY(BSON("index" << 1 << "details"
-                                        << BSON("operatorName"
-                                                << "$lt"
-                                                << "specifiedAs" << secondFailingClause << "reason"
-                                                << "comparison succeeded"
-                                                << "consideredValue" << 9))));
+        BSON("operatorName" << "$nor"
+                            << "clausesSatisfied"
+                            << BSON_ARRAY(BSON("index" << 1 << "details"
+                                                       << BSON("operatorName"
+                                                               << "$lt"
+                                                               << "specifiedAs"
+                                                               << secondFailingClause << "reason"
+                                                               << "comparison succeeded"
+                                                               << "consideredValue" << 9))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -650,22 +621,22 @@ TEST(LogicalMatchExpression, NorAllSuccessfulClauses) {
     BSONObj secondFailingClause = BSON("a" << BSON("$gt" << 10));
     BSONObj query = BSON("$nor" << BSON_ARRAY(firstFailingClause << secondFailingClause));
     BSONObj document = BSON("a" << 15);
-    BSONObj expectedError = BSON(
-        "operatorName"
-        << "$nor"
-        << "clausesSatisfied"
-        << BSON_ARRAY(BSON("index" << 0 << "details"
-                                   << BSON("operatorName"
-                                           << "$lt"
-                                           << "specifiedAs" << firstFailingClause << "reason"
-                                           << "comparison succeeded"
-                                           << "consideredValue" << 15))
-                      << BSON("index" << 1 << "details"
-                                      << BSON("operatorName"
-                                              << "$gt"
-                                              << "specifiedAs" << secondFailingClause << "reason"
-                                              << "comparison succeeded"
-                                              << "consideredValue" << 15))));
+    BSONObj expectedError =
+        BSON("operatorName"
+             << "$nor"
+             << "clausesSatisfied"
+             << BSON_ARRAY(BSON("index" << 0 << "details"
+                                        << BSON("operatorName" << "$lt"
+                                                               << "specifiedAs"
+                                                               << firstFailingClause << "reason"
+                                                               << "comparison succeeded"
+                                                               << "consideredValue" << 15))
+                           << BSON("index" << 1 << "details"
+                                           << BSON("operatorName" << "$gt"
+                                                                  << "specifiedAs"
+                                                                  << secondFailingClause << "reason"
+                                                                  << "comparison succeeded"
+                                                                  << "consideredValue" << 15))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -675,14 +646,13 @@ TEST(LogicalMatchExpression, BasicNot) {
     BSONObj failingQuery = BSON("a" << failingClause);
     BSONObj query = BSON("a" << BSON("$not" << failingClause));
     BSONObj document = BSON("a" << 9);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$not"
-                                 << "details"
-                                 << BSON("operatorName"
-                                         << "$lt"
-                                         << "specifiedAs" << failingQuery << "reason"
-                                         << "comparison succeeded"
-                                         << "consideredValue" << 9));
+    BSONObj expectedError =
+        BSON("operatorName" << "$not"
+                            << "details"
+                            << BSON("operatorName" << "$lt"
+                                                   << "specifiedAs" << failingQuery << "reason"
+                                                   << "comparison succeeded"
+                                                   << "consideredValue" << 9));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -706,12 +676,12 @@ TEST(LogicalMatchExpression, NotOverImplicitAnd) {
                                                  << "comparison succeeded"
                                                  << "consideredValue" << 10))
                             << BSON("index" << 1 << "details"
-                                            << BSON("operatorName"
-                                                    << "$gt"
-                                                    << "specifiedAs"
-                                                    << BSON("a" << BSON("$gt" << 5)) << "reason"
-                                                    << "comparison succeeded"
-                                                    << "consideredValue" << 10)))));
+                                            << BSON("operatorName" << "$gt"
+                                                                   << "specifiedAs"
+                                                                   << BSON("a" << BSON("$gt" << 5))
+                                                                   << "reason"
+                                                                   << "comparison succeeded"
+                                                                   << "consideredValue" << 10)))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -720,17 +690,16 @@ TEST(LogicalMatchExpression, NestedNot) {
     BSONObj failingQuery = BSON("a" << failingClause);
     BSONObj query = BSON("a" << BSON("$not" << BSON("$not" << failingClause)));
     BSONObj document = BSON("a" << 11);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$not"
-                                 << "details"
-                                 << BSON("operatorName"
-                                         << "$not"
-                                         << "details"
-                                         << BSON("operatorName"
-                                                 << "$lt"
-                                                 << "specifiedAs" << failingQuery << "reason"
-                                                 << "comparison failed"
-                                                 << "consideredValue" << 11)));
+    BSONObj expectedError = BSON(
+        "operatorName" << "$not"
+                       << "details"
+                       << BSON("operatorName"
+                               << "$not"
+                               << "details"
+                               << BSON("operatorName" << "$lt"
+                                                      << "specifiedAs" << failingQuery << "reason"
+                                                      << "comparison failed"
+                                                      << "consideredValue" << 11)));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -838,135 +807,114 @@ TEST(LogicalMatchExpression, NestedAndOrNorNotOneFailingClause) {
 TEST(MiscellaneousMatchExpression, BasicExists) {
     BSONObj query = BSON("a" << BSON("$exists" << true));
     BSONObj document = BSON("b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$exists"
-                                 << "specifiedAs" << query << "reason"
-                                 << "path does not exist");
+    BSONObj expectedError = BSON("operatorName" << "$exists"
+                                                << "specifiedAs" << query << "reason"
+                                                << "path does not exist");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, NotExists) {
     BSONObj query = BSON("a" << BSON("$exists" << false));
     BSONObj document = BSON("a" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$exists"
-                                 << "specifiedAs" << query << "reason"
-                                 << "path does exist");
+    BSONObj expectedError = BSON("operatorName" << "$exists"
+                                                << "specifiedAs" << query << "reason"
+                                                << "path does exist");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 // $type
 TEST(MiscellaneousMatchExpression, BasicType) {
-    BSONObj query = BSON("a" << BSON("$type"
-                                     << "int"));
-    BSONObj document = BSON("a"
-                            << "one");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$type"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredValue"
-                                 << "one"
-                                 << "consideredType"
-                                 << "string");
+    BSONObj query = BSON("a" << BSON("$type" << "int"));
+    BSONObj document = BSON("a" << "one");
+    BSONObj expectedError = BSON("operatorName" << "$type"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredValue"
+                                                << "one"
+                                                << "consideredType"
+                                                << "string");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, NotType) {
-    BSONObj failingClause = BSON("$type"
-                                 << "string");
+    BSONObj failingClause = BSON("$type" << "string");
     BSONObj failingQuery = BSON("a" << failingClause);
     BSONObj query = BSON("a" << BSON("$not" << failingClause));
-    BSONObj document = BSON("a"
-                            << "words");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$not"
-                                 << "details"
-                                 << BSON("operatorName"
-                                         << "$type"
-                                         << "specifiedAs" << failingQuery << "reason"
-                                         << "type did match"
-                                         << "consideredValue"
-                                         << "words"
-                                         << "consideredType"
-                                         << "string"));
+    BSONObj document = BSON("a" << "words");
+    BSONObj expectedError =
+        BSON("operatorName" << "$not"
+                            << "details"
+                            << BSON("operatorName" << "$type"
+                                                   << "specifiedAs" << failingQuery << "reason"
+                                                   << "type did match"
+                                                   << "consideredValue"
+                                                   << "words"
+                                                   << "consideredType"
+                                                   << "string"));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, TypeMissingPath) {
-    BSONObj query = BSON("a" << BSON("$type"
-                                     << "double"));
+    BSONObj query = BSON("a" << BSON("$type" << "double"));
     BSONObj document = BSON("b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$type"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$type"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, TypeImplicitArrayTraversal) {
-    BSONObj query = BSON("a" << BSON("$type"
-                                     << "double"));
-    BSONObj document = BSON("a" << BSON_ARRAY("x"
-                                              << "y"
-                                              << "z"));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$type"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredValues"
-                                 << BSON_ARRAY("x"
-                                               << "y"
-                                               << "z")
-                                 << "consideredType"
-                                 << "string");
+    BSONObj query = BSON("a" << BSON("$type" << "double"));
+    BSONObj document = BSON("a" << BSON_ARRAY("x" << "y"
+                                                  << "z"));
+    BSONObj expectedError = BSON("operatorName" << "$type"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredValues"
+                                                << BSON_ARRAY("x" << "y"
+                                                                  << "z")
+                                                << "consideredType"
+                                                << "string");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, TypeImplicitArrayTraversalEmptyArray) {
-    BSONObj query = BSON("a" << BSON("$type"
-                                     << "double"));
+    BSONObj query = BSON("a" << BSON("$type" << "double"));
     BSONObj document = BSON("a" << BSONArray{});
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$type"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredValues" << BSONArray{});
+    BSONObj expectedError = BSON("operatorName" << "$type"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredValues" << BSONArray{});
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 // $expr
 TEST(MiscellaneousMatchExpression, BasicExpr) {
-    BSONObj query = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
-                                                             << "$b")));
+    BSONObj query = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a" << "$b")));
     BSONObj document = BSON("a" << 1 << "b" << 2);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$expr"
-                                 << "specifiedAs" << query << "reason"
-                                 << "expression did not match"
-                                 << "expressionResult" << false);
+    BSONObj expectedError = BSON("operatorName" << "$expr"
+                                                << "specifiedAs" << query << "reason"
+                                                << "expression did not match"
+                                                << "expressionResult" << false);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, NorExpr) {
-    BSONObj failingClause = BSON("$eq" << BSON_ARRAY("$a"
-                                                     << "$b"));
+    BSONObj failingClause = BSON("$eq" << BSON_ARRAY("$a" << "$b"));
     BSONObj failingQuery = BSON("$expr" << failingClause);
     BSONObj query = BSON("$nor" << BSON_ARRAY(failingQuery));
     BSONObj document = BSON("a" << 1 << "b" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$nor"
-                                 << "clausesSatisfied"
-                                 << BSON_ARRAY(BSON(
-                                        "index" << 0 << "details"
-                                                << BSON("operatorName"
-                                                        << "$expr"
-                                                        << "specifiedAs" << failingQuery << "reason"
-                                                        << "expression did match"
-                                                        << "expressionResult" << true))));
+    BSONObj expectedError =
+        BSON("operatorName" << "$nor"
+                            << "clausesSatisfied"
+                            << BSON_ARRAY(BSON("index"
+                                               << 0 << "details"
+                                               << BSON("operatorName"
+                                                       << "$expr"
+                                                       << "specifiedAs" << failingQuery << "reason"
+                                                       << "expression did match"
+                                                       << "expressionResult" << true))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, ExprImplicitArrayTraversal) {
-    BSONObj query = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
-                                                             << "$b")));
+    BSONObj query = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a" << "$b")));
     BSONObj document = BSON("a" << BSON_ARRAY(0 << 1 << 2) << "b" << BSON_ARRAY(3 << 4 << 5));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$expr"
-                                 << "specifiedAs" << query << "reason"
-                                 << "expression did not match"
-                                 << "expressionResult" << false);
+    BSONObj expectedError = BSON("operatorName" << "$expr"
+                                                << "specifiedAs" << query << "reason"
+                                                << "expression did not match"
+                                                << "expressionResult" << false);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1055,11 +1003,10 @@ TEST(MiscellaneousMatchExpression, ExprsWhichThrowUnderInversion) {
 TEST(MiscellaneousMatchExpression, SampleRateAlwaysFalse) {
     BSONObj query = fromjson("{$sampleRate: 0}");
     BSONObj document = fromjson("{'will this always fail?': 'yes!'}");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$sampleRate"
-                                 << "specifiedAs" << query << "reason"
-                                 << "expression did not match"
-                                 << "expressionResult" << false);
+    BSONObj expectedError = BSON("operatorName" << "$sampleRate"
+                                                << "specifiedAs" << query << "reason"
+                                                << "expression did not match"
+                                                << "expressionResult" << false);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, SampleRateAlwaysTrue) {
@@ -1077,11 +1024,10 @@ TEST(MiscellaneousMatchExpression, SampleRateAlwaysTrue) {
 TEST(MiscellaneousMatchExpression, ExprExpressionResultNumeric) {
     BSONObj query = BSON("$expr" << 0);
     BSONObj document = BSON("a" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$expr"
-                                 << "specifiedAs" << query << "reason"
-                                 << "expression did not match"
-                                 << "expressionResult" << 0);
+    BSONObj expectedError = BSON("operatorName" << "$expr"
+                                                << "specifiedAs" << query << "reason"
+                                                << "expression did not match"
+                                                << "expressionResult" << 0);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, NorExprExpressionResultObject) {
@@ -1089,15 +1035,15 @@ TEST(MiscellaneousMatchExpression, NorExprExpressionResultObject) {
     BSONObj query = BSON("$nor" << BSON_ARRAY(failingExpression));
     BSONObj document = BSON("a" << 1);
     BSONObj expectedError =
-        BSON("operatorName"
-             << "$nor"
-             << "clausesSatisfied"
-             << BSON_ARRAY(BSON("index" << 0 << "details"
-                                        << BSON("operatorName"
-                                                << "$expr"
-                                                << "specifiedAs" << failingExpression << "reason"
-                                                << "expression did match"
-                                                << "expressionResult" << BSON("b" << 1)))));
+        BSON("operatorName" << "$nor"
+                            << "clausesSatisfied"
+                            << BSON_ARRAY(BSON(
+                                   "index" << 0 << "details"
+                                           << BSON("operatorName"
+                                                   << "$expr"
+                                                   << "specifiedAs" << failingExpression << "reason"
+                                                   << "expression did match"
+                                                   << "expressionResult" << BSON("b" << 1)))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1105,11 +1051,10 @@ TEST(MiscellaneousMatchExpression, NorExprExpressionResultObject) {
 TEST(MiscellaneousMatchExpression, BasicMod) {
     BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
     BSONObj document = BSON("a" << 2);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$mod"
-                                 << "specifiedAs" << query << "reason"
-                                 << "$mod did not evaluate to expected remainder"
-                                 << "consideredValue" << 2);
+    BSONObj expectedError = BSON("operatorName" << "$mod"
+                                                << "specifiedAs" << query << "reason"
+                                                << "$mod did not evaluate to expected remainder"
+                                                << "consideredValue" << 2);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, NotMod) {
@@ -1117,101 +1062,88 @@ TEST(MiscellaneousMatchExpression, NotMod) {
     BSONObj failingQuery = BSON("a" << failingClause);
     BSONObj query = BSON("a" << BSON("$not" << failingClause));
     BSONObj document = BSON("a" << 2);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$not"
-                                 << "details"
-                                 << BSON("operatorName"
-                                         << "$mod"
-                                         << "specifiedAs" << failingQuery << "reason"
-                                         << "$mod did evaluate to expected remainder"
-                                         << "consideredValue" << 2));
+    BSONObj expectedError =
+        BSON("operatorName" << "$not"
+                            << "details"
+                            << BSON("operatorName" << "$mod"
+                                                   << "specifiedAs" << failingQuery << "reason"
+                                                   << "$mod did evaluate to expected remainder"
+                                                   << "consideredValue" << 2));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, ModMissingPath) {
     BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
     BSONObj document = BSON("b" << 2);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$mod"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$mod"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversal) {
     BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
     BSONObj document = BSON("a" << BSON_ARRAY(0 << 2 << 4));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$mod"
-                                 << "specifiedAs" << query << "reason"
-                                 << "$mod did not evaluate to expected remainder"
-                                 << "consideredValues" << BSON_ARRAY(0 << 2 << 4));
+    BSONObj expectedError = BSON("operatorName" << "$mod"
+                                                << "specifiedAs" << query << "reason"
+                                                << "$mod did not evaluate to expected remainder"
+                                                << "consideredValues" << BSON_ARRAY(0 << 2 << 4));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, ModNonNumeric) {
     BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
-    BSONObj document = BSON("a"
-                            << "two");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$mod"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredType"
-                                 << "string"
-                                 << "expectedTypes"
-                                 << BSON_ARRAY("decimal"
-                                               << "double"
-                                               << "int"
-                                               << "long")
-                                 << "consideredValue"
-                                 << "two");
+    BSONObj document = BSON("a" << "two");
+    BSONObj expectedError = BSON("operatorName" << "$mod"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredType"
+                                                << "string"
+                                                << "expectedTypes"
+                                                << BSON_ARRAY("decimal" << "double"
+                                                                        << "int"
+                                                                        << "long")
+                                                << "consideredValue"
+                                                << "two");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversalNonNumeric) {
     BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
-    BSONObj document = BSON("a" << BSON_ARRAY("zero"
-                                              << "two"
-                                              << "four"));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$mod"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredType"
-                                 << "string"
-                                 << "expectedTypes"
-                                 << BSON_ARRAY("decimal"
-                                               << "double"
-                                               << "int"
-                                               << "long")
-                                 << "consideredValues"
-                                 << BSON_ARRAY("zero"
-                                               << "two"
-                                               << "four"));
+    BSONObj document = BSON("a" << BSON_ARRAY("zero" << "two"
+                                                     << "four"));
+    BSONObj expectedError = BSON("operatorName" << "$mod"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredType"
+                                                << "string"
+                                                << "expectedTypes"
+                                                << BSON_ARRAY("decimal" << "double"
+                                                                        << "int"
+                                                                        << "long")
+                                                << "consideredValues"
+                                                << BSON_ARRAY("zero" << "two"
+                                                                     << "four"));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversalMixedTypes) {
     BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
     BSONObj document = BSON("a" << BSON_ARRAY(0 << "two"
                                                 << "four"));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$mod"
-                                 << "specifiedAs" << query << "reason"
-                                 << "$mod did not evaluate to expected remainder"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(0 << "two"
-                                                 << "four"));
+    BSONObj expectedError = BSON("operatorName" << "$mod"
+                                                << "specifiedAs" << query << "reason"
+                                                << "$mod did not evaluate to expected remainder"
+                                                << "consideredValues"
+                                                << BSON_ARRAY(0 << "two"
+                                                                << "four"));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 // $regex
 TEST(MiscellaneousMatchExpression, BasicRegex) {
     BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
                                               << ""));
-    BSONObj document = BSON("a"
-                            << "one");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$regex"
-                                 << "specifiedAs" << query << "reason"
-                                 << "regular expression did not match"
-                                 << "consideredValue"
-                                 << "one");
+    BSONObj document = BSON("a" << "one");
+    BSONObj expectedError = BSON("operatorName" << "$regex"
+                                                << "specifiedAs" << query << "reason"
+                                                << "regular expression did not match"
+                                                << "consideredValue"
+                                                << "one");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, NotRegex) {
@@ -1219,96 +1151,83 @@ TEST(MiscellaneousMatchExpression, NotRegex) {
                                           << "");
     BSONObj failingQuery = BSON("a" << failingClause);
     BSONObj query = BSON("a" << BSON("$not" << failingClause));
-    BSONObj document = BSON("a"
-                            << "myRegex");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$not"
-                                 << "details"
-                                 << BSON("operatorName"
-                                         << "$regex"
-                                         << "specifiedAs" << failingQuery << "reason"
-                                         << "regular expression did match"
-                                         << "consideredValue"
-                                         << "myRegex"));
+    BSONObj document = BSON("a" << "myRegex");
+    BSONObj expectedError =
+        BSON("operatorName" << "$not"
+                            << "details"
+                            << BSON("operatorName" << "$regex"
+                                                   << "specifiedAs" << failingQuery << "reason"
+                                                   << "regular expression did match"
+                                                   << "consideredValue"
+                                                   << "myRegex"));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, RegexMissingPath) {
     BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
                                               << ""));
-    BSONObj document = BSON("b"
-                            << "myRegex");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$regex"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj document = BSON("b" << "myRegex");
+    BSONObj expectedError = BSON("operatorName" << "$regex"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversal) {
     BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
                                               << ""));
-    BSONObj document = BSON("a" << BSON_ARRAY("x"
-                                              << "y"
-                                              << "z"));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$regex"
-                                 << "specifiedAs" << query << "reason"
-                                 << "regular expression did not match"
-                                 << "consideredValues"
-                                 << BSON_ARRAY("x"
-                                               << "y"
-                                               << "z"));
+    BSONObj document = BSON("a" << BSON_ARRAY("x" << "y"
+                                                  << "z"));
+    BSONObj expectedError = BSON("operatorName" << "$regex"
+                                                << "specifiedAs" << query << "reason"
+                                                << "regular expression did not match"
+                                                << "consideredValues"
+                                                << BSON_ARRAY("x" << "y"
+                                                                  << "z"));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, RegexNonString) {
     BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
                                               << ""));
     BSONObj document = BSON("a" << 1);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$regex"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredType"
-                                 << "int"
-                                 << "expectedTypes"
-                                 << BSON_ARRAY("regex"
-                                               << "string"
-                                               << "symbol")
-                                 << "consideredValue" << 1);
+    BSONObj expectedError = BSON("operatorName" << "$regex"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredType"
+                                                << "int"
+                                                << "expectedTypes"
+                                                << BSON_ARRAY("regex" << "string"
+                                                                      << "symbol")
+                                                << "consideredValue" << 1);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversalNonString) {
     BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
                                               << ""));
     BSONObj document = BSON("a" << BSON_ARRAY(0 << 1 << 2));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$regex"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredType"
-                                 << "int"
-                                 << "expectedTypes"
-                                 << BSON_ARRAY("regex"
-                                               << "string"
-                                               << "symbol")
-                                 << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
+    BSONObj expectedError = BSON("operatorName" << "$regex"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredType"
+                                                << "int"
+                                                << "expectedTypes"
+                                                << BSON_ARRAY("regex" << "string"
+                                                                      << "symbol")
+                                                << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversalMixedTypes) {
     BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
                                               << ""));
     BSONObj document = BSON("a" << BSON_ARRAY("x" << 1 << 2));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$regex"
-                                 << "specifiedAs" << query << "reason"
-                                 << "regular expression did not match"
-                                 << "consideredValues" << BSON_ARRAY("x" << 1 << 2));
+    BSONObj expectedError = BSON("operatorName" << "$regex"
+                                                << "specifiedAs" << query << "reason"
+                                                << "regular expression did not match"
+                                                << "consideredValues" << BSON_ARRAY("x" << 1 << 2));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(MiscellaneousMatchExpression, RegexNoExplicitOperator) {
     BSONObj query = BSON("a" << BSONRegEx("^S"));
-    BSONObj document = BSON("a"
-                            << "so sorry; not capitalized");
+    BSONObj document = BSON("a" << "so sorry; not capitalized");
     BSONObj expectedError = fromjson(
         "{operatorName: '$regex',"
         "specifiedAs: {a: /^S/}, "
@@ -1319,8 +1238,7 @@ TEST(MiscellaneousMatchExpression, RegexNoExplicitOperator) {
 
 TEST(MiscellaneousMatchExpression, NotOverRegexNoExplicitOperator) {
     BSONObj query = BSON("a" << BSON("$not" << BSONRegEx("^S")));
-    BSONObj document = BSON("a"
-                            << "S");
+    BSONObj document = BSON("a" << "S");
     BSONObj expectedError = fromjson(
         "{operatorName: '$not', 'details': "
         "   {operatorName: '$regex',"
@@ -1334,11 +1252,10 @@ TEST(MiscellaneousMatchExpression, NotOverRegexNoExplicitOperator) {
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearNumeric) {
     BSONObj query = BSON("a" << BSON("$bitsAllClear" << 2));
     BSONObj document = BSON("a" << 7);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAllClear"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 7);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAllClear"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 7);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1347,15 +1264,14 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearNumeric) {
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearNumericOnValueMatch) {
     BSONObj query = BSON("a" << BSON("$not" << BSON("$bitsAllClear" << 2)));
     BSONObj document = BSON("a" << 5);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$not"
-                                 << "details"
-                                 << BSON("operatorName"
-                                         << "$bitsAllClear"
-                                         << "specifiedAs" << BSON("a" << BSON("$bitsAllClear" << 2))
-                                         << "reason"
-                                         << "bitwise operator matched successfully"
-                                         << "consideredValue" << 5));
+    BSONObj expectedError = BSON(
+        "operatorName" << "$not"
+                       << "details"
+                       << BSON("operatorName" << "$bitsAllClear"
+                                              << "specifiedAs"
+                                              << BSON("a" << BSON("$bitsAllClear" << 2)) << "reason"
+                                              << "bitwise operator matched successfully"
+                                              << "consideredValue" << 5));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1364,11 +1280,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearNumericOnValueM
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearPositionList) {
     BSONObj query = BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(1)));
     BSONObj document = BSON("a" << 7);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAllClear"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 7);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAllClear"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 7);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1379,11 +1294,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearBinData) {
     BSONObj query = BSON("a" << BSON("$bitsAllClear" << BSONBinData(
                                          &binaryData, sizeof(binaryData), BinDataGeneral)));
     BSONObj document = BSON("a" << 7);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAllClear"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 7);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAllClear"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 7);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1391,11 +1305,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearBinData) {
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllSetNumeric) {
     BSONObj query = BSON("a" << BSON("$bitsAllSet" << 2));
     BSONObj document = BSON("a" << 5);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAllSet"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 5);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAllSet"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 5);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1404,11 +1317,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllSetNumeric) {
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllSetPositionList) {
     BSONObj query = BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(1)));
     BSONObj document = BSON("a" << 5);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAllSet"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 5);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAllSet"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 5);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1419,11 +1331,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllSetBinData) {
     BSONObj query = BSON(
         "a" << BSON("$bitsAllSet" << BSONBinData(&binaryData, sizeof(binaryData), BinDataGeneral)));
     BSONObj document = BSON("a" << 5);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAllSet"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 5);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAllSet"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 5);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1431,11 +1342,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllSetBinData) {
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnyClearNumeric) {
     BSONObj query = BSON("a" << BSON("$bitsAnyClear" << 3));
     BSONObj document = BSON("a" << 7);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAnyClear"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 7);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAnyClear"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 7);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1444,11 +1354,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnyClearNumeric) {
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnyClearPositionList) {
     BSONObj query = BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(1 << 0)));
     BSONObj document = BSON("a" << 7);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAnyClear"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 7);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAnyClear"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 7);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1459,11 +1368,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnyClearBinData) {
     BSONObj query = BSON("a" << BSON("$bitsAnyClear" << BSONBinData(
                                          &binaryData, sizeof(binaryData), BinDataGeneral)));
     BSONObj document = BSON("a" << 7);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAnyClear"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 7);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAnyClear"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 7);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1471,11 +1379,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnyClearBinData) {
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnySetNumeric) {
     BSONObj query = BSON("a" << BSON("$bitsAnySet" << 3));
     BSONObj document = BSON("a" << 0);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAnySet"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 0);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAnySet"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 0);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1484,11 +1391,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnySetNumeric) {
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnySetPositionList) {
     BSONObj query = BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(1 << 0)));
     BSONObj document = BSON("a" << 0);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAnySet"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 0);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAnySet"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 0);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1499,11 +1405,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnySetBinData) {
     BSONObj query = BSON(
         "a" << BSON("$bitsAnySet" << BSONBinData(&binaryData, sizeof(binaryData), BinDataGeneral)));
     BSONObj document = BSON("a" << 0);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAnySet"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValue" << 0);
+    BSONObj expectedError = BSON("operatorName" << "$bitsAnySet"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValue" << 0);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1511,22 +1416,19 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnySetBinData) {
 // mismatch.
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnyClearOnTypeMismatch) {
     BSONObj query = BSON("a" << BSON("$bitsAnyClear" << 3));
-    BSONObj document = BSON("a"
-                            << "someString");
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAnyClear"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredType"
-                                 << "string"
-                                 << "expectedTypes"
-                                 << BSON_ARRAY("binData"
-                                               << "decimal"
-                                               << "double"
-                                               << "int"
-                                               << "long")
-                                 << "consideredValue"
-                                 << "someString");
+    BSONObj document = BSON("a" << "someString");
+    BSONObj expectedError = BSON("operatorName" << "$bitsAnyClear"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredType"
+                                                << "string"
+                                                << "expectedTypes"
+                                                << BSON_ARRAY("binData" << "decimal"
+                                                                        << "double"
+                                                                        << "int"
+                                                                        << "long")
+                                                << "consideredValue"
+                                                << "someString");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1536,11 +1438,10 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearOnValueArray) {
     BSONObj query = BSON("a" << BSON("$bitsAllClear" << 2));
     BSONArray attributeValue = BSON_ARRAY(7 << 3);
     BSONObj document = BSON("a" << attributeValue);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$bitsAllClear"
-                                 << "specifiedAs" << query << "reason"
-                                 << "bitwise operator failed to match"
-                                 << "consideredValues" << BSON_ARRAY(7 << 3));
+    BSONObj expectedError = BSON("operatorName" << "$bitsAllClear"
+                                                << "specifiedAs" << query << "reason"
+                                                << "bitwise operator failed to match"
+                                                << "consideredValues" << BSON_ARRAY(7 << 3));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1549,16 +1450,14 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersects) {
     BSONObj query = fromjson(
         "{'a': {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], [0, 3], [3, "
         "0], [0, 0]]]}}}}");
-    BSONObj point = BSON("type"
-                         << "Point"
-                         << "coordinates" << BSON_ARRAY(3 << 3));
+    BSONObj point = BSON("type" << "Point"
+                                << "coordinates" << BSON_ARRAY(3 << 3));
     BSONObj document = BSON("a" << point);
-    BSONObj expectedError =
-        BSON("operatorName"
-             << "$geoIntersects"
-             << "specifiedAs" << query << "reason"
-             << "none of the considered geometries intersected the expression’s geometry"
-             << "consideredValue" << point);
+    BSONObj expectedError = BSON(
+        "operatorName" << "$geoIntersects"
+                       << "specifiedAs" << query << "reason"
+                       << "none of the considered geometries intersected the expression’s geometry"
+                       << "consideredValue" << point);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1567,14 +1466,12 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersectsMissingField) {
     BSONObj query = fromjson(
         "{'a': {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], [0, 3], [3, "
         "0], [0, 0]]]}}}}");
-    BSONObj point = BSON("type"
-                         << "Point"
-                         << "coordinates" << BSON_ARRAY(3 << 3));
+    BSONObj point = BSON("type" << "Point"
+                                << "coordinates" << BSON_ARRAY(3 << 3));
     BSONObj document = BSON("b" << point);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$geoIntersects"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$geoIntersects"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1585,9 +1482,8 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersectsOnValueMatch) {
         "{$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], [0, 3], [3, 0], [0, "
         "0]]]}}}");
     BSONObj query = BSON("a" << BSON("$not" << subquery));
-    BSONObj point = BSON("type"
-                         << "Point"
-                         << "coordinates" << BSON_ARRAY(1 << 1));
+    BSONObj point = BSON("type" << "Point"
+                                << "coordinates" << BSON_ARRAY(1 << 1));
     BSONObj document = BSON("a" << point);
     BSONObj expectedError =
         BSON(
@@ -1608,15 +1504,14 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersectsOnTypeMismatch) {
     BSONObj query = fromjson(
         "{'a': {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], [0, 3], [3, "
         "0], [0, 0]]]}}}}");
-    BSONObj point = BSON("type"
-                         << "Point"
-                         << "coordinates" << BSON_ARRAY(3 << 3));
+    BSONObj point = BSON("type" << "Point"
+                                << "coordinates" << BSON_ARRAY(3 << 3));
     BSONObj document = BSON("a" << 2);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$geoIntersects"
-                                 << "specifiedAs" << query << "reason"
-                                 << "could not find a valid geometry at the given path"
-                                 << "consideredValue" << 2);
+    BSONObj expectedError =
+        BSON("operatorName" << "$geoIntersects"
+                            << "specifiedAs" << query << "reason"
+                            << "could not find a valid geometry at the given path"
+                            << "consideredValue" << 2);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1625,12 +1520,12 @@ TEST(GeoMatchExpression, GeneratesValidationErrorForGeoWithin) {
         "{coordinates: {$geoWithin: {$centerSphere: [[-79.9081268,9.3547792], 0.02523]}}}");
     BSONArray coordinates = BSON_ARRAY(-72.5419922 << 18.2312794);
     BSONObj document = BSON("coordinates" << coordinates);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$geoWithin"
-                                 << "specifiedAs" << query << "reason"
-                                 << "none of the considered geometries were contained within the "
-                                    "expression’s geometry"
-                                 << "consideredValues" << coordinates);
+    BSONObj expectedError =
+        BSON("operatorName" << "$geoWithin"
+                            << "specifiedAs" << query << "reason"
+                            << "none of the considered geometries were contained within the "
+                               "expression’s geometry"
+                            << "consideredValues" << coordinates);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1638,15 +1533,14 @@ TEST(GeoMatchExpression, GeneratesValidationErrorForGeoWithinTypeMismatch) {
     BSONObj query = fromjson(
         "{coordinates: {$geoWithin: {$centerSphere: [[-79.9081268,9.3547792], 0.02523]}}}");
     // 'arr' is of $geoWithin's expected type (an array), but is not a valid geometry.
-    BSONArray arr = BSON_ARRAY("foo"
-                               << "bar"
-                               << "baz");
+    BSONArray arr = BSON_ARRAY("foo" << "bar"
+                                     << "baz");
     BSONObj document = BSON("coordinates" << arr);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$geoWithin"
-                                 << "specifiedAs" << query << "reason"
-                                 << "could not find a valid geometry at the given path"
-                                 << "consideredValues" << arr);
+    BSONObj expectedError =
+        BSON("operatorName" << "$geoWithin"
+                            << "specifiedAs" << query << "reason"
+                            << "could not find a valid geometry at the given path"
+                            << "consideredValues" << arr);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1656,20 +1550,17 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersectsOnValueArray) {
     BSONObj query = fromjson(
         "{'a': {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], [0, 3], [3, "
         "0], [0, 0]]]}}}}");
-    BSONObj point1 = BSON("type"
-                          << "Point"
-                          << "coordinates" << BSON_ARRAY(3 << 3));
-    BSONObj point2 = BSON("type"
-                          << "Point"
-                          << "coordinates" << BSON_ARRAY(4 << 4));
+    BSONObj point1 = BSON("type" << "Point"
+                                 << "coordinates" << BSON_ARRAY(3 << 3));
+    BSONObj point2 = BSON("type" << "Point"
+                                 << "coordinates" << BSON_ARRAY(4 << 4));
     auto points = BSON_ARRAY(point1 << point2);
     BSONObj document = BSON("a" << points);
-    BSONObj expectedError =
-        BSON("operatorName"
-             << "$geoIntersects"
-             << "specifiedAs" << query << "reason"
-             << "none of the considered geometries intersected the expression’s geometry"
-             << "consideredValues" << points);
+    BSONObj expectedError = BSON(
+        "operatorName" << "$geoIntersects"
+                       << "specifiedAs" << query << "reason"
+                       << "none of the considered geometries intersected the expression’s geometry"
+                       << "consideredValues" << points);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1678,9 +1569,8 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoWithin) {
     BSONObj query = fromjson(
         "{'a': {$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], [0, 3], [3, 0], "
         "[0, 0]]]}}}}");
-    BSONObj point = BSON("type"
-                         << "Point"
-                         << "coordinates" << BSON_ARRAY(3 << 3));
+    BSONObj point = BSON("type" << "Point"
+                                << "coordinates" << BSON_ARRAY(3 << 3));
     BSONObj document = BSON("a" << point);
     BSONObj expectedError =
         BSON("operatorName"
@@ -1697,19 +1587,18 @@ TEST(GeoMatchExpression, GeneratesValidationErrorForMatchGeoWithin) {
         "{$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], [0, 3], [3, 0], [0, "
         "0]]]}}}");
     BSONObj query = BSON("a" << BSON("$not" << subquery));
-    BSONObj point = BSON("type"
-                         << "Point"
-                         << "coordinates" << BSON_ARRAY(1 << 1));
+    BSONObj point = BSON("type" << "Point"
+                                << "coordinates" << BSON_ARRAY(1 << 1));
     BSONObj document = BSON("a" << point);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$not"
-                                 << "details"
-                                 << BSON("operatorName"
-                                         << "$geoWithin"
-                                         << "specifiedAs" << BSON("a" << subquery) << "reason"
-                                         << "at least one of considered geometries was contained "
-                                            "within the expression’s geometry"
-                                         << "consideredValue" << point));
+    BSONObj expectedError =
+        BSON("operatorName" << "$not"
+                            << "details"
+                            << BSON("operatorName"
+                                    << "$geoWithin"
+                                    << "specifiedAs" << BSON("a" << subquery) << "reason"
+                                    << "at least one of considered geometries was contained "
+                                       "within the expression’s geometry"
+                                    << "consideredValue" << point));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 // Array operators.
@@ -1719,26 +1608,24 @@ TEST(GeoMatchExpression, GeneratesValidationErrorForMatchGeoWithin) {
 TEST(ArrayMatchingMatchExpression, BasicSize) {
     BSONObj query = BSON("a" << BSON("$size" << 2));
     BSONObj document = BSON("a" << BSON_ARRAY(1 << 2 << 3));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$size"
-                                 << "specifiedAs" << query << "reason"
-                                 << "array length was not equal to given size"
-                                 << "consideredValue" << BSON_ARRAY(1 << 2 << 3));
+    BSONObj expectedError = BSON("operatorName" << "$size"
+                                                << "specifiedAs" << query << "reason"
+                                                << "array length was not equal to given size"
+                                                << "consideredValue" << BSON_ARRAY(1 << 2 << 3));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ArrayMatchingMatchExpression, SizeNonArray) {
     BSONObj query = BSON("a" << BSON("$size" << 2));
     BSONObj document = BSON("a" << 3);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$size"
-                                 << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredType"
-                                 << "int"
-                                 << "expectedType"
-                                 << "array"
-                                 << "consideredValue" << 3);
+    BSONObj expectedError = BSON("operatorName" << "$size"
+                                                << "specifiedAs" << query << "reason"
+                                                << "type did not match"
+                                                << "consideredType"
+                                                << "int"
+                                                << "expectedType"
+                                                << "array"
+                                                << "consideredValue" << 3);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1746,25 +1633,23 @@ TEST(ArrayMatchingMatchExpression, SizeNonArray) {
 TEST(ArrayMatchingMatchExpression, SizeMissingPath) {
     BSONObj query = BSON("a" << BSON("$size" << 2));
     BSONObj document = BSON("b" << 3);
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$size"
-                                 << "specifiedAs" << query << "reason"
-                                 << "field was missing");
+    BSONObj expectedError = BSON("operatorName" << "$size"
+                                                << "specifiedAs" << query << "reason"
+                                                << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(ArrayMatchingMatchExpression, NotOverSize) {
     BSONObj query = BSON("a" << BSON("$not" << BSON("$size" << 2)));
     BSONObj document = BSON("a" << BSON_ARRAY(1 << 2));
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$not"
-                                 << "details"
-                                 << BSON("operatorName"
-                                         << "$size"
-                                         << "specifiedAs" << BSON("a" << BSON("$size" << 2))
-                                         << "reason"
-                                         << "array length was equal to given size"
-                                         << "consideredValue" << BSON_ARRAY(1 << 2)));
+    BSONObj expectedError =
+        BSON("operatorName" << "$not"
+                            << "details"
+                            << BSON("operatorName" << "$size"
+                                                   << "specifiedAs"
+                                                   << BSON("a" << BSON("$size" << 2)) << "reason"
+                                                   << "array length was equal to given size"
+                                                   << "consideredValue" << BSON_ARRAY(1 << 2)));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -2010,12 +1895,11 @@ TEST(DocValidationTruncationTest, TruncatedConsideredValuesArray) {
         }
     }
     BSONObj document = BSON("a" << valuesArray.arr());
-    BSONObj expectedError = BSON("operatorName"
-                                 << "$lt"
-                                 << "specifiedAs" << query << "reason"
-                                 << "comparison failed"
-                                 << "consideredValues" << consideredValues.arr()
-                                 << "consideredValuesTruncated" << true);
+    BSONObj expectedError = BSON("operatorName" << "$lt"
+                                                << "specifiedAs" << query << "reason"
+                                                << "comparison failed"
+                                                << "consideredValues" << consideredValues.arr()
+                                                << "consideredValuesTruncated" << true);
     verifyGeneratedError(query, document, expectedError);
 }
 

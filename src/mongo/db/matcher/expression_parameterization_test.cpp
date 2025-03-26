@@ -519,8 +519,7 @@ TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithArraySetsNoP
 }
 
 TEST(MatchExpressionParameterizationVisitor, ExprMatchExpressionSetsNoParamsIds) {
-    BSONObj query = BSON("$expr" << BSON("$gte" << BSON_ARRAY("$a"
-                                                              << "$b")));
+    BSONObj query = BSON("$expr" << BSON("$gte" << BSON_ARRAY("$a" << "$b")));
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
@@ -623,9 +622,8 @@ TEST(MatchExpressionParameterizationVisitor,
      AutoParametrizationWalkerSetsCorrectNumberOfParamsIds) {
     BSONObj equalityExpr = BSON("x" << 1);
     BSONObj gtExpr = BSON("y" << BSON("$gt" << 2));
-    BSONObj inExpr = BSON("$in" << BSON_ARRAY("a"
-                                              << "b"
-                                              << "c"));
+    BSONObj inExpr = BSON("$in" << BSON_ARRAY("a" << "b"
+                                                  << "c"));
     BSONObj regexExpr = BSON("m" << BSONRegEx("/^regex/i"));
     BSONObj sizeExpr = BSON("n" << BSON("$size" << 1));
 

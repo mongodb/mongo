@@ -59,14 +59,12 @@ TEST(ExpressionConstantTest, Create) {
 
 TEST(ExpressionConstantTest, CreateFromBsonElement) {
     /** Create an ExpressionConstant from a BsonElement. */
-    BSONObj spec = BSON("IGNORED_FIELD_NAME"
-                        << "foo");
+    BSONObj spec = BSON("IGNORED_FIELD_NAME" << "foo");
     auto expCtx = ExpressionContextForTest{};
     BSONElement specElement = spec.firstElement();
     VariablesParseState vps = expCtx.variablesParseState;
     intrusive_ptr<Expression> expression = ExpressionConstant::parse(&expCtx, specElement, vps);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON(""
-                                  << "foo"),
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("" << "foo"),
                              toBson(expression->evaluate({}, &expCtx.variables)));
 }
 

@@ -103,9 +103,8 @@ TEST_F(CountCmdShapeTest, DefaultCountShape) {
 
 // Test that the query field of the count command is included in the shape and shapified.
 TEST_F(CountCmdShapeTest, CountQueryShape) {
-    const auto query = BSON("a"
-                            << "y"
-                            << "b" << 42);
+    const auto query = BSON("a" << "y"
+                                << "b" << 42);
     const auto ccr = std::make_unique<CountCommandRequest>(testNss);
     ccr->setQuery(query);
     const auto expectedShape = fromjson(
@@ -119,9 +118,8 @@ TEST_F(CountCmdShapeTest, CountQueryShape) {
 
 // Test that the collation field of the count command is included in the shape and not shapified.
 TEST_F(CountCmdShapeTest, CountCollationShape) {
-    const auto collation = BSON("locale"
-                                << "fr"
-                                << "strength" << 1);
+    const auto collation = BSON("locale" << "fr"
+                                         << "strength" << 1);
     const auto ccr = std::make_unique<CountCommandRequest>(testNss);
     ccr->setCollation(collation);
     const auto expectedShape = fromjson(
@@ -164,12 +162,10 @@ TEST_F(CountCmdShapeTest, CountSkipShape) {
 // Test that the query, limit, and skip fields are properly serialized when using the debug format.
 TEST_F(CountCmdShapeTest, CountShapeDebugFormat) {
     const auto ccr = std::make_unique<CountCommandRequest>(testNss);
-    const auto query = BSON("a"
-                            << "y"
-                            << "b" << 42);
-    const auto collation = BSON("locale"
-                                << "fr"
-                                << "strength" << 1);
+    const auto query = BSON("a" << "y"
+                                << "b" << 42);
+    const auto collation = BSON("locale" << "fr"
+                                         << "strength" << 1);
     ccr->setQuery(query);
     ccr->setCollation(collation);
     ccr->setLimit(50);
@@ -377,9 +373,8 @@ TEST_F(CountCmdShapeTest, StableQueryShapeHashValue) {
 
 // Test that the size of the query shape included the query and the command specific components.
 TEST_F(CountCmdShapeTest, SizeOfShapeComponents) {
-    const auto query = BSON("a"
-                            << "y"
-                            << "b" << 42);
+    const auto query = BSON("a" << "y"
+                                << "b" << 42);
     const auto countCmdComponent = makeShapeComponentsFromQuery(query);
     const auto querySize = countCmdComponent->representativeQuery.objsize();
 

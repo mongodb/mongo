@@ -63,10 +63,9 @@ TEST(ClusterExplainTest, PruneWriteConcern) {
 }
 
 TEST(ClusterExplainTest, PruneLsid) {
-    auto internalCmd = BSON("find"
-                            << "test"
-                            << "filter" << BSON("a" << 1) << "lsid"
-                            << BSON("id" << mongo::UUID::gen()));
+    auto internalCmd =
+        BSON("find" << "test"
+                    << "filter" << BSON("a" << 1) << "lsid" << BSON("id" << mongo::UUID::gen()));
     auto verbosity = explain::VerbosityEnum::kQueryPlanner;
     auto expected =
         fromjson("{explain: {find: 'test', filter: {a: 1}}, verbosity: 'queryPlanner'}");
@@ -79,11 +78,10 @@ TEST(ClusterExplainTest, PruneReadPreference) {
 }
 
 TEST(ClusterExplainTest, PruneClusterTime) {
-    auto internalCmd = BSON("find"
-                            << "test"
-                            << "filter" << BSON("a" << 1) << "$clusterTime"
-                            << BSON("clusterTime" << Timestamp(2, 2)) << "$configTime"
-                            << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
+    auto internalCmd = BSON("find" << "test"
+                                   << "filter" << BSON("a" << 1) << "$clusterTime"
+                                   << BSON("clusterTime" << Timestamp(2, 2)) << "$configTime"
+                                   << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
     auto verbosity = explain::VerbosityEnum::kQueryPlanner;
     auto expected =
         fromjson("{explain: {find: 'test', filter: {a: 1}}, verbosity: 'queryPlanner'}");

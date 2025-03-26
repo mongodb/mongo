@@ -194,7 +194,7 @@ private:
  */
 class DeferredWriterTestEmpty : public DeferredWriterTestBase {
 public:
-    ~DeferredWriterTestEmpty() override{};
+    ~DeferredWriterTestEmpty() override {};
 
     void run() override {
         {
@@ -212,7 +212,7 @@ public:
  */
 class DeferredWriterTestConcurrent : public DeferredWriterTestBase {
 public:
-    ~DeferredWriterTestConcurrent() override{};
+    ~DeferredWriterTestConcurrent() override {};
 
     void worker(DeferredWriter* writer) {
         for (int i = 0; i < kDocsPerWorker; ++i) {

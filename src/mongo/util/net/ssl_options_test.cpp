@@ -483,33 +483,29 @@ TEST(SetupOptions, RedactionSingleName) {
 }
 
 TEST(SetupOptions, RedactionDottedName) {
-    auto obj = BSON("net" << BSON("tls" << BSON("mode"
-                                                << "requireTLS"
-                                                << "certificateKeyFilePassword"
-                                                << "qwerty"
-                                                << "ClusterPassword"
-                                                << "qwerty")
+    auto obj = BSON("net" << BSON("tls" << BSON("mode" << "requireTLS"
+                                                       << "certificateKeyFilePassword"
+                                                       << "qwerty"
+                                                       << "ClusterPassword"
+                                                       << "qwerty")
                                         << "ssl"
-                                        << BSON("mode"
-                                                << "requireSSL"
-                                                << "PEMKeyPassword"
-                                                << "qwerty"
-                                                << "ClusterPassword"
-                                                << "qwerty")));
+                                        << BSON("mode" << "requireSSL"
+                                                       << "PEMKeyPassword"
+                                                       << "qwerty"
+                                                       << "ClusterPassword"
+                                                       << "qwerty")));
 
-    auto res = BSON("net" << BSON("tls" << BSON("mode"
-                                                << "requireTLS"
-                                                << "certificateKeyFilePassword"
-                                                << "<password>"
-                                                << "ClusterPassword"
-                                                << "<password>")
+    auto res = BSON("net" << BSON("tls" << BSON("mode" << "requireTLS"
+                                                       << "certificateKeyFilePassword"
+                                                       << "<password>"
+                                                       << "ClusterPassword"
+                                                       << "<password>")
                                         << "ssl"
-                                        << BSON("mode"
-                                                << "requireSSL"
-                                                << "PEMKeyPassword"
-                                                << "<password>"
-                                                << "ClusterPassword"
-                                                << "<password>")));
+                                        << BSON("mode" << "requireSSL"
+                                                       << "PEMKeyPassword"
+                                                       << "<password>"
+                                                       << "ClusterPassword"
+                                                       << "<password>")));
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);

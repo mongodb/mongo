@@ -815,17 +815,15 @@ TEST_F(ProjectionASTTest, ParserDoesNotErrorOnPositionalOfNonQueryField) {
 }
 
 TEST_F(ProjectionASTTest, ShouldThrowWhenParsingInvalidExpression) {
-    ASSERT_THROWS(parseWithDefaultPolicies(BSON("a" << BSON("$gt" << BSON("bad"
-                                                                          << "arguments")))),
+    ASSERT_THROWS(parseWithDefaultPolicies(BSON("a" << BSON("$gt" << BSON("bad" << "arguments")))),
                   AssertionException);
 }
 
 TEST_F(ProjectionASTTest, ShouldThrowWhenParsingUnknownExpression) {
-    ASSERT_THROWS_CODE(
-        parseWithDefaultPolicies(BSON("a" << BSON("$fakeExpression" << BSON("bad"
-                                                                            << "arguments")))),
-        AssertionException,
-        31325);
+    ASSERT_THROWS_CODE(parseWithDefaultPolicies(
+                           BSON("a" << BSON("$fakeExpression" << BSON("bad" << "arguments")))),
+                       AssertionException,
+                       31325);
 }
 
 TEST_F(ProjectionASTTest, ShouldThrowWhenParsingSliceInvalidWithFindFeaturesOff) {

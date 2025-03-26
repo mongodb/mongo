@@ -69,11 +69,10 @@ TEST(JParseUtilTest, RegexForwardSlash) {
     auto jsonStr =
         "{$regexFindAll: {input: \"$obj.obj.obj.obj.str\", regex: /transparent|Forward/, options: "
         "\"\"}}";
-    BSONObj expected =
-        BSON("$regexFindAll" << BSON("input"
-                                     << "$obj.obj.obj.obj.str"
-                                     << "regex" << BSONRegEx("transparent|Forward") << "options"
-                                     << ""));
+    BSONObj expected = BSON(
+        "$regexFindAll" << BSON("input" << "$obj.obj.obj.obj.str"
+                                        << "regex" << BSONRegEx("transparent|Forward") << "options"
+                                        << ""));
     parseFuzzerJsonAndAssertEq(jsonStr, expected);
 }
 
@@ -81,11 +80,10 @@ TEST(JParseUtilTest, RegexForwardSlashWithOptions) {
     auto jsonStr =
         "{$regexFindAll: {input: \"$obj.obj.obj.obj.str\", regex: /transparent|Forward/, options: "
         "\"\"}}";
-    BSONObj expected =
-        BSON("$regexFindAll" << BSON("input"
-                                     << "$obj.obj.obj.obj.str"
-                                     << "regex" << BSONRegEx("transparent|Forward") << "options"
-                                     << ""));
+    BSONObj expected = BSON(
+        "$regexFindAll" << BSON("input" << "$obj.obj.obj.obj.str"
+                                        << "regex" << BSONRegEx("transparent|Forward") << "options"
+                                        << ""));
     parseFuzzerJsonAndAssertEq(jsonStr, expected);
 }
 

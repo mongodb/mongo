@@ -317,17 +317,15 @@ protected:
         MultiUpdateCoordinatorMetadata metadata;
         metadata.setId(UUID::gen());
 
-        const BSONObj query = BSON("member"
-                                   << "abc123");
+        const BSONObj query = BSON("member" << "abc123");
         const BSONObj update = BSON("$set" << BSON("points" << 50));
         auto rawUpdate = BSON("q" << query << "u" << update << "multi" << true);
         if (_testUpsert) {
             rawUpdate.addField(BSON("upsert" << true).firstElement());
             metadata.setIsUpsert(true);
         }
-        auto cmd = BSON("update"
-                        << "coll"
-                        << "updates" << BSON_ARRAY(rawUpdate));
+        auto cmd = BSON("update" << "coll"
+                                 << "updates" << BSON_ARRAY(rawUpdate));
         metadata.setUpdateCommand(cmd);
         metadata.setNss(kNamespace);
         return metadata;
@@ -723,13 +721,11 @@ TEST_F(MultiUpdateCoordinatorTest, AbortAfterDone) {
 
 TEST_F(MultiUpdateCoordinatorTest, FailsForUnsupportedCmd) {
     auto document = createStateDocument();
-    const BSONObj query = BSON("member"
-                               << "abc123");
+    const BSONObj query = BSON("member" << "abc123");
     const BSONObj update = BSON("$set" << BSON("points" << 50));
     auto rawUpdate = BSON("q" << query << "u" << update << "multi" << true);
-    auto cmd = BSON("NotARealUpdateCmd"
-                    << "coll"
-                    << "updates" << BSON_ARRAY(rawUpdate));
+    auto cmd = BSON("NotARealUpdateCmd" << "coll"
+                                        << "updates" << BSON_ARRAY(rawUpdate));
     document.getMetadata().setUpdateCommand(cmd);
 
     auto instance = createInstanceFrom(document);

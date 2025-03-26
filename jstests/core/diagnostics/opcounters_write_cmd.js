@@ -100,13 +100,13 @@ t.insert([{_id: 0}, {_id: 1}]);
 opCounters = newdb.serverStatus().opcounters;
 res = t.remove({_id: 0});
 assert.commandWorked(res);
-assert.eq(opCounters.delete + 1, newdb.serverStatus().opcounters.delete);
+assert.eq(opCounters.delete +1, newdb.serverStatus().opcounters.delete);
 
 // Delete, with error.
 opCounters = newdb.serverStatus().opcounters;
 res = t.remove({_id: {$invalidOp: 1}});
 assert.writeError(res);
-assert.eq(opCounters.delete + 1, newdb.serverStatus().opcounters.delete);
+assert.eq(opCounters.delete +1, newdb.serverStatus().opcounters.delete);
 
 //
 // 4. Query.

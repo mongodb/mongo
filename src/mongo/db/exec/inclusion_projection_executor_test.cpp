@@ -220,10 +220,9 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddDependenciesOfComputedFields) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a"
-                                                                     << "$a"
-                                                                     << "x"
-                                                                     << "$z"));
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << "$a"
+                                                                         << "x"
+                                                                         << "$z"));
 
     DepsTracker deps;
     inclusion->addDependencies(&deps);
@@ -262,8 +261,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddPathToDependenciesForNestedComputedFieldsUsingVariableReferences) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("x.y"
-                                                                     << "$z"));
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("x.y" << "$z"));
 
     DepsTracker deps;
     inclusion->addDependencies(&deps);
@@ -928,8 +926,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMeta
     inputDocBuilder.metadata().setRecordId(RecordId{6});
     inputDocBuilder.metadata().setIndexKey(BSON("foo" << 7));
     inputDocBuilder.metadata().setSortKey(Value{Document{{"bar", 8}}}, true);
-    inputDocBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
-                                                          << "foo"));
+    inputDocBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     inputDocBuilder.metadata().setVectorSearchScore(9.0);
     inputDocBuilder.metadata().setScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();
@@ -1117,11 +1114,10 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 }
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedProjections) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON(
-        "computedMeta1" << BSON("$toUpper"
-                                << "$myMeta.x")
-                        << "computed2" << BSON("$add" << BSON_ARRAY(1 << "$c")) << "computedMeta3"
-                        << "$myMeta"));
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(
+        BSON("computedMeta1" << BSON("$toUpper" << "$myMeta.x") << "computed2"
+                             << BSON("$add" << BSON_ARRAY(1 << "$c")) << "computedMeta3"
+                             << "$myMeta"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{};
@@ -1143,10 +1139,9 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedPro
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
        ExtractComputedProjectionInProjectShouldNotHideDependentFields) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a"
-                                                                     << "$myMeta"
-                                                                     << "b"
-                                                                     << "$a"));
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << "$myMeta"
+                                                                         << "b"
+                                                                         << "$a"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{};
@@ -1163,8 +1158,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
        ExtractComputedProjectionInProjectShouldNotIncludeId) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
-        BSON("a" << BSON("$sum" << BSON_ARRAY("$myMeta"
-                                              << "$_id"))));
+        BSON("a" << BSON("$sum" << BSON_ARRAY("$myMeta" << "$_id"))));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{};
@@ -1180,10 +1174,9 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
        ExtractComputedProjectionInProjectShouldNotHideDependentSubFields) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a"
-                                                                     << "$myMeta"
-                                                                     << "b"
-                                                                     << "$a.x"));
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << "$myMeta"
+                                                                         << "b"
+                                                                         << "$a.x"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{};
@@ -1199,10 +1192,9 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
        ExtractComputedProjectionInProjectShouldNotHideDependentSubFieldsWithDottedSibling) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a"
-                                                                     << "$myMeta"
-                                                                     << "c.b"
-                                                                     << "$a.x"));
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << "$myMeta"
+                                                                         << "c.b"
+                                                                         << "$a.x"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{};
@@ -1218,11 +1210,8 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAfterSplit) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
-        BSON("a" << true << "computedMeta1"
-                 << BSON("$toUpper"
-                         << "$myMeta.x")
-                 << "computed2" << BSON("$add" << BSON_ARRAY(1 << "$c")) << "c" << true
-                 << "computedMeta3"
+        BSON("a" << true << "computedMeta1" << BSON("$toUpper" << "$myMeta.x") << "computed2"
+                 << BSON("$add" << BSON_ARRAY(1 << "$c")) << "c" << true << "computedMeta3"
                  << "$myMeta"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
@@ -1240,11 +1229,9 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAft
 }
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, DoNotExtractReservedNames) {
-    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true << "data"
-                                                                         << BSON("$toUpper"
-                                                                                 << "$myMeta.x")
-                                                                         << "newMeta"
-                                                                         << "$myMeta"));
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(
+        BSON("a" << true << "data" << BSON("$toUpper" << "$myMeta.x") << "newMeta"
+                 << "$myMeta"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{"meta", "data", "_id"};
@@ -1252,8 +1239,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, DoNotExtractReserv
         r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
     ASSERT_EQ(addFields.nFields(), 1);
-    auto expectedAddFields = BSON("newMeta"
-                                  << "$meta");
+    auto expectedAddFields = BSON("newMeta" << "$meta");
     ASSERT_BSONOBJ_EQ(expectedAddFields, addFields);
     ASSERT_EQ(deleteFlag, false);
 

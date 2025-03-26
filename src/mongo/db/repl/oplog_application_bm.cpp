@@ -317,13 +317,12 @@ public:
     void createBatch(int size) {
         const long long term1 = 1;
         for (int idx = 0; idx < size; ++idx) {
-            _oplogEntries.emplace_back(BSON("op"
-                                            << "i"
-                                            << "ns"
-                                            << "foo.bar"
-                                            << "ui" << _foobarUUID << "o" << makeDoc(idx) << "ts"
-                                            << Timestamp(1, idx) << "t" << term1 << "v" << 2
-                                            << "wall" << Date_t::now()));
+            _oplogEntries.emplace_back(BSON("op" << "i"
+                                                 << "ns"
+                                                 << "foo.bar"
+                                                 << "ui" << _foobarUUID << "o" << makeDoc(idx)
+                                                 << "ts" << Timestamp(1, idx) << "t" << term1 << "v"
+                                                 << 2 << "wall" << Date_t::now()));
         }
     }
 
@@ -350,19 +349,18 @@ public:
         for (int batchNum = 0; opsLeft > 0; ++batchNum) {
             std::vector<BSONObj> applyOpsArray;
             for (int idx = 0; idx < batchSize; ++idx) {
-                applyOpsArray.emplace_back(BSON("op"
-                                                << "i"
-                                                << "ns"
-                                                << "foo.bar"
-                                                << "ui" << _foobarUUID << "o" << makeDoc(idx)));
+                applyOpsArray.emplace_back(BSON("op" << "i"
+                                                     << "ns"
+                                                     << "foo.bar"
+                                                     << "ui" << _foobarUUID << "o"
+                                                     << makeDoc(idx)));
             }
-            _oplogEntries.emplace_back(BSON("op"
-                                            << "c"
-                                            << "ns"
-                                            << "admin.$cmd"
-                                            << "o" << BSON("applyOps" << applyOpsArray) << "ts"
-                                            << Timestamp(1, batchNum) << "t" << term1 << "v" << 2
-                                            << "wall" << Date_t::now()));
+            _oplogEntries.emplace_back(BSON("op" << "c"
+                                                 << "ns"
+                                                 << "admin.$cmd"
+                                                 << "o" << BSON("applyOps" << applyOpsArray) << "ts"
+                                                 << Timestamp(1, batchNum) << "t" << term1 << "v"
+                                                 << 2 << "wall" << Date_t::now()));
             opsLeft -= batchSize;
         }
     }
@@ -375,11 +373,11 @@ public:
         for (int batchNum = 0; opsLeft > 0; ++batchNum) {
             std::vector<BSONObj> applyOpsArray;
             for (int idx = 0; idx < batchSize; ++idx) {
-                applyOpsArray.emplace_back(BSON("op"
-                                                << "i"
-                                                << "ns"
-                                                << "foo.bar"
-                                                << "ui" << _foobarUUID << "o" << makeDoc(idx)));
+                applyOpsArray.emplace_back(BSON("op" << "i"
+                                                     << "ns"
+                                                     << "foo.bar"
+                                                     << "ui" << _foobarUUID << "o"
+                                                     << makeDoc(idx)));
             }
             _oplogEntries.emplace_back(BSON(
                 "lsid" << lsidObj << "txnNumber" << static_cast<long long>(batchNum) << "op"
@@ -416,11 +414,11 @@ public:
 
             std::vector<BSONObj> applyOpsArray;
             for (int idx = 0; idx < batchSize; ++idx) {
-                applyOpsArray.emplace_back(BSON("op"
-                                                << "i"
-                                                << "ns"
-                                                << "foo.bar"
-                                                << "ui" << _foobarUUID << "o" << makeDoc(idx)));
+                applyOpsArray.emplace_back(BSON("op" << "i"
+                                                     << "ns"
+                                                     << "foo.bar"
+                                                     << "ui" << _foobarUUID << "o"
+                                                     << makeDoc(idx)));
             }
             _oplogEntries.emplace_back(BSON(
                 "lsid" << lsidObj << "txnNumber" << txnNumber << "op"

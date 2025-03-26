@@ -622,9 +622,8 @@ TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(
@@ -636,9 +635,8 @@ TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
             insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -682,9 +680,8 @@ TEST_F(TxnAPITest, AttachesAPIVersion) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -697,9 +694,8 @@ TEST_F(TxnAPITest, AttachesAPIVersion) {
             insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -753,13 +749,13 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
                 attempt += 1;
                 // No write concern on requests prior to commit/abort.
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand(DatabaseName::createDatabaseName_forTest(
-                                                     boost::none, "user"_sd),
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
+                auto insertRes =
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
                 ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
                 // Each attempt releases and reacquires the session from the session pool,
@@ -772,13 +768,13 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
 
 
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
-                insertRes = txnClient
-                                .runCommand(DatabaseName::createDatabaseName_forTest(boost::none,
-                                                                                     "user"_sd),
-                                            BSON("insert"
-                                                 << "foo"
-                                                 << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                .get();
+                insertRes =
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
                 ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
                 // Each attempt returns and reacquires the session from the session pool,
@@ -835,13 +831,13 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnAbort) {
         auto swResult = txnWithRetries().runNoThrow(
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand(DatabaseName::createDatabaseName_forTest(
-                                                     boost::none, "user"_sd),
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
+                auto insertRes =
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
                 ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
                 mockClient()->setNextCommandResponse(
@@ -879,13 +875,13 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 attempt += 1;
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand(DatabaseName::createDatabaseName_forTest(
-                                                     boost::none, "user"_sd),
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
+                auto insertRes =
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
                 ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
                 // Each attempt returns and reacquires the session from the session pool,
@@ -899,13 +895,13 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
 
                 // Subsequent requests shouldn't have a read concern.
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
-                insertRes = txnClient
-                                .runCommand(DatabaseName::createDatabaseName_forTest(boost::none,
-                                                                                     "user"_sd),
-                                            BSON("insert"
-                                                 << "foo"
-                                                 << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                .get();
+                insertRes =
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
                 ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
                 // Each attempt returns and reacquires the session from the session pool,
@@ -948,9 +944,8 @@ TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
@@ -1017,9 +1012,8 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
 
             // The commit or implicit abort response.
@@ -1070,9 +1064,8 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
@@ -1113,9 +1106,8 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
@@ -1156,9 +1148,8 @@ TEST_F(TxnAPITest, DoesNotRetryOnNonTransientCommitErrorWithNonRetryableCommitWC
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
@@ -1201,9 +1192,8 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
@@ -1247,9 +1237,8 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
@@ -1290,9 +1279,8 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(
@@ -1331,9 +1319,8 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
@@ -1372,9 +1359,8 @@ TEST_F(TxnAPITest, RetriesOnNonTransientCommitWithErrorRetryableCommitWCError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
@@ -1416,9 +1402,8 @@ TEST_F(TxnAPITest, RetriesOnTransientCommitErrorWithRetryableWCError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
@@ -1481,12 +1466,11 @@ TEST_F(TxnAPITest, RunThrowsOnCommitCmdError) {
                                  mockClient()->setNextCommandResponse(kOKInsertResponse);
                                  auto insertRes =
                                      txnClient
-                                         .runCommand(
-                                             DatabaseName::createDatabaseName_forTest(boost::none,
-                                                                                      "user"_sd),
-                                             BSON("insert"
-                                                  << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                         .runCommand(DatabaseName::createDatabaseName_forTest(
+                                                         boost::none, "user"_sd),
+                                                     BSON("insert" << "foo"
+                                                                   << "documents"
+                                                                   << BSON_ARRAY(BSON("x" << 1))))
                                          .get();
 
                                  // The commit response.
@@ -1507,12 +1491,11 @@ TEST_F(TxnAPITest, RunThrowsOnCommitWCError) {
                                  mockClient()->setNextCommandResponse(kOKInsertResponse);
                                  auto insertRes =
                                      txnClient
-                                         .runCommand(
-                                             DatabaseName::createDatabaseName_forTest(boost::none,
-                                                                                      "user"_sd),
-                                             BSON("insert"
-                                                  << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                         .runCommand(DatabaseName::createDatabaseName_forTest(
+                                                         boost::none, "user"_sd),
+                                                     BSON("insert" << "foo"
+                                                                   << "documents"
+                                                                   << BSON_ARRAY(BSON("x" << 1))))
                                          .get();
 
                                  // The commit response.
@@ -1533,9 +1516,8 @@ TEST_F(TxnAPITest, UnyieldsAfterBodyError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             uasserted(ErrorCodes::InternalError, "Simulated body error");
             return SemiFuture<void>::makeReady();
@@ -1556,9 +1538,8 @@ TEST_F(TxnAPITest, HandlesExceptionWhileYielding) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             return SemiFuture<void>::makeReady();
         });
@@ -1577,9 +1558,8 @@ TEST_F(TxnAPITest, HandlesExceptionWhileUnyielding) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             return SemiFuture<void>::makeReady();
         });
@@ -1598,9 +1578,8 @@ TEST_F(TxnAPITest, TransactionErrorTakesPrecedenceOverUnyieldError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
 
             resourceYielder()->throwInUnyield(ErrorCodes::Interrupted);
@@ -1638,9 +1617,8 @@ TEST_F(TxnAPITest, TransactionObeysCallerOpCtxBeingInterrupted) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
 
             txnApiStarted.countDownAndWait();
@@ -1671,9 +1649,8 @@ TEST_F(TxnAPITest, CallerInterruptionErrorTakesPrecedenceOverTransactionError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
 
             txnApiStarted.countDownAndWait();
@@ -1705,9 +1682,8 @@ TEST_F(TxnAPITest, ClientSession_UsesNonRetryableInternalSession) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -1757,13 +1733,12 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents"
-                                     << BSON_ARRAY(BSON("x" << 1))
-                                     // Retryable transactions must include stmtIds for
-                                     // retryable write commands.
-                                     << "stmtIds" << BSON_ARRAY(1)))
+                                BSON("insert" << "foo"
+                                              << "documents"
+                                              << BSON_ARRAY(BSON("x" << 1))
+                                              // Retryable transactions must include stmtIds for
+                                              // retryable write commands.
+                                              << "stmtIds" << BSON_ARRAY(1)))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -1779,8 +1754,7 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
             auto findRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("find"
-                                     << "foo"))
+                                BSON("find" << "foo"))
                     .get();
             ASSERT(findRes["ok"]);  // Verify the mocked response was returned.
 
@@ -1789,9 +1763,9 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
             insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1)) << "stmtId" << 1))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))
+                                              << "stmtId" << 1))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
@@ -1835,9 +1809,8 @@ DEATH_TEST_F(TxnAPITest,
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
 
             return SemiFuture<void>::makeReady();
@@ -1858,9 +1831,8 @@ TEST_F(TxnAPITest, ClientTransaction_UsesClientTransactionOptionsAndDoesNotCommi
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -1899,9 +1871,8 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotAppendStartTransactionFields) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -1934,9 +1905,8 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotBestEffortAbortOnFailure) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -1971,9 +1941,8 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotRetryOnTransientErrors) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -2003,9 +1972,8 @@ TEST_F(TxnAPITest, HandleErrorRetryCommitOnNetworkError) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
 
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
@@ -2057,9 +2025,8 @@ TEST_F(TxnAPITest, RetryCommitMultipleTimesIncludesMajorityWriteConcern) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
@@ -2116,9 +2083,8 @@ TEST_F(TxnAPITest, CommitAfterTransientErrorAfterRetryCommitUsesOriginalWriteCon
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
@@ -2294,9 +2260,8 @@ TEST_F(TxnAPITest, OwnSession_StartTransactionRetryLimitOnTransientErrors) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             uasserted(ErrorCodes::HostUnreachable, "Host unreachable error");
             return SemiFuture<void>::makeReady();
@@ -2325,9 +2290,8 @@ TEST_F(TxnAPITest, OwnSession_CommitTransactionRetryLimitOnTransientErrors) {
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(
@@ -2375,9 +2339,8 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultR
             auto insertRes =
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -2477,13 +2440,13 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionBodyError
                 attempt += 1;
 
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand(DatabaseName::createDatabaseName_forTest(
-                                                     boost::none, "user"_sd),
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
+                auto insertRes =
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
                 ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
                 // Only throw once to verify the API gives up right away.
@@ -2529,13 +2492,13 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionCommandEr
                 attempt += 1;
 
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand(DatabaseName::createDatabaseName_forTest(
-                                                     boost::none, "user"_sd),
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
+                auto insertRes =
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
                 ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
                 // The commit response.
@@ -2579,13 +2542,13 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionWCError) 
                 attempt += 1;
 
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand(DatabaseName::createDatabaseName_forTest(
-                                                     boost::none, "user"_sd),
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
+                auto insertRes =
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
                 ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
                 // The commit response.
@@ -2631,9 +2594,8 @@ TEST_F(TxnAPITest, DoesNotWaitForBestEffortAbortIfCancelled) {
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             txnClient
                 .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                            BSON("insert"
-                                 << "foo"
-                                 << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
                 .get();
 
             // Interrupting the caller's opCtx prevents waiting for the best effort abort.
@@ -2682,9 +2644,8 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
 
                 // Throw a non-transient error once to trigger a best effort abort with no retry.
@@ -2748,9 +2709,8 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 txnClient
                     .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                BSON("insert"
-                                     << "foo"
-                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                BSON("insert" << "foo"
+                                              << "documents" << BSON_ARRAY(BSON("x" << 1))))
                     .get();
 
                 // Throw a transient error once to trigger a best effort abort then retry.
@@ -2805,9 +2765,8 @@ TEST_F(TxnAPITest, WriteConcernErrorFromCleanupAbortExposedInResult) {
                     txnClient
                         .runCommand(
                             DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                            BSON("insert"
-                                 << "foo"
-                                 << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                            BSON("insert" << "foo"
+                                          << "documents" << BSON_ARRAY(BSON("x" << 1))))
                         .get();
 
                     // Throw a non-transient error once to trigger a best effort cleanup abort with

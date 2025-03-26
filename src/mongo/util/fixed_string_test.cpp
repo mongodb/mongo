@@ -91,11 +91,8 @@ constexpr auto tupleCartesianProduct(auto aTup, auto bTup) {
     return std::apply(
         [&](auto... as) {
             return std::tuple_cat([&](auto a) {
-                return std::apply(
-                    [&](auto... bs) {
-                        return std::tuple{std::tuple{a, bs}...};
-                    },
-                    bTup);
+                return std::apply([&](auto... bs) { return std::tuple{std::tuple{a, bs}...}; },
+                                  bTup);
             }(as)...);
         },
         aTup);

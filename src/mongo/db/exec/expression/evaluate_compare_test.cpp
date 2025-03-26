@@ -171,9 +171,7 @@ TEST_F(EvaluateCompareTest, CmpGt) {
 
 TEST_F(EvaluateCompareTest, CmpBracketed) {
     /** $cmp results are bracketed to an absolute value of 1. */
-    runTest(BSON("$cmp" << BSON_ARRAY("z"
-                                      << "a")),
-            BSON("" << 1));
+    runTest(BSON("$cmp" << BSON_ARRAY("z" << "a")), BSON("" << 1));
 }
 
 }  // namespace expression_evaluation_test

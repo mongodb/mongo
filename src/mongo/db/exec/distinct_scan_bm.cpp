@@ -139,8 +139,7 @@ enum ShardFilteringStrategy { NoShardFilter, ShardFilter };
 
 class ShardFilteringDistinctScanPerfTestFixture : public QueryShardServerTestFixture {
 public:
-    void _doTest() final { /* Unused. */
-    }
+    void _doTest() final { /* Unused. */ }
 
     struct DistinctScanParamsForTest {
         // Collection & sharding set-up.

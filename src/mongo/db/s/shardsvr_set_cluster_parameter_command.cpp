@@ -110,8 +110,7 @@ public:
                 // that secondaries can be aware of this txn.
                 DBDirectClient client(opCtx);
                 client.update(NamespaceString::kServerConfigurationNamespace,
-                              BSON("_id"
-                                   << "SetClusterParameterStats"),
+                              BSON("_id" << "SetClusterParameterStats"),
                               BSON("$inc" << BSON("count" << 1)),
                               true /* upsert */,
                               false /* multi */);

@@ -3558,9 +3558,8 @@ boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStateme
 
 namespace {
 template <typename Name, typename Value>
-requires(!std::is_unsigned_v<Value>) void mapLogv2ToBSON(BSONObjBuilder& builder,
-                                                         const Name& name,
-                                                         const Value& value) {
+requires(!std::is_unsigned_v<Value>)
+void mapLogv2ToBSON(BSONObjBuilder& builder, const Name& name, const Value& value) {
     builder.append(name, value);
 }
 

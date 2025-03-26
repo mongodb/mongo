@@ -2,6 +2,7 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable.
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
+
 import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 

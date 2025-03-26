@@ -61,7 +61,7 @@ public:
         return id;
     }
 
-    void addVariableRefs(std::set<Variables::Id>* refs) const final{};
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {};
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,

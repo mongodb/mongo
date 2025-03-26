@@ -103,18 +103,14 @@ TEST(BSONElementHasher, SeedMatters) {
 
 // Test strings hash to different things
 TEST(BSONElementHasher, IntAndStringHashesDiffer) {
-    ASSERT_NOT_EQUALS(hashIt(BSON("a" << 3)),
-                      hashIt(BSON("a"
-                                  << "3")));
+    ASSERT_NOT_EQUALS(hashIt(BSON("a" << 3)), hashIt(BSON("a" << "3")));
 }
 
 // Test regexps and strings hash to different things
 TEST(BSONElementHasher, RegexAndStringHashesDiffer) {
     BSONObjBuilder builder;
 
-    ASSERT_NOT_EQUALS(hashIt(BSON("a"
-                                  << "3")),
-                      hashIt(builder.appendRegex("a", "3").obj()));
+    ASSERT_NOT_EQUALS(hashIt(BSON("a" << "3")), hashIt(builder.appendRegex("a", "3").obj()));
 }
 
 // Test arrays and subobject hash to different things
@@ -264,23 +260,20 @@ TEST(BSONElementHasher, HashNull) {
 }
 
 TEST(BSONElementHasher, HashString) {
-    BSONObj o = BSON("check"
-                     << "abc");
+    BSONObj o = BSON("check" << "abc");
     ASSERT_EQUALS(hashIt(o), 8478485326885698097LL);
     o = BSON("check" << BSONSymbol("abc"));
     ASSERT_EQUALS(hashIt(o), 8478485326885698097LL);
 
-    o = BSON("check"
-             << "");
+    o = BSON("check" << "");
     ASSERT_EQUALS(hashIt(o), 2049396243249673340LL);
     o = BSON("check" << BSONSymbol(""));
     ASSERT_EQUALS(hashIt(o), 2049396243249673340LL);
 }
 
 TEST(BSONElementHasher, HashObject) {
-    BSONObj o = BSON("check" << BSON("a"
-                                     << "abc"
-                                     << "b" << 123LL));
+    BSONObj o = BSON("check" << BSON("a" << "abc"
+                                         << "b" << 123LL));
     ASSERT_EQUALS(hashIt(o), 4771603801758380216LL);
 
     o = BSON("check" << BSONObj());
@@ -288,9 +281,8 @@ TEST(BSONElementHasher, HashObject) {
 }
 
 TEST(BSONElementHasher, HashArray) {
-    BSONObj o = BSON("check" << BSON_ARRAY("bar"
-                                           << "baz"
-                                           << "qux"));
+    BSONObj o = BSON("check" << BSON_ARRAY("bar" << "baz"
+                                                 << "qux"));
     ASSERT_EQUALS(hashIt(o), -2938911267422831539LL);
 
     o = BSON("check" << BSONArray());
@@ -373,9 +365,8 @@ TEST(BSONElementHasher, HashWithNonZeroSeed) {
     BSONObj o = BSON("check" << 42);
     ASSERT_EQUALS(hashIt(o, seed), 4302929669663179197LL);
 
-    o = BSON("check" << BSON_ARRAY("sunflower"
-                                   << "sesame"
-                                   << "mustard"));
+    o = BSON("check" << BSON_ARRAY("sunflower" << "sesame"
+                                               << "mustard"));
     ASSERT_EQUALS(hashIt(o, seed), -9222615859251096151LL);
 }
 

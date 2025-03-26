@@ -286,14 +286,10 @@ TEST_F(RangeValidatorTest, TopLevel_TwoSided) {
 TEST_F(RangeValidatorTest, Nested_OneSided) {
     for (auto lb : operators) {
         ASSERT_VALID_RANGE_MATCH(
-            match::dollarAnd({BSON("name"
-                                   << "hello")
-                                  .jsonString(),
+            match::dollarAnd({BSON("name" << "hello").jsonString(),
                               match::range("age", lb, payload("age", 0, lb, boost::none))}));
         ASSERT_VALID_RANGE_EXPR(
-            agg::dollarAnd({BSON("name"
-                                 << "hello")
-                                .jsonString(),
+            agg::dollarAnd({BSON("name" << "hello").jsonString(),
                             agg::range("age", lb, payload("age", 0, lb, boost::none))}));
     }
 }
@@ -419,9 +415,7 @@ TEST_F(RangeValidatorTest, LogicalOps_UnderAnd) {
                                        match::range("age", op, payload("age", 0, op, boost::none)),
                                        match::range("age", op, stub("age", 0, op, boost::none)),
                                    }),
-                    BSON("hello"
-                         << "world")
-                        .jsonString(),
+                    BSON("hello" << "world").jsonString(),
                 }));
         }
         ASSERT_INVALID_RANGE_EXPR(
@@ -432,9 +426,7 @@ TEST_F(RangeValidatorTest, LogicalOps_UnderAnd) {
                                  agg::range("age", op, payload("age", 0, op, boost::none)),
                                  agg::range("age", op, stub("age", 0, op, boost::none)),
                              }),
-                BSON("hello"
-                     << "world")
-                    .jsonString(),
+                BSON("hello" << "world").jsonString(),
             }));
         ASSERT_INVALID_RANGE_MATCH(
             7030709,
@@ -650,18 +642,14 @@ TEST_F(RangeValidatorTest, TwoSided_MatchingPayloadsAtDifferentLevels) {
                     "$and",
                     {match::range("age", lb, payload("age", 0, lb, ub)),
                      match::queryOp("$or",
-                                    {BSON("hello"
-                                          << "world")
-                                         .jsonString(),
+                                    {BSON("hello" << "world").jsonString(),
                                      match::range("age", ub, stub("age", 0, lb, ub))})}));
             ASSERT_INVALID_RANGE_EXPR(
                 7030709,
                 agg::queryOp("$and",
                              {agg::range("age", lb, payload("age", 0, lb, ub)),
                               agg::queryOp("$or",
-                                           {BSON("hello"
-                                                 << "world")
-                                                .jsonString(),
+                                           {BSON("hello" << "world").jsonString(),
                                             agg::range("age", ub, stub("age", 0, lb, ub))})}));
             ASSERT_INVALID_RANGE_MATCH(
                 7030710,
@@ -669,18 +657,14 @@ TEST_F(RangeValidatorTest, TwoSided_MatchingPayloadsAtDifferentLevels) {
                     "$and",
                     {match::range("age", lb, stub("age", 0, lb, ub)),
                      match::queryOp("$or",
-                                    {BSON("hello"
-                                          << "world")
-                                         .jsonString(),
+                                    {BSON("hello" << "world").jsonString(),
                                      match::range("age", ub, payload("age", 0, lb, ub))})}));
             ASSERT_INVALID_RANGE_EXPR(
                 7030710,
                 agg::queryOp("$and",
                              {agg::range("age", lb, stub("age", 0, lb, ub)),
                               agg::queryOp("$or",
-                                           {BSON("hello"
-                                                 << "world")
-                                                .jsonString(),
+                                           {BSON("hello" << "world").jsonString(),
                                             agg::range("age", ub, payload("age", 0, lb, ub))})}));
         }
     }

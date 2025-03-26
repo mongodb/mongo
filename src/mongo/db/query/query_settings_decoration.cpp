@@ -51,6 +51,6 @@ QuerySettings* QuerySettingsDecoration::get(SharedCollectionDecorations* decorat
 }
 
 QuerySettingsDecoration::QuerySettingsDecoration()
-    : _querySettings(std::make_unique<QuerySettings>()){};
+    : _querySettings(std::make_unique<QuerySettings>()) {};
 
 }  // namespace mongo

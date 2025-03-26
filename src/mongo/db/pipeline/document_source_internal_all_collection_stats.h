@@ -120,7 +120,7 @@ public:
         return id;
     }
 
-    void addVariableRefs(std::set<Variables::Id>* refs) const final{};
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {};
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 

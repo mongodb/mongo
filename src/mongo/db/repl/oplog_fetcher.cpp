@@ -1174,7 +1174,7 @@ void OplogFetcher::OplogFetcherRestartDecisionDefault::fetchSuccessful(OplogFetc
     _numRestarts = 0;
 }
 
-OplogFetcher::OplogFetcherRestartDecision::~OplogFetcherRestartDecision(){};
+OplogFetcher::OplogFetcherRestartDecision::~OplogFetcherRestartDecision() {};
 
 }  // namespace repl
 }  // namespace mongo

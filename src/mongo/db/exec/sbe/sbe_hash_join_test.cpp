@@ -65,14 +65,12 @@ using HashJoinStageTest = PlanStageTestFixture;
 TEST_F(HashJoinStageTest, HashJoinCollationTest) {
     using namespace std::literals;
     for (auto useCollator : {false, true}) {
-        auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY("a"
-                                                                        << "b"
-                                                                        << "c"));
+        auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY("a" << "b"
+                                                                            << "c"));
         value::ValueGuard innerGuard{innerTag, innerVal};
 
-        auto [outerTag, outerVal] = stage_builder::makeValue(BSON_ARRAY("a"
-                                                                        << "b"
-                                                                        << "A"));
+        auto [outerTag, outerVal] = stage_builder::makeValue(BSON_ARRAY("a" << "b"
+                                                                            << "A"));
         value::ValueGuard outerGuard{outerTag, outerVal};
 
         // After running the join we expect to get back pairs of the keys that were

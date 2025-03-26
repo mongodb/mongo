@@ -244,39 +244,23 @@ assertResultsMatchWithAndWithoutPushdown(
                   coll, pipeline, [{_id: "a", ss: 30}, {_id: "b", ss: 60}, {_id: "c", ss: 10}], 2));
 
 // The second $group stage refers to a top-field below a $switch
-assertResultsMatchWithAndWithoutPushdown(coll,
-                                         [
-                                             {$group: {_id: {$divide: ["$price", 5]}}},
-                                             {
-                                                 $group: {
-                                                     _id: null,
-                                                     lowp: {
-                                                         $sum: {
-                                                             $switch: {
-                                                                 branches: [{
-                                                                     case: {$lte: ["$_id", 3]},
-                                                                     then: 1
-                                                                 }],
-                                                                 default: 0
-                                                             }
-                                                         }
-                                                     },
-                                                     highp: {
-                                                         $sum: {
-                                                             $switch: {
-                                                                 branches: [{
-                                                                     case: {$gt: ["$_id", 3]},
-                                                                     then: 1
-                                                                 }],
-                                                                 default: 0
-                                                             }
-                                                         }
-                                                     }
-                                                 }
-                                             }
-                                         ],
-                                         [{"_id": null, "lowp": 2, "highp": 1}],
-                                         2);
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [
+        {$group: {_id: {$divide: ["$price", 5]}}},
+        {
+            $group: {
+                _id: null,
+                lowp: {
+                    $sum: {$switch: {branches: [{case: {$lte: ["$_id", 3]}, then: 1}], default: 0}}
+                },
+                highp:
+                    {$sum: {$switch: {branches: [{case: {$gt: ["$_id", 3]}, then: 1}], default: 0}}}
+            }
+        }
+    ],
+    [{"_id": null, "lowp": 2, "highp": 1}],
+    2);
 
 // The second $group stage refers to a top-field below a $cond
 assertResultsMatchWithAndWithoutPushdown(
@@ -295,38 +279,20 @@ assertResultsMatchWithAndWithoutPushdown(
     2);
 
 // The second $group stage refers to a top-field below a nested $cond / $ifNull
-assertResultsMatchWithAndWithoutPushdown(coll,
-                                         [
-                                             {$group: {_id: {$divide: ["$price", 5]}}},
-                                             {
-                                                 $group: {
-                                                     _id: null,
-                                                     lowp: {
-                                                         $sum: {
-                                                             $cond: [
-                                                                 {
-                                                                     $lte:
-                                                                         [{$ifNull: ["$_id", 0]}, 3]
-                                                                 },
-                                                                 1,
-                                                                 0
-                                                             ]
-                                                         }
-                                                     },
-                                                     highp: {
-                                                         $sum: {
-                                                             $cond: [
-                                                                 {$gt: [{$ifNull: ["$_id", 0]}, 3]},
-                                                                 1,
-                                                                 0
-                                                             ]
-                                                         }
-                                                     }
-                                                 }
-                                             }
-                                         ],
-                                         [{"_id": null, "lowp": 2, "highp": 1}],
-                                         2);
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [
+        {$group: {_id: {$divide: ["$price", 5]}}},
+        {
+            $group: {
+                _id: null,
+                lowp: {$sum: {$cond: [{$lte: [{$ifNull: ["$_id", 0]}, 3]}, 1, 0]}},
+                highp: {$sum: {$cond: [{$gt: [{$ifNull: ["$_id", 0]}, 3]}, 1, 0]}}
+            }
+        }
+    ],
+    [{"_id": null, "lowp": 2, "highp": 1}],
+    2);
 
 // The second $group stage refers to top-fields below a $let
 assertResultsMatchWithAndWithoutPushdown(
@@ -349,72 +315,24 @@ assertResultsMatchWithAndWithoutPushdown(
     2);
 
 // The second $group stage refers to top-fields below a $and
-assertResultsMatchWithAndWithoutPushdown(coll,
-                                         [
-                                             {
-                                                 $group: {
-                                                     _id: "$item",
-                                                     maxp: {$max: "$price"},
-                                                     minp: {$min: "$price"}
-                                                 }
-                                             },
-                                             {
-                                                 $group:
-                                                     {
-                                                         _id: "$_id",
-                                                         o:
-                                                             {
-                                                                 $sum:
-                                                                     {
-                                                                         $and: [
-                                                                             {$gt: ["$maxp", 15]},
-                                                                             {$lt: ["$minp", 10]}
-                                                                         ]
-                                                                     }
-                                                             }
-                                                     }
-                                             }
-                                         ],
-                                         [
-                                             {"_id": "a", "o": 0},
-                                             {"_id": "c", "o": 0},
-                                             {"_id": "b", "o": 0}
-                                         ],
-                                         2);
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [
+        {$group: {_id: "$item", maxp: {$max: "$price"}, minp: {$min: "$price"}}},
+        {$group: {_id: "$_id", o: {$sum: {$and: [{$gt: ["$maxp", 15]}, {$lt: ["$minp", 10]}]}}}}
+    ],
+    [{"_id": "a", "o": 0}, {"_id": "c", "o": 0}, {"_id": "b", "o": 0}],
+    2);
 
 // The second $group stage refers to top-fields below a $or
-assertResultsMatchWithAndWithoutPushdown(coll,
-                                         [
-                                             {
-                                                 $group: {
-                                                     _id: "$item",
-                                                     maxp: {$max: "$price"},
-                                                     minp: {$min: "$price"}
-                                                 }
-                                             },
-                                             {
-                                                 $group:
-                                                     {
-                                                         _id: "$_id",
-                                                         o:
-                                                             {
-                                                                 $sum:
-                                                                     {
-                                                                         $or: [
-                                                                             {$gt: ["$maxp", 15]},
-                                                                             {$lt: ["$minp", 10]}
-                                                                         ]
-                                                                     }
-                                                             }
-                                                     }
-                                             }
-                                         ],
-                                         [
-                                             {"_id": "a", "o": 0},
-                                             {"_id": "c", "o": 0},
-                                             {"_id": "b", "o": 0}
-                                         ],
-                                         2);
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [
+        {$group: {_id: "$item", maxp: {$max: "$price"}, minp: {$min: "$price"}}},
+        {$group: {_id: "$_id", o: {$sum: {$or: [{$gt: ["$maxp", 15]}, {$lt: ["$minp", 10]}]}}}}
+    ],
+    [{"_id": "a", "o": 0}, {"_id": "c", "o": 0}, {"_id": "b", "o": 0}],
+    2);
 
 // The second $group stage refers to both a top-level field and a sub-field twice which does not
 // exist.

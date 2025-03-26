@@ -1227,8 +1227,7 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCollectionIsRenamed) {
         _initializeCollection(_opCtx.get(), uuidBeforeRename, nssBeforeRename);
 
     // Insert a document into the collection.
-    const auto objInRenamedCollection = BSON("_id"
-                                             << "kyle");
+    const auto objInRenamedCollection = BSON("_id" << "kyle");
     _insertDocAndGenerateOplogEntry(objInRenamedCollection, uuidBeforeRename, nssBeforeRename, 2);
 
     // Rename the original collection.
@@ -1247,8 +1246,7 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCollectionIsRenamed) {
         _initializeCollection(_opCtx.get(), uuidAfterRename, nssBeforeRename);
 
     // Insert a different document into the new collection.
-    const auto objInNewCollection = BSON("_id"
-                                         << "jungsoo");
+    const auto objInNewCollection = BSON("_id" << "jungsoo");
     _insertDocAndGenerateOplogEntry(objInNewCollection, uuidAfterRename, nssBeforeRename, 4);
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -1280,12 +1278,8 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCreateCollAndInsertsAreRo
     ASSERT_OK(_insertOplogEntry(oplogEntry));
 
     // Insert documents into the collection.
-    const std::vector<BSONObj> objs({BSON("_id"
-                                          << "kyle"),
-                                     BSON("_id"
-                                          << "jungsoo"),
-                                     BSON("_id"
-                                          << "erjon")});
+    const std::vector<BSONObj> objs(
+        {BSON("_id" << "kyle"), BSON("_id" << "jungsoo"), BSON("_id" << "erjon")});
     for (auto&& obj : objs) {
         _insertDocAndGenerateOplogEntry(obj, uuid, nss);
     }
@@ -2418,8 +2412,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnMalformedApplyOpsOplogEntry)
         makeCommandOp(Timestamp(2, 2),
                       boost::none,
                       NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin, "$cmd"),
-                      BSON("applyOps" << BSON("not"
-                                              << "array")),
+                      BSON("applyOps" << BSON("not" << "array")),
                       2);
 
     auto status = rollbackOps({applyOpsCmdOp});
@@ -2532,8 +2525,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordShardIdentityRollbackFo
                                Timestamp(2, 2),
                                uuid,
                                redactTenant(nss),
-                               BSON("_id"
-                                    << "not_the_shard_id_document"),
+                               BSON("_id" << "not_the_shard_id_document"),
                                boost::none,
                                2);
     ASSERT_OK(rollbackOps({deleteOp}));
@@ -2550,8 +2542,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsConfigVersionRollback) {
                                Timestamp(2, 2),
                                uuid,
                                nss.ns_forTest(),
-                               BSON("_id"
-                                    << "a"),
+                               BSON("_id" << "a"),
                                boost::none,
                                2);
 
@@ -2568,8 +2559,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackFo
                                Timestamp(2, 2),
                                uuid,
                                nss.ns_forTest(),
-                               BSON("_id"
-                                    << "a"),
+                               BSON("_id" << "a"),
                                boost::none,
                                2);
     ASSERT_OK(rollbackOps({insertOp}));
@@ -2586,8 +2576,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackFo
                                Timestamp(2, 2),
                                uuid,
                                nss.ns_forTest(),
-                               BSON("_id"
-                                    << "a"),
+                               BSON("_id" << "a"),
                                boost::none,
                                2);
     ASSERT_OK(rollbackOps({deleteOp}));
@@ -2598,15 +2587,13 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsInsertOpsInUUIDToIdMap) {
     const auto nss1 = NamespaceString::createNamespaceString_forTest("db.people");
     const auto uuid1 = UUID::gen();
     const auto coll1 = _initializeCollection(_opCtx.get(), uuid1, nss1);
-    const auto obj1 = BSON("_id"
-                           << "kyle");
+    const auto obj1 = BSON("_id" << "kyle");
     const auto insertOp1 = _insertDocAndReturnOplogEntry(obj1, uuid1, nss1, 2);
 
     const auto nss2 = NamespaceString::createNamespaceString_forTest("db.persons");
     const auto uuid2 = UUID::gen();
     const auto coll2 = _initializeCollection(_opCtx.get(), uuid2, nss2);
-    const auto obj2 = BSON("_id"
-                           << "jungsoo");
+    const auto obj2 = BSON("_id" << "jungsoo");
     const auto insertOp2 = _insertDocAndReturnOplogEntry(obj2, uuid2, nss2, 3);
 
     ASSERT_OK(rollbackOps({insertOp2, insertOp1}));

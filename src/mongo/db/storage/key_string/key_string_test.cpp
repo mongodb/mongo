@@ -373,9 +373,7 @@ TEST_F(KeyStringBuilderTest, DeprecatedBinData) {
 
 TEST_F(KeyStringBuilderTest, ValidColumn) {
     BSONColumnBuilder cb;
-    cb.append(BSON("a"
-                   << "deadbeef")
-                  .getField("a"));
+    cb.append(BSON("a" << "deadbeef").getField("a"));
     cb.append(BSON("a" << 1).getField("a"));
     cb.append(BSON("a" << 2).getField("a"));
     cb.append(BSON("a" << 1).getField("a"));
@@ -439,9 +437,7 @@ TEST_F(KeyStringBuilderTest, ActualBytesDouble) {
 
 TEST_F(KeyStringBuilderTest, AllTypesSimple) {
     ROUNDTRIP(version, BSON("" << 5.5));
-    ROUNDTRIP(version,
-              BSON(""
-                   << "abc"));
+    ROUNDTRIP(version, BSON("" << "abc"));
     ROUNDTRIP(version, BSON("" << BSON("a" << 5)));
     ROUNDTRIP(version, BSON("" << BSON_ARRAY("a" << 5)));
     ROUNDTRIP(version, BSON("" << BSONBinData("abc", 3, bdtCustom)));
@@ -452,10 +448,7 @@ TEST_F(KeyStringBuilderTest, AllTypesSimple) {
     ROUNDTRIP(version, BSON("" << BSONRegEx("asdf", "x")));
     ROUNDTRIP(version, BSON("" << BSONDBRef("db.c", OID("010203040506070809101112"))));
     ROUNDTRIP(version, BSON("" << BSONCode("abc_code")));
-    ROUNDTRIP(version,
-              BSON("" << BSONCodeWScope("def_code",
-                                        BSON("x_scope"
-                                             << "a"))));
+    ROUNDTRIP(version, BSON("" << BSONCodeWScope("def_code", BSON("x_scope" << "a"))));
     ROUNDTRIP(version, BSON("" << 5));
     ROUNDTRIP(version, BSON("" << Timestamp(123123, 123)));
     ROUNDTRIP(version, BSON("" << Timestamp(~0U, 3)));
@@ -495,8 +488,7 @@ TEST_F(KeyStringBuilderTest, SubDoc1) {
 }
 
 TEST_F(KeyStringBuilderTest, SubDoc2) {
-    BSONObj a = BSON("" << BSON("a"
-                                << "foo"));
+    BSONObj a = BSON("" << BSON("a" << "foo"));
     BSONObj b = BSON("" << BSON("b" << 5.5));
     BSONObj c = BSON("" << BSON("c" << BSON("x" << 5)));
     ROUNDTRIP(version, a);
@@ -691,19 +683,17 @@ TEST_F(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
     }
 
     {
-        BSONObj doc = BSON("fieldA"
-                           << "value1"
-                           << "fieldB"
-                           << "value2");
+        BSONObj doc = BSON("fieldA" << "value1"
+                                    << "fieldB"
+                                    << "value2");
         key_string::HeapBuilder ks(key_string::Version::V1, ONE_DESCENDING);
         ks.appendBSONElement(doc["fieldA"]);
         ks.appendBSONElement(doc["fieldB"]);
         key_string::Value data = ks.release();
         COMPARE_KS_BSON(data,
-                        BSON(""
-                             << "value1"
-                             << ""
-                             << "value2"),
+                        BSON("" << "value1"
+                                << ""
+                                << "value2"),
                         ONE_DESCENDING);
     }
 }
@@ -1127,10 +1117,8 @@ const std::vector<BSONObj>& getInterestingElements(key_string::Version version) 
     elements.push_back(BSON("" << -2.2));
     elements.push_back(BSON("" << -12312312.2123123123123));
     elements.push_back(BSON("" << 12312312.2123123123123));
-    elements.push_back(BSON(""
-                            << "aaa"));
-    elements.push_back(BSON(""
-                            << "AAA"));
+    elements.push_back(BSON("" << "aaa"));
+    elements.push_back(BSON("" << "AAA"));
     elements.push_back(BSON("" << zeroBall));
     elements.push_back(BSON("" << ball));
     elements.push_back(BSON("" << ball00n));
@@ -1149,15 +1137,9 @@ const std::vector<BSONObj>& getInterestingElements(key_string::Version version) 
     elements.push_back(BSON("" << BSONCode(zeroBall)));
     elements.push_back(BSON("" << BSONCode(ball)));
     elements.push_back(BSON("" << BSONCode(ball00n)));
-    elements.push_back(BSON("" << BSONCodeWScope("def_code1",
-                                                 BSON("x_scope"
-                                                      << "a"))));
-    elements.push_back(BSON("" << BSONCodeWScope("def_code2",
-                                                 BSON("x_scope"
-                                                      << "a"))));
-    elements.push_back(BSON("" << BSONCodeWScope("def_code2",
-                                                 BSON("x_scope"
-                                                      << "b"))));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code1", BSON("x_scope" << "a"))));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code2", BSON("x_scope" << "a"))));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code2", BSON("x_scope" << "b"))));
     elements.push_back(BSON("" << BSONCodeWScope(zeroBall, BSON("a" << 1))));
     elements.push_back(BSON("" << BSONCodeWScope(ball, BSON("a" << 1))));
     elements.push_back(BSON("" << BSONCodeWScope(ball00n, BSON("a" << 1))));

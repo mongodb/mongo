@@ -92,8 +92,7 @@ TEST(Validity, NewVersionNoClusterId) {
     // Tests error on parsing new format with no clusterId
     //
 
-    auto versionDoc = BSON("test"
-                           << "test_value");
+    auto versionDoc = BSON("test" << "test_value");
 
     ASSERT_THROWS(VersionType::parse(IDLParserContext("VersionType"), versionDoc),
                   AssertionException);

@@ -55,7 +55,7 @@ class Hasher {
 
 public:
     explicit Hasher(HashSeed seed);
-    ~Hasher(){};
+    ~Hasher() {};
 
     // pointer to next part of input key, length in bytes to read
     void addData(const void* keyData, size_t numBytes);

@@ -97,7 +97,7 @@ protected:
             size_t inserted;
         };
 
-        ModifyResult(){};
+        ModifyResult() {};
         ModifyResult(ModifyResult::Type type) : type(type) {}
 
         Type type;

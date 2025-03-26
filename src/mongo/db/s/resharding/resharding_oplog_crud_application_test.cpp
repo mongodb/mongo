@@ -304,9 +304,9 @@ public:
 
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
         store.forEach(opCtx,
-                      BSON("op"
-                           << "c"
-                           << "o.applyOps" << BSON("$exists" << true) << "ts" << BSON("$gt" << ts)),
+                      BSON("op" << "c"
+                                << "o.applyOps" << BSON("$exists" << true) << "ts"
+                                << BSON("$gt" << ts)),
                       [&](const auto& oplogEntry) {
                           auto applyOpsCmd = oplogEntry.getObject().getOwned();
                           auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsCmd);

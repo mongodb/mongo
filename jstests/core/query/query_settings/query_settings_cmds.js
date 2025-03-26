@@ -36,7 +36,9 @@ qsutils.removeAllQuerySettings();
 function testQuerySettingsUsing(params) {
     let queryShapeHashA = null;
     // Ensure that query settings cluster parameter is empty.
-    { qsutils.assertQueryShapeConfiguration([]); }
+    {
+        qsutils.assertQueryShapeConfiguration([]);
+    }
 
     // Ensure that 'querySettings' cluster parameter contains QueryShapeConfiguration after
     // invoking setQuerySettings command.

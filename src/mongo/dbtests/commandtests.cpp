@@ -274,9 +274,7 @@ public:
         ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder indexSpec;
-        indexSpec.append("key",
-                         BSON("a"
-                              << ""));
+        indexSpec.append("key", BSON("a" << ""));
 
         BSONArrayBuilder indexes;
         indexes.append(indexSpec.obj());

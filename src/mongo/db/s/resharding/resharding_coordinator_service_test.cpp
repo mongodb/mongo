@@ -331,17 +331,13 @@ public:
         std::transform(reshardingOptions.donorShardIds.begin(),
                        reshardingOptions.donorShardIds.end(),
                        std::back_inserter(donorShards),
-                       [](auto shardId) {
-                           return DonorShardEntry{shardId, {}};
-                       });
+                       [](auto shardId) { return DonorShardEntry{shardId, {}}; });
 
         std::vector<RecipientShardEntry> recipientShards;
         std::transform(reshardingOptions.recipientShardIds.begin(),
                        reshardingOptions.recipientShardIds.end(),
                        std::back_inserter(recipientShards),
-                       [](auto shardId) {
-                           return RecipientShardEntry{shardId, {}};
-                       });
+                       [](auto shardId) { return RecipientShardEntry{shardId, {}}; });
 
         ReshardingCoordinatorDocument doc(state, donorShards, recipientShards);
         doc.setCommonReshardingMetadata(meta);

@@ -165,14 +165,11 @@ TEST_F(NoChunkFixture, KeyBelongsToMe) {
 }
 
 TEST_F(NoChunkFixture, IsValidKey) {
-    ASSERT(makeTrackedCollectionMetadata().isValidKey(BSON("a"
-                                                           << "abcde")));
+    ASSERT(makeTrackedCollectionMetadata().isValidKey(BSON("a" << "abcde")));
     ASSERT(makeTrackedCollectionMetadata().isValidKey(BSON("a" << 3)));
-    ASSERT(!makeTrackedCollectionMetadata().isValidKey(BSON("a"
-                                                            << "abcde"
-                                                            << "b" << 1)));
-    ASSERT(!makeTrackedCollectionMetadata().isValidKey(BSON("c"
-                                                            << "abcde")));
+    ASSERT(!makeTrackedCollectionMetadata().isValidKey(BSON("a" << "abcde"
+                                                                << "b" << 1)));
+    ASSERT(!makeTrackedCollectionMetadata().isValidKey(BSON("c" << "abcde")));
 }
 
 TEST_F(NoChunkFixture, GetNextChunk) {

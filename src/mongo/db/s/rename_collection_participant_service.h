@@ -86,7 +86,7 @@ public:
     void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
-        const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) override{};
+        const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) override {};
 
     std::shared_ptr<Instance> constructInstance(BSONObj initialState) override;
 };

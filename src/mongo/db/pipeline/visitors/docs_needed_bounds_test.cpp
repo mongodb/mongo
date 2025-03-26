@@ -86,10 +86,9 @@ TEST(DocsNeededBoundsTest, DocsNeededBoundsSerializesCorrectly) {
     docs_needed_bounds::serializeDocsNeededConstraint(101, "otherTestBounds", &objBuilder);
 
     ASSERT_BSONOBJ_EQ(objBuilder.done(),
-                      BSON("minBounds"
-                           << "Unknown"
-                           << "maxBounds"
-                           << "NeedAll"
-                           << "otherTestBounds" << 101));
+                      BSON("minBounds" << "Unknown"
+                                       << "maxBounds"
+                                       << "NeedAll"
+                                       << "otherTestBounds" << 101));
 }
 }  // namespace mongo

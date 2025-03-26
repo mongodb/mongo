@@ -303,8 +303,8 @@ export var AnalyzeShardKeyUtil = {
                 0,
                 metrics);
         } else {
-            assert.eq(metrics.sampleSize.update + metrics.sampleSize.delete +
-                          metrics.sampleSize.findAndModify,
+            assert.eq(metrics.sampleSize.update +
+                          metrics.sampleSize.delete +metrics.sampleSize.findAndModify,
                       metrics.sampleSize.total,
                       metrics.sampleSize);
 

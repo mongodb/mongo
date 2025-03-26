@@ -1065,7 +1065,7 @@ public:
         : StorageEngine::StreamingCursor(options),
           _session(session),
           _path(path),
-          _wtBackup(wtBackup){};
+          _wtBackup(wtBackup) {};
 
     ~StreamingCursorImpl() override = default;
 
@@ -1288,7 +1288,9 @@ WiredTigerKVEngine::beginNonBlockingBackup(const StorageEngine::BackupOptions& o
 
     // Create ongoingBackup.lock file to signal recovery that it should delete WiredTiger.backup if
     // we have an unclean shutdown with the cursor still open.
-    { boost::filesystem::ofstream ongoingBackup(getOngoingBackupPath()); }
+    {
+        boost::filesystem::ofstream ongoingBackup(getOngoingBackupPath());
+    }
 
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
     stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);

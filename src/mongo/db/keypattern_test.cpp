@@ -127,14 +127,8 @@ TEST(KeyPattern, GlobalMinMax) {
     ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a" << 1 << "b" << -1.0f)).globalMax(),
                       BSON("a" << MAXKEY << "b" << MINKEY));
 
-    ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a"
-                                      << "hashed"))
-                          .globalMin(),
-                      BSON("a" << MINKEY));
-    ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a"
-                                      << "hashed"))
-                          .globalMax(),
-                      BSON("a" << MAXKEY));
+    ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a" << "hashed")).globalMin(), BSON("a" << MINKEY));
+    ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a" << "hashed")).globalMax(), BSON("a" << MAXKEY));
 
     //
     // Nested KeyPatterns

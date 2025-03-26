@@ -111,18 +111,14 @@ TEST_F(GoldenGenExpressionTest, TestSimpleExpr) {
         runTest(&anyTrueExpr, rootSlot, val, "ExpressionAnyElementTrue"_sd);
     }
     {
-        Value arrVal = Value(BSON_ARRAY(BSON("k"
-                                             << "_id"
-                                             << "v" << 0)
-                                        << BSON("k"
-                                                << "field1"
-                                                << "v" << 4)
-                                        << BSON("k"
-                                                << "field2"
-                                                << "v" << true)
-                                        << BSON("k"
-                                                << "null"
-                                                << "v" << BSONNULL)));
+        Value arrVal = Value(BSON_ARRAY(BSON("k" << "_id"
+                                                 << "v" << 0)
+                                        << BSON("k" << "field1"
+                                                    << "v" << 4)
+                                        << BSON("k" << "field2"
+                                                    << "v" << true)
+                                        << BSON("k" << "null"
+                                                    << "v" << BSONNULL)));
         auto varExpr = ExpressionFieldPath::createVarFromString(
             _expCtx.get(), "ROOT", _expCtx->variablesParseState);
         ExpressionObjectToArray obj2arrExpr(_expCtx.get());
@@ -252,10 +248,9 @@ TEST_F(GoldenGenExpressionTest, TestExprStr) {
         ExpressionSplit splitExpr(_expCtx.get(), {strFieldExpr, constExpr});
         runTest(&splitExpr,
                 rootSlot,
-                Value(BSON_ARRAY("This"
-                                 << "is"
-                                 << "a"
-                                 << "test.")),
+                Value(BSON_ARRAY("This" << "is"
+                                        << "a"
+                                        << "test.")),
                 "ExpressionSplit"_sd);
     }
     {
@@ -323,9 +318,8 @@ TEST_F(GoldenGenExpressionTest, TestExprStr) {
             _expCtx.get(), strFieldExpr, pattern, nullptr, "$regexFind"_sd);
         runTest(&regFindExpr,
                 rootSlot,
-                Value(BSON("match"
-                           << "test"
-                           << "idx" << 10 << "captures" << BSONArray())),
+                Value(BSON("match" << "test"
+                                   << "idx" << 10 << "captures" << BSONArray())),
                 "ExpressionRegexFind"_sd);
     }
     {
@@ -335,9 +329,8 @@ TEST_F(GoldenGenExpressionTest, TestExprStr) {
             _expCtx.get(), strFieldExpr, pattern, nullptr, "$regexFindAll"_sd);
         runTest(&regFindAllExpr,
                 rootSlot,
-                Value(BSON_ARRAY(BSON("match"
-                                      << "test"
-                                      << "idx" << 10 << "captures" << BSONArray()))),
+                Value(BSON_ARRAY(BSON("match" << "test"
+                                              << "idx" << 10 << "captures" << BSONArray()))),
                 "ExpressionRegexFindAll"_sd);
     }
     {

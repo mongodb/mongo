@@ -1496,8 +1496,7 @@ TEST_F(MigrationChunkClonerSourceTest, CorrectDocumentsFetchedWithDottedShardKey
 }
 
 TEST_F(MigrationChunkClonerSourceTest, CorrectDocumentsFetchedWithHasheddShardKeyPattern) {
-    const ShardKeyPattern hashedShardKeyPattern(BSON("X"
-                                                     << "hashed"));
+    const ShardKeyPattern hashedShardKeyPattern(BSON("X" << "hashed"));
 
     const ShardsvrMoveRange req = createMoveRangeRequest(
         ChunkRange(BSON("X" << 6000000000000000000ll), BSON("X" << 9003000000000000000ll)));
@@ -1631,8 +1630,7 @@ TEST_F(MigrationChunkClonerSourceTest, UpdatedDocumentsFetched) {
 }
 
 TEST_F(MigrationChunkClonerSourceTest, UpdatedDocumentsFetchedWithHashedShardKey) {
-    const ShardKeyPattern shardKeyPattern(BSON("X"
-                                               << "hashed"));
+    const ShardKeyPattern shardKeyPattern(BSON("X" << "hashed"));
 
     const ShardsvrMoveRange req = createMoveRangeRequest(
         ChunkRange(BSON("X" << 6000000000000000000ll), BSON("X" << 9003000000000000000ll)));

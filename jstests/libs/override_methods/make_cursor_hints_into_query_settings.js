@@ -1,5 +1,5 @@
-import {sysCollNamePrefix} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {
+    sysCollNamePrefix,
     transformIndexHintsFromTimeseriesToView
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {

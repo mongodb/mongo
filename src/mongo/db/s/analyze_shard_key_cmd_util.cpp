@@ -217,9 +217,8 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
 
     std::vector<BSONObj> pipeline;
 
-    pipeline.push_back(BSON("$project" << BSON("_id" << 0 << kIndexKeyFieldName
-                                                     << BSON("$meta"
-                                                             << "indexKey"))));
+    pipeline.push_back(
+        BSON("$project" << BSON("_id" << 0 << kIndexKeyFieldName << BSON("$meta" << "indexKey"))));
 
     if (numDocsTotal > numDocsToSample) {
         pipeline.push_back(
@@ -259,9 +258,8 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
                   << kNumDistinctValuesFieldName << BSON("$sum" << 1) << kMostCommonValuesFieldName
                   << BSON("$topN" << BSON("n" << numMostCommonValues << "sortBy"
                                               << BSON(kFrequencyFieldName << -1) << "output"
-                                              << BSON("_id"
-                                                      << "$_id" << kFrequencyFieldName
-                                                      << ("$" + kFrequencyFieldName)))))));
+                                              << BSON("_id" << "$_id" << kFrequencyFieldName
+                                                            << ("$" + kFrequencyFieldName)))))));
 
     // Unwind "mostCommonValues" to return each shard value in its own document.
     pipeline.push_back(BSON("$unwind" << ("$" + kMostCommonValuesFieldName)));
@@ -297,10 +295,8 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
                        << BSON_ARRAY(BSON("$match" << matchBuilder.obj()) << BSON("$limit" << 1))
                        << "as"
                        << "docs")));
-        pipeline.push_back(BSON("$set" << BSON(kDocFieldName << BSON("$first"
-                                                                     << "$docs"))));
-        pipeline.push_back(BSON("$unset" << BSON_ARRAY("docs"
-                                                       << "_id")));
+        pipeline.push_back(BSON("$set" << BSON(kDocFieldName << BSON("$first" << "$docs"))));
+        pipeline.push_back(BSON("$unset" << BSON_ARRAY("docs" << "_id")));
     } else {
         pipeline.push_back(BSON(
             "$set" << BSON(kIndexKeyFieldName
@@ -898,15 +894,11 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
 
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$collStats" << BSON("storageStats" << BSONObj())));
-    pipeline.push_back(BSON("$group" << BSON("_id" << BSONNULL << kNumBytesFieldName
-                                                   << BSON("$sum"
-                                                           << "$storageStats.size")
-                                                   << kNumDocsFieldName
-                                                   << BSON("$sum"
-                                                           << "$storageStats.count")
-                                                   << kNumOrphanDocsFieldName
-                                                   << BSON("$sum"
-                                                           << "$storageStats.numOrphanDocs"))));
+    pipeline.push_back(BSON(
+        "$group" << BSON("_id" << BSONNULL << kNumBytesFieldName
+                               << BSON("$sum" << "$storageStats.size") << kNumDocsFieldName
+                               << BSON("$sum" << "$storageStats.count") << kNumOrphanDocsFieldName
+                               << BSON("$sum" << "$storageStats.numOrphanDocs"))));
     AggregateCommandRequest aggRequest(nss, pipeline);
     aggRequest.setReadConcern(extractReadConcern(opCtx));
 

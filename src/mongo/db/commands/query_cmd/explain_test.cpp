@@ -53,14 +53,11 @@ TEST(ExplainTest, VerbosityEnumToStringReturnsCorrectValues) {
 }
 
 TEST(ExplainTest, ExplainSerializeToBSONCorrectly) {
-    ASSERT_BSONOBJ_EQ(BSON("verbosity"
-                           << "queryPlanner"),
+    ASSERT_BSONOBJ_EQ(BSON("verbosity" << "queryPlanner"),
                       ExplainOptions::toBSON(Verbosity::kQueryPlanner));
-    ASSERT_BSONOBJ_EQ(BSON("verbosity"
-                           << "executionStats"),
+    ASSERT_BSONOBJ_EQ(BSON("verbosity" << "executionStats"),
                       ExplainOptions::toBSON(Verbosity::kExecStats));
-    ASSERT_BSONOBJ_EQ(BSON("verbosity"
-                           << "allPlansExecution"),
+    ASSERT_BSONOBJ_EQ(BSON("verbosity" << "allPlansExecution"),
                       ExplainOptions::toBSON(Verbosity::kExecAllPlans));
 }
 

@@ -57,104 +57,82 @@ void checkParse(const BSONObj& rpsObj, const ReadPreferenceSetting& expected) {
 }
 
 TEST(ReadPreferenceSetting, ParseValid) {
-    checkParse(BSON("mode"
-                    << "primary"),
+    checkParse(BSON("mode" << "primary"),
                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
     // Check that primary with wildcard tags is accepted for backwards compatibility, but
     // that the tags are parsed as the empty TagSet.
-    checkParse(BSON("mode"
-                    << "primary"
-                    << "tags" << BSON_ARRAY(BSONObj())),
+    checkParse(BSON("mode" << "primary"
+                           << "tags" << BSON_ARRAY(BSONObj())),
                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
-    checkParse(BSON("mode"
-                    << "secondaryPreferred"
-                    << "tags"
-                    << BSON_ARRAY(BSON("dc"
-                                       << "ny"))),
+    checkParse(BSON("mode" << "secondaryPreferred"
+                           << "tags" << BSON_ARRAY(BSON("dc" << "ny"))),
                ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
-                                     TagSet(BSON_ARRAY(BSON("dc"
-                                                            << "ny")))));
-    checkParse(BSON("mode"
-                    << "secondary"
-                    << "maxStalenessSeconds" << kMinMaxStaleness.count()),
+                                     TagSet(BSON_ARRAY(BSON("dc" << "ny")))));
+    checkParse(BSON("mode" << "secondary"
+                           << "maxStalenessSeconds" << kMinMaxStaleness.count()),
                ReadPreferenceSetting(ReadPreference::SecondaryOnly, kMinMaxStaleness));
 
-    checkParse(BSON("mode"
-                    << "secondary"
-                    << "maxStalenessSeconds" << 0),
+    checkParse(BSON("mode" << "secondary"
+                           << "maxStalenessSeconds" << 0),
                ReadPreferenceSetting(ReadPreference::SecondaryOnly, Seconds(0)));
 
-    checkParse(BSON("mode"
-                    << "secondary"
-                    << "tags"
-                    << BSON_ARRAY(BSON("dc"
-                                       << "ny"))
-                    << "maxStalenessSeconds" << kMinMaxStaleness.count()),
+    checkParse(BSON("mode" << "secondary"
+                           << "tags" << BSON_ARRAY(BSON("dc" << "ny")) << "maxStalenessSeconds"
+                           << kMinMaxStaleness.count()),
                ReadPreferenceSetting(ReadPreference::SecondaryOnly,
-                                     TagSet(BSON_ARRAY(BSON("dc"
-                                                            << "ny"))),
+                                     TagSet(BSON_ARRAY(BSON("dc" << "ny"))),
                                      kMinMaxStaleness));
 
-    checkParse(BSON("mode"
-                    << "nearest"
-                    << "tags"
-                    << BSON_ARRAY(BSON("dc"
-                                       << "ny"))
-                    << "maxStalenessSeconds" << kMinMaxStaleness.count() << "hedge" << BSONObj()),
+    checkParse(BSON("mode" << "nearest"
+                           << "tags" << BSON_ARRAY(BSON("dc" << "ny")) << "maxStalenessSeconds"
+                           << kMinMaxStaleness.count() << "hedge" << BSONObj()),
                ReadPreferenceSetting(ReadPreference::Nearest,
-                                     TagSet(BSON_ARRAY(BSON("dc"
-                                                            << "ny"))),
+                                     TagSet(BSON_ARRAY(BSON("dc" << "ny"))),
                                      kMinMaxStaleness,
                                      HedgingMode()));
 }
 
 TEST(ReadPreferenceSetting, ParseHedgingMode) {
     // No hedging mode.
-    auto rpsObj = BSON("mode"
-                       << "primary");
+    auto rpsObj = BSON("mode" << "primary");
     auto rps = parse(rpsObj);
     ASSERT_TRUE(rps.pref == ReadPreference::PrimaryOnly);
     ASSERT_FALSE(rps.hedgingMode.has_value());
 
     // Implicit opt-in for readPreference mode "nearest" should no longer default to hedging mode
     // enabled.
-    rpsObj = BSON("mode"
-                  << "nearest");
+    rpsObj = BSON("mode" << "nearest");
     rps = parse(rpsObj);
     ASSERT_TRUE(rps.pref == ReadPreference::Nearest);
     ASSERT_FALSE(rps.hedgingMode.has_value());
 
     // Default hedging mode.
-    rpsObj = BSON("mode"
-                  << "primaryPreferred"
-                  << "hedge" << BSONObj());
+    rpsObj = BSON("mode" << "primaryPreferred"
+                         << "hedge" << BSONObj());
     rps = parse(rpsObj);
     ASSERT_TRUE(rps.pref == ReadPreference::PrimaryPreferred);
     ASSERT_TRUE(rps.hedgingMode.has_value());
     ASSERT_TRUE(rps.hedgingMode->getEnabled());
 
     // Input hedging mode.
-    rpsObj = BSON("mode"
-                  << "nearest"
-                  << "hedge" << BSON("enabled" << true));
+    rpsObj = BSON("mode" << "nearest"
+                         << "hedge" << BSON("enabled" << true));
     rps = parse(rpsObj);
     ASSERT_TRUE(rps.pref == ReadPreference::Nearest);
     ASSERT_TRUE(rps.hedgingMode.has_value());
     ASSERT_TRUE(rps.hedgingMode->getEnabled());
 
-    rpsObj = BSON("mode"
-                  << "nearest"
-                  << "hedge" << BSON("enabled" << false));
+    rpsObj = BSON("mode" << "nearest"
+                         << "hedge" << BSON("enabled" << false));
     rps = parse(rpsObj);
     ASSERT_TRUE(rps.pref == ReadPreference::Nearest);
     ASSERT_TRUE(rps.hedgingMode.has_value());
     ASSERT_FALSE(rps.hedgingMode->getEnabled());
 
-    rpsObj = BSON("mode"
-                  << "primary"
-                  << "hedge" << BSON("enabled" << false));
+    rpsObj = BSON("mode" << "primary"
+                         << "hedge" << BSON("enabled" << false));
     rps = parse(rpsObj);
 
     ASSERT_TRUE(rps.pref == ReadPreference::PrimaryOnly);
@@ -164,16 +142,14 @@ TEST(ReadPreferenceSetting, ParseHedgingMode) {
 
 TEST(ReadPreferenceSetting, ParseIsPretargeted) {
     // No $_isPretargeted.
-    auto rpsObj = BSON("mode"
-                       << "primary");
+    auto rpsObj = BSON("mode" << "primary");
     auto rps = parse(rpsObj);
     ASSERT_TRUE(rps.pref == ReadPreference::PrimaryOnly);
     ASSERT_FALSE(rps.isPretargeted);
 
     // $_isPretargeted true.
-    rpsObj = BSON("mode"
-                  << "secondary"
-                  << "$_isPretargeted" << true);
+    rpsObj = BSON("mode" << "secondary"
+                         << "$_isPretargeted" << true);
     rps = parse(rpsObj);
     ASSERT_TRUE(rps.pref == ReadPreference::SecondaryOnly);
     ASSERT_TRUE(rps.isPretargeted);
@@ -197,10 +173,7 @@ void checkParseContainerFailsWithError(const BSONObj& rpsObj, ErrorCodes::Error 
 }
 
 TEST(ReadPreferenceSetting, NonEquality) {
-    auto tagSet = TagSet(BSON_ARRAY(BSON("dc"
-                                         << "ca")
-                                    << BSON("foo"
-                                            << "bar")));
+    auto tagSet = TagSet(BSON_ARRAY(BSON("dc" << "ca") << BSON("foo" << "bar")));
     auto hedgingMode = HedgingMode();
     hedgingMode.setEnabled(false);
     auto rps =
@@ -228,75 +201,59 @@ TEST(ReadPreferenceSetting, NonEquality) {
 
 TEST(ReadPreferenceSetting, ParseInvalid) {
     // mode primary can not have tags
-    checkParseFails(BSON("mode"
-                         << "primary"
-                         << "tags"
-                         << BSON_ARRAY(BSON("foo"
-                                            << "bar"))));
+    checkParseFails(BSON("mode" << "primary"
+                                << "tags" << BSON_ARRAY(BSON("foo" << "bar"))));
     // bad mode
-    checkParseFails(BSON("mode"
-                         << "khalesi"));
+    checkParseFails(BSON("mode" << "khalesi"));
 
     // no mode
-    checkParseFails(BSON("foo"
-                         << "bar"));
+    checkParseFails(BSON("foo" << "bar"));
 
     // tags not an array
-    checkParseFails(BSON("mode"
-                         << "nearest"
-                         << "tags"
-                         << "bad"));
+    checkParseFails(BSON("mode" << "nearest"
+                                << "tags"
+                                << "bad"));
 
     // maxStalenessSeconds is negative
-    checkParseFails(BSON("mode"
-                         << "secondary"
-                         << "maxStalenessSeconds" << -1));
+    checkParseFails(BSON("mode" << "secondary"
+                                << "maxStalenessSeconds" << -1));
 
     // maxStalenessSeconds is NaN
-    checkParseFails(BSON("mode"
-                         << "secondary"
-                         << "maxStalenessSeconds"
-                         << "ONE"));
+    checkParseFails(BSON("mode" << "secondary"
+                                << "maxStalenessSeconds"
+                                << "ONE"));
 
     // maxStalenessSeconds and primary
-    checkParseFails(BSON("mode"
-                         << "primary"
-                         << "maxStalenessSeconds" << kMinMaxStaleness.count()));
+    checkParseFails(BSON("mode" << "primary"
+                                << "maxStalenessSeconds" << kMinMaxStaleness.count()));
 
     // maxStalenessSeconds is less than min
-    checkParseFailsWithError(BSON("mode"
-                                  << "primary"
-                                  << "maxStalenessSeconds"
-                                  << Seconds(kMinMaxStaleness.count() - 1).count()),
+    checkParseFailsWithError(BSON("mode" << "primary"
+                                         << "maxStalenessSeconds"
+                                         << Seconds(kMinMaxStaleness.count() - 1).count()),
                              ErrorCodes::MaxStalenessOutOfRange);
 
     // maxStalenessSeconds is greater than max
-    checkParseFails(BSON("mode"
-                         << "secondary"
-                         << "maxStalenessSeconds" << Seconds::max().count()));
+    checkParseFails(BSON("mode" << "secondary"
+                                << "maxStalenessSeconds" << Seconds::max().count()));
 
     // Hedging is not supported for read preference mode "primary".
-    checkParseFailsWithError(BSON("mode"
-                                  << "primary"
-                                  << "hedge" << BSONObj()),
+    checkParseFailsWithError(BSON("mode" << "primary"
+                                         << "hedge" << BSONObj()),
                              ErrorCodes::InvalidOptions);
 
-    checkParseContainerFailsWithError(BSON("abc" << BSON("pang"
-                                                         << "pong")
-                                                 << "$readPreference" << 2),
-                                      ErrorCodes::TypeMismatch);
+    checkParseContainerFailsWithError(
+        BSON("abc" << BSON("pang" << "pong") << "$readPreference" << 2), ErrorCodes::TypeMismatch);
 
     // $_isPretargeted false.
-    checkParseFailsWithError(BSON("mode"
-                                  << "nearest"
-                                  << "$_isPretargeted" << false),
+    checkParseFailsWithError(BSON("mode" << "nearest"
+                                         << "$_isPretargeted" << false),
                              ErrorCodes::InvalidOptions);
 
     // $_isPretargeted wrong type.
-    checkParseFailsWithError(BSON("mode"
-                                  << "primaryPreferred"
-                                  << "$_isPretargeted"
-                                  << "foo"),
+    checkParseFailsWithError(BSON("mode" << "primaryPreferred"
+                                         << "$_isPretargeted"
+                                         << "foo"),
                              ErrorCodes::TypeMismatch);
 }
 
@@ -307,36 +264,29 @@ void checkRoundtrip(const ReadPreferenceSetting& rps) {
 }
 
 TEST(ReadPreferenceSetting, Roundtrip) {
-    checkRoundtrip(ReadPreferenceSetting(ReadPreference::SecondaryOnly,
-                                         TagSet(BSON_ARRAY(BSON("dc"
-                                                                << "ca")
-                                                           << BSON("foo"
-                                                                   << "bar")))));
+    checkRoundtrip(
+        ReadPreferenceSetting(ReadPreference::SecondaryOnly,
+                              TagSet(BSON_ARRAY(BSON("dc" << "ca") << BSON("foo" << "bar")))));
     checkRoundtrip(ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     checkRoundtrip(ReadPreferenceSetting(ReadPreference::PrimaryPreferred, TagSet()));
 
     checkRoundtrip(ReadPreferenceSetting(ReadPreference::SecondaryOnly,
-                                         TagSet(BSON_ARRAY(BSON("dc"
-                                                                << "ca"
-                                                                << "rack"
-                                                                << "bar")))));
+                                         TagSet(BSON_ARRAY(BSON("dc" << "ca"
+                                                                     << "rack"
+                                                                     << "bar")))));
 
-    checkRoundtrip(ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
-                                         TagSet(BSON_ARRAY(BSON("dc"
-                                                                << "ca")
-                                                           << BSON("foo"
-                                                                   << "bar"))),
-                                         kMinMaxStaleness));
+    checkRoundtrip(
+        ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
+                              TagSet(BSON_ARRAY(BSON("dc" << "ca") << BSON("foo" << "bar"))),
+                              kMinMaxStaleness));
 
     auto hedgingMode = HedgingMode();
-    checkRoundtrip(ReadPreferenceSetting(ReadPreference::Nearest,
-                                         TagSet(BSON_ARRAY(BSON("dc"
-                                                                << "ca")
-                                                           << BSON("foo"
-                                                                   << "bar"))),
-                                         kMinMaxStaleness,
-                                         hedgingMode));
+    checkRoundtrip(
+        ReadPreferenceSetting(ReadPreference::Nearest,
+                              TagSet(BSON_ARRAY(BSON("dc" << "ca") << BSON("foo" << "bar"))),
+                              kMinMaxStaleness,
+                              hedgingMode));
 
     checkRoundtrip(ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
                                          TagSet(),

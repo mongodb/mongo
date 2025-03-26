@@ -122,17 +122,12 @@ TEST_F(ShardKeyIndexUtilTest, HashedKeyPattern) {
     createIndex(BSON("key" << BSON("x" << 1) << "name"
                            << "x"
                            << "v" << kIndexVersion));
-    createIndex(BSON("key" << BSON("x"
-                                   << "hashed")
-                           << "name"
+    createIndex(BSON("key" << BSON("x" << "hashed") << "name"
                            << "xhashed"
                            << "v" << kIndexVersion));
 
-    const auto index = findShardKeyPrefixedIndex(opCtx(),
-                                                 coll(),
-                                                 BSON("x"
-                                                      << "hashed"),
-                                                 true /* requireSingleKey */);
+    const auto index = findShardKeyPrefixedIndex(
+        opCtx(), coll(), BSON("x" << "hashed"), true /* requireSingleKey */);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("xhashed", index->descriptor()->indexName());
@@ -163,10 +158,7 @@ TEST_F(ShardKeyIndexUtilTest, ExcludesIncompatibleIndexes) {
                            << "v" << kIndexVersion));
     createIndex(BSON("key" << BSON("x" << 1) << "name"
                            << "collation"
-                           << "collation"
-                           << BSON("locale"
-                                   << "fr")
-                           << "v" << kIndexVersion));
+                           << "collation" << BSON("locale" << "fr") << "v" << kIndexVersion));
     createIndex(BSON("key" << BSON("x" << 1) << "name"
                            << "x"
                            << "v" << kIndexVersion));
@@ -256,32 +248,21 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithNonExistingIndex) {
 }
 
 TEST_F(ShardKeyIndexUtilTest, LastShardIndexExcludesHashedIndex) {
-    createIndex(BSON("key" << BSON("x"
-                                   << "hashed")
-                           << "name"
+    createIndex(BSON("key" << BSON("x" << "hashed") << "name"
                            << "xhashed"
                            << "v" << kIndexVersion));
 
-    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(opCtx(),
-                                                    coll(),
-                                                    "y",
-                                                    BSON("x"
-                                                         << "hashed")));
+    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(opCtx(), coll(), "y", BSON("x" << "hashed")));
 }
 
 TEST_F(ShardKeyIndexUtilTest, LastShardIndexExcludesCompoundHashedIndex) {
-    createIndex(BSON("key" << BSON("x"
-                                   << "hashed"
-                                   << "y" << 1)
+    createIndex(BSON("key" << BSON("x" << "hashed"
+                                       << "y" << 1)
                            << "name"
                            << "xhashed"
                            << "v" << kIndexVersion));
 
-    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(opCtx(),
-                                                    coll(),
-                                                    "y",
-                                                    BSON("x"
-                                                         << "hashed")));
+    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(opCtx(), coll(), "y", BSON("x" << "hashed")));
 }
 
 }  // namespace

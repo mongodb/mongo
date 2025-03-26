@@ -51,7 +51,7 @@ public:
                                                SimpleMemoryUsageTracker* memTracker,
                                                std::pair<Value, Value> sMinAndsMax)
         : WindowFunctionExecNonRemovableCommon(iter, input, upperDocumentBound, memTracker),
-          _sMinAndsMax(sMinAndsMax.first, sMinAndsMax.second){};
+          _sMinAndsMax(sMinAndsMax.first, sMinAndsMax.second) {};
 
     void updateWindow(const Value& input) final {
         _windowMinAndMax.update(input);

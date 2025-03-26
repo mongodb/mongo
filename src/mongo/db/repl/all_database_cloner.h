@@ -83,7 +83,7 @@ private:
     class ConnectStage : public ClonerStage<AllDatabaseCloner> {
     public:
         ConnectStage(std::string name, AllDatabaseCloner* cloner, ClonerRunFn stageFunc)
-            : ClonerStage<AllDatabaseCloner>(name, cloner, stageFunc){};
+            : ClonerStage<AllDatabaseCloner>(name, cloner, stageFunc) {};
         bool checkSyncSourceValidityOnRetry() final {
             return false;
         }

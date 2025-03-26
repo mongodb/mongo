@@ -496,13 +496,11 @@ AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
     // Stage 1. Join config.collections and config.chunks using the collection UUID to create the
     // placement-by-shard info documents
     {
-        auto lookupPipelineObj = PipelineBuilder(pipeline.getExpCtx())
-                                     .addStage<Group>(BSON("_id"
-                                                           << "$shard"
-                                                           << "value"
-                                                           << BSON("$max"
-                                                                   << "$onCurrentShardSince")))
-                                     .buildAsBson();
+        auto lookupPipelineObj =
+            PipelineBuilder(pipeline.getExpCtx())
+                .addStage<Group>(BSON("_id" << "$shard"
+                                            << "value" << BSON("$max" << "$onCurrentShardSince")))
+                .buildAsBson();
 
         pipeline.addStage<Lookup>(BSON("from" << NamespaceString::kConfigsvrChunksNamespace.coll()
                                               << "localField" << CollectionType::kUuidFieldName
@@ -516,10 +514,8 @@ AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
     {
         // Get the most recent collection placement timestamp among all the shards: if not found,
         // apply initTimestamp as a fallback.
-        const auto placementTimestampExpr =
-            BSON("$ifNull" << BSON_ARRAY(BSON("$max"
-                                              << "$timestampByShard.value")
-                                         << initTimestamp));
+        const auto placementTimestampExpr = BSON(
+            "$ifNull" << BSON_ARRAY(BSON("$max" << "$timestampByShard.value") << initTimestamp));
 
         pipeline.addStage<Project>(BSON("_id" << 0 << kNss << "$_id" << kShards
                                               << "$timestampByShard._id" << kUuid << 1 << kTimestamp
@@ -1551,10 +1547,8 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
                                     {NamespaceString::kConfigsvrPlacementHistoryNamespace});
 
     pipeline.addStage<DocumentSourceGroup>(
-        BSON("_id"
-             << "$" + NamespacePlacementType::kNssFieldName << "mostRecentTimestamp"
-             << BSON("$max"
-                     << "$" + NamespacePlacementType::kTimestampFieldName)));
+        BSON("_id" << "$" + NamespacePlacementType::kNssFieldName << "mostRecentTimestamp"
+                   << BSON("$max" << "$" + NamespacePlacementType::kTimestampFieldName)));
     pipeline.addStage<DocumentSourceMatch>(
         BSON("_id" << BSON("$ne" << NamespaceStringUtil::serialize(
                                ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,

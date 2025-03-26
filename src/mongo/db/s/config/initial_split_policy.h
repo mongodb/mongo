@@ -264,7 +264,7 @@ public:
     // Interface to faciliate testing
     class SampleDocumentSource {
     public:
-        virtual ~SampleDocumentSource(){};
+        virtual ~SampleDocumentSource() {};
         virtual boost::optional<BSONObj> getNext() = 0;
         virtual Pipeline* getPipeline_forTest() = 0;
     };

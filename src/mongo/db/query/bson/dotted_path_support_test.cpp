@@ -578,9 +578,7 @@ TEST(ExtractAllElementsAlongPath, DoesExpandMultiplePositionalPathSpecifications
     dps::extractAllElementsAlongPath(
         obj, "a.1.0.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
-    assertBSONElementSetsAreEqual({BSON(""
-                                        << "(1, 0)")},
-                                  actualElements);
+    assertBSONElementSetsAreEqual({BSON("" << "(1, 0)")}, actualElements);
     assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
 }
 
@@ -606,11 +604,7 @@ TEST(ExtractAllElementsAlongPath, DoesExpandArrayFoundAfterPositionalSpecificati
     dps::extractAllElementsAlongPath(
         obj, "a.1.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
-    assertBSONElementSetsAreEqual({BSON(""
-                                        << "(1, 0)"),
-                                   BSON(""
-                                        << "(1, 1)")},
-                                  actualElements);
+    assertBSONElementSetsAreEqual({BSON("" << "(1, 0)"), BSON("" << "(1, 1)")}, actualElements);
     assertArrayComponentsAreEqual({1U}, actualArrayComponents);
 }
 
@@ -723,9 +717,7 @@ TEST(ExtractElementAtPathOrArrayAlongPath, FieldWithDotsDontHideNestedObjects) {
     dps::extractAllElementsAlongPath(
         obj, "b.c", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
-    assertBSONElementSetsAreEqual({BSON("c"
-                                        << "foo")},
-                                  actualElements);
+    assertBSONElementSetsAreEqual({BSON("c" << "foo")}, actualElements);
     assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
 }
 

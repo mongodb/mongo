@@ -121,11 +121,10 @@ public:
         pushResponse(BSON("ok" << 1));
 
         // Call clientAuthenticate()
-        return BSON("mechanism"
-                    << "MONGODB-X509"
-                    << "db"
-                    << "$external"
-                    << "user" << _username);
+        return BSON("mechanism" << "MONGODB-X509"
+                                << "db"
+                                << "$external"
+                                << "user" << _username);
     }
 
 

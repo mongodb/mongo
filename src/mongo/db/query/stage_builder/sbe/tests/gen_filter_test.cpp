@@ -161,8 +161,7 @@ TEST_F(GoldenGenFilternTest, TestSimpleExpr) {
     {
         InMatchExpression inExpr("str"_sd);
         ASSERT_OK(inExpr.addRegex(std::make_unique<RegexMatchExpression>(""_sd, "ABc", "i")));
-        BSONArray arr = BSON_ARRAY("3"
-                                   << "4" << BSONNULL);
+        BSONArray arr = BSON_ARRAY("3" << "4" << BSONNULL);
         ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
         runTest(&inExpr,
                 rootSlot,

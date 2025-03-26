@@ -232,7 +232,7 @@ public:
 
 class StorageEngineTestNotEphemeral : public StorageEngineTest {
 public:
-    StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.inMemory(false)){};
+    StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.inMemory(false)) {};
 };
 
 }  // namespace mongo

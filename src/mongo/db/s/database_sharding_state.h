@@ -256,7 +256,7 @@ public:
 private:
     struct DbMetadataRefresh {
         DbMetadataRefresh(SharedSemiFuture<void> future, CancellationSource cancellationSource)
-            : future(std::move(future)), cancellationSource(std::move(cancellationSource)){};
+            : future(std::move(future)), cancellationSource(std::move(cancellationSource)) {};
 
         // Tracks the ongoing database metadata refresh.
         SharedSemiFuture<void> future;

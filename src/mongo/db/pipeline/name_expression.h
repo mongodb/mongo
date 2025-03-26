@@ -59,7 +59,7 @@ class BSONElement;
 class NameExpression {
 public:
     NameExpression() = default;
-    NameExpression(const std::string& name) : NameExpression(BSON("" << name).firstElement()){};
+    NameExpression(const std::string& name) : NameExpression(BSON("" << name).firstElement()) {};
     NameExpression(const BSONElement& nameElem);
     NameExpression(const NameExpression&) = default;
     NameExpression(NameExpression&& other)

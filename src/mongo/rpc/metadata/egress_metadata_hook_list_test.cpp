@@ -105,9 +105,7 @@ TEST(EgressMetadataHookListTest, SingleHook) {
 
     BSONObjBuilder builder;
     ASSERT_OK(hookList.writeRequestMetadata(nullptr, &builder));
-    ASSERT_BSONOBJ_EQ(BSON("h1"
-                           << ""),
-                      builder.obj());
+    ASSERT_BSONOBJ_EQ(BSON("h1" << ""), builder.obj());
 
     BSONObj testObj(BSON("x" << 1));
     ASSERT_OK(hookList.readReplyMetadata(nullptr, testObj));
@@ -126,10 +124,9 @@ TEST(EgressMetadataHookListTest, MultipleHooks) {
 
     BSONObjBuilder builder;
     ASSERT_OK(hookList.writeRequestMetadata(nullptr, &builder));
-    ASSERT_BSONOBJ_EQ(BSON("foo"
-                           << ""
-                           << "bar"
-                           << ""),
+    ASSERT_BSONOBJ_EQ(BSON("foo" << ""
+                                 << "bar"
+                                 << ""),
                       builder.obj());
 
     BSONObj testObj(BSON("x" << 1));

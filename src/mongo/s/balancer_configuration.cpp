@@ -105,37 +105,25 @@ const char kAttemptToBalanceJumboChunks[] = "attemptToBalanceJumboChunks";
 
 const char BalancerSettingsType::kKey[] = "balancer";
 const std::vector<std::string> BalancerSettingsType::kBalancerModes = {"full", "off"};
-const BSONObj BalancerSettingsType::kSchema =
-    BSON("properties" << BSON("_id" << BSON("enum" << BSON_ARRAY(BalancerSettingsType::kKey))
-                                    << kMode << BSON("enum" << kBalancerModes) << kStopped
-                                    << BSON("bsonType"
-                                            << "bool")
-                                    << kActiveWindow
-                                    << BSON("bsonType"
-                                            << "object"
-                                            << "required"
-                                            << BSON_ARRAY("start"
-                                                          << "stop"))
-                                    << "_secondaryThrottle"
-                                    << BSON("oneOf" << BSON_ARRAY(BSON("bsonType"
-                                                                       << "bool")
-                                                                  << BSON("bsonType"
-                                                                          << "object")))
-                                    << kWaitForDelete
-                                    << BSON("bsonType"
-                                            << "bool")
-                                    << kAttemptToBalanceJumboChunks
-                                    << BSON("bsonType"
-                                            << "bool"))
-                      << "additionalProperties" << false);
+const BSONObj BalancerSettingsType::kSchema = BSON(
+    "properties" << BSON("_id" << BSON("enum" << BSON_ARRAY(BalancerSettingsType::kKey)) << kMode
+                               << BSON("enum" << kBalancerModes) << kStopped
+                               << BSON("bsonType" << "bool") << kActiveWindow
+                               << BSON("bsonType" << "object"
+                                                  << "required" << BSON_ARRAY("start" << "stop"))
+                               << "_secondaryThrottle"
+                               << BSON("oneOf" << BSON_ARRAY(BSON("bsonType" << "bool")
+                                                             << BSON("bsonType" << "object")))
+                               << kWaitForDelete << BSON("bsonType" << "bool")
+                               << kAttemptToBalanceJumboChunks << BSON("bsonType" << "bool"))
+                 << "additionalProperties" << false);
 
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
 const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{128 * 1024 * 1024};
 const BSONObj ChunkSizeSettingsType::kSchema = BSON(
     "properties" << BSON("_id" << BSON("enum" << BSON_ARRAY(ChunkSizeSettingsType::kKey)) << kValue
-                               << BSON("bsonType"
-                                       << "number"
-                                       << "minimum" << 1 << "maximum" << 1024))
+                               << BSON("bsonType" << "number"
+                                                  << "minimum" << 1 << "maximum" << 1024))
                  << "additionalProperties" << false);
 
 const char AutoMergeSettingsType::kKey[] = "automerge";

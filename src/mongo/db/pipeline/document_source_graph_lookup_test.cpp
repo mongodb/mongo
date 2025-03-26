@@ -813,16 +813,15 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
     RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
-    auto originalBSON = BSON("$graphLookup" << BSON("from"
-                                                    << "foo"
-                                                    << "startWith"
-                                                    << "$x"
-                                                    << "connectFromField"
-                                                    << "id"
-                                                    << "connectToField"
-                                                    << "id"
-                                                    << "as"
-                                                    << "connections"));
+    auto originalBSON = BSON("$graphLookup" << BSON("from" << "foo"
+                                                           << "startWith"
+                                                           << "$x"
+                                                           << "connectFromField"
+                                                           << "id"
+                                                           << "connectToField"
+                                                           << "id"
+                                                           << "as"
+                                                           << "connections"));
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         expCtx->getNamespaceString().dbName(), _targetColl);
@@ -848,16 +847,15 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
     expCtx->setResolvedNamespaces(
         ResolvedNamespaceMap{{graphLookupNs, {graphLookupNs, std::vector<BSONObj>()}}});
 
-    auto spec = BSON("$graphLookup" << BSON("from"
-                                            << "foo"
-                                            << "startWith"
-                                            << "$x"
-                                            << "connectFromField"
-                                            << "id"
-                                            << "connectToField"
-                                            << "id"
-                                            << "as"
-                                            << "connections"));
+    auto spec = BSON("$graphLookup" << BSON("from" << "foo"
+                                                   << "startWith"
+                                                   << "$x"
+                                                   << "connectFromField"
+                                                   << "id"
+                                                   << "connectToField"
+                                                   << "id"
+                                                   << "as"
+                                                   << "connections"));
     auto graphLookupStage = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), expCtx);
     auto pipeline =
         Pipeline::create({DocumentSourceMock::createForTest(expCtx), graphLookupStage}, expCtx);

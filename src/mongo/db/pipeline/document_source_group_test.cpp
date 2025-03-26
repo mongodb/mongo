@@ -177,8 +177,7 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
     const size_t maxMemoryUsageBytes = 1000;
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
-    auto accumulatorArg = BSON(""
-                               << "$largeStr");
+    auto accumulatorArg = BSON("" << "$largeStr");
     auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement pushStatement{"spaceHog", accExpr};
     auto groupByExpression =
@@ -220,8 +219,7 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
                                 // This is the only way to do this in a debug build.
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
-    auto accumulatorArg = BSON(""
-                               << "$largeStr");
+    auto accumulatorArg = BSON("" << "$largeStr");
     auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement pushStatement{"spaceHog", accExpr};
     auto groupByExpression =
@@ -246,8 +244,7 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
                                 // This is the only way to do this in a debug build.
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
-    auto accumulatorArg = BSON(""
-                               << "$largeStr");
+    auto accumulatorArg = BSON("" << "$largeStr");
     auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement pushStatement{"spaceHog", accExpr};
     auto groupByExpression =
@@ -550,29 +547,13 @@ TEST_F(DocumentSourceGroupTest, MemoryTracking) {
     // Pause between input docs so we have a chance to check memory tracking.
     auto mock = DocumentSourceMock::createForTest(
         {
-            Document{{"_id", 0},
-                     {"k", 10},
-                     {"arr",
-                      BSON_ARRAY("foo"_sd
-                                 << "bar"_sd)}},
+            Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
             DocumentSource::GetNextResult::makePauseExecution(),
-            Document{{"_id", 1},
-                     {"k", 10},
-                     {"arr",
-                      BSON_ARRAY("baz"_sd
-                                 << "mongo"_sd)}},
+            Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"_sd << "mongo"_sd)}},
             DocumentSource::GetNextResult::makePauseExecution(),
-            Document{{"_id", 2},
-                     {"k", 20},
-                     {"arr",
-                      BSON_ARRAY("bird"_sd
-                                 << "elephant"_sd)}},
+            Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"_sd << "elephant"_sd)}},
             DocumentSource::GetNextResult::makePauseExecution(),
-            Document{{"_id", 3},
-                     {"k", 20},
-                     {"arr",
-                      BSON_ARRAY("dog"_sd
-                                 << "giraffe"_sd)}},
+            Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"_sd << "giraffe"_sd)}},
         },
         expCtx);
 
@@ -832,8 +813,7 @@ class IdObjectExpression : public ExpressionBase {
         return BSON("a" << 6);
     }
     BSONObj spec() override {
-        return BSON("_id" << BSON("z"
-                                  << "$a"));
+        return BSON("_id" << BSON("z" << "$a"));
     }
     BSONObj expected() override {
         return BSON("_id" << BSON("z" << 6));
@@ -857,16 +837,14 @@ class TwoIdSpecs : public ParseErrorBase {
 /** $group _id is the empty string. */
 class IdEmptyString : public IdConstantBase {
     BSONObj spec() override {
-        return BSON("_id"
-                    << "");
+        return BSON("_id" << "");
     }
 };
 
 /** $group _id is a std::string constant. */
 class IdStringConstant : public IdConstantBase {
     BSONObj spec() override {
-        return BSON("_id"
-                    << "abc");
+        return BSON("_id" << "abc");
     }
 };
 
@@ -876,8 +854,7 @@ class IdFieldPath : public ExpressionBase {
         return BSON("a" << 5);
     }
     BSONObj spec() override {
-        return BSON("_id"
-                    << "$a");
+        return BSON("_id" << "$a");
     }
     BSONObj expected() override {
         return BSON("_id" << 5);
@@ -887,8 +864,7 @@ class IdFieldPath : public ExpressionBase {
 /** $group with _id set to an invalid field path. */
 class IdInvalidFieldPath : public ParseErrorBase {
     BSONObj spec() override {
-        return BSON("_id"
-                    << "$a..");
+        return BSON("_id" << "$a..");
     }
 };
 
@@ -974,9 +950,7 @@ class AggregateObjectExpression : public ExpressionBase {
         return BSON("a" << 6);
     }
     BSONObj spec() override {
-        return BSON("_id" << 0 << "z"
-                          << BSON("$first" << BSON("x"
-                                                   << "$a")));
+        return BSON("_id" << 0 << "z" << BSON("$first" << BSON("x" << "$a")));
     }
     BSONObj expected() override {
         return BSON("_id" << 0 << "z" << BSON("x" << 6));
@@ -989,9 +963,7 @@ class AggregateOperatorExpression : public ExpressionBase {
         return BSON("a" << 6);
     }
     BSONObj spec() override {
-        return BSON("_id" << 0 << "z"
-                          << BSON("$first"
-                                  << "$a"));
+        return BSON("_id" << 0 << "z" << BSON("$first" << "$a"));
     }
     BSONObj expected() override {
         return BSON("_id" << 0 << "z" << 6);
@@ -1092,9 +1064,7 @@ class SingleDocument : public CheckResultsBase {
         return {DOC("a" << 1)};
     }
     BSONObj groupSpec() override {
-        return BSON("_id" << 0 << "a"
-                          << BSON("$sum"
-                                  << "$a"));
+        return BSON("_id" << 0 << "a" << BSON("$sum" << "$a"));
     }
     std::string expectedResultSetString() override {
         return "[{_id:0,a:1}]";
@@ -1107,9 +1077,7 @@ class TwoValuesSingleKey : public CheckResultsBase {
         return {DOC("a" << 1), DOC("a" << 2)};
     }
     BSONObj groupSpec() override {
-        return BSON("_id" << 0 << "a"
-                          << BSON("$push"
-                                  << "$a"));
+        return BSON("_id" << 0 << "a" << BSON("$push" << "$a"));
     }
     std::string expectedResultSetString() override {
         return "[{_id:0,a:[1,2]}]";
@@ -1122,11 +1090,8 @@ class TwoValuesTwoKeys : public CheckResultsBase {
         return {DOC("_id" << 0 << "a" << 1), DOC("_id" << 1 << "a" << 2)};
     }
     BSONObj groupSpec() override {
-        return BSON("_id"
-                    << "$_id"
-                    << "a"
-                    << BSON("$push"
-                            << "$a"));
+        return BSON("_id" << "$_id"
+                          << "a" << BSON("$push" << "$a"));
     }
     std::string expectedResultSetString() override {
         return "[{_id:0,a:[1]},{_id:1,a:[2]}]";
@@ -1142,11 +1107,8 @@ class FourValuesTwoKeys : public CheckResultsBase {
                 DOC("id" << 1 << "a" << 4)};
     }
     BSONObj groupSpec() override {
-        return BSON("_id"
-                    << "$id"
-                    << "a"
-                    << BSON("$push"
-                            << "$a"));
+        return BSON("_id" << "$id"
+                          << "a" << BSON("$push" << "$a"));
     }
     std::string expectedResultSetString() override {
         return "[{_id:0,a:[1,3]},{_id:1,a:[2,4]}]";
@@ -1162,12 +1124,9 @@ class FourValuesTwoKeysTwoAccumulators : public CheckResultsBase {
                 DOC("id" << 1 << "a" << 4)};
     }
     BSONObj groupSpec() override {
-        return BSON("_id"
-                    << "$id"
-                    << "list"
-                    << BSON("$push"
-                            << "$a")
-                    << "sum" << BSON("$sum" << BSON("$divide" << BSON_ARRAY("$a" << 2))));
+        return BSON("_id" << "$id"
+                          << "list" << BSON("$push" << "$a") << "sum"
+                          << BSON("$sum" << BSON("$divide" << BSON_ARRAY("$a" << 2))));
     }
     std::string expectedResultSetString() override {
         return "[{_id:0,list:[1,3],sum:2},{_id:1,list:[2,4],sum:3}]";
@@ -1180,11 +1139,8 @@ class GroupNullUndefinedIds : public CheckResultsBase {
         return {DOC("a" << BSONNULL << "b" << 100), DOC("b" << 10)};
     }
     BSONObj groupSpec() override {
-        return BSON("_id"
-                    << "$a"
-                    << "sum"
-                    << BSON("$sum"
-                            << "$b"));
+        return BSON("_id" << "$a"
+                          << "sum" << BSON("$sum" << "$b"));
     }
     std::string expectedResultSetString() override {
         return "[{_id:null,sum:110}]";
@@ -1194,28 +1150,25 @@ class GroupNullUndefinedIds : public CheckResultsBase {
 /** A complex _id expression. */
 class ComplexId : public CheckResultsBase {
     std::deque<DocumentSource::GetNextResult> inputData() override {
-        return {DOC("a"
-                    << "de"_sd
-                    << "b"
-                    << "ad"_sd
-                    << "c"
-                    << "beef"_sd
-                    << "d"
-                    << ""_sd),
-                DOC("a"
-                    << "d"_sd
-                    << "b"
-                    << "eadbe"_sd
-                    << "c"
-                    << ""_sd
-                    << "d"
-                    << "ef"_sd)};
+        return {DOC("a" << "de"_sd
+                        << "b"
+                        << "ad"_sd
+                        << "c"
+                        << "beef"_sd
+                        << "d"
+                        << ""_sd),
+                DOC("a" << "d"_sd
+                        << "b"
+                        << "eadbe"_sd
+                        << "c"
+                        << ""_sd
+                        << "d"
+                        << "ef"_sd)};
     }
     BSONObj groupSpec() override {
-        return BSON("_id" << BSON("$concat" << BSON_ARRAY("$a"
-                                                          << "$b"
-                                                          << "$c"
-                                                          << "$d")));
+        return BSON("_id" << BSON("$concat" << BSON_ARRAY("$a" << "$b"
+                                                               << "$c"
+                                                               << "$d")));
     }
     std::string expectedResultSetString() override {
         return "[{_id:'deadbeef'}]";
@@ -1228,9 +1181,7 @@ class UndefinedAccumulatorValue : public CheckResultsBase {
         return {Document()};
     }
     BSONObj groupSpec() override {
-        return BSON("_id" << 0 << "first"
-                          << BSON("$first"
-                                  << "$missing"));
+        return BSON("_id" << 0 << "first" << BSON("$first" << "$missing"));
     }
     std::string expectedResultSetString() override {
         return "[{_id:0, first:null}]";
@@ -1248,11 +1199,8 @@ public:
                                                         ctx());
 
         // Create a group source.
-        createGroup(BSON("_id"
-                         << "$x"
-                         << "list"
-                         << BSON("$push"
-                                 << "$y")));
+        createGroup(BSON("_id" << "$x"
+                               << "list" << BSON("$push" << "$y")));
         // Create a merger version of the source.
         boost::intrusive_ptr<DocumentSource> group = createMerger();
         // Attach the merger to the synthetic shard results.
@@ -1335,12 +1283,9 @@ private:
                 Document(BSON("a" << 2 << "b" << 1))};
     }
     BSONObj groupSpec() final {
-        return BSON("_id"
-                    << "$a"
-                    << "sum"
-                    << BSON("$sum"
-                            << "$b")
-                    << "$monotonicIdFields" << BSON_ARRAY("_id"));
+        return BSON("_id" << "$a"
+                          << "sum" << BSON("$sum" << "$b") << "$monotonicIdFields"
+                          << BSON_ARRAY("_id"));
     }
     std::string expectedResultSetString() final {
         return "[{_id:1,sum:3},{_id:2,sum:4}]";
@@ -1425,14 +1370,11 @@ private:
     }
 
     BSONObj groupSpec() final {
-        auto id = BSON("x"
-                       << "$x"
-                       << "y"
-                       << "$y");
-        return BSON("_id" << id << "big_array"
-                          << BSON("$push"
-                                  << "$b")
-                          << "$monotonicIdFields" << BSON_ARRAY("x"));
+        auto id = BSON("x" << "$x"
+                           << "y"
+                           << "$y");
+        return BSON("_id" << id << "big_array" << BSON("$push" << "$b") << "$monotonicIdFields"
+                          << BSON_ARRAY("x"));
     }
 
     boost::optional<int64_t> getMaxMemoryUsageBytes() final {
@@ -1476,12 +1418,9 @@ private:
     }
 
     BSONObj groupSpec() final {
-        return BSON("_id"
-                    << "$a"
-                    << "big_array"
-                    << BSON("$push"
-                            << "$b")
-                    << "$monotonicIdFields" << BSON_ARRAY("_id"));
+        return BSON("_id" << "$a"
+                          << "big_array" << BSON("$push" << "$b") << "$monotonicIdFields"
+                          << BSON_ARRAY("_id"));
     }
 
     boost::optional<int64_t> getMaxMemoryUsageBytes() final {
@@ -1521,14 +1460,11 @@ private:
     }
 
     BSONObj groupSpec() final {
-        BSONObj id = BSON("x"
-                          << "$x"
-                          << "y"
-                          << "$y");
-        return BSON("_id" << id << "sum"
-                          << BSON("$sum"
-                                  << "$z")
-                          << "$monotonicIdFields" << BSON_ARRAY("x"));
+        BSONObj id = BSON("x" << "$x"
+                              << "y"
+                              << "$y");
+        return BSON("_id" << id << "sum" << BSON("$sum" << "$z") << "$monotonicIdFields"
+                          << BSON_ARRAY("x"));
     }
 
     boost::optional<int64_t> getMaxMemoryUsageBytes() final {

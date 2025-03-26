@@ -1067,9 +1067,8 @@ void CheckCommandMsgIdlParsingForOpMsgRequest(bool simulateAtlasProxyTenantProto
     const TenantId tenantId(OID::gen());
     const std::string dbString =
         simulateAtlasProxyTenantProtocol ? (tenantId.toString() + "_testDb") : "testDb";
-    auto cmd = BSON("insert"
-                    << "bar"
-                    << "$db" << dbString << "documents" << BSON_ARRAY(BSONObj()));
+    auto cmd = BSON("insert" << "bar"
+                             << "$db" << dbString << "documents" << BSON_ARRAY(BSONObj()));
     OpMsgRequest msg;
     msg.body = cmd;
     auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(

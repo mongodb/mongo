@@ -202,22 +202,20 @@ TEST_F(SBEReplaceOneExprTest, BsonStrings) {
     };
 
     // Test find and replace string.
-    auto bson = BSON("in"
-                     << "this is a string"
-                     << "find"
-                     << "is"
-                     << "replace"
-                     << "at");
+    auto bson = BSON("in" << "this is a string"
+                          << "find"
+                          << "is"
+                          << "replace"
+                          << "at");
     bindSlots(bson);
     runAndAssertExpression(compiledExpr.get(), "that is a string");
 
     // Test not finding string.
-    bson = BSON("in"
-                << "this is a string"
-                << "find"
-                << "at"
-                << "replace"
-                << "is");
+    bson = BSON("in" << "this is a string"
+                     << "find"
+                     << "at"
+                     << "replace"
+                     << "is");
     bindSlots(bson);
     runAndAssertExpression(compiledExpr.get(), "this is a string");
 }

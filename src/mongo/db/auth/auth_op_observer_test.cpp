@@ -145,10 +145,9 @@ public:
                                         "v2read",
                                         "test",
                                         credentials,
-                                        BSON_ARRAY(BSON("role"
-                                                        << "read"
-                                                        << "db"
-                                                        << "test")));
+                                        BSON_ARRAY(BSON("role" << "read"
+                                                               << "db"
+                                                               << "test")));
     }
 
     void doInsert(const NamespaceString& nss,
@@ -319,10 +318,9 @@ TEST_F(AuthOpObserverTest, OnUpdate) {
                                               "v2read",
                                               "test",
                                               credentials,
-                                              BSON_ARRAY(BSON("role"
-                                                              << "readwrite"
-                                                              << "db"
-                                                              << "test")));
+                                              BSON_ARRAY(BSON("role" << "readwrite"
+                                                                     << "db"
+                                                                     << "test")));
 
     doUpdate(usersNss, userDocument, updatedUserDoc, true);
 
@@ -332,8 +330,7 @@ TEST_F(AuthOpObserverTest, OnUpdate) {
 
 TEST_F(AuthOpObserverTest, OnDelete) {
     // Deleting a user document should trigger cache invalidation after the WUOW commits.
-    auto userDoc = BSON("_id"
-                        << "admin.v2read");
+    auto userDoc = BSON("_id" << "admin.v2read");
     doDelete(usersNss, userDoc, true);
 
     // Deleting a random document in the test collection should not trigger cache invalidation.

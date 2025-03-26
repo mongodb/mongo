@@ -227,31 +227,28 @@ public:
         ASSERT_OK(authzBackend->insert(
             opCtx.get(),
             NamespaceString::createNamespaceString_forTest("admin.system.users"),
-            BSON("_id"
-                 << "test.sajack"
-                 << "user"
-                 << "sajack"
-                 << "db"
-                 << "test"
-                 << "credentials"
-                 << BSON("SCRAM-SHA-256"
-                         << scram::Secrets<SHA256Block>::generateCredentials("sajack‍", 15000))
-                 << "roles" << BSONArray()),
+            BSON("_id" << "test.sajack"
+                       << "user"
+                       << "sajack"
+                       << "db"
+                       << "test"
+                       << "credentials"
+                       << BSON("SCRAM-SHA-256" << scram::Secrets<SHA256Block>::generateCredentials(
+                                   "sajack‍", 15000))
+                       << "roles" << BSONArray()),
             BSONObj()));
 
 
-        ASSERT_OK(authzBackend->insert(opCtx.get(),
-                                       NamespaceString::createNamespaceString_forTest(
-                                           "admin.system.users"),
-                                       BSON("_id"
-                                            << "$external.sajack"
-                                            << "user"
-                                            << "sajack"
-                                            << "db"
-                                            << "$external"
-                                            << "credentials" << BSON("external" << true) << "roles"
-                                            << BSONArray()),
-                                       BSONObj()));
+        ASSERT_OK(authzBackend->insert(
+            opCtx.get(),
+            NamespaceString::createNamespaceString_forTest("admin.system.users"),
+            BSON("_id" << "$external.sajack"
+                       << "user"
+                       << "sajack"
+                       << "db"
+                       << "$external"
+                       << "credentials" << BSON("external" << true) << "roles" << BSONArray()),
+            BSONObj()));
 
         std::unique_ptr<UserRequest> systemLocal =
             std::make_unique<UserRequestGeneral>(UserName("__system"_sd, "local"_sd), boost::none);
@@ -346,13 +343,11 @@ TEST_F(MechanismRegistryTest, internalAuth) {
         SASLServerMechanismRegistry::kValidateGlobalMechanisms);
 
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), getMechsFor(internalSajack));
-    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth"
-                                                              << "BAR")),
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth" << "BAR")),
                       getMechsFor((*internalSecurity.getUser())->getName()));
 
     registry.setEnabledMechanisms({"BAR", "InternalAuth"});
-    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth"
-                                                              << "BAR")),
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth" << "BAR")),
                       getMechsFor(internalSajack));
 }
 

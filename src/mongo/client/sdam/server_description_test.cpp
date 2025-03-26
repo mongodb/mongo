@@ -278,18 +278,13 @@ protected:
                         .append("opTime", kOpTime.toBSON())
                         .obj())
             .obj();
-    static inline const auto kBsonHostNames = okBuilder()
-                                                  .append("me", "Me:1234")
-                                                  .appendArray("hosts",
-                                                               BSON_ARRAY("Foo:1234"
-                                                                          << "Bar:1234"))
-                                                  .appendArray("arbiters",
-                                                               BSON_ARRAY("Baz:1234"
-                                                                          << "Buz:1234"))
-                                                  .appendArray("passives",
-                                                               BSON_ARRAY("Biz:1234"
-                                                                          << "Boz:1234"))
-                                                  .obj();
+    static inline const auto kBsonHostNames =
+        okBuilder()
+            .append("me", "Me:1234")
+            .appendArray("hosts", BSON_ARRAY("Foo:1234" << "Bar:1234"))
+            .appendArray("arbiters", BSON_ARRAY("Baz:1234" << "Buz:1234"))
+            .appendArray("passives", BSON_ARRAY("Biz:1234" << "Boz:1234"))
+            .obj();
     static inline const auto kBsonSetVersionName =
         okBuilder().append("setVersion", 1).append("setName", "bar").obj();
     static inline const auto kBsonElectionId = okBuilder().append("electionId", OID::max()).obj();

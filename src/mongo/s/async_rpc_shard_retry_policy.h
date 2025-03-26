@@ -76,8 +76,7 @@ public:
     }
 
     BSONObj toBSON() const final {
-        return BSON("retryPolicyType"
-                    << "shardRetryPolicy");
+        return BSON("retryPolicyType" << "shardRetryPolicy");
     }
 
 private:

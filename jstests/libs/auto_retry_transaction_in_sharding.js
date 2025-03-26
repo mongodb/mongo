@@ -1,4 +1,5 @@
 import "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";

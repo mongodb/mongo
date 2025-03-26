@@ -285,9 +285,8 @@ void CollectionRoutingInfoTargeterTest::
     // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
-    auto criTargeter = prepare(BSON("a.b"
-                                    << "hashed"
-                                    << "c.d" << 1),
+    auto criTargeter = prepare(BSON("a.b" << "hashed"
+                                          << "c.d" << 1),
                                splitPoints);
     for (int i = 0; i < 1000; i++) {
         auto insertObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
@@ -329,9 +328,8 @@ void CollectionRoutingInfoTargeterTest::
                                         BSON("a.b" << hashedValueOfZero << "c.d" << -100),
                                         BSON("a.b" << hashedValueOfZero << "c.d" << 0),
                                         BSON("a.b" << hashedValueOfZero << "c.d" << 100)};
-    auto criTargeter = prepare(BSON("a.b"
-                                    << "hashed"
-                                    << "c.d" << 1),
+    auto criTargeter = prepare(BSON("a.b" << "hashed"
+                                          << "c.d" << 1),
                                splitPoints);
 
     auto res = criTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: -111}}"));
@@ -457,9 +455,8 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
     // chunk [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
-    auto criTargeter = prepare(BSON("a.b"
-                                    << "hashed"
-                                    << "c.d" << 1),
+    auto criTargeter = prepare(BSON("a.b" << "hashed"
+                                          << "c.d" << 1),
                                splitPoints);
 
     for (int i = 0; i < 1000; i++) {
@@ -591,9 +588,8 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithHashedPrefixHashedSh
     // [-2^62, 0), '2' has chunk ['0', 2^62) and '3' has chunk [2^62, MaxKey).
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << -(1LL << 62)), BSON("a.b" << 0LL), BSON("a.b" << (1LL << 62))};
-    auto criTargeter = prepare(BSON("a.b"
-                                    << "hashed"
-                                    << "c.d" << 1),
+    auto criTargeter = prepare(BSON("a.b" << "hashed"
+                                          << "c.d" << 1),
                                splitPoints);
 
     for (int i = 0; i < 1000; i++) {

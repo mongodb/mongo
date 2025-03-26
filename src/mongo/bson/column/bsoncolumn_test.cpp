@@ -4169,8 +4169,7 @@ TEST_F(BSONColumnTest, ArrayUncompressed) {
 }
 
 TEST_F(BSONColumnTest, ArrayEqual) {
-    auto elemObj = createElementArray(BSON_ARRAY("a"
-                                                 << "b"));
+    auto elemObj = createElementArray(BSON_ARRAY("a" << "b"));
     std::vector<BSONElement> elems = {elemObj, elemObj};
 
     BufBuilder expected;
@@ -8629,9 +8628,8 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
 
     BufBuilder expected;
     appendInterleavedStart(expected,
-                           BSON("root" << BSON("a"
-                                               << "asd"
-                                               << "0" << 1)));
+                           BSON("root" << BSON("a" << "asd"
+                                                   << "0" << 1)));
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {
@@ -8754,9 +8752,8 @@ TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterMerge) {
 
     BufBuilder expected;
     appendInterleavedStart(expected,
-                           BSON("root" << BSON("a"
-                                               << "asd"
-                                               << "0" << 1)));
+                           BSON("root" << BSON("a" << "asd"
+                                                   << "0" << 1)));
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {

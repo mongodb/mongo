@@ -408,9 +408,8 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
     BSONObjBuilder schema(validator.subobjStart("$jsonSchema"));
     schema.append("bsonType", "object");
     schema.append("required",
-                  BSON_ARRAY("_id"
-                             << "control"
-                             << "data"));
+                  BSON_ARRAY("_id" << "control"
+                                   << "data"));
     {
         BSONObjBuilder properties(schema.subobjStart("properties"));
         {
@@ -422,9 +421,8 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
             BSONObjBuilder control(properties.subobjStart("control"));
             control.append("bsonType", "object");
             control.append("required",
-                           BSON_ARRAY("version"
-                                      << "min"
-                                      << "max"));
+                           BSON_ARRAY("version" << "min"
+                                                << "max"));
             {
                 BSONObjBuilder innerProperties(control.subobjStart("properties"));
                 {

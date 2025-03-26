@@ -107,18 +107,15 @@ function assertWouldChangeOwningShardUpdateResult(res, expectedUpdatedDoc) {
 //
 
 // Test behaviours common to update and upsert.
-[false,
- true]
-    .forEach(function(isUpsert) {
-        // Full shard key in query matches the update document.
-        assertUpdateWorked({x: 4, y: 3, z: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
-        assertUpdateWorked({x: 4, _id: 0, z: 3, y: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
+[false, true].forEach(function(isUpsert) {
+    // Full shard key in query matches the update document.
+    assertUpdateWorked({x: 4, y: 3, z: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
+    assertUpdateWorked({x: 4, _id: 0, z: 3, y: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
 
-        // Case when upsert needs to insert a new document and the new document should belong in the
-        // same shard as the targeted shard. For non-upserts, it will be a no-op.
-        assertUpdateWorkedWithNoMatchingDoc(
-            {x: 4, y: 0, z: 0}, {x: 1, z: 3, y: 110, a: 90}, isUpsert);
-    });
+    // Case when upsert needs to insert a new document and the new document should belong in the
+    // same shard as the targeted shard. For non-upserts, it will be a no-op.
+    assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, {x: 1, z: 3, y: 110, a: 90}, isUpsert);
+});
 
 //
 // Test behaviours specific to non-upsert updates.

@@ -201,12 +201,12 @@ struct PlanCacheIndexTree {
  * TODO SERVER-90496: Deduplicate this with members in VirtualScanNode.
  */
 struct VirtualScanCacheData {
-    VirtualScanCacheData() : docs({}), hasRecordId(false), indexKeyPattern(BSONObj()){};
+    VirtualScanCacheData() : docs({}), hasRecordId(false), indexKeyPattern(BSONObj()) {};
 
     VirtualScanCacheData(const std::vector<BSONArray>& docs,
                          bool hasRecordId,
                          const BSONObj& keyPattern)
-        : docs(docs), hasRecordId(hasRecordId), indexKeyPattern(keyPattern){};
+        : docs(docs), hasRecordId(hasRecordId), indexKeyPattern(keyPattern) {};
     VirtualScanCacheData(const VirtualScanCacheData& other) = default;
 
     std::vector<BSONArray> docs;

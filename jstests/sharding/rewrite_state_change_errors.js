@@ -32,10 +32,10 @@ function merge(x, y) {
 }
 
 function runInsertScenarios(injectCodeField, extractCode, message) {
-    for (const testCase of [
-             [{}, false, "Not rewritten by default."],
-             [{allowRewriteStateChange: false}, false, "Explicitly disallowing rewrites."],
-             [{allowRewriteStateChange: true}, true, "Explicitly allowing rewrites."],
+    for (const testCase
+             of [[{}, false, "Not rewritten by default."],
+                 [{allowRewriteStateChange: false}, false, "Explicitly disallowing rewrites."],
+                 [{allowRewriteStateChange: true}, true, "Explicitly allowing rewrites."],
     ]) {
         const [allowConfigFields, rewriteAllowed, desc] = testCase;
         const summary = message + ": " + desc;

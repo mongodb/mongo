@@ -64,8 +64,7 @@ const auto kBarNamespace = NamespaceString::createNamespaceString_forTest(kTestD
 const auto kQuxNamespace = NamespaceString::createNamespaceString_forTest(kTestDb, kQuxName);
 const auto kEmptyPipeline = BSONArray();
 const auto kBinaryCollation = BSONObj();
-const auto kFilipinoCollation = BSON("locale"
-                                     << "fil");
+const auto kFilipinoCollation = BSON("locale" << "fil");
 
 class ViewGraphFixture : public unittest::Test {
 public:

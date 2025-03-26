@@ -214,9 +214,11 @@ std::string toUtf8String(MSIHANDLE hInstall, const std::wstring& wide) {
         }                                                                                      \
     }
 
-#define LOG_INFO(...) \
-                      \
-    { LogMessage(hInstall, INSTALLMESSAGE_INFO, __VA_ARGS__); }
+#define LOG_INFO(...)                                           \
+                                                                \
+    {                                                           \
+        LogMessage(hInstall, INSTALLMESSAGE_INFO, __VA_ARGS__); \
+    }
 
 /**
  * UpdateMongoYAML - MSI custom action entry point

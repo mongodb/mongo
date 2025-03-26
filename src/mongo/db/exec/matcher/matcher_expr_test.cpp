@@ -100,8 +100,7 @@ TEST_F(ExprMatchTest, ComparisonToConstantMatchesCorrectly) {
 
 TEST_F(ExprMatchTest, ComparisonToConstantVariableMatchesCorrectly) {
     setVariable("var", Value(5));
-    createMatcher(BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
-                                                           << "$$var"))));
+    createMatcher(BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a" << "$$var"))));
 
     ASSERT_TRUE(matches(BSON("a" << 5)));
 
@@ -110,8 +109,7 @@ TEST_F(ExprMatchTest, ComparisonToConstantVariableMatchesCorrectly) {
 }
 
 TEST_F(ExprMatchTest, ComparisonBetweenTwoFieldPathsMatchesCorrectly) {
-    createMatcher(BSON("$expr" << BSON("$gt" << BSON_ARRAY("$a"
-                                                           << "$b"))));
+    createMatcher(BSON("$expr" << BSON("$gt" << BSON_ARRAY("$a" << "$b"))));
 
     ASSERT_TRUE(matches(BSON("a" << 10 << "b" << 2)));
 
@@ -553,11 +551,9 @@ TEST_F(ExprMatchTest, InitialCollationUsedForComparisons) {
     setCollator(std::move(collator));
     createMatcher(fromjson("{$expr: {$eq: ['$x', 'abc']}}"));
 
-    ASSERT_TRUE(matches(BSON("x"
-                             << "AbC")));
+    ASSERT_TRUE(matches(BSON("x" << "AbC")));
 
-    ASSERT_FALSE(matches(BSON("x"
-                              << "cba")));
+    ASSERT_FALSE(matches(BSON("x" << "cba")));
 }
 
 TEST_F(ExprMatchTest, SetCollatorChangesCollationUsedForComparisons) {
@@ -567,11 +563,9 @@ TEST_F(ExprMatchTest, SetCollatorChangesCollationUsedForComparisons) {
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     setCollator(std::move(collator));
 
-    ASSERT_TRUE(matches(BSON("x"
-                             << "AbC")));
+    ASSERT_TRUE(matches(BSON("x" << "AbC")));
 
-    ASSERT_FALSE(matches(BSON("x"
-                              << "cba")));
+    ASSERT_FALSE(matches(BSON("x" << "cba")));
 }
 
 TEST_F(ExprMatchTest, ReturnsFalseInsteadOfErrorWithFailpointSet) {

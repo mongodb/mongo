@@ -107,16 +107,11 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
         10);
     ASSERT_BSONOBJ_EQ(request.getHint().value_or(BSONObj()), BSON("a" << 1));
-    ASSERT_BSONOBJ_EQ(request.getCollation().value_or(BSONObj()),
-                      BSON("locale"
-                           << "en_US"));
+    ASSERT_BSONOBJ_EQ(request.getCollation().value_or(BSONObj()), BSON("locale" << "en_US"));
     ASSERT_EQ(*request.getMaxTimeMS(), 100u);
-    ASSERT_BSONOBJ_EQ(request.getReadConcern()->toBSONInner(),
-                      BSON("level"
-                           << "linearizable"));
+    ASSERT_BSONOBJ_EQ(request.getReadConcern()->toBSONInner(), BSON("level" << "linearizable"));
     ASSERT_BSONOBJ_EQ(request.getUnwrappedReadPref().value_or(BSONObj()),
-                      BSON("$readPreference"
-                           << "nearest"));
+                      BSON("$readPreference" << "nearest"));
     ASSERT_TRUE(request.getExchange().has_value());
     ASSERT_TRUE(request.getIsMapReduceCommand());
     ASSERT_TRUE(request.getIncludeQueryStatsMetrics());
@@ -190,9 +185,7 @@ TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
         unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(inputBson));
     ASSERT(request.getExplain());
     ASSERT(request.getExplain().value());
-    ASSERT_BSONOBJ_EQ(request.getReadConcern()->toBSONInner(),
-                      BSON("level"
-                           << "majority"));
+    ASSERT_BSONOBJ_EQ(request.getReadConcern()->toBSONInner(), BSON("level" << "majority"));
 }
 
 //
@@ -224,18 +217,14 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setMaxTimeMS(10u);
     const auto hintObj = BSON("a" << 1);
     request.setHint(hintObj);
-    const auto collationObj = BSON("locale"
-                                   << "en_US");
+    const auto collationObj = BSON("locale" << "en_US");
     request.setCollation(collationObj);
-    const auto readPrefObj = BSON("$readPreference"
-                                  << "nearest");
+    const auto readPrefObj = BSON("$readPreference" << "nearest");
     request.setUnwrappedReadPref(readPrefObj);
-    const auto readConcernObj = BSON("level"
-                                     << "linearizable");
+    const auto readConcernObj = BSON("level" << "linearizable");
     request.setReadConcern(repl::ReadConcernArgs::kLinearizable);
     request.setIsMapReduceCommand(true);
-    const auto letParamsObj = BSON("foo"
-                                   << "bar");
+    const auto letParamsObj = BSON("foo" << "bar");
     request.setLet(letParamsObj);
     auto uuid = UUID::gen();
     request.setCollectionUUID(uuid);
@@ -310,9 +299,7 @@ TEST(AggregationRequestTest, ShouldAcceptHintAsString) {
         "'a'}");
     auto request = aggregation_request_helper::parseFromBSONForTests(inputBson);
     ASSERT_OK(request.getStatus());
-    ASSERT_BSONOBJ_EQ(request.getValue().getHint().value_or(BSONObj()),
-                      BSON("$hint"
-                           << "a_1"));
+    ASSERT_BSONOBJ_EQ(request.getValue().getHint().value_or(BSONObj()), BSON("$hint" << "a_1"));
 }
 
 TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {

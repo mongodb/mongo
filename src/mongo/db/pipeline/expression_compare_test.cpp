@@ -203,8 +203,7 @@ class NoOptimizeNe : public NoOptimize {
 /** No optimization is performend without a constant. */
 class NoOptimizeNoConstant : public NoOptimize {
     BSONObj spec() override {
-        return BSON("$ne" << BSON_ARRAY("$a"
-                                        << "$b"));
+        return BSON("$ne" << BSON_ARRAY("$a" << "$b"));
     }
 };
 

@@ -380,11 +380,9 @@ function runMultiBatchTests(collOpts) {
     replSet.awaitReplication();
 }
 
-[{},
- {clusteredIndex: {key: {_id: 1}, unique: true}}]
-    .forEach(collOpts => {
-        runMultiBatchTests(collOpts);
-    });
+[{}, {clusteredIndex: {key: {_id: 1}, unique: true}}].forEach(collOpts => {
+    runMultiBatchTests(collOpts);
+});
 
 // Now, test some unusual cases where the command should fail.
 function testErrorOnNonexistent() {
@@ -451,8 +449,7 @@ function simpleTestCatchesExtra(collOpts) {
                   JSON.stringify(errors.toArray()));
 }
 
-[{validationLevel: "off"},
- {validationLevel: "off", clusteredIndex: {key: {_id: 1}, unique: true}}]
+[{validationLevel: "off"}, {validationLevel: "off", clusteredIndex: {key: {_id: 1}, unique: true}}]
     .forEach(collOpts => {
         simpleTestCatchesExtra(collOpts);
     });

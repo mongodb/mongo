@@ -349,10 +349,9 @@ TEST_F(
     InitializeShardingAwarenessIfNeededQueryableBackupModeAndShardServerAndInvalidOverrideShardIdentity) {
     storageGlobalParams.queryableBackupMode = true;
     serverGlobalParams.overrideShardIdentity =
-        BSON("_id"
-             << "shardIdentity" << ShardIdentity::kShardNameFieldName << kShardName
-             << ShardIdentity::kClusterIdFieldName << OID::gen()
-             << ShardIdentity::kConfigsvrConnectionStringFieldName << "invalid");
+        BSON("_id" << "shardIdentity" << ShardIdentity::kShardNameFieldName << kShardName
+                   << ShardIdentity::kClusterIdFieldName << OID::gen()
+                   << ShardIdentity::kConfigsvrConnectionStringFieldName << "invalid");
 
     ASSERT_THROWS_CODE(ShardingInitializationMongoD::getShardIdentityDoc(operationContext()),
                        AssertionException,
@@ -400,10 +399,9 @@ TEST_F(
     InitializeShardingAwarenessIfNeededQueryableBackupModeAndNotShardServerAndInvalidOverrideShardIdentity) {
     storageGlobalParams.queryableBackupMode = true;
     serverGlobalParams.clusterRole = ClusterRole::None;
-    serverGlobalParams.overrideShardIdentity = BSON("_id"
-                                                    << "shardIdentity"
-                                                    << "configsvrConnectionString"
-                                                    << "invalid");
+    serverGlobalParams.overrideShardIdentity = BSON("_id" << "shardIdentity"
+                                                          << "configsvrConnectionString"
+                                                          << "invalid");
 
     ASSERT_THROWS_CODE(ShardingInitializationMongoD::getShardIdentityDoc(operationContext()),
                        AssertionException,
@@ -436,10 +434,9 @@ TEST_F(
 TEST_F(ShardingInitializationMongoDTest,
        InitializeShardingAwarenessIfNeededNotQueryableBackupModeAndInvalidOverrideShardIdentity) {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
-    serverGlobalParams.overrideShardIdentity = BSON("_id"
-                                                    << "shardIdentity"
-                                                    << "configsvrConnectionString"
-                                                    << "invalid");
+    serverGlobalParams.overrideShardIdentity = BSON("_id" << "shardIdentity"
+                                                          << "configsvrConnectionString"
+                                                          << "invalid");
 
     ASSERT_THROWS_CODE(ShardingInitializationMongoD::getShardIdentityDoc(operationContext()),
                        AssertionException,
@@ -493,12 +490,10 @@ TEST_F(
     {
         ScopedSetStandaloneMode standalone(getServiceContext());
 
-        BSONObj invalidShardIdentity = BSON("_id"
-                                            << "shardIdentity" << ShardIdentity::kShardNameFieldName
-                                            << kShardName << ShardIdentity::kClusterIdFieldName
-                                            << OID::gen()
-                                            << ShardIdentity::kConfigsvrConnectionStringFieldName
-                                            << "invalid");
+        BSONObj invalidShardIdentity =
+            BSON("_id" << "shardIdentity" << ShardIdentity::kShardNameFieldName << kShardName
+                       << ShardIdentity::kClusterIdFieldName << OID::gen()
+                       << ShardIdentity::kConfigsvrConnectionStringFieldName << "invalid");
 
         _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace,
                                 invalidShardIdentity);
@@ -605,10 +600,9 @@ TEST_F(
     ScopedSetStandaloneMode standalone(getServiceContext());
 
     _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace,
-                            BSON("_id"
-                                 << "shardIdentity"
-                                 << "configsvrConnectionString"
-                                 << "invalid"));
+                            BSON("_id" << "shardIdentity"
+                                       << "configsvrConnectionString"
+                                       << "invalid"));
 
     // The shardIdentity doc on disk, even if invalid, is ignored if the ClusterRole is None. This
     // is to allow fixing the shardIdentity doc by starting without --shardsvr.

@@ -100,8 +100,7 @@ TEST_F(SetClusterParameterCoordinatorTest,
 
 TEST_F(SetClusterParameterCoordinatorTest, ParameterValuesEqualParametersEqual) {
     ASSERT(_parameterValuesEqual(
-        BSON("attr1"
-             << "val"),
+        BSON("attr1" << "val"),
         BSON(SetClusterParameterCoordinatorDocument::kClusterParameterTimeFieldName
              << Timestamp(2, 0) << "_id"
              << "parameterName"
@@ -111,8 +110,7 @@ TEST_F(SetClusterParameterCoordinatorTest, ParameterValuesEqualParametersEqual) 
 
 TEST_F(SetClusterParameterCoordinatorTest, ParameterValuesEqualParametersNotEqual) {
     ASSERT(!_parameterValuesEqual(
-        BSON("attr1"
-             << "val"),
+        BSON("attr1" << "val"),
         BSON(SetClusterParameterCoordinatorDocument::kClusterParameterTimeFieldName
              << Timestamp(2, 0) << "_id"
              << "parameterName"
@@ -122,8 +120,7 @@ TEST_F(SetClusterParameterCoordinatorTest, ParameterValuesEqualParametersNotEqua
 
 TEST_F(SetClusterParameterCoordinatorTest, ParameterValuesEqualParameterCountNotEqual) {
     ASSERT(!_parameterValuesEqual(
-        BSON("attr1"
-             << "val"),
+        BSON("attr1" << "val"),
         BSON(SetClusterParameterCoordinatorDocument::kClusterParameterTimeFieldName
              << Timestamp(2, 0) << "_id"
              << "parameterName"

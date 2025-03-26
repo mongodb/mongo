@@ -64,11 +64,10 @@ static const NamespaceString testns =
 const IDLParserContext ctxt("count");
 
 TEST(CountCommandTest, ParserDealsWithMissingFieldsCorrectly) {
-    auto commandObj = BSON("count"
-                           << "TestColl"
-                           << "$db"
-                           << "TestDB"
-                           << "query" << BSON("a" << BSON("$lte" << 10)));
+    auto commandObj = BSON("count" << "TestColl"
+                                   << "$db"
+                                   << "TestDB"
+                                   << "query" << BSON("a" << BSON("$lte" << 10)));
     auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
 
     ASSERT_BSONOBJ_EQ(countCmd.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
@@ -82,23 +81,16 @@ TEST(CountCommandTest, ParserDealsWithMissingFieldsCorrectly) {
 }
 
 TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
-    auto commandObj = BSON("count"
-                           << "TestColl"
-                           << "$db"
-                           << "TestDB"
-                           << "query" << BSON("a" << BSON("$gte" << 11)) << "limit" << 100 << "skip"
-                           << 1000 << "hint" << BSON("b" << 5) << "collation"
-                           << BSON("locale"
-                                   << "en_US")
-                           << "readConcern"
-                           << BSON("level"
-                                   << "linearizable")
-                           << "$queryOptions"
-                           << BSON("$readPreference"
-                                   << "secondary")
-                           << "comment"
-                           << "aComment"
-                           << "maxTimeMS" << 10000);
+    auto commandObj =
+        BSON("count" << "TestColl"
+                     << "$db"
+                     << "TestDB"
+                     << "query" << BSON("a" << BSON("$gte" << 11)) << "limit" << 100 << "skip"
+                     << 1000 << "hint" << BSON("b" << 5) << "collation" << BSON("locale" << "en_US")
+                     << "readConcern" << BSON("level" << "linearizable") << "$queryOptions"
+                     << BSON("$readPreference" << "secondary") << "comment"
+                     << "aComment"
+                     << "maxTimeMS" << 10000);
     const auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
 
     ASSERT_BSONOBJ_EQ(countCmd.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
@@ -114,77 +106,71 @@ TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
 }
 
 TEST(CountCommandTest, ParsingNegativeLimitGivesPositiveLimit) {
-    auto commandObj = BSON("count"
-                           << "TestColl"
-                           << "$db"
-                           << "TestDB"
-                           << "limit" << -100);
+    auto commandObj = BSON("count" << "TestColl"
+                                   << "$db"
+                                   << "TestDB"
+                                   << "limit" << -100);
     const auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
 
     ASSERT_EQ(countCmd.getLimit().value(), 100);
 }
 
 TEST(CountCommandTest, LimitCannotBeMinLong) {
-    auto commandObj = BSON("count"
-                           << "TestColl"
-                           << "$db"
-                           << "TestDB"
-                           << "query" << BSON("a" << BSON("$gte" << 11)) << "limit"
-                           << std::numeric_limits<long long>::min());
+    auto commandObj = BSON("count" << "TestColl"
+                                   << "$db"
+                                   << "TestDB"
+                                   << "query" << BSON("a" << BSON("$gte" << 11)) << "limit"
+                                   << std::numeric_limits<long long>::min());
 
     ASSERT_THROWS_CODE(
         CountCommandRequest::parse(ctxt, commandObj), AssertionException, ErrorCodes::BadValue);
 }
 
 TEST(CountCommandTest, FailParseBadSkipValue) {
-    ASSERT_THROWS_CODE(CountCommandRequest::parse(ctxt,
-                                                  BSON("count"
-                                                       << "TestColl"
-                                                       << "$db"
-                                                       << "TestDB"
-                                                       << "query" << BSON("a" << BSON("$gte" << 11))
-                                                       << "skip" << -1000)),
-                       AssertionException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        CountCommandRequest::parse(ctxt,
+                                   BSON("count" << "TestColl"
+                                                << "$db"
+                                                << "TestDB"
+                                                << "query" << BSON("a" << BSON("$gte" << 11))
+                                                << "skip" << -1000)),
+        AssertionException,
+        ErrorCodes::BadValue);
 }
 
 TEST(CountCommandTest, FailParseBadCollationType) {
-    ASSERT_THROWS_CODE(
-        CountCommandRequest::parse(ctxt,
-                                   BSON("count"
-                                        << "TestColl"
+    ASSERT_THROWS_CODE(CountCommandRequest::parse(
+                           ctxt,
+                           BSON("count" << "TestColl"
                                         << "$db"
                                         << "TestDB"
                                         << "query" << BSON("a" << BSON("$gte" << 11)) << "collation"
                                         << "en_US")),
-        AssertionException,
-        ErrorCodes::TypeMismatch);
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST(CountCommandTest, FailParseUnknownField) {
     ASSERT_THROWS_CODE(CountCommandRequest::parse(ctxt,
-                                                  BSON("count"
-                                                       << "TestColl"
-                                                       << "$db"
-                                                       << "TestDB"
-                                                       << "foo"
-                                                       << "bar")),
+                                                  BSON("count" << "TestColl"
+                                                               << "$db"
+                                                               << "TestDB"
+                                                               << "foo"
+                                                               << "bar")),
                        AssertionException,
                        ErrorCodes::IDLUnknownField);
 }
 
 TEST(CountCommandTest, ConvertToAggregationWithHint) {
-    auto commandObj = BSON("count"
-                           << "TestColl"
-                           << "$db"
-                           << "TestDB"
-                           << "hint" << BSON("x" << 1));
+    auto commandObj = BSON("count" << "TestColl"
+                                   << "$db"
+                                   << "TestDB"
+                                   << "hint" << BSON("x" << 1));
     auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
     auto ar = query_request_conversion::asAggregateCommandRequest(countCmd);
     ASSERT_BSONOBJ_EQ(ar.getHint().value_or(BSONObj()), BSON("x" << 1));
 
-    std::vector<BSONObj> expectedPipeline{BSON("$count"
-                                               << "count")};
+    std::vector<BSONObj> expectedPipeline{BSON("$count" << "count")};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getPipeline().begin(),
@@ -193,11 +179,10 @@ TEST(CountCommandTest, ConvertToAggregationWithHint) {
 }
 
 TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
-    auto commandObj = BSON("count"
-                           << "TestColl"
-                           << "$db"
-                           << "TestDB"
-                           << "limit" << 200 << "skip" << 300 << "query" << BSON("x" << 7));
+    auto commandObj = BSON("count" << "TestColl"
+                                   << "$db"
+                                   << "TestDB"
+                                   << "limit" << 200 << "skip" << 300 << "query" << BSON("x" << 7));
     auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
     auto ar = query_request_conversion::asAggregateCommandRequest(countCmd);
     ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
@@ -208,8 +193,7 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
     std::vector<BSONObj> expectedPipeline{BSON("$match" << BSON("x" << 7)),
                                           BSON("$skip" << 300),
                                           BSON("$limit" << 200),
-                                          BSON("$count"
-                                               << "count")};
+                                          BSON("$count" << "count")};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getPipeline().begin(),
@@ -218,15 +202,13 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
 
 TEST(CountCommandTest, ConvertToAggregationWithMaxTimeMS) {
     auto countCmd = CountCommandRequest::parse(ctxt,
-                                               BSON("count"
-                                                    << "TestColl"
-                                                    << "maxTimeMS" << 100 << "$db"
-                                                    << "TestDB"));
+                                               BSON("count" << "TestColl"
+                                                            << "maxTimeMS" << 100 << "$db"
+                                                            << "TestDB"));
     auto ar = query_request_conversion::asAggregateCommandRequest(countCmd);
     ASSERT_EQ(ar.getMaxTimeMS().value_or(0), 100u);
 
-    std::vector<BSONObj> expectedPipeline{BSON("$count"
-                                               << "count")};
+    std::vector<BSONObj> expectedPipeline{BSON("$count" << "count")};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getPipeline().begin(),
@@ -236,19 +218,15 @@ TEST(CountCommandTest, ConvertToAggregationWithMaxTimeMS) {
 
 TEST(CountCommandTest, ConvertToAggregationWithQueryOptions) {
     auto countCmd = CountCommandRequest::parse(ctxt,
-                                               BSON("count"
-                                                    << "TestColl"
-                                                    << "$db"
-                                                    << "TestDB"));
-    countCmd.setUnwrappedReadPref(BSON("readPreference"
-                                       << "secondary"));
+                                               BSON("count" << "TestColl"
+                                                            << "$db"
+                                                            << "TestDB"));
+    countCmd.setUnwrappedReadPref(BSON("readPreference" << "secondary"));
     auto ar = query_request_conversion::asAggregateCommandRequest(countCmd);
     ASSERT_BSONOBJ_EQ(ar.getUnwrappedReadPref().value_or(BSONObj()),
-                      BSON("readPreference"
-                           << "secondary"));
+                      BSON("readPreference" << "secondary"));
 
-    std::vector<BSONObj> expectedPipeline{BSON("$count"
-                                               << "count")};
+    std::vector<BSONObj> expectedPipeline{BSON("$count" << "count")};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getPipeline().begin(),
@@ -258,18 +236,16 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryOptions) {
 
 TEST(CountCommandTest, ConvertToAggregationWithReadConcern) {
     auto countCmd = CountCommandRequest::parse(ctxt,
-                                               BSON("count"
-                                                    << "TestColl"
-                                                    << "$db"
-                                                    << "TestDB"));
+                                               BSON("count" << "TestColl"
+                                                            << "$db"
+                                                            << "TestDB"));
     countCmd.setReadConcern(repl::ReadConcernArgs::kLinearizable);
     auto ar = query_request_conversion::asAggregateCommandRequest(countCmd);
     ASSERT_TRUE(ar.getReadConcern().has_value());
     ASSERT_BSONOBJ_EQ(ar.getReadConcern()->toBSONInner(),
                       repl::ReadConcernArgs::kLinearizable.toBSONInner());
 
-    std::vector<BSONObj> expectedPipeline{BSON("$count"
-                                               << "count")};
+    std::vector<BSONObj> expectedPipeline{BSON("$count" << "count")};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getPipeline().begin(),

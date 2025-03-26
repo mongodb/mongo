@@ -495,10 +495,8 @@ TEST_F(QueryPlannerTest, ShardFilterNestedProjCovered) {
 
 TEST_F(QueryPlannerTest, ShardFilterHashProjNotCovered) {
     params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    params.shardKey = BSON("a"
-                           << "hashed");
-    addIndex(BSON("a"
-                  << "hashed"));
+    params.shardKey = BSON("a" << "hashed");
+    addIndex(BSON("a" << "hashed"));
 
     runQuerySortProj(fromjson("{a: 1}"), BSONObj(), fromjson("{_id : 0, a : 1}"));
 
@@ -526,8 +524,7 @@ TEST_F(QueryPlannerTest, ShardFilterKeyPrefixIndexCovered) {
 
 TEST_F(QueryPlannerTest, ShardFilterNoIndexNotCovered) {
     params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    params.shardKey = BSON("a"
-                           << "hashed");
+    params.shardKey = BSON("a" << "hashed");
     addIndex(BSON("b" << 1));
 
     runQuerySortProj(fromjson("{b: 1}"), BSONObj(), fromjson("{_id : 0, a : 1}"));

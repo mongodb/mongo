@@ -70,8 +70,7 @@ using std::deque;
 using std::string;
 using std::vector;
 
-static const BSONObj metaTextScore = BSON("$meta"
-                                          << "textScore");
+static const BSONObj metaTextScore = BSON("$meta" << "textScore");
 
 class DocumentSourceSortTest : public AggregationContextFixture {
 protected:
@@ -125,8 +124,7 @@ TEST_F(DocumentSourceSortTest, RejectsEmptyObjectSpec) {
 }
 
 TEST_F(DocumentSourceSortTest, RejectsSpecWithNonNumericValues) {
-    BSONObj spec = BSON("$sort" << BSON("a"
-                                        << "b"));
+    BSONObj spec = BSON("$sort" << BSON("a" << "b"));
     BSONElement specElement = spec.firstElement();
     ASSERT_THROWS(DocumentSourceSort::createFromBson(specElement, getExpCtx()), AssertionException);
 }
@@ -252,21 +250,18 @@ TEST_F(DocumentSourceSortTest, ReportsNoPathsModified) {
 }
 
 TEST_F(DocumentSourceSortTest, AllowsSortOnMetaGeoNearDistance) {
-    BSONObj spec = BSON("$sort" << BSON("dist" << BSON("$meta"
-                                                       << "geoNearDistance")));
+    BSONObj spec = BSON("$sort" << BSON("dist" << BSON("$meta" << "geoNearDistance")));
     BSONElement specElement = spec.firstElement();
     auto sort = DocumentSourceSort::createFromBson(specElement, getExpCtx());
 
     vector<Value> arr;
     sort->serializeToArray(arr);
     ASSERT_BSONOBJ_EQ(arr[0].getDocument().toBson(),
-                      BSON("$sort" << BSON("$computed0" << BSON("$meta"
-                                                                << "geoNearDistance"))));
+                      BSON("$sort" << BSON("$computed0" << BSON("$meta" << "geoNearDistance"))));
 }
 
 TEST_F(DocumentSourceSortTest, DetectsDependencyOnMeta) {
-    BSONObj spec = BSON("$sort" << BSON("dist" << BSON("$meta"
-                                                       << "geoNearDistance")));
+    BSONObj spec = BSON("$sort" << BSON("dist" << BSON("$meta" << "geoNearDistance")));
     BSONElement specElement = spec.firstElement();
     auto sort = DocumentSourceSort::createFromBson(specElement, getExpCtx());
 
@@ -429,8 +424,7 @@ TEST_F(DocumentSourceSortExecutionTest, RandMeta) {
     MutableDocument second(Document{{"_id", 1}});
     second.metadata().setRandVal(0.02);
 
-    createSort(BSON("$computed0" << BSON("$meta"
-                                         << "randVal")));
+    createSort(BSON("$computed0" << BSON("$meta" << "randVal")));
     checkResults({first.freeze(), second.freeze()}, sort(), "[{_id:1},{_id:0}]");
 }
 

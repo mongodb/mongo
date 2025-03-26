@@ -819,8 +819,7 @@ protected:
 
 // Insert one document
 TEST_F(FleCrudTest, InsertOne) {
-    auto doc = BSON("encrypted"
-                    << "secret");
+    auto doc = BSON("encrypted" << "secret");
     auto element = doc.firstElement();
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
@@ -845,8 +844,7 @@ TEST_F(FleCrudTest, InsertOneRange) {
 // Insert two documents with same values
 TEST_F(FleCrudTest, InsertTwoSame) {
 
-    auto doc = BSON("encrypted"
-                    << "secret");
+    auto doc = BSON("encrypted" << "secret");
     auto element = doc.firstElement();
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
     doSingleInsert(2, element, Fle2AlgorithmInt::kEquality);
@@ -864,30 +862,22 @@ TEST_F(FleCrudTest, InsertTwoSame) {
 // Insert two documents with different values
 TEST_F(FleCrudTest, InsertTwoDifferent) {
 
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
-    doSingleInsert(2,
-                   BSON("encrypted"
-                        << "topsecret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
+    doSingleInsert(2, BSON("encrypted" << "topsecret"));
 
     assertDocumentCounts(2, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 
-    ASSERT_FALSE(
-        _queryImpl
-            ->getById(_escNs,
-                      ESCCollection::generateNonAnchorId(getTestESCToken(BSON("encrypted"
-                                                                              << "secret")),
-                                                         1))
-            .isEmpty());
-    ASSERT_FALSE(
-        _queryImpl
-            ->getById(_escNs,
-                      ESCCollection::generateNonAnchorId(getTestESCToken(BSON("encrypted"
-                                                                              << "topsecret")),
-                                                         1))
-            .isEmpty());
+    ASSERT_FALSE(_queryImpl
+                     ->getById(_escNs,
+                               ESCCollection::generateNonAnchorId(
+                                   getTestESCToken(BSON("encrypted" << "secret")), 1))
+                     .isEmpty());
+    ASSERT_FALSE(_queryImpl
+                     ->getById(_escNs,
+                               ESCCollection::generateNonAnchorId(
+                                   getTestESCToken(BSON("encrypted" << "topsecret")), 1))
+                     .isEmpty());
 }
 
 // Insert 1 document with 100 fields
@@ -1066,8 +1056,7 @@ TEST_F(FleCrudTest, InsertPayloadIsBothRangeAndTextSearch) {
 
 // Insert and delete one document
 TEST_F(FleCrudTest, InsertAndDeleteOne) {
-    auto doc = BSON("encrypted"
-                    << "secret");
+    auto doc = BSON("encrypted" << "secret");
     auto element = doc.firstElement();
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
@@ -1101,8 +1090,7 @@ TEST_F(FleCrudTest, InsertAndDeleteOneRange) {
 
 // Insert two documents, and delete both
 TEST_F(FleCrudTest, InsertTwoSameAndDeleteTwo) {
-    auto doc = BSON("encrypted"
-                    << "secret");
+    auto doc = BSON("encrypted" << "secret");
     auto element = doc.firstElement();
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
@@ -1123,12 +1111,8 @@ TEST_F(FleCrudTest, InsertTwoSameAndDeleteTwo) {
 
 // Insert two documents with different values and delete them
 TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
-    doSingleInsert(2,
-                   BSON("encrypted"
-                        << "topsecret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
+    doSingleInsert(2, BSON("encrypted" << "topsecret"));
 
     assertDocumentCounts(2, 2, 2);
 
@@ -1141,9 +1125,7 @@ TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
 
 // Insert one document but delete another document
 TEST_F(FleCrudTest, InsertOneButDeleteAnother) {
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
     assertDocumentCounts(1, 1, 1);
 
     doSingleDelete(2, Fle2AlgorithmInt::kEquality);
@@ -1155,15 +1137,11 @@ TEST_F(FleCrudTest, InsertOneButDeleteAnother) {
 // Update one document
 TEST_F(FleCrudTest, UpdateOne) {
 
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 1, 1);
 
-    doSingleUpdate(1,
-                   BSON("encrypted"
-                        << "top secret"));
+    doSingleUpdate(1, BSON("encrypted" << "top secret"));
 
     assertDocumentCounts(1, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
@@ -1200,15 +1178,11 @@ TEST_F(FleCrudTest, UpdateOneRange) {
 
 // Update one document but to the same value
 TEST_F(FleCrudTest, UpdateOneSameValue) {
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 1, 1);
 
-    doSingleUpdate(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleUpdate(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
@@ -1223,14 +1197,11 @@ TEST_F(FleCrudTest, UpdateOneSameValue) {
 
 // Update one document with replacement
 TEST_F(FleCrudTest, UpdateOneReplace) {
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 1, 1);
 
-    auto replace = BSON("encrypted"
-                        << "top secret");
+    auto replace = BSON("encrypted" << "top secret");
 
     auto buf = generateSinglePlaceholder(replace.firstElement());
     auto efc = getTestEncryptedFieldConfig();
@@ -1291,9 +1262,7 @@ TEST_F(FleCrudTest, UpdateOneReplaceRange) {
 // Rename safeContent
 TEST_F(FleCrudTest, RenameSafeContent) {
 
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 1, 1);
 
@@ -1308,9 +1277,7 @@ TEST_F(FleCrudTest, RenameSafeContent) {
 
 // Mess with __safeContent__ and ensure the update errors
 TEST_F(FleCrudTest, SetSafeContent) {
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 1, 1);
 
@@ -1345,14 +1312,11 @@ TEST_F(FleCrudTest, testValidateEncryptedFieldConfigFields) {
 
 // Update one document via findAndModify
 TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 1, 1);
 
-    auto doc = BSON("encrypted"
-                    << "top secret");
+    auto doc = BSON("encrypted" << "top secret");
     auto element = doc.firstElement();
     auto buf = generateSinglePlaceholder(element);
     auto efc = getTestEncryptedFieldConfig();
@@ -1416,8 +1380,7 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOneRange) {
 
 // Insert and delete one document via findAndModify
 TEST_F(FleCrudTest, FindAndModify_InsertAndDeleteOne) {
-    auto doc = BSON("encrypted"
-                    << "secret");
+    auto doc = BSON("encrypted" << "secret");
     auto element = doc.firstElement();
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
@@ -1436,9 +1399,7 @@ TEST_F(FleCrudTest, FindAndModify_InsertAndDeleteOne) {
 // Rename safeContent
 TEST_F(FleCrudTest, FindAndModify_RenameSafeContent) {
 
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 1, 1);
 
@@ -1462,9 +1423,7 @@ TEST_F(FleCrudTest, validateTagsTest) {
 
 // Mess with __safeContent__ and ensure the update errors
 TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
-    doSingleInsert(1,
-                   BSON("encrypted"
-                        << "secret"));
+    doSingleInsert(1, BSON("encrypted" << "secret"));
 
     assertDocumentCounts(1, 1, 1);
 
@@ -1527,8 +1486,7 @@ TEST_F(FleCrudTest, validateIndexKeyInvalid) {
 }
 
 TEST_F(FleTagsTest, InsertOne) {
-    auto doc = BSON("encrypted"
-                    << "a");
+    auto doc = BSON("encrypted" << "a");
 
     doSingleInsert(1, doc);
 
@@ -1536,8 +1494,7 @@ TEST_F(FleTagsTest, InsertOne) {
 }
 
 TEST_F(FleTagsTest, InsertTwoSame) {
-    auto doc = BSON("encrypted"
-                    << "a");
+    auto doc = BSON("encrypted" << "a");
 
     doSingleInsert(1, doc);
     doSingleInsert(2, doc);
@@ -1546,10 +1503,8 @@ TEST_F(FleTagsTest, InsertTwoSame) {
 }
 
 TEST_F(FleTagsTest, InsertTwoDifferent) {
-    auto doc1 = BSON("encrypted"
-                     << "a");
-    auto doc2 = BSON("encrypted"
-                     << "b");
+    auto doc1 = BSON("encrypted" << "a");
+    auto doc2 = BSON("encrypted" << "b");
 
     doSingleInsert(1, doc1);
     doSingleInsert(2, doc2);
@@ -1559,8 +1514,7 @@ TEST_F(FleTagsTest, InsertTwoDifferent) {
 }
 
 TEST_F(FleTagsTest, InsertAndDeleteOne) {
-    auto doc = BSON("encrypted"
-                    << "a");
+    auto doc = BSON("encrypted" << "a");
 
     doSingleInsert(1, doc);
     doSingleDelete(1, Fle2AlgorithmInt::kEquality);
@@ -1569,8 +1523,7 @@ TEST_F(FleTagsTest, InsertAndDeleteOne) {
 }
 
 TEST_F(FleTagsTest, InsertTwoSameAndDeleteOne) {
-    auto doc = BSON("encrypted"
-                    << "a");
+    auto doc = BSON("encrypted" << "a");
 
     doSingleInsert(1, doc);
     doSingleInsert(2, doc);
@@ -1580,10 +1533,8 @@ TEST_F(FleTagsTest, InsertTwoSameAndDeleteOne) {
 }
 
 TEST_F(FleTagsTest, InsertTwoDifferentAndDeleteOne) {
-    auto doc1 = BSON("encrypted"
-                     << "a");
-    auto doc2 = BSON("encrypted"
-                     << "b");
+    auto doc1 = BSON("encrypted" << "a");
+    auto doc2 = BSON("encrypted" << "b");
 
     doSingleInsert(1, doc1);
     doSingleInsert(2, doc2);
@@ -1594,10 +1545,8 @@ TEST_F(FleTagsTest, InsertTwoDifferentAndDeleteOne) {
 }
 
 TEST_F(FleTagsTest, InsertAndUpdate) {
-    auto doc1 = BSON("encrypted"
-                     << "a");
-    auto doc2 = BSON("encrypted"
-                     << "b");
+    auto doc1 = BSON("encrypted" << "a");
+    auto doc2 = BSON("encrypted" << "b");
 
     doSingleInsert(1, doc1);
     doSingleUpdate(1, doc2);
@@ -1619,10 +1568,8 @@ TEST_F(FleTagsTest, ContentionFactor) {
         }]
     })"));
 
-    auto doc1 = BSON("encrypted"
-                     << "a");
-    auto doc2 = BSON("encrypted"
-                     << "b");
+    auto doc1 = BSON("encrypted" << "a");
+    auto doc2 = BSON("encrypted" << "b");
 
     // Insert doc1 twice with a contention factor of 0 and once with a contention factor or 3.
     doSingleInsertWithContention(1, doc1, 4, 0, efc);
@@ -1673,8 +1620,7 @@ TEST_F(FleTagsTest, ContentionFactor) {
 }
 
 TEST_F(FleTagsTest, MemoryLimit) {
-    auto doc = BSON("encrypted"
-                    << "a");
+    auto doc = BSON("encrypted" << "a");
 
     const auto tagLimit = 10;
 

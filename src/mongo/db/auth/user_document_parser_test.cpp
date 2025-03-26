@@ -95,237 +95,201 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
     BSONArray emptyArray = BSONArrayBuilder().arr();
 
     // V1 documents don't work
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                       << "spencer"
-                                                       << "pwd"
-                                                       << "a"
-                                                       << "roles" << BSON_ARRAY("read"))));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                              << "pwd"
+                                                              << "a"
+                                                              << "roles" << BSON_ARRAY("read"))));
 
     // Need name field
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("db"
-                                                       << "test"
-                                                       << "credentials" << credentials << "roles"
-                                                       << emptyArray)));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("db" << "test"
+                                                            << "credentials" << credentials
+                                                            << "roles" << emptyArray)));
 
     // Need source field
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                       << "spencer"
-                                                       << "credentials" << credentials << "roles"
-                                                       << emptyArray)));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                              << "credentials" << credentials
+                                                              << "roles" << emptyArray)));
 
     // Need credentials field
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                       << "spencer"
-                                                       << "db"
-                                                       << "test"
-                                                       << "roles" << emptyArray)));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                              << "db"
+                                                              << "test"
+                                                              << "roles" << emptyArray)));
 
     // Need roles field
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                       << "spencer"
-                                                       << "db"
-                                                       << "test"
-                                                       << "credentials" << credentials)));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                              << "db"
+                                                              << "test"
+                                                              << "credentials" << credentials)));
 
     // authenticationRestricitons must be an array if it exists
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                       << "spencer"
-                                                       << "db"
-                                                       << "test"
-                                                       << "authenticationRestrictions"
-                                                       << "bogus")));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                              << "db"
+                                                              << "test"
+                                                              << "authenticationRestrictions"
+                                                              << "bogus")));
 
     // Empty authenticationRestrictions is OK
-    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                   << "spencer"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials" << credentials << "roles"
-                                                   << emptyArray << "authenticationRestrictions"
-                                                   << emptyArray)));
+    ASSERT_OK(v2parser.checkValidUserDocument(
+        BSON("user" << "spencer"
+                    << "db"
+                    << "test"
+                    << "credentials" << credentials << "roles" << emptyArray
+                    << "authenticationRestrictions" << emptyArray)));
 
     // Empty roles arrays are OK
-    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                   << "spencer"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials" << credentials << "roles"
-                                                   << emptyArray)));
+    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                          << "db"
+                                                          << "test"
+                                                          << "credentials" << credentials << "roles"
+                                                          << emptyArray)));
 
     // Need credentials of {external: true} if user's db is $external
-    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                   << "spencer"
-                                                   << "db"
-                                                   << "$external"
-                                                   << "credentials" << BSON("external" << true)
-                                                   << "roles" << emptyArray)));
+    ASSERT_OK(v2parser.checkValidUserDocument(
+        BSON("user" << "spencer"
+                    << "db"
+                    << "$external"
+                    << "credentials" << BSON("external" << true) << "roles" << emptyArray)));
 
     // Roles must be objects
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                       << "spencer"
-                                                       << "db"
-                                                       << "test"
-                                                       << "credentials" << credentials << "roles"
-                                                       << BSON_ARRAY("read"))));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                              << "db"
+                                                              << "test"
+                                                              << "credentials" << credentials
+                                                              << "roles" << BSON_ARRAY("read"))));
 
     // Role needs name
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                       << "spencer"
-                                                       << "db"
-                                                       << "test"
-                                                       << "credentials" << credentials << "roles"
-                                                       << BSON_ARRAY(BSON("db"
-                                                                          << "dbA")))));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON(
+        "user" << "spencer"
+               << "db"
+               << "test"
+               << "credentials" << credentials << "roles" << BSON_ARRAY(BSON("db" << "dbA")))));
 
     // Role needs source
-    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                       << "spencer"
-                                                       << "db"
-                                                       << "test"
-                                                       << "credentials" << credentials << "roles"
-                                                       << BSON_ARRAY(BSON("role"
-                                                                          << "roleA")))));
+    ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON(
+        "user" << "spencer"
+               << "db"
+               << "test"
+               << "credentials" << credentials << "roles" << BSON_ARRAY(BSON("role" << "roleA")))));
 
 
     // Basic valid user document
-    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                   << "spencer"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials" << credentials << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "roleA"
-                                                                      << "db"
-                                                                      << "dbA")))));
+    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                          << "db"
+                                                          << "test"
+                                                          << "credentials" << credentials << "roles"
+                                                          << BSON_ARRAY(BSON("role" << "roleA"
+                                                                                    << "db"
+                                                                                    << "dbA")))));
 
     // Multiple roles OK
-    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                   << "spencer"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials" << credentials << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "roleA"
-                                                                      << "db"
-                                                                      << "dbA")
-                                                                 << BSON("role"
-                                                                         << "roleB"
-                                                                         << "db"
-                                                                         << "dbB")))));
+    ASSERT_OK(
+        v2parser.checkValidUserDocument(BSON("user" << "spencer"
+                                                    << "db"
+                                                    << "test"
+                                                    << "credentials" << credentials << "roles"
+                                                    << BSON_ARRAY(BSON("role" << "roleA"
+                                                                              << "db"
+                                                                              << "dbA")
+                                                                  << BSON("role" << "roleB"
+                                                                                 << "db"
+                                                                                 << "dbB")))));
 
     // Optional authenticationRestrictions field OK
-    ASSERT_OK(v2parser.checkValidUserDocument(
-        BSON("user"
-             << "spencer"
-             << "db"
-             << "test"
-             << "credentials" << credentials << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("127.0.0.1/8") << "serverAddress"
-                                               << BSON_ARRAY("127.0.0.1/8")))
-             << "roles"
-             << BSON_ARRAY(BSON("role"
-                                << "roleA"
-                                << "db"
-                                << "dbA")))));
+    ASSERT_OK(v2parser.checkValidUserDocument(BSON(
+        "user" << "spencer"
+               << "db"
+               << "test"
+               << "credentials" << credentials << "authenticationRestrictions"
+               << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("127.0.0.1/8") << "serverAddress"
+                                                 << BSON_ARRAY("127.0.0.1/8")))
+               << "roles"
+               << BSON_ARRAY(BSON("role" << "roleA"
+                                         << "db"
+                                         << "dbA")))));
 
     // Optional extraData field OK
-    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                   << "spencer"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials" << credentials << "extraData"
-                                                   << BSON("foo"
-                                                           << "bar")
-                                                   << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "roleA"
-                                                                      << "db"
-                                                                      << "dbA")))));
+    ASSERT_OK(v2parser.checkValidUserDocument(BSON(
+        "user" << "spencer"
+               << "db"
+               << "test"
+               << "credentials" << credentials << "extraData" << BSON("foo" << "bar") << "roles"
+               << BSON_ARRAY(BSON("role" << "roleA"
+                                         << "db"
+                                         << "dbA")))));
 }
 
 TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
     // Old "pwd" field not valid
     ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                                     BSON("user"
-                                                                          << "spencer"
-                                                                          << "db"
-                                                                          << "test"
-                                                                          << "pwd"
-                                                                          << "")));
+                                                                     BSON("user" << "spencer"
+                                                                                 << "db"
+                                                                                 << "test"
+                                                                                 << "pwd"
+                                                                                 << "")));
 
     // Credentials must be provided
     ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                                     BSON("user"
-                                                                          << "spencer"
-                                                                          << "db"
-                                                                          << "test")));
+                                                                     BSON("user" << "spencer"
+                                                                                 << "db"
+                                                                                 << "test")));
 
     // Credentials must be object
     ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                                     BSON("user"
-                                                                          << "spencer"
-                                                                          << "db"
-                                                                          << "test"
-                                                                          << "credentials"
-                                                                          << "a")));
+                                                                     BSON("user" << "spencer"
+                                                                                 << "db"
+                                                                                 << "test"
+                                                                                 << "credentials"
+                                                                                 << "a")));
 
     // Must specify credentials for a valid mechanism
-    ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                                     BSON("user"
-                                                                          << "spencer"
-                                                                          << "db"
-                                                                          << "test"
-                                                                          << "credentials"
-                                                                          << BSON("foo"
-                                                                                  << "bar"))));
+    ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromUserDocument(
+        user.get(),
+        BSON("user" << "spencer"
+                    << "db"
+                    << "test"
+                    << "credentials" << BSON("foo" << "bar"))));
 
     // May specify only SCRAM-SHA-1 credentials
-    ASSERT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                                 BSON("user"
-                                                                      << "spencer"
-                                                                      << "db"
-                                                                      << "test"
-                                                                      << "credentials"
-                                                                      << BSON("SCRAM-SHA-1"
-                                                                              << sha1_creds))));
+    ASSERT_OK(v2parser.initializeUserCredentialsFromUserDocument(
+        user.get(),
+        BSON("user" << "spencer"
+                    << "db"
+                    << "test"
+                    << "credentials" << BSON("SCRAM-SHA-1" << sha1_creds))));
     ASSERT(user->getCredentials().scram_sha1.isValid());
     ASSERT(!user->getCredentials().scram_sha256.isValid());
     ASSERT(!user->getCredentials().isExternal);
 
     // May specify only SCRAM-SHA-256 credentials
-    ASSERT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                                 BSON("user"
-                                                                      << "spencer"
-                                                                      << "db"
-                                                                      << "test"
-                                                                      << "credentials"
-                                                                      << BSON("SCRAM-SHA-256"
-                                                                              << sha256_creds))));
+    ASSERT_OK(v2parser.initializeUserCredentialsFromUserDocument(
+        user.get(),
+        BSON("user" << "spencer"
+                    << "db"
+                    << "test"
+                    << "credentials" << BSON("SCRAM-SHA-256" << sha256_creds))));
     ASSERT(!user->getCredentials().scram_sha1.isValid());
     ASSERT(user->getCredentials().scram_sha256.isValid());
     ASSERT(!user->getCredentials().isExternal);
 
     // Make sure extracting valid combined credentials works
-    ASSERT_OK(
-        v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                           BSON("user"
-                                                                << "spencer"
-                                                                << "db"
-                                                                << "test"
-                                                                << "credentials" << credentials)));
+    ASSERT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
+                                                                 BSON("user" << "spencer"
+                                                                             << "db"
+                                                                             << "test"
+                                                                             << "credentials"
+                                                                             << credentials)));
     ASSERT(user->getCredentials().scram_sha1.isValid());
     ASSERT(user->getCredentials().scram_sha256.isValid());
     ASSERT(!user->getCredentials().isExternal);
 
     // Credentials are {external:true if users's db is $external
-    ASSERT_OK(
-        v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                           BSON("user"
-                                                                << "spencer"
-                                                                << "db"
-                                                                << "$external"
-                                                                << "credentials"
-                                                                << BSON("external" << true))));
+    ASSERT_OK(v2parser.initializeUserCredentialsFromUserDocument(
+        user.get(),
+        BSON("user" << "spencer"
+                    << "db"
+                    << "$external"
+                    << "credentials" << BSON("external" << true))));
     ASSERT(!user->getCredentials().scram_sha1.isValid());
     ASSERT(!user->getCredentials().scram_sha256.isValid());
     ASSERT(user->getCredentials().isExternal);
@@ -333,67 +297,57 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
 
 TEST_F(V2UserDocumentParsing, V2RoleExtraction) {
     // "roles" field must be provided
-    ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                                    << "spencer"),
-                                                               user.get()));
+    ASSERT_NOT_OK(
+        v2parser.initializeUserRolesFromUserDocument(BSON("user" << "spencer"), user.get()));
 
     // V1-style roles arrays no longer work
     ASSERT_NOT_OK(
-        v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                          << "spencer"
-                                                          << "roles" << BSON_ARRAY("read")),
+        v2parser.initializeUserRolesFromUserDocument(BSON("user" << "spencer"
+                                                                 << "roles" << BSON_ARRAY("read")),
                                                      user.get()));
 
     // Roles must have "db" field
-    ASSERT_NOT_OK(
-        v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                          << "spencer"
-                                                          << "roles" << BSON_ARRAY(BSONObj())),
-                                                     user.get()));
+    ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
+        BSON("user" << "spencer"
+                    << "roles" << BSON_ARRAY(BSONObj())),
+        user.get()));
 
-    ASSERT_NOT_OK(
-        v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                          << "spencer"
-                                                          << "roles"
-                                                          << BSON_ARRAY(BSON("role"
-                                                                             << "roleA"))),
-                                                     user.get()));
+    ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
+        BSON("user" << "spencer"
+                    << "roles" << BSON_ARRAY(BSON("role" << "roleA"))),
+        user.get()));
 
-    ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                                    << "spencer"
-                                                                    << "roles"
-                                                                    << BSON_ARRAY(BSON("user"
-                                                                                       << "roleA"
-                                                                                       << "db"
-                                                                                       << "dbA"))),
-                                                               user.get()));
+    ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
+        BSON("user" << "spencer"
+                    << "roles"
+                    << BSON_ARRAY(BSON("user" << "roleA"
+                                              << "db"
+                                              << "dbA"))),
+        user.get()));
 
     // Valid role names are extracted successfully
-    ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                                << "spencer"
-                                                                << "roles"
-                                                                << BSON_ARRAY(BSON("role"
-                                                                                   << "roleA"
-                                                                                   << "db"
-                                                                                   << "dbA"))),
-                                                           user.get()));
+    ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
+        BSON("user" << "spencer"
+                    << "roles"
+                    << BSON_ARRAY(BSON("role" << "roleA"
+                                              << "db"
+                                              << "dbA"))),
+        user.get()));
     RoleNameIterator roles = user->getRoles();
     ASSERT_EQUALS(RoleName("roleA", "dbA"), roles.next());
     ASSERT_FALSE(roles.more());
 
     // Multiple roles OK
-    ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                                << "spencer"
-                                                                << "roles"
-                                                                << BSON_ARRAY(BSON("role"
-                                                                                   << "roleA"
-                                                                                   << "db"
-                                                                                   << "dbA")
-                                                                              << BSON("role"
-                                                                                      << "roleB"
-                                                                                      << "db"
-                                                                                      << "dbB"))),
-                                                           user.get()));
+    ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
+        BSON("user" << "spencer"
+                    << "roles"
+                    << BSON_ARRAY(BSON("role" << "roleA"
+                                              << "db"
+                                              << "dbA")
+                                  << BSON("role" << "roleB"
+                                                 << "db"
+                                                 << "dbB"))),
+        user.get()));
     roles = user->getRoles();
     RoleName role = roles.next();
     if (role == RoleName("roleA", "dbA")) {
@@ -410,84 +364,72 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtraction) {
     const auto emptyObj = BSONObjBuilder().obj();
 
     // "authenticationRestrictions" field is optional
-    ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(BSON("user"
-                                                                                 << "spencer"),
-                                                                            user.get()));
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions" << emptyArray),
+        BSON("user" << "spencer"), user.get()));
+    ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions" << emptyArray),
         user.get()));
 
     // authenticationRestrictions must have at least one of "clientSource"/"serverAdddress" fields
     ASSERT_NOT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions" << BSON_ARRAY(emptyObj)),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions" << BSON_ARRAY(emptyObj)),
         user.get()));
 
     // authenticationRestrictions must not have unexpected elements
     ASSERT_NOT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("foo"
-                                << "bar"))),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions" << BSON_ARRAY(BSON("foo" << "bar"))),
         user.get()));
 
     // authenticationRestrictions may have only one of "clientSource"/"serverAddress" fields
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("::1")))),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions"
+                    << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("::1")))),
         user.get()));
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("serverAddress" << BSON_ARRAY("::1")))),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions"
+                    << BSON_ARRAY(BSON("serverAddress" << BSON_ARRAY("::1")))),
         user.get()));
 
     // authenticationRestrictions may have both "clientSource"/"serverAddress" fields
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("::1") << "serverAddress"
-                                               << BSON_ARRAY("::1")))),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions"
+                    << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("::1") << "serverAddress"
+                                                      << BSON_ARRAY("::1")))),
         user.get()));
 
     // authenticationRestrictions addresses must be valid CIDR strings
     ASSERT_NOT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("1.2.3.4.5")))),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions"
+                    << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("1.2.3.4.5")))),
         user.get()));
     ASSERT_NOT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("serverAddress" << BSON_ARRAY(":::1")))),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions"
+                    << BSON_ARRAY(BSON("serverAddress" << BSON_ARRAY(":::1")))),
         user.get()));
     ASSERT_NOT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("::1") << "serverAddress"
-                                               << BSON_ARRAY(":::1")))),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions"
+                    << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("::1") << "serverAddress"
+                                                      << BSON_ARRAY(":::1")))),
         user.get()));
 }
 
 TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtractionAndRetreival) {
     enableIPv6(true);
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
-        BSON("user"
-             << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("169.254.12.0/22") << "serverAddress"
-                                               << BSON_ARRAY("fe80::/10")))),
+        BSON("user" << "spencer"
+                    << "authenticationRestrictions"
+                    << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("169.254.12.0/22")
+                                                      << "serverAddress"
+                                                      << BSON_ARRAY("fe80::/10")))),
         user.get()));
 
     const auto& doc = user->getRestrictions();

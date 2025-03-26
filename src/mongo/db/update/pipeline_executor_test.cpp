@@ -322,8 +322,7 @@ TEST_F(UpdateTestFixture, CanUseConstantsAcrossMultipleUpdates) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     const std::vector<BSONObj> pipeline{fromjson("{$set: {b: '$$var1'}}")};
-    const auto constants = BSON("var1"
-                                << "foo");
+    const auto constants = BSON("var1" << "foo");
     PipelineExecutor exec(expCtx, pipeline, constants);
 
     // Update first doc.

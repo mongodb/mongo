@@ -72,7 +72,8 @@ public:
      */
     class Sampler {
     public:
-        Sampler(std::string name, Date_t lastPingTime) : _name(name), _lastPingTime(lastPingTime){};
+        Sampler(std::string name, Date_t lastPingTime)
+            : _name(name), _lastPingTime(lastPingTime) {};
 
         std::string getName() const {
             return _name;

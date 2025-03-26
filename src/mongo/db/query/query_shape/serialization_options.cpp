@@ -99,8 +99,7 @@ static const StringMap<StringData> kArrayTypeStringConstants{
 
 static constexpr auto kRepresentativeString = "?"_sd;
 static constexpr auto kRepresentativeNumber = 1;
-static const auto kRepresentativeObject = BSON("?"
-                                               << "?");
+static const auto kRepresentativeObject = BSON("?" << "?");
 static const auto kRepresentativeArray = BSONArray();
 static constexpr auto kRepresentativeBinData = BSONBinData();
 static const auto kRepresentativeObjectId = OID::max();

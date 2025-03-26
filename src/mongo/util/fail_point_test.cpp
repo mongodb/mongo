@@ -345,22 +345,19 @@ TEST(FailPoint, parseBSONInvalidModeFails) {
     swTuple = FailPoint::parseBSON(BSON("mode" << true));
     ASSERT_FALSE(swTuple.isOK());
 
-    swTuple = FailPoint::parseBSON(BSON("mode"
-                                        << "notAMode"));
+    swTuple = FailPoint::parseBSON(BSON("mode" << "notAMode"));
     ASSERT_FALSE(swTuple.isOK());
 
     swTuple = FailPoint::parseBSON(BSON("mode" << BSON("invalidSubField" << 1)));
     ASSERT_FALSE(swTuple.isOK());
 
-    swTuple = FailPoint::parseBSON(BSON("mode" << BSON("times"
-                                                       << "notAnInt")));
+    swTuple = FailPoint::parseBSON(BSON("mode" << BSON("times" << "notAnInt")));
     ASSERT_FALSE(swTuple.isOK());
 
     swTuple = FailPoint::parseBSON(BSON("mode" << BSON("times" << -5)));
     ASSERT_FALSE(swTuple.isOK());
 
-    swTuple = FailPoint::parseBSON(BSON("mode" << BSON("activationProbability"
-                                                       << "notADouble")));
+    swTuple = FailPoint::parseBSON(BSON("mode" << BSON("activationProbability" << "notADouble")));
     ASSERT_FALSE(swTuple.isOK());
 
     double greaterThan1 = 1.3;
@@ -373,12 +370,10 @@ TEST(FailPoint, parseBSONInvalidModeFails) {
 }
 
 TEST(FailPoint, parseBSONValidModeSucceeds) {
-    auto swTuple = FailPoint::parseBSON(BSON("mode"
-                                             << "off"));
+    auto swTuple = FailPoint::parseBSON(BSON("mode" << "off"));
     ASSERT_TRUE(swTuple.isOK());
 
-    swTuple = FailPoint::parseBSON(BSON("mode"
-                                        << "alwaysOn"));
+    swTuple = FailPoint::parseBSON(BSON("mode" << "alwaysOn"));
     ASSERT_TRUE(swTuple.isOK());
 
     swTuple = FailPoint::parseBSON(BSON("mode" << BSON("times" << 1)));
@@ -389,17 +384,15 @@ TEST(FailPoint, parseBSONValidModeSucceeds) {
 }
 
 TEST(FailPoint, parseBSONInvalidDataFails) {
-    auto swTuple = FailPoint::parseBSON(BSON("mode"
-                                             << "alwaysOn"
-                                             << "data"
-                                             << "notABSON"));
+    auto swTuple = FailPoint::parseBSON(BSON("mode" << "alwaysOn"
+                                                    << "data"
+                                                    << "notABSON"));
     ASSERT_FALSE(swTuple.isOK());
 }
 
 TEST(FailPoint, parseBSONValidDataSucceeds) {
-    auto swTuple = FailPoint::parseBSON(BSON("mode"
-                                             << "alwaysOn"
-                                             << "data" << BSON("a" << 1)));
+    auto swTuple = FailPoint::parseBSON(BSON("mode" << "alwaysOn"
+                                                    << "data" << BSON("a" << 1)));
     ASSERT_TRUE(swTuple.isOK());
 }
 

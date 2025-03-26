@@ -65,8 +65,7 @@ TEST_F(ClusterServerParameterSynchronizationHelpersTest, ValidateBadClusterParam
 }
 
 TEST_F(ClusterServerParameterSynchronizationHelpersTest, ValidateUnknownClusterParameterName) {
-    BSONObj clusterParamDoc = BSON("_id"
-                                   << "testUnknown");
+    BSONObj clusterParamDoc = BSON("_id" << "testUnknown");
 
     ASSERT_THROWS_CODE(cluster_parameters::validateParameter(clusterParamDoc, boost::none),
                        DBException,
@@ -110,8 +109,7 @@ TEST_F(ClusterServerParameterSynchronizationHelpersTest, BadClusterParameterName
 TEST_F(ClusterServerParameterSynchronizationHelpersTest, EmptyClusterParameterName) {
     auto opCtx = cc().makeOperationContext();
 
-    BSONObj clusterParamDoc = BSON("_id"
-                                   << "");
+    BSONObj clusterParamDoc = BSON("_id" << "");
 
     ASSERT_DOES_NOT_THROW(
         cluster_parameters::updateParameter(opCtx.get(), clusterParamDoc, "", boost::none));

@@ -149,8 +149,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncoded
     std::string indexName("a_1");
     auto keyPattern = BSON("a" << 1);
     auto keyValue = BSON("" << mockCollationKey);
-    auto collation = BSON("locale"
-                          << "en_US");
+    auto collation = BSON("locale" << "en_US");
 
     auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, collation);
     ASSERT_NOT_OK(dupKeyStatus);
@@ -177,8 +176,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageHexEncodesInvalidUTF8ForIndexW
     // The byte sequence c0 16 is invalid UTF-8 since this is an overlong encoding of the letter
     // "a", which should be represented as simply 0x16. The byte 0xc0 is always illegal in UTF-8
     // since it would only ever be used for an overload two-byte encoding of an ASCII character.
-    auto keyValue = BSON(""
-                         << "\xc0\x16");
+    auto keyValue = BSON("" << "\xc0\x16");
     auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, BSONObj{});
     ASSERT_NOT_OK(dupKeyStatus);
     ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
@@ -191,9 +189,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageHexEncodesInvalidUTF8ForIndexW
     auto extraInfo = dupKeyStatus.extraInfo<DuplicateKeyErrorInfo>();
     ASSERT(extraInfo);
     ASSERT_BSONOBJ_EQ(extraInfo->getKeyPattern(), keyPattern);
-    ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(),
-                      BSON("a"
-                           << "\xc0\x16"));
+    ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(), BSON("a" << "\xc0\x16"));
 }
 
 }  // namespace mongo

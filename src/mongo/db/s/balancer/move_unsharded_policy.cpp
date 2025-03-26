@@ -67,9 +67,7 @@ bool clusterHasShardedCollections(OperationContext* opCtx, bool draining) {
     // Skip config.system.sessions if we are not draining as it isn't balanced as part of the random
     // migrations failpoint. If we are draining shards, though, we need to include this collection.
     if (!draining) {
-        matchBuilder.append(CollectionType::kNssFieldName,
-                            BSON("$regex"
-                                 << "^(?!config\\.).*"));
+        matchBuilder.append(CollectionType::kNssFieldName, BSON("$regex" << "^(?!config\\.).*"));
     }
 
     std::vector<BSONObj> rawPipelineStages{
@@ -214,14 +212,13 @@ std::vector<std::pair<NamespaceString, ChunkType>> getTrackedUnshardedCollection
         //     ],
         //     "as": "chunks",
         // }
-        BSON("$lookup" << BSON("from"
-                               << "chunks"
-                               << "localField" << ChunkType::collectionUUID.name() << "foreignField"
-                               << CollectionType::kUuidFieldName << "pipeline"
-                               << BSON_ARRAY(
-                                      BSON("$match" << BSON(ChunkType::shard.name() << shardId))
+        BSON("$lookup" << BSON(
+                 "from" << "chunks"
+                        << "localField" << ChunkType::collectionUUID.name() << "foreignField"
+                        << CollectionType::kUuidFieldName << "pipeline"
+                        << BSON_ARRAY(BSON("$match" << BSON(ChunkType::shard.name() << shardId))
                                       << BSON("$limit" << 1))
-                               << "as" << chunkFieldName)),
+                        << "as" << chunkFieldName)),
 
         // This stage has two purposes:
         //   - Promote the chunk object to top level field in every collection entry.

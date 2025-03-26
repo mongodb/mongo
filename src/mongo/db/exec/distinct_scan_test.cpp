@@ -518,49 +518,39 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyInMiddleDistinctKeySuffixTest) {
 TEST_F(DistinctScanTest, ShardFilteringShardKeyAtEndTest) {
     const ShardKeyPattern shardKeyPattern(BSON("c" << 1));
     const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
-    verifyDistinctScanExecution({.shardKey = shardKey,
-                                 .docsOnShard = kDataset,
-                                 .chunks =
-                                     {
-                                         {{shardKey.globalMin(),
-                                           BSON("c"
-                                                << "PEAR")},
-                                          true /* isOnCurShard */},
-                                         {{BSON("c"
-                                                << "PEAR"),
-                                           BSON("c"
-                                                << "banana")},
-                                          false /* isOnCurShard */},
-                                         {{BSON("c"
-                                                << "banana"),
-                                           shardKey.globalMax()},
-                                          true /* isOnCurShard */},
-                                     },
-                                 .idxKey = BSON("a" << -1 << "b" << -1 << "c" << -1),
-                                 .scanDirection = -1,
-                                 .fieldNo = 0,
-                                 .bounds =
-                                     makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
-                                                      {"b", {IndexBoundsBuilder::allValues()}},
-                                                      {"c", {IndexBoundsBuilder::allValues()}}}),
-                                 .shouldShardFilter = true,
-                                 .shouldFetch = false,
-                                 .expectedWorkPattern = {PlanStage::NEED_TIME,
-                                                         BSON("" << 5 << "" << true << ""
-                                                                 << "AppLe"),
-                                                         BSON("" << 9 << "" << false << ""
-                                                                 << "ApPlE"),
-                                                         BSON("" << 10 << "" << false << ""
-                                                                 << "pear"),
-                                                         BSON("" << 15 << "" << true << ""
-                                                                 << "pEaR"),
-                                                         PlanStage::NEED_TIME,
-                                                         BSON("" << 20 << "" << false << ""
-                                                                 << "BaNaNa"),
-                                                         PlanStage::NEED_TIME,
-                                                         BSON("" << 35 << "" << false << ""
-                                                                 << "ANANAS"),
-                                                         PlanStage::IS_EOF}});
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks =
+             {
+                 {{shardKey.globalMin(), BSON("c" << "PEAR")}, true /* isOnCurShard */},
+                 {{BSON("c" << "PEAR"), BSON("c" << "banana")}, false /* isOnCurShard */},
+                 {{BSON("c" << "banana"), shardKey.globalMax()}, true /* isOnCurShard */},
+             },
+         .idxKey = BSON("a" << -1 << "b" << -1 << "c" << -1),
+         .scanDirection = -1,
+         .fieldNo = 0,
+         .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
+                                    {"b", {IndexBoundsBuilder::allValues()}},
+                                    {"c", {IndexBoundsBuilder::allValues()}}}),
+         .shouldShardFilter = true,
+         .shouldFetch = false,
+         .expectedWorkPattern = {PlanStage::NEED_TIME,
+                                 BSON("" << 5 << "" << true << ""
+                                         << "AppLe"),
+                                 BSON("" << 9 << "" << false << ""
+                                         << "ApPlE"),
+                                 BSON("" << 10 << "" << false << ""
+                                         << "pear"),
+                                 BSON("" << 15 << "" << true << ""
+                                         << "pEaR"),
+                                 PlanStage::NEED_TIME,
+                                 BSON("" << 20 << "" << false << ""
+                                         << "BaNaNa"),
+                                 PlanStage::NEED_TIME,
+                                 BSON("" << 35 << "" << false << ""
+                                         << "ANANAS"),
+                                 PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeySubsetTest) {
@@ -800,132 +790,106 @@ TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeyContiguousSubsetTest) {
 TEST_F(DistinctScanTest, ShardFilteringCompoundIndexShardKeySuffixTestChunkSkipping) {
     const ShardKeyPattern shardKeyPattern(BSON("c" << 1));
     const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
-    verifyDistinctScanExecution({.shardKey = shardKey,
-                                 .docsOnShard =
-                                     {
-                                         BSON("a" << 1 << "b" << 1 << "c"
-                                                  << "orphan-no-next-chunk"),
-                                         BSON("a" << 2 << "b" << 1 << "c"
-                                                  << "non-orphan"),
-                                     },
-                                 .chunks = {{{shardKey.globalMin(),
-                                              BSON("c"
-                                                   << "non-orphan-end")},
-                                             true /* isOnCurShard */},
-                                            {{BSON("c"
-                                                   << "non-orphan-end"),
-                                              shardKey.globalMax()},
-                                             false /* isOnCurShard */}},
-                                 .idxKey = BSON("a" << 1 << "b" << -1 << "c" << 1),
-                                 .scanDirection = 1,
-                                 .fieldNo = 0,
-                                 .bounds = makeIndexBounds(
-                                     {{"a", {IndexBoundsBuilder::allValues()}},
-                                      {"b", {IndexBoundsBuilder::allValues().reverseClone()}},
-                                      {"c", {IndexBoundsBuilder::allValues()}}}),
-                                 .shouldShardFilter = true,
-                                 .shouldFetch = false,
-                                 .expectedWorkPattern = {PlanStage::NEED_TIME,
-                                                         BSON("" << 2 << "" << 1 << ""
-                                                                 << "non-orphan"),
-                                                         PlanStage::IS_EOF}});
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard =
+             {
+                 BSON("a" << 1 << "b" << 1 << "c"
+                          << "orphan-no-next-chunk"),
+                 BSON("a" << 2 << "b" << 1 << "c"
+                          << "non-orphan"),
+             },
+         .chunks = {{{shardKey.globalMin(), BSON("c" << "non-orphan-end")},
+                     true /* isOnCurShard */},
+                    {{BSON("c" << "non-orphan-end"), shardKey.globalMax()},
+                     false /* isOnCurShard */}},
+         .idxKey = BSON("a" << 1 << "b" << -1 << "c" << 1),
+         .scanDirection = 1,
+         .fieldNo = 0,
+         .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}},
+                                    {"b", {IndexBoundsBuilder::allValues().reverseClone()}},
+                                    {"c", {IndexBoundsBuilder::allValues()}}}),
+         .shouldShardFilter = true,
+         .shouldFetch = false,
+         .expectedWorkPattern = {PlanStage::NEED_TIME,
+                                 BSON("" << 2 << "" << 1 << ""
+                                         << "non-orphan"),
+                                 PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringNoShardKeyInIndexKeyTest) {
     const ShardKeyPattern shardKeyPattern(BSON("c" << 1));
     const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
-    verifyDistinctScanExecution({.shardKey = shardKey,
-                                 .docsOnShard = kDataset,
-                                 .chunks =
-                                     {
-                                         {{shardKey.globalMin(),
-                                           BSON("c"
-                                                << "PEAR")},
-                                          true /* isOnCurShard */},
-                                         {{BSON("c"
-                                                << "PEAR"),
-                                           BSON("c"
-                                                << "banana")},
-                                          false /* isOnCurShard */},
-                                         {{BSON("c"
-                                                << "banana"),
-                                           shardKey.globalMax()},
-                                          true /* isOnCurShard */},
-                                     },
-                                 .idxKey = BSON("a" << 1),
-                                 .scanDirection = 1,
-                                 .fieldNo = 0,
-                                 .bounds =
-                                     makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}}}),
-                                 .shouldShardFilter = true,
-                                 .shouldFetch = true,
-                                 .expectedWorkPattern = {
-                                     PlanStage::NEED_TIME,
-                                     PlanStage::NEED_TIME,
-                                     BSON("_id" << 3 << "a" << 5 << "b" << true << "c"
-                                                << "AppLe"),
-                                     BSON("_id" << 4 << "a" << 9 << "b" << false << "c"
-                                                << "ApPlE"),
-                                     PlanStage::NEED_TIME,
-                                     BSON("_id" << 6 << "a" << 10 << "b" << false << "c"
-                                                << "pear"),
-                                     BSON("_id" << 7 << "a" << 15 << "b" << true << "c"
-                                                << "pEaR"),
-                                     PlanStage::NEED_TIME,
-                                     PlanStage::NEED_TIME,
-                                     BSON("_id" << 10 << "a" << 20 << "b" << false << "c"
-                                                << "BaNaNa"),
-                                     PlanStage::NEED_TIME,
-                                     BSON("_id" << 14 << "a" << 35 << "b" << false << "c"
-                                                << "ANANAS"),
-                                     PlanStage::IS_EOF}});
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks =
+             {
+                 {{shardKey.globalMin(), BSON("c" << "PEAR")}, true /* isOnCurShard */},
+                 {{BSON("c" << "PEAR"), BSON("c" << "banana")}, false /* isOnCurShard */},
+                 {{BSON("c" << "banana"), shardKey.globalMax()}, true /* isOnCurShard */},
+             },
+         .idxKey = BSON("a" << 1),
+         .scanDirection = 1,
+         .fieldNo = 0,
+         .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}}}),
+         .shouldShardFilter = true,
+         .shouldFetch = true,
+         .expectedWorkPattern = {PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 BSON("_id" << 3 << "a" << 5 << "b" << true << "c"
+                                            << "AppLe"),
+                                 BSON("_id" << 4 << "a" << 9 << "b" << false << "c"
+                                            << "ApPlE"),
+                                 PlanStage::NEED_TIME,
+                                 BSON("_id" << 6 << "a" << 10 << "b" << false << "c"
+                                            << "pear"),
+                                 BSON("_id" << 7 << "a" << 15 << "b" << true << "c"
+                                            << "pEaR"),
+                                 PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 BSON("_id" << 10 << "a" << 20 << "b" << false << "c"
+                                            << "BaNaNa"),
+                                 PlanStage::NEED_TIME,
+                                 BSON("_id" << 14 << "a" << 35 << "b" << false << "c"
+                                            << "ANANAS"),
+                                 PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringNoShardKeyInIndexKeyReverseScanTest) {
     const ShardKeyPattern shardKeyPattern(BSON("c" << 1));
     const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
-    verifyDistinctScanExecution({.shardKey = shardKey,
-                                 .docsOnShard = kDataset,
-                                 .chunks =
-                                     {
-                                         {{shardKey.globalMin(),
-                                           BSON("c"
-                                                << "PEAR")},
-                                          true /* isOnCurShard */},
-                                         {{BSON("c"
-                                                << "PEAR"),
-                                           BSON("c"
-                                                << "banana")},
-                                          false /* isOnCurShard */},
-                                         {{BSON("c"
-                                                << "banana"),
-                                           shardKey.globalMax()},
-                                          true /* isOnCurShard */},
-                                     },
-                                 .idxKey = BSON("a" << 1),
-                                 .scanDirection = -1,
-                                 .fieldNo = 0,
-                                 .bounds = makeIndexBounds(
-                                     {{"a", {IndexBoundsBuilder::allValues().reverseClone()}}}),
-                                 .shouldShardFilter = true,
-                                 .shouldFetch = true,
-                                 .expectedWorkPattern = {
-                                     BSON("_id" << 14 << "a" << 35 << "b" << false << "c"
-                                                << "ANANAS"),
-                                     PlanStage::NEED_TIME,
-                                     PlanStage::NEED_TIME,
-                                     BSON("_id" << 11 << "a" << 20 << "b" << true << "c"
-                                                << "BANANA"),
-                                     PlanStage::NEED_TIME,
-                                     BSON("_id" << 7 << "a" << 15 << "b" << true << "c"
-                                                << "pEaR"),
-                                     BSON("_id" << 6 << "a" << 10 << "b" << false << "c"
-                                                << "pear"),
-                                     BSON("_id" << 4 << "a" << 9 << "b" << false << "c"
-                                                << "ApPlE"),
-                                     BSON("_id" << 3 << "a" << 5 << "b" << true << "c"
-                                                << "AppLe"),
-                                     PlanStage::IS_EOF}});
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks =
+             {
+                 {{shardKey.globalMin(), BSON("c" << "PEAR")}, true /* isOnCurShard */},
+                 {{BSON("c" << "PEAR"), BSON("c" << "banana")}, false /* isOnCurShard */},
+                 {{BSON("c" << "banana"), shardKey.globalMax()}, true /* isOnCurShard */},
+             },
+         .idxKey = BSON("a" << 1),
+         .scanDirection = -1,
+         .fieldNo = 0,
+         .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues().reverseClone()}}}),
+         .shouldShardFilter = true,
+         .shouldFetch = true,
+         .expectedWorkPattern = {BSON("_id" << 14 << "a" << 35 << "b" << false << "c"
+                                            << "ANANAS"),
+                                 PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 BSON("_id" << 11 << "a" << 20 << "b" << true << "c"
+                                            << "BANANA"),
+                                 PlanStage::NEED_TIME,
+                                 BSON("_id" << 7 << "a" << 15 << "b" << true << "c"
+                                            << "pEaR"),
+                                 BSON("_id" << 6 << "a" << 10 << "b" << false << "c"
+                                            << "pear"),
+                                 BSON("_id" << 4 << "a" << 9 << "b" << false << "c"
+                                            << "ApPlE"),
+                                 BSON("_id" << 3 << "a" << 5 << "b" << true << "c"
+                                            << "AppLe"),
+                                 PlanStage::IS_EOF}});
 }
 
 }  // namespace

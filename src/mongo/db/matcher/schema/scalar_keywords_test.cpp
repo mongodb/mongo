@@ -340,8 +340,7 @@ TEST(JSONSchemaParserScalarTest, PatternTranslatesCorrectlyWithString) {
         BSON("$or" << BSON_ARRAY(
                  BSON("foo" << BSON("$not" << BSON("$exists" << true)))
                  << BSON("$and" << BSON_ARRAY(
-                             BSON("foo" << BSON("$regex"
-                                                << "abc"))
+                             BSON("foo" << BSON("$regex" << "abc"))
                              << BSON("foo" << BSON("$_internalSchemaType" << BSON_ARRAY(2)))))));
     ASSERT_SERIALIZES_TO(optimizedResult, expected);
 }

@@ -178,9 +178,8 @@ constexpr auto kExceptionMessage = "No good very bad exception";
 COMMON_THREAD_POOL_DEATH_TEST(DieWhenExceptionBubblesUp, kExceptionMessage) {
     auto& pool = getThreadPool();
     pool.startup();
-    pool.schedule([](auto status) {
-        uassertStatusOK(Status({ErrorCodes::BadValue, kExceptionMessage}));
-    });
+    pool.schedule(
+        [](auto status) { uassertStatusOK(Status({ErrorCodes::BadValue, kExceptionMessage})); });
     pool.shutdown();
     pool.join();
 }

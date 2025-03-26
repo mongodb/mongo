@@ -49,12 +49,8 @@ TEST(CollationBSONComparisonTest, CompareCodeWScopeElementWithCollationShouldNot
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONElementComparator comparator(BSONElementComparator::FieldNamesMode::kConsider,
                                            &collator);
-    BSONObj obj1 = BSON("a" << BSONCodeWScope("js code",
-                                              BSON("foo"
-                                                   << "bar")));
-    BSONObj obj2 = BSON("a" << BSONCodeWScope("js code",
-                                              BSON("foo"
-                                                   << "not bar")));
+    BSONObj obj1 = BSON("a" << BSONCodeWScope("js code", BSON("foo" << "bar")));
+    BSONObj obj2 = BSON("a" << BSONCodeWScope("js code", BSON("foo" << "not bar")));
     // The elements are not equal with or without the "always equal" collator.
     ASSERT(comparator.evaluate(obj1["a"] != obj2["a"]));
     ASSERT_BSONELT_NE(obj1["a"], obj2["a"]);
@@ -64,12 +60,8 @@ TEST(CollationBSONComparisonTest, CompareCodeWScopeObjWithCollationShouldNotResp
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONObjComparator comparator(
         BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &collator);
-    BSONObj obj1 = BSON("a" << BSONCodeWScope("js code",
-                                              BSON("foo"
-                                                   << "bar")));
-    BSONObj obj2 = BSON("a" << BSONCodeWScope("js code",
-                                              BSON("foo"
-                                                   << "not bar")));
+    BSONObj obj1 = BSON("a" << BSONCodeWScope("js code", BSON("foo" << "bar")));
+    BSONObj obj2 = BSON("a" << BSONCodeWScope("js code", BSON("foo" << "not bar")));
     // The elements are not equal with or without the "always equal" collator.
     ASSERT(comparator.evaluate(obj1 != obj2));
     ASSERT_BSONOBJ_NE(obj1, obj2);
@@ -79,12 +71,8 @@ TEST(CollationBSONComparisonTest, HashingCodeWScopeElementWithCollationShouldNot
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONElementComparator comparator(BSONElementComparator::FieldNamesMode::kConsider,
                                            &collator);
-    BSONObj obj1 = BSON("a" << BSONCodeWScope("js code",
-                                              BSON("foo"
-                                                   << "bar")));
-    BSONObj obj2 = BSON("a" << BSONCodeWScope("js code",
-                                              BSON("foo"
-                                                   << "not bar")));
+    BSONObj obj1 = BSON("a" << BSONCodeWScope("js code", BSON("foo" << "bar")));
+    BSONObj obj2 = BSON("a" << BSONCodeWScope("js code", BSON("foo" << "not bar")));
     // The elements are not equal with or without the "always equal" collator.
     ASSERT_NE(SimpleBSONElementComparator::kInstance.hash(obj1["a"]),
               SimpleBSONElementComparator::kInstance.hash(obj2["a"]));
@@ -95,12 +83,8 @@ TEST(CollationBSONComparisonTest, HashingCodeWScopeObjWithCollationShouldNotResp
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONObjComparator comparator(
         BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &collator);
-    BSONObj obj1 = BSON("a" << BSONCodeWScope("js code",
-                                              BSON("foo"
-                                                   << "bar")));
-    BSONObj obj2 = BSON("a" << BSONCodeWScope("js code",
-                                              BSON("foo"
-                                                   << "not bar")));
+    BSONObj obj1 = BSON("a" << BSONCodeWScope("js code", BSON("foo" << "bar")));
+    BSONObj obj2 = BSON("a" << BSONCodeWScope("js code", BSON("foo" << "not bar")));
     // The elements are not equal with or without the "always equal" collator.
     ASSERT_NE(SimpleBSONObjComparator::kInstance.hash(obj1),
               SimpleBSONObjComparator::kInstance.hash(obj2));
@@ -111,10 +95,8 @@ TEST(CollationBSONComparisonTest, ElementStringComparisonShouldRespectCollation)
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONElementComparator comparator(BSONElementComparator::FieldNamesMode::kConsider,
                                            &collator);
-    BSONObj obj1 = BSON("a"
-                        << "foo");
-    BSONObj obj2 = BSON("a"
-                        << "not foo");
+    BSONObj obj1 = BSON("a" << "foo");
+    BSONObj obj2 = BSON("a" << "not foo");
     ASSERT(comparator.evaluate(obj1["a"] == obj2["a"]));
 }
 
@@ -122,10 +104,8 @@ TEST(CollationBSONComparisonTest, ElementStringHashShouldRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONElementComparator comparator(BSONElementComparator::FieldNamesMode::kConsider,
                                            &collator);
-    BSONObj obj1 = BSON("a"
-                        << "foo");
-    BSONObj obj2 = BSON("a"
-                        << "not foo");
+    BSONObj obj1 = BSON("a" << "foo");
+    BSONObj obj2 = BSON("a" << "not foo");
     ASSERT_EQ(comparator.hash(obj1["a"]), comparator.hash(obj2["a"]));
 }
 
@@ -133,10 +113,8 @@ TEST(CollationBSONComparisonTest, ObjStringComparisonShouldRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONObjComparator comparator(
         BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &collator);
-    BSONObj obj1 = BSON("a"
-                        << "foo");
-    BSONObj obj2 = BSON("a"
-                        << "not foo");
+    BSONObj obj1 = BSON("a" << "foo");
+    BSONObj obj2 = BSON("a" << "not foo");
     ASSERT(comparator.evaluate(obj1 == obj2));
 }
 
@@ -144,10 +122,8 @@ TEST(CollationBSONComparisonTest, ObjStringHashShouldRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONObjComparator comparator(
         BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &collator);
-    BSONObj obj1 = BSON("a"
-                        << "foo");
-    BSONObj obj2 = BSON("a"
-                        << "not foo");
+    BSONObj obj1 = BSON("a" << "foo");
+    BSONObj obj2 = BSON("a" << "not foo");
     ASSERT_EQ(comparator.hash(obj1), comparator.hash(obj2));
 }
 
@@ -191,8 +167,7 @@ TEST(CollationBSONComparisonTest, IdenticalCodeAndStringValuesAreNotEqual) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONObjComparator comparator(
         BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &collator);
-    BSONObj obj1 = BSON("a"
-                        << "foo");
+    BSONObj obj1 = BSON("a" << "foo");
     BSONObj obj2 = BSON("a" << BSONCode("foo"));
     ASSERT_BSONOBJ_NE(obj1, obj2);
     ASSERT(comparator.evaluate(obj1 != obj2));
@@ -202,8 +177,7 @@ TEST(CollationBSONComparisonTest, IdenticalCodeAndStringValuesDoNotHashEqually) 
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const BSONObjComparator comparator(
         BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &collator);
-    BSONObj obj1 = BSON("a"
-                        << "foo");
+    BSONObj obj1 = BSON("a" << "foo");
     BSONObj obj2 = BSON("a" << BSONCode("foo"));
     ASSERT_NE(comparator.hash(obj1), comparator.hash(obj2));
     ASSERT_NE(SimpleBSONObjComparator::kInstance.hash(obj1),

@@ -49,9 +49,7 @@ TEST(AlwaysFalseMatchExpression, RejectsAllObjects) {
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSON("a" << BSONObj())));
     ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSON("a" << 1)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr,
-                                            BSON("a"
-                                                 << "string")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSON("a" << "string")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSONObj()));
 }
 
@@ -60,9 +58,7 @@ TEST(AlwaysTrueMatchExpression, AcceptsAllObjects) {
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSON("a" << BSONObj())));
     ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSON("a" << 1)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr,
-                                           BSON("a"
-                                                << "string")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSON("a" << "string")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSONObj()));
 }
 
@@ -172,12 +168,9 @@ TEST(ElemMatchObjectMatchExpression, ElemMatchKey) {
 }
 
 TEST(ElemMatchObjectMatchExpression, Collation) {
-    auto baseOperand = BSON("b"
-                            << "string");
-    auto match = BSON("a" << BSON_ARRAY(BSON("b"
-                                             << "string")));
-    auto notMatch = BSON("a" << BSON_ARRAY(BSON("b"
-                                                << "string2")));
+    auto baseOperand = BSON("b" << "string");
+    auto match = BSON("a" << BSON_ARRAY(BSON("b" << "string")));
+    auto notMatch = BSON("a" << BSON_ARRAY(BSON("b" << "string2")));
     auto eq = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand["b"]);
     auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
     auto collator = CollatorInterfaceMock{CollatorInterfaceMock::MockType::kAlwaysEqual};
@@ -374,8 +367,7 @@ TEST(SizeMatchExpression, MatchesElement) {
 
 TEST(SizeMatchExpression, MatchesNonArray) {
     // Non arrays do not match.
-    auto stringValue = BSON("a"
-                            << "z");
+    auto stringValue = BSON("a" << "z");
     auto numberValue = BSON("a" << 0);
     auto arrayValue = BSON("a" << BSONArray());
     auto size = SizeMatchExpression{""_sd, 0};
@@ -426,17 +418,13 @@ TEST(InternalExprComparisonMatchExpression, DoesNotPerformTypeBracketing) {
         ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << 1)));
         ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << 2)));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << 3.5)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt,
-                                               BSON("x"
-                                                    << "string")));
+        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << "string")));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON("a" << 1))));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << OID())));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << DATENOW)));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << Timestamp(0, 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt,
-                                               BSON("x"
-                                                    << "/^m/")));
+        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << "/^m/")));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << MAXKEY)));
     }
     {
@@ -449,17 +437,13 @@ TEST(InternalExprComparisonMatchExpression, DoesNotPerformTypeBracketing) {
         ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << 1)));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << 2)));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << 3.5)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte,
-                                               BSON("x"
-                                                    << "string")));
+        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << "string")));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON("a" << 1))));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << OID())));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << DATENOW)));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << Timestamp(0, 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte,
-                                               BSON("x"
-                                                    << "/^m/")));
+        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << "/^m/")));
         ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << MAXKEY)));
     }
     {
@@ -472,9 +456,7 @@ TEST(InternalExprComparisonMatchExpression, DoesNotPerformTypeBracketing) {
         ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << 1)));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << 2)));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << 3.5)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt,
-                                                BSON("x"
-                                                     << "string")));
+        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << "string")));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON("a" << 1))));
         ASSERT_TRUE(exec::matcher::matchesBSON(
             &lt,
@@ -483,9 +465,7 @@ TEST(InternalExprComparisonMatchExpression, DoesNotPerformTypeBracketing) {
         ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << OID())));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << DATENOW)));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << Timestamp(0, 3))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt,
-                                                BSON("x"
-                                                     << "/^m/")));
+        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << "/^m/")));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << MAXKEY)));
     }
     {
@@ -498,9 +478,7 @@ TEST(InternalExprComparisonMatchExpression, DoesNotPerformTypeBracketing) {
         ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << 1)));
         ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << 2)));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << 3.5)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte,
-                                                BSON("x"
-                                                     << "string")));
+        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << "string")));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON("a" << 1))));
         ASSERT_TRUE(exec::matcher::matchesBSON(
             &lte,
@@ -509,9 +487,7 @@ TEST(InternalExprComparisonMatchExpression, DoesNotPerformTypeBracketing) {
         ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << OID())));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << DATENOW)));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << Timestamp(0, 3))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte,
-                                                BSON("x"
-                                                     << "/^m/")));
+        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << "/^m/")));
         ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << MAXKEY)));
     }
 }
@@ -656,33 +632,24 @@ TEST(InternalExprEqMatchExpression, CorrectlyMatchesScalarElements) {
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq1, BSON("a" << 5.0)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq1, BSON("a" << 6)));
 
-    BSONObj operand2 = BSON("a"
-                            << "str");
+    BSONObj operand2 = BSON("a" << "str");
     InternalExprEqMatchExpression eq2(operand2.firstElement().fieldNameStringData(),
                                       operand2.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq2,
-                                           BSON("a"
-                                                << "str")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq2,
-                                            BSON("a"
-                                                 << "string")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq2, BSON("a" << "str")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq2, BSON("a" << "string")));
 }
 
 TEST(InternalExprEqMatchExpression, StringMatchingRespectsCollation) {
-    BSONObj operand = BSON("a"
-                           << "string");
+    BSONObj operand = BSON("a" << "string");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());
     eq.setCollator(&collator);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq,
-                                           BSON("a"
-                                                << "string2")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << "string2")));
 }
 
 TEST(InternalExprEqMatchExpression, ComparisonRespectsNewCollationAfterCallingSetCollator) {
-    BSONObj operand = BSON("a"
-                           << "string1");
+    BSONObj operand = BSON("a" << "string1");
 
     CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
     CollatorInterfaceMock collatorCompareLower(CollatorInterfaceMock::MockType::kToLowerString);
@@ -690,21 +657,13 @@ TEST(InternalExprEqMatchExpression, ComparisonRespectsNewCollationAfterCallingSe
     InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());
     eq.setCollator(&collatorAlwaysEqual);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq,
-                                           BSON("a"
-                                                << "string2")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << "string2")));
 
 
     eq.setCollator(&collatorCompareLower);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq,
-                                           BSON("a"
-                                                << "string1")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq,
-                                           BSON("a"
-                                                << "STRING1")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq,
-                                            BSON("a"
-                                                 << "string2")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << "string1")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << "STRING1")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << "string2")));
 }
 
 TEST(InternalExprEqMatchExpression, CorrectlyMatchesArrayElement) {
@@ -795,32 +754,22 @@ TEST(InternalExprEqMatchExpression, ConsidersFieldNameInObjectEquality) {
 }
 
 TEST(ComparisonMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
-    BSONObj operand = BSON("a"
-                           << "string");
+    BSONObj operand = BSON("a" << "string");
     EqualityMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT(!exec::matcher::matchesBSON(&eq,
-                                       BSON("a"
-                                            << "string2"),
-                                       nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << "string2"), nullptr));
 }
 
 TEST(ComparisonMatchExpression, StringMatchingRespectsCollation) {
-    BSONObj operand = BSON("a"
-                           << "string");
+    BSONObj operand = BSON("a" << "string");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     EqualityMatchExpression eq("a"_sd, operand["a"]);
     eq.setCollator(&collator);
-    ASSERT(exec::matcher::matchesBSON(&eq,
-                                      BSON("a"
-                                           << "string2"),
-                                      nullptr));
+    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << "string2"), nullptr));
 }
 
 TEST(ComparisonMatchExpression, UnequalLengthString) {
-    BSONObj operand = BSON("a"
-                           << "abc");
-    BSONObj match = BSON("a"
-                         << "abcd");
+    BSONObj operand = BSON("a" << "abc");
+    BSONObj match = BSON("a" << "abcd");
     EqualityMatchExpression eq(""_sd, operand["a"]);
     ASSERT(!exec::matcher::matchesSingleElement(&eq, match.firstElement()));
 }
@@ -1040,8 +989,7 @@ TEST(LtOp, MatchesElement) {
     BSONObj match = BSON("a" << 4.5);
     BSONObj notMatch = BSON("a" << 6);
     BSONObj notMatchEqual = BSON("a" << 5);
-    BSONObj notMatchWrongType = BSON("a"
-                                     << "foo");
+    BSONObj notMatchWrongType = BSON("a" << "foo");
     LTMatchExpression lt(""_sd, operand["$lt"]);
     ASSERT(exec::matcher::matchesSingleElement(&lt, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&lt, notMatch.firstElement()));
@@ -1158,8 +1106,7 @@ TEST(LteOp, MatchesElement) {
     BSONObj match = BSON("a" << 4.5);
     BSONObj equalMatch = BSON("a" << 5);
     BSONObj notMatch = BSON("a" << 6);
-    BSONObj notMatchWrongType = BSON("a"
-                                     << "foo");
+    BSONObj notMatchWrongType = BSON("a" << "foo");
     LTEMatchExpression lte(""_sd, operand["$lte"]);
     ASSERT(exec::matcher::matchesSingleElement(&lte, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&lte, equalMatch.firstElement()));
@@ -1368,8 +1315,7 @@ TEST(GteOp, MatchesElement) {
     BSONObj match = BSON("a" << 5.5);
     BSONObj equalMatch = BSON("a" << 5);
     BSONObj notMatch = BSON("a" << 4);
-    BSONObj notMatchWrongType = BSON("a"
-                                     << "foo");
+    BSONObj notMatchWrongType = BSON("a" << "foo");
     GTEMatchExpression gte(""_sd, operand["$gte"]);
     ASSERT(exec::matcher::matchesSingleElement(&gte, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&gte, equalMatch.firstElement()));
@@ -1476,42 +1422,33 @@ TEST(GteOp, ElemMatchKey) {
 }
 
 TEST(RegexMatchExpression, MatchesElementExact) {
-    BSONObj match = BSON("a"
-                         << "b");
-    BSONObj notMatch = BSON("a"
-                            << "c");
+    BSONObj match = BSON("a" << "b");
+    BSONObj notMatch = BSON("a" << "c");
     RegexMatchExpression regex(""_sd, "b", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementSimplePrefix) {
-    BSONObj match = BSON("x"
-                         << "abc");
-    BSONObj notMatch = BSON("x"
-                            << "adz");
+    BSONObj match = BSON("x" << "abc");
+    BSONObj notMatch = BSON("x" << "adz");
     RegexMatchExpression regex(""_sd, "^ab", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementCaseSensitive) {
-    BSONObj match = BSON("x"
-                         << "abc");
-    BSONObj notMatch = BSON("x"
-                            << "ABC");
+    BSONObj match = BSON("x" << "abc");
+    BSONObj notMatch = BSON("x" << "ABC");
     RegexMatchExpression regex(""_sd, "abc", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementCaseInsensitive) {
-    BSONObj match = BSON("x"
-                         << "abc");
-    BSONObj matchUppercase = BSON("x"
-                                  << "ABC");
-    BSONObj notMatch = BSON("x"
-                            << "abz");
+    BSONObj match = BSON("x" << "abc");
+    BSONObj matchUppercase = BSON("x" << "ABC");
+    BSONObj notMatch = BSON("x" << "abz");
     RegexMatchExpression regex(""_sd, "abc", "i");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&regex, matchUppercase.firstElement()));
@@ -1519,22 +1456,17 @@ TEST(RegexMatchExpression, MatchesElementCaseInsensitive) {
 }
 
 TEST(RegexMatchExpression, MatchesElementMultilineOff) {
-    BSONObj match = BSON("x"
-                         << "az");
-    BSONObj notMatch = BSON("x"
-                            << "\naz");
+    BSONObj match = BSON("x" << "az");
+    BSONObj notMatch = BSON("x" << "\naz");
     RegexMatchExpression regex(""_sd, "^a", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementMultilineOn) {
-    BSONObj match = BSON("x"
-                         << "az");
-    BSONObj matchMultiline = BSON("x"
-                                  << "\naz");
-    BSONObj notMatch = BSON("x"
-                            << "\n\n");
+    BSONObj match = BSON("x" << "az");
+    BSONObj matchMultiline = BSON("x" << "\naz");
+    BSONObj notMatch = BSON("x" << "\n\n");
     RegexMatchExpression regex(""_sd, "^a", "m");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&regex, matchMultiline.firstElement()));
@@ -1542,42 +1474,33 @@ TEST(RegexMatchExpression, MatchesElementMultilineOn) {
 }
 
 TEST(RegexMatchExpression, MatchesElementExtendedOff) {
-    BSONObj match = BSON("x"
-                         << "a b");
-    BSONObj notMatch = BSON("x"
-                            << "ab");
+    BSONObj match = BSON("x" << "a b");
+    BSONObj notMatch = BSON("x" << "ab");
     RegexMatchExpression regex(""_sd, "a b", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementExtendedOn) {
-    BSONObj match = BSON("x"
-                         << "ab");
-    BSONObj notMatch = BSON("x"
-                            << "a b");
+    BSONObj match = BSON("x" << "ab");
+    BSONObj notMatch = BSON("x" << "a b");
     RegexMatchExpression regex(""_sd, "a b", "x");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementDotAllOff) {
-    BSONObj match = BSON("x"
-                         << "a b");
-    BSONObj notMatch = BSON("x"
-                            << "a\nb");
+    BSONObj match = BSON("x" << "a b");
+    BSONObj notMatch = BSON("x" << "a\nb");
     RegexMatchExpression regex(""_sd, "a.b", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementDotAllOn) {
-    BSONObj match = BSON("x"
-                         << "a b");
-    BSONObj matchDotAll = BSON("x"
-                               << "a\nb");
-    BSONObj notMatch = BSON("x"
-                            << "ab");
+    BSONObj match = BSON("x" << "a b");
+    BSONObj matchDotAll = BSON("x" << "a\nb");
+    BSONObj notMatch = BSON("x" << "ab");
     RegexMatchExpression regex(""_sd, "a.b", "s");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&regex, matchDotAll.firstElement()));
@@ -1585,8 +1508,7 @@ TEST(RegexMatchExpression, MatchesElementDotAllOn) {
 }
 
 TEST(RegexMatchExpression, MatchesElementMultipleFlags) {
-    BSONObj matchMultilineDotAll = BSON("x"
-                                        << "\na\nb");
+    BSONObj matchMultilineDotAll = BSON("x" << "\na\nb");
     RegexMatchExpression regex(""_sd, "^a.b", "ms");
     ASSERT(exec::matcher::matchesSingleElement(&regex, matchMultilineDotAll.firstElement()));
 }
@@ -1618,34 +1540,21 @@ TEST(RegexMatchExpression, MatchesElementWrongType) {
 }
 
 TEST(RegexMatchExpression, MatchesElementUtf8) {
-    BSONObj multiByteCharacter = BSON("x"
-                                      << "\xc2\xa5");
+    BSONObj multiByteCharacter = BSON("x" << "\xc2\xa5");
     RegexMatchExpression regex(""_sd, "^.$", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, multiByteCharacter.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesScalar) {
     RegexMatchExpression regex("a"_sd, "b", "");
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "b"),
-                                      nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&regex,
-                                       BSON("a"
-                                            << "c"),
-                                       nullptr));
+    ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "b"), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&regex, BSON("a" << "c"), nullptr));
 }
 
 TEST(RegexMatchExpression, MatchesArrayValue) {
     RegexMatchExpression regex("a"_sd, "b", "");
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a" << BSON_ARRAY("c"
-                                                             << "b")),
-                                      nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&regex,
-                                       BSON("a" << BSON_ARRAY("d"
-                                                              << "c")),
-                                       nullptr));
+    ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << BSON_ARRAY("c" << "b")), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&regex, BSON("a" << BSON_ARRAY("d" << "c")), nullptr));
 }
 
 TEST(RegexMatchExpression, MatchesNull) {
@@ -1658,55 +1567,32 @@ TEST(RegexMatchExpression, ElemMatchKey) {
     RegexMatchExpression regex("a"_sd, "b", "");
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&regex,
-                                       BSON("a"
-                                            << "c"),
-                                       &details));
+    ASSERT(!exec::matcher::matchesBSON(&regex, BSON("a" << "c"), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "b"),
-                                      &details));
+    ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "b"), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a" << BSON_ARRAY("c"
-                                                             << "b")),
-                                      &details));
+    ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << BSON_ARRAY("c" << "b")), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
 TEST(RegexMatchExpression, RegexAcceptsUCPStartOption) {
     RegexMatchExpression regex("a"_sd, "(*UCP)(\\w|\u304C)", "");
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "k")));
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "\u304B")));
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "\u304C")));
+    ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "k")));
+    ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "\u304B")));
+    ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "\u304C")));
 }
 
 TEST(RegexMatchExpression, RegexAcceptsLFOption) {
     // The LF option tells the regex to only treat \n as a newline. "." will not match newlines (by
     // default) so a\nb will not match, but a\rb will.
     RegexMatchExpression regexLF("a"_sd, "(*LF)a.b", "");
-    ASSERT(!exec::matcher::matchesBSON(&regexLF,
-                                       BSON("a"
-                                            << "a\nb")));
-    ASSERT(exec::matcher::matchesBSON(&regexLF,
-                                      BSON("a"
-                                           << "a\rb")));
+    ASSERT(!exec::matcher::matchesBSON(&regexLF, BSON("a" << "a\nb")));
+    ASSERT(exec::matcher::matchesBSON(&regexLF, BSON("a" << "a\rb")));
 
     RegexMatchExpression regexCR("a"_sd, "(*CR)a.b", "");
-    ASSERT(exec::matcher::matchesBSON(&regexCR,
-                                      BSON("a"
-                                           << "a\nb")));
-    ASSERT(!exec::matcher::matchesBSON(&regexCR,
-                                       BSON("a"
-                                            << "a\rb")));
+    ASSERT(exec::matcher::matchesBSON(&regexCR, BSON("a" << "a\nb")));
+    ASSERT(!exec::matcher::matchesBSON(&regexCR, BSON("a" << "a\rb")));
 }
 
 TEST(ModMatchExpression, MatchesElement) {
@@ -1825,8 +1711,7 @@ TEST(InMatchExpression, MatchesElementMultiple) {
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     BSONObj matchFirst = BSON("a" << 1);
-    BSONObj matchSecond = BSON("a"
-                               << "r");
+    BSONObj matchSecond = BSON("a" << "r");
     BSONObj matchThird = BSON("a" << true);
     BSONObj notMatch = BSON("a" << false);
     ASSERT(exec::matcher::matchesSingleElement(&in, matchFirst["a"]));
@@ -1927,8 +1812,7 @@ TEST(InMatchExpression, ElemMatchKey) {
 
 TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
     BSONArray operand = BSON_ARRAY("string");
-    BSONObj notMatch = BSON("a"
-                            << "string2");
+    BSONObj notMatch = BSON("a" << "string2");
     InMatchExpression in(""_sd);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
@@ -1937,8 +1821,7 @@ TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
 
 TEST(InMatchExpression, StringMatchingRespectsCollation) {
     BSONArray operand = BSON_ARRAY("string");
-    BSONObj match = BSON("a"
-                         << "string2");
+    BSONObj match = BSON("a" << "string2");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     InMatchExpression in(""_sd);
     in.setCollator(&collator);
@@ -2777,16 +2660,12 @@ TEST(NotMatchExpression, ElemMatchKey) {
 }
 
 TEST(NotMatchExpression, SetCollatorPropagatesToChild) {
-    auto baseOperand = BSON("a"
-                            << "string");
+    auto baseOperand = BSON("a" << "string");
     auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["a"]);
     auto notOp = NotMatchExpression{eq.release()};
     auto collator = CollatorInterfaceMock{CollatorInterfaceMock::MockType::kAlwaysEqual};
     notOp.setCollator(&collator);
-    ASSERT(!exec::matcher::matchesBSON(&notOp,
-                                       BSON("a"
-                                            << "string2"),
-                                       nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&notOp, BSON("a" << "string2"), nullptr));
 }
 
 TEST(AndOp, NoClauses) {
@@ -2795,18 +2674,12 @@ TEST(AndOp, NoClauses) {
 }
 
 TEST(AndOp, MatchesElementThreeClauses) {
-    auto baseOperand1 = BSON("$lt"
-                             << "z1");
-    auto baseOperand2 = BSON("$gt"
-                             << "a1");
-    auto match = BSON("a"
-                      << "r1");
-    auto notMatch1 = BSON("a"
-                          << "z1");
-    auto notMatch2 = BSON("a"
-                          << "a1");
-    auto notMatch3 = BSON("a"
-                          << "r");
+    auto baseOperand1 = BSON("$lt" << "z1");
+    auto baseOperand2 = BSON("$gt" << "a1");
+    auto match = BSON("a" << "r1");
+    auto notMatch1 = BSON("a" << "z1");
+    auto notMatch2 = BSON("a" << "a1");
+    auto notMatch3 = BSON("a" << "r");
 
     auto sub1 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand1["$lt"]);
     auto sub2 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand2["$gt"]);
@@ -3043,8 +2916,7 @@ TEST(NorOp, ElemMatchKey) {
 }
 
 TEST(ExpressionTypeTest, MatchesElementStringType) {
-    BSONObj match = BSON("a"
-                         << "abc");
+    BSONObj match = BSON("a" << "abc");
     BSONObj notMatch = BSON("a" << 5);
     TypeMatchExpression type(""_sd, String);
     ASSERT(exec::matcher::matchesSingleElement(&type, match["a"]));
@@ -3053,8 +2925,7 @@ TEST(ExpressionTypeTest, MatchesElementStringType) {
 
 TEST(ExpressionTypeTest, MatchesElementNullType) {
     BSONObj match = BSON("a" << BSONNULL);
-    BSONObj notMatch = BSON("a"
-                            << "abc");
+    BSONObj notMatch = BSON("a" << "abc");
     TypeMatchExpression type(""_sd, jstNULL);
     ASSERT(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&type, notMatch["a"]));
@@ -3064,8 +2935,7 @@ TEST(ExpressionTypeTest, MatchesElementNumber) {
     BSONObj match1 = BSON("a" << 1);
     BSONObj match2 = BSON("a" << 1LL);
     BSONObj match3 = BSON("a" << 2.5);
-    BSONObj notMatch = BSON("a"
-                            << "abc");
+    BSONObj notMatch = BSON("a" << "abc");
     ASSERT_EQ(BSONType::NumberInt, match1["a"].type());
     ASSERT_EQ(BSONType::NumberLong, match2["a"].type());
     ASSERT_EQ(BSONType::NumberDouble, match3["a"].type());
@@ -3101,10 +2971,7 @@ TEST(ExpressionTypeTest, TypeArrayMatchesOuterAndInnerArray) {
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSONArray()), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(4 << "a")), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(BSONArray() << 2)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&type,
-                                       BSON("a"
-                                            << "bar"),
-                                       nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << "bar"), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesObject) {
@@ -3150,10 +3017,7 @@ TEST(ExpressionTypeTest, ElemMatchKey) {
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 1), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&type,
-                                      BSON("a" << BSON("b"
-                                                       << "string")),
-                                      &details));
+    ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON("b" << "string")), &details));
     ASSERT(!details.hasElemMatchKey());
     ASSERT(exec::matcher::matchesBSON(
         &type, BSON("a" << BSON("b" << BSON_ARRAY("string"))), &details));
@@ -3303,8 +3167,7 @@ TEST(ExpressionBinDataSubTypeTest, DoesNotMatchArrays) {
 }
 
 TEST(ExpressionBinDataSubTypeTest, DoesNotMatchString) {
-    BSONObj notMatch = BSON("a"
-                            << "str");
+    BSONObj notMatch = BSON("a" << "str");
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::bdtCustom);
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }

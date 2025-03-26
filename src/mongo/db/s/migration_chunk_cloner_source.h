@@ -106,7 +106,7 @@ public:
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override;
 
-    void rollback(OperationContext* opCtx) noexcept override{};
+    void rollback(OperationContext* opCtx) noexcept override {};
 
 private:
     const LogicalSessionId _lsid;
@@ -181,7 +181,7 @@ public:
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override;
 
-    void rollback(OperationContext* opCtx) noexcept override{};
+    void rollback(OperationContext* opCtx) noexcept override {};
 
 private:
     std::vector<NamespaceString> _namespaces;

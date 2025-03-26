@@ -3211,8 +3211,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ExtractShardKeyFromOplogNonCRUD) {
                                     BSON("_id" << 1 << "a.b" << 5));        // o
     auto commandOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),  // optime
                                        repl::OpTypeEnum::kCommand,          // op type
-                                       BSON("create"
-                                            << "c"));  // o
+                                       BSON("create" << "c"));              // o
 
     ASSERT_BSONOBJ_EQ(
         SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, noopOplog),

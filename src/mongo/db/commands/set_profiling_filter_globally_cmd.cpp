@@ -105,12 +105,10 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
     // Log the change made to server's global profiling settings.
     LOGV2(72832,
           "Profiler settings changed globally",
-          "from"_attr = oldDefault ? BSON("filter" << oldDefault->serialize())
-                                   : BSON("filter"
-                                          << "none"),
-          "to"_attr = newDefault ? BSON("filter" << newDefault->serialize())
-                                 : BSON("filter"
-                                        << "none"));
+          "from"_attr =
+              oldDefault ? BSON("filter" << oldDefault->serialize()) : BSON("filter" << "none"),
+          "to"_attr =
+              newDefault ? BSON("filter" << newDefault->serialize()) : BSON("filter" << "none"));
     return true;
 }
 

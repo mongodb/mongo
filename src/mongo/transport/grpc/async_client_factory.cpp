@@ -233,7 +233,7 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                         "error"_attr = s);
         })
         .onError<ErrorCodes::ExceededTimeLimit>([this, target, timeout](Status s) mutable
-                                                -> StatusWith<std::shared_ptr<AsyncDBClient>> {
+                                                    -> StatusWith<std::shared_ptr<AsyncDBClient>> {
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 size_t activeCalls;
                 {

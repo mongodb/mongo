@@ -87,8 +87,7 @@ public:
 
     OpMsgRequest pingRequest() {
         OpMsgRequest request;
-        request.body = BSON("msg"
-                            << "ping");
+        request.body = BSON("msg" << "ping");
         return request;
     }
 

@@ -292,7 +292,7 @@ public:
 
     class ReaderBase {
     public:
-        virtual ~ReaderBase(){};
+        virtual ~ReaderBase() {};
 
         virtual uint8_t readStringLike() = 0;
         virtual uint8_t readNumeric() = 0;
@@ -357,7 +357,7 @@ public:
      */
     class ExplainReader : public ReaderBase {
     public:
-        explicit ExplainReader(ReaderBase& reader) : _reader(reader){};
+        explicit ExplainReader(ReaderBase& reader) : _reader(reader) {};
         ~ExplainReader() override = default;
 
         uint8_t readStringLike() final;

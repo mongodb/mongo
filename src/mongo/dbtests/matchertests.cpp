@@ -247,8 +247,7 @@ public:
             NamespaceString::createNamespaceString_forTest("unittests.matchertests");
         AutoGetCollectionForReadCommand ctx(&opCtx, nss);
         const auto expCtx = ExpressionContextBuilder{}.opCtx(opCtxPtr.get()).ns(kTestNss).build();
-        M m(BSON("$where"
-                 << "function(){ return this.a == 1; }"),
+        M m(BSON("$where" << "function(){ return this.a == 1; }"),
             expCtx,
             ExtensionsCallbackReal(&opCtx, &nss),
             MatchExpressionParser::AllowedFeatures::kJavascript);
@@ -293,12 +292,8 @@ class NullCollator {
 public:
     void run() {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        M matcher(BSON("a"
-                       << "string"),
-                  expCtx);
-        ASSERT(!exec::matcher::matches(&matcher,
-                                       BSON("a"
-                                            << "string2")));
+        M matcher(BSON("a" << "string"), expCtx);
+        ASSERT(!exec::matcher::matches(&matcher, BSON("a" << "string2")));
     }
 };
 
@@ -311,12 +306,8 @@ public:
             std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         expCtx->setCollator(std::move(collator));
-        M matcher(BSON("a"
-                       << "string"),
-                  expCtx);
-        ASSERT(exec::matcher::matches(&matcher,
-                                      BSON("a"
-                                           << "string2")));
+        M matcher(BSON("a" << "string"), expCtx);
+        ASSERT(exec::matcher::matches(&matcher, BSON("a" << "string2")));
     }
 };
 

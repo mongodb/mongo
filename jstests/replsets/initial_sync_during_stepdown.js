@@ -2,8 +2,7 @@
  * Test that stepdown during collection cloning and oplog fetching does not interrupt initial sync.
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
-import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = "initialSyncDuringStepDown";

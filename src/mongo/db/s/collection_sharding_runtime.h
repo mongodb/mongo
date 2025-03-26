@@ -322,7 +322,7 @@ private:
     public:
         PlacementVersionRecoverOrRefresh(SharedSemiFuture<void> future,
                                          CancellationSource cancellationSource)
-            : future(std::move(future)), cancellationSource(std::move(cancellationSource)){};
+            : future(std::move(future)), cancellationSource(std::move(cancellationSource)) {};
 
         // Tracks ongoing placement version recover/refresh.
         SharedSemiFuture<void> future;

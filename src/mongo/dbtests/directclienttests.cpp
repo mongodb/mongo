@@ -96,8 +96,7 @@ public:
         DBDirectClient client(&opCtx);
 
         BSONObj result;
-        BSONObj cmdObj = BSON("count"
-                              << "");
+        BSONObj cmdObj = BSON("count" << "");
         ASSERT(!client.runCommand(
             DatabaseName::createDatabaseName_forTest(boost::none, ""), cmdObj, result))
             << result;

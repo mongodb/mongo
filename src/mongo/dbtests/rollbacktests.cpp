@@ -355,10 +355,8 @@ public:
         Lock::GlobalWrite globalWriteLock(&opCtx);
         OldClientContext ctx(&opCtx, source);
 
-        BSONObj sourceDoc = BSON("_id"
-                                 << "source");
-        BSONObj targetDoc = BSON("_id"
-                                 << "target");
+        BSONObj sourceDoc = BSON("_id" << "source");
+        BSONObj targetDoc = BSON("_id" << "target");
 
         {
             WriteUnitOfWork uow(&opCtx);
@@ -424,10 +422,8 @@ public:
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, nss);
 
-        BSONObj oldDoc = BSON("_id"
-                              << "old");
-        BSONObj newDoc = BSON("_id"
-                              << "new");
+        BSONObj oldDoc = BSON("_id" << "old");
+        BSONObj newDoc = BSON("_id" << "new");
 
         {
             WriteUnitOfWork uow(&opCtx);
@@ -483,8 +479,7 @@ public:
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, nss);
 
-        BSONObj doc = BSON("_id"
-                           << "foo");
+        BSONObj doc = BSON("_id" << "foo");
 
         ASSERT(!collectionExists(&opCtx, &ctx, nss.ns_forTest()));
         {

@@ -195,8 +195,8 @@ TEST(JSONSchemaParserEncryptTest, ParseSucceedsWithEmptyEncryptObject) {
 }
 
 TEST(JSONSchemaParserEncryptTest, ParseSucceedsWithBsonType) {
-    BSONObj schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType"
-                                                                               << "int"))));
+    BSONObj schema =
+        BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType" << "int"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
 }
@@ -210,50 +210,48 @@ TEST(JSONSchemaParserEncryptTest, ParseFailsWithBsonTypeGivenByCode) {
 TEST(JSONSchemaParserEncryptTest, ParseSucceedsWithArrayOfBsonTypes) {
     BSONObj schema =
         BSON("properties" << BSON(
-                 "foo" << BSON("encrypt" << BSON("bsonType" << BSON_ARRAY("int"
-                                                                          << "date"
-                                                                          << "string")))));
+                 "foo" << BSON("encrypt" << BSON("bsonType" << BSON_ARRAY("int" << "date"
+                                                                                << "string")))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
 }
 
 TEST(JSONSchemaParserEncryptTest, ParseSucceedsIfEncryptFieldsAreValid) {
-    auto schema = BSON(
-        "properties" << BSON(
-            "foo" << BSON("encrypt" << BSON("bsonType"
-                                            << "string"
-                                            << "keyId"
-                                            << "/pointer"
-                                            << "algorithm"
-                                            << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"))));
+    auto schema =
+        BSON("properties" << BSON(
+                 "foo" << BSON("encrypt" << BSON(
+                                   "bsonType" << "string"
+                                              << "keyId"
+                                              << "/pointer"
+                                              << "algorithm"
+                                              << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
 }
 
 TEST(JSONSchemaParserEncryptTest, FailsToParseIfEncryptHasBadFieldName) {
-    BSONObj schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyIdx"
-                                                                               << "/pointer"))));
+    BSONObj schema =
+        BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyIdx" << "/pointer"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::IDLUnknownField);
-    schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType"
-                                                                       << "bool"
-                                                                       << "keyIdx"
-                                                                       << "/pointer"))));
+    schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType" << "bool"
+                                                                                  << "keyIdx"
+                                                                                  << "/pointer"))));
     result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::IDLUnknownField);
 }
 
 TEST(JSONSchemaParserEncryptTest, FailsToParseWithBadKeyIdArray) {
-    auto schema = BSON(
-        "properties" << BSON("foo" << BSON("encrypt" << BSON("keyId" << BSON_ARRAY("nonsense"
-                                                                                   << "again")))));
+    auto schema =
+        BSON("properties" << BSON(
+                 "foo" << BSON("encrypt" << BSON("keyId" << BSON_ARRAY("nonsense" << "again")))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), 51088);
 }
 
 TEST(JSONSchemaParserEncryptTest, FailsToParseWithBadBSONType) {
-    auto schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType"
-                                                                            << "Stringx"))));
+    auto schema =
+        BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType" << "Stringx"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 
@@ -264,15 +262,15 @@ TEST(JSONSchemaParserEncryptTest, FailsToParseWithBadBSONType) {
 }
 
 TEST(JSONSchemaParserEncryptTest, FailsToParseWithBadAlgorithm) {
-    auto schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("algorithm"
-                                                                            << "Stringx"))));
+    auto schema =
+        BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("algorithm" << "Stringx"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 }
 
 TEST(JSONSchemaParserEncryptTest, FailsToParseWithBadPointer) {
-    auto schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyId"
-                                                                            << "invalidPointer"))));
+    auto schema =
+        BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyId" << "invalidPointer"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), 51065);
 }

@@ -66,7 +66,7 @@ public:
                     OperationContext* opCtx,
                     ShardId shardId,
                     ReadPreferenceSetting readPref)
-        : _executor(executor), _opCtx(opCtx), _shardId(shardId), _readPref(readPref){};
+        : _executor(executor), _opCtx(opCtx), _shardId(shardId), _readPref(readPref) {};
 
     SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override {
         return getShard()

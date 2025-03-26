@@ -72,9 +72,9 @@ struct KeyConstraints {
 
 template <typename Hasher, typename Comparator, typename T, typename TT>
 inline constexpr bool IsComparableWith =
-    decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::
-        value&& decltype(KeyConstraints<Hasher, Comparator>::IsComparable(
-            std::declval<T>(), std::declval<TT>()))::value;
+    decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::value &&
+    decltype(KeyConstraints<Hasher, Comparator>::IsComparable(std::declval<T>(),
+                                                              std::declval<TT>()))::value;
 
 
 template <typename K,
@@ -144,7 +144,8 @@ public:
      * Finds an element in the cache by key.
      */
     template <typename KeyType>
-    requires IsComparable<KeyType> iterator find(const KeyType& key) {
+    requires IsComparable<KeyType>
+    iterator find(const KeyType& key) {
         return promote(key);
     }
 
@@ -158,8 +159,8 @@ public:
      * properly.
      */
     template <typename KeyType>
-    requires IsComparable<KeyType> const_iterator cfind(const KeyType& key)
-    const {
+    requires IsComparable<KeyType>
+    const_iterator cfind(const KeyType& key) const {
         auto it = _map.find(key);
         return (it == _map.end()) ? end() : const_iterator(it->second);
     }
@@ -169,7 +170,8 @@ public:
      * to the least recently used element.
      */
     template <typename KeyType>
-    requires IsComparable<KeyType> iterator promote(const KeyType& key) {
+    requires IsComparable<KeyType>
+    iterator promote(const KeyType& key) {
         auto it = _map.find(key);
         return (it == _map.end()) ? end() : promote(it->second);
     }

@@ -150,7 +150,7 @@ public:
 
     class Action {
     public:
-        Action(ActionFunc func) : _actionFunc(std::move(func)){};
+        Action(ActionFunc func) : _actionFunc(std::move(func)) {};
 
         Action(const BSONObj& response) {
             _actionFunc = [=](const BSONObj& request) {

@@ -81,9 +81,8 @@ protected:
                                                   .append("minWireVersion", 2)
                                                   .append("maxWireVersion", 10)
                                                   .appendArray("hosts",
-                                                               BSON_ARRAY("foo:1234"
-                                                                          << "bar:1234"
-                                                                          << "baz:1234"))
+                                                               BSON_ARRAY("foo:1234" << "bar:1234"
+                                                                                     << "baz:1234"))
 
                                                   .obj();
 };

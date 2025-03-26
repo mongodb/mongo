@@ -4,6 +4,7 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 // ]
 import "jstests/libs/query/sbe_assert_error_override.js";
+
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const caseSensitive = {

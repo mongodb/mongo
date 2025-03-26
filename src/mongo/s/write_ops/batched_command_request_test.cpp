@@ -53,10 +53,9 @@ namespace {
 TEST(BatchedCommandRequest, BasicInsert) {
     BSONArray insertArray = BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1));
 
-    BSONObj origInsertRequestObj = BSON("insert"
-                                        << "test"
-                                        << "documents" << insertArray << "writeConcern"
-                                        << BSON("w" << 1) << "ordered" << true);
+    BSONObj origInsertRequestObj = BSON("insert" << "test"
+                                                 << "documents" << insertArray << "writeConcern"
+                                                 << BSON("w" << 1) << "ordered" << true);
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
@@ -78,12 +77,11 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
     const Timestamp timestamp(2, 2);
     const Timestamp majorAndMinor(1, 2);
 
-    BSONObj origInsertRequestObj = BSON("insert"
-                                        << "test"
-                                        << "documents" << insertArray << "writeConcern"
-                                        << BSON("w" << 1) << "ordered" << true << "shardVersion"
-                                        << BSON("e" << epoch << "t" << timestamp << "v"
-                                                    << majorAndMinor));
+    BSONObj origInsertRequestObj =
+        BSON("insert" << "test"
+                      << "documents" << insertArray << "writeConcern" << BSON("w" << 1) << "ordered"
+                      << true << "shardVersion"
+                      << BSON("e" << epoch << "t" << timestamp << "v" << majorAndMinor));
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
@@ -135,10 +133,9 @@ TEST(BatchedCommandRequest, BasicUpdate) {
     BSONObj u = BSON("value" << 2);
     BSONArray updateArray = BSON_ARRAY(BSON("q" << q << "u" << u));
 
-    BSONObj origUpdateRequestObj = BSON("update"
-                                        << "test"
-                                        << "updates" << updateArray << "writeConcern"
-                                        << BSON("w" << 2));
+    BSONObj origUpdateRequestObj =
+        BSON("update" << "test"
+                      << "updates" << updateArray << "writeConcern" << BSON("w" << 2));
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origUpdateRequestObj, docSeq));
@@ -175,21 +172,17 @@ TEST(BatchedCommandRequest, MultiUpdate) {
                             BSON("$unset" << BSON("a" << 1 << "b" << 0))};
     BSONObj s1 = BSON("sortField1" << 1 << "sortField2" << -1);
 
-    BSONObj q2 = BSON("value"
-                      << "test");
-    BSONObj u2 = BSON("$set" << BSON("foo"
-                                     << "bar")
-                             << "$inc" << BSON("qux" << 12));
+    BSONObj q2 = BSON("value" << "test");
+    BSONObj u2 = BSON("$set" << BSON("foo" << "bar") << "$inc" << BSON("qux" << 12));
 
     BSONArray updateArray =
         BSON_ARRAY(BSON("q" << q0 << "u" << u0 << "c" << c0)
                    << BSON("q" << q1 << "u" << u1 << "multi" << true << "sort" << s1)
                    << BSON("q" << q2 << "u" << u2));
 
-    BSONObj origUpdateRequestObj = BSON("update"
-                                        << "testUpdate"
-                                        << "updates" << updateArray << "writeConcern"
-                                        << BSON("w" << 1) << "ordered" << true);
+    BSONObj origUpdateRequestObj = BSON("update" << "testUpdate"
+                                                 << "updates" << updateArray << "writeConcern"
+                                                 << BSON("w" << 1) << "ordered" << true);
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origUpdateRequestObj, docSeq));

@@ -156,8 +156,7 @@ TEST(ValidateResultsTest, MissingAndExtraEntriesKeepsAtLeastOne) {
     ASSERT_EQ(1, vr.getExtraIndexEntries().size());
 
     // Much smaller.
-    auto obj2 = BSON("x"
-                     << "a");
+    auto obj2 = BSON("x" << "a");
     vr.addMissingIndexEntry(obj2);
     vr.addExtraIndexEntry(obj2);
 
@@ -226,8 +225,7 @@ TEST(ValidateResultsTest, SpecAppearsInOutput) {
     ValidateResults vr;
 
     IndexValidateResults& ivr = vr.getIndexValidateResult("index1");
-    ivr.setSpec(BSON("k"
-                     << "v"));
+    ivr.setSpec(BSON("k" << "v"));
 
     BSONObjBuilder bob;
     vr.appendToResultObj(&bob, /*debugging=*/false);

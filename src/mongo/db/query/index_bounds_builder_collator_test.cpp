@@ -56,8 +56,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateExprEqualToStringRespectsCollation) {
     auto testIndex = buildSimpleIndexEntry(keyPattern);
     testIndex.collator = &collator;
 
-    BSONObj obj = BSON("a" << BSON("$_internalExprEq"
-                                   << "foo"));
+    BSONObj obj = BSON("a" << BSON("$_internalExprEq" << "foo"));
     auto [expr, inputParamIdMap] = parseMatchExpression(obj);
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
@@ -77,8 +76,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualityToStringWithMockCollator) {
     auto testIndex = buildSimpleIndexEntry();
     testIndex.collator = &collator;
 
-    BSONObj obj = BSON("a"
-                       << "foo");
+    BSONObj obj = BSON("a" << "foo");
     auto [expr, inputParamIdMap] = parseMatchExpression(obj);
     BSONElement elt = obj.firstElement();
 
@@ -123,8 +121,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToStringWithMockCollator) {
     auto testIndex = buildSimpleIndexEntry();
     testIndex.collator = &collator;
 
-    BSONObj obj = BSON("a" << BSON("$ne"
-                                   << "bar"));
+    BSONObj obj = BSON("a" << BSON("$ne" << "bar"));
     auto [expr, inputParamIdMap] = parseMatchExpression(obj);
     BSONElement elt = obj.firstElement();
 
@@ -673,8 +670,7 @@ TEST_F(IndexBoundsBuilderTest, StringEqualityAgainstHashedIndexWithCollatorUsesH
     interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
 
-    BSONObj expectedCollationKey = BSON(""
-                                        << "oof");
+    BSONObj expectedCollationKey = BSON("" << "oof");
     BSONObj expectedHash = ExpressionMapping::hash(expectedCollationKey.firstElement());
     BSONObjBuilder intervalBuilder;
     intervalBuilder.append("", expectedHash.firstElement().numberLong());
@@ -733,8 +729,7 @@ TEST_F(IndexBoundsBuilderTest, InWithStringAgainstHashedIndexWithCollatorUsesHas
     interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
 
-    BSONObj expectedCollationKey = BSON(""
-                                        << "oof");
+    BSONObj expectedCollationKey = BSON("" << "oof");
     BSONObj expectedHash = ExpressionMapping::hash(expectedCollationKey.firstElement());
     BSONObjBuilder intervalBuilder;
     intervalBuilder.append("", expectedHash.firstElement().numberLong());

@@ -227,22 +227,16 @@ TEST(AddressRestrictionTest, contains) {
 }
 
 TEST(AddressRestrictionTest, parseFail) {
-    const BSONObj
-        tests[] =
-            {
-                BSON("unknownField"
-                     << ""),
-                BSON("clientSource"
-                     << "1.2.3.4.5"),
-                BSON("clientSource"
-                     << "1.2.3.4"
-                     << "unknownField"
-                     << ""),
-                BSON("clientSource"
-                     << "1.2.3.4"
-                     << "clientSource"
-                     << "2.3.4.5"),
-            };
+    const BSONObj tests[] = {
+        BSON("unknownField" << ""),
+        BSON("clientSource" << "1.2.3.4.5"),
+        BSON("clientSource" << "1.2.3.4"
+                            << "unknownField"
+                            << ""),
+        BSON("clientSource" << "1.2.3.4"
+                            << "clientSource"
+                            << "2.3.4.5"),
+    };
     for (const auto& t : tests) {
         ASSERT_FALSE(parseAddressRestrictionSet(t).isOK());
     }

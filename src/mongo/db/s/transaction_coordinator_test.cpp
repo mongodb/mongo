@@ -1541,9 +1541,8 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) 
 
     DBDirectClient dbClient(operationContext());
     auto oplogEntry = dbClient.findOne(NamespaceString::kRsOplogNamespace,
-                                       BSON("op"
-                                            << "n"
-                                            << "o.msg.endOfTransaction" << 1));
+                                       BSON("op" << "n"
+                                                 << "o.msg.endOfTransaction" << 1));
     auto o2 = oplogEntry.getField("o2");
     ASSERT_EQ(o2.type(), BSONType::Object);
     ASSERT_BSONOBJ_EQ(o2.Obj(), expectedO2);
@@ -1911,9 +1910,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     expectedMetrics.currentInSteps[stepIndex]++;
 
     setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
-                       BSON("mode"
-                            << "alwaysOn"
-                            << "data" << BSON("useUninterruptibleSleep" << 1)));
+                       BSON("mode" << "alwaysOn"
+                                   << "data" << BSON("useUninterruptibleSleep" << 1)));
     coordinator->runCommit(operationContext(), kTwoShardIdList);
     waitUntilCoordinatorDocIsPresent();
 
@@ -1934,9 +1932,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     expectedMetrics.currentInSteps[stepIndex - 1]--;
     expectedMetrics.currentInSteps[stepIndex]++;
 
-    setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
-                       BSON("mode"
-                            << "off"));
+    setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern", BSON("mode" << "off"));
     waitUntilMessageSent();
 
     checkStats(stats, expectedStats);
@@ -1957,9 +1953,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     expectedMetrics.currentInSteps[stepIndex]++;
 
     setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
-                       BSON("mode"
-                            << "alwaysOn"
-                            << "data" << BSON("useUninterruptibleSleep" << 1)));
+                       BSON("mode" << "alwaysOn"
+                                   << "data" << BSON("useUninterruptibleSleep" << 1)));
     // Respond to the second prepare request in a separate thread, because the coordinator will
     // hijack that thread to run its continuation.
     assertPrepareSentAndRespondWithSuccess();
@@ -1983,9 +1978,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     expectedMetrics.currentInSteps[stepIndex - 1]--;
     expectedMetrics.currentInSteps[stepIndex]++;
 
-    setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
-                       BSON("mode"
-                            << "off"));
+    setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern", BSON("mode" << "off"));
     // The last thing the coordinator will do on the hijacked prepare response thread is schedule
     // the commitTransaction network requests.
     future.timed_get(kLongFutureTimeout);
@@ -2010,9 +2003,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     expectedMetrics.currentInSteps[stepIndex]++;
 
     setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
-                       BSON("mode"
-                            << "alwaysOn"
-                            << "data" << BSON("useUninterruptibleSleep" << 1)));
+                       BSON("mode" << "alwaysOn"
+                                   << "data" << BSON("useUninterruptibleSleep" << 1)));
     // Respond to the second commit request in a separate thread, because the coordinator will
     // hijack that thread to run its continuation.
     assertCommitSentAndRespondWithSuccess();
@@ -2034,9 +2026,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     expectedMetrics.currentInSteps[stepIndex]--;
     expectedMetrics.totalCommittedTwoPhaseCommit++;
 
-    setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
-                       BSON("mode"
-                            << "off"));
+    setGlobalFailPoint("hangAfterDeletingCoordinatorDoc", BSON("mode" << "off"));
     // The last thing the coordinator will do on the hijacked commit response thread is signal
     // the coordinator's completion.
 
@@ -2741,11 +2731,11 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTransactionParamete
 TEST_F(TransactionCoordinatorMetricsTest,
        SlowLogLineIncludesTerminationCauseAndCommitTimestampForCommitDecision) {
     runSimpleTwoPhaseCommitWithCommitDecisionAndCaptureLogLines();
-    ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
-                      BSON("attr" << BSON("terminationCause"
-                                          << "committed"
-                                          << "commitTimestamp" << Timestamp(1, 1).toBSON()))));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("terminationCause" << "committed"
+                                              << "commitTimestamp" << Timestamp(1, 1).toBSON()))));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseForAbortDecision) {
@@ -2774,9 +2764,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseFor
     coordinator->shutdown();
     stopCapturingLogMessages();
 
-    ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("terminationCause"
-                                                                      << "aborted"))));
+    ASSERT_EQUALS(
+        1, countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("terminationCause" << "aborted"))));
 
     ASSERT_EQUALS(
         1,

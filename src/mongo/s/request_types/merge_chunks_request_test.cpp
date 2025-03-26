@@ -59,12 +59,12 @@ TEST(ConfigSvrMergeChunks, BasicValidConfigCommand) {
     auto collUUID = UUID::gen();
     auto request = ConfigSvrMergeChunks::parse(
         ctx,
-        BSON("_configsvrCommitChunksMerge"
-             << "TestDB.TestColl"
-             << "collUUID" << collUUID.toBSON() << "chunkRange" << chunkRange.toBSON() << "shard"
-             << "shard0000"
-             << "$db"
-             << "admin"));
+        BSON("_configsvrCommitChunksMerge" << "TestDB.TestColl"
+                                           << "collUUID" << collUUID.toBSON() << "chunkRange"
+                                           << chunkRange.toBSON() << "shard"
+                                           << "shard0000"
+                                           << "$db"
+                                           << "admin"));
     ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
               request.getCommandParameter());
     ASSERT_TRUE(collUUID == request.getCollectionUUID());
@@ -75,11 +75,11 @@ TEST(ConfigSvrMergeChunks, BasicValidConfigCommand) {
 TEST(ConfigSvrMergeChunks, ConfigCommandtoBSON) {
     auto collUUID = UUID::gen();
     BSONObj serializedRequest =
-        BSON("_configsvrCommitChunksMerge"
-             << "TestDB.TestColl"
-             << "shard"
-             << "shard0000"
-             << "collUUID" << collUUID.toBSON() << "chunkRange" << chunkRange.toBSON());
+        BSON("_configsvrCommitChunksMerge" << "TestDB.TestColl"
+                                           << "shard"
+                                           << "shard0000"
+                                           << "collUUID" << collUUID.toBSON() << "chunkRange"
+                                           << chunkRange.toBSON());
     auto writeConcern = generic_argument_util::kMajorityWriteConcern;
 
     BSONObjBuilder cmdBuilder;
@@ -217,12 +217,11 @@ TEST(ShardsvrMergeChunks, BasicValidConfigCommand) {
     bounds.push_back(max);
 
     OID epoch = OID::gen();
-    auto request =
-        ShardsvrMergeChunks::parse(ctx,
-                                   BSON("mergeChunks"
-                                        << "TestDB.TestColl"
-                                        << "bounds" << bounds << "epoch" << epoch << "$db"
-                                        << "admin"));
+    auto request = ShardsvrMergeChunks::parse(ctx,
+                                              BSON("mergeChunks" << "TestDB.TestColl"
+                                                                 << "bounds" << bounds << "epoch"
+                                                                 << epoch << "$db"
+                                                                 << "admin"));
     ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
               request.getCommandParameter());
 
@@ -252,10 +251,9 @@ TEST(ShardsvrMergeChunks, MissingBoundErrors) {
 
     OID epoch = OID::gen();
     ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
-                                                  BSON("mergeChunks"
-                                                       << "TestDB.TestColl"
-                                                       << "epoch" << epoch << "$db"
-                                                       << "admin")),
+                                                  BSON("mergeChunks" << "TestDB.TestColl"
+                                                                     << "epoch" << epoch << "$db"
+                                                                     << "admin")),
                        DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -266,10 +264,9 @@ TEST(ShardsvrMergeChunks, MissingEpochErrors) {
     bounds.push_back(max);
 
     ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
-                                                  BSON("mergeChunks"
-                                                       << "TestDB.TestColl"
-                                                       << "bounds" << bounds << "$db"
-                                                       << "admin")),
+                                                  BSON("mergeChunks" << "TestDB.TestColl"
+                                                                     << "bounds" << bounds << "$db"
+                                                                     << "admin")),
                        DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -294,14 +291,13 @@ TEST(ShardsvrMergeChunks, WrongBoundTypeErrors) {
     bounds.push_back(max);
 
     OID epoch = OID::gen();
-    ASSERT_THROWS_CODE(
-        ShardsvrMergeChunks::parse(ctx,
-                                   BSON("mergeChunks"
-                                        << "TestDB.TestColl"
-                                        << "bounds" << 1234 << "epoch" << epoch << "$db"
-                                        << "admin")),
-        DBException,
-        ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
+                                                  BSON("mergeChunks" << "TestDB.TestColl"
+                                                                     << "bounds" << 1234 << "epoch"
+                                                                     << epoch << "$db"
+                                                                     << "admin")),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST(ClusterMergeChunks, BasicValidConfigCommand) {
@@ -310,10 +306,9 @@ TEST(ClusterMergeChunks, BasicValidConfigCommand) {
     bounds.push_back(max);
 
     auto request = ClusterMergeChunks::parse(ctx,
-                                             BSON("mergeChunks"
-                                                  << "TestDB.TestColl"
-                                                  << "bounds" << bounds << "$db"
-                                                  << "admin"));
+                                             BSON("mergeChunks" << "TestDB.TestColl"
+                                                                << "bounds" << bounds << "$db"
+                                                                << "admin"));
 
     ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
               request.getCommandParameter());
@@ -343,10 +338,9 @@ TEST(ClusterMergeChunks, MissingBoundErrors) {
     bounds.push_back(max);
 
     ASSERT_THROWS_CODE(ClusterMergeChunks::parse(ctx,
-                                                 BSON("mergeChunks"
-                                                      << "TestDB.TestColl"
-                                                      << "$db"
-                                                      << "admin")),
+                                                 BSON("mergeChunks" << "TestDB.TestColl"
+                                                                    << "$db"
+                                                                    << "admin")),
                        DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -370,10 +364,9 @@ TEST(ClusterMergeChunks, WrongBoundTypeErrors) {
     bounds.push_back(max);
 
     ASSERT_THROWS_CODE(ClusterMergeChunks::parse(ctx,
-                                                 BSON("mergeChunks"
-                                                      << "TestDB.TestColl"
-                                                      << "bounds" << 1234 << "$db"
-                                                      << "admin")),
+                                                 BSON("mergeChunks" << "TestDB.TestColl"
+                                                                    << "bounds" << 1234 << "$db"
+                                                                    << "admin")),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }

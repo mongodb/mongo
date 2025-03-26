@@ -77,7 +77,7 @@ class CollectionBulkLoaderMock : public CollectionBulkLoader {
 
 public:
     explicit CollectionBulkLoaderMock(std::shared_ptr<CollectionMockStats> collStats)
-        : stats(std::move(collStats)){};
+        : stats(std::move(collStats)) {};
     ~CollectionBulkLoaderMock() override = default;
     Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
@@ -439,12 +439,13 @@ public:
         [](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
             return Status{ErrorCodes::IllegalOperation, "CreateCollectionFn not implemented."};
         };
-    CreateIndexesOnEmptyCollectionFn createIndexesOnEmptyCollFn = [](OperationContext* opCtx,
-                                                                     const NamespaceString& nss,
-                                                                     const std::vector<BSONObj>&
-                                                                         secondaryIndexSpecs) {
-        return Status{ErrorCodes::IllegalOperation, "createIndexesOnEmptyCollFn not implemented."};
-    };
+    CreateIndexesOnEmptyCollectionFn createIndexesOnEmptyCollFn =
+        [](OperationContext* opCtx,
+           const NamespaceString& nss,
+           const std::vector<BSONObj>& secondaryIndexSpecs) {
+            return Status{ErrorCodes::IllegalOperation,
+                          "createIndexesOnEmptyCollFn not implemented."};
+        };
     TruncateCollectionFn truncateCollFn = [](OperationContext* opCtx, const NamespaceString& nss) {
         return Status{ErrorCodes::IllegalOperation, "TruncateCollectionFn not implemented."};
     };

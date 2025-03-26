@@ -104,8 +104,7 @@ private:
 };
 
 TEST_F(ExprMatchTest, ComparisonThrowsWithUnboundVariable) {
-    ASSERT_THROWS(createMatcher(BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
-                                                                         << "$$var")))),
+    ASSERT_THROWS(createMatcher(BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a" << "$$var")))),
                   DBException);
 }
 
@@ -160,8 +159,8 @@ TEST(ExprMatchTest, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("var");
     expCtx->variables.setConstantValue(varId, Value(4));
-    BSONObj expression = BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD"
-                                                                      << "$$var")));
+    BSONObj expression =
+        BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD" << "$$var")));
     BSONObj expressionEquiv =
         BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD" << BSON("$const" << 4))));
     BSONObj expressionNotEquiv =

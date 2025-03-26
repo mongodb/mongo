@@ -68,8 +68,7 @@ namespace repl {
 
 namespace {
 
-const auto kMsgObj = BSON("msg"
-                          << "periodic noop");
+const auto kMsgObj = BSON("msg" << "periodic noop");
 
 }  // namespace
 

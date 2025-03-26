@@ -425,12 +425,12 @@ public:
      * the members explaining what they each stand for.
      */
     struct RemoveExistingIndexesFlags {
-        RemoveExistingIndexesFlags(){};
+        RemoveExistingIndexesFlags() {};
         RemoveExistingIndexesFlags(
             bool removeInProgressIndexBuilds,
             const std::map<StringData, std::set<IndexType>>* fieldsToUseForComparison)
             : removeInProgressIndexBuilds(removeInProgressIndexBuilds),
-              fieldsToUseForComparison(fieldsToUseForComparison){};
+              fieldsToUseForComparison(fieldsToUseForComparison) {};
         // Flag indicating whether we should also check unfinished index builds for wether the given
         // specs match.
         bool removeInProgressIndexBuilds = true;

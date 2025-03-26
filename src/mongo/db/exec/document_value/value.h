@@ -446,8 +446,8 @@ inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
 class ImplicitValue : public Value {
 public:
     template <typename T>
-    requires std::is_constructible_v<Value, T> ImplicitValue(T&& arg)
-        : Value(std::forward<T>(arg)) {}
+    requires std::is_constructible_v<Value, T>
+    ImplicitValue(T&& arg) : Value(std::forward<T>(arg)) {}
 
     ImplicitValue(std::initializer_list<ImplicitValue> values) : Value(convertToValues(values)) {}
     ImplicitValue(std::vector<ImplicitValue> values) : Value(convertToValues(values)) {}

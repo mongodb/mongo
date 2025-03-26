@@ -59,7 +59,7 @@ namespace repl {
 // This is a simple random-access "oplog buffer" based on a vector.
 class OplogBufferMock : public RandomAccessOplogBuffer {
 public:
-    OplogBufferMock() : RandomAccessOplogBuffer(){};
+    OplogBufferMock() : RandomAccessOplogBuffer() {};
 
     void startup(OperationContext* opCtx) final;
     void shutdown(OperationContext* opCtx) final;
@@ -67,7 +67,7 @@ public:
               Batch::const_iterator begin,
               Batch::const_iterator end,
               boost::optional<const Cost&> cost = boost::none) final;
-    void waitForSpace(OperationContext* opCtx, const Cost& cost) final{};
+    void waitForSpace(OperationContext* opCtx, const Cost& cost) final {};
     bool isEmpty() const final;
     std::size_t getSize() const final;
     std::size_t getCount() const final;

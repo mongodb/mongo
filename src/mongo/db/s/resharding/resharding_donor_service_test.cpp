@@ -1002,9 +1002,8 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
         ->acquireRecoverableCriticalSectionBlockWrites(
             opCtx.get(),
             doc.getSourceNss(),
-            BSON("command"
-                 << "resharding_donor"
-                 << "collection" << doc.getSourceNss().toString_forTest()),
+            BSON("command" << "resharding_donor"
+                           << "collection" << doc.getSourceNss().toString_forTest()),
             ShardingCatalogClient::kLocalWriteConcern);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
@@ -1062,9 +1061,8 @@ TEST_F(ReshardingDonorServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
         ->acquireRecoverableCriticalSectionBlockWrites(
             opCtx.get(),
             doc.getSourceNss(),
-            BSON("command"
-                 << "resharding_donor"
-                 << "collection" << doc.getSourceNss().toString_forTest()),
+            BSON("command" << "resharding_donor"
+                           << "collection" << doc.getSourceNss().toString_forTest()),
             ShardingCatalogClient::kLocalWriteConcern);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());

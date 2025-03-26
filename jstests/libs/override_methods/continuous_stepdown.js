@@ -172,7 +172,7 @@ const StepdownThread = function() {
  * Overrides the ReplSetTest constructor to start the continuous primary stepdown thread.
  */
 function makeReplSetTestWithContinuousPrimaryStepdown(stepdownOptions, verbositySetting) {
-    return class ReplSetTestWithContinuousPrimaryStepdown extends ReplSetTest {
+    return class ReplSetTestWithContinuousPrimaryStepdown extends ReplSetTest{
         constructor(options) {
             super(options);
             // Handle for the continuous stepdown thread.
@@ -291,7 +291,7 @@ function makeReplSetTestWithContinuousPrimaryStepdown(stepdownOptions, verbosity
  * Overrides the ShardingTest constructor to start the continuous primary stepdown thread.
  */
 function makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbositySetting) {
-    return class ShardingTestWithContinuousPrimaryStepdown extends ShardingTest {
+    return class ShardingTestWithContinuousPrimaryStepdown extends ShardingTest{
         constructor(params) {
             params.other = params.other || {};
 
@@ -363,7 +363,6 @@ function makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbosit
          * This method is disabled because it runs aggregation, which doesn't handle config
          * server stepdown correctly.
          */
-        printShardingStatus() {
-        }
+        printShardingStatus() {}
     };
 }

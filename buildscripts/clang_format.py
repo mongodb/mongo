@@ -39,17 +39,17 @@ from buildscripts.mongo_toolchain import MongoToolchainError, get_mongo_toolchai
 #
 
 # Expected version of clang-format
-CLANG_FORMAT_VERSION = "12.0.1"
-CLANG_FORMAT_SHORT_VERSION = "12.0"
-CLANG_FORMAT_SHORTER_VERSION = "120"
+CLANG_FORMAT_VERSION = "19.1.7"
+CLANG_FORMAT_SHORT_VERSION = "19.1"
+CLANG_FORMAT_SHORTER_VERSION = "191"
 
 # Name of clang-format as a binary
 CLANG_FORMAT_PROGNAME = "clang-format"
 
-TOOLCHAIN_VERSION = "v4"
+TOOLCHAIN_VERSION = "v5"
 
 CLANG_FORMAT_HTTP_DARWIN_CACHE = (
-    "http://mongodbtoolchain.build.10gen.cc/toolchain/osx/clang-format-12.0.1"
+    "https://mdb-build-public.s3.amazonaws.com/clang-format-osx-binaries/clang-format-19.1.7"
 )
 
 try:
@@ -290,18 +290,23 @@ class ClangFormat(object):
 
 
 FILES_RE = re.compile("\\.(h|hpp|ipp|cpp|js)$")
+TPL_FILES_RE = re.compile("\\.tpl\\.")
 
 
 def is_interesting_file(file_name):
     """Return true if this file should be checked."""
     return (
-        file_name.startswith("jstests")
-        or file_name.startswith("src")
-        and not file_name.startswith("src/third_party/")
-        and not file_name.startswith("src/mongo/gotools/")
-        and not file_name.startswith("src/mongo/db/modules/enterprise/src/streams/third_party")
-        and not file_name.startswith("src/streams/third_party")
-    ) and FILES_RE.search(file_name)
+        (
+            file_name.startswith("jstests")
+            or file_name.startswith("src")
+            and not file_name.startswith("src/third_party/")
+            and not file_name.startswith("src/mongo/gotools/")
+            and not file_name.startswith("src/mongo/db/modules/enterprise/src/streams/third_party")
+            and not file_name.startswith("src/streams/third_party")
+        )
+        and FILES_RE.search(file_name)
+        and not TPL_FILES_RE.search(file_name)
+    )
 
 
 def get_list_from_lines(lines):

@@ -76,9 +76,8 @@ protected:
 
             BSONObj expectedCreateCmd = BSON("create" << collName << "capped" << true << "size"
                                                       << cappedSize << "writeConcern"
-                                                      << BSON("w"
-                                                              << "majority"
-                                                              << "wtimeout" << 60000)
+                                                      << BSON("w" << "majority"
+                                                                  << "wtimeout" << 60000)
                                                       << "maxTimeMS" << 30000);
             ASSERT_BSONOBJ_EQ(expectedCreateCmd, request.cmdObj);
 

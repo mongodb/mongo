@@ -833,8 +833,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateExprEqualToStringRespectsCollation) {
     auto testIndex = buildSimpleIndexEntry(keyPattern);
     testIndex.collator = &collator;
 
-    BSONObj obj = BSON("a" << BSON("$_internalExprEq"
-                                   << "foo"));
+    BSONObj obj = BSON("a" << BSON("$_internalExprEq" << "foo"));
     auto [expr, inputParamIdMap] = parseMatchExpression(obj);
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;

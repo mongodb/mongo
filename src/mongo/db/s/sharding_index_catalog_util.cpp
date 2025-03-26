@@ -89,9 +89,9 @@ void performNoopRetryableWriteForIndexCommit(
 
 BSONObj getCriticalSectionReasonForIndexCommit(const NamespaceString& nss,
                                                const std::string& name) {
-    return BSON("command"
-                << "commitIndexCatalogEntry"
-                << "nss" << nss.toStringForErrorMsg() << IndexCatalogType::kNameFieldName << name);
+    return BSON("command" << "commitIndexCatalogEntry"
+                          << "nss" << nss.toStringForErrorMsg() << IndexCatalogType::kNameFieldName
+                          << name);
 }
 
 /**

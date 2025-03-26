@@ -120,10 +120,8 @@ function runTestWithCollOpts(collOpts) {
     runTest(101, 201, 0 /* numExpectedErrorsPrimary */, 0 /* numExpectedErrorsSecondary */);
 }
 
-[{},
- {clusteredIndex: {key: {_id: 1}, unique: true}}]
-    .forEach(collOpts => {
-        runTestWithCollOpts(collOpts);
-    });
+[{}, {clusteredIndex: {key: {_id: 1}, unique: true}}].forEach(collOpts => {
+    runTestWithCollOpts(collOpts);
+});
 
 rst.stopSet();

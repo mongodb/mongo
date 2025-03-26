@@ -158,9 +158,8 @@ TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
     resetManager(std::make_unique<FaultManagerConfig>());
     RAIIServerParameterControllerForTest _intervalController{
         "healthMonitoringIntervals",
-        BSON("values" << BSON_ARRAY(BSON("type"
-                                         << "test"
-                                         << "interval" << 1)))};
+        BSON("values" << BSON_ARRAY(BSON("type" << "test"
+                                                << "interval" << 1)))};
     auto faultFacetType = FaultFacetType::kMock1;
     AtomicWord<Severity> severity{Severity::kOk};
     registerMockHealthObserver(faultFacetType, [&severity] { return severity.load(); });
@@ -197,9 +196,8 @@ TEST_F(FaultManagerTest,
     resetManager(std::make_unique<FaultManagerConfig>());
     RAIIServerParameterControllerForTest _intervalController{
         "healthMonitoringIntervals",
-        BSON("values" << BSON_ARRAY(BSON("type"
-                                         << "test"
-                                         << "interval" << 1)))};
+        BSON("values" << BSON_ARRAY(BSON("type" << "test"
+                                                << "interval" << 1)))};
     RAIIServerParameterControllerForTest _serverParamController{"activeFaultDurationSecs", 5};
 
     AtomicWord<bool> shouldBlock{true};

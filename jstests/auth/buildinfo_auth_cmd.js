@@ -76,39 +76,37 @@ function runTest(conn, authEnabled) {
     testCases.forEach((test) => runTestcase(conn, test, authEnabled));
 }
 
-[true,
- false]
-    .forEach(function(authEnabled) {
-        {
-            // Test standalone.
-            const opts = {useHostname: false};
-            if (authEnabled) {
-                opts.auth = '';
-            }
-            const m = MongoRunner.runMongod(opts);
-            // localhostAuthBypass should allow buildInfo to work with auth enabled,
-            // even though we're not yet authenticated.
-            runTestcase(m, {mode: null, expect: 'success'}, false);
-
-            // Now (order is important), create users and run the tests
-            // expecting auth-enabled mode failure.
-            runTest(m, authEnabled);
-
-            MongoRunner.stopMongod(m);
+[true, false].forEach(function(authEnabled) {
+    {
+        // Test standalone.
+        const opts = {useHostname: false};
+        if (authEnabled) {
+            opts.auth = '';
         }
+        const m = MongoRunner.runMongod(opts);
+        // localhostAuthBypass should allow buildInfo to work with auth enabled,
+        // even though we're not yet authenticated.
+        runTestcase(m, {mode: null, expect: 'success'}, false);
 
-        {
-            // Test sharded.
-            const opts = {shards: 1, mongos: 1, config: 1};
-            if (authEnabled) {
-                opts.other = {keyFile: 'jstests/libs/key1'};
-            }
-            const st = new ShardingTest(opts);
-            if (authEnabled) {
-                // localhostAuthBypass only applies to shards, so we should fail pre-auth.
-                runTestcase(st.s0, {mode: null, expect: 'fail'}, false);
-            }
-            runTest(st.s0, authEnabled);
-            st.stop();
+        // Now (order is important), create users and run the tests
+        // expecting auth-enabled mode failure.
+        runTest(m, authEnabled);
+
+        MongoRunner.stopMongod(m);
+    }
+
+    {
+        // Test sharded.
+        const opts = {shards: 1, mongos: 1, config: 1};
+        if (authEnabled) {
+            opts.other = {keyFile: 'jstests/libs/key1'};
         }
-    });
+        const st = new ShardingTest(opts);
+        if (authEnabled) {
+            // localhostAuthBypass only applies to shards, so we should fail pre-auth.
+            runTestcase(st.s0, {mode: null, expect: 'fail'}, false);
+        }
+        runTest(st.s0, authEnabled);
+        st.stop();
+    }
+});

@@ -1341,7 +1341,7 @@ static UChar32 linenoiseReadChar(void) {
                     return modifierKeys | PAGE_DOWN_KEY;
                 default:
                     continue;  // in raw mode, ReadConsoleInput shows shift, ctrl ...
-            }                  //  ... ignore them
+            }  //  ... ignore them
         } else if (rec.Event.KeyEvent.uChar.UnicodeChar ==
                    ctrlChar('[')) {  // ESC, set flag for later
             escSeen = true;

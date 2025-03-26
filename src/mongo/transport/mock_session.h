@@ -88,7 +88,7 @@ public:
         return false;
     };
 
-    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override{};
+    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override {};
 
     bool bindsToOperationState() const override {
         return false;

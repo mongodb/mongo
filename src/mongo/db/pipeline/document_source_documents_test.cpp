@@ -136,8 +136,7 @@ TEST_F(DocumentSourceDocumentsTest, ReturnsNoneIfNotDesugaredDocuments) {
             preserveNullAndEmptyArrays: true
         }
     })");
-    auto replaceRootStage = BSON("$replaceRoot" << BSON("newRoot"
-                                                        << "$fullDocument"));
+    auto replaceRootStage = BSON("$replaceRoot" << BSON("newRoot" << "$fullDocument"));
 
     auto pipeline = Pipeline::parse(
         std::vector<BSONObj>({queueStage, projectStage, unwindStage, replaceRootStage}), expCtx);

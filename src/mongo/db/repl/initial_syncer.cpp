@@ -936,9 +936,8 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime(
                BSON("state" << BSON("$in" << BSON_ARRAY(preparedState << inProgressState))));
     cmd.append("sort", BSON(SessionTxnRecord::kStartOpTimeFieldName << 1));
     cmd.append("readConcern",
-               BSON("level"
-                    << "local"
-                    << "afterClusterTime" << defaultBeginFetchingOpTime.getTimestamp()));
+               BSON("level" << "local"
+                            << "afterClusterTime" << defaultBeginFetchingOpTime.getTimestamp()));
     cmd.append("limit", 1);
 
     _beginFetchingOpTimeFetcher = std::make_unique<Fetcher>(

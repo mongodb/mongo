@@ -252,10 +252,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
       _donorConnStr(std::move(donorConnStr)),
       _recipientHost(std::move(recipientHost)),
       _stats(ShardingStatistics::get(_opCtx)),
-      _critSecReason(BSON("command"
-                          << "moveChunk"
-                          << "fromShard" << _args.getFromShard() << "toShard"
-                          << _args.getToShard())),
+      _critSecReason(BSON("command" << "moveChunk"
+                                    << "fromShard" << _args.getFromShard() << "toShard"
+                                    << _args.getToShard())),
       _moveTimingHelper(_opCtx,
                         "from",
                         _args.getCommandParameter(),

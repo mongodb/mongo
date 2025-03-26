@@ -41,7 +41,7 @@ namespace process_health {
 class DnsHealthObserver final : public HealthObserverBase {
 public:
     DnsHealthObserver(ServiceContext* svcCtx)
-        : HealthObserverBase(svcCtx), _random(PseudoRandom(SecureRandom().nextInt64())){};
+        : HealthObserverBase(svcCtx), _random(PseudoRandom(SecureRandom().nextInt64())) {};
 
 protected:
     FaultFacetType getType() const override {

@@ -211,10 +211,8 @@ TEST_F(UpdateCommandTest, SingleQuery) {
 
 TEST_F(UpdateCommandTest, SingleQueryWithHintAndCollation) {
     auto update = BSON("q" << BSON("price" << BSON("$gt" << 100)) << "hint" << BSON("price" << 1)
-                           << "collation"
-                           << BSON("locale"
-                                   << "fr")
-                           << "u" << BSON("$inc" << BSON("price" << 10)));
+                           << "collation" << BSON("locale" << "fr") << "u"
+                           << BSON("$inc" << BSON("price" << 10)));
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
 
@@ -340,14 +338,12 @@ TEST_F(BulkWriteTest, SingleQueryInUpdateOp) {
 
 TEST_F(BulkWriteTest, SingleQueryInUpdateOpWithHintCollationSort) {
     auto bulkWriteArgs = {
-        BSON("ops" << BSON_ARRAY(BSON("insert" << 0 << "document" << BSON("_id" << 1))
-                                 << BSON("update"
-                                         << 0 << "filter" << BSON("price" << BSON("$gt" << 100))
-                                         << "updateMods" << BSON("$inc" << BSON("price" << 1))
-                                         << "hint" << BSON("price" << 1) << "collation"
-                                         << BSON("locale"
-                                                 << "fr")
-                                         << "sort" << BSON("price" << 1)))),
+        BSON("ops" << BSON_ARRAY(
+                 BSON("insert" << 0 << "document" << BSON("_id" << 1))
+                 << BSON("update" << 0 << "filter" << BSON("price" << BSON("$gt" << 100))
+                                  << "updateMods" << BSON("$inc" << BSON("price" << 1)) << "hint"
+                                  << BSON("price" << 1) << "collation" << BSON("locale" << "fr")
+                                  << "sort" << BSON("price" << 1)))),
         BSON("nsInfo" << BSON_ARRAY(BSON("ns" << kNss)))};
 
     auto mirroredObj = createCommandAndGetMirrored("1", bulkWriteArgs);
@@ -464,11 +460,9 @@ TEST_F(FindCommandTest, MirrorableKeys) {
                      BSON("limit" << 1),
                      BSON("batchSize" << 1),
                      BSON("singleBatch" << false),
-                     BSON("comment"
-                          << "This is a comment."),
+                     BSON("comment" << "This is a comment."),
                      BSON("maxTimeMS" << 100),
-                     BSON("readConcern" << BSON("level"
-                                                << "local")),
+                     BSON("readConcern" << BSON("level" << "local")),
                      BSON("max" << BSONObj()),
                      BSON("min" << BSONObj()),
                      BSON("returnKey" << true),
@@ -503,9 +497,8 @@ TEST_F(FindCommandTest, ValidateMirroredQuery) {
     constexpr auto limit = 50;
     const auto sortObj = BSON("name" << 1);
     const auto hint = BSONObj();
-    const auto collation = BSON("locale"
-                                << "\"fr\""
-                                << "strength" << 1);
+    const auto collation = BSON("locale" << "\"fr\""
+                                         << "strength" << 1);
     const auto min = BSONObj();
     const auto max = BSONObj();
 
@@ -611,13 +604,11 @@ TEST_F(FindAndModifyCommandTest, BatchSizeReconfiguration) {
 }
 
 TEST_F(FindAndModifyCommandTest, ValidateMirroredQuery) {
-    const auto query = BSON("name"
-                            << "Andy");
+    const auto query = BSON("name" << "Andy");
     const auto sortObj = BSON("rating" << 1);
     const auto update = BSON("$inc" << BSON("score" << 1));
     constexpr auto upsert = true;
-    const auto collation = BSON("locale"
-                                << "\"fr\"");
+    const auto collation = BSON("locale" << "\"fr\"");
     const auto encInfoValue = BSON("type" << 1 << "schema" << BSONObj::kEmptyObject);
 
     auto findAndModifyArgs = {BSON("query" << query),
@@ -642,8 +633,7 @@ TEST_F(FindAndModifyCommandTest, ValidateMirroredQuery) {
 }
 
 TEST_F(FindAndModifyCommandTest, ValidateShardVersionAndDatabaseVersion) {
-    std::vector<BSONObj> findAndModifyArgs = {BSON("query" << BSON("name"
-                                                                   << "Andy")),
+    std::vector<BSONObj> findAndModifyArgs = {BSON("query" << BSON("name" << "Andy")),
                                               BSON("update" << BSON("$inc" << BSON("score" << 1)))};
 
     {
@@ -675,8 +665,7 @@ public:
 };
 
 TEST_F(DistinctCommandTest, MirrorableKeys) {
-    auto distinctArgs = {BSON("key"
-                              << ""),
+    auto distinctArgs = {BSON("key" << ""),
                          BSON("query" << BSONObj()),
                          BSON("readConcern" << BSONObj()),
                          BSON("collation" << BSONObj()),
@@ -689,10 +678,8 @@ TEST_F(DistinctCommandTest, MirrorableKeys) {
 
 TEST_F(DistinctCommandTest, ValidateMirroredQuery) {
     constexpr auto key = "rating";
-    const auto query = BSON("cuisine"
-                            << "italian");
-    const auto readConcern = BSON("level"
-                                  << "majority");
+    const auto query = BSON("cuisine" << "italian");
+    const auto readConcern = BSON("level" << "majority");
     const auto collation = BSON("strength" << 1);
 
     auto distinctArgs = {BSON("key" << key),
@@ -767,8 +754,7 @@ TEST_F(CountCommandTest, MirrorableKeys) {
 }
 
 TEST_F(CountCommandTest, ValidateMirroredQuery) {
-    const auto query = BSON("status"
-                            << "Delivered");
+    const auto query = BSON("status" << "Delivered");
     const auto hint = BSON("status" << 1);
     constexpr auto limit = 1000;
     const auto encInfoValue = BSON("type" << 1 << "schema" << BSONObj::kEmptyObject);

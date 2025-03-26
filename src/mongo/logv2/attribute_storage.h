@@ -698,8 +698,8 @@ public:
      * to extend with their own attributes.
      */
     template <typename... Args>
-    DynamicAttributes(DynamicAttributes&& other,
-                      Args&&... args) requires(detail::IsNamedArg<Args>&&...)
+    DynamicAttributes(DynamicAttributes&& other, Args&&... args)
+    requires(detail::IsNamedArg<Args> && ...)
         : _attributes(std::move(other._attributes)),
           _copiedStrings(std::move(other._copiedStrings)) {
         (add(std::forward<Args>(args)), ...);

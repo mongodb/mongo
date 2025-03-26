@@ -102,11 +102,10 @@ public:
 
             auto handleRecoverableCriticalSection = [this](auto opCtx) {
                 const auto reason = request().getReason().get_value_or(
-                    BSON("command"
-                         << "ShardSvrParticipantBlockCommand"
-                         << "ns"
-                         << NamespaceStringUtil::serialize(ns(),
-                                                           SerializationContext::stateDefault())));
+                    BSON("command" << "ShardSvrParticipantBlockCommand"
+                                   << "ns"
+                                   << NamespaceStringUtil::serialize(
+                                          ns(), SerializationContext::stateDefault())));
                 auto blockType = request().getBlockType().get_value_or(
                     CriticalSectionBlockTypeEnum::kReadsAndWrites);
 

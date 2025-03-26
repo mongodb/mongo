@@ -174,10 +174,7 @@ TEST(ExpressionObjectParse, ShouldRejectInvalidFieldName) {
 TEST(ExpressionObjectParse, ShouldRejectInvalidFieldPathAsValue) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    ASSERT_THROWS(ExpressionObject::parse(&expCtx,
-                                          BSON("a"
-                                               << "$field."),
-                                          vps),
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON("a" << "$field."), vps),
                   AssertionException);
 }
 
@@ -226,11 +223,9 @@ TEST(ExpressionObjectDependencies, VariablesShouldBeAddedToReferences) {
 TEST(ExpressionObjectDependencies, LocalLetVariablesShouldBeFilteredOutOfDependencies) {
     auto expCtx = ExpressionContextForTest{};
     expCtx.variablesParseState.defineVariable("var1");
-    auto letSpec = BSON("$let" << BSON("vars" << BSON("var2"
-                                                      << "abc")
-                                              << "in"
-                                              << BSON("$multiply" << BSON_ARRAY("$$var1"
-                                                                                << "$$var2"))));
+    auto letSpec =
+        BSON("$let" << BSON("vars" << BSON("var2" << "abc") << "in"
+                                   << BSON("$multiply" << BSON_ARRAY("$$var1" << "$$var2"))));
     auto expressionLet =
         ExpressionLet::parse(&expCtx, letSpec.firstElement(), expCtx.variablesParseState);
     std::set<Variables::Id> refs;
@@ -242,13 +237,11 @@ TEST(ExpressionObjectDependencies, LocalLetVariablesShouldBeFilteredOutOfDepende
 TEST(ExpressionObjectDependencies, LocalMapVariablesShouldBeFilteredOutOfDependencies) {
     auto expCtx = ExpressionContextForTest{};
     expCtx.variablesParseState.defineVariable("var1");
-    auto mapSpec = BSON("$map" << BSON("input"
-                                       << "$field1"
-                                       << "as"
-                                       << "var2"
-                                       << "in"
-                                       << BSON("$multiply" << BSON_ARRAY("$$var1"
-                                                                         << "$$var2"))));
+    auto mapSpec = BSON(
+        "$map" << BSON("input" << "$field1"
+                               << "as"
+                               << "var2"
+                               << "in" << BSON("$multiply" << BSON_ARRAY("$$var1" << "$$var2"))));
 
     auto expressionMap =
         ExpressionMap::parse(&expCtx, mapSpec.firstElement(), expCtx.variablesParseState);
@@ -261,11 +254,10 @@ TEST(ExpressionObjectDependencies, LocalMapVariablesShouldBeFilteredOutOfDepende
 TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDependencies) {
     auto expCtx = ExpressionContextForTest{};
     expCtx.variablesParseState.defineVariable("var1");
-    auto filterSpec = BSON("$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3) << "as"
-                                                     << "var2"
-                                                     << "cond"
-                                                     << BSON("$gt" << BSON_ARRAY("$$var1"
-                                                                                 << "$$var2"))));
+    auto filterSpec = BSON(
+        "$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3) << "as"
+                                  << "var2"
+                                  << "cond" << BSON("$gt" << BSON_ARRAY("$$var1" << "$$var2"))));
 
     auto expressionFilter =
         ExpressionFilter::parse(&expCtx, filterSpec.firstElement(), expCtx.variablesParseState);

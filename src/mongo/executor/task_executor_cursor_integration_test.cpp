@@ -190,9 +190,8 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
     auto opCtx = makeOpCtx();
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
                              DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                             BSON("find"
-                                  << "test"
-                                  << "batchSize" << 10),
+                             BSON("find" << "test"
+                                         << "batchSize" << 10),
                              opCtx.get());
 
     executor::TaskExecutorCursorOptions opts(/*pinConnection*/ gPinTaskExecCursorConns.load() ||
@@ -217,9 +216,8 @@ TEST_F(TaskExecutorCursorFixture, BasicNonPinned) {
     auto opCtx = makeOpCtx();
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
                              DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                             BSON("find"
-                                  << "test"
-                                  << "batchSize" << 10),
+                             BSON("find" << "test"
+                                         << "batchSize" << 10),
                              opCtx.get());
     executor::TaskExecutorCursorOptions opts(/*pinConnection*/ false,
                                              /*batchSize*/ 10,
@@ -244,9 +242,8 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
     auto opCtx = makeOpCtx();
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
                              DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                             BSON("find"
-                                  << "test"
-                                  << "batchSize" << 10),
+                             BSON("find" << "test"
+                                         << "batchSize" << 10),
                              opCtx.get());
 
     executor::TaskExecutorCursorOptions opts(/*pinConnection*/ true,
@@ -302,11 +299,8 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
     // unchanged.
     const size_t kNumConnections = 4;
     std::vector<TaskExecutor::CallbackHandle> handles;
-    auto cmd = BSON("find"
-                    << "test"
-                    << "filter"
-                    << BSON("$where"
-                            << "sleep(100); return true;"));
+    auto cmd = BSON("find" << "test"
+                           << "filter" << BSON("$where" << "sleep(100); return true;"));
     for (size_t i = 0; i < kNumConnections; i++) {
         handles.emplace_back(scheduleRemoteCommand(opCtx.get(), target, cmd));
     }
@@ -323,9 +317,8 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
                               << fpName << "mode"
                               << "alwaysOn"
                               << "data"
-                              << BSON("ns"
-                                      << "test.test"
-                                      << "commands" << BSON_ARRAY("getMore"))));
+                              << BSON("ns" << "test.test"
+                                           << "commands" << BSON_ARRAY("getMore"))));
         ScopeGuard guard([&] {
             runRemoteCommand(opCtx.get(),
                              target,
@@ -335,9 +328,8 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
 
         RemoteCommandRequest rcr(target,
                                  DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                 BSON("find"
-                                      << "test"
-                                      << "batchSize" << 10),
+                                 BSON("find" << "test"
+                                             << "batchSize" << 10),
                                  opCtx.get());
 
         executor::TaskExecutorCursorOptions opts(

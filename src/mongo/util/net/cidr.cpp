@@ -140,7 +140,7 @@ CIDR::CIDR() : _family(AF_UNSPEC), _len(0) {
 }
 
 template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<<CIDR>(CIDR value) {
+BSONObjBuilder& BSONObjBuilderValueStream::operator<< <CIDR>(CIDR value) {
     _builder->append(_fieldName, value.toString());
     _fieldName = StringData();
     return *_builder;

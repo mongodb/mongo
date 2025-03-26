@@ -62,7 +62,7 @@ void OpCounters::_reset() {
     _acceptableErrorInCommand->store(0);
 }
 
-void OpCounters::_checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::*counter, int n) {
+void OpCounters::_checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::* counter, int n) {
     static constexpr auto maxCount = 1LL << 60;
     auto oldValue = (this->*counter)->fetchAndAddRelaxed(n);
     if (oldValue > maxCount) {

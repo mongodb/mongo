@@ -61,7 +61,7 @@ public:
     DelayableTimeoutCallback(executor::TaskExecutor* executor,
                              executor::TaskExecutor::CallbackFn callback,
                              std::string timerName = std::string())
-        : _executor(executor), _callback(std::move(callback)), _timerName(std::move(timerName)){};
+        : _executor(executor), _callback(std::move(callback)), _timerName(std::move(timerName)) {};
 
     ~DelayableTimeoutCallback();
 

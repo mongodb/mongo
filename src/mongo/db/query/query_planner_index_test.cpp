@@ -1437,8 +1437,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsPartial) {
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsText) {
     params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
-    addIndex(BSON("a"
-                  << "text"));
+    addIndex(BSON("a" << "text"));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
     assertNumSolutions(1);
     assertSolutionExists(
@@ -1448,8 +1447,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsText) {
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsGeo) {
     params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
-    addIndex(BSON("a"
-                  << "2dsphere"));
+    addIndex(BSON("a" << "2dsphere"));
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1}}"));
     assertNumSolutions(1);
     assertSolutionExists(

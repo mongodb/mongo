@@ -458,15 +458,14 @@ TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
     ASSERT_TRUE(newSyncSource.empty());
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -525,29 +524,29 @@ TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
 
 TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
     updateConfig(
-        BSON("_id"
-             << "rs0"
-             << "version" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "hself")
-                           << BSON("_id" << 10 << "host"
-                                         << "h1")
-                           << BSON("_id" << 20 << "host"
-                                         << "h2"
-                                         << "buildIndexes" << false << "priority" << 0)
-                           << BSON("_id" << 30 << "host"
-                                         << "h3"
-                                         << "hidden" << true << "priority" << 0 << "votes" << 0)
-                           << BSON("_id" << 40 << "host"
-                                         << "h4"
-                                         << "arbiterOnly" << true)
-                           << BSON("_id" << 50 << "host"
-                                         << "h5"
-                                         << "secondaryDelaySecs" << 1 << "priority" << 0)
-                           << BSON("_id" << 60 << "host"
-                                         << "h6")
-                           << BSON("_id" << 70 << "host"
-                                         << "hprimary"))),
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 10 << "host"
+                                               << "h1")
+                                 << BSON("_id" << 20 << "host"
+                                               << "h2"
+                                               << "buildIndexes" << false << "priority" << 0)
+                                 << BSON("_id" << 30 << "host"
+                                               << "h3"
+                                               << "hidden" << true << "priority" << 0 << "votes"
+                                               << 0)
+                                 << BSON("_id" << 40 << "host"
+                                               << "h4"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 50 << "host"
+                                               << "h5"
+                                               << "secondaryDelaySecs" << 1 << "priority" << 0)
+                                 << BSON("_id" << 60 << "host"
+                                               << "h6")
+                                 << BSON("_id" << 70 << "host"
+                                               << "hprimary"))),
         0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -676,15 +675,14 @@ TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
 }
 
 TEST_F(TopoCoordTest, NodeWontChooseSyncSourceFromOlderTerm) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 10 << "host"
-                                                  << "h1")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 10 << "host"
+                                                        << "h1")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2"))),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -768,15 +766,14 @@ TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
 }
 
 TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimary) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -819,15 +816,14 @@ TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimary) {
 }
 
 TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -869,15 +865,14 @@ TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourc
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -919,15 +914,14 @@ TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpir
 }
 
 TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -970,15 +964,14 @@ TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimar
 }
 
 TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     // We use readPreference nearest only when in initialSync
@@ -1069,15 +1062,14 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
 }
 
 TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     // We use readPreference nearest only when in initialSync
@@ -1153,15 +1145,14 @@ TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSeconda
 }
 
 TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     // We use readPreference nearest only when in initialSync
@@ -1265,15 +1256,14 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
 }
 
 TEST_F(TopoCoordTest, PreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     // We use readPreference nearest only when in initialSync
@@ -1356,15 +1346,14 @@ TEST_F(TopoCoordTest, PreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPr
 }
 
 TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -1421,15 +1410,14 @@ TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp) {
 }
 
 TEST_F(TopoCoordTest, NodeRetriesReconfigWhenAbsentFromConfig) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "h1")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "h1")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  -1);
     ASSERT_EQUALS(HeartbeatResponseAction::RetryReconfig,
                   heartbeatFromMember(HostAndPort("h2"),
@@ -1456,14 +1444,13 @@ TEST_F(TopoCoordTest, NodeReturnsNotSecondaryWhenSyncFromIsRunAgainstArbiter) {
 
 
     // Test trying to sync from another node when we are an arbiter
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself"
-                                               << "arbiterOnly" << true)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "hself"
+                                                     << "arbiterOnly" << true)
+                                          << BSON("_id" << 1 << "host"
+                                                        << "h1"))),
                  0);
 
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h1"), &response, &result);
@@ -1475,26 +1462,26 @@ TEST_F(TopoCoordTest, NodeReturnsNotSecondaryWhenSyncFromIsRunAgainstPrimary) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
 
     // Try to sync while PRIMARY
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
@@ -1511,26 +1498,26 @@ TEST_F(TopoCoordTest, NodeReturnsNodeNotFoundWhenSyncFromRequestsANodeNotInConfi
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     getTopoCoord().prepareSyncFromResponse(HostAndPort("fakemember"), &response, &result);
@@ -1542,26 +1529,26 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsSelf) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Try to sync from self
@@ -1574,26 +1561,26 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiter) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
 
@@ -1607,26 +1594,26 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbui
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Try to sync from a node that doesn't build indexes
@@ -1640,26 +1627,26 @@ TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNode) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Try to sync from a member that is down
@@ -1677,26 +1664,26 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAStaleNode) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Sync successfully from a member that is stale
@@ -1719,26 +1706,26 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAValidNode) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Sync successfully from an up-to-date member
@@ -1762,26 +1749,26 @@ TEST_F(TopoCoordTest,
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     heartbeatFromMember(
@@ -1805,26 +1792,26 @@ TEST_F(TopoCoordTest, NodeReturnsUnauthorizedWhenSyncFromRequestsANodeWeAreNotAu
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Try to sync from a member that is unauth'd
@@ -1867,26 +1854,26 @@ TEST_F(TopoCoordTest,
     BSONObjBuilder response;
     BSONObjBuilder response2;
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "h2"
-                                                  << "priority" << 0 << "buildIndexes" << false)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "h3")
-                                    << BSON("_id" << 4 << "host"
-                                                  << "h4")
-                                    << BSON("_id" << 5 << "host"
-                                                  << "h5")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "h6"))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "h1"
+                                               << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2"
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5")
+                                 << BSON("_id" << 6 << "host"
+                                               << "h6"))),
+        0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Sync successfully from an up-to-date member.
@@ -2204,22 +2191,21 @@ TEST_F(TopoCoordTest, ReplSetGetStatusVotingMembersCountAndWritableVotingMembers
     // replSetGetStatus are set correctly when arbiters and non-voting nodes are included in the
     // replica set.
     RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
-    updateConfig(BSON("_id"
-                      << "mySet"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "test0:1234")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "test1:1234")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "test2:1234"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "test3:1234"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 4 << "host"
-                                                  << "test4:1234"
-                                                  << "votes" << 0 << "priority" << 0))),
+    updateConfig(BSON("_id" << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test0:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test1:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test2:1234"
+                                                        << "arbiterOnly" << true)
+                                          << BSON("_id" << 3 << "host"
+                                                        << "test3:1234"
+                                                        << "arbiterOnly" << true)
+                                          << BSON("_id" << 4 << "host"
+                                                        << "test4:1234"
+                                                        << "votes" << 0 << "priority" << 0))),
                  0);
     BSONObjBuilder statusBuilder;
     Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
@@ -2294,12 +2280,11 @@ TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) 
 }
 
 TEST_F(TopoCoordTest, PrepareStepDownAttemptFailsIfNotLeader) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"))
+                            << "protocolVersion" << 1),
                  0);
     getTopoCoord().changeMemberState_forTest(MemberState::RS_SECONDARY);
     Status expectedStatus(ErrorCodes::NotWritablePrimary, "This node is not a primary. ");
@@ -2433,17 +2418,17 @@ class PrepareHeartbeatResponseV1Test : public TopoCoordTest {
 public:
     void setUp() override {
         TopoCoordTest::setUp();
-        updateConfig(BSON("_id"
-                          << "rs0"
-                          << "version" << initConfigVersion << "term" << initConfigTerm << "members"
-                          << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                                   << "hself"
-                                                   << "arbiterOnly" << useArbiter)
-                                        << BSON("_id" << 20 << "host"
-                                                      << "h2")
-                                        << BSON("_id" << 30 << "host"
-                                                      << "h3"))
-                          << "settings" << BSON("protocolVersion" << 1)),
+        updateConfig(BSON("_id" << "rs0"
+                                << "version" << initConfigVersion << "term" << initConfigTerm
+                                << "members"
+                                << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                         << "hself"
+                                                         << "arbiterOnly" << useArbiter)
+                                              << BSON("_id" << 20 << "host"
+                                                            << "h2")
+                                              << BSON("_id" << 30 << "host"
+                                                            << "h3"))
+                                << "settings" << BSON("protocolVersion" << 1)),
                      0);
         if (useArbiter) {
             ASSERT_EQUALS(MemberState::RS_ARBITER, getTopoCoord().getMemberState().s);
@@ -2494,14 +2479,13 @@ TEST_F(PrepareHeartbeatResponseV1Test,
 TEST_F(PrepareHeartbeatResponseV1Test,
        NodeReturnsInvalidReplicaSetConfigWhenAHeartbeatRequestComesInWhileAbsentFromAPV1Config) {
     // reconfig self out of set
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 3 << "members"
-                      << BSON_ARRAY(BSON("_id" << 20 << "host"
-                                               << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))
-                      << "settings" << BSON("protocolVersion" << 1)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 3 << "members"
+                            << BSON_ARRAY(BSON("_id" << 20 << "host"
+                                                     << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))
+                            << "settings" << BSON("protocolVersion" << 1)),
                  -1);
     ReplSetHeartbeatArgsV1 args;
     args.setSetName("rs0");
@@ -2788,13 +2772,12 @@ TEST_F(PrepareHeartbeatResponseV1Test,
 TEST_F(TopoCoordTest, RespondToHeartbeatsWithNullLastAppliedAndLastDurableWhileInInitialSync) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "h0")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "h0")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "h1"))),
                  1);
 
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
@@ -2825,11 +2808,10 @@ TEST_F(TopoCoordTest, RespondToHeartbeatsWithNullLastAppliedAndLastDurableWhileI
 TEST_F(TopoCoordTest, DoNotBecomeCandidateWhenBecomingSecondaryInSingleNodeSetIfInMaintenanceMode) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "hself"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "hself"))),
                  0);
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
@@ -2853,12 +2835,12 @@ TEST_F(TopoCoordTest,
        DoNotBecomeCandidateWhenReconfigToBeElectableInSingleNodeSetIfInMaintenanceMode) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    auto cfg = ReplSetConfig::parse(BSON("_id"
-                                         << "rs0"
-                                         << "version" << 1 << "protocolVersion" << 1 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                  << "hself"
-                                                                  << "priority" << 0))));
+    auto cfg =
+        ReplSetConfig::parse(BSON("_id" << "rs0"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "hself"
+                                                                 << "priority" << 0))));
     getTopoCoord().updateConfig(cfg, 0, now()++);
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
@@ -2870,11 +2852,10 @@ TEST_F(TopoCoordTest,
     // We should not become a candidate when we reconfig to become electable if we are currently in
     // maintenance mode.
     getTopoCoord().adjustMaintenanceCountBy(1);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "hself"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "hself"))),
                  0);
     ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 }
@@ -2882,12 +2863,11 @@ TEST_F(TopoCoordTest,
 TEST_F(TopoCoordTest, NodeDoesNotBecomeCandidateWhenBecomingSecondaryInSingleNodeSetIfUnelectable) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    auto cfg = ReplSetConfig::parse(BSON("_id"
-                                         << "rs0"
-                                         << "version" << 1 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                  << "hself"
-                                                                  << "priority" << 0))));
+    auto cfg = ReplSetConfig::parse(BSON("_id" << "rs0"
+                                               << "version" << 1 << "members"
+                                               << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                        << "hself"
+                                                                        << "priority" << 0))));
 
     getTopoCoord().updateConfig(cfg, 0, now()++);
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
@@ -2903,28 +2883,26 @@ TEST_F(TopoCoordTest, NodeTransitionsFromRemovedToStartup2WhenAddedToConfig) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
     // config to be absent from the set
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  -1);
     // should become removed since we are not in the set
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
 
     // reconfig to add to set
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  0);
     // having been added to the config, we should no longer be REMOVED and should enter STARTUP2
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
@@ -2934,27 +2912,25 @@ TEST_F(TopoCoordTest, NodeTransitionsFromRemovedToStartup2WhenAddedToConfig) {
 TEST_F(TopoCoordTest, NodeTransitionsToRemovedWhenRemovedFromConfig) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  0);
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
     // reconfig to remove self
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  -1);
     // should become removed since we are no longer in the set
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
@@ -2964,11 +2940,10 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedWhenRemovedFromConfig) {
 TEST_F(TopoCoordTest, NodeTransitionsToRemovedWhenRemovedFromConfigEvenWhenPrimary) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"))),
                  0);
     ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
@@ -2983,13 +2958,12 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedWhenRemovedFromConfigEvenWhenPrima
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
     // reconfig to remove self
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  -1);
     // should become removed since we are no longer in the set even though we were primary
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
@@ -2999,11 +2973,10 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedWhenRemovedFromConfigEvenWhenPrima
 TEST_F(TopoCoordTest, NodeTransitionsToSecondaryWhenReconfiggingToBeUnelectable) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "protocolVersion" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "protocolVersion" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"))),
                  0);
     ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
@@ -3018,16 +2991,15 @@ TEST_F(TopoCoordTest, NodeTransitionsToSecondaryWhenReconfiggingToBeUnelectable)
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
     // now lose primary due to loss of electability
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"
-                                               << "priority" << 0)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"
+                                                     << "priority" << 0)
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  0);
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
@@ -3036,11 +3008,10 @@ TEST_F(TopoCoordTest, NodeTransitionsToSecondaryWhenReconfiggingToBeUnelectable)
 TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigIfNodeRemainsElectable) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"))),
                  0);
 
     ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
@@ -3057,34 +3028,31 @@ TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigIfNodeRemainsElecta
 
     // Now reconfig in ways that leave us electable and ensure we are still the primary.
     // Add hosts
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  0,
                  Date_t::fromMillisSinceEpoch(-1));
     ASSERT_TRUE(TopologyCoordinator::Role::kLeader == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
     // Change priorities and tags
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"
-                                               << "priority" << 10)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017"
-                                                  << "priority" << 5 << "tags"
-                                                  << BSON("dc"
-                                                          << "NA"
-                                                          << "rack"
-                                                          << "rack1")))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"
+                                                     << "priority" << 10)
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017"
+                                                        << "priority" << 5 << "tags"
+                                                        << BSON("dc" << "NA"
+                                                                     << "rack"
+                                                                     << "rack1")))),
                  0,
                  Date_t::fromMillisSinceEpoch(-1));
     ASSERT_TRUE(TopologyCoordinator::Role::kLeader == getTopoCoord().getRole());
@@ -3092,13 +3060,12 @@ TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigIfNodeRemainsElecta
 }
 
 TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfig) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
@@ -3106,31 +3073,29 @@ TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfig) {
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 
     // reconfig and stay secondary
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  0);
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 }
 
 TEST_F(TopoCoordTest, NodeReturnsArbiterWhenGetMemberStateRunsAgainstArbiter) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself"
-                                               << "arbiterOnly" << true)
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself"
+                                                     << "arbiterOnly" << true)
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     ASSERT_EQUALS(MemberState::RS_ARBITER, getTopoCoord().getMemberState().s);
 }
@@ -3143,15 +3108,14 @@ TEST_F(TopoCoordTest, ShouldNotStandForElectionWhileRemovedFromTheConfig) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantVotesToTwoDifferentNodesInTheSameTerm) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -3190,13 +3154,12 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVotesToTwoDifferentNodesInTheSameTerm) {
 }
 
 TEST_F(TopoCoordTest, UpdateLastCommittedInPrevConfigSetsToLastCommittedOpTime) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
 
     // Make sure the lastCommittedInPrevConfig is set to be the current committed optime.
@@ -3225,15 +3188,14 @@ TEST_F(TopoCoordTest, UpdateLastCommittedInPrevConfigSetsToLastCommittedOpTime) 
 
 
 TEST_F(TopoCoordTest, DryRunVoteRequestShouldNotPreventSubsequentDryRunsForThatTerm) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -3307,15 +3269,14 @@ TEST_F(TopoCoordTest, DryRunVoteRequestShouldNotPreventSubsequentDryRunsForThatT
 }
 
 TEST_F(TopoCoordTest, VoteRequestShouldNotPreventDryRunsForThatTerm) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -3355,15 +3316,14 @@ TEST_F(TopoCoordTest, VoteRequestShouldNotPreventDryRunsForThatTerm) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenReplSetNameDoesNotMatch) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -3389,16 +3349,15 @@ public:
     auto testWithArbiter(bool useArbiter,
                          long long requestVotesConfigVersion,
                          long long requestVotesConfigTerm) {
-        updateConfig(BSON("_id"
-                          << "rs0"
-                          << "version" << 2 << "term" << 2LL << "members"
-                          << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                                   << "hself"
-                                                   << "arbiterOnly" << useArbiter)
-                                        << BSON("_id" << 20 << "host"
-                                                      << "h2")
-                                        << BSON("_id" << 30 << "host"
-                                                      << "h3"))),
+        updateConfig(BSON("_id" << "rs0"
+                                << "version" << 2 << "term" << 2LL << "members"
+                                << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                         << "hself"
+                                                         << "arbiterOnly" << useArbiter)
+                                              << BSON("_id" << 20 << "host"
+                                                            << "h2")
+                                              << BSON("_id" << 30 << "host"
+                                                            << "h3"))),
                      0);
         if (useArbiter) {
             ASSERT_EQUALS(MemberState::RS_ARBITER, getTopoCoord().getMemberState().s);
@@ -3458,15 +3417,14 @@ TEST_F(ConfigTermAndVersionVoteTest, ArbiterDoesNotGrantVoteWhenConfigTermIsLowe
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsStale) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -3493,15 +3451,14 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsStale) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenLastWrittenIsStale) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -3531,15 +3488,14 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenLastWrittenIsStale) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesGrantVoteWhenOnlyLastAppliedIsStale) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -3565,15 +3521,14 @@ TEST_F(TopoCoordTest, NodeDoesGrantVoteWhenOnlyLastAppliedIsStale) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenReplSetNameDoesNotMatch) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
     // set term to 1
@@ -3616,15 +3571,14 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenReplSetNameDoesNotMatch) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenConfigVersionIsLower) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "term" << 1LL << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "term" << 1LL << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
     // set term to 1
@@ -3670,15 +3624,14 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenConfigVersionIsLower) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenTermIsStale) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
     // set term to 1
@@ -3720,15 +3673,14 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenTermIsStale) {
 }
 
 TEST_F(TopoCoordTest, NodeGrantsVoteWhenTermIsHigherButConfigVersionIsLower) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "term" << 1LL << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "term" << 1LL << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -3755,15 +3707,14 @@ TEST_F(TopoCoordTest, NodeGrantsVoteWhenTermIsHigherButConfigVersionIsLower) {
 }
 
 TEST_F(TopoCoordTest, GrantDryRunVoteEvenWhenTermHasBeenSeen) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
     // set term to 1
@@ -3806,15 +3757,14 @@ TEST_F(TopoCoordTest, GrantDryRunVoteEvenWhenTermHasBeenSeen) {
 }
 
 TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
     // set term to 1
@@ -3871,16 +3821,15 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSuppor
     setOptions(options);
     getTopoCoord().setStorageEngineSupportsReadCommitted(false);
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
-                      << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
     ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
 }
@@ -3894,16 +3843,15 @@ TEST_F(TopoCoordTest, NodeBecomesSecondaryAsNormalWhenReadCommittedSupportedAndC
     setOptions(options);
     getTopoCoord().setStorageEngineSupportsReadCommitted(true);
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
-                      << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "h2")
+                                          << BSON("_id" << 30 << "host"
+                                                        << "h3"))),
                  0);
 
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
@@ -3915,17 +3863,16 @@ class HeartbeatResponseTestV1 : public TopoCoordTest {
 public:
     void setUp() override {
         TopoCoordTest::setUp();
-        updateConfig(BSON("_id"
-                          << "rs0"
-                          << "version" << 5 << "term" << 1 << "members"
-                          << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                   << "host1:27017")
-                                        << BSON("_id" << 1 << "host"
-                                                      << "host2:27017")
-                                        << BSON("_id" << 2 << "host"
-                                                      << "host3:27017"))
-                          << "protocolVersion" << 1 << "settings"
-                          << BSON("heartbeatTimeoutSecs" << 5)),
+        updateConfig(BSON("_id" << "rs0"
+                                << "version" << 5 << "term" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                         << "host1:27017")
+                                              << BSON("_id" << 1 << "host"
+                                                            << "host2:27017")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "host3:27017"))
+                                << "protocolVersion" << 1 << "settings"
+                                << BSON("heartbeatTimeoutSecs" << 5)),
                      0);
     }
 };
@@ -3941,18 +3888,18 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime freshOpTime = OpTime(Timestamp(3005, 0), 0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 7 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself"
-                                               << "buildIndexes" << false << "priority" << 0)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3"
-                                                  << "buildIndexes" << false << "priority" << 0))),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 7 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself"
+                                            << "buildIndexes" << false << "priority" << 0)
+                                 << BSON("_id" << 1 << "host"
+                                               << "host2")
+                                 << BSON("_id" << 2 << "host"
+                                               << "host3"
+                                               << "buildIndexes" << false << "priority" << 0))),
+        0);
 
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, freshOpTime);
@@ -4400,17 +4347,16 @@ TEST_F(HeartbeatResponseTestV1,
     // "host2" since we are not aware of who the new primary is.
 
     setSelfMemberState(MemberState::RS_SECONDARY);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
-                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
                  0);
 
     OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
@@ -4431,17 +4377,16 @@ TEST_F(HeartbeatResponseTestV1,
     // "host2" since "host3" is the new primary and chaining is disabled.
 
     setSelfMemberState(MemberState::RS_SECONDARY);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
-                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
                  0);
 
     OpTime oldElection = OpTime(Timestamp(1, 1), 1);
@@ -4480,17 +4425,16 @@ TEST_F(HeartbeatResponseTestV1,
     // "host2" since we are not aware of who the new primary is.
 
     setSelfMemberState(MemberState::RS_SECONDARY);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
-                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
                  0);
 
     OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
@@ -4508,17 +4452,16 @@ TEST_F(HeartbeatResponseTestV1,
     // "host2" since "host3" is the new primary and chaining is disabled.
 
     setSelfMemberState(MemberState::RS_SECONDARY);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
-                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
                  0);
 
     OpTime oldElection = OpTime(Timestamp(1, 1), 1);
@@ -4554,17 +4497,16 @@ TEST_F(HeartbeatResponseTestV1,
     // "host2" since, though "host3" is the new primary, "host2" also thinks it is primary.
 
     setSelfMemberState(MemberState::RS_SECONDARY);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
-                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
                  0);
 
     OpTime oldElection = OpTime(Timestamp(1, 1), 1);
@@ -4595,17 +4537,16 @@ TEST_F(HeartbeatResponseTestV1,
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldntChangeSyncSourceWhenChainingDisabledAndWeArePrimary) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
-                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
                  0);
 
     OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
@@ -4625,17 +4566,16 @@ TEST_F(HeartbeatResponseTestV1, ShouldntChangeSyncSourceWhenChainingDisabledAndW
 
 TEST_F(HeartbeatResponseTestV1,
        ShouldntChangeSyncSourceOnErrorWhenChainingDisabledAndWeArePrimary) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
-                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
                  0);
 
     OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
@@ -4654,16 +4594,15 @@ class ReevalSyncSourceTest : public TopoCoordTest {
 public:
     void setUp() override {
         TopoCoordTest::setUp();
-        updateConfig(BSON("_id"
-                          << "rs0"
-                          << "version" << 5 << "term" << 1 << "members"
-                          << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                   << "host1:27017")
-                                        << BSON("_id" << 1 << "host"
-                                                      << "host2:27017")
-                                        << BSON("_id" << 2 << "host"
-                                                      << "host3:27017"))
-                          << "protocolVersion" << 1),
+        updateConfig(BSON("_id" << "rs0"
+                                << "version" << 5 << "term" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                         << "host1:27017")
+                                              << BSON("_id" << 1 << "host"
+                                                            << "host2:27017")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "host3:27017"))
+                                << "protocolVersion" << 1),
                      0);
 
         // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
@@ -4849,16 +4788,15 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrim
 }
 
 TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenSourcePingTimeIsMissing) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
@@ -4878,16 +4816,15 @@ TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenSourcePingTimeIsMissing) {
 }
 
 TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenCandidatePingTimeIsMissing) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
@@ -4907,18 +4844,18 @@ TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenCandidatePingTimeIsMissing) {
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSecondaryDelaySecs) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"
-                                               << "secondaryDelaySecs" << 1 << "priority" << 0)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 5 << "term" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "host1:27017"
+                                            << "secondaryDelaySecs" << 1 << "priority" << 0)
+                                 << BSON("_id" << 1 << "host"
+                                               << "host2:27017")
+                                 << BSON("_id" << 2 << "host"
+                                               << "host3:27017"))
+                   << "protocolVersion" << 1),
+        0);
 
     // Set up so that without secondaryDelaySecs, the node otherwise would have changed sync
     // sources.
@@ -4933,18 +4870,18 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSecondaryDelaySecs) {
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeNotFoundInConfig) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"
-                                               << "secondaryDelaySecs" << 1 << "priority" << 0)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
-                 -1);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 5 << "term" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "host1:27017"
+                                            << "secondaryDelaySecs" << 1 << "priority" << 0)
+                                 << BSON("_id" << 1 << "host"
+                                               << "host2:27017")
+                                 << BSON("_id" << 2 << "host"
+                                               << "host3:27017"))
+                   << "protocolVersion" << 1),
+        -1);
 
     // Set up so that without secondaryDelaySecs and not being in the config, the node otherwise
     // would have changed sync sources.
@@ -5010,16 +4947,15 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenHaveNotChangedTooManyTimesRecently) {
 }
 
 TEST_F(TopoCoordTest, DontChangeWhenNodeRequiresMorePings) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1),
                  0);
     // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
     // should change sync sources due to ping time.
@@ -5072,10 +5008,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByReplSetSyncFromComman
 TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByFailPoint) {
     auto forceSyncSourceCandidateFailPoint =
         globalFailPointRegistry().find("forceSyncSourceCandidate");
-    forceSyncSourceCandidateFailPoint->setMode(FailPoint::alwaysOn,
-                                               0,
-                                               BSON("hostAndPort"
-                                                    << "host2:27017"));
+    forceSyncSourceCandidateFailPoint->setMode(
+        FailPoint::alwaysOn, 0, BSON("hostAndPort" << "host2:27017"));
 
     // Make sure to turn off the failpoint at the end of this test.
     ON_BLOCK_EXIT([&]() { forceSyncSourceCandidateFailPoint->setMode(FailPoint::off); });
@@ -5164,13 +5098,12 @@ TEST_F(ReevalSyncSourceTest, RemovedNodeSpecifiesSyncSourceStartupParameter) {
     RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
                                                               "host2:27017"};
     // Remove ourselves from the config.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))),
                  -1);
     // Confirm we were actually removed.
     ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
@@ -5206,16 +5139,16 @@ public:
     }
 
     BSONObj makeRSConfigWithVersionAndTerm(long long version, long long term) {
-        return BSON("_id"
-                    << "rs0"
-                    << "version" << version << "term" << term << "members"
-                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                             << "host1:27017")
-                                  << BSON("_id" << 1 << "host"
-                                                << "host2:27017")
-                                  << BSON("_id" << 2 << "host"
-                                                << "host3:27017"))
-                    << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5));
+        return BSON("_id" << "rs0"
+                          << "version" << version << "term" << term << "members"
+                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                   << "host1:27017")
+                                        << BSON("_id" << 1 << "host"
+                                                      << "host2:27017")
+                                        << BSON("_id" << 2 << "host"
+                                                      << "host3:27017"))
+                          << "protocolVersion" << 1 << "settings"
+                          << BSON("heartbeatTimeoutSecs" << 5));
     }
 
     long long initConfigVersion = 2;
@@ -5432,14 +5365,13 @@ TEST_F(HeartbeatResponseTestV1, ReconfigNodeRemovedBetweenHeartbeatRequestAndRep
     // now request from host3 and receive after host2 has been removed via reconfig
     getTopoCoord().prepareHeartbeatRequestV1(now()++, "rs0", HostAndPort("host3"));
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     ReplSetHeartbeatResponse hb;
@@ -5477,14 +5409,13 @@ TEST_F(HeartbeatResponseTestV1, ReconfigBetweenHeartbeatRequestAndRepsonse) {
     // now request from host3 and receive after host2 has been removed via reconfig
     getTopoCoord().prepareHeartbeatRequestV1(now()++, "rs0", HostAndPort("host3"));
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     ReplSetHeartbeatResponse hb;
@@ -5549,19 +5480,18 @@ TEST_F(HeartbeatResponseTestV1, RelinquishPrimaryWhenMajorityOfVotersIsNoLongerV
 
 TEST_F(HeartbeatResponseTestV1,
        ScheduleAPriorityTakeoverWhenElectableAndReceiveHeartbeatFromLowerPriorityPrimary) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"
-                                               << "priority" << 2)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "host7:27017"))
-                      << "protocolVersion" << 1 << "settings"
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"
+                                                     << "priority" << 2)
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 6 << "host"
+                                                        << "host7:27017"))
+                            << "protocolVersion" << 1 << "settings"
 
-                      << BSON("heartbeatTimeoutSecs" << 5)),
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -5578,18 +5508,17 @@ TEST_F(HeartbeatResponseTestV1,
 }
 
 TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataTermPreventsPriorityTakeover) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017"
-                                               << "priority" << 2)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"
-                                                  << "priority" << 3)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))
-                      << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017"
+                                                     << "priority" << 2)
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"
+                                                        << "priority" << 3)
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))
+                            << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -5628,18 +5557,17 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataTermPreventsPriorityTakeover)
 }
 
 TEST_F(TopoCoordTest, FreshestNodeDoesCatchupTakeover) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
 
-                      << BSON("heartbeatTimeoutSecs" << 5)),
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -5684,18 +5612,17 @@ TEST_F(TopoCoordTest, FreshestNodeDoesCatchupTakeover) {
 }
 
 TEST_F(TopoCoordTest, StaleNodeDoesntDoCatchupTakeover) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
 
-                      << BSON("heartbeatTimeoutSecs" << 5)),
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -5742,18 +5669,17 @@ TEST_F(TopoCoordTest, StaleNodeDoesntDoCatchupTakeover) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverHeartbeatSaysPrimaryCaughtUp) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
 
-                      << BSON("heartbeatTimeoutSecs" << 5)),
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -5796,18 +5722,17 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverHeartbeatSaysPrimaryCaughtUp) {
 }
 
 TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings"
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
 
-                      << BSON("heartbeatTimeoutSecs" << 5)),
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -5858,15 +5783,14 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp
 // Test for the bug described in SERVER-48958 where we would schedule a catchup takeover for a node
 // with priority 0.
 TEST_F(TopoCoordTest, NodeWontScheduleCatchupTakeoverIfPriorityZero) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host1:27017"
-                                               << "priority" << 0)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host1:27017"
+                                                     << "priority" << 0)
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     // Make ourselves the priority:0 secondary.
@@ -5903,16 +5827,16 @@ TEST_F(TopoCoordTest, NodeWontScheduleCatchupTakeoverIfPriorityZero) {
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsWhenNotPrimary) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -5927,16 +5851,16 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsWhenNotPrimary) {
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsWhenAlreadySteppingDown) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -5952,16 +5876,16 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsWhenAlreadySteppingDown) {
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsForDifferentTerm) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -5977,16 +5901,16 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsForDifferentTerm) {
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastStepDownUntil) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -6004,16 +5928,16 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastStepDownUntil) {
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastWaitUntil) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -6034,16 +5958,16 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastWaitUntil) {
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUp) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -6062,16 +5986,16 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUp) {
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUpForceIsTrueButNotPastWaitUntil) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -6090,16 +6014,16 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUpForceIsTrueButN
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfNoSecondariesCaughtUpForceIsTrueAndPastWaitUntil) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -6118,16 +6042,16 @@ TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfNoSecondariesCaughtUpForceIsTrueA
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfSecondariesCaughtUp) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -6146,17 +6070,17 @@ TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfSecondariesCaughtUp) {
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsIfSecondaryCaughtUpButNotElectable) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017"
-                                                  << "priority" << 0 << "hidden" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017"
+                                                        << "priority" << 0 << "hidden" << true)
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     const auto term = getTopoCoord().getTerm();
     Date_t curTime = now();
@@ -6184,14 +6108,13 @@ TEST_F(TopoCoordTest,
 
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"))
+                            << "protocolVersion" << 1),
                  0);
     {
         BSONObjBuilder statusBuilder;
@@ -6235,14 +6158,13 @@ TEST_F(TopoCoordTest,
 
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
@@ -6301,16 +6223,15 @@ TEST_F(TopoCoordTest, replSetGetStatusForThreeMemberedReplicaSet) {
 
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 30 << "host"
-                                               << "hself:27017")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "hprimary:27017")
-                                    << BSON("_id" << 10 << "host"
-                                                  << "h1:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 30 << "host"
+                                                     << "hself:27017")
+                                          << BSON("_id" << 20 << "host"
+                                                        << "hprimary:27017")
+                                          << BSON("_id" << 10 << "host"
+                                                        << "h1:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
@@ -6394,12 +6315,11 @@ TEST_F(TopoCoordTest, StatusResponseAlwaysIncludesStringStatusFieldsForNonMember
 
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017"))
+                            << "protocolVersion" << 1),
                  -1);  // This node is no longer part of this replica set.
 
     BSONObjBuilder statusBuilder;
@@ -6426,11 +6346,10 @@ TEST_F(TopoCoordTest, StatusResponseAlwaysIncludesStringStatusFieldsForNonMember
 }
 
 TEST_F(TopoCoordTest, NoElectionHandoffCandidateInSingleNodeReplicaSet) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017"))),
                  0);
 
     makeSelfPrimary();
@@ -6441,13 +6360,12 @@ TEST_F(TopoCoordTest, NoElectionHandoffCandidateInSingleNodeReplicaSet) {
 }
 
 TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneLaggedNode) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6462,14 +6380,13 @@ TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneLaggedNode) {
 }
 
 TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneUnelectableNode) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"
-                                                  << "priority" << 0))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"
+                                                        << "priority" << 0))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6484,16 +6401,15 @@ TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneUnelectableNode) {
 }
 
 TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneLaggedAndOneUnelectableNode) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"
-                                                  << "priority" << 0))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"
+                                                        << "priority" << 0))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6511,13 +6427,12 @@ TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneLaggedAndOneUnelectableNo
 }
 
 TEST_F(TopoCoordTest, ExactlyOneNodeEligibleForElectionHandoffOutOfOneSecondary) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6532,18 +6447,17 @@ TEST_F(TopoCoordTest, ExactlyOneNodeEligibleForElectionHandoffOutOfOneSecondary)
 }
 
 TEST_F(TopoCoordTest, ExactlyOneNodeEligibleForElectionHandoffOutOfThreeSecondaries) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"
-                                                  << "priority" << 0)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"
+                                                        << "priority" << 0)
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6566,16 +6480,15 @@ TEST_F(TopoCoordTest, ExactlyOneNodeEligibleForElectionHandoffOutOfThreeSecondar
 }
 
 TEST_F(TopoCoordTest, TwoNodesEligibleForElectionHandoffResolveByPriority) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"
-                                                  << "priority" << 5))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"
+                                                        << "priority" << 5))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6595,15 +6508,14 @@ TEST_F(TopoCoordTest, TwoNodesEligibleForElectionHandoffResolveByPriority) {
 }
 
 TEST_F(TopoCoordTest, TwoNodesEligibleForElectionHandoffEqualPriorityResolveByMemberId) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6648,15 +6560,14 @@ public:
 
 TEST_F(ConfigReplicationTest, MajorityReplicatedConfigChecks) {
     // Config with three nodes requires at least 2 nodes to replicate the config.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "term" << 0 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
 
     // makeSelfPrimary() doesn't actually conduct a true election, so the term will still be 0.
@@ -6680,15 +6591,14 @@ TEST_F(ConfigReplicationTest, MajorityReplicatedConfigChecks) {
 
     // Update _rsConfig with config(v: 3, t: 0). configTerms are the same but configVersion 3 is
     // higher than 2.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 3 << "term" << 0 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 3 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
 
     // Currently, only we have config 3.
@@ -6702,15 +6612,14 @@ TEST_F(ConfigReplicationTest, MajorityReplicatedConfigChecks) {
     ASSERT_TRUE(getTopoCoord().haveTaggedNodesSatisfiedCondition(pred, tagPattern));
 
     // Update _rsConfig with config(v: 4, t: 1). configTerm 1 is higher than configTerm 0.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 4 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 4 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
 
     // Currently, only we have config 4.
@@ -6722,16 +6631,15 @@ TEST_F(ConfigReplicationTest, MajorityReplicatedConfigChecks) {
 }
 
 TEST_F(ConfigReplicationTest, ArbiterIncludedInMajorityReplicatedConfigChecks) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "term" << 0 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"
+                                                        << "arbiterOnly" << true)
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
 
     // makeSelfPrimary() doesn't actually conduct a true election, so the term will still be 0.
@@ -6749,17 +6657,16 @@ TEST_F(ConfigReplicationTest, ArbiterIncludedInMajorityReplicatedConfigChecks) {
 }
 
 TEST_F(ConfigReplicationTest, NonVotingNodeExcludedFromMajorityReplicatedConfigChecks) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "term" << 0 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"
-                                                  << "votes" << 0 << "priority" << 0)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"
-                                                  << "arbiterOnly" << true))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"
+                                                        << "votes" << 0 << "priority" << 0)
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"
+                                                        << "arbiterOnly" << true))),
                  0);
 
     // makeSelfPrimary() doesn't actually conduct a true election, so the term will still be 0.
@@ -6785,16 +6692,15 @@ TEST_F(ConfigReplicationTest, NonVotingNodeExcludedFromMajorityReplicatedConfigC
 
 
 TEST_F(ConfigReplicationTest, ArbiterIncludedInAllReplicatedConfigChecks) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "term" << 0 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"
-                                                  << "arbiterOnly" << true))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"
+                                                        << "arbiterOnly" << true))),
                  0);
 
     // makeSelfPrimary() doesn't actually conduct a true election, so the term will still be 0.
@@ -6815,19 +6721,18 @@ TEST_F(ConfigReplicationTest, ArbiterIncludedInAllReplicatedConfigChecks) {
 }
 
 TEST_F(ConfigReplicationTest, ArbiterAndNonVotingNodeIncludedInAllReplicatedConfigChecks) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "term" << 0 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"
-                                                  << "votes" << 0 << "priority" << 0)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"
-                                                  << "arbiterOnly" << true))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"
+                                                        << "votes" << 0 << "priority" << 0)
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"
+                                                        << "arbiterOnly" << true))),
                  0);
 
     // makeSelfPrimary() doesn't actually conduct a true election, so the term will still be 0.
@@ -6853,19 +6758,18 @@ TEST_F(ConfigReplicationTest, ArbiterAndNonVotingNodeIncludedInAllReplicatedConf
 TEST_F(TopoCoordTest, OnlyDataBearingVoterIncludedInInternalMajorityWriteConcern) {
     // The config has 3 voting members including an arbiter, so the majority
     // number is 2.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "term" << 0 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"
-                                                  << "votes" << 0 << "priority" << 0)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"
-                                                  << "arbiterOnly" << true))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"
+                                                        << "votes" << 0 << "priority" << 0)
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"
+                                                        << "arbiterOnly" << true))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6903,15 +6807,14 @@ TEST_F(TopoCoordTest, HaveTaggedNodesReachedOpTime) {
     // The config has 3 voting members, so the majority number is 2.
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagReduceMajorityWriteLatency", true);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "term" << 0 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6954,19 +6857,18 @@ TEST_F(TopoCoordTest, HaveTaggedNodesReachedOpTime) {
 
 TEST_F(TopoCoordTest, ArbiterNotIncludedInW3WriteInPSSAReplSet) {
     // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy it.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"
-                                                  << "priority" << 0 << "votes" << 0)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"
-                                                  << "arbiterOnly" << true))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"
+                                                        << "priority" << 0 << "votes" << 0)
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"
+                                                        << "arbiterOnly" << true))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -6994,23 +6896,22 @@ TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
     // In a PSSAA set, a w:2 write should only be acknowledged if at least one of the secondaries
     // can satisfy it.
     RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017"
-                                                  << "priority" << 0 << "votes" << 0)
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"
-                                                  << "priority" << 0 << "votes" << 0)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"
-                                                  << "arbiterOnly" << true)
-                                    << BSON("_id" << 4 << "host"
-                                                  << "host4:27017"
-                                                  << "arbiterOnly" << true))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017"
+                                                        << "priority" << 0 << "votes" << 0)
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"
+                                                        << "priority" << 0 << "votes" << 0)
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"
+                                                        << "arbiterOnly" << true)
+                                          << BSON("_id" << 4 << "host"
+                                                        << "host4:27017"
+                                                        << "arbiterOnly" << true))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -7037,15 +6938,14 @@ TEST_F(TopoCoordTest, HaveNumNodesReachedOpTime) {
     // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy it.
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagReduceMajorityWriteLatency", true);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 2 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017"))),
                  0);
 
     const auto term = getTopoCoord().getTerm();
@@ -7080,52 +6980,47 @@ TEST_F(TopoCoordTest, HaveNumNodesReachedOpTime) {
 }
 
 TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
-    auto configA = ReplSetConfig::parse(BSON(
-        "_id"
-        << "rs0"
-        << "version" << 1 << "protocolVersion" << 1 << "members"
-        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                 << "node0"
-                                 << "tags"
-                                 << BSON("dc"
-                                         << "NA"
-                                         << "rack"
-                                         << "rackNA1"))
-                      << BSON("_id" << 1 << "host"
-                                    << "node1"
-                                    << "tags"
-                                    << BSON("dc"
-                                            << "NA"
-                                            << "rack"
-                                            << "rackNA2"))
-                      << BSON("_id" << 2 << "host"
-                                    << "node2"
-                                    << "tags"
-                                    << BSON("dc"
-                                            << "NA"
-                                            << "rack"
-                                            << "rackNA3"))
-                      << BSON("_id" << 3 << "host"
-                                    << "node3"
-                                    << "tags"
-                                    << BSON("dc"
-                                            << "EU"
-                                            << "rack"
-                                            << "rackEU1"))
-                      << BSON("_id" << 4 << "host"
-                                    << "node4"
-                                    << "tags"
-                                    << BSON("dc"
-                                            << "EU"
-                                            << "rack"
-                                            << "rackEU2"))
-                      << BSON("_id" << 5 << "host"
-                                    << "node5"
-                                    << "arbiterOnly" << true))
-        << "settings"
-        << BSON("getLastErrorModes" << BSON(
-                    "valid" << BSON("dc" << 2 << "rack" << 3) << "invalidNotEnoughValues"
-                            << BSON("dc" << 3) << "invalidNotEnoughNodes" << BSON("rack" << 6)))));
+    auto configA = ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "node0"
+                                            << "tags"
+                                            << BSON("dc" << "NA"
+                                                         << "rack"
+                                                         << "rackNA1"))
+                                 << BSON("_id" << 1 << "host"
+                                               << "node1"
+                                               << "tags"
+                                               << BSON("dc" << "NA"
+                                                            << "rack"
+                                                            << "rackNA2"))
+                                 << BSON("_id" << 2 << "host"
+                                               << "node2"
+                                               << "tags"
+                                               << BSON("dc" << "NA"
+                                                            << "rack"
+                                                            << "rackNA3"))
+                                 << BSON("_id" << 3 << "host"
+                                               << "node3"
+                                               << "tags"
+                                               << BSON("dc" << "EU"
+                                                            << "rack"
+                                                            << "rackEU1"))
+                                 << BSON("_id" << 4 << "host"
+                                               << "node4"
+                                               << "tags"
+                                               << BSON("dc" << "EU"
+                                                            << "rack"
+                                                            << "rackEU2"))
+                                 << BSON("_id" << 5 << "host"
+                                               << "node5"
+                                               << "arbiterOnly" << true))
+                   << "settings"
+                   << BSON("getLastErrorModes"
+                           << BSON("valid" << BSON("dc" << 2 << "rack" << 3)
+                                           << "invalidNotEnoughValues" << BSON("dc" << 3)
+                                           << "invalidNotEnoughNodes" << BSON("rack" << 6)))));
     getTopoCoord().updateConfig(configA, -1, Date_t());
 
     CommitQuorumOptions validNumberCQ;
@@ -7162,22 +7057,21 @@ TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
 }
 
 TEST_F(TopoCoordTest, CommitQuorumBuildIndexesFalse) {
-    auto configA =
-        ReplSetConfig::parse(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 1 << "protocolVersion" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                           << "node0")
-                                                << BSON("_id" << 1 << "host"
-                                                              << "node1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "node2")
-                                                << BSON("_id" << 3 << "host"
-                                                              << "node3")
-                                                << BSON("_id" << 4 << "host"
-                                                              << "node4"
-                                                              << "priority" << 0 << "hidden" << true
-                                                              << "buildIndexes" << false))));
+    auto configA = ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "node0")
+                                 << BSON("_id" << 1 << "host"
+                                               << "node1")
+                                 << BSON("_id" << 2 << "host"
+                                               << "node2")
+                                 << BSON("_id" << 3 << "host"
+                                               << "node3")
+                                 << BSON("_id" << 4 << "host"
+                                               << "node4"
+                                               << "priority" << 0 << "hidden" << true
+                                               << "buildIndexes" << false))));
     getTopoCoord().updateConfig(configA, -1, Date_t());
 
     {
@@ -7288,18 +7182,17 @@ TEST_F(TopoCoordTest, AdvanceCommittedOpTimeDisregardsWallTimeOrder) {
 
 TEST_F(HeartbeatResponseTestV1,
        ScheduleACatchupTakeoverWhenElectableAndReceiveHeartbeatFromPrimaryInCatchup) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "host7:27017"))
-                      << "protocolVersion" << 1 << "settings"
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 6 << "host"
+                                                        << "host7:27017"))
+                            << "protocolVersion" << 1 << "settings"
 
-                      << BSON("heartbeatTimeoutSecs" << 5)),
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -7323,20 +7216,19 @@ TEST_F(HeartbeatResponseTestV1,
 
 TEST_F(HeartbeatResponseTestV1,
        ScheduleACatchupTakeoverWhenBothCatchupAndPriorityTakeoverPossible) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host0:27017"
-                                               << "priority" << 2)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 6 << "host"
-                                                  << "host7:27017"
-                                                  << "priority" << 3))
-                      << "protocolVersion" << 1 << "settings"
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host0:27017"
+                                                     << "priority" << 2)
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 6 << "host"
+                                                        << "host7:27017"
+                                                        << "priority" << 3))
+                            << "protocolVersion" << 1 << "settings"
 
-                      << BSON("heartbeatTimeoutSecs" << 5)),
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -7359,15 +7251,14 @@ TEST_F(HeartbeatResponseTestV1,
 }
 
 TEST_F(HeartbeatResponseTestV1, DoNotScheduleACatchupTakeoverIfLastAppliedIsInCurrentTerm) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host3:27017"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host3:27017"))),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -7392,28 +7283,28 @@ TEST_F(HeartbeatResponseTestV1, DoNotScheduleACatchupTakeoverIfLastAppliedIsInCu
 
 TEST_F(HeartbeatResponseTestV1,
        ScheduleElectionIfAMajorityOfVotersIsVisibleEvenThoughATrueMajorityIsNot) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"
-                                                  << "votes" << 0 << "priority" << 0)
-                                    << BSON("_id" << 3 << "host"
-                                                  << "host4:27017"
-                                                  << "votes" << 0 << "priority" << 0)
-                                    << BSON("_id" << 4 << "host"
-                                                  << "host5:27017"
-                                                  << "votes" << 0 << "priority" << 0)
-                                    << BSON("_id" << 5 << "host"
-                                                  << "host6:27017"
-                                                  << "votes" << 0 << "priority" << 0)
-                                    << BSON("_id" << 6 << "host"
-                                                  << "host7:27017"))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"
+                                                        << "votes" << 0 << "priority" << 0)
+                                          << BSON("_id" << 3 << "host"
+                                                        << "host4:27017"
+                                                        << "votes" << 0 << "priority" << 0)
+                                          << BSON("_id" << 4 << "host"
+                                                        << "host5:27017"
+                                                        << "votes" << 0 << "priority" << 0)
+                                          << BSON("_id" << 5 << "host"
+                                                        << "host6:27017"
+                                                        << "votes" << 0 << "priority" << 0)
+                                          << BSON("_id" << 6 << "host"
+                                                        << "host7:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -7482,17 +7373,16 @@ TEST_F(HeartbeatResponseTestV1, ScheduleElectionWhenPrimaryIsMarkedDownAndWeAreE
 
 TEST_F(HeartbeatResponseTestV1,
        NodeDoesNotStandForElectionWhenPrimaryIsMarkedDownViaHeartbeatButWeAreAnArbiter) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"
-                                               << "arbiterOnly" << true)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"
+                                                     << "arbiterOnly" << true)
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     OpTime election = OpTime(Timestamp(400, 0), 0);
@@ -7591,17 +7481,16 @@ TEST_F(HeartbeatResponseTestV1,
        NodeDoesNotStandForElectionWhenPrimaryIsMarkedDownViaHeartbeatButWeHaveZeroPriority) {
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017"
-                                               << "priority" << 0)
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 5 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017"
+                                                     << "priority" << 0)
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"))
+                            << "protocolVersion" << 1),
                  0);
 
     OpTime election = OpTime(Timestamp(400, 0), 0);
@@ -7674,17 +7563,17 @@ TEST_F(HeartbeatResponseTestV1,
     // In this test, the Topology coordinator sees a PRIMARY ("host2") and then sees a higher
     // priority and stale node ("host3"). It responds with NoAction, as it should in all
     // multiprimary states in PV1.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 6 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"
-                                                  << "priority" << 3))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 6 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"
+                                                        << "priority" << 3))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -7707,17 +7596,17 @@ TEST_F(HeartbeatResponseTestV1,
     // In this test, the Topology coordinator becomes PRIMARY and then sees a higher priority
     // and stale node ("host3"). It responds with NoAction, as it should in all
     // multiprimary states in PV1.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 6 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"
-                                                  << "priority" << 3))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 6 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"
+                                                        << "priority" << 3))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     OpTime election = OpTime(Timestamp(1000, 0), 0);
     OpTime staleTime = OpTime();
@@ -7737,17 +7626,17 @@ TEST_F(HeartbeatResponseTestV1,
     // In this test, the Topology coordinator becomes PRIMARY and then sees a higher priority
     // and equally fresh node ("host3"). It responds with NoAction, as it should in all
     // multiprimary states in PV1.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 6 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"
-                                                  << "priority" << 3))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 6 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"
+                                                        << "priority" << 3))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     OpTime election = OpTime(Timestamp(1000, 0), 0);
 
@@ -7768,17 +7657,17 @@ TEST_F(HeartbeatResponseTestV1,
     // In this test, the Topology coordinator sees a PRIMARY ("host2") and then sees a higher
     // priority and similarly fresh node ("host3"). It responds with NoAction, as it should
     // in all multiprimary states in PV1.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 6 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"
-                                                  << "priority" << 3))
-                      << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 6 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "host1:27017")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2:27017")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "host3:27017"
+                                                        << "priority" << 3))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
@@ -7930,18 +7819,18 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberDoesNo
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherSyncSourceOpTime = OpTime(Timestamp(3005, 0), 0);
 
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 6 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3"
-                                                  << "buildIndexes" << false << "priority" << 0))
-                      << "protocolVersion" << 1),
-                 0);
+    updateConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 6 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "hself")
+                                 << BSON("_id" << 1 << "host"
+                                               << "host2")
+                                 << BSON("_id" << 2 << "host"
+                                               << "host3"
+                                               << "buildIndexes" << false << "priority" << 0))
+                   << "protocolVersion" << 1),
+        0);
 
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, fresherSyncSourceOpTime);
@@ -7989,13 +7878,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfSyncSourceHasDifferen
     OpTime syncSourceOpTime = OpTime(Timestamp(400, 1), 0);
 
     // Update the config version to 7.
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 7 << "term" << 2LL << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2"))),
+    updateConfig(BSON("_id" << "rs0"
+                            << "version" << 7 << "term" << 2LL << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "hself")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "host2"))),
                  0);
 
     // We should not want to change our sync source from "host2" even though it has a different
@@ -8262,17 +8150,16 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataSameConfig) {
 
     // construct a copy of the original config for log message checking later
     // see HeartbeatResponseTest for the origin of the original config
-    auto originalConfig = ReplSetConfig::parse(BSON("_id"
-                                                    << "rs0"
-                                                    << "version" << 5 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "host1:27017")
-                                                                  << BSON("_id" << 1 << "host"
-                                                                                << "host2:27017")
-                                                                  << BSON("_id" << 2 << "host"
-                                                                                << "host3:27017"))
-                                                    << "protocolVersion" << 1 << "settings"
-                                                    << BSON("heartbeatTimeoutSecs" << 5)));
+    auto originalConfig = ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 5 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "host1:27017")
+                                 << BSON("_id" << 1 << "host"
+                                               << "host2:27017")
+                                 << BSON("_id" << 2 << "host"
+                                               << "host3:27017"))
+                   << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)));
 
     ReplSetHeartbeatResponse sameConfigResponse;
     sameConfigResponse.setSetName("rs0");

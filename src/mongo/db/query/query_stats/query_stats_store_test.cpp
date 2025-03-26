@@ -224,8 +224,7 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         fcr->setBatchSize(25);
         fcr->setMaxTimeMS(1000);
         fcr->setNoCursorTimeout(false);
-        opCtx->setComment(BSON("comment"
-                               << " foo bar baz"));
+        opCtx->setComment(BSON("comment" << " foo bar baz"));
         fcr->setSingleBatch(false);
         fcr->setAllowDiskUse(false);
         fcr->setAllowPartialResults(true);
@@ -525,13 +524,9 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setAllowDiskUse(false);
     fcr.setShowRecordId(true);
     fcr.setMirrored(true);
-    auto readPreference = BSON("mode"
-                               << "nearest"
-                               << "tags"
-                               << BSON_ARRAY(BSON("some"
-                                                  << "tag")
-                                             << BSON("some"
-                                                     << "other tag")));
+    auto readPreference =
+        BSON("mode" << "nearest"
+                    << "tags" << BSON_ARRAY(BSON("some" << "tag") << BSON("some" << "other tag")));
     ReadPreferenceSetting::get(expCtx->getOperationContext()) =
         uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPreference));
     key = makeQueryStatsKeyFindRequest(fcr, expCtx, true);
@@ -744,8 +739,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
         key);
     // Test with a string hint. Note that this is the internal representation of the string hint
     // generated at parse time.
-    fcr.setHint(BSON("$hint"
-                     << "z"));
+    fcr.setHint(BSON("$hint" << "z"));
 
     key = makeQueryStatsKeyFindRequest(fcr, expCtx, false);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1002,8 +996,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     // Add the fields that shouldn't be abstracted.
     acr.setAllowDiskUse(false);
     acr.setHint(BSON("z" << 1 << "c" << 1));
-    acr.setCollation(BSON("locale"
-                          << "simple"));
+    acr.setCollation(BSON("locale" << "simple"));
     shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1071,9 +1064,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
         shapified);
 
     // Add let.
-    acr.setLet(BSON("var1" << BSON("$literal"
-                                   << "$foo")
-                           << "var2"
+    acr.setLet(BSON("var1" << BSON("$literal" << "$foo") << "var2"
                            << "bar"));
     shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
@@ -1151,8 +1142,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setCursor(cursorOptions);
     acr.setMaxTimeMS(500);
     acr.setBypassDocumentValidation(true);
-    expCtx->getOperationContext()->setComment(BSON("comment"
-                                                   << "note to self"));
+    expCtx->getOperationContext()->setComment(BSON("comment" << "note to self"));
     shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

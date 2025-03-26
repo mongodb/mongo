@@ -318,22 +318,19 @@ TEST_F(CMCollapseTreeTest, SortMergeFromOrInReverseDirection) {
     expected.fields.push_back(OrderedIntervalList());
     expected.fields.push_back(OrderedIntervalList());
 
-    expected.fields[0].intervals.push_back(Interval(BSON(""
-                                                         << "foo"
-                                                         << ""
-                                                         << "foo"),
+    expected.fields[0].intervals.push_back(Interval(BSON("" << "foo"
+                                                            << ""
+                                                            << "foo"),
                                                     true,
                                                     true));
-    expected.fields[1].intervals.push_back(Interval(BSON(""
-                                                         << "bar"
-                                                         << ""
-                                                         << "bar"),
+    expected.fields[1].intervals.push_back(Interval(BSON("" << "bar"
+                                                            << ""
+                                                            << "bar"),
                                                     true,
                                                     true));
-    expected.fields[1].intervals.push_back(Interval(BSON(""
-                                                         << "baz"
-                                                         << ""
-                                                         << "baz"),
+    expected.fields[1].intervals.push_back(Interval(BSON("" << "baz"
+                                                            << ""
+                                                            << "baz"),
                                                     true,
                                                     true));
     expected.fields[2].intervals.push_back(Interval(BSON("" << 100 << "" << 200), true, true));
@@ -413,9 +410,8 @@ TEST_F(CMCollapseTreeTest, ArrayEquality) {
 // { a: /abc/ } -> a: ["", {}), [/abc/, /abc/]
 TEST_F(CMCollapseTreeTest, Regex) {
     OrderedIntervalList expected;
-    expected.intervals.push_back(Interval(BSON(""
-                                               << ""
-                                               << "" << BSONObj()),
+    expected.intervals.push_back(Interval(BSON("" << ""
+                                                  << "" << BSONObj()),
                                           true,
                                           false));
     BSONObjBuilder builder;

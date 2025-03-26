@@ -1174,10 +1174,9 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
     sessionInfo.setSessionId(sessionId);
     sessionInfo.setTxnNumber(3);
 
-    const auto txnOperations = BSON_ARRAY(BSON("op"
-                                               << "i"
-                                               << "ns" << testNs.toString_forTest() << "o"
-                                               << BSON("_id" << 1)));
+    const auto txnOperations =
+        BSON_ARRAY(BSON("op" << "i"
+                             << "ns" << testNs.toString_forTest() << "o" << BSON("_id" << 1)));
     const auto prepareDate = Date_t::now();
     const auto prepareOp =
         _makeTransactionOplogEntry({Timestamp(2, 0), 1},
@@ -1249,10 +1248,9 @@ TEST_F(ReplicationRecoveryTest,
     sessionInfo.setSessionId(sessionId);
     sessionInfo.setTxnNumber(3);
 
-    const auto txnOperations = BSON_ARRAY(BSON("op"
-                                               << "i"
-                                               << "ns" << testNs.toString_forTest() << "o"
-                                               << BSON("_id" << 1)));
+    const auto txnOperations =
+        BSON_ARRAY(BSON("op" << "i"
+                             << "ns" << testNs.toString_forTest() << "o" << BSON("_id" << 1)));
     const auto prepareDate = Date_t::now();
     const auto prepareOp =
         _makeTransactionOplogEntry({Timestamp(2, 0), 1},

@@ -223,6 +223,6 @@ inline StringBuilder& operator<<(StringBuilder& s, const UUID& uuid) {
  *     BSON("uuid" << uuid) -> { uuid: BinData(4, "...") }
  */
 template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<<UUID>(UUID value);
+BSONObjBuilder& BSONObjBuilderValueStream::operator<< <UUID>(UUID value);
 
 }  // namespace mongo

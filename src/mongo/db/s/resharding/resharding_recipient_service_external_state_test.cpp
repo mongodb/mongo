@@ -130,9 +130,8 @@ protected:
             ASSERT_BSONOBJ_EQ(request.cmdObj["filter"].Obj(), BSON("info.uuid" << uuid));
             ASSERT(request.cmdObj.hasField("databaseVersion"));
             ASSERT_BSONOBJ_EQ(request.cmdObj["readConcern"].Obj(),
-                              BSON("level"
-                                   << "local"
-                                   << "afterClusterTime" << kDefaultFetchTimestamp));
+                              BSON("level" << "local"
+                                           << "afterClusterTime" << kDefaultFetchTimestamp));
 
             std::string listCollectionsNs = str::stream()
                 << nss.db_forTest() << "$cmd.listCollections";
@@ -153,9 +152,8 @@ protected:
             ASSERT_EQ(request.cmdObj.firstElement().checkAndGetStringData(), nss.coll());
             ASSERT(request.cmdObj.hasField("shardVersion"));
             ASSERT_BSONOBJ_EQ(request.cmdObj["readConcern"].Obj(),
-                              BSON("level"
-                                   << "local"
-                                   << "afterClusterTime" << kDefaultFetchTimestamp));
+                              BSON("level" << "local"
+                                           << "afterClusterTime" << kDefaultFetchTimestamp));
 
             return BSON(
                 "ok" << 1 << "cursor"
@@ -312,11 +310,8 @@ protected:
 TEST_F(RecipientServiceExternalStateTest, ReshardingConfigServerUpdatesHaveNoTimeout) {
     RecipientStateMachineExternalStateImpl externalState;
     auto future = launchAsync([&] {
-        externalState.updateCoordinatorDocument(operationContext(),
-                                                BSON("query"
-                                                     << "test"),
-                                                BSON("update"
-                                                     << "test"));
+        externalState.updateCoordinatorDocument(
+            operationContext(), BSON("query" << "test"), BSON("update" << "test"));
     });
 
     onCommand([&](const executor::RemoteCommandRequest& request) {

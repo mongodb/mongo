@@ -5,6 +5,7 @@
  */
 // Loads data into the namespace 'aggdb.articles'.
 import "jstests/aggregation/data/articles.js";
+
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const testDB = db.getSiblingDB("aggdb");

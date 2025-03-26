@@ -5,8 +5,10 @@ import {
     assertCreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
-import {runCommandChangeStreamPassthroughAware} from "jstests/libs/query/change_stream_util.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    runCommandChangeStreamPassthroughAware
+} from "jstests/libs/query/change_stream_util.js";
 
 // Drop the test collections to assure a clean run.
 const collName = jsTestName();

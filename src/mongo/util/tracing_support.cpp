@@ -165,10 +165,9 @@ public:
 
         ~BasicSpan() override {
             _spans = boost::none;
-            _factory->_arrayBuilder->append(BSON("ph"
-                                                 << "E"
-                                                 << "ts" << _nowFractionalMillis() << "pid" << 1
-                                                 << "tid" << 1));
+            _factory->_arrayBuilder->append(BSON("ph" << "E"
+                                                      << "ts" << _nowFractionalMillis() << "pid"
+                                                      << 1 << "tid" << 1));
         }
 
         double _nowFractionalMillis() const {

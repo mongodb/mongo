@@ -52,7 +52,7 @@ namespace mongo::query_tester {
 namespace {
 struct TestSpec {
     TestSpec(std::filesystem::path path, size_t low = kMinTestNum, size_t high = kMaxTestNum)
-        : testPath(path), startTest(low), endTest(high){};
+        : testPath(path), startTest(low), endTest(high) {};
 
     // Validate that this test conforms to our expectations about filesystem things.
     void validate(ModeOption mode) const {

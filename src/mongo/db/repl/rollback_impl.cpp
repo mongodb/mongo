@@ -530,22 +530,19 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
     // Query for retryable writes oplog entries with a non-null 'prevWriteOpTime' value
     // less than or equal to the 'stableTimestamp'. This query intends to include no-op
     // retryable writes oplog entries that have been applied through a migration process.
-    const auto filter = BSON("op" << BSON("$in" << BSON_ARRAY("i"
-                                                              << "u"
-                                                              << "d")));
+    const auto filter = BSON("op" << BSON("$in" << BSON_ARRAY("i" << "u"
+                                                                  << "d")));
     // We use the 'fromMigrate' field to differentiate migrated retryable writes entries from
     // transactions entries.
-    const auto filterFromMigration = BSON("op"
-                                          << "n"
-                                          << "fromMigrate" << true);
+    const auto filterFromMigration = BSON("op" << "n"
+                                               << "fromMigrate" << true);
     // When the 'ReplicateVectoredInsertsTransactionally' feature flag is enabled, we batch inserts
     // into a single applyOps oplog entry with an internal array of operations as inserts, and set
     // the 'multiOpType' flag. The stmtId then becomes an internal parameter for the array of
     // batched operations, so we should not look for it in the outer document.
     const auto filterForVectorInsertsApplyOps =
-        BSON("op"
-             << "c"
-             << "multiOpType" << repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+        BSON("op" << "c"
+                  << "multiOpType" << repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
     findRequest.setFilter(BSON(
         "ts" << BSON("$gt" << stableTimestamp) << "txnNumber" << BSON("$exists" << true) << "$or"

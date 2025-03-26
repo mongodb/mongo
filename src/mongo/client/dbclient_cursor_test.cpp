@@ -319,8 +319,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
 
     // Create and set a terminal 'getMore' response. The 'moreToCome' flag is not set, since this is
     // the last message of the stream.
-    auto terminalDoc = BSON("_id"
-                            << "terminal");
+    auto terminalDoc = BSON("_id" << "terminal");
     auto getMoreTerminalResponseMsg = mockGetMoreResponse(nss, 0, {terminalDoc});
     conn.setRecvResponse(getMoreTerminalResponseMsg);
 
@@ -404,8 +403,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     ASSERT_BSONOBJ_EQ(docObj(4), cursor.next());
 
     // Exhaust the cursor with a terminal 'getMore' response.
-    auto terminalDoc = BSON("_id"
-                            << "terminal");
+    auto terminalDoc = BSON("_id" << "terminal");
     auto terminalGetMoreResponseMsg = mockGetMoreResponse(nss, 0, {terminalDoc});
     conn.setRecvResponse(terminalGetMoreResponseMsg);
 

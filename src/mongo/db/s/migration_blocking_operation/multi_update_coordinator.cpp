@@ -76,11 +76,10 @@ primary_only_service_helpers::PauseDuringPhaseTransitionFailPoint<MultiUpdateCoo
 AggregateCommandRequest makeAggregationToCheckForPendingUpdates(const NamespaceString& nss,
                                                                 const LogicalSessionId& lsid) {
     auto currentOpStage = fromjson("{$currentOp: {allUsers: true, idleSessions: true}}");
-    auto matchStage = BSON("$match" << BSON("type"
-                                            << "op"
-                                            << "op"
-                                            << "command"
-                                            << "lsid" << lsid.toBSON()));
+    auto matchStage = BSON("$match" << BSON("type" << "op"
+                                                   << "op"
+                                                   << "command"
+                                                   << "lsid" << lsid.toBSON()));
 
     AggregateCommandRequest request{nss};
     request.setPipeline({currentOpStage, matchStage});

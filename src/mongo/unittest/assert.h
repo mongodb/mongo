@@ -457,16 +457,16 @@ public:
                                     const void* b);
 
     template <typename A, typename B>
-    requires(                                                                              //
-        !(std::is_convertible_v<A, StringData> && std::is_convertible_v<B, StringData>)&&  //
-        !(std::is_pointer_v<A> && std::is_pointer_v<B>)&&                                  //
-        !(std::is_array_v<A> && std::is_array_v<B>))                                       //
-        static ComparisonAssertion make(const char* theFile,
-                                        unsigned theLine,
-                                        StringData aExpression,
-                                        StringData bExpression,
-                                        const A& a,
-                                        const B& b) {
+    requires(                                                                               //
+        !(std::is_convertible_v<A, StringData> && std::is_convertible_v<B, StringData>) &&  //
+        !(std::is_pointer_v<A> && std::is_pointer_v<B>) &&                                  //
+        !(std::is_array_v<A> && std::is_array_v<B>))                                        //
+    static ComparisonAssertion make(const char* theFile,
+                                    unsigned theLine,
+                                    StringData aExpression,
+                                    StringData bExpression,
+                                    const A& a,
+                                    const B& b) {
         return ComparisonAssertion(theFile, theLine, aExpression, bExpression, a, b);
     }
 

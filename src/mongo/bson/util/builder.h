@@ -404,7 +404,8 @@ public:
     }
 
     template <int...>
-    requires(!std::is_same_v<int64_t, long long>) void appendNum(int64_t j) {
+    requires(!std::is_same_v<int64_t, long long>)
+    void appendNum(int64_t j) {
         appendNumImpl(j);
     }
 

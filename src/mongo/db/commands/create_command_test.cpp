@@ -63,9 +63,9 @@ TEST_F(CreateCommandTest, CreateFailsWithEncryptionOptions) {
 
     DBDirectClient client(opCtx);
 
-    auto cmd = BSON("create" << nss.coll() << "storageEngine"
-                             << BSON("wiredTiger" << BSON("configString"
-                                                          << "encryption=(keyid=key)")));
+    auto cmd =
+        BSON("create" << nss.coll() << "storageEngine"
+                      << BSON("wiredTiger" << BSON("configString" << "encryption=(keyid=key)")));
     BSONObj result;
     // This should fail since config.system.indexBuilds does not exist.
     ASSERT_FALSE(client.runCommand(nss.dbName(), cmd, result)) << result;
@@ -83,9 +83,9 @@ TEST_F(CreateCommandTest, LegacyCreateSucceedsWithEncryptionOptions) {
 
     DBDirectClient client(opCtx);
 
-    auto cmd = BSON("create" << nss.coll() << "storageEngine"
-                             << BSON("wiredTiger" << BSON("configString"
-                                                          << "encryption=(keyid=key)")));
+    auto cmd =
+        BSON("create" << nss.coll() << "storageEngine"
+                      << BSON("wiredTiger" << BSON("configString" << "encryption=(keyid=key)")));
     BSONObj result;
     // This should fail since config.system.indexBuilds does not exist.
     ASSERT_TRUE(client.runCommand(nss.dbName(), cmd, result)) << result;

@@ -142,8 +142,7 @@ public:
         AutoGetDb autoDb(opCtx, nss.dbName(), LockMode::MODE_X);
         autoDb.ensureDbExists(opCtx);
 
-        BSONObj timeseriesOptions = BSON("timeField"
-                                         << "timestamp");
+        BSONObj timeseriesOptions = BSON("timeField" << "timestamp");
 
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             opCtx);
@@ -213,7 +212,9 @@ public:
 
         txnParticipant.unstashTransactionResources(opCtx, "preparedTransaction");
         // The transaction machinery cannot store an empty locker.
-        { Lock::GlobalLock globalLock(opCtx, MODE_IX); }
+        {
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+        }
         auto opTime = [opCtx] {
             TransactionParticipant::SideTransactionBlock sideTxn{opCtx};
 
@@ -308,8 +309,7 @@ public:
      * Inserts the 'reshardingBlockingWrites' noop oplog entry.
      */
     void insertDonorFinalEventNoopOplogEntry(const NamespaceString& sourceNss) {
-        auto msg = BSON("msg"
-                        << "Writes to {} are temporarily blocked for resharding");
+        auto msg = BSON("msg" << "Writes to {} are temporarily blocked for resharding");
         ReshardBlockingWritesChangeEventO2Field o2Field{
             sourceNss, UUID::gen(), resharding::kReshardFinalOpLogType.toString()};
         insertNoopOplogEntry(sourceNss, msg, o2Field.toBSON());
@@ -319,9 +319,8 @@ public:
      * Inserting the 'reshardingDoneCatchUp' noop oplog entry.
      */
     void insertRecipientFinalEventNoopOplogEntry(const NamespaceString& tempNss) {
-        auto msg = BSON("msg"
-                        << "The temporary resharding collection now has a "
-                           "strictly consistent view of the data");
+        auto msg = BSON("msg" << "The temporary resharding collection now has a "
+                                 "strictly consistent view of the data");
         ReshardDoneCatchUpChangeEventO2Field o2Field{tempNss, reshardingUUID};
         insertNoopOplogEntry(tempNss, msg, o2Field.toBSON());
     }
@@ -942,10 +941,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TxnCommittedAfterStartTime_PreparedBe
     });
     auto prepareOpTime = prepareTxn(opCtx, sessionId, txnNumber);
 
-    insertNoopOplogEntry(sourceNss,
-                         BSON("msg"
-                              << "mock noop"),
-                         BSONObj() /* o2Field */);
+    insertNoopOplogEntry(sourceNss, BSON("msg" << "mock noop"), BSONObj() /* o2Field */);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     commitTxn(opCtx, sessionId, txnNumber, prepareOpTime.getTimestamp());

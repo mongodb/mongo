@@ -325,7 +325,7 @@ public:
     class StreamingCursor {
     public:
         StreamingCursor() = delete;
-        explicit StreamingCursor(BackupOptions options) : options(options){};
+        explicit StreamingCursor(BackupOptions options) : options(options) {};
 
         virtual ~StreamingCursor() = default;
 

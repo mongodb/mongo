@@ -635,31 +635,25 @@ TEST_F(GoldenSbeStageBuilderTest, TestTextMatch) {
     createCollection({fromjson("{_id: 0, a: 'this is test'}"),
                       fromjson("{_id: 1, a: 'a test'}"),
                       fromjson("{_id: 2, a: 'hello'}")},
-                     BSON("a"
-                          << "text"));
+                     BSON("a" << "text"));
     TextMatchExpression textExpr(operationContext(),
                                  _nss,
                                  TextMatchExpressionBase::TextParams{.query = "test",
                                                                      .language = "english",
                                                                      .caseSensitive = true});
-    auto textNode = std::make_unique<TextMatchNode>(makeIndexEntry(BSON("a"
-                                                                        << "text")),
-                                                    textExpr.getFTSQuery().clone(),
-                                                    false);
-    auto indexScanNode = std::make_unique<IndexScanNode>(makeIndexEntry(BSON("a"
-                                                                             << "text")));
+    auto textNode = std::make_unique<TextMatchNode>(
+        makeIndexEntry(BSON("a" << "text")), textExpr.getFTSQuery().clone(), false);
+    auto indexScanNode = std::make_unique<IndexScanNode>(makeIndexEntry(BSON("a" << "text")));
     IndexBounds bounds{};
     OrderedIntervalList oil("a");
-    oil.intervals.emplace_back(BSON(""
-                                    << "a"
-                                    << ""
-                                    << "z"),
+    oil.intervals.emplace_back(BSON("" << "a"
+                                       << ""
+                                       << "z"),
                                true,
                                true);
     bounds.fields.emplace_back(std::move(oil));
     indexScanNode->bounds = std::move(bounds);
-    indexScanNode->sortSet = ProvidedSortSet{BSON("a"
-                                                  << "text")};
+    indexScanNode->sortSet = ProvidedSortSet{BSON("a" << "text")};
     textNode->children.push_back(std::make_unique<FetchNode>(std::move(indexScanNode)));
     runTest(std::move(textNode),
             BSON_ARRAY(BSON("_id" << 0 << "a"
@@ -818,10 +812,9 @@ TEST_F(SearchSbeStageBuilderTest, TestSearch) {
         _gctx->outStream() << "SearchMeta Test" << std::endl;
         auto node =
             std::make_unique<SearchNode>(true /* isSearchMeta */,
-                                         BSON("query"
-                                              << "test"
-                                              << "path"
-                                              << "a"),
+                                         BSON("query" << "test"
+                                                      << "path"
+                                                      << "a"),
                                          boost::none /* limit */,
                                          boost::none /* sortSpec */,
                                          kCursorIdResult /* remoteCursorId */,
@@ -832,10 +825,9 @@ TEST_F(SearchSbeStageBuilderTest, TestSearch) {
     {
         _gctx->outStream() << "Search NonStoredSource Test" << std::endl;
         auto node = std::make_unique<SearchNode>(false /* isSearchMeta */,
-                                                 BSON("query"
-                                                      << "test"
-                                                      << "path"
-                                                      << "a"),
+                                                 BSON("query" << "test"
+                                                              << "path"
+                                                              << "a"),
                                                  boost::none /* limit */,
                                                  boost::none /* sortSpec */,
                                                  kCursorIdResult /* remoteCursorId */,
@@ -847,11 +839,10 @@ TEST_F(SearchSbeStageBuilderTest, TestSearch) {
     {
         _gctx->outStream() << "Search NonStoredSource Test" << std::endl;
         auto node = std::make_unique<SearchNode>(false /* isSearchMeta */,
-                                                 BSON("query"
-                                                      << "test"
-                                                      << "path"
-                                                      << "a"
-                                                      << "returnStoredSource" << true),
+                                                 BSON("query" << "test"
+                                                              << "path"
+                                                              << "a"
+                                                              << "returnStoredSource" << true),
                                                  1 /* limit */,
                                                  boost::none /* sortSpec */,
                                                  kCursorIdStoredSource /* remoteCursorId */,

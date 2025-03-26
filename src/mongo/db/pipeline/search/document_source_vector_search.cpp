@@ -156,8 +156,7 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
     // Redact queryVector (embeddings field) if it exists to avoid including all
     // embeddings values and keep explainObj data concise.
     if (opts.isSerializingForExplain() && explainObj.hasField("queryVector")) {
-        explainObj = explainObj.addFields(BSON("queryVector"
-                                               << "redacted"));
+        explainObj = explainObj.addFields(BSON("queryVector" << "redacted"));
     }
     return Value(Document{{kStageName, explainObj}});
 }

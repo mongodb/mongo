@@ -100,11 +100,9 @@ TEST(CommitQuorumOptionsTest, ToBSON) {
 
     {
         CommitQuorumOptions options;
-        BSONObj obj = BSON("commitQuorum"
-                           << "someTag");
+        BSONObj obj = BSON("commitQuorum" << "someTag");
         ASSERT_OK(options.parse(obj.getField("commitQuorum")));
-        ASSERT_TRUE(options.toBSON().woCompare(BSON("commitQuorum"
-                                                    << "someTag")) == 0);
+        ASSERT_TRUE(options.toBSON().woCompare(BSON("commitQuorum" << "someTag")) == 0);
     }
 
     {
@@ -112,8 +110,7 @@ TEST(CommitQuorumOptionsTest, ToBSON) {
         CommitQuorumOptions options;
         options.mode = "majority";
         options.numNodes = 5;
-        ASSERT_TRUE(options.toBSON().woCompare(BSON("commitQuorum"
-                                                    << "majority")) == 0);
+        ASSERT_TRUE(options.toBSON().woCompare(BSON("commitQuorum" << "majority")) == 0);
     }
 }
 

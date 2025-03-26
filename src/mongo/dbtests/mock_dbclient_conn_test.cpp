@@ -249,19 +249,13 @@ TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
     {
         MockDBClientConnection conn(&server);
         conn.insert(nss1, BSON("a" << 1));
-        conn.insert(nss2,
-                    BSON("ef"
-                         << "gh"));
+        conn.insert(nss2, BSON("ef" << "gh"));
         conn.insert(nss3, BSON("x" << 2));
 
         conn.insert(nss1, BSON("b" << 3));
-        conn.insert(nss2,
-                    BSON("jk"
-                         << "lm"));
+        conn.insert(nss2, BSON("jk" << "lm"));
 
-        conn.insert(nss2,
-                    BSON("x"
-                         << "yz"));
+        conn.insert(nss2, BSON("x" << "yz"));
     }
 
     {
@@ -353,19 +347,13 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
     {
         MockDBClientConnection conn(&server);
         conn.insert(nss1, BSON("a" << 1));
-        conn.insert(nss2,
-                    BSON("ef"
-                         << "gh"));
+        conn.insert(nss2, BSON("ef" << "gh"));
         conn.insert(nss3, BSON("x" << 2));
 
         conn.insert(nss1, BSON("b" << 3));
-        conn.insert(nss2,
-                    BSON("jk"
-                         << "lm"));
+        conn.insert(nss2, BSON("jk" << "lm"));
 
-        conn.insert(nss2,
-                    BSON("x"
-                         << "yz"));
+        conn.insert(nss2, BSON("x" << "yz"));
     }
 
     {
@@ -411,9 +399,7 @@ TEST(MockDBClientConnTest, InsertAfterRemove) {
         MockDBClientConnection conn(&server);
         conn.insert(nss, BSON("a" << 1));
         conn.insert(nss, BSON("b" << 3));
-        conn.insert(nss,
-                    BSON("x"
-                         << "yz"));
+        conn.insert(nss, BSON("x" << "yz"));
     }
 
     {
@@ -487,12 +473,10 @@ TEST(MockDBClientConnTest, CyclingCmd) {
 
     {
         vector<mongo::StatusWith<BSONObj>> helloReplySequence;
-        helloReplySequence.push_back(BSON("set"
-                                          << "a"
-                                          << "isWritablePrimary" << true << "ok" << 1));
-        helloReplySequence.push_back(BSON("set"
-                                          << "a"
-                                          << "isWritablePrimary" << false << "ok" << 1));
+        helloReplySequence.push_back(BSON("set" << "a"
+                                                << "isWritablePrimary" << true << "ok" << 1));
+        helloReplySequence.push_back(BSON("set" << "a"
+                                                << "isWritablePrimary" << false << "ok" << 1));
         server.setCommandReply("hello", helloReplySequence);
     }
 

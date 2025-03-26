@@ -924,10 +924,8 @@ KeyMaterial EncryptedDBClientBase::getKey(const UUID& uuid) {
 
 SymmetricKey& EncryptedDBClientBase::getKMSLocalKey() {
     if (!_localKey.has_value()) {
-        std::unique_ptr<KMSService> kmsService =
-            KMSServiceController::createFromDisk(_encryptionOptions.getKmsProviders().toBSON(),
-                                                 BSON("provider"
-                                                      << "local"));
+        std::unique_ptr<KMSService> kmsService = KMSServiceController::createFromDisk(
+            _encryptionOptions.getKmsProviders().toBSON(), BSON("provider" << "local"));
         _localKey = std::move(kmsService->getMasterKey());
     }
 

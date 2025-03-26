@@ -129,8 +129,7 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfNonConstant) {
                               .opCtx(opCtx.get())
                               .ns(mongo::NamespaceString::createNamespaceString_forTest(
                                   "test"_sd, "namespace"_sd))
-                              .letParameters(BSON("a"
-                                                  << "$b"))
+                              .letParameters(BSON("a" << "$b"))
                               .build()),
         mongo::DBException,
         4890500);

@@ -178,10 +178,9 @@ TEST(CursorResponseTest, parseFromBSONIdFieldMissing) {
 
 TEST(CursorResponseTest, parseFromBSONIdFieldWrongType) {
     StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(
-        BSON("cursor" << BSON("id"
-                              << "123"
-                              << "ns" << defaultNssStr << "nextBatch"
-                              << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+        BSON("cursor" << BSON("id" << "123"
+                                   << "ns" << defaultNssStr << "nextBatch"
+                                   << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                       << "ok" << 1));
     ASSERT_NOT_OK(result.getStatus());
 }

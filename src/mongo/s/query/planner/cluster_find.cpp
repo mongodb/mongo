@@ -142,10 +142,8 @@ namespace {
 // Ticks for server-side Javascript deprecation log messages.
 Rarely _samplerFunctionJs, _samplerWhereClause;
 
-static const BSONObj kSortKeyMetaProjection = BSON("$meta"
-                                                   << "sortKey");
-static const BSONObj kGeoNearDistanceMetaProjection = BSON("$meta"
-                                                           << "geoNearDistance");
+static const BSONObj kSortKeyMetaProjection = BSON("$meta" << "sortKey");
+static const BSONObj kGeoNearDistanceMetaProjection = BSON("$meta" << "geoNearDistance");
 
 const char kFindCmdName[] = "find";
 

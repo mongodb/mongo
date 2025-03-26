@@ -54,12 +54,10 @@ namespace mongo::sbe {
 // {"field1": 1, "field2" : {"innerField": 2}}
 const BSONObj bsonObj = BSON("field1" << 1 << "field2" << BSON("innerField" << 2));
 // [{"k" : "field1", "v" : 1}, {"k" : "field2", "v" :{"innerField": 2}}]
-const BSONArray bsonArr1 = BSON_ARRAY(BSON("k"
-                                           << "field1"
-                                           << "v" << 1)
-                                      << BSON("k"
-                                              << "field2"
-                                              << "v" << BSON("innerField" << 2)));
+const BSONArray bsonArr1 = BSON_ARRAY(BSON("k" << "field1"
+                                               << "v" << 1)
+                                      << BSON("k" << "field2"
+                                                  << "v" << BSON("innerField" << 2)));
 // [["field1", 1], ["field2", {"innerField": 2}]]
 const BSONArray bsonArr2 =
     BSON_ARRAY(BSON_ARRAY("field1" << 1) << BSON_ARRAY("field2" << BSON("innerField" << 2)));
@@ -218,35 +216,27 @@ TEST_F(SBEObjectArrayConversionTest, ArrayToObjectExpression) {
 
     // Test error conditions
     std::string strWithNullByte{0x1B, 0x54, 0x00, 0x32};
-    auto
-        errInputs =
-            {
-                BSON_ARRAY("elem1"
-                           << "elem2"),
-                BSON_ARRAY(BSON_ARRAY("field1" << 1) << BSON("k"
-                                                             << "field2"
-                                                             << "v" << 2)),
-                BSON_ARRAY(BSONArrayBuilder().arr()),
-                BSON_ARRAY(BSON_ARRAY(1 << "field1")),
-                BSON_ARRAY(BSON_ARRAY("field1")),
-                BSON_ARRAY(BSON_ARRAY("field1" << 1 << "dummy")),
-                BSON_ARRAY(BSON_ARRAY(strWithNullByte << 1)),
-                BSON_ARRAY(BSON("k"
-                                << "field2"
-                                << "v" << 2)
-                           << BSON_ARRAY("field1" << 1)),
-                BSON_ARRAY(BSONObjBuilder().obj()),
-                BSON_ARRAY(BSON("k"
-                                << "field2")),
-                BSON_ARRAY(BSON("k"
-                                << "field2"
-                                << "v" << 2 << "dummy" << 3)),
-                BSON_ARRAY(BSON("x"
-                                << "field2"
-                                << "y" << 2)),
-                BSON_ARRAY(BSON("k" << 1 << "v" << 2)),
-                BSON_ARRAY(BSON("k" << strWithNullByte << "v" << 2)),
-            };
+    auto errInputs = {
+        BSON_ARRAY("elem1" << "elem2"),
+        BSON_ARRAY(BSON_ARRAY("field1" << 1) << BSON("k" << "field2"
+                                                         << "v" << 2)),
+        BSON_ARRAY(BSONArrayBuilder().arr()),
+        BSON_ARRAY(BSON_ARRAY(1 << "field1")),
+        BSON_ARRAY(BSON_ARRAY("field1")),
+        BSON_ARRAY(BSON_ARRAY("field1" << 1 << "dummy")),
+        BSON_ARRAY(BSON_ARRAY(strWithNullByte << 1)),
+        BSON_ARRAY(BSON("k" << "field2"
+                            << "v" << 2)
+                   << BSON_ARRAY("field1" << 1)),
+        BSON_ARRAY(BSONObjBuilder().obj()),
+        BSON_ARRAY(BSON("k" << "field2")),
+        BSON_ARRAY(BSON("k" << "field2"
+                            << "v" << 2 << "dummy" << 3)),
+        BSON_ARRAY(BSON("x" << "field2"
+                            << "y" << 2)),
+        BSON_ARRAY(BSON("k" << 1 << "v" << 2)),
+        BSON_ARRAY(BSON("k" << strWithNullByte << "v" << 2)),
+    };
 
     auto errCodes = {
         5153201,

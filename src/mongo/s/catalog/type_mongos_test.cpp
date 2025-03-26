@@ -188,9 +188,8 @@ TEST(Validity, Valid) {
                        << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
                        << MongosType::uptime(100) << MongosType::waiting(false)
                        << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSON_ARRAY("foo"
-                                                                   << "bar"
-                                                                   << "baz"))
+                       << MongosType::advisoryHostFQDNs(BSON_ARRAY("foo" << "bar"
+                                                                         << "baz"))
                        << MongosType::embeddedRouter(false));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);

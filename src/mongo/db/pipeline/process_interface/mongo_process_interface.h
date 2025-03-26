@@ -180,7 +180,7 @@ public:
     MongoProcessInterface(std::shared_ptr<executor::TaskExecutor> executor)
         : taskExecutor(std::move(executor)) {}
 
-    virtual ~MongoProcessInterface(){};
+    virtual ~MongoProcessInterface() {};
 
     /**
      * Returns an instance of a 'WriteSizeEstimator' interface.
