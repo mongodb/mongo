@@ -259,7 +259,7 @@ std::unique_ptr<FindCommandRequest> makeFindFromBmParams(
 IndexEntry createIndexEntry(BSONObj keyPattern, const std::string& indexName) {
     return IndexEntry(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      IndexDescriptor::kLatestIndexVersion,
+                      IndexConfig::kLatestIndexVersion,
                       false,
                       {},
                       {},

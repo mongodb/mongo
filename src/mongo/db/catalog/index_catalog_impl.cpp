@@ -643,8 +643,10 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     bool isUpdateMetadata = CreateIndexEntryFlags::kUpdateMetadata & flags;
     if (isUpdateMetadata) {
         bool isForceUpdateMetadata = CreateIndexEntryFlags::kForceUpdateMetadata & flags;
-        engine->getEngine()->alterIdentMetadata(
-            *shard_role_details::getRecoveryUnit(opCtx), ident, desc, isForceUpdateMetadata);
+        engine->getEngine()->alterIdentMetadata(*shard_role_details::getRecoveryUnit(opCtx),
+                                                ident,
+                                                desc->toIndexConfig(),
+                                                isForceUpdateMetadata);
     }
 
     if (!frozen) {

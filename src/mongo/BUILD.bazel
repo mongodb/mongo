@@ -608,7 +608,6 @@ filegroup(
         "//src/mongo/db/fts:tokenizer.h",
         "//src/mongo/db/fts/unicode:codepoints.h",
         "//src/mongo/db/index:index_descriptor.h",
-        "//src/mongo/db/index:index_descriptor_fwd.h",
         "//src/mongo/db/index:multikey_paths.h",
         "//src/mongo/db/index_builds:index_builds.h",
         "//src/mongo/db/index_builds:resumable_index_builds_gen",

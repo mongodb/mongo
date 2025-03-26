@@ -177,7 +177,7 @@ protected:
         // actually doing the planning.
         _indices.push_back(IndexEntry(index,
                                       IndexNames::nameToType(IndexNames::findPluginName(index)),
-                                      IndexDescriptor::kLatestIndexVersion,
+                                      IndexConfig::kLatestIndexVersion,
                                       false,
                                       {},
                                       {},
@@ -191,7 +191,7 @@ protected:
     }
 
     BSONObj makeIndexSpec(BSONObj index, StringData indexName) {
-        return BSON("v" << IndexDescriptor::kLatestIndexVersion << "key" << index << "name"
+        return BSON("v" << IndexConfig::kLatestIndexVersion << "key" << index << "name"
                         << indexName);
     }
 

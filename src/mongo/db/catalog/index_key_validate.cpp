@@ -399,7 +399,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
             // Here we always validate the key pattern according to the most recent rules, in order
             // to enforce that all new indexes have well-formed key patterns.
             Status keyPatternValidateStatus =
-                validateKeyPattern(keyPattern, IndexDescriptor::kLatestIndexVersion);
+                validateKeyPattern(keyPattern, IndexConfig::kLatestIndexVersion);
             if (!keyPatternValidateStatus.isOK()) {
                 return keyPatternValidateStatus;
             }

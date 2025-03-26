@@ -424,7 +424,7 @@ std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
     const NamespaceString& nss,
     const CollectionOptions& collOptions,
     StringData ident,
-    const IndexDescriptor* desc) {
+    const IndexConfig& config) {
     return std::make_unique<DevNullSortedDataInterface>(ident);
 }
 

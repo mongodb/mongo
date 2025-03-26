@@ -414,7 +414,7 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
     // Use query framework to generate index bounds.
     IndexEntry indexEntry(key,
                           indexType,
-                          IndexDescriptor::kLatestIndexVersion,
+                          IndexConfig::kLatestIndexVersion,
                           // The shard key index cannot be multikey.
                           false,
                           // Empty multikey paths, since the shard key index cannot be multikey.

@@ -216,7 +216,7 @@ Status createIndexOnCollection(OperationContext* opCtx,
         IndexSpec index;
         index.addKeys(keys);
         index.unique(unique);
-        index.version(int(IndexDescriptor::kLatestIndexVersion));
+        index.version(int(IndexConfig::kLatestIndexVersion));
         auto removeIndexBuildsToo = false;
         auto indexSpecs = indexCatalog->removeExistingIndexes(
             opCtx,

@@ -100,8 +100,8 @@ protected:
         auto indexCatalog = coll.getWritableCollection(opCtx)->getIndexCatalog();
         ASSERT(indexCatalog);
 
-        auto indexSpec = BSON("v" << IndexDescriptor::kLatestIndexVersion << "key" << index
-                                  << "name" << indexName);
+        auto indexSpec =
+            BSON("v" << IndexConfig::kLatestIndexVersion << "key" << index << "name" << indexName);
         ASSERT_OK(
             indexCatalog
                 ->createIndexOnEmptyCollection(opCtx, coll.getWritableCollection(opCtx), indexSpec)

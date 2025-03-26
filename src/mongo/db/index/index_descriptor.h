@@ -46,12 +46,12 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/index/index_descriptor_fwd.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -68,8 +68,7 @@ class OperationContext;
  */
 class IndexDescriptor {
 public:
-    enum class IndexVersion { kV1 = 1, kV2 = 2 };
-    static constexpr IndexVersion kLatestIndexVersion = IndexVersion::kV2;
+    using IndexVersion = IndexConfig::IndexVersion;
 
     // Used to report the result of a comparison between two indexes.
     enum class Comparison {
@@ -251,6 +250,11 @@ public:
     // Return a (rather compact) std::string representation.
     std::string toString() const {
         return _shared->_infoObj.toString();
+    }
+
+    // Converts to a minimal type for passing into storage engine.
+    IndexConfig toIndexConfig() const {
+        return {isIdIndex(), unique(), version(), infoObj(), indexName(), ordering()};
     }
 
     // Return the info object.

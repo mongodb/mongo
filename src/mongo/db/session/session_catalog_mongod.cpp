@@ -536,7 +536,7 @@ void MongoDSessionCatalog::set(ServiceContext* service,
 
 BSONObj MongoDSessionCatalog::getConfigTxnPartialIndexSpec() {
     NewIndexSpec index;
-    index.setV(int(IndexDescriptor::kLatestIndexVersion));
+    index.setV(int(IndexConfig::kLatestIndexVersion));
     index.setKey(BSON(
         SessionTxnRecord::kParentSessionIdFieldName
         << 1

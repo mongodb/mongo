@@ -425,7 +425,7 @@ TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyBelowElemMa
     auto keyPattern = BSON("a.b.c.d" << 1);
     IndexEntry ind(keyPattern,
                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                   IndexDescriptor::kLatestIndexVersion,
+                   IndexConfig::kLatestIndexVersion,
                    true,
                    {},
                    {},

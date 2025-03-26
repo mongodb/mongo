@@ -194,7 +194,7 @@ TEST_F(IndexConsistencyTest, ExtraEntryPartialFindingsWithNonzeroMemoryLimit) {
             collWriter,
             BSON("name"
                  << "a_1"
-                 << "v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("a" << 1))));
+                 << "v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("a" << 1))));
         for (int i = 0; i < 10; ++i) {
             BSONObj doc = BSON("_id" << i << "a" << std::string(600 * 1024, 'a' + i));
             ASSERT_OK(collection_internal::insertDocument(
@@ -249,7 +249,7 @@ TEST_F(IndexConsistencyTest, MissingEntryPartialFindingsWithNonzeroMemoryLimit) 
             writeColl,
             BSON("name"
                  << "a_1"
-                 << "v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("a" << 1))));
+                 << "v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("a" << 1))));
         for (int i = 0; i < 10; ++i) {
             BSONObj doc = BSON("_id" << i << "a" << std::string(600 * 1024, 'a' + i));
             ASSERT_OK(collection_internal::insertDocument(

@@ -83,13 +83,14 @@ public:
         OperationContext* opCtx) final {
         std::string ns = "test.wt";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        BSONObj spec = BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
-                                  << "unique" << true);
+        BSONObj spec =
+            BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName << "v"
+                       << static_cast<int>(IndexConfig::kLatestIndexVersion) << "unique" << true);
 
         auto collection = std::make_unique<CollectionMock>(nss);
         IndexDescriptor desc("", spec);
         invariant(desc.isIdIndex());
+        IndexConfig config = desc.toIndexConfig();
 
         const bool isLogged = false;
         StatusWith<std::string> result =
@@ -97,7 +98,7 @@ public:
                                                   "",
                                                   "",
                                                   NamespaceStringUtil::serializeForCatalog(nss),
-                                                  desc,
+                                                  config,
                                                   isLogged);
         ASSERT_OK(result.getStatus());
 
@@ -109,7 +110,7 @@ public:
                       result.getValue()));
 
         return std::make_unique<WiredTigerIdIndex>(
-            opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
+            opCtx, uri, UUID::gen(), "" /* ident */, config, isLogged);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(OperationContext* opCtx,
@@ -121,7 +122,7 @@ public:
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
                                   << "testIndex"
-                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)
                                   << "unique" << unique);
 
         if (partial) {
@@ -134,13 +135,14 @@ public:
         auto collection = std::make_unique<CollectionMock>(nss);
 
         IndexDescriptor& desc = _descriptors.emplace_back("", spec);
+        IndexConfig config = desc.toIndexConfig();
 
         StatusWith<std::string> result =
             WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
                                                   "",
                                                   "",
                                                   NamespaceStringUtil::serializeForCatalog(nss),
-                                                  desc,
+                                                  config,
                                                   WiredTigerUtil::useTableLogging(nss));
         ASSERT_OK(result.getStatus());
 
@@ -157,7 +159,7 @@ public:
                                                            UUID::gen(),
                                                            "" /* ident */,
                                                            keyFormat,
-                                                           &desc,
+                                                           config,
                                                            WiredTigerUtil::useTableLogging(nss));
         }
         return std::make_unique<WiredTigerIndexStandard>(opCtx,
@@ -165,7 +167,7 @@ public:
                                                          UUID::gen(),
                                                          "" /* ident */,
                                                          keyFormat,
-                                                         &desc,
+                                                         config,
                                                          WiredTigerUtil::useTableLogging(nss));
     }
 

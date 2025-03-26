@@ -90,7 +90,7 @@ private:
     IndexEntry createIndexEntry(BSONObj keyPattern, std::string indexName) {
         return IndexEntry(keyPattern,
                           IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                          IndexDescriptor::kLatestIndexVersion,
+                          IndexConfig::kLatestIndexVersion,
                           false /*multikey*/,
                           {} /*mutikeyPaths*/,
                           {} /*multikeyPathSet*/,
@@ -120,7 +120,7 @@ void BM_Simple(benchmark::State& state) {
     ASSERT_OK(indexCatalog
                   ->createIndexOnEmptyCollection(opCtx,
                                                  coll.getWritableCollection(opCtx),
-                                                 BSON("v" << IndexDescriptor::kLatestIndexVersion
+                                                 BSON("v" << IndexConfig::kLatestIndexVersion
                                                           << "key" << BSON("x1" << 1) << "name"
                                                           << "index1"))
                   .getStatus());

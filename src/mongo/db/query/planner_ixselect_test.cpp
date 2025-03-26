@@ -249,7 +249,7 @@ void findRelevantTaggedNodePathsAndIndices(MatchExpression* root,
 IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             false,
             {},
             {},
@@ -1176,7 +1176,7 @@ auto makeIndexEntry(BSONObj keyPattern,
         });
     return std::make_pair(IndexEntry(keyPattern,
                                      indexType,
-                                     IndexDescriptor::kLatestIndexVersion,
+                                     IndexConfig::kLatestIndexVersion,
                                      multiKey,
                                      multiKeyPaths,
                                      multiKeyPathSet,
@@ -1825,7 +1825,7 @@ TEST(QueryPlannerIXSelectTest, SparseIndexCannotBeUsedInALookup) {
         BSON("$**" << 1), {}, {}, BSON("wildcardProjection" << BSON("_id" << 1 << "subpath" << 1)));
     IndexEntry sparseIndex(BSON("abc" << 1),
                            INDEX_BTREE,
-                           IndexDescriptor::kLatestIndexVersion,
+                           IndexConfig::kLatestIndexVersion,
                            false,
                            {},    /* multiKeyPaths */
                            {},    /* multiKeyPathSet */

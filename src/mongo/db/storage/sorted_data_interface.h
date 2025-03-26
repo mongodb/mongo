@@ -52,6 +52,41 @@ namespace CollectionValidation {
 class ValidationOptions;
 }
 
+struct IndexConfig {
+    enum class IndexVersion { kV1 = 1, kV2 = 2 };
+    static constexpr IndexVersion kLatestIndexVersion = IndexVersion::kV2;
+
+    bool isIdIndex;
+    bool unique;
+    IndexVersion version;
+    const BSONObj& infoObj;
+    const std::string& indexName;
+    const Ordering& ordering;
+
+    IndexConfig(bool isIdIndex,
+                bool unique,
+                IndexVersion version,
+                const BSONObj& infoObj,
+                const std::string& indexName,
+                const Ordering& ordering)
+        : isIdIndex(isIdIndex),
+          unique(unique),
+          version(version),
+          infoObj(infoObj),
+          indexName(indexName),
+          ordering(ordering) {}
+
+    // Discourage caching by deleting copy/move constructors and assignment operators.
+    IndexConfig(const IndexConfig&) = delete;
+    IndexConfig& operator=(const IndexConfig&) = delete;
+    IndexConfig(IndexConfig&&) = delete;
+    IndexConfig& operator=(IndexConfig&&) = delete;
+
+    std::string toString() const {
+        return infoObj.toString();
+    }
+};
+
 /**
  * This is the uniform interface for storing indexes and supporting point queries as well as range
  * queries. The actual implementation is up to the storage engine. All the storage engines must

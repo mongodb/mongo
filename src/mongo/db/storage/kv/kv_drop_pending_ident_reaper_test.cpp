@@ -84,7 +84,7 @@ public:
         const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
-        const IndexDescriptor* desc) override {
+        const IndexConfig& config) override {
         return nullptr;
     }
 
@@ -110,7 +110,7 @@ public:
                                      const NamespaceString& nss,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
-                                     const IndexDescriptor* desc) override {
+                                     const IndexConfig& config) override {
         return Status::OK();
     }
     Status dropSortedDataInterface(RecoveryUnit&, StringData ident) override {

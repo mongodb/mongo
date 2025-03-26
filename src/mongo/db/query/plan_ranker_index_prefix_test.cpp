@@ -40,7 +40,7 @@ namespace {
 IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             false,
             {},
             {},

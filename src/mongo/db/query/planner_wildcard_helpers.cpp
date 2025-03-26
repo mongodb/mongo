@@ -427,7 +427,7 @@ boost::optional<IndexEntry> createExpandedIndexEntry(const IndexEntry& wildcardI
     const bool isMultikey = !multikeyPaths[wildcardFieldPos].empty();
     IndexEntry entry(std::move(expandedKeyPattern),
                      IndexType::INDEX_WILDCARD,
-                     IndexDescriptor::kLatestIndexVersion,
+                     IndexConfig::kLatestIndexVersion,
                      isMultikey,
                      std::move(multikeyPaths),
                      // Expanded index entries always use the fixed-size multikey paths

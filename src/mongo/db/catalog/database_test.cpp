@@ -256,9 +256,9 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
 
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT_EQUALS(indexCatalog->numIndexesInProgress(), 0);
-        auto indexInfoObj = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
-                                     << BSON("a" << 1) << "name"
-                                     << "a_1");
+        auto indexInfoObj =
+            BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("a" << 1) << "name"
+                     << "a_1");
 
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
             collection->ns(), indexInfoObj, IndexBuildMethod::kHybrid, UUID::gen());

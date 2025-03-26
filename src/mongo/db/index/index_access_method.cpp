@@ -106,7 +106,8 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
     auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto desc = entry->descriptor();
     auto makeSDI = [&] {
-        return engine->getSortedDataInterface(opCtx, nss, collectionOptions, ident, desc);
+        return engine->getSortedDataInterface(
+            opCtx, nss, collectionOptions, ident, desc->toIndexConfig());
     };
     const std::string& type = desc->getAccessMethodName();
 

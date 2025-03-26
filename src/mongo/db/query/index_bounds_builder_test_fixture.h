@@ -84,7 +84,7 @@ public:
     static IndexEntry buildSimpleIndexEntry(const BSONObj& kp = BSONObj()) {
         return {kp,
                 IndexNames::nameToType(IndexNames::findPluginName(kp)),
-                IndexDescriptor::kLatestIndexVersion,
+                IndexConfig::kLatestIndexVersion,
                 false,
                 {},
                 {},
@@ -103,7 +103,7 @@ public:
     IndexEntry buildMultikeyIndexEntry(const BSONObj& kp, const MultikeyPaths& mkp) {
         return {kp,
                 IndexNames::nameToType(IndexNames::findPluginName(kp)),
-                IndexDescriptor::kLatestIndexVersion,
+                IndexConfig::kLatestIndexVersion,
                 true,  // multikey
                 mkp,   // multikey paths
                 {},
@@ -131,7 +131,7 @@ public:
         }
         return {kp,
                 IndexType::INDEX_WILDCARD,
-                IndexDescriptor::kLatestIndexVersion,
+                IndexConfig::kLatestIndexVersion,
                 isMultikey,  // multikey
                 mkp,         // multikey paths
                 {},

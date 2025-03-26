@@ -47,7 +47,7 @@ struct WildcardIndexEntryMock {
         const auto type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
         indexEntry = std::make_unique<IndexEntry>(keyPattern,
                                                   type,
-                                                  IndexDescriptor::kLatestIndexVersion,
+                                                  IndexConfig::kLatestIndexVersion,
                                                   false,
                                                   emptyMultiKeyPaths,
                                                   multiKeyPathSet,

@@ -167,27 +167,25 @@ StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& option
 }
 
 // static
-std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& desc) {
+std::string WiredTigerIndex::generateAppMetadataString(const IndexConfig& config) {
     int dataFormatVersion;
+    bool isV2OrAbove = config.version >= IndexConfig::IndexVersion::kV2;
 
-    if (desc.unique() && !desc.isIdIndex()) {
+    if (config.unique && !config.isIdIndex) {
         if (MONGO_unlikely(WTIndexCreateUniqueIndexesInOldFormat.shouldFail())) {
             LOGV2(8596200,
                   "Creating unique index with old format version due to "
                   "WTIndexCreateUniqueIndexesInOldFormat failpoint",
-                  "desc"_attr = desc.toString());
-            dataFormatVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
-                ? kDataFormatV4KeyStringV1UniqueIndexVersionV2
-                : kDataFormatV3KeyStringV0UniqueIndexVersionV1;
+                  "config"_attr = config.toString());
+            dataFormatVersion = isV2OrAbove ? kDataFormatV4KeyStringV1UniqueIndexVersionV2
+                                            : kDataFormatV3KeyStringV0UniqueIndexVersionV1;
         } else {
-            dataFormatVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
-                ? kDataFormatV6KeyStringV1UniqueIndexVersionV2
-                : kDataFormatV5KeyStringV0UniqueIndexVersionV1;
+            dataFormatVersion = isV2OrAbove ? kDataFormatV6KeyStringV1UniqueIndexVersionV2
+                                            : kDataFormatV5KeyStringV0UniqueIndexVersionV1;
         }
     } else {
-        dataFormatVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
-            ? kDataFormatV2KeyStringV1IndexVersionV2
-            : kDataFormatV1KeyStringV0IndexVersionV1;
+        dataFormatVersion = isV2OrAbove ? kDataFormatV2KeyStringV1IndexVersionV2
+                                        : kDataFormatV1KeyStringV0IndexVersionV1;
     }
 
     // Index metadata
@@ -199,7 +197,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
                                                               const std::string& sysIndexConfig,
                                                               const std::string& collIndexConfig,
                                                               StringData tableName,
-                                                              const IndexDescriptor& desc,
+                                                              const IndexConfig& config,
                                                               bool isLogged) {
     str::stream ss;
 
@@ -221,7 +219,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     // Raise an error about unrecognized fields that may be introduced in newer versions of
     // this storage engine.
     // Ensure that 'configString' field is a string. Raise an error if this is not the case.
-    BSONElement storageEngineElement = desc.infoObj()["storageEngine"];
+    BSONElement storageEngineElement = config.infoObj["storageEngine"];
     if (storageEngineElement.isABSONObj()) {
         BSONObj storageEngine = storageEngineElement.Obj();
         StatusWith<std::string> parseStatus =
@@ -242,7 +240,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     ss << ",value_format=u";
 
     // Index metadata
-    ss << generateAppMetadataString(desc);
+    ss << generateAppMetadataString(config);
     if (isLogged) {
         ss << "log=(enabled=true)";
     } else {
@@ -273,16 +271,16 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  const UUID& collectionUUID,
                                  StringData ident,
                                  KeyFormat rsKeyFormat,
-                                 const IndexDescriptor* desc,
+                                 const IndexConfig& config,
                                  bool isLogged)
     : SortedDataInterface(ident,
-                          _handleVersionInfo(ctx, uri, ident, desc, isLogged),
-                          desc->ordering(),
+                          _handleVersionInfo(ctx, uri, ident, config, isLogged),
+                          config.ordering,
                           rsKeyFormat),
       _uri(uri),
       _tableId(WiredTigerUtil::genTableId()),
       _collectionUUID(collectionUUID),
-      _indexName(desc->indexName()),
+      _indexName(config.indexName),
       _isLogged(isLogged) {}
 
 namespace {
@@ -611,10 +609,10 @@ std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDup
 void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
                                                const std::string& uri,
                                                StringData ident,
-                                               const IndexDescriptor* desc) {
-    auto indexVersion = desc->version();
-    auto isIndexVersion1 = indexVersion == IndexDescriptor::IndexVersion::kV1;
-    auto isIndexVersion2 = indexVersion == IndexDescriptor::IndexVersion::kV2;
+                                               const IndexConfig& config) {
+    auto indexVersion = config.version;
+    auto isIndexVersion1 = indexVersion == IndexConfig::IndexVersion::kV1;
+    auto isIndexVersion2 = indexVersion == IndexConfig::IndexVersion::kV2;
     auto isDataFormat6 = _dataFormatVersion == kDataFormatV1KeyStringV0IndexVersionV1;
     auto isDataFormat8 = _dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2;
     auto isDataFormat13 = _dataFormatVersion == kDataFormatV5KeyStringV0UniqueIndexVersionV1;
@@ -623,14 +621,14 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
     // uniqueness of the index. Specifically:
     // * The index is a secondary unique index, but the data format version is 6 (v1) or 8 (v2).
     // * The index is a non-unique index, but the data format version is 13 (v1) or 14 (v2).
-    if ((!desc->isIdIndex() && desc->unique() &&
+    if ((!config.isIdIndex && config.unique &&
          ((isIndexVersion1 && isDataFormat6) || (isIndexVersion2 && isDataFormat8))) ||
-        (!desc->unique() &&
+        (!config.unique &&
          ((isIndexVersion1 && isDataFormat13) || (isIndexVersion2 && isDataFormat14)))) {
         auto engine = opCtx->getServiceContext()->getStorageEngine();
         engine->getEngine()->alterIdentMetadata(*shard_role_details::getRecoveryUnit(opCtx),
                                                 ident,
-                                                desc,
+                                                config,
                                                 /* isForceUpdateMetadata */ false);
         auto prevVersion = _dataFormatVersion;
         // The updated data format is guaranteed to be within the supported version range.
@@ -644,8 +642,8 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
                 .getValue();
         LOGV2_WARNING(6818600,
                       "Fixing index metadata data format version",
-                      logAttrs(desc->getEntry()->getNSSFromCatalog(opCtx)),
-                      "indexName"_attr = desc->indexName(),
+                      logAttrs(_collectionUUID),
+                      "indexName"_attr = config.indexName,
                       "prevVersion"_attr = prevVersion,
                       "newVersion"_attr = _dataFormatVersion);
     }
@@ -654,7 +652,7 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
 key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                         const std::string& uri,
                                                         StringData ident,
-                                                        const IndexDescriptor* desc,
+                                                        const IndexConfig& config,
                                                         bool isLogged) {
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx))->getSessionNoTxn(),
@@ -662,28 +660,25 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         kMinimumIndexVersion,
         kMaximumIndexVersion);
     if (!version.isOK()) {
-        auto collectionNamespace = desc->getEntry()->getNSSFromCatalog(ctx);
         Status versionStatus = version.getStatus();
-        Status indexVersionStatus(
-            ErrorCodes::UnsupportedFormat,
-            str::stream() << versionStatus.reason() << " Index: {name: " << desc->indexName()
-                          << ", ns: " << collectionNamespace.toStringForErrorMsg()
-                          << "} - version either too old or too new for this mongod.");
+        Status indexVersionStatus(ErrorCodes::UnsupportedFormat,
+                                  str::stream()
+                                      << versionStatus.reason() << " Index: {name: "
+                                      << config.indexName << ", ns: " << _collectionUUID
+                                      << "} - version either too old or too new for this mongod.");
         fassertFailedWithStatus(28579, indexVersionStatus);
     }
     _dataFormatVersion = version.getValue();
 
-    _repairDataFormatVersion(ctx, uri, ident, desc);
+    _repairDataFormatVersion(ctx, uri, ident, config);
 
-    if (!desc->isIdIndex() && desc->unique() &&
+    if (!config.isIdIndex && config.unique &&
         (_dataFormatVersion < kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
          _dataFormatVersion > kDataFormatV6KeyStringV1UniqueIndexVersionV2)) {
-        auto collectionNamespace = desc->getEntry()->getNSSFromCatalog(ctx);
-        Status versionStatus(ErrorCodes::UnsupportedFormat,
-                             str::stream()
-                                 << "Index: {name: " << desc->indexName()
-                                 << ", ns: " << collectionNamespace.toStringForErrorMsg()
-                                 << "} has incompatible format version: " << _dataFormatVersion);
+        Status versionStatus(
+            ErrorCodes::UnsupportedFormat,
+            str::stream() << "Index: {name: " << config.indexName << ", ns: " << _collectionUUID
+                          << "} has incompatible format version: " << _dataFormatVersion);
         fassertFailedWithStatusNoTrace(31179, versionStatus);
     }
 
@@ -1357,9 +1352,9 @@ WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              const UUID& collectionUUID,
                                              StringData ident,
                                              KeyFormat rsKeyFormat,
-                                             const IndexDescriptor* desc,
+                                             const IndexConfig& config,
                                              bool isLogged)
-    : WiredTigerIndex(ctx, uri, collectionUUID, ident, rsKeyFormat, desc, isLogged) {
+    : WiredTigerIndex(ctx, uri, collectionUUID, ident, rsKeyFormat, config, isLogged) {
     // _id indexes must use WiredTigerIdIndex
     invariant(!isIdIndex());
     // All unique indexes should be in the timestamp-safe format version as of version 4.2.
@@ -1421,9 +1416,9 @@ WiredTigerIdIndex::WiredTigerIdIndex(OperationContext* ctx,
                                      const std::string& uri,
                                      const UUID& collectionUUID,
                                      StringData ident,
-                                     const IndexDescriptor* desc,
+                                     const IndexConfig& config,
                                      bool isLogged)
-    : WiredTigerIndex(ctx, uri, collectionUUID, ident, KeyFormat::Long, desc, isLogged) {
+    : WiredTigerIndex(ctx, uri, collectionUUID, ident, KeyFormat::Long, config, isLogged) {
     invariant(isIdIndex());
 }
 
@@ -1730,9 +1725,9 @@ WiredTigerIndexStandard::WiredTigerIndexStandard(OperationContext* ctx,
                                                  const UUID& collectionUUID,
                                                  StringData ident,
                                                  KeyFormat rsKeyFormat,
-                                                 const IndexDescriptor* desc,
+                                                 const IndexConfig& config,
                                                  bool isLogged)
-    : WiredTigerIndex(ctx, uri, collectionUUID, ident, rsKeyFormat, desc, isLogged) {}
+    : WiredTigerIndex(ctx, uri, collectionUUID, ident, rsKeyFormat, config, isLogged) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexStandard::newCursor(
     OperationContext* opCtx, bool forward) const {

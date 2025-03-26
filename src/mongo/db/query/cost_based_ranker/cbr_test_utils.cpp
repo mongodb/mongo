@@ -66,7 +66,7 @@ IndexEntry buildSimpleIndexEntry(const std::vector<std::string>& indexFields) {
     BSONObj kp = fieldsToKeyPattern(indexFields);
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             false,
             {},
             {},
@@ -98,7 +98,7 @@ IndexEntry buildMultikeyIndexEntry(const std::vector<std::string>& indexFields,
     }
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             true,
             mkp,
             {},

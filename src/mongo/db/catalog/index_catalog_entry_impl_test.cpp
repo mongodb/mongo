@@ -174,11 +174,12 @@ TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
     CollectionOptions collOptions{};
     DevNullKVEngine engine{};
-    auto sortedDataInterface =
-        engine.getSortedDataInterface(nullptr, nss, collOptions, "wildcardIndent", nullptr);
 
     auto indexDescriptor = makeIndexDescriptor(
         "wildcardIndex", BSON("a" << 1 << "b" << 1 << "$**" << 1), BSON("c" << 1 << "_id" << 1));
+
+    auto sortedDataInterface = engine.getSortedDataInterface(
+        nullptr, nss, collOptions, "wildcardIndent", indexDescriptor->toIndexConfig());
 
     ASSERT_EQ(IndexNames::WILDCARD, indexDescriptor->getAccessMethodName());
 
@@ -203,11 +204,12 @@ TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex_Exclu
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
     CollectionOptions collOptions{};
     DevNullKVEngine engine{};
-    auto sortedDataInterface =
-        engine.getSortedDataInterface(nullptr, nss, collOptions, "wildcardIndent", nullptr);
 
     auto indexDescriptor = makeIndexDescriptor(
         "wildcardIndex", BSON("a" << 1 << "b" << 1 << "$**" << 1), BSON("c" << 0));
+
+    auto sortedDataInterface = engine.getSortedDataInterface(
+        nullptr, nss, collOptions, "wildcardIndent", indexDescriptor->toIndexConfig());
 
     ASSERT_EQ(IndexNames::WILDCARD, indexDescriptor->getAccessMethodName());
 

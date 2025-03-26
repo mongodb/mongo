@@ -267,23 +267,4 @@ Status buildDupKeyErrorStatus(const key_string::Value& keyString,
     return buildDupKeyErrorStatus(key, collectionNamespace, indexName, keyPattern, indexCollation);
 }
 
-Status buildDupKeyErrorStatus(OperationContext* opCtx,
-                              const key_string::Value& keyString,
-                              const Ordering& ordering,
-                              const IndexDescriptor* desc) {
-    const BSONObj key = key_string::toBson(keyString.getView(), ordering, keyString.getTypeBits());
-    return buildDupKeyErrorStatus(opCtx, key, desc);
-}
-
-Status buildDupKeyErrorStatus(OperationContext* opCtx,
-                              const BSONObj& key,
-                              const IndexDescriptor* desc) {
-    NamespaceString nss;
-    invariant(desc);
-    // In testing this may be nullptr, and being a bit more lenient during error handling is OK.
-    if (desc->getEntry())
-        nss = desc->getEntry()->getNSSFromCatalog(opCtx);
-    return buildDupKeyErrorStatus(
-        key, nss, desc->indexName(), desc->keyPattern(), desc->collation());
-}
 }  // namespace mongo

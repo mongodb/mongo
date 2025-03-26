@@ -42,7 +42,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/validate/validate_results.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -84,9 +83,6 @@ const int kDataFormatV6KeyStringV1UniqueIndexVersionV2 = 14;
 const int kMinimumIndexVersion = kDataFormatV1KeyStringV0IndexVersionV1;
 const int kMaximumIndexVersion = kDataFormatV6KeyStringV1UniqueIndexVersionV2;
 
-class IndexCatalogEntry;
-class IndexDescriptor;
-
 namespace CollectionValidation {
 class ValidationOptions;
 }
@@ -105,7 +101,7 @@ public:
      * in WiredTiger's metadata. The output string is of the form:
      * ",app_metadata=(...)," and can be appended to the config strings for WiredTiger's API calls.
      */
-    static std::string generateAppMetadataString(const IndexDescriptor& desc);
+    static std::string generateAppMetadataString(const IndexConfig& config);
 
     /**
      * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
@@ -123,7 +119,7 @@ public:
                                                         const std::string& sysIndexConfig,
                                                         const std::string& collIndexConfig,
                                                         StringData tableName,
-                                                        const IndexDescriptor& desc,
+                                                        const IndexConfig& config,
                                                         bool isLogged);
 
     /**
@@ -147,7 +143,7 @@ public:
                     const UUID& collectionUUID,
                     StringData ident,
                     KeyFormat rsKeyFormat,
-                    const IndexDescriptor* desc,
+                    const IndexConfig& config,
                     bool isLogged);
 
     std::variant<Status, DuplicateKey> insert(OperationContext* opCtx,
@@ -206,7 +202,7 @@ public:
         return false;
     }
 
-    virtual UUID getCollectionUUID() const {
+    UUID getCollectionUUID() const {
         return _collectionUUID;
     }
 
@@ -279,7 +275,7 @@ protected:
     key_string::Version _handleVersionInfo(OperationContext* ctx,
                                            const std::string& uri,
                                            StringData ident,
-                                           const IndexDescriptor* desc,
+                                           const IndexConfig& config,
                                            bool isLogged);
 
     /*
@@ -289,7 +285,7 @@ protected:
     void _repairDataFormatVersion(OperationContext* opCtx,
                                   const std::string& uri,
                                   StringData ident,
-                                  const IndexDescriptor* desc);
+                                  const IndexConfig& config);
 
     /*
      * The data format version is effectively const after the WiredTigerIndex instance is
@@ -310,7 +306,7 @@ public:
                           const UUID& collectionUUID,
                           StringData ident,
                           KeyFormat rsKeyFormat,
-                          const IndexDescriptor* desc,
+                          const IndexConfig& config,
                           bool isLogged);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
@@ -362,7 +358,7 @@ public:
                       const std::string& uri,
                       const UUID& collectionUUID,
                       StringData ident,
-                      const IndexDescriptor* desc,
+                      const IndexConfig& config,
                       bool isLogged);
 
     std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
@@ -421,7 +417,7 @@ public:
                             const UUID& collectionUUID,
                             StringData ident,
                             KeyFormat rsKeyFormat,
-                            const IndexDescriptor* desc,
+                            const IndexConfig& config,
                             bool isLogged);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,

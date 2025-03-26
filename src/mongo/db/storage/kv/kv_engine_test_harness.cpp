@@ -313,15 +313,16 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
         uow.commit();
     }
 
-    IndexDescriptor desc("",
-                         BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "key"
-                                  << BSON("a" << 1)));
+    IndexDescriptor desc(
+        "",
+        BSON("v" << static_cast<int>(IndexConfig::kLatestIndexVersion) << "key" << BSON("a" << 1)));
+    IndexConfig config = desc.toIndexConfig();
     std::unique_ptr<SortedDataInterface> sorted;
     {
         auto opCtx = _makeOperationContext(engine);
         ASSERT_OK(engine->createSortedDataInterface(
-            *shard_role_details::getRecoveryUnit(opCtx.get()), nss, options, ident, &desc));
-        sorted = engine->getSortedDataInterface(opCtx.get(), nss, options, ident, &desc);
+            *shard_role_details::getRecoveryUnit(opCtx.get()), nss, options, ident, config));
+        sorted = engine->getSortedDataInterface(opCtx.get(), nss, options, ident, config);
         ASSERT(sorted);
     }
 
@@ -1477,13 +1478,14 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
                          BSON("v"
                               << "1"
                               << "key" << BSON("a" << 1)));
+    IndexConfig config = desc.toIndexConfig();
     std::unique_ptr<SortedDataInterface> sorted;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         ASSERT_OK(engine->createSortedDataInterface(
-            *shard_role_details::getRecoveryUnit(opCtx), nss, CollectionOptions(), ident, &desc));
-        sorted = engine->getSortedDataInterface(opCtx, nss, CollectionOptions(), ident, &desc);
+            *shard_role_details::getRecoveryUnit(opCtx), nss, CollectionOptions(), ident, config));
+        sorted = engine->getSortedDataInterface(opCtx, nss, CollectionOptions(), ident, config);
         ASSERT(sorted);
     }
 }

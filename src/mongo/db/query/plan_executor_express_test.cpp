@@ -51,7 +51,7 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr, bool setLimit
 IndexEntry createIndexEntry(BSONObj keyPattern, bool unique, bool sparse = false) {
     return IndexEntry(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      IndexDescriptor::kLatestIndexVersion,
+                      IndexConfig::kLatestIndexVersion,
                       false /*multikey*/,
                       {} /*mutikeyPaths*/,
                       {} /*multikeyPathSet*/,

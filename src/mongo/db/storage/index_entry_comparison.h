@@ -45,7 +45,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -290,14 +289,5 @@ Status buildDupKeyErrorStatus(const key_string::Value& keyString,
                               const BSONObj& keyPattern,
                               const BSONObj& indexCollation,
                               const Ordering& ordering);
-
-Status buildDupKeyErrorStatus(OperationContext* opCtx,
-                              const BSONObj& key,
-                              const IndexDescriptor* desc);
-
-Status buildDupKeyErrorStatus(OperationContext* opCtx,
-                              const key_string::Value& keyString,
-                              const Ordering& ordering,
-                              const IndexDescriptor* desc);
 
 }  // namespace mongo

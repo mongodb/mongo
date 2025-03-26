@@ -140,7 +140,7 @@ protected:
 IndexEntry buildSimpleIndexEntry(const BSONObj& kp, const std::string& indexName) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             false,
             {},
             {},
@@ -162,7 +162,7 @@ IndexEntry buildWildcardIndexEntry(const BSONObj& kp,
                                    const std::string& indexName) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             false,
             {},
             {},

@@ -74,7 +74,7 @@ protected:
 
     static BSONObj buildIndexSpec(StringData fieldName, bool unique) {
         return BSONObjBuilder{}
-            .append("v", IndexDescriptor::kLatestIndexVersion)
+            .append("v", IndexConfig::kLatestIndexVersion)
             .append("key", BSON(fieldName << 1))
             .append("name", fieldName + "_1")
             .append("unique", unique)

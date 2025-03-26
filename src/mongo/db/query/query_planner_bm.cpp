@@ -59,7 +59,7 @@ std::unique_ptr<CanonicalQuery> getCanonicalQuery(OperationContext* opCtx, Query
 IndexEntry createIndexEntry(BSONObj keyPattern) {
     return IndexEntry(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      IndexDescriptor::kLatestIndexVersion,
+                      IndexConfig::kLatestIndexVersion,
                       false /*multikey*/,
                       {} /*mutikeyPaths*/,
                       {} /*multikeyPathSet*/,

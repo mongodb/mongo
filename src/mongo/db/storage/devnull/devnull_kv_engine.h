@@ -44,7 +44,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/backup_block.h"
@@ -93,7 +92,7 @@ public:
                                      const NamespaceString& nss,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
-                                     const IndexDescriptor* desc) override {
+                                     const IndexConfig& config) override {
         return Status::OK();
     }
 
@@ -106,7 +105,7 @@ public:
         const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
-        const IndexDescriptor* desc) override;
+        const IndexConfig& config) override;
 
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,

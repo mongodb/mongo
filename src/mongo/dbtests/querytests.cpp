@@ -169,7 +169,7 @@ protected:
 
     void addIndex(const IndexSpec& spec) {
         BSONObjBuilder builder(spec.toBSON());
-        builder.append("v", int(IndexDescriptor::kLatestIndexVersion));
+        builder.append("v", int(IndexConfig::kLatestIndexVersion));
         auto specObj = builder.obj();
 
         CollectionWriter collection(&_opCtx, _collection->ns());

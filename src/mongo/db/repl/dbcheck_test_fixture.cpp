@@ -188,7 +188,7 @@ void DbCheckTest::createIndex(OperationContext* opCtx, const BSONObj& indexKey) 
     ASSERT(collection);
 
     ASSERT_EQ(1, indexKey.nFields()) << kNss.toStringForErrorMsg() << "/" << indexKey;
-    auto spec = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << indexKey << "name"
+    auto spec = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
                          << (indexKey.firstElementFieldNameStringData() + "_1"));
 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);

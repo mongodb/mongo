@@ -178,7 +178,7 @@ protected:
                      std::string name,
                      Seconds expireAfterSeconds) {
         const auto spec =
-            BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << keyPattern << "name"
+            BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << keyPattern << "name"
                      << name << "expireAfterSeconds" << durationCount<Seconds>(expireAfterSeconds));
 
         createIndex(nss, spec);
@@ -613,7 +613,7 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     AutoGetCollection collection(opCtx(), nss, MODE_X);
     ASSERT(collection);
     auto spec =
-        BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
+        BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
                  << "fooIndex");
     createIndex(nss, spec);
 
@@ -1014,7 +1014,7 @@ TEST_F(TTLTest, TTLDoubleFitsIntoInt32) {
     client.createColl(nss);
     const double expireAfterSeconds = 4.5;
     const auto validSpec =
-        BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
+        BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
                  << "smallEnough"
                  << "expireAfterSeconds" << expireAfterSeconds);
     createIndex(nss, validSpec);
@@ -1044,7 +1044,7 @@ TEST_F(TTLTest, TTLMinDoubleFitsIntoInt32) {
     client.createColl(nss);
     const double expireAfterSeconds = std::numeric_limits<double>::min();
     const auto validSpec =
-        BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
+        BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
                  << "minDoubleExpiry"
                  << "expireAfterSeconds" << expireAfterSeconds);
     createIndex(nss, validSpec);
@@ -1076,7 +1076,7 @@ TEST_F(TTLTest, TTLkExpireAfterSecondsForInactiveTTLIndexIsValid) {
     // very long time, but expiry set to the maximum int32 value is still valid for a TTL index.
     const auto expireAfterSeconds = index_key_validate::kExpireAfterSecondsForInactiveTTLIndex;
     const auto validSpec =
-        BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
+        BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
                  << "TTLExpiryForInactiveTTL"
                  << "expireAfterSeconds" << durationCount<Seconds>(expireAfterSeconds));
     createIndex(nss, validSpec);
@@ -1136,35 +1136,35 @@ protected:
 };
 
 TEST_F(SkipInvalidTTLTest, TTLMaxLongExpireAfterSeconds) {
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1)
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1)
                          << "name"
                          << "maxLongExpiry"
                          << "expireAfterSeconds" << LLONG_MAX));
 }
 
 TEST_F(SkipInvalidTTLTest, TTLMinLongExpireAfterSeconds) {
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1)
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1)
                          << "name"
                          << "minLongExpiry"
                          << "expireAfterSeconds" << LLONG_MIN));
 }
 
 TEST_F(SkipInvalidTTLTest, TTLBasicNegativeExpireAfterSeconds) {
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1)
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1)
                          << "name"
                          << "basicNegExpiry"
                          << "expireAfterSeconds" << -1));
 }
 
 TEST_F(SkipInvalidTTLTest, TTLMinInt32ExpireAfterSeconds) {
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1)
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1)
                          << "name"
                          << "minIntExpiry"
                          << "expireAfterSeconds" << std::numeric_limits<int32_t>::min()));
 }
 
 TEST_F(SkipInvalidTTLTest, TTLNonNumericExpireAfterSeconds) {
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1)
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1)
                          << "name"
                          << "nonNumericExpiry"
                          << "expireAfterSeconds"
@@ -1173,7 +1173,7 @@ TEST_F(SkipInvalidTTLTest, TTLNonNumericExpireAfterSeconds) {
 
 TEST_F(SkipInvalidTTLTest, TTLSpecialIndexType) {
     // An index not of type IndexType::INDEX_BTREE isn't permitted for TTL expiration.
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key"
                          << BSON("foo"
                                  << "hashed")
                          << "name"
@@ -1182,21 +1182,21 @@ TEST_F(SkipInvalidTTLTest, TTLSpecialIndexType) {
 }
 
 TEST_F(SkipInvalidTTLTest, TTLCompoundIndex) {
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key"
                          << BSON("foo" << 1 << "secondIdxKey" << 1) << "name"
                          << "compoundIndex"
                          << "expireAfterSeconds" << 10));
 }
 
 TEST_F(SkipInvalidTTLTest, TTLPosNan) {
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1)
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1)
                          << "name"
                          << "posNanExpiry"
                          << "expireAfterSeconds" << std::numeric_limits<double>::quiet_NaN()));
 }
 
 TEST_F(SkipInvalidTTLTest, TTLNegNan) {
-    runTestCase(BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1)
+    runTestCase(BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("foo" << 1)
                          << "name"
                          << "negNanExpiry"
                          << "expireAfterSeconds" << -std::numeric_limits<double>::quiet_NaN()));

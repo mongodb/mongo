@@ -79,8 +79,8 @@ public:
             collection = _database->createCollection(&_opCtx, nss());
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
-            auto indexSpec = BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
-                                      << "key" << BSON("a" << 1) << "name"
+            auto indexSpec = BSON("v" << static_cast<int>(IndexConfig::kLatestIndexVersion) << "key"
+                                      << BSON("a" << 1) << "name"
                                       << "a_1");
             uassertStatusOK(
                 indexCatalog->createIndexOnEmptyCollection(&_opCtx, collection, indexSpec));

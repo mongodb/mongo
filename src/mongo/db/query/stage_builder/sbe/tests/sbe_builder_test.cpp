@@ -307,7 +307,7 @@ protected:
 IndexEntry makeIndexEntry(BSONObj keyPattern) {
     return {keyPattern,
             IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             false /* multiKey */,
             {{}, {}} /* multiKeyPaths */,
             {} /* multikeyPathSet */,

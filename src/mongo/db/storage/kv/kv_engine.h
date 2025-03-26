@@ -44,7 +44,6 @@
 
 namespace mongo {
 
-class IndexDescriptor;
 class JournalListener;
 class OperationContext;
 class RecoveryUnit;
@@ -108,7 +107,7 @@ public:
         const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
-        const IndexDescriptor* desc) = 0;
+        const IndexConfig& config) = 0;
 
     /**
      * The create and drop methods on KVEngine are not transactional. Transactional semantics
@@ -196,7 +195,7 @@ public:
                                              const NamespaceString& nss,
                                              const CollectionOptions& collOptions,
                                              StringData ident,
-                                             const IndexDescriptor* desc) = 0;
+                                             const IndexConfig& config) = 0;
 
     /**
      * Similar to createSortedDataInterface but this imports from an existing table with the
@@ -259,7 +258,7 @@ public:
 
     virtual void alterIdentMetadata(RecoveryUnit&,
                                     StringData ident,
-                                    const IndexDescriptor* desc,
+                                    const IndexConfig& config,
                                     bool isForceUpdateMetadata) {}
 
     /**

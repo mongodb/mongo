@@ -515,7 +515,7 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
                                 << nss.toStringForErrorMsg() << " because collection "
                                 << nss.toStringForErrorMsg() << " does not exist.";
 
-        auto indexInfoObj = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
+        auto indexInfoObj = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key"
                                      << BSON("a" << 1) << "name" << indexName);
 
         WriteUnitOfWork wuow(opCtx);

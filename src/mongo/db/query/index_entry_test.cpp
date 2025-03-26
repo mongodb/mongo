@@ -48,7 +48,7 @@ IndexEntry makeIndexEntry(BSONObj keyPattern, MultikeyPaths multiKeyPaths) {
 
     return {keyPattern,
             IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             multiKey,
             multiKeyPaths,
             {},

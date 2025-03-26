@@ -99,7 +99,7 @@ protected:
 
         params.mainCollectionInfo.indexes.push_back({std::move(keyPattern),
                                                      IndexType::INDEX_WILDCARD,
-                                                     IndexDescriptor::kLatestIndexVersion,
+                                                     IndexConfig::kLatestIndexVersion,
                                                      isMultikey,
                                                      {},  // multikeyPaths
                                                      std::move(multikeyFieldRefs),

@@ -48,7 +48,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/journal_listener.h"
@@ -298,13 +297,13 @@ public:
                                      const NamespaceString& ns,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
-                                     const IndexDescriptor* desc) override;
+                                     const IndexConfig& config) override;
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
-        const IndexDescriptor* desc) override;
+        const IndexConfig& config) override;
 
     /**
      * panicOnCorruptWtMetadata - determines whether WT should panic or error upon corrupt metadata
@@ -341,7 +340,7 @@ public:
 
     void alterIdentMetadata(RecoveryUnit&,
                             StringData ident,
-                            const IndexDescriptor* desc,
+                            const IndexConfig& config,
                             bool isForceUpdateMetadata) override;
 
     Status alterMetadata(StringData uri, StringData config);

@@ -91,7 +91,7 @@ using namespace unittest;
 static const RecordId kMetadataId = record_id_helpers::reservedIdFor(
     record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long);
 
-static const int kIndexVersion = static_cast<int>(IndexDescriptor::kLatestIndexVersion);
+static const int kIndexVersion = static_cast<int>(IndexConfig::kLatestIndexVersion);
 static const NamespaceString kDefaultNSS =
     NamespaceString::createNamespaceString_forTest("wildcard_multikey_persistence.test");
 static const std::string kDefaultIndexName{"wildcard_multikey"};

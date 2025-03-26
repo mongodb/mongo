@@ -22,7 +22,6 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/concurrency:lock_manager",
-        "//src/mongo/db/query/query_stats",
     ],
 )
 
