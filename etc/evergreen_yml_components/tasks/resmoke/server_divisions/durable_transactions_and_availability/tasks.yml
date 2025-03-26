@@ -442,6 +442,7 @@ tasks:
 
   - <<: *gen_task_template
     name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
+    exec_timeout_secs: 5400 # Time out the task if it runs for more than 1.5 hours.
     tags:
       [
         "assigned_to_jira_team_server_repl",

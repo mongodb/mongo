@@ -1,10 +1,10 @@
 /**
  * findAndModify_update_queue.js
  *
- * A large number of documents are inserted during the workload setup. Each thread repeated updates
- * a document from the collection using the findAndModify command, and stores the _id field of that
- * document in another database. At the end of the workload, the contents of the other database are
- * checked for whether one thread updated the same document as another thread.
+ * A large number of documents are inserted during the workload setup. Each thread repeatedly
+ * updates a document from the collection using the findAndModify command, and stores the _id field
+ * of that document in another database. At the end of the workload, the contents of the other
+ * database are checked for whether one thread updated the same document as another thread.
  *
  * This workload was designed to reproduce an issue similar to SERVER-18304 for update operations
  * using the findAndModify command where the old version of the document is returned.

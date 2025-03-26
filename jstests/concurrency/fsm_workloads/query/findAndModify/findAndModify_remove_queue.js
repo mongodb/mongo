@@ -1,10 +1,10 @@
 /**
  * findAndModify_remove_queue.js
  *
- * A large number of documents are inserted during the workload setup. Each thread repeated removes
- * a document from the collection using the findAndModify command, and stores the _id field of that
- * document in another database. At the end of the workload, the contents of the other database are
- * checked for whether one thread removed the same document as another thread.
+ * A large number of documents are inserted during the workload setup. Each thread repeatedly
+ * removes a document from the collection using the findAndModify command, and stores the _id field
+ * of that document in another database. At the end of the workload, the contents of the other
+ * database are checked for whether one thread removed the same document as another thread.
  *
  * This workload was designed to reproduce SERVER-18304.
  *
@@ -104,14 +104,18 @@ export const $config = (function() {
         var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
         if (this.opName === 'removed') {
-            if (isMongod(db)) {
-                // Each findAndModify should be internally retried until it removes exactly one
-                // document. Since this.numDocs == this.iterations * this.threadCount, there should
-                // not be any documents remaining.
-                assert.eq(db[collName].find().itcount(),
-                          0,
-                          'Expected all documents to have been removed');
-            }
+            // Each findAndModify should be internally retried until it removes exactly one
+            // document. Since this.numDocs == this.iterations * this.threadCount, there should not
+            // be any documents remaining.
+            assert.eq(
+                db[collName].find().itcount(), 0, 'Expected all documents to have been removed');
+        } else if (this.opName === 'updated') {
+            // Each findAndModify should be internally retried until it updates exactly one
+            // document. Since this.numDocs == this.iterations * this.threadCount, there should not
+            // be any documents remaining with '{counter: 0}'.
+            assert.eq(db[collName].find({counter: 0}).itcount(),
+                      0,
+                      'Expected all documents to have been updated');
         }
 
         var docs = ownedDB[collName].find().toArray();
