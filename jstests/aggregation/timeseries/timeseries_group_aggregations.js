@@ -244,10 +244,8 @@ function stageRequirementsMatch(stage1, stage2) {
 
 function runAggregations(allowDiskUse, forceSpilling) {
     // Don't set the flags on classic because it's already considered correct.
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceSpilling
-    }));
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}));
     /*
      * Try all combinations of $project and $match stages followed by a $group or $count at the end.
      * To avoid running unrealistic queries, we'll check what fields a stage needs to run. For
@@ -293,4 +291,4 @@ function runAggregations(allowDiskUse, forceSpilling) {
                 forceSpilling=${forceSpilling}`);
 }
 
-runAggregations(false /*allowDiskUse*/, false /*forceSpilling*/);
+runAggregations(false /*allowDiskUse*/, "inDebug" /*increased Spilling*/);

@@ -49,6 +49,7 @@ public:
     QueryPlanRankerModeEnum getPlanRankerMode() const;
     SamplingConfidenceIntervalEnum getConfidenceInterval() const;
     SamplingCEMethodEnum getInternalQuerySamplingCEMethod() const;
+    SbeHashAggIncreasedSpillingModeEnum getSbeHashAggIncreasedSpillingMode() const;
 
     bool getSbeDisableGroupPushdownForOp() const;
     bool getSbeDisableLookupPushdownForOp() const;
@@ -75,6 +76,7 @@ private:
     QueryPlanRankerModeEnum _planRankerMode;
     SamplingConfidenceIntervalEnum _samplingConfidenceInterval;
     SamplingCEMethodEnum _samplingCEMethod;
+    SbeHashAggIncreasedSpillingModeEnum _sbeHashAggIncreasedSpillingMode;
     size_t _planEvaluationMaxResults;
     size_t _maxScansToExplodeValue;
     bool _sbeDisableGroupPushdownValue;

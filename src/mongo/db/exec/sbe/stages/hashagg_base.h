@@ -140,6 +140,7 @@ protected:
      */
     int64_t spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
     void spill(MemoryCheckData& mcd);
+    void spill();
     void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd);
 
     // Memory tracking and spilling to disk.
@@ -162,7 +163,7 @@ protected:
     std::unique_ptr<SpillingStore> _recordStore;
     std::unique_ptr<SeekableRecordCursor> _rsCursor;
 
-    // A monotically increasing counter used to ensure uniqueness of 'RecordId' values. When
+    // A monotonically increasing counter used to ensure uniqueness of 'RecordId' values. When
     // spilling, the key is encoding into the 'RecordId' of the '_recordStore'. Record ids must be
     // unique by definition, but we might end up spilling multiple partial aggregates for the same
     // key. We ensure uniqueness by appending a unique integer to the end of this key, which is

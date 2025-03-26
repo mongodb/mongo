@@ -505,12 +505,14 @@ public:
     GroupCounters(GroupCounters&) = delete;
     GroupCounters& operator=(const GroupCounters&) = delete;
 
-    void incrementGroupCountersPerSpilling(int64_t spills,
-                                           int64_t spilledBytes,
-                                           int64_t spilledRecords) {
+    void incrementPerSpilling(int64_t spills,
+                              int64_t spilledBytes,
+                              int64_t spilledRecords,
+                              int64_t spilledDataStorageSize) {
         groupSpills.incrementRelaxed(spills);
         groupSpilledBytes.incrementRelaxed(spilledBytes);
         groupSpilledRecords.incrementRelaxed(spilledRecords);
+        groupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
     }
 
     void incrementGroupCountersPerQuery(int64_t spilledDataStorageSize) {
@@ -519,7 +521,7 @@ public:
 
     // The total number of spills from group stages.
     Counter64& groupSpills = *MetricBuilder<Counter64>{"query.group.spills"};
-    // The total number of bytes spilled from group stages. The spilled stroage size after
+    // The total number of bytes spilled from group stages. The spilled storage size after
     // compression might be different from the bytes spilled.
     Counter64& groupSpilledBytes = *MetricBuilder<Counter64>{"query.group.spilledBytes"};
     // The number of records spilled.

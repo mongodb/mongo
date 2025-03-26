@@ -70,6 +70,7 @@ const expectedParamDefaults = {
     internalQueryCollectOptimizerMetrics: false,
     internalQueryDisablePlanCache: false,
     internalQueryFindCommandBatchSize: 101,
+    internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "inDebug"
 };
 
 function assertDefaultParameterValues() {
@@ -314,5 +315,10 @@ assertSetParameterFails("internalQueryFindCommandBatchSize", -1);
 assertSetParameterSucceeds("internalTextOrStageMaxMemoryBytes", 100 * 1024 * 1024);
 assertSetParameterFails("internalTextOrStageMaxMemoryBytes", 0);
 assertSetParameterFails("internalTextOrStageMaxMemoryBytes", -1);
+
+assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "never");
+assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "always");
+assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "inDebug");
+assertSetParameterFails("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "random");
 
 MongoRunner.stopMongod(conn);

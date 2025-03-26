@@ -270,7 +270,7 @@ void GroupProcessor::spill() {
 
     int64_t spilledBytes =
         _spillStats->bytesSpilled() - _stats.spillingStats.getSpilledDataStorageSize();
-    groupCounters.incrementGroupCountersPerSpilling(1 /* spills */, spilledBytes, _groups.size());
+    groupCounters.incrementPerSpilling(1 /* spills */, spilledBytes, _groups.size(), spilledBytes);
     _stats.spillingStats.updateSpillingStats(
         1, _memoryTracker.currentMemoryBytes(), _groups.size(), _spillStats->bytesSpilled());
 

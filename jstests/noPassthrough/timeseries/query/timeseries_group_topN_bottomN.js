@@ -191,10 +191,8 @@ groupStages.push({
 
 function runAggregations(allowDiskUse, forceSpilling) {
     // Don't set the flags on classic because it's already considered correct.
-    assert.commandWorked(bpDb.adminCommand({
-        setParameter: 1,
-        internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceSpilling
-    }));
+    assert.commandWorked(bpDb.adminCommand(
+        {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}));
     let pipe = 0;
     for (const groupStage of groupStages) {
         compareClassicAndBP([groupStage], allowDiskUse);
@@ -204,8 +202,8 @@ function runAggregations(allowDiskUse, forceSpilling) {
                 forceSpilling=${forceSpilling}`);
 }  // runAggregations
 
-// Run with different combinations of allowDiskUse and force spilling.
-runAggregations(false /* allowDiskUse */, false /* forceSpilling */);
+// Run with different combinations of allowDiskUse and increased spilling.
+runAggregations(false /* allowDiskUse */, "inDebug" /* increased spilling */);
 
 MongoRunner.stopMongod(classicConn);
 MongoRunner.stopMongod(bpConn);

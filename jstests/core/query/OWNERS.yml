@@ -15,3 +15,6 @@ filters:
   - "read_after_optime.js":
     approvers:
       - 10gen/server-replication
+  - "release_memory/*":
+    approvers:
+      - 10gen/query-execution

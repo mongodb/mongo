@@ -93,7 +93,7 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
 
     if (_allowDiskUse) {
         tassert(7039549,
-                "disk use enabled for HashAggStage but incorrect number of merging expresssions",
+                "disk use enabled for HashAggStage but incorrect number of merging expressions",
                 _aggs.size() == _mergingExprs.size());
     }
 }
@@ -349,6 +349,7 @@ void HashAggStage::open(bool reOpen) {
                 if (_forceIncreasedSpilling && !newKey) {
                     // If configured to spill more than usual, we spill after seeing the same key
                     // twice.
+                    _htIt = _ht->begin();
                     spill(memoryCheckData);
                 } else {
                     // Estimates how much memory is being used. If we estimate that the hash table
@@ -371,27 +372,12 @@ void HashAggStage::open(bool reOpen) {
         // store.
         if (_recordStore) {
             if (!_ht->empty()) {
+                _htIt = _ht->begin();
                 spill(memoryCheckData);
             }
 
-            auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
-            _specificStats.spillingStats.updateSpilledDataStorageSize(
-                _recordStore->rs()->storageSize(ru));
-            groupCounters.incrementGroupCountersPerQuery(
-                _specificStats.spillingStats.getSpilledDataStorageSize());
-
-            // Establish a cursor, positioned at the beginning of the record store.
-            _rsCursor = _recordStore->getCursor(_opCtx);
-
-            // Callers will be obtaining the results from the spill table, so set the
-            // 'SwitchAccessors' so that they refer to the rows recovered from the record store
-            // under the hood.
-            for (auto&& accessor : _outKeyAccessors) {
-                accessor->setIndex(1);
-            }
-            for (auto&& accessor : _outAggAccessors) {
-                accessor->setIndex(1);
-            }
+            // Data will be returned from disk.
+            switchToDisk();
         }
     }
 
@@ -488,19 +474,7 @@ PlanState HashAggStage::getNext() {
     }
 
     // We didn't spill. Obtain the next output row from the hash table.
-    if (_htIt == _ht->end()) {
-        // First invocation of getNext() after open().
-        if (!_seekKeysAccessors.empty()) {
-            _htIt = _ht->find(_seekKeys);
-        } else {
-            _htIt = _ht->begin();
-        }
-    } else if (!_seekKeysAccessors.empty()) {
-        // Subsequent invocation with seek keys. Return only 1 single row (if any).
-        _htIt = _ht->end();
-    } else {
-        ++_htIt;
-    }
+    setIterator();
 
     if (_htIt == _ht->end()) {
         // The hash table has been drained (and we never spilled to disk) so we're done.

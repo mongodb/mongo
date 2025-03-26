@@ -141,7 +141,7 @@ TimeseriesTest.run((insert) => {
     function runTests(allowDiskUse, forceIncreasedSpilling) {
         assert.commandWorked(db.adminCommand({
             setParameter: 1,
-            internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceIncreasedSpilling
+            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceIncreasedSpilling
         }));
         const dateUpperBound = new Date(datePrefix + 200);
         const dateLowerBound = new Date(datePrefix);
@@ -230,11 +230,11 @@ TimeseriesTest.run((insert) => {
     }
 
     // Run the tests with allowDiskUse=false.
-    runTests(false /* allowDiskUse */, false);
+    runTests(false /* allowDiskUse */, "inDebug");
 
     // Run the tests with allowDiskUse=true.
-    runTests(true /* allowDiskUse */, false);
+    runTests(true /* allowDiskUse */, "inDebug");
 
-    // Run the tests with allowDiskUse=true and force spilling.
-    runTests(true /* allowDiskUse */, true);
+    // Run the tests with allowDiskUse=true and increased spilling.
+    runTests(true /* allowDiskUse */, "always");
 });

@@ -133,6 +133,27 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+    void doForceSpill() final {
+        // If we've already spilled, then there is nothing else to do.
+        if (_recordStore) {
+            return;
+        }
+
+        // Check before advancing _htIt.
+        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Exceeded memory limit for $group, but didn't allow external spilling;"
+                " pass allowDiskUse:true to opt in",
+                _allowDiskUse);
+
+        setIterator();
+
+        spill();
+
+        switchToDisk();
+
+        doSaveState(true);
+    }
+
 private:
     /**
      * Given a 'record' from the record store and a 'collator', decodes it into a pair of
@@ -143,6 +164,40 @@ private:
         const Record& record, const CollatorInterface& collator);
 
     PlanState getNextSpilled();
+
+    // Set the in memory data iterator to the next record that should be returned.
+    void setIterator() {
+        // We didn't spill. Obtain the next output row from the hash table.
+        if (_htIt == _ht->end()) {
+            // First invocation of getNext() after open().
+            if (!_seekKeysAccessors.empty()) {
+                _htIt = _ht->find(_seekKeys);
+            } else {
+                _htIt = _ht->begin();
+            }
+        } else if (!_seekKeysAccessors.empty()) {
+            // Subsequent invocation with seek keys. Return only 1 single row (if any).
+            _htIt = _ht->end();
+        } else {
+            ++_htIt;
+        }
+    }
+
+    // The stage has spilled to disk. Results will be returned from there.
+    void switchToDisk() {
+        // Establish a cursor, positioned at the beginning of the record store.
+        _rsCursor = _recordStore->getCursor(_opCtx);
+
+        // Callers will be obtaining the results from the spill table, so set the
+        // 'SwitchAccessors' so that they refer to the rows recovered from the record store
+        // under the hood.
+        for (auto&& accessor : _outKeyAccessors) {
+            accessor->setIndex(1);
+        }
+        for (auto&& accessor : _outAggAccessors) {
+            accessor->setIndex(1);
+        }
+    }
 
     const value::SlotVector _gbs;
     const AggExprVector _aggs;

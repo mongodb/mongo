@@ -20,7 +20,7 @@ for (let i = 0; i < 1000; i++) {
 
 // Test that accumulators respect the collation when the group operation spills to disk.
 assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: true}));
+    {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "always"}));
 const caseInsensitive = {
     collation: {locale: "en_US", strength: 2}
 };

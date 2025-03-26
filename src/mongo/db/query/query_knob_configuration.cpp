@@ -58,6 +58,12 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
                             ->get<SamplingCEMethod>("internalQuerySamplingCEMethod")
                             ->_data.get();
 
+    _sbeHashAggIncreasedSpillingMode =
+        ServerParameterSet::getNodeParameterSet()
+            ->get<SbeHashAggIncreasedSpillingMode>(
+                "internalQuerySlotBasedExecutionHashAggIncreasedSpilling")
+            ->_data.get();
+
     _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
     _internalQuerySpillingMinAvailableDiskSpaceBytes =
@@ -79,6 +85,12 @@ SamplingConfidenceIntervalEnum QueryKnobConfiguration::getConfidenceInterval() c
 SamplingCEMethodEnum QueryKnobConfiguration::getInternalQuerySamplingCEMethod() const {
     return _samplingCEMethod;
 }
+
+SbeHashAggIncreasedSpillingModeEnum QueryKnobConfiguration::getSbeHashAggIncreasedSpillingMode()
+    const {
+    return _sbeHashAggIncreasedSpillingMode;
+}
+
 
 bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() const {
     return _sbeDisableGroupPushdownValue;

@@ -461,6 +461,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/query/**/noop_writes.js @10gen/query-execution-write-exec @svc-auto-approve-bot
 /jstests/core/query/**/write_change_stream_pit_preimage.js @10gen/query-execution-change-streams @svc-auto-approve-bot
 /jstests/core/query/**/read_after_optime.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/core/query/release_memory/* @10gen/query-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/api/OWNERS.yml
 /jstests/core/query/api/**/* @10gen/query-optimization-parsers @svc-auto-approve-bot

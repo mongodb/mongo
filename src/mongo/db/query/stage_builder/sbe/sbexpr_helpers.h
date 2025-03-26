@@ -721,5 +721,20 @@ protected:
     SbSlotVector allocateOutSlotsForMergeStage(const std::vector<SbSlotVector>& slots);
 
     PlanNodeId _nodeId;
+
+private:
+    bool useIncreasedSpilling(bool allowDiskUse,
+                              SbeHashAggIncreasedSpillingModeEnum forceIncreasedSpillingMode) {
+        switch (forceIncreasedSpillingMode) {
+            case SbeHashAggIncreasedSpillingModeEnum::kAlways:
+                return true;
+            case SbeHashAggIncreasedSpillingModeEnum::kNever:
+                return false;
+            case SbeHashAggIncreasedSpillingModeEnum::kInDebug:
+                return kDebugBuild && allowDiskUse;
+            default:
+                tasserted(9915702, "Unknown forceIncreasedSpillingMode");
+        }
+    }
 };
 }  // namespace mongo::stage_builder

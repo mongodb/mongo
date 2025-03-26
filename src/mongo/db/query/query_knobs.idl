@@ -78,6 +78,14 @@ enums:
             k95: "95"
             k99: "99"
 
+    SbeHashAggIncreasedSpillingMode:
+        description: "Enum for supported increased spilling mode for HashAgg"
+        type: string
+        values:
+            kAlways: "always"
+            kNever: "never"
+            kInDebug: "inDebug"
+
 structs:
   InternalQueryCutoffForSampleFromRandomCursorStorage:
     description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
@@ -906,12 +914,16 @@ server_parameters:
         gt: 0
     redact: false
 
-  internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling:
-    description: "If true, the HashAgg stage will perform increased spilling."
+  internalQuerySlotBasedExecutionHashAggIncreasedSpilling:
+    description: "Define whether the HashAgg stage will perform increased spilling It supports 3 values: kAlways, kNever, kInDebug. 
+    When set to kAlways, increased spilling will be enabled. When set to kNever, increases spilling will be disabled. 
+    When set to kInDebug, increased spilling will be enabled only in debug builds."
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling"
-    cpp_vartype: AtomicWord<bool>
-    default: false
+    cpp_class:
+      name: SbeHashAggIncreasedSpillingMode
+      data: synchronized_value<SbeHashAggIncreasedSpillingModeEnum>
+    default:
+      expr: SbeHashAggIncreasedSpillingModeEnum::kInDebug
     redact: false
 
   internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:

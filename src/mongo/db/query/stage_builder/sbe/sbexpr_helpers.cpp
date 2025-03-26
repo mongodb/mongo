@@ -628,8 +628,11 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
     // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
     // logic for merging partial aggregates which otherwise would require large data sizes to
     // exercise.
-    const bool forceIncreasedSpilling = _state.allowDiskUse &&
-        (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
+
+    const bool forceIncreasedSpilling = useIncreasedSpilling(
+        _state.allowDiskUse,
+        _state.expCtx->getQueryKnobConfiguration().getSbeHashAggIncreasedSpillingMode());
+
 
     // For normal (non-block) HashAggStage, the group by "out" slots are the same as the incoming
     // group by slots.
@@ -729,8 +732,9 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     sbe::value::SlotVector accumulatorDataSlots = lower(accumulatorDataSbSlots);
     sbe::SlotExprPairVector mergingExprsVec = lower(mergingExprs);
 
-    const bool forceIncreasedSpilling = _state.allowDiskUse &&
-        (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
+    const bool forceIncreasedSpilling = useIncreasedSpilling(
+        _state.allowDiskUse,
+        _state.expCtx->getQueryKnobConfiguration().getSbeHashAggIncreasedSpillingMode());
 
     stage = sbe::makeS<sbe::BlockHashAggStage>(std::move(stage),
                                                std::move(groupBySlots),

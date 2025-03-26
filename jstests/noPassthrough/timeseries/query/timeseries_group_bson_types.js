@@ -184,10 +184,8 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
 }
 
 function runTestCases(allowDiskUse, forceSpilling) {
-    assert.commandWorked(bpDb.adminCommand({
-        setParameter: 1,
-        internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceSpilling
-    }));
+    assert.commandWorked(bpDb.adminCommand(
+        {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}));
     let testcases = blockProcessingTestCases(
         timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, false, false);
     // Filter out tests with known accepted differences between SBE and Classic.
@@ -196,10 +194,10 @@ function runTestCases(allowDiskUse, forceSpilling) {
     }
 }
 
-// Run with different combinations of allowDiskUse and forced spilling.
-runTestCases(false /*allowDiskUse*/, false /*forceSpilling*/);
-runTestCases(true /*allowDiskUse*/, false /*forceSpilling*/);
-runTestCases(true /*allowDiskUse*/, true /*forceSpilling*/);
+// Run with different combinations of allowDiskUse and increased spilling in debug builds.
+runTestCases(false /*allowDiskUse*/, "inDebug" /*increased Spilling*/);
+runTestCases(true /*allowDiskUse*/, "inDebug" /*increased Spilling*/);
+runTestCases(true /*allowDiskUse*/, "always" /*increased Spilling*/);
 
 MongoRunner.stopMongod(scalarConn);
 MongoRunner.stopMongod(bpConn);

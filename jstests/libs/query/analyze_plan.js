@@ -1242,3 +1242,18 @@ export function getIndexOfStageOnSingleNode(root, stageName) {
 export function getAllPlans(explain) {
     return [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)];
 }
+
+/**
+ * Given the root of an explain, checks whether it has a $mergeCursors stage.
+ */
+export function hasMergeCursors(explain) {
+    if (explain.hasOwnProperty("splitPipeline")) {
+        if (explain.splitPipeline && explain.splitPipeline.hasOwnProperty("mergerPart")) {
+            if (explain.splitPipeline.mergerPart[0] &&
+                explain.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors")) {
+                return true;
+            }
+        }
+    }
+    return false;
+}

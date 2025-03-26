@@ -94,6 +94,25 @@ public:
         bool shouldSpill = false,
         std::unique_ptr<mongo::CollatorInterfaceMock> optionalCollator = nullptr);
 
+    void runAndAssertForceSpill(mongo::sbe::PlanStage* stage,
+                                const SpillingStats& expectedSpillingStats) {
+        // Get ready to yield.
+        stage->saveState(true);
+
+        // Force spill.
+        stage->forceSpill();
+
+        // Check stats to make sure it spilled
+        auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+        ASSERT_TRUE(stats->usedDisk);
+        ASSERT_EQ(expectedSpillingStats.getSpills(), stats->spillingStats.getSpills());
+        ASSERT_EQ(expectedSpillingStats.getSpilledRecords(),
+                  stats->spillingStats.getSpilledRecords());
+
+        // Get ready to retrieve more records.
+        stage->restoreState(true);
+    }
+
 private:
     std::unique_ptr<Lock::GlobalLock> _globalLock;
 };
@@ -411,7 +430,7 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
 
     ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
     auto [res1Tag, res1Val] = resultAccessor->getViewOfValue();
-    // There are '2' occurences of '5' in the input.
+    // There are '2' occurrences of '5' in the input.
     assertValuesEqual(res1Tag, res1Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(2));
     ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
 
@@ -420,7 +439,7 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
     stage->open(true);
     ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
     auto [res2Tag, res2Val] = resultAccessor->getViewOfValue();
-    // There are '3' occurences of '6' in the input.
+    // There are '3' occurrences of '6' in the input.
     assertValuesEqual(res2Tag, res2Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(3));
     ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
 
@@ -429,7 +448,7 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
     stage->open(true);
     ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
     auto [res3Tag, res3Val] = resultAccessor->getViewOfValue();
-    // There are '4' occurences of '7' in the input.
+    // There are '4' occurrences of '7' in the input.
     assertValuesEqual(res3Tag, res3Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(4));
     ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
 
@@ -488,6 +507,81 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     ASSERT_FALSE(stats->usedDisk);
     ASSERT_EQ(0, stats->spillingStats.getSpills());
     ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
+
+    stage->close();
+}
+
+TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
+    auto ctx = makeCompileCtx();
+
+    // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
+    auto [inputTag, inputVal] =
+        stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+
+    // Build a HashAggStage, group by the scanSlot and compute a simple count.
+    auto countsSlot = generateSlotId();
+    auto spillSlot = generateSlotId();
+    auto stage = makeS<HashAggStage>(
+        std::move(scanStage),
+        makeSV(scanSlot),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1)))),
+        makeSV(),  // Seek slot
+        true,
+        boost::none,
+        true /* allowDiskUse */,
+        makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
+        nullptr /* yieldPolicy */,
+        kEmptyPlanNodeId);
+
+    // Prepare the tree and get the 'SlotAccessor' for the output slot.
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), countsSlot);
+
+    // Read in all of the results.
+    std::set<int64_t> results;
+    bool firstForceSpill = true;
+    bool secondForceSpill = true;
+    while (stage->getNext() == PlanState::ADVANCED) {
+        auto [resTag, resVal] = resultAccessor->getViewOfValue();
+        ASSERT_EQ(value::TypeTags::NumberInt64, resTag);
+        ASSERT_TRUE(results.insert(value::bitcastFrom<int64_t>(resVal)).second);
+        if (firstForceSpill) {
+            // Make sure it has not spilled already.
+            auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+            ASSERT_FALSE(stats->usedDisk);
+            ASSERT_EQ(0, stats->spillingStats.getSpills());
+            ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
+
+            SpillingStats expectedSpillingStats;
+            expectedSpillingStats.incrementSpills();
+            // There are three records in total and one has been already consumed.
+            expectedSpillingStats.incrementSpilledRecords(2);
+            runAndAssertForceSpill(stage.get(), expectedSpillingStats);
+
+            firstForceSpill = false;
+        } else if (secondForceSpill) {
+            auto statsBeforeForceSpill =
+                static_cast<const HashAggStats*>(stage->getSpecificStats());
+            runAndAssertForceSpill(stage.get(), statsBeforeForceSpill->spillingStats);
+            secondForceSpill = false;
+        }
+    }
+
+    // Check that the results match the expected.
+    ASSERT_EQ(3, results.size());
+    ASSERT_EQ(1, results.count(2));  // 2 of "5"s
+    ASSERT_EQ(1, results.count(3));  // 3 of "6"s
+    ASSERT_EQ(1, results.count(4));  // 4 of "7"s
+
+    // Check that the spilling behavior matches the expected.
+    auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+    ASSERT_TRUE(stats->usedDisk);
+    ASSERT_EQ(1, stats->spillingStats.getSpills());
+    ASSERT_EQ(2, stats->spillingStats.getSpilledRecords());
 
     stage->close();
 }
@@ -914,6 +1008,185 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     // We expect each incoming value to result in a spill of a single record.
     ASSERT_EQ(stats->spillingStats.getSpills(), 9);
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 9);
+
+    stage->close();
+}
+
+TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
+    auto ctx = makeCompileCtx();
+
+    // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
+    auto [inputTag, inputVal] =
+        stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+
+    // Build a HashAggStage, group by the scanSlot and compute a simple count.
+    auto countsSlot = generateSlotId();
+    auto sumsSlot = generateSlotId();
+    auto spillSlot1 = generateSlotId();
+    auto spillSlot2 = generateSlotId();
+    auto stage = makeS<HashAggStage>(
+        std::move(scanStage),
+        makeSV(scanSlot),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1))),
+                          sumsSlot,
+                          nullptr,
+                          makeFunction("sum", makeE<EVariable>(scanSlot))),
+        makeSV(),  // Seek slot
+        true,
+        boost::none,
+        true /* allowDiskUse */,
+        makeSlotExprPairVec(spillSlot1,
+                            makeFunction("sum", makeVariable(spillSlot1)),
+                            spillSlot2,
+                            makeFunction("sum", makeVariable(spillSlot2))),
+        nullptr /* yieldPolicy */,
+        kEmptyPlanNodeId);
+
+    // Prepare the tree and get the 'SlotAccessor' for the output slot.
+    auto resultAccessors = prepareTree(ctx.get(), stage.get(), makeSV(countsSlot, sumsSlot));
+
+    // Read in all of the results.
+    std::set<std::pair<int64_t /*count*/, int32_t /*sum*/>> results;
+    bool firstForceSpill = true;
+    bool secondForceSpill = true;
+    while (stage->getNext() == PlanState::ADVANCED) {
+        auto [resCountTag, resCountVal] = resultAccessors[0]->getViewOfValue();
+        ASSERT_EQ(value::TypeTags::NumberInt64, resCountTag);
+
+        auto [resSumTag, resSumVal] = resultAccessors[1]->getViewOfValue();
+        ASSERT_EQ(value::TypeTags::NumberInt32, resSumTag);
+
+        ASSERT_TRUE(results
+                        .insert(std::make_pair(value::bitcastFrom<int64_t>(resCountVal),
+                                               value::bitcastFrom<int32_t>(resSumVal)))
+                        .second);
+
+        if (firstForceSpill) {
+            // Make sure it has not spilled already.
+            auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+            ASSERT_FALSE(stats->usedDisk);
+            ASSERT_EQ(0, stats->spillingStats.getSpills());
+            ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
+
+            SpillingStats expectedSpillingStats;
+            expectedSpillingStats.incrementSpills();
+            // There are three records in total and one has been already consumed.
+            expectedSpillingStats.incrementSpilledRecords(2);
+            runAndAssertForceSpill(stage.get(), expectedSpillingStats);
+
+            firstForceSpill = false;
+        } else if (secondForceSpill) {
+            auto statsBeforeForceSpill =
+                static_cast<const HashAggStats*>(stage->getSpecificStats());
+            runAndAssertForceSpill(stage.get(), statsBeforeForceSpill->spillingStats);
+            secondForceSpill = false;
+        }
+    }
+
+    // Check that the results match the expected.
+    ASSERT_EQ(3, results.size());
+    ASSERT_EQ(1, results.count(std::make_pair(2, 2 * 5)));  // 2 of "5"s
+    ASSERT_EQ(1, results.count(std::make_pair(3, 3 * 6)));  // 3 of "6"s
+    ASSERT_EQ(1, results.count(std::make_pair(4, 4 * 7)));  // 4 of "7"s
+
+    // Check that the spilling behavior matches the expected.
+    // Check that the spilling behavior matches the expected.
+    auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+    ASSERT_TRUE(stats->usedDisk);
+    ASSERT_EQ(1, stats->spillingStats.getSpills());
+    ASSERT_EQ(2, stats->spillingStats.getSpilledRecords());
+
+    stage->close();
+}
+
+TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
+    // We estimate the size of result row like {double, int64} at 59B. Set the memory threshold to
+    // 128B so that two rows fit in memory.
+    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
+        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
+    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(128);
+    ON_BLOCK_EXIT([&] {
+        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
+            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
+    });
+
+    auto ctx = makeCompileCtx();
+
+    // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
+    auto [inputTag, inputVal] =
+        stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+
+    // Build a HashAggStage, group by the scanSlot and compute a simple count.
+    auto countsSlot = generateSlotId();
+    auto sumsSlot = generateSlotId();
+    auto spillSlot1 = generateSlotId();
+    auto spillSlot2 = generateSlotId();
+    auto stage = makeS<HashAggStage>(
+        std::move(scanStage),
+        makeSV(scanSlot),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1))),
+                          sumsSlot,
+                          nullptr,
+                          makeFunction("sum", makeE<EVariable>(scanSlot))),
+        makeSV(),  // Seek slot
+        true,
+        boost::none,
+        true /* allowDiskUse */,
+        makeSlotExprPairVec(spillSlot1,
+                            makeFunction("sum", makeVariable(spillSlot1)),
+                            spillSlot2,
+                            makeFunction("sum", makeVariable(spillSlot2))),
+        nullptr /* yieldPolicy */,
+        kEmptyPlanNodeId);
+
+    // Prepare the tree and get the 'SlotAccessor' for the output slot.
+    auto resultAccessors = prepareTree(ctx.get(), stage.get(), makeSV(countsSlot, sumsSlot));
+
+    // Read in all of the results.
+    std::set<std::pair<int64_t /*count*/, int32_t /*sum*/>> results;
+    bool forceSpill = true;
+    while (stage->getNext() == PlanState::ADVANCED) {
+        auto [resCountTag, resCountVal] = resultAccessors[0]->getViewOfValue();
+        ASSERT_EQ(value::TypeTags::NumberInt64, resCountTag);
+
+        auto [resSumTag, resSumVal] = resultAccessors[1]->getViewOfValue();
+        ASSERT_EQ(value::TypeTags::NumberInt32, resSumTag);
+
+        ASSERT_TRUE(results
+                        .insert(std::make_pair(value::bitcastFrom<int64_t>(resCountVal),
+                                               value::bitcastFrom<int32_t>(resSumVal)))
+                        .second);
+
+        if (forceSpill) {
+            auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+            runAndAssertForceSpill(stage.get(), stats->spillingStats);
+            forceSpill = false;
+        }
+    }
+
+    // Check that the results match the expected.
+    ASSERT_EQ(3, results.size());
+    ASSERT_EQ(1, results.count(std::make_pair(2, 2 * 5)));  // 2 of "5"s
+    ASSERT_EQ(1, results.count(std::make_pair(3, 3 * 6)));  // 3 of "6"s
+    ASSERT_EQ(1, results.count(std::make_pair(4, 4 * 7)));  // 4 of "7"s
+
+    // Check that the spilling behavior matches the expected.
+    auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+    ASSERT_TRUE(stats->usedDisk);
+    ASSERT_EQ(stats->spillingStats.getSpills(), 3);
+    // The input has one run of two consecutive values, so we expect to spill as many records as
+    // there are input values minus one.
+    ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
     stage->close();
 }

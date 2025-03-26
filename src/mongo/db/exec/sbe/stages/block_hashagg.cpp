@@ -726,6 +726,7 @@ void BlockHashAggStage::open(bool reOpen) {
         if (!_ht->empty()) {
             if (_forceIncreasedSpilling) {
                 // Spill for every row that appears in the hash table.
+                _htIt = _ht->begin();
                 spill(memoryCheckData);
             } else {
                 // Estimates how much memory is being used. If we estimate that the hash table
@@ -748,14 +749,9 @@ void BlockHashAggStage::open(bool reOpen) {
     // store.
     if (_recordStore) {
         if (!_ht->empty()) {
+            _htIt = _ht->begin();
             spill(memoryCheckData);
         }
-
-        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
-        _specificStats.spillingStats.updateSpilledDataStorageSize(
-            _recordStore->rs()->storageSize(ru));
-        groupCounters.incrementGroupCountersPerQuery(
-            _specificStats.spillingStats.getSpilledDataStorageSize());
 
         // Establish a cursor, positioned at the beginning of the record store.
         _rsCursor = _recordStore->getCursor(_opCtx);

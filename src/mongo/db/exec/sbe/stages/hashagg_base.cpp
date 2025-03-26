@@ -43,6 +43,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_options.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 namespace sbe {
 
@@ -173,7 +175,20 @@ int64_t HashAggBaseStage<Derived>::spillRowToDisk(const value::MaterializedRow& 
 }
 
 template <class Derived>
-void HashAggBaseStage<Derived>::spill(MemoryCheckData& mcd) {
+void HashAggBaseStage<Derived>::spill() {
+    // The stage returns results using an iterator '_htIt' over the hashTable '_ht'. At any moment
+    // '_htIt' points to the record that should be returned in the next getNext() invocation. When
+    // we spill, we want to spill only the records in '_ht' that have not been already returned to
+    // the caller.
+    if (_htIt == _ht->end()) {
+        LOGV2_DEBUG(9915700,
+                    2,
+                    "All in memory data has been consumed. HashAgg stage has nothing to spill. "
+                    "Clearing memory.");
+        _ht->clear();
+        return;
+    }
+
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             "Exceeded memory limit for $group, but didn't allow external spilling;"
             " pass allowDiskUse:true to opt in",
@@ -183,26 +198,41 @@ void HashAggBaseStage<Derived>::spill(MemoryCheckData& mcd) {
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
         storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
-    // Since we flush the entire hash table to disk, we also clear any state related to estimating
-    // memory consumption.
-    mcd.reset();
-
     if (!_recordStore) {
         makeTemporaryRecordStore();
     }
 
     int64_t spilledBytes = 0;
     int64_t spilledRecords = 0;
-    for (auto&& it : *_ht) {
-        spilledBytes += spillRowToDisk(it.first, it.second);
+
+    // Spill only the records that have not been already consumed.
+    for (; _htIt != _ht->end(); ++_htIt) {
+        spilledBytes += spillRowToDisk(_htIt->first, _htIt->second);
         spilledRecords++;
     }
 
     _ht->clear();
 
+
+    auto storageSizeBeforeSpillUpdate =
+        static_cast<Derived*>(this)->getHashAggStats()->spillingStats.getSpilledDataStorageSize();
     static_cast<Derived*>(this)->getHashAggStats()->spillingStats.updateSpillingStats(
         1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
-    groupCounters.incrementGroupCountersPerSpilling(1 /* spills */, spilledBytes, spilledRecords);
+    auto storageSizeAfterSpillUpdate =
+        static_cast<Derived*>(this)->getHashAggStats()->spillingStats.getSpilledDataStorageSize();
+    groupCounters.incrementPerSpilling(1 /* spills */,
+                                       spilledBytes,
+                                       spilledRecords,
+                                       storageSizeAfterSpillUpdate - storageSizeBeforeSpillUpdate);
+}
+
+template <class Derived>
+void HashAggBaseStage<Derived>::spill(MemoryCheckData& mcd) {
+    spill();
+
+    // Since we flush the entire hash table to disk, we also clear any state related to estimating
+    // memory consumption.
+    mcd.reset();
 }
 
 // Checks memory usage. Ideally, we'd want to know the exact size of already accumulated data, but
@@ -225,15 +255,19 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
     const long long estimatedTotalSize = _ht->size() * estimatedRowSize;
 
     if (estimatedTotalSize >= _approxMemoryUseInBytesBeforeSpill) {
+        // It is safe to set this to the begining because spilling outside the releaseMemory only
+        // happens before any results have been consumed and every time data is spilled the _ht is
+        // cleared.
+        _htIt = _ht->begin();
         spill(mcd);
     } else {
         // Calculate the next memory checkpoint. We estimate it based on the prior growth of the
         // '_ht' and the remaining available memory. If 'estimatedGainPerChildAdvance' suggests that
         // the hash table is growing, then the checkpoint is estimated as some configurable
         // percentage of the number of additional input rows that we would have to process to
-        // consume the remaining memory. On the other hand, a value of 'estimtedGainPerChildAdvance'
-        // close to zero indicates a stable hash stable size, in which case we can delay the next
-        // check progressively.
+        // consume the remaining memory. On the other hand, a value of
+        // 'estimatedGainPerChildAdvance' close to zero indicates a stable hash stable size, in
+        // which case we can delay the next check progressively.
         const double estimatedGainPerChildAdvance =
             (static_cast<double>(estimatedTotalSize - mcd.lastEstimatedMemoryUsage) /
              mcd.memoryCheckpointCounter);
