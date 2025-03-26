@@ -59,7 +59,7 @@ public:
 
     BSONObj getById(const NamespaceString& nss, PrfBlock block);
 
-    uint64_t countDocuments(const NamespaceString& nss) final;
+    uint64_t countDocuments(const NamespaceString& nss);
 
     std::vector<std::vector<FLEEdgeCountInfo>> getTags(
         const NamespaceString& nss,

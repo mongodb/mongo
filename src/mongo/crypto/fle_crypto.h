@@ -199,13 +199,6 @@ public:
     virtual BSONObj getById(const NamespaceString& nss, BSONElement element) = 0;
 
     /**
-     * Count the documents in the collection.
-     *
-     * Throws if the collection is not found.
-     */
-    virtual uint64_t countDocuments(const NamespaceString& nss) = 0;
-
-    /**
      * Get the set of counts from ESC for a set of tags. Returns counts for these fields suitable
      * either for query or insert based on the type parameter.
      *

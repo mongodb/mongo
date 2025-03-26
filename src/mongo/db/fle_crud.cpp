@@ -1720,36 +1720,6 @@ BSONObj FLEQueryInterfaceImpl::getById(const NamespaceString& nss, BSONElement e
     }
 }
 
-uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
-    // Since count() does not work in a transaction, call count() by bypassing the transaction api
-    // Allow the thread to be killable. If interrupted, the call to runCommand will fail with the
-    // interruption.
-    auto client = _service->makeClient("SEP-int-fle-crud");
-
-    AlternativeClientRegion clientRegion(client);
-    auto opCtx = cc().makeOperationContext();
-    auto as = AuthorizationSession::get(cc());
-    as->grantInternalAuthorization();
-
-    CountCommandRequest ccr(nss);
-    auto opMsgRequest = ccr.serialize();
-
-    DBDirectClient directClient(opCtx.get());
-    auto uniqueReply = directClient.runCommand(opMsgRequest);
-
-    auto reply = uniqueReply->getCommandReply();
-
-    auto status = getStatusFromWriteCommandReply(reply);
-    uassertStatusOK(status);
-
-    int64_t signedDocCount = reply.getIntField("n"_sd);
-    if (signedDocCount < 0) {
-        signedDocCount = 0;
-    }
-
-    return static_cast<uint64_t>(signedDocCount);
-}
-
 QECountInfoQueryTypeEnum queryTypeTranslation(FLEQueryInterface::TagQueryType type) {
     switch (type) {
         case FLEQueryInterface::TagQueryType::kInsert:
@@ -2035,11 +2005,6 @@ BSONObj FLETagNoTXNQuery::getById(const NamespaceString& nss, BSONElement elemen
     invariant(false);
     return {};
 };
-
-uint64_t FLETagNoTXNQuery::countDocuments(const NamespaceString& nss) {
-    invariant(false);
-    return 0;
-}
 
 std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     const NamespaceString& nss,

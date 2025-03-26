@@ -320,8 +320,6 @@ public:
 
     BSONObj getById(const NamespaceString& nss, BSONElement element) final;
 
-    uint64_t countDocuments(const NamespaceString& nss) final;
-
     std::vector<std::vector<FLEEdgeCountInfo>> getTags(
         const NamespaceString& nss,
         const std::vector<std::vector<FLEEdgePrfBlock>>& escDerivedFromDataTokenAndCounter,
@@ -367,39 +365,6 @@ private:
 };
 
 /**
- * FLEStateCollectionReader using an FLEQueryInterface.
- */
-class FLEStateCollectionQueryInterfaceReader : public FLEStateCollectionReader {
-public:
-    FLEStateCollectionQueryInterfaceReader(FLEQueryInterface* iface, const NamespaceString& nss)
-        : _query(iface), _nss(nss) {}
-
-    uint64_t getDocumentCount() const override {
-        return _query->countDocuments(_nss);
-    }
-
-    BSONObj getById(PrfBlock block) const override {
-        BSONObjBuilder bob;
-        bob.appendBinData("_id"_sd, block.size(), BinDataType::BinDataGeneral, block.data());
-        auto docs = _query->findDocuments(_nss, bob.obj());
-        _stats.setRead(_stats.getRead() + 1);
-        if (docs.empty()) {
-            return {};
-        }
-        return std::move(docs[0]);
-    }
-
-    ECStats getStats() const override {
-        return _stats;
-    }
-
-private:
-    FLEQueryInterface* _query;
-    NamespaceString _nss;
-    mutable ECStats _stats;
-};
-
-/**
  * FLETagQueryInterface that does not use transaction_api.h to retrieve tags.
  */
 class FLETagNoTXNQuery : public FLETagQueryInterface {
@@ -407,8 +372,6 @@ public:
     FLETagNoTXNQuery(OperationContext* opCtx);
 
     BSONObj getById(const NamespaceString& nss, BSONElement element) final;
-
-    uint64_t countDocuments(const NamespaceString& nss) final;
 
     std::vector<std::vector<FLEEdgeCountInfo>> getTags(
         const NamespaceString& nss,
