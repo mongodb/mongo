@@ -393,16 +393,10 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
         if (swResult.getValue().getEffectiveStatus().isOK()) {
             return StatusWith<ClusterWriteWithoutShardKeyResponse>(
                 sharedBlock->clusterWriteResponse);
+        } else {
+            return StatusWith<ClusterWriteWithoutShardKeyResponse>(
+                swResult.getValue().getEffectiveStatus());
         }
-        if (!swResult.getValue().cmdStatus.isOK() && swResult.getValue().wcError.isValid(nullptr) &&
-            swResult.getValue().cmdStatus.code() != ErrorCodes::ErrorWithWriteConcernError) {
-            return Status{ErrorWithWriteConcernErrorInfo(swResult.getValue().cmdStatus,
-                                                         swResult.getValue().wcError),
-                          "Commit failure includes a write concern error"};
-        }
-
-        return StatusWith<ClusterWriteWithoutShardKeyResponse>(
-            swResult.getValue().getEffectiveStatus());
     } else {
         return StatusWith<ClusterWriteWithoutShardKeyResponse>(swResult.getStatus());
     }

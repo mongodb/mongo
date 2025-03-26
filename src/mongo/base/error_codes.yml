@@ -842,7 +842,6 @@ error_codes:
       code: 441,
       name: ErrorWithWriteConcernError,
       extra: ErrorWithWriteConcernErrorInfo,
-      categories: [InternalOnly],
     }
   - {code: 442, name: RetryMultiPlanning}
   - {
