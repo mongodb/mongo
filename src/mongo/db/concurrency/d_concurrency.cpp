@@ -29,8 +29,6 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
-#include <string>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -38,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
@@ -49,17 +46,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-
-Lock::ResourceMutex::ResourceMutex(std::string resourceLabel)
-    : _rid(ResourceCatalog::get().newResourceIdForMutex(std::move(resourceLabel))) {}
-
-bool Lock::ResourceMutex::isExclusivelyLocked(Locker* locker) {
-    return locker->isLockHeldForMode(_rid, MODE_X);
-}
-
-bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
-    return locker->isLockHeldForMode(_rid, MODE_IS);
-}
 
 Lock::ResourceLock::ResourceLock(ResourceLock&& other)
     : _opCtx(other._opCtx), _rid(std::move(other._rid)), _result(other._result) {

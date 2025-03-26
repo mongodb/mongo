@@ -39,7 +39,6 @@ mongo_cc_library(
     name = "lock_manager",
     srcs = [
         "cond_var_lock_grant_notification.cpp",
-        "d_concurrency.cpp",
         "fill_locker_info.cpp",
         "lock_manager.cpp",
         "lock_manager_defs.cpp",
@@ -50,7 +49,6 @@ mongo_cc_library(
     ],
     hdrs = [
         "cond_var_lock_grant_notification.h",
-        "d_concurrency.h",
         "fill_locker_info.h",
         "lock_manager.h",
         "lock_manager_defs.h",
@@ -138,7 +136,9 @@ mongo_cc_unit_test(
         "locker_test.cpp",
         "resource_catalog_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = [
+        "mongo_unittest_second_group",
+    ],
     deps = [
         ":exception_util",
         ":lock_manager",
@@ -161,6 +161,6 @@ mongo_cc_benchmark(
     ],
     deps = [
         ":lock_manager",
-        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context",
     ],
 )

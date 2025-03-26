@@ -475,7 +475,6 @@ mongo_cc_unit_test(
         ":jwt",
         "//src/mongo:base",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/net:openssl_init",
     ],
@@ -491,6 +490,5 @@ mongo_cc_benchmark(
         ":fle_crypto",
         ":sha_block",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/concurrency:lock_manager",
     ],
 )

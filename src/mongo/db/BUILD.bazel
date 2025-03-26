@@ -652,10 +652,12 @@ mongo_cc_library(
     name = "shard_role_api_stor_ex",
     srcs = [
         "//src/mongo/db/catalog:collection.cpp",
+        "//src/mongo/db/concurrency:d_concurrency.cpp",
         "//src/mongo/db/concurrency:replication_state_transition_lock_guard.cpp",
     ],
     hdrs = [
         "//src/mongo/db/catalog:collection.h",
+        "//src/mongo/db/concurrency:d_concurrency.h",
         "//src/mongo/db/concurrency:replication_state_transition_lock_guard.h",
     ],
     deps = [
@@ -1036,6 +1038,7 @@ mongo_cc_library(
         ":profile_settings",
         ":server_base",  # TODO(SERVER-93876): Remove.
         ":server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api_stor_ex",
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/admission:ingress_admission_context",
         "//src/mongo/db/admission:ticketholder_manager",
@@ -1047,7 +1050,6 @@ mongo_cc_library(
         "//src/mongo/db/commands:create_command",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/db/query:common_query_enums_and_helpers",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
@@ -2811,7 +2813,6 @@ mongo_cc_library(
     deps = [
         ":dbdirectclient",
         ":rw_concern_d",
-        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/repl:repl_coordinator_interface",
     ],
 )
@@ -4396,7 +4397,7 @@ mongo_cc_benchmark(
     ],
     deps = [
         ":service_context_non_d",
-        ":shard_role_api",
+        ":shard_role_api_stor_ex",
     ],
 )
 

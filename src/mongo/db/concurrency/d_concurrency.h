@@ -32,7 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <string>
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
@@ -46,30 +45,9 @@ namespace mongo {
 
 class Lock {
 public:
-    /**
-     * For use as general mutex or readers/writers lock, outside the general multi-granularity
-     * model. A ResourceMutex is not affected by yielding and two phase locking semantics inside
-     * WUOWs. Lock with ResourceLock, SharedLock or ExclusiveLock. Uses same fairness as other
-     * LockManager locks.
-     */
-    class ResourceMutex {
-    public:
-        ResourceMutex(std::string resourceLabel);
-
-        /**
-         * Each instantiation of this class allocates a new ResourceId.
-         */
-        ResourceId getRid() const {
-            return _rid;
-        }
-
-        bool isExclusivelyLocked(Locker* locker);
-
-        bool isAtLeastReadLocked(Locker* locker);
-
-    private:
-        const ResourceId _rid;
-    };
+    // TODO (SERVER-102774): Remove this aliasing by substituting all usages of Lock::ResourceMutex
+    // with ResourceMutex.
+    using ResourceMutex = mongo::ResourceMutex;
 
     /**
      * General purpose RAII wrapper for a resource managed by the lock manager

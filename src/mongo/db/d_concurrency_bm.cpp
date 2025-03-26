@@ -136,6 +136,22 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionExclusiveLock)(benchmark::Stat
     }
 }
 
+BENCHMARK_DEFINE_F(DConcurrencyTest, BM_SharedLock)(benchmark::State& state) {
+    static ResourceMutex resMutex("BM_SharedLock");
+
+    for (auto keepRunning : state) {
+        Lock::SharedLock lk(clients[state.thread_index].second.get(), resMutex);
+    }
+}
+
+BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ExclusiveLock)(benchmark::State& state) {
+    static ResourceMutex resMutex("BM_ExclusiveLock");
+
+    for (auto keepRunning : state) {
+        Lock::ExclusiveLock lk(clients[state.thread_index].second.get(), resMutex);
+    }
+}
+
 BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionIntentSharedLock)
     ->ThreadRange(1, kMaxPerfThreads);
 BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)
@@ -143,6 +159,9 @@ BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)
 
 BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionSharedLock)->ThreadRange(1, kMaxPerfThreads);
 BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionExclusiveLock)->ThreadRange(1, kMaxPerfThreads);
+
+BENCHMARK_REGISTER_F(DConcurrencyTest, BM_SharedLock)->ThreadRange(1, kMaxPerfThreads);
+BENCHMARK_REGISTER_F(DConcurrencyTest, BM_ExclusiveLock)->ThreadRange(1, kMaxPerfThreads);
 
 }  // namespace
 }  // namespace mongo

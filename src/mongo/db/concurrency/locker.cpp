@@ -33,6 +33,7 @@
 #include "mongo/db/admission/ticketholder_manager.h"
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/dump_lock_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
@@ -1254,6 +1255,17 @@ void reportGlobalLockingStats(SingleThreadedLockStats* outStats) {
 
 void resetGlobalLockStats() {
     globalStats.reset();
+}
+
+ResourceMutex::ResourceMutex(std::string resourceLabel)
+    : _rid(ResourceCatalog::get().newResourceIdForMutex(std::move(resourceLabel))) {}
+
+bool ResourceMutex::isExclusivelyLocked(Locker* locker) {
+    return locker->isLockHeldForMode(_rid, MODE_X);
+}
+
+bool ResourceMutex::isAtLeastReadLocked(Locker* locker) {
+    return locker->isLockHeldForMode(_rid, MODE_IS);
 }
 
 }  // namespace mongo

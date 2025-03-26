@@ -792,6 +792,32 @@ protected:
 };
 
 /**
+ * For use as general mutex or readers/writers lock, outside the general multi-granularity model. A
+ * ResourceMutex is not affected by yielding and two phase locking semantics inside WUOWs.
+ *
+ * Lock with ResourceLock, SharedLock or ExclusiveLock. Uses same fairness as other LockManager
+ * locks.
+ */
+class ResourceMutex {
+public:
+    ResourceMutex(std::string resourceLabel);
+
+    /**
+     * Each instantiation of this class allocates a new ResourceId.
+     */
+    ResourceId getRid() const {
+        return _rid;
+    }
+
+    bool isExclusivelyLocked(Locker* locker);
+
+    bool isAtLeastReadLocked(Locker* locker);
+
+private:
+    const ResourceId _rid;
+};
+
+/**
  *
  * NOTE FOR DEVELOPERS: ANY NEW USAGE OF THIS CLASS SHOULD BE ACCOMPANIED BY A TODO AND A
  * SERVER-XXXXX TICKET TO INVESTIGATE ITS SAFETY.

@@ -110,7 +110,6 @@ mongo_cc_unit_test(
         ":sdam_test_util",
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/client:replica_set_monitor_protocol_test_util",
-        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
     ],
 )

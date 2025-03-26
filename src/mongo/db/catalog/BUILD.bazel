@@ -119,7 +119,6 @@ mongo_cc_library(
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:shard_role_api_stor_ex",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/collection_crud",
-        "//src/mongo/db/concurrency:lock_manager",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:bson_collection_catalog_entry",

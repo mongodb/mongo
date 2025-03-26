@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
@@ -104,7 +103,7 @@ BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_Mutex)(benchmark::State& state
 }
 
 BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_SharedLock_Direct)(benchmark::State& state) {
-    static Lock::ResourceMutex resMutex("BM_LockUnlock_SharedLock_Direct");
+    static ResourceMutex resMutex("BM_LockUnlock_SharedLock_Direct");
 
     auto* lockManager = LockManager::get(getServiceContext());
     Locker locker(getServiceContext());
@@ -120,7 +119,7 @@ BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_SharedLock_Direct)(benchmark::
 }
 
 BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_SharedLock_Locker)(benchmark::State& state) {
-    static Lock::ResourceMutex resMutex("BM_LockUnlock_SharedLock_Locker");
+    static ResourceMutex resMutex("BM_LockUnlock_SharedLock_Locker");
 
     auto* opCtx = clients[state.thread_index].second.get();
     Locker locker(getServiceContext());
@@ -131,31 +130,12 @@ BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_SharedLock_Locker)(benchmark::
     }
 }
 
-BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_SharedLock)(benchmark::State& state) {
-    static Lock::ResourceMutex resMutex("BM_LockUnlock_SharedLock");
-
-    for (auto keepRunning : state) {
-        Lock::SharedLock lk(clients[state.thread_index].second.get(), resMutex);
-    }
-}
-
-BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_ExclusiveLock)(benchmark::State& state) {
-    static Lock::ResourceMutex resMutex("BM_LockUnlock_ExclusiveLock");
-
-    for (auto keepRunning : state) {
-        Lock::ExclusiveLock lk(clients[state.thread_index].second.get(), resMutex);
-    }
-}
-
 BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_Mutex)->ThreadRange(1, kMaxPerfThreads);
-
 BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_SharedLock_Direct)
     ->ThreadRange(1, kMaxPerfThreads);
 BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_SharedLock_Locker)
     ->ThreadRange(1, kMaxPerfThreads);
-BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_SharedLock)->ThreadRange(1, kMaxPerfThreads);
 
-BENCHMARK_REGISTER_F(LockManagerTest, BM_LockUnlock_ExclusiveLock)->ThreadRange(1, kMaxPerfThreads);
 
 }  // namespace
 }  // namespace mongo
