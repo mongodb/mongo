@@ -51,6 +51,7 @@ const auto kDefaultRetryabilityPredicate = [](const Status& status) {
         status == ErrorCodes::FailedToSatisfyReadPreference ||
         status.isA<ErrorCategory::CursorInvalidatedError>() || status == ErrorCodes::Interrupted ||
         status.isA<ErrorCategory::CancellationError>() ||
+        status.isA<ErrorCategory::ExceededTimeLimitError>() ||
         status.isA<ErrorCategory::NotPrimaryError>() ||
         status.isA<ErrorCategory::NetworkTimeoutError>();
 };
