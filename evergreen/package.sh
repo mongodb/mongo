@@ -12,6 +12,7 @@ valid_mongocryptd_variants=(
   "enterprise-amazon2"
   "enterprise-amazon2-arm64"
   "enterprise-amazon2-streams"
+  "enterprise-amazon2-streams-arm64"
   "enterprise-amazon2023"
   "enterprise-amazon2023-arm64"
   "enterprise-amazon2023-arm64-grav4"
