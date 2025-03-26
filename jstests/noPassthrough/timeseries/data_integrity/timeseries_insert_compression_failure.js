@@ -1,5 +1,5 @@
 /**
- * Tests that if time-series inserts fails due to bucket compression failure, those insert can be
+ * Tests that if time-series inserts fails due to bucket compression failure, those inserts can be
  * retried and will not try writing to the same corrupt bucket.
  *
  * @tags: [
@@ -11,6 +11,14 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 // Disable testing diagnostics because bucket compression failure results in a tripwire assertion.
 TestData.testingDiagnosticsEnabled = false;
+
+const corruptBucket = function(bucketsColl, bucketId) {
+    // Corrupt the bucket by adding an out-of-order index in the "a" column. This will make the
+    // bucket uncompressible.
+    let res = assert.commandWorked(
+        bucketsColl.updateOne({_id: bucketId}, {$set: {"data.a.0": 0, "control.min.a": 0}}));
+    assert.eq(res.modifiedCount, 1);
+};
 
 const runTest = function(ordered) {
     jsTestLog("Ordered: [" + ordered.toString() + "]");
@@ -26,7 +34,14 @@ const runTest = function(ordered) {
     assert.commandWorked(db.createCollection(
         collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-    const time = ISODate("2024-01-16T20:48:39.448Z");
+    const timestamps = [
+        ISODate("2024-01-16T20:48:39.448Z"),
+        ISODate("2024-01-16T20:48:40.448Z"),
+        ISODate("2024-01-16T20:48:41.448Z"),
+        ISODate("2024-01-16T20:48:42.448Z"),
+        ISODate("2024-01-16T20:48:43.448Z"),
+        ISODate("2024-01-16T20:48:44.448Z"),
+    ];
     const bucket = {
         _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
         control: {
@@ -38,7 +53,7 @@ const runTest = function(ordered) {
             },
             max: {
                 _id: ObjectId("65a6eba7e6d2e848e08c3751"),
-                [timeFieldName]: time,
+                [timeFieldName]: timestamps[0],
                 a: 1,
             },
         },
@@ -49,8 +64,8 @@ const runTest = function(ordered) {
                 1: ObjectId("65a6eba7e6d2e848e08c3751"),
             },
             [timeFieldName]: {
-                0: time,
-                1: time,
+                0: timestamps[0],
+                1: timestamps[0],
             },
             a: {
                 1: 1,
@@ -59,11 +74,7 @@ const runTest = function(ordered) {
     };
     assert.commandWorked(bucketsColl.insert(bucket));
 
-    // Corrupt the bucket by adding an out-of-order index in the "a" column. This will make the
-    // bucket uncompressible.
-    let res = assert.commandWorked(
-        bucketsColl.updateOne({_id: bucket._id}, {$set: {"data.a.0": 0, "control.min.a": 0}}));
-    assert.eq(res.modifiedCount, 1);
+    corruptBucket(bucketsColl, bucket._id);
 
     let stats = assert.commandWorked(coll.stats());
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "bucketCount"));
@@ -87,11 +98,7 @@ const runTest = function(ordered) {
     assert.eq(0,
               TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    // TODO SERVER-100913: Re-enable this check with the new expected counter value.
-    // Once the new write path is connected, the expected numBucketsQueried value will change
-    // because we will (correctly) increment the counter upon querying and reopening a bucket that
-    // is compressed.
-    // assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
+    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
@@ -101,16 +108,16 @@ const runTest = function(ordered) {
     };
 
     const docs = [
-        {[timeFieldName]: time, [metaFieldName]: 1, a: 2},  // Bucket 1
-        {[timeFieldName]: time, [metaFieldName]: 0, a: 2},  // Bucket 0 (corrupt)
-        {[timeFieldName]: time, [metaFieldName]: 2, a: 2},  // Bucket 2
-        {[timeFieldName]: time, [metaFieldName]: 1, a: 3},  // Bucket 1
-        {[timeFieldName]: time, [metaFieldName]: 0, a: 3},  // Bucket 0 (corrupt)
-        {[timeFieldName]: time, [metaFieldName]: 1, a: 4},  // Bucket 1
+        {[timeFieldName]: timestamps[0], [metaFieldName]: 1, a: 2},  // Bucket 1
+        {[timeFieldName]: timestamps[1], [metaFieldName]: 0, a: 2},  // Bucket 0 (corrupt)
+        {[timeFieldName]: timestamps[2], [metaFieldName]: 2, a: 2},  // Bucket 2
+        {[timeFieldName]: timestamps[3], [metaFieldName]: 1, a: 3},  // Bucket 1
+        {[timeFieldName]: timestamps[4], [metaFieldName]: 0, a: 3},  // Bucket 0 (corrupt)
+        {[timeFieldName]: timestamps[5], [metaFieldName]: 1, a: 4},  // Bucket 1
     ];
     assert.eq(coll.find().itcount(), 2);
 
-    res = insert(docs);
+    let res = insert(docs);
     assert.eq(res.ok, 1);
     assert.eq(res.n, 6);
     assert(res["writeErrors"] === undefined);
@@ -139,8 +146,7 @@ const runTest = function(ordered) {
     assert.eq(0,
               TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    // TODO SERVER-100913
-    // assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
+    assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
@@ -169,11 +175,10 @@ const runTest = function(ordered) {
     assert.eq(0,
               TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(0,
+    assert.eq(2,
               TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    // TODO SERVER-100913
-    // assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
+    assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
