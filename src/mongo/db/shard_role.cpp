@@ -927,6 +927,7 @@ CollectionAcquisitions acquireCollections(OperationContext* opCtx,
 
 CollectionAcquisitionMap makeAcquisitionMap(CollectionAcquisitions acquisitions) {
     CollectionAcquisitionMap map;
+    map.reserve(acquisitions.size());
     for (auto&& a : acquisitions) {
         map.emplace(a.nss(), std::move(a));
     }
@@ -935,6 +936,7 @@ CollectionAcquisitionMap makeAcquisitionMap(CollectionAcquisitions acquisitions)
 
 CollectionOrViewAcquisitionMap makeAcquisitionMap(CollectionOrViewAcquisitions acquisitions) {
     CollectionOrViewAcquisitionMap map;
+    map.reserve(acquisitions.size());
     for (auto&& a : acquisitions) {
         map.emplace(a.nss(), std::move(a));
     }
