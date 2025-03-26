@@ -2,6 +2,7 @@ import gzip
 import os
 import pathlib
 import platform
+import re
 import stat
 import sys
 from urllib.request import urlretrieve
@@ -12,7 +13,7 @@ mongo_path = pathlib.Path(__file__).parents[1]
 sys.path.append(str(mongo_path))
 from buildscripts.util.expansions import get_expansion
 
-DB_CONTRIB_TOOL_VERSION = "v1.0.0"
+DB_CONTRIB_TOOL_VERSION = "v1.0.1"
 RELEASE_URL = (
     f"https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/{DB_CONTRIB_TOOL_VERSION}/"
 )
@@ -27,6 +28,20 @@ def get_binary_name() -> str:
 
     if machine == "amd64" or machine == "x86_64":
         machine = "x64"
+
+    # On ppc64le RHEL, pyinstaller builds are not forward compatible (At least not from RHEL 8 -> 9),
+    # so we need to create and name each binary with the exact OS.
+    if machine == "ppc64le":
+        # Get the major version from the release string
+        # like '4.18.0-513.5.1.el8_9.ppc64le' -> major release 8
+        major_version_match = re.findall("el(\d+)", os.uname().release)
+        assert len(major_version_match) == 1
+        major_version = int(major_version_match[0])
+
+        # db-contrib-tool 1.0.1 is only released up to RHEL 9 on PPC64LE
+        major_version = min(major_version, 9)
+
+        operating_system = f"rhel{major_version}"
 
     binary_name = f"db-contrib-tool_{DB_CONTRIB_TOOL_VERSION}_{operating_system}_{machine}"
     if operating_system == "windows":
