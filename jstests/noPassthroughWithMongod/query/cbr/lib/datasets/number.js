@@ -1,6 +1,6 @@
-/*
-  A dataset containing mostly numbers of the same type
-*/
+/**
+ * A dataset containing mostly numbers of the same type
+ */
 
 export class NumberDataset {
     docs() {
@@ -53,9 +53,9 @@ export class NumberDataset {
             {a: {$lte: 50}},
 
             // $ne
-            // TODO(SERVER-99024): {a: {$ne: -1}},
+            {a: {$ne: -1}},
             {a: {$ne: 50}},
-            // TODO(SERVER-99024): {a: {$ne: 0}},
+            {a: {$ne: 0}},
             {a: {$ne: "no_such_value"}},
             {a: {$ne: ""}},
             {a: {$ne: null}},
@@ -82,7 +82,7 @@ export class NumberDataset {
 
             // Negation with $nor
             {$nor: [{a: 50}]},
-            // TODO(SERVER-99024): {$nor: [{a: -1}] },
+            {$nor: [{a: -1}]},
             {$nor: [{a: null}]},
             {$nor: [{a: {$gt: 90}}]},
 
