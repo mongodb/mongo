@@ -235,7 +235,10 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                     _result = ConfigsvrCreateDatabaseResponse(dbVersion.get());
                 }
                 _exitCriticalSection(opCtx, executor, token, false /* throwIfReasonDiffers */);
-                refreshDatabaseCache(opCtx, dbName, _doc.getPrimaryShard().get());
+                if (_doc.getAuthoritativeMetadataAccessLevel() ==
+                    AuthoritativeMetadataAccessLevelEnum::kNone) {
+                    refreshDatabaseCache(opCtx, dbName, _doc.getPrimaryShard().get());
+                }
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {

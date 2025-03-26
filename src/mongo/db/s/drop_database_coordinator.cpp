@@ -579,7 +579,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
-            {
+
+            if (_doc.getAuthoritativeMetadataAccessLevel() ==
+                AuthoritativeMetadataAccessLevelEnum::kNone) {
                 const auto primaryShardId = ShardingState::get(opCtx)->shardId();
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
                 participants.erase(
