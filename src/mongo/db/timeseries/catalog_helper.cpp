@@ -35,11 +35,29 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 
 namespace timeseries {
+
+namespace {
+
+constexpr size_t kMaxAcquisitionRetryAttempts = 5;
+
+
+CollectionOrViewAcquisition acquireCollectionOrViewWithLockFreeRead(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode) {
+    if (mode == LockMode::MODE_IS) {
+        return acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionReq);
+    }
+    return acquireCollectionOrView(opCtx, acquisitionReq, mode);
+}
+
+}  // namespace
 
 boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
                                                         const NamespaceString& nss,
@@ -114,6 +132,88 @@ TimeseriesLookupInfo lookupTimeseriesCollection(OperationContext* opCtx,
 
     // neither the received nss nor the buckets nss are existing timeseries collections
     return {false, false, nss};
+}
+
+std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode) {
+
+    tassert(10168010,
+            "Found unsupported view mode during buckets acquisition",
+            acquisitionReq.viewMode == AcquisitionPrerequisites::ViewMode::kMustBeCollection);
+
+    const auto& originNssOrUUID = acquisitionReq.nssOrUUID;
+    auto remainingAttempts = kMaxAcquisitionRetryAttempts;
+    while (remainingAttempts-- > 0) {
+        // Override view mode to allow acquisition on timeseries view
+        acquisitionReq.viewMode = AcquisitionPrerequisites::ViewMode::kCanBeView;
+
+        boost::optional<CollectionOrViewAcquisition> acq =
+            acquireCollectionOrViewWithLockFreeRead(opCtx, acquisitionReq, mode);
+        if (acq->isView()) {
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    fmt::format("Namespace {} is a view, not a collection",
+                                acq->nss().toStringForErrorMsg()),
+                    acq->getView().getViewDefinition().timeseries());
+
+            // modify acquisition request to target the buckets collection
+            auto bucketsNss = acq->getView().getViewDefinition().viewOn();
+            auto bucketsAcquisitionReq = CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, bucketsNss, acquisitionReq.operationType);
+
+            // Release the main acquisition before attempting acquisition on buckets collection.
+            // This is necessary to avoid deadlock with other code that perform acquisition in
+            // opposite order (e.g. dropCollection)
+            acq.reset();
+            auto bucketsAcq =
+                acquireCollectionOrViewWithLockFreeRead(opCtx, bucketsAcquisitionReq, mode);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    fmt::format("Timeseries buckets collection does not exist {}",
+                                bucketsAcquisitionReq.nssOrUUID.toStringForErrorMsg()),
+                    bucketsAcq.collectionExists());
+            return {CollectionAcquisition(std::move(bucketsAcq)), true};
+        }
+
+
+        // Even if the timeseries view does not exist we look directly for the legacy system buckets
+        // collection. This is to support writes when the timeseries view does not exists. For
+        // instance for direct writes on shards other than the DB primary shard.
+        if (!acq->collectionExists() && originNssOrUUID.isNamespaceString() &&
+            !originNssOrUUID.nss().isTimeseriesBucketsCollection()) {
+            auto bucketsNss = originNssOrUUID.nss().makeTimeseriesBucketsNamespace();
+            auto bucketsCollExists = static_cast<bool>(
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNss));
+            if (bucketsCollExists) {
+                auto bucketsAcquisitionReq = CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx, bucketsNss, acquisitionReq.operationType);
+
+                acq.reset();
+                auto bucketsAcq =
+                    acquireCollectionOrViewWithLockFreeRead(opCtx, bucketsAcquisitionReq, mode);
+                tassert(10168030,
+                        fmt::format("Found a view registered with system bucket namespace '{}'",
+                                    bucketsNss.toStringForErrorMsg()),
+                        !bucketsAcq.isView());
+                if (!bucketsAcq.collectionExists()) {
+                    LOGV2_DEBUG(10168031,
+                                1,
+                                "Detected drop of timeseries buckets collection during acquisition "
+                                "attempt. Retrying.",
+                                logAttrs(bucketsNss),
+                                "remainingAttempts"_attr = remainingAttempts);
+                    continue;
+                }
+                return {CollectionAcquisition(std::move(bucketsAcq)), true};
+            }
+        }
+
+        return {CollectionAcquisition(std::move(*acq)), false};
+    }
+
+    uasserted(ErrorCodes::ConflictingOperationInProgress,
+              fmt::format("Exhausted rety attempts while trying to acquire collection '{}'. Number "
+                          "attempts performed {}",
+                          originNssOrUUID.toStringForErrorMsg(),
+                          kMaxAcquisitionRetryAttempts));
 }
 
 }  // namespace timeseries

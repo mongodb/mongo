@@ -33,6 +33,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo {
@@ -44,6 +45,23 @@ class OperationContext;
  * Namespace for helper functions related to time-series collections.
  */
 namespace timeseries {
+
+/**
+ * This function is a wrapper of `acquireCollection`.
+ *
+ * It returns a pair where the first element is the resulting collection acquisition.
+ *
+ * The second element is a boolean indicating if the acquisition has been made after translating the
+ * namespace to the underlying timeseries system buckets collection. This boolean will be set to
+ * true only for existing legacy timeseries collection (view + buckets).
+ *
+ * MODE_IS acquisition requests are implicitly converted to `maybeLockFree`.
+ *
+ * TODO SERVER-101784 remove this function once 9.0 becomes last LTS. By then only viewless
+ * timeseries collection will exist.
+ */
+std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode);
 
 struct TimeseriesLookupInfo {
     // If the namespace refer to a timeseries collection

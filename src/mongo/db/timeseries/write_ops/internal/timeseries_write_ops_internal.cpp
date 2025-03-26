@@ -42,6 +42,7 @@
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
@@ -241,58 +242,11 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
         write_ops_exec::performUpdates(opCtx, op, OperationSource::kTimeseriesInsert), request);
 }
 
-// TODO SERVER-101784 remove this helper function once 9.0 becomes last LTS
-// By then we won't have system.buckets collection anymore, only viewless timeseries collection will
-// exists.
-CollectionAcquisition acquireBucketsCollection(OperationContext* opCtx,
-                                               CollectionAcquisitionRequest acquisitionReq,
-                                               LockMode mode) {
-    const auto& originNss = acquisitionReq.nssOrUUID.nss();
-
-    tassert(10168010,
-            "Found unsupported view mode during buckets acquisition",
-            acquisitionReq.viewMode == AcquisitionPrerequisites::ViewMode::kMustBeCollection);
-
-    // Override view mode to allow acquisition on timeseries view
-    acquisitionReq.viewMode = AcquisitionPrerequisites::ViewMode::kCanBeView;
-
-    boost::optional<CollectionOrViewAcquisition> acq =
-        acquireCollectionOrView(opCtx, acquisitionReq, mode);
-
-    boost::optional<NamespaceString> translatedBucketsNs;
-    if (acq->isView()) {
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                fmt::format("Namespace {} is a view, not a collection",
-                            acq->nss().toStringForErrorMsg()),
-                acq->getView().getViewDefinition().timeseries());
-
-        translatedBucketsNs = acq->getView().getViewDefinition().viewOn();
-    } else if (!acq->collectionExists() && !originNss.isTimeseriesBucketsCollection()) {
-        // Even if the timeseries view does not exist we look directly for the legacy system buckets
-        // collection. This is to support writes when the timeseries view does not exists. For
-        // instance for direct writes on shards other than the DB primary shard.
-        translatedBucketsNs = originNss.makeTimeseriesBucketsNamespace();
-    }
-
-    if (translatedBucketsNs) {
-        // Release the main acquisition before attempting acquisition on buckets collection.
-        // This is necessary to avoid deadlock with other code that perform acquisition in opposide
-        // order (e.g. dropCollection)
-        acq.reset();
-
-        // modify acquistion request to target the buckets collection
-        acquisitionReq.viewMode = AcquisitionPrerequisites::ViewMode::kMustBeCollection;
-        acquisitionReq.nssOrUUID = *translatedBucketsNs;
-        return acquireCollection(opCtx, acquisitionReq, mode);
-    }
-
-    return CollectionAcquisition(std::move(*acq));
-}
-
 CollectionAcquisition acquireAndValidateBucketsCollection(
     OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode) {
 
-    auto bucketsAcq = acquireBucketsCollection(opCtx, acquisitionReq, mode);
+    auto [bucketsAcq, _] =
+        timeseries::acquireCollectionWithBucketsLookup(opCtx, acquisitionReq, mode);
     timeseries::assertTimeseriesBucketsCollection(bucketsAcq.getCollectionPtr().get());
     return bucketsAcq;
 }

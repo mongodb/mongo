@@ -194,6 +194,7 @@ mongo_cc_library(
     deps = [
         ":timeseries_options",
         "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
         "//src/mongo/db/catalog:collection_catalog",
     ],
 )
