@@ -17,6 +17,7 @@ import {
     $config as $baseConfig
 } from
     "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_unsharded.js";
+import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.retryOnKilledSession = true;
@@ -44,18 +45,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         [$super.data.executionContextTypes.kClientTransaction]: false,
     };
 
+    // Threads only begin killing sessions once every thread has finished init(), where a thread
+    // will decrement killCountdownLatch.
+    $config.data.killCountdown = new CountDownLatch($config.threadCount);
+
     $config.data.runInternalTransaction = function runInternalTransaction(
         defaultDb, collName, executionCtxType, crudOp) {
         try {
             $super.data.runInternalTransaction.apply(this, arguments);
         } catch (e) {
-            if (e.code == ErrorCodes.Interrupted) {
-                // For the client retryable write case, interrupt errors should be handled by
-                // retry_on_killed_session.js.
-                assert.neq(executionCtxType, this.executionContextTypes.kClientRetryableWrite);
-                // For the client transaction case, interrupt errors should be handled by the
-                // withTxnAndAutoRetry wrapper.
-                assert.neq(executionCtxType, this.executionContextTypes.kClientTransaction);
+            if (KilledSessionUtil.hasKilledSessionError(e) ||
+                KilledSessionUtil.hasKilledSessionWCError(e)) {
                 return;
             }
             if (e.code == ErrorCodes.NoSuchTransaction) {
@@ -79,6 +79,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.killSession = function(db, collName) {
+        if ($config.data.killCountdown.getCount() > 0) {
+            return;
+        }
         return killSession(db, collName);
     };
 
@@ -99,6 +102,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                           .toArray();
 
         jsTest.log(`Current ops with transactions:\n${tojson(currOps)}`);
+    };
+
+    $config.states.init = function init(db, collName) {
+        $super.states.init.apply(this, arguments);
+        $config.data.killCountdown.countDown();
     };
 
     $config.transitions = {
