@@ -30,23 +30,61 @@
 #pragma once
 
 #include <variant>
+#include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/feature_compatibility_version_parser.h"
-#include "mongo/db/server_options.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/version_context.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
+class FeatureFlag {
+public:
+    ~FeatureFlag() = default;
+
+    /**
+     * Indicates whether runtime changes to the flag via the 'setParameter' command should be
+     * allowed.
+     */
+    virtual bool allowRuntimeToggle() const = 0;
+
+    /**
+     * Populate a BSON object with the flag's value and any other properties.
+     */
+    virtual void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const = 0;
+
+    /**
+     * Returns the boolean value representing the flag's user-configured value, which does not
+     * necessarily indicate whether the feature is enabled.
+     *
+     * Intended for use by 'FeatureFlagServerParameter' to implement client configuration of the
+     * flag. Do not use this interface to query the flag.
+     */
+    virtual bool getForServerParameter() const = 0;
+
+    /**
+     * Configure the flag according to a user-supplied bool value.
+     *
+     * Intended for use by 'FeatureFlagServerParameter' to implement client configuration of the
+     * flag. Do not use this interface to udpate the flag.
+     */
+    virtual void setForServerParameter(bool enabled) = 0;
+
+    /**
+     * Add the flag to any process-global registry that it belongs to.
+     *
+     * Intended for use by 'FeatureFlagServerParameter' during process intitialization.
+     */
+    virtual void registerFlag() {}
+};
 
 /**
  * BinaryCompatibleFeatureFlag is a simple boolean feature flag whose value is only set at startup.
  * Its value does not change at runtime, nor during FCV upgrade/downgrade.
  */
-class BinaryCompatibleFeatureFlag {
-    friend class FeatureFlagServerParameter;  // For set(...)
-
+class BinaryCompatibleFeatureFlag : public FeatureFlag {
 public:
     explicit BinaryCompatibleFeatureFlag(bool enabled) : _enabled(enabled) {}
 
@@ -58,11 +96,21 @@ public:
         return _enabled;
     }
 
-private:
-    void set(bool enabled) {
-        _enabled = enabled;
-    };
+    bool allowRuntimeToggle() const override {
+        return false;
+    }
 
+    void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const override;
+
+    bool getForServerParameter() const override {
+        return _enabled;
+    }
+
+    void setForServerParameter(bool enabled) override {
+        _enabled = enabled;
+    }
+
+private:
     bool _enabled;
 };
 
@@ -72,9 +120,7 @@ private:
  * threshold version and it is defined as enabled by default. It is not implicitly convertible to
  * bool to force all call sites to make a decision about what check to use.
  */
-class FCVGatedFeatureFlag {
-    friend class FeatureFlagServerParameter;  // For set(...)
-
+class FCVGatedFeatureFlag : public FeatureFlag {
 public:
     FCVGatedFeatureFlag(bool enabled,
                         StringData versionString,
@@ -142,15 +188,17 @@ public:
         multiversion::FeatureCompatibilityVersion targetFCV,
         multiversion::FeatureCompatibilityVersion originalFCV) const;
 
-    /**
-     * Return the version associated with this feature flag.
-     *
-     * Throws if feature is not enabled.
-     */
-    multiversion::FeatureCompatibilityVersion getVersion() const;
+    bool allowRuntimeToggle() const override {
+        return false;
+    }
 
-private:
-    void set(bool enabled);
+    void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const override;
+
+    bool getForServerParameter() const override {
+        return _enabled;
+    }
+
+    void setForServerParameter(bool enabled) override;
 
 private:
     bool _enabled;
@@ -224,4 +272,85 @@ private:
  */
 inline constexpr CheckableFeatureFlagRef kDoesNotRequireFeatureFlag;
 
+/**
+ * Describes where in the release cycle a feature is.
+ */
+enum class RolloutPhase {
+    // The feature is not ready for release and is disabled by default.
+    inDevelopment,
+
+    // The feature is ready to be released via the incremental rollout process but is still disabled
+    // by default.
+    rollout,
+
+    // The feature is enabled by default.
+    released,
+};
+
+class IncrementalRolloutFeatureFlag : public FeatureFlag {
+public:
+    static const std::vector<const IncrementalRolloutFeatureFlag*>& getAll();
+
+    IncrementalRolloutFeatureFlag(StringData flagName, RolloutPhase phase, bool value)
+        : _flagName(std::string{flagName}), _phase(phase), _value(value) {}
+
+    /**
+     * Returns true if the feature is currently enabled, false otherwise. Also increments the
+     * process-global counter tracking the total number of checks of this flag.
+     *
+     * NB: Unlike other feature flags, incremental rollout flags _can_ change their value at
+     * runtime. Callers should take care not to assume that repeated calls to this check will return
+     * the same value. Consider using an 'IncrementalFeatureContext' when querying the flag value.
+     */
+    bool checkEnabled();
+
+    /**
+     * Add a document to the 'flagStats' array of the form:
+     * {
+     *   "name": <string>,
+     *   "value": <bool>,
+     *   "falseChecks": <number>,
+     *   "trueChecks": <number>,
+     *   "numToggles": <number>,
+     * }
+     */
+    void appendFlagStats(BSONArrayBuilder& flagStats) const;
+
+    const std::string& getName() const {
+        return _flagName;
+    }
+
+    bool allowRuntimeToggle() const override {
+        return true;
+    }
+
+    void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const override;
+
+    bool getForServerParameter() const override {
+        return _value.loadRelaxed();
+    }
+
+    /**
+     * Set a new value for the flag and, if the new value is different from the previous value,
+     * increment the process-wide counter for how many times the flag was toggled.
+     */
+    void setForServerParameter(bool value) override;
+
+    void registerFlag() override {
+        registerFlag(this);
+    }
+
+private:
+    // Adds flag to the global list of flags returned by the 'getAll()' method. Only safe to call as
+    // part of process initialization.
+    static void registerFlag(IncrementalRolloutFeatureFlag* flag);
+
+    std::string _flagName;
+    RolloutPhase _phase;
+    Atomic<bool> _value;
+
+    Atomic<int64_t> _numFalseChecks;
+    Atomic<int64_t> _numTrueChecks;
+    Atomic<int64_t> _numToggles;
+};
 }  // namespace mongo

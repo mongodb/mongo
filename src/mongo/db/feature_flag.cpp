@@ -29,14 +29,32 @@
 
 #include "mongo/db/feature_flag.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
+void BinaryCompatibleFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const {
+    flagBuilder.append("value", _enabled);
+    if (_enabled) {
+        // (Generic FCV reference): Feature flag support.
+        flagBuilder.append("version",
+                           FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
+                               multiversion::GenericFCV::kLatest));
+    }
+    flagBuilder.append("shouldBeFCVGated", false);
 
-// (Generic FCV reference): feature flag support
+    if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isVersionInitialized()) {
+        flagBuilder.append("currentlyEnabled", _enabled);
+    }
+}
+
+// (Generic FCV reference): Feature flag support.
 FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled,
                                          StringData versionString,
                                          bool enableOnTransitionalFCV)
@@ -151,13 +169,23 @@ bool FCVGatedFeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
     return targetFCV >= _version && originalFCV < _version;
 }
 
-multiversion::FeatureCompatibilityVersion FCVGatedFeatureFlag::getVersion() const {
-    uassert(5111001, "Feature Flag is not enabled, cannot retrieve version", _enabled);
+void FCVGatedFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const {
+    flagBuilder.append("value", _enabled);
+    if (_enabled) {
+        flagBuilder.append(
+            "version",
+            FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(_version));
+    }
+    flagBuilder.append("shouldBeFCVGated", true);
 
-    return _version;
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized()) {
+        // TODO (SERVER-102076): Use VersionContext from opCtx instead of kVersionContextIgnored.
+        flagBuilder.append("currentlyEnabled", isEnabled(kVersionContextIgnored, fcvSnapshot));
+    }
 }
 
-void FCVGatedFeatureFlag::set(bool enabled) {
+void FCVGatedFeatureFlag::setForServerParameter(bool enabled) {
     _enabled = enabled;
 }
 
@@ -173,5 +201,59 @@ bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitia
 bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
     ServerGlobalParams::FCVSnapshot fcv) const {
     return isEnabledUseLatestFCVWhenUninitialized(kVersionContextIgnored, fcv);
+}
+
+namespace {
+std::vector<const IncrementalRolloutFeatureFlag*>& getMutableAllIncrementalRolloutFeatureFlags() {
+    static StaticImmortal<std::vector<const IncrementalRolloutFeatureFlag*>> flags;
+    return *flags;
+}
+}  // namespace
+
+const std::vector<const IncrementalRolloutFeatureFlag*>& IncrementalRolloutFeatureFlag::getAll() {
+    return getMutableAllIncrementalRolloutFeatureFlags();
+}
+
+bool IncrementalRolloutFeatureFlag::checkEnabled() {
+    auto checkResult = _value.load();
+    (checkResult ? _numTrueChecks : _numFalseChecks).addAndFetch(1);
+    return checkResult;
+}
+
+void IncrementalRolloutFeatureFlag::appendFlagStats(BSONArrayBuilder& flagStats) const {
+    BSONObjBuilder{flagStats.subobjStart()}
+        .append("name", _flagName)
+        .append("value", _value.loadRelaxed())
+        .append("falseChecks", static_cast<long long>(_numFalseChecks.loadRelaxed()))
+        .append("trueChecks", static_cast<long long>(_numTrueChecks.loadRelaxed()))
+        .append("numToggles", static_cast<long long>(_numToggles.loadRelaxed()));
+}
+
+void IncrementalRolloutFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const {
+    bool enabled = _value.loadRelaxed();
+    flagBuilder.append("value", enabled);
+    if (enabled) {
+        // (Generic FCV reference): Feature flag support.
+        flagBuilder.append("version",
+                           FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
+                               multiversion::GenericFCV::kLatest));
+    }
+    flagBuilder.append("shouldBeFCVGated", false);
+
+    if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isVersionInitialized()) {
+        flagBuilder.append("currentlyEnabled", enabled);
+    }
+}
+
+void IncrementalRolloutFeatureFlag::setForServerParameter(bool value) {
+    auto previousValue = _value.swap(value);
+
+    if (previousValue != value) {
+        _numToggles.addAndFetch(1);
+    }
+}
+
+void IncrementalRolloutFeatureFlag::registerFlag(IncrementalRolloutFeatureFlag* flag) {
+    getMutableAllIncrementalRolloutFeatureFlags().push_back(flag);
 }
 }  // namespace mongo

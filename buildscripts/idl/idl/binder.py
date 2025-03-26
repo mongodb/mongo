@@ -1641,26 +1641,30 @@ def _bind_feature_flag_phase(ctxt, param):
     return feature_flag_phase
 
 
+def _is_ifr_feature_flag_enabled_by_default(feature_flag_phase):
+    # type: (ast.FeatureFlagRolloutPhase) -> bool
+    return feature_flag_phase != ast.FeatureFlagRolloutPhase.IN_DEVELOPMENT
+
+
 def _bind_ifr_feature_flag_default(ctxt, param, feature_flag_phase):
     # type: (errors.ParserContext, syntax.FeatureFlag, ast.FeatureFlagRolloutPhase) -> ast.Expression
-    expr_for_default = (
-        syntax.Expression(param.default.file_name, param.default.line, param.default.column)
-        if param.default
-        else syntax.Expression(param.file_name, param.line, param.column)
-    )
 
     # The 'default' value for an IFR flag is determined by its IFR phase. The flag can optionally
     # specify a default value, but it must match the phase's default value.
     default_value = (
-        "true" if feature_flag_phase == ast.FeatureFlagRolloutPhase.RELEASED else "false"
+        "true" if _is_ifr_feature_flag_enabled_by_default(feature_flag_phase) else "false"
     )
-    if not param.default or param.default.literal == default_value:
-        expr_for_default.expr = default_value
-    else:
+    if param.default and param.default.literal != default_value:
         ctxt.add_invalid_feature_flag_default_value(
-            expr_for_default, str(feature_flag_phase), default_value
+            param.default, str(feature_flag_phase), default_value
         )
         return None
+
+    expr_for_default = syntax.Expression(param.file_name, param.line, param.column)
+    expr_for_default.expr = (
+        f'"{param.name}"_sd, RolloutPhase::'
+        f"{feature_flag_phase.to_camel_case_string()}, {default_value}"
+    )
 
     bound_expr = _bind_expression(expr_for_default)
     bound_expr.export = False
@@ -1907,6 +1911,18 @@ def _bind_config_option(ctxt, globals_spec, option):
             return None
 
     return node
+
+
+def is_feature_flag_enabled_by_default(feature_flag):
+    # type: (syntax.FeatureFlag) -> bool
+    """Determine if an idl.FeatureFlag should be enabled by default without validating its syntax"""
+
+    if feature_flag.incremental_rollout_phase:
+        return _is_ifr_feature_flag_enabled_by_default(
+            ast.FeatureFlagRolloutPhase.bind(feature_flag.incremental_rollout_phase)
+        )
+    else:
+        return feature_flag.default.literal == "true"
 
 
 def bind(parsed_spec):

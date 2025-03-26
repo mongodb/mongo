@@ -74,6 +74,18 @@ feature_flags:
       version: $ver_str(last_lts)
       shouldBeFCVGated: true
 
+    featureFlagInDevelopmentForTest:
+      description: "Incremental feature rollout flag"
+      cpp_varname: gFeatureFlagInDevelopmentForTest
+      incremental_rollout_phase: in_development
+      shouldBeFCVGated: false
+
+    featureFlagReleasedForTest:
+      description: "Incremental feature rollout flag in the 'released' phase"
+      cpp_varname: gFeatureFlagReleasedForTest
+      incremental_rollout_phase: released
+      shouldBeFCVGated: false
+
 server_parameters:
     spTestNeedsFeatureFlagToaster:
       description: "Server Parameter gated on featureFlagToaster"

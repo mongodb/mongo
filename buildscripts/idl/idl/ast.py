@@ -447,6 +447,15 @@ class FeatureFlagRolloutPhase(enum.Enum):
         }
         return bindings.get(self)
 
+    def to_camel_case_string(self):
+        bindings = {
+            FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT: "notForIncrementalRollout",
+            FeatureFlagRolloutPhase.IN_DEVELOPMENT: "inDevelopment",
+            FeatureFlagRolloutPhase.ROLLOUT: "rollout",
+            FeatureFlagRolloutPhase.RELEASED: "released",
+        }
+        return bindings.get(self)
+
 
 class ServerParameter(common.SourceLocation):
     """IDL ServerParameter setting."""

@@ -29,81 +29,34 @@
 
 
 #include <boost/optional/optional.hpp>
-#include <variant>
 
-#include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/feature_flag_server_parameter.h"
-#include "mongo/util/overloaded_visitor.h"
-#include "mongo/util/version/releases.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-FeatureFlagServerParameter::FeatureFlagServerParameter(StringData name,
-                                                       BinaryCompatibleFeatureFlag& storage)
-    : ServerParameter(name, ServerParameterType::kStartupOnly), _storage(&storage) {}
-
-FeatureFlagServerParameter::FeatureFlagServerParameter(StringData name,
-                                                       FCVGatedFeatureFlag& storage)
-    : ServerParameter(name, ServerParameterType::kStartupOnly), _storage(&storage) {}
+FeatureFlagServerParameter::FeatureFlagServerParameter(StringData name, FeatureFlag* flag)
+    : ServerParameter(name,
+                      flag->allowRuntimeToggle() ? ServerParameterType::kStartupAndRuntime
+                                                 : ServerParameterType::kStartupOnly),
+      _flag(flag) {}
 
 void FeatureFlagServerParameter::append(OperationContext* opCtx,
                                         BSONObjBuilder* b,
                                         StringData name,
                                         const boost::optional<TenantId>&) {
-    bool enabled =
-        visit(OverloadedVisitor{[](BinaryCompatibleFeatureFlag* impl) { return impl->isEnabled(); },
-                                [](FCVGatedFeatureFlag* impl) {
-                                    return impl->isEnabledAndIgnoreFCVUnsafe();
-                                }},
-              _storage);
-
-    {
-        auto sub = BSONObjBuilder(b->subobjStart(name));
-        sub.append("value"_sd, enabled);
-
-        if (enabled) {
-            auto version = visit(OverloadedVisitor{[](BinaryCompatibleFeatureFlag* impl) {
-                                                       // (Generic FCV reference): feature flag
-                                                       // support
-                                                       return multiversion::GenericFCV::kLatest;
-                                                   },
-                                                   [](FCVGatedFeatureFlag* impl) {
-                                                       return impl->getVersion();
-                                                   }},
-                                 _storage);
-            sub.append("version",
-                       FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(version));
-        }
-
-        sub.append("shouldBeFCVGated", std::holds_alternative<FCVGatedFeatureFlag*>(_storage));
-
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        if (fcvSnapshot.isVersionInitialized()) {
-            const bool currentlyEnabled =
-                visit(OverloadedVisitor{
-                          [](BinaryCompatibleFeatureFlag* impl) { return impl->isEnabled(); },
-                          [&](FCVGatedFeatureFlag* impl) {
-                              // TODO (SERVER-102076): Use VersionContext from opCtx.
-                              return impl->isEnabled(kVersionContextIgnored, fcvSnapshot);
-                          }},
-                      _storage);
-            sub.append("currentlyEnabled", currentlyEnabled);
-        }
-    }
+    BSONObjBuilder flagBuilder(b->subobjStart(name));
+    _flag->appendFlagValueAndMetadata(flagBuilder);
 }
 
 void FeatureFlagServerParameter::appendSupportingRoundtrip(OperationContext* opCtx,
                                                            BSONObjBuilder* b,
                                                            StringData name,
                                                            const boost::optional<TenantId>&) {
-    bool enabled =
-        visit(OverloadedVisitor{[](BinaryCompatibleFeatureFlag* impl) { return impl->isEnabled(); },
-                                [](FCVGatedFeatureFlag* impl) {
-                                    return impl->isEnabledAndIgnoreFCVUnsafe();
-                                }},
-              _storage);
-    b->append(name, enabled);
+    b->append(name, _flag->getForServerParameter());
 }
 
 Status FeatureFlagServerParameter::set(const BSONElement& newValueElement,
@@ -115,7 +68,11 @@ Status FeatureFlagServerParameter::set(const BSONElement& newValueElement,
                 str::stream() << "Failed setting " << name() << ": " << status.reason()};
     }
 
-    visit([&](auto&& impl) { impl->set(newValue); }, _storage);
+    try {
+        _flag->setForServerParameter(newValue);
+    } catch (DBException& e) {
+        return e.toStatus();
+    }
 
     return Status::OK();
 }
@@ -126,9 +83,16 @@ Status FeatureFlagServerParameter::setFromString(StringData str, const boost::op
         return swNewValue.getStatus();
     }
 
-    visit([&](auto&& impl) { impl->set(swNewValue.getValue()); }, _storage);
+    try {
+        _flag->setForServerParameter(swNewValue.getValue());
+    } catch (DBException& e) {
+        return e.toStatus();
+    }
 
     return Status::OK();
 }
 
+void FeatureFlagServerParameter::onRegistrationWithProcessGlobalParameterList() {
+    _flag->registerFlag();
+}
 }  // namespace mongo

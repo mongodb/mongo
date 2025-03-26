@@ -47,8 +47,7 @@ namespace mongo {
  */
 class FeatureFlagServerParameter : public ServerParameter {
 public:
-    FeatureFlagServerParameter(StringData name, BinaryCompatibleFeatureFlag& storage);
-    FeatureFlagServerParameter(StringData name, FCVGatedFeatureFlag& storage);
+    FeatureFlagServerParameter(StringData name, FeatureFlag* flag);
 
     /**
      * Encode the setting into BSON object.
@@ -84,8 +83,10 @@ public:
      */
     Status setFromString(StringData str, const boost::optional<TenantId>&) final;
 
+    void onRegistrationWithProcessGlobalParameterList() override;
+
 private:
-    std::variant<BinaryCompatibleFeatureFlag*, FCVGatedFeatureFlag*> _storage;
+    FeatureFlag* _flag;
 };
 
 }  // namespace mongo

@@ -41,7 +41,7 @@ import yaml
 sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../..")))
 
 from buildscripts.idl import lib
-from buildscripts.idl.idl import parser
+from buildscripts.idl.idl import binder, parser
 
 
 def get_all_feature_flags(idl_dirs: List[str] = None):
@@ -64,7 +64,9 @@ def get_all_feature_flags(idl_dirs: List[str] = None):
             with open(idl_path) as idl_file:
                 doc = parser.parse_file(idl_file, idl_path)
             for feature_flag in doc.spec.feature_flags:
-                all_flags[feature_flag.name] = feature_flag.default.literal
+                all_flags[feature_flag.name] = (
+                    "true" if binder.is_feature_flag_enabled_by_default(feature_flag) else "false"
+                )
 
     return all_flags
 

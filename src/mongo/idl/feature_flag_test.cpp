@@ -31,9 +31,11 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/feature_flag_test_gen.h"
@@ -82,6 +84,20 @@ void FeatureFlagTest::setUp() {
     Test::setUp();
 }
 
+boost::optional<multiversion::FeatureCompatibilityVersion> getFeatureFlagVersion(
+    const FeatureFlag& flag) {
+    BSONObjBuilder flagBuilder;
+    flag.appendFlagValueAndMetadata(flagBuilder);
+    BSONObj serializedFlag = flagBuilder.done();
+
+    auto version = serializedFlag["version"];
+    if (version.eoo()) {
+        return {};
+    }
+
+    return multiversion::parseVersionForFeatureFlags(version.checkAndGetStringData());
+}
+
 // Sanity check feature flags
 TEST(IDLFeatureFlag, Basic) {
     // false is set by "default" attribute in the IDL file.
@@ -93,24 +109,27 @@ TEST(IDLFeatureFlag, Basic) {
     ASSERT_NOT_OK(featureFlagToaster->setFromString("alpha", boost::none));
 
     // (Generic FCV reference): feature flag test
-    ASSERT(feature_flags::gFeatureFlagToaster.getVersion() == multiversion::GenericFCV::kLatest);
+    ASSERT(getFeatureFlagVersion(feature_flags::gFeatureFlagToaster) ==
+           multiversion::GenericFCV::kLatest);
 }
 
 // Verify getVersion works correctly when enabled and not enabled
 TEST_F(FeatureFlagTest, Version) {
     // (Generic FCV reference): feature flag test
-    ASSERT(feature_flags::gFeatureFlagBlender.getVersion() == multiversion::GenericFCV::kLatest);
+    ASSERT(getFeatureFlagVersion(feature_flags::gFeatureFlagBlender) ==
+           multiversion::GenericFCV::kLatest);
 
     // NOTE: if you are hitting this assertion, the version in feature_flag_test.idl may need to be
     // changed to match the current kLastLTS
     // (Generic FCV reference): feature flag test
-    ASSERT(feature_flags::gFeatureFlagSpoon.getVersion() == multiversion::GenericFCV::kLastLTS);
+    ASSERT(getFeatureFlagVersion(feature_flags::gFeatureFlagSpoon) ==
+           multiversion::GenericFCV::kLastLTS);
 
     ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == false);
     ASSERT_NOT_OK(_featureFlagBlender->setFromString("alpha", boost::none));
 
-    ASSERT_THROWS(feature_flags::gFeatureFlagBlender.getVersion(), AssertionException);
+    ASSERT(!getFeatureFlagVersion(feature_flags::gFeatureFlagBlender).has_value());
 }
 
 // Test feature flag server parameters are serialized correctly
@@ -437,6 +456,77 @@ TEST_F(FeatureFlagTest, TestFCVGatedWithTransitionOnTransitionalFCV) {
                                                     kDowngradingFromLatestToLastLTSFCVSnapshot));
 }
 
+BSONObj readStatsFromFlag(const IncrementalRolloutFeatureFlag& flag) {
+    BSONArrayBuilder flagStatsBuilder;
+    flag.appendFlagStats(flagStatsBuilder);
+    BSONArray statsArray(flagStatsBuilder.done());
 
+    ASSERT_EQ(statsArray.nFields(), 1);
+    return statsArray.firstElement().Obj().getOwned();
+}
+
+TEST(IDLFeatureFlag, IncrementalRolloutFeatureFlag) {
+    // Because it is in the "in_development" state, "featureFlagInDevelopmentForTest" should be
+    // disabled by default.
+    ASSERT(!feature_flags::gFeatureFlagInDevelopmentForTest.checkEnabled());
+
+    // Verify that enabling the flag succeeds.
+    auto* featureFlagInDevelopmentForTest = getServerParameter("featureFlagInDevelopmentForTest");
+    ASSERT_OK(featureFlagInDevelopmentForTest->setFromString("true", boost::none));
+    ASSERT(feature_flags::gFeatureFlagInDevelopmentForTest.checkEnabled());
+
+    // Enable the flag a second time.
+    ASSERT_OK(featureFlagInDevelopmentForTest->setFromString("true", boost::none));
+    ASSERT(feature_flags::gFeatureFlagInDevelopmentForTest.checkEnabled());
+
+    // Check the flag's stats, which should account for all three calls to 'checkEnabled()' but only
+    // one "toggle," because the second call to 'setFromString()' does not change the flag's value.
+    auto firstFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagInDevelopmentForTest);
+    ASSERT_BSONOBJ_EQ_UNORDERED(firstFlagStats,
+                                BSONObjBuilder{}
+                                    .append("name", "featureFlagInDevelopmentForTest")
+                                    .append("value", true)
+                                    .append("falseChecks", 1)
+                                    .append("trueChecks", 2)
+                                    .append("numToggles", 1)
+                                    .obj());
+
+    // Check the flag's stats again, to ensure that we did not alter their state by observing them.
+    // (I.e, 'appendFlagStats()' should not change the 'falseChecks' and 'trueChecks' values.)
+    auto secondFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagInDevelopmentForTest);
+    ASSERT_BSONOBJ_EQ_UNORDERED(firstFlagStats, secondFlagStats);
+}
+
+TEST(IDLFeatureFlag, ReleasedIncrementalRolloutFeatureFlag) {
+    // Because it is in the "released" state, "featureFlagReleasedForTest" should be enabled by
+    // default.
+    ASSERT(feature_flags::gFeatureFlagReleasedForTest.checkEnabled());
+
+    // Verify that enabling the flag succeeds but has no effect.
+    auto* featureFlagReleasedForTest = getServerParameter("featureFlagReleasedForTest");
+    ASSERT_OK(featureFlagReleasedForTest->setFromString("true", boost::none));
+    ASSERT(feature_flags::gFeatureFlagReleasedForTest.checkEnabled());
+
+    // Verify that disabling the flag succeeds.
+    ASSERT_OK(featureFlagReleasedForTest->setFromString("false", boost::none));
+    ASSERT(!feature_flags::gFeatureFlagReleasedForTest.checkEnabled());
+
+    // Check the flag's stats, which should account for all three calls to 'checkEnabled()' but only
+    // one "toggle," because the first call to 'setFromString()' does not change the flag's value.
+    auto firstFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagReleasedForTest);
+    ASSERT_BSONOBJ_EQ_UNORDERED(firstFlagStats,
+                                BSONObjBuilder{}
+                                    .append("name", "featureFlagReleasedForTest")
+                                    .append("value", false)
+                                    .append("falseChecks", 1)
+                                    .append("trueChecks", 2)
+                                    .append("numToggles", 1)
+                                    .obj());
+
+    // Check the flag's stats again, to ensure that we did not alter their state by observing them.
+    // (I.e, 'appendFlagStats()' should not change the 'falseChecks' and 'trueChecks' values.)
+    auto secondFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagReleasedForTest);
+    ASSERT_BSONOBJ_EQ_UNORDERED(firstFlagStats, secondFlagStats);
+}
 }  // namespace
 }  // namespace mongo

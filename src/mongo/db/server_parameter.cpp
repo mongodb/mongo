@@ -257,6 +257,7 @@ void ServerParameterSet::disableTestParameters() {
 }
 
 void registerServerParameter(std::unique_ptr<ServerParameter> p) {
+    p->onRegistrationWithProcessGlobalParameterList();
     auto spt = p->getServerParameterType();
     ServerParameterSet::getParameterSet(spt)->add(std::move(p));
 }

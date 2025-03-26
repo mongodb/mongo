@@ -290,6 +290,10 @@ public:
         _minFCV = minFCV;
     }
 
+    // Called during process initialization before the ServerParameter gets registered with the
+    // global ServerParameterSet singleton.
+    virtual void onRegistrationWithProcessGlobalParameterList() {}
+
 protected:
     virtual bool _isEnabledOnVersion(
         const multiversion::FeatureCompatibilityVersion& targetFCV) const;

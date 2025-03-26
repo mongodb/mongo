@@ -843,6 +843,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_servers",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:default_max_time_ms_cluster_parameter",
+        "//src/mongo/db:incremental_rollout_metrics",
         "//src/mongo/db:logical_time_metadata_hook",
         "//src/mongo/db/pipeline/process_interface:mongos_process_interface_factory",
         "//src/mongo/db/process_health:config_server_health_observer",

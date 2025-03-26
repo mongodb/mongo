@@ -3277,18 +3277,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_server_parameter_with_storage(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a single IDLServerParameterWithStorage."""
-        if param.feature_flag_phase == ast.FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT:
+        if param.feature_flag_phase is not None:
             self._writer.write_line(
                 common.template_args(
-                    "auto ret = std::make_unique<FeatureFlagServerParameter>(${name}, ${storage});",
-                    storage=param.cpp_varname,
-                    name=_encaps(param.name),
-                )
-            )
-        elif param.feature_flag_phase is not None:
-            self._writer.write_line(
-                common.template_args(
-                    "auto ret = std::make_unique<IncrementalRolloutFeatureFlagServerParameter>(${name}, ${storage});",
+                    "auto ret = std::make_unique<FeatureFlagServerParameter>(${name}, &${storage});",
                     storage=param.cpp_varname,
                     name=_encaps(param.name),
                 )
