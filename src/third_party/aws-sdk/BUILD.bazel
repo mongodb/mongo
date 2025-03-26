@@ -37,13 +37,15 @@ AWS_CRT_CPP_INCLUDE = select({
 
 mongo_cc_library(
     name = "aws-cjson",
-    srcs = glob([
+    srcs = [
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/cJSON.c",
-    ]),
-    hdrs = glob([
+    ],
+    hdrs = [
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/cJSON.h",
-    ]),
-    includes = ["dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external"],
+    ],
+    includes = [
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external",
+    ],
 )
 
 mongo_cc_library(
@@ -70,11 +72,12 @@ mongo_cc_library(
             "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/arch/generic/cpuid.c",
         ],
     }),
-    hdrs = glob([
+    hdrs = [
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/external/ittnotify.h",
+    ] + glob([
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/posix/*",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/*.h",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/*.inl",
-        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/external/ittnotify.h",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/private/*.h",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/private/*.inl",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/libcbor/*.h",
@@ -98,6 +101,8 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-macro-redefined",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -179,6 +184,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -260,6 +266,7 @@ mongo_cc_library(
         "-Wno-unknown-pragmas",
         "-DS2N_EXPORTS",
         "-include utils/s2n_prelude.h",
+        "-Wno-macro-redefined",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -326,6 +333,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -372,6 +380,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -406,15 +415,17 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "aws-c-io",
-    srcs = glob([
+    srcs = [
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/external/ittnotify.h",
+    ] + glob([
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/*.c",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/linux/*.c",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/posix/*.c",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/s2n/*.c",
     ]),
-    hdrs = glob([
+    hdrs = [
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/external/ittnotify.h",
+    ] + glob([
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include/aws/io/*.h",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include/aws/io/private/*.h",
         "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include/aws/io/private/*.h",
@@ -434,6 +445,8 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-macro-redefined",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -489,6 +502,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -541,6 +555,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -599,6 +614,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -663,6 +679,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -732,6 +749,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -788,6 +806,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
+        "-Wno-newline-eof",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -877,6 +896,7 @@ mongo_cc_library(
     copts = AWS_CRT_CPP_INCLUDES + [
         "-Wno-error",
         "-fvisibility-inlines-hidden",
+        "-Wno-newline-eof",
     ],
     local_defines = [
         "AWS_AUTH_USE_IMPORT_EXPORT",
@@ -966,7 +986,9 @@ mongo_cc_library(
         "dist/aws-sdk/src/aws-cpp-sdk-core/source/smithy/tracing/*.cpp",
         "dist/aws-sdk/src/aws-cpp-sdk-core/source/platform/linux-shared/*.cpp",
     ]),
-    hdrs = glob([
+    hdrs = [
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/external/tinyxml2/tinyxml2.h",
+    ] + glob([
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/auth/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/auth/signer/*.h",
@@ -999,7 +1021,6 @@ mongo_cc_library(
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/ratelimiter/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/stream/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/external/cjson/*.h",
-        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/external/tinyxml2/tinyxml2.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/client/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/client/impl/*.h",
@@ -1019,7 +1040,6 @@ mongo_cc_library(
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/signer/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/signer/built-in/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/interceptor/*.h",
-        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/interceptor/impl/*.h",
         "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/interceptor/impl/*.h",
     ]),
     copts = AWS_CPP_COPTS + [
