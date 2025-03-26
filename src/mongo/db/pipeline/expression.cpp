@@ -4931,8 +4931,8 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrEndsWith,
 
 ExpressionEncStrEndsWith::ExpressionEncStrEndsWith(ExpressionContext* const expCtx,
                                                    boost::intrusive_ptr<Expression> input,
-                                                   boost::intrusive_ptr<Expression> prefix)
-    : ExpressionEncTextSearch(expCtx, std::move(input), std::move(prefix)) {}
+                                                   boost::intrusive_ptr<Expression> suffix)
+    : ExpressionEncTextSearch(expCtx, std::move(input), std::move(suffix)) {}
 
 constexpr auto kEncStrEndsWith = "$encStrEndsWith"_sd;
 boost::intrusive_ptr<Expression> ExpressionEncStrEndsWith::parse(ExpressionContext* const expCtx,
@@ -4964,6 +4964,53 @@ const char* ExpressionEncStrEndsWith::getOpName() const {
 Value ExpressionEncStrEndsWith::evaluate(const Document& root, Variables* variables) const {
     uassert(10120900,
             "ExpressionEncStrEndsWith can't be evaluated without binary payload",
+            canBeEvaluated());
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+/* --------------------------------- encStrContains------------------------------------------- */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrContains,
+                                      ExpressionEncStrContains::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      gFeatureFlagQETextSearchPreview);
+
+ExpressionEncStrContains::ExpressionEncStrContains(ExpressionContext* const expCtx,
+                                                   boost::intrusive_ptr<Expression> input,
+                                                   boost::intrusive_ptr<Expression> substring)
+    : ExpressionEncTextSearch(expCtx, std::move(input), std::move(substring)) {}
+
+constexpr auto kEncStrContains = "$encStrContains"_sd;
+boost::intrusive_ptr<Expression> ExpressionEncStrContains::parse(ExpressionContext* const expCtx,
+                                                                 BSONElement expr,
+                                                                 const VariablesParseState& vps) {
+
+    IDLParserContext ctx(kEncStrContains);
+
+    auto fleEncStrContains = EncStrContainsStruct::parse(ctx, expr.Obj());
+
+    auto inputExpr =
+        ExpressionFieldPath::parse(expCtx, fleEncStrContains.getInput().toString(), vps);
+
+    auto substringExpr =
+        Expression::parseOperand(expCtx, fleEncStrContains.getSubstring().getElement(), vps);
+
+    return new ExpressionEncStrContains(expCtx, std::move(inputExpr), std::move(substringExpr));
+}
+
+Value ExpressionEncStrContains::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kEncStrContains,
+                           Document{{"input", _children[_kInput]->serialize(options)},
+                                    {"substring", _children[_kTextOperand]->serialize(options)}}}});
+}
+
+const char* ExpressionEncStrContains::getOpName() const {
+    return kEncStrContains.rawData();
+}
+
+Value ExpressionEncStrContains::evaluate(const Document& root, Variables* variables) const {
+    uassert(10208800,
+            "ExpressionEncStrContains can't be evaluated without binary payload",
             canBeEvaluated());
     return exec::expression::evaluate(*this, root, variables);
 }

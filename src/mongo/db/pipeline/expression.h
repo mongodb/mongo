@@ -4929,7 +4929,30 @@ class ExpressionEncStrEndsWith final : public ExpressionEncTextSearch {
 public:
     ExpressionEncStrEndsWith(ExpressionContext* expCtx,
                              boost::intrusive_ptr<Expression> input,
-                             boost::intrusive_ptr<Expression> prefix);
+                             boost::intrusive_ptr<Expression> suffix);
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+};
+
+class ExpressionEncStrContains final : public ExpressionEncTextSearch {
+public:
+    ExpressionEncStrContains(ExpressionContext* expCtx,
+                             boost::intrusive_ptr<Expression> input,
+                             boost::intrusive_ptr<Expression> substring);
 
     Value evaluate(const Document& root, Variables* variables) const final;
     Value serialize(const SerializationOptions& options = {}) const final;

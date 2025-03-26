@@ -177,6 +177,7 @@ class ExpressionInternalKeyStringValue;
 class ExpressionUUID;
 class ExpressionEncStrStartsWith;
 class ExpressionEncStrEndsWith;
+class ExpressionEncStrContains;
 
 class AccumulatorAvg;
 class AccumulatorFirstN;
@@ -271,6 +272,7 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFLEEqual>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionEncStrStartsWith>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionEncStrEndsWith>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionEncStrContains>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalRawSortKey>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMap>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMeta>) = 0;
@@ -471,6 +473,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionInternalFLEEqual*) override {}
     void visit(const ExpressionEncStrStartsWith*) override {}
     void visit(const ExpressionEncStrEndsWith*) override {}
+    void visit(const ExpressionEncStrContains*) override {}
     void visit(const ExpressionInternalRawSortKey*) override {}
     void visit(const ExpressionMap*) override {}
     void visit(const ExpressionMeta*) override {}

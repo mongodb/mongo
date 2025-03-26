@@ -83,3 +83,16 @@ structs:
             description: "Suffix expression"
             type: IDLAnyType
             cpp_name: suffix
+
+    EncStrContainsStruct:
+        description: "Struct for $encStrContains"
+        strict: true
+        fields:
+          input:
+            description: "Target field path expression"
+            type: string
+            cpp_name: input
+          substring:
+            description: "Substring expression"
+            type: IDLAnyType
+            cpp_name: substring

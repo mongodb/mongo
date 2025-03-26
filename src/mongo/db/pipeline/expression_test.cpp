@@ -2367,8 +2367,8 @@ TEST(ExpressionFLEEndsWithTest, ParseAssertConstraints) {
         auto exprBson = fromjson("{$encStrEndsWith: {input: \"$foo\", suffix:\"test\"}}");
         auto parsedExpr = ExpressionEncStrEndsWith::parse(&expCtx, exprBson.firstElement(), vps);
 
-        auto* startsWith = dynamic_cast<ExpressionEncStrEndsWith*>(parsedExpr.get());
-        ASSERT_NE(startsWith, nullptr);
+        auto* endsWith = dynamic_cast<ExpressionEncStrEndsWith*>(parsedExpr.get());
+        ASSERT_NE(endsWith, nullptr);
     }
 
     // Success with BinData suffix payload.
@@ -2433,6 +2433,147 @@ TEST(ExpressionFLEEndsWithTest, ParseBinDataPayloadRoundtrip) {
                 }
     }}
         }})");
+
+    ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
+}
+
+// This test fails since featureFlagQETextSearchPreview is disabled by default.
+// TODO SERVER-65769: Remove when feature flag is enabled by default.
+TEST(ExpressionFLEStrContainsTest, FeatureFlagDisabled) {
+
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    {
+        auto expr = fromjson("{$encStrContains: 12}");
+        ASSERT_THROWS_CODE(Parse::Object::parseObject(expr), DBException, 168);
+    }
+}
+
+TEST(ExpressionFLEStrContainsTest, ParseAssertConstraints) {
+
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrContains: 12}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrContains::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            10065);
+    }
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrContains: {input: {}}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrContains::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            14);
+    }
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrContains: {input: 2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrContains::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            14);
+    }
+
+    // Error, missing input field.
+    {
+        auto exprInvalidBson = fromjson("{$encStrContains: {substring: 2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrContains::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            40414);
+    }
+
+    // Error, input must be a field path expression.
+    {
+        auto exprInvalidBson = fromjson("{$encStrContains: {input: \"foo\", substring:\"test\"}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrContains::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            16873);
+    }
+
+    // Error, substring must be string or bindata.
+    {
+        auto exprInvalidBson = fromjson("{$encStrContains: {input: \"$foo\", substring:2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrContains::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            10111802);
+    }
+
+    // Success with string substring.
+    {
+        auto exprBson = fromjson("{$encStrContains: {input: \"$foo\", substring:\"test\"}}");
+        auto parsedExpr = ExpressionEncStrContains::parse(&expCtx, exprBson.firstElement(), vps);
+
+        auto* exprContains = dynamic_cast<ExpressionEncStrContains*>(parsedExpr.get());
+        ASSERT_NE(exprContains, nullptr);
+    }
+
+    // Success with BinData substring payload.
+    {
+        auto exprBson = fromjson(R"(
+            {$encStrContains: {
+                input: "$foo", 
+                substring: {
+                    "$binary" : {
+                        base64:
+                             "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                        subType: "6"
+                    }
+                }
+            }})");
+        auto parsedExpr = ExpressionEncStrContains::parse(&expCtx, exprBson.firstElement(), vps);
+
+        auto* contains = dynamic_cast<ExpressionEncStrContains*>(parsedExpr.get());
+        ASSERT_NE(contains, nullptr);
+    }
+}
+
+TEST(ExpressionFLEStrContainsTest, ParseStringPayloadRoundtrip) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto exprBson = fromjson("{$encStrContains: {input: \"$foo\", substring:\"test\"}}");
+
+    auto exprFle = ExpressionEncStrContains::parse(&expCtx, exprBson.firstElement(), vps);
+    auto value = exprFle->serialize();
+    auto roundTripExpr =
+        fromjson("{$encStrContains: {input: \"$foo\", substring: {$const:\"test\"}}}");
+
+    ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
+}
+
+TEST(ExpressionFLEStrContainsTest, ParseBinDataPayloadRoundtrip) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto exprBson = fromjson(R"(
+        {$encStrContains: {
+            input: "$foo", 
+            substring: {
+                "$binary" : {
+                    base64:
+                         "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    subType: "6"
+                }
+            }
+        }})");
+    auto exprFle = ExpressionEncStrContains::parse(&expCtx, exprBson.firstElement(), vps);
+    auto value = exprFle->serialize();
+
+    auto roundTripExpr = fromjson(R"(
+        {$encStrContains: {
+            input: "$foo", 
+            substring: {
+               "$const": {
+                "$binary" : {
+                    base64:
+                         "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    subType: "6"
+                }}}}})");
 
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
