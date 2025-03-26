@@ -70,7 +70,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"
-#include "mongo/db/s/shard_local_catalog_operations.h"
+#include "mongo/db/s/shard_catalog_operations.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern.h"
@@ -98,7 +98,7 @@
 namespace mongo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(skipShardLocalCatalogRecovery);
+MONGO_FAIL_POINT_DEFINE(skipShardCatalogRecovery);
 
 const StringData kShardingIndexCatalogEntriesFieldName = "indexes"_sd;
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
@@ -652,7 +652,7 @@ void ShardingRecoveryService::recoverStates(OperationContext* opCtx,
 
 void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
     Lock::GlobalWrite globalLock{opCtx};
-    LOGV2(9813601, "Recovering DatabaseShardingState from the shard-local catalog");
+    LOGV2(9813601, "Recovering DatabaseShardingState from the shard catalog");
 
     const auto allDatabases = DatabaseShardingState::getDatabaseNames(opCtx);
     for (const auto& dbName : allDatabases) {
@@ -660,7 +660,7 @@ void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
         scopedDss->clearAuthoritativeDbInfo(opCtx);
     }
 
-    const auto dssMetadataCursor = shard_local_catalog_operations::readAllDatabaseMetadata(opCtx);
+    const auto dssMetadataCursor = shard_catalog_operations::readAllDatabaseMetadata(opCtx);
     while (dssMetadataCursor->more()) {
         const auto dbInfo =
             DatabaseType::parse(IDLParserContext("DatabaseType"), dssMetadataCursor->next());
@@ -676,7 +676,7 @@ void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
 
     if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        MONGO_likely(!skipShardLocalCatalogRecovery.shouldFail())) {
+        MONGO_likely(!skipShardCatalogRecovery.shouldFail())) {
         // Has to be called on rollback too. Takes the global lock.
         _reloadShardingState(opCtx);
     }

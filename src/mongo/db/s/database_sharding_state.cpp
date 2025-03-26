@@ -283,7 +283,7 @@ void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseTyp
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // When the feature flag for authoritative database metadata is enabled, this should act as
         // a noop. Clearing and setting the database metadata is only managed by the recover from
-        // disk during startup/rollback or as part of a DDL commit to the shard-local catalog.
+        // disk during startup/rollback or as part of a DDL commit to the shard catalog.
         return;
     }
 
@@ -329,7 +329,7 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngo
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // When the feature flag for authoritative database metadata is enabled, this should act as
         // a noop. Clearing and setting the database metadata is only managed by the recover from
-        // disk during startup/rollback or as part of a DDL commit to the shard-local catalog.
+        // disk during startup/rollback or as part of a DDL commit to the shard catalog.
         return;
     }
 

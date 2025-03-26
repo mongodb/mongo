@@ -732,11 +732,11 @@ void MovePrimaryCoordinator::commitMetadataToShards(
     const CancellationToken& token) {
     const auto& sessionForDrop = getNewSession(opCtx);
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
-    sharding_ddl_util::commitDropDatabaseMetadataToShardLocalCatalog(
+    sharding_ddl_util::commitDropDatabaseMetadataToShardCatalog(
         opCtx, _dbName, thisShardId, sessionForDrop, executor, token);
 
     const auto& sessionForCreate = getNewSession(opCtx);
-    sharding_ddl_util::commitCreateDatabaseMetadataToShardLocalCatalog(
+    sharding_ddl_util::commitCreateDatabaseMetadataToShardCatalog(
         opCtx,
         {_dbName, _doc.getToShardId(), preCommitDbVersion},
         sessionForCreate,

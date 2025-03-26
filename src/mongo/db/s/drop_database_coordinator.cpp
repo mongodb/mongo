@@ -130,7 +130,7 @@ void removeDatabaseMetadataFromShard(OperationContext* opCtx,
                                      const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                      const CancellationToken& token) {
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
-    sharding_ddl_util::commitDropDatabaseMetadataToShardLocalCatalog(
+    sharding_ddl_util::commitDropDatabaseMetadataToShardCatalog(
         opCtx, dbName, thisShardId, osi, executor, token);
 }
 

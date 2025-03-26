@@ -318,9 +318,9 @@ protected:
     FailPointEnableBlock disableQueryAnalysisWriter{"disableQueryAnalysisWriter"};
     // Disable direct connection checks because this fixture doesn't set up the ShardingState
     FailPointEnableBlock _skipDirectConnectionChecks{"skipDirectConnectionChecks"};
-    // ShardLocalCatalog recovery uses a DBDirectClient which requires initialization of the
+    // ShardCatalog recovery uses a DBDirectClient which requires initialization of the
     // serviceEntryPoint.
-    FailPointEnableBlock skipShardLocalCatalogRecovery{"skipShardLocalCatalogRecovery"};
+    FailPointEnableBlock skipShardCatalogRecovery{"skipShardCatalogRecovery"};
 };
 
 

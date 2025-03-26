@@ -65,15 +65,19 @@ NSS_CONSTANT(kConfigCacheDatabasesNamespace, DatabaseName::kConfig, "cache.datab
 
 // Name for a shard's authoritative databases metadata collection, each document of which indicates
 // the state of a specific database.
-NSS_CONSTANT(kConfigShardDatabasesNamespace, DatabaseName::kConfig, "shard.databases"_sd)
+NSS_CONSTANT(kConfigShardCatalogDatabasesNamespace,
+             DatabaseName::kConfig,
+             "shard.catalog.databases"_sd)
 
 // Name for a shard's authoritative collections metadata collection, each document of which
 // indicates the state of a specific collection.
-NSS_CONSTANT(kConfigShardCollectionsNamespace, DatabaseName::kConfig, "shard.collections"_sd)
+NSS_CONSTANT(kConfigShardCatalogCollectionsNamespace,
+             DatabaseName::kConfig,
+             "shard.catalog.collections"_sd)
 
 // Name for a shard's authoritative chunks metadata collection, each document of which indicates
 // the state of a specific chunk.
-NSS_CONSTANT(kConfigShardChunksNamespace, DatabaseName::kConfig, "shard.chunks"_sd)
+NSS_CONSTANT(kConfigShardCatalogChunksNamespace, DatabaseName::kConfig, "shard.catalog.chunks"_sd)
 
 // Namespace for storing keys for signing and validating cluster times created by the cluster
 // that this node is in.

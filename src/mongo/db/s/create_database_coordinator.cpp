@@ -212,7 +212,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                 if (_doc.getAuthoritativeMetadataAccessLevel() >=
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                     const auto& session = getNewSession(opCtx);
-                    sharding_ddl_util::commitCreateDatabaseMetadataToShardLocalCatalog(
+                    sharding_ddl_util::commitCreateDatabaseMetadataToShardCatalog(
                         opCtx, db, session, executor, token);
                 }
 

@@ -171,7 +171,7 @@ private:
 
     /**
      * Called from onConsistentDataAvailable to recover the in-memory metadata information from the
-     * on-disk shard-local catalog. Runs on startup and on rollback.
+     * on-disk shard catalog. Runs on startup and on rollback.
      */
     void _reloadShardingState(OperationContext* opCtx);
 

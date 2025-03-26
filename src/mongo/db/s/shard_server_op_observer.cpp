@@ -59,9 +59,9 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/shard_catalog_operations.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/s/shard_local_catalog_operations.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_recovery_service.h"
@@ -968,8 +968,8 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(
                 "Updating database sharding in-memory state onCreateDatabaseMetadata",
                 "dbName"_attr = dbName);
 
-    // Step 1: Write to `config.shard.databases` to insert database metadata.
-    shard_local_catalog_operations::insertDatabaseMetadata(opCtx, dbMetadata);
+    // Step 1: Write to `config.shard.catalog.databases` to insert database metadata.
+    shard_catalog_operations::insertDatabaseMetadata(opCtx, dbMetadata);
 
     // Step 2: Update DSS in primary node.
     {
@@ -991,8 +991,8 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
                 "Updating database sharding in-memory state onDropDatabaseMetadata",
                 "dbName"_attr = dbName);
 
-    // Step 1: Remove database metadata from `config.shard.databases`.
-    shard_local_catalog_operations::deleteDatabaseMetadata(opCtx, dbName);
+    // Step 1: Remove database metadata from `config.shard.catalog.databases`.
+    shard_catalog_operations::deleteDatabaseMetadata(opCtx, dbName);
 
     // Step 2: Update DSS in primary node.
     {

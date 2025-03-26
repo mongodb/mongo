@@ -3,7 +3,7 @@
  * being a shardsvr and back to non shardsvr.
  * @tags: [
  *   requires_persistence,
- *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard-local catalog
+ *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
  *   incompatible_with_authoritative_shards,
  *   # This test is incompatible with 'config shard' as it creates a cluster with 0 shards in order
  *   # to be able to add shard with data on it (which is only allowed on the first shard).

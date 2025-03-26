@@ -17,19 +17,19 @@ function getChunksMetadataFromGlobalCatalog(uuid) {
     return st.s.getDB("config").chunks.find({uuid}).toArray();
 }
 
-// Helper: Validate that the shard-local collection metadata matches expected.
-function validateShardLocalCatalog(ns, shard, expectedCollMetadata) {
+// Helper: Validate that the collection metadata from the shard catalog matches expected.
+function validateCollectionMetadataFromShardCatalog(ns, shard, expectedCollMetadata) {
     const collMetadataFromShard =
-        shard.getDB("config").getCollection("shard.collections").findOne({_id: ns});
+        shard.getDB("config").getCollection("shard.catalog.collections").findOne({_id: ns});
     assert.eq(expectedCollMetadata,
               collMetadataFromShard,
               "Mismatch in collection metadata for namespace: " + ns);
 }
 
-// Helper: Validate that the shard-local chunks metadata matches expected.
-function validateShardLocalChunksCatalog(uuid, shard, expectedChunksMetadata) {
+// Helper: Validate that the chunks metadata from the shard catalog matches expected.
+function validateChunksFromShardCatalog(uuid, shard, expectedChunksMetadata) {
     const chunksMetadataFromShard =
-        shard.getDB("config").getCollection("shard.chunks").find({uuid}).toArray();
+        shard.getDB("config").getCollection("shard.catalog.chunks").find({uuid}).toArray();
 
     assert.eq(expectedChunksMetadata.length,
               chunksMetadataFromShard.length,
@@ -86,11 +86,11 @@ function validateShardLocalChunksCatalog(uuid, shard, expectedChunksMetadata) {
         {_shardsvrFetchCollMetadata: ns, writeConcern: {w: "majority"}}));
 
     // Validate collection metadata.
-    validateShardLocalCatalog(ns, st.shard0, globalCollMetadata);
+    validateCollectionMetadataFromShardCatalog(ns, st.shard0, globalCollMetadata);
 
     // Validate chunks metadata.
     const globalChunksMetadata = getChunksMetadataFromGlobalCatalog(collUUID);
-    validateShardLocalChunksCatalog(collUUID, st.shard0, globalChunksMetadata);
+    validateChunksFromShardCatalog(collUUID, st.shard0, globalChunksMetadata);
 }
 
 {
@@ -166,8 +166,8 @@ function validateShardLocalChunksCatalog(uuid, shard, expectedChunksMetadata) {
     // Validate metadata consistency.
     const globalChunksMetadata = getChunksMetadataFromGlobalCatalog(collUUID);
 
-    validateShardLocalCatalog(ns, st.shard0, globalCollMetadata);
-    validateShardLocalChunksCatalog(collUUID, st.shard0, globalChunksMetadata);
+    validateCollectionMetadataFromShardCatalog(ns, st.shard0, globalCollMetadata);
+    validateChunksFromShardCatalog(collUUID, st.shard0, globalChunksMetadata);
 }
 
 st.stop();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/shard_local_catalog_operations.h"
+#include "mongo/db/s/shard_catalog_operations.h"
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbdirectclient.h"
@@ -40,10 +40,10 @@
 
 namespace mongo {
 
-namespace shard_local_catalog_operations {
+namespace shard_catalog_operations {
 
 std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx) {
-    FindCommandRequest findOp(NamespaceString::kConfigShardDatabasesNamespace);
+    FindCommandRequest findOp(NamespaceString::kConfigShardCatalogDatabasesNamespace);
     DBDirectClient client(opCtx);
 
     auto cursor = client.find(std::move(findOp));
@@ -59,7 +59,7 @@ std::unique_ptr<DBClientCursor> readDatabaseMetadata(OperationContext* opCtx,
     const auto dbNameStr =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
 
-    FindCommandRequest findOp{NamespaceString::kConfigShardDatabasesNamespace};
+    FindCommandRequest findOp{NamespaceString::kConfigShardCatalogDatabasesNamespace};
     findOp.setFilter(BSON(DatabaseType::kDbNameFieldName << dbNameStr));
 
     auto cursor = client.find(std::move(findOp));
@@ -81,7 +81,7 @@ void insertDatabaseMetadata(OperationContext* opCtx, const DatabaseType& dbMetad
 
     auto coll = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString::kConfigShardDatabasesNamespace,
+        CollectionAcquisitionRequest(NamespaceString::kConfigShardCatalogDatabasesNamespace,
                                      AcquisitionPrerequisites::kPretendUnsharded,
                                      repl::ReadConcernArgs::kLocal,
                                      AcquisitionPrerequisites::kWrite),
@@ -111,7 +111,7 @@ void deleteDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName)
 
     auto coll = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString::kConfigShardDatabasesNamespace,
+        CollectionAcquisitionRequest(NamespaceString::kConfigShardCatalogDatabasesNamespace,
                                      AcquisitionPrerequisites::kPretendUnsharded,
                                      repl::ReadConcernArgs::kLocal,
                                      AcquisitionPrerequisites::kWrite),
@@ -120,7 +120,7 @@ void deleteDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName)
     // For a drop operation, this method is based on the assumption that previous database metadata
     // exists, which implies that the authoritative collection should also be present. If that
     // collection is not found, it indicates an inconsistency in the metadata. In other words, there
-    // is a database that was not registered in the shard-local catalog.
+    // is a database that was not registered in the shard catalog.
     invariant(coll.exists());
 
     deleteObjects(
@@ -129,6 +129,6 @@ void deleteDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName)
     wuow.commit();
 }
 
-}  // namespace shard_local_catalog_operations
+}  // namespace shard_catalog_operations
 
 }  // namespace mongo

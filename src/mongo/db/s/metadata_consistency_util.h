@@ -152,7 +152,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
 
 /**
  * Checks for inconsistencies in the database's metadata between the global catalog and the
- * shard-local catalog.
+ * shard catalog.
  *
  * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
  * there is no inconsistency, it returns an empty vector.

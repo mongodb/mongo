@@ -68,7 +68,7 @@ private:
     void _prepareDbsToClone(OperationContext* opCtx);
 
     /**
-     * Clones the metadata for all databases that were marked for cloning to the shard-local
+     * Clones the metadata for all databases that were marked for cloning to the shard
      * catalog. This function iterates through the list of databases and attempts to clone them
      * individually.
      */

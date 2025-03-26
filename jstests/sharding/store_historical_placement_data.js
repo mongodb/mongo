@@ -1,6 +1,6 @@
 /**
  * @tags: [
- *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard-local catalog
+ *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
  *   incompatible_with_authoritative_shards,
  * ]
  */

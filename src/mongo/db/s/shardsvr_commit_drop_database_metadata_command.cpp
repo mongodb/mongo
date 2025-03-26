@@ -60,7 +60,7 @@ public:
 
     std::string help() const override {
         return "Internal command. This command aims to commit a dropDatabase operation to the "
-               "shard-local catalog.";
+               "shard catalog.";
     }
 
     bool supportsRetryableWrite() const final {
@@ -97,12 +97,12 @@ public:
             }
 
             LOGV2(10105902,
-                  "About to commit dropDatabase metadata in the shard-local catalog",
+                  "About to commit dropDatabase metadata in the shard catalog",
                   "dbName"_attr = dbName);
 
             {
                 // Using the original operation context, the write operations to update the
-                // shard-local catalog would fail since retryable writes are not compatible with
+                // shard catalog would fail since retryable writes are not compatible with
                 // applying the WriteUnitOfWork as a transaction (kGroupForTransaction). A tactical
                 // solution is to use an alternative client as well as a new operation context.
 
@@ -125,7 +125,7 @@ public:
             }
 
             LOGV2(10105903,
-                  "Committed dropDatabase metadata in the shard-local catalog",
+                  "Committed dropDatabase metadata in the shard catalog",
                   "dbName"_attr = dbName);
 
             // Since no write that generated a retryable write oplog entry with this sessionId and

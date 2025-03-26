@@ -1,10 +1,10 @@
 /*
  * Test for validating the correct behaviour of the CloneAuthoritativeMetadata DDL. This test aims
- * to check that the database metadata is cloned from the global catalog to the shard-local catalog
+ * to check that the database metadata is cloned from the global catalog to the shard catalog
  * and cache correctly.
  *
  * NOTE: This test relies that there is no registration of authoritative database metadata in the
- * shard-local catalog initially, as it will test how the DDL works before implementing the full
+ * shard catalog initially, as it will test how the DDL works before implementing the full
  * upgrade procedure.
  *
  * @tags: [
@@ -22,12 +22,13 @@ function getDbMetadataFromGlobalCatalog(db) {
     return db.getSiblingDB('config').databases.findOne({_id: db.getName()});
 }
 
-function validateShardLocalCatalog(dbName, shard, expectedDbMetadata) {
-    const dbMetadataFromShard = shard.getDB('config').shard.databases.findOne({_id: dbName});
+function validateShardCatalog(dbName, shard, expectedDbMetadata) {
+    const dbMetadataFromShard =
+        shard.getDB('config').shard.catalog.databases.findOne({_id: dbName});
     assert.eq(expectedDbMetadata, dbMetadataFromShard);
 }
 
-function validateShardLocalCatalogCache(dbName, shard, expectedDbMetadata) {
+function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
     const dbMetadataFromShard = shard.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(dbMetadataFromShard);
 
@@ -69,17 +70,17 @@ function runCloningDDL(conn) {
     // Make sure the database metadata is installed on all nodes.
     st.awaitReplicationOnShards();
 
-    // Validate that db metadata in the shard-local catalog and cache matches the global catalog.
+    // Validate that db metadata in the shard catalog and cache matches the global catalog.
     let dbMetadataFromConfig = getDbMetadataFromGlobalCatalog(fooDb);
-    validateShardLocalCatalog(fooDbName, st.shard1, dbMetadataFromConfig);
+    validateShardCatalog(fooDbName, st.shard1, dbMetadataFromConfig);
     st.rs1.nodes.forEach(node => {
-        validateShardLocalCatalogCache(fooDbName, node, dbMetadataFromConfig);
+        validateShardCatalogCache(fooDbName, node, dbMetadataFromConfig);
     });
 
     dbMetadataFromConfig = getDbMetadataFromGlobalCatalog(barDb);
-    validateShardLocalCatalog(barDbName, st.shard1, dbMetadataFromConfig);
+    validateShardCatalog(barDbName, st.shard1, dbMetadataFromConfig);
     st.rs1.nodes.forEach(node => {
-        validateShardLocalCatalogCache(barDbName, node, dbMetadataFromConfig);
+        validateShardCatalogCache(barDbName, node, dbMetadataFromConfig);
     });
 }
 
@@ -97,9 +98,9 @@ function runCloningDDL(conn) {
     st.awaitReplicationOnShards();
 
     const dbMetadataFromConfig = getDbMetadataFromGlobalCatalog(st.s.getDB(dbName));
-    validateShardLocalCatalog(dbName, st.shard0, dbMetadataFromConfig);
+    validateShardCatalog(dbName, st.shard0, dbMetadataFromConfig);
     st.rs0.nodes.forEach(node => {
-        validateShardLocalCatalogCache(dbName, node, dbMetadataFromConfig);
+        validateShardCatalogCache(dbName, node, dbMetadataFromConfig);
     });
 }
 
@@ -131,9 +132,9 @@ function validateCloningDDLWithConcurrentOperation(dbName, op) {
 
     // Validate that in shard0 we haven't cloned anything.
     st.awaitReplicationOnShards();
-    validateShardLocalCatalog(dbName, st.shard0, null /* expectedDbMetadata */);
+    validateShardCatalog(dbName, st.shard0, null /* expectedDbMetadata */);
     st.rs0.nodes.forEach(node => {
-        validateShardLocalCatalogCache(dbName, node, null /* expectedDbMetadata */);
+        validateShardCatalogCache(dbName, node, null /* expectedDbMetadata */);
     });
 }
 

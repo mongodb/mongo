@@ -59,8 +59,8 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/shard_catalog_operations.h"
 #include "mongo/db/s/shard_key_index_util.h"
-#include "mongo/db/s/shard_local_catalog_operations.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
@@ -405,11 +405,11 @@ std::unique_ptr<DBClientCursor> _getCollectionChunksCursor(DBDirectClient* clien
         false /* useExhaust */));
 }
 
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
+std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCatalogCache(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const DatabaseVersion& dbVersionInGlobalCatalog,
-    const DatabaseVersion& dbVersionInShardLocalCatalog,
+    const DatabaseVersion& dbVersionInShardCatalog,
     const ShardId& primaryShard) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
@@ -420,75 +420,75 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLo
 
     if (!dbVersionInCache) {
         inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalogCache,
-            MissingDatabaseMetadataInShardLocalCatalogCacheDetails{
+            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalogCache,
+            MissingDatabaseMetadataInShardCatalogCacheDetails{
                 dbName, primaryShard, dbVersionInGlobalCatalog}));
     } else if (dbVersionInGlobalCatalog != *dbVersionInCache ||
-               dbVersionInShardLocalCatalog != *dbVersionInCache) {
+               dbVersionInShardCatalog != *dbVersionInCache) {
         inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,
-            InconsistentDatabaseVersionInShardLocalCatalogCacheDetails{dbName,
-                                                                       primaryShard,
-                                                                       dbVersionInGlobalCatalog,
-                                                                       dbVersionInShardLocalCatalog,
-                                                                       *dbVersionInCache}));
+            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalogCache,
+            InconsistentDatabaseVersionInShardCatalogCacheDetails{dbName,
+                                                                  primaryShard,
+                                                                  dbVersionInGlobalCatalog,
+                                                                  dbVersionInShardCatalog,
+                                                                  *dbVersionInCache}));
     }
 
     return inconsistencies;
 }
 
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalog(
+std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCatalog(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const DatabaseVersion& dbVersionInGlobalCatalog,
     const ShardId& primaryShard) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
-    auto cursor = shard_local_catalog_operations::readDatabaseMetadata(opCtx, dbName);
+    auto cursor = shard_catalog_operations::readDatabaseMetadata(opCtx, dbName);
 
     if (!cursor->more()) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalog,
-            MissingDatabaseMetadataInShardLocalCatalogDetails{
-                dbName, primaryShard, dbVersionInGlobalCatalog}));
+        inconsistencies.emplace_back(
+            makeInconsistency(MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog,
+                              MissingDatabaseMetadataInShardCatalogDetails{
+                                  dbName, primaryShard, dbVersionInGlobalCatalog}));
         return inconsistencies;
     }
 
     try {
-        auto dbInShardLocalCatalog =
+        auto dbInShardCatalog =
             DatabaseType::parse(IDLParserContext("DatabaseType"), cursor->nextSafe().getOwned());
 
-        auto shardInLocalCatalog = dbInShardLocalCatalog.getPrimary();
+        auto shardInLocalCatalog = dbInShardCatalog.getPrimary();
         if (shardInLocalCatalog != primaryShard) {
             inconsistencies.emplace_back(makeInconsistency(
-                MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardLocalCatalog,
-                MisplacedDatabaseMetadataInShardLocalCatalogDetails{
+                MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardCatalog,
+                MisplacedDatabaseMetadataInShardCatalogDetails{
                     dbName, primaryShard, shardInLocalCatalog}));
         }
 
-        auto dbVersionInShardLocalCatalog = dbInShardLocalCatalog.getVersion();
-        if (dbVersionInGlobalCatalog != dbVersionInShardLocalCatalog) {
+        auto dbVersionInShardCatalog = dbInShardCatalog.getVersion();
+        if (dbVersionInGlobalCatalog != dbVersionInShardCatalog) {
             inconsistencies.emplace_back(makeInconsistency(
-                MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalog,
-                InconsistentDatabaseVersionInShardLocalCatalogDetails{
-                    dbName, primaryShard, dbVersionInGlobalCatalog, dbVersionInShardLocalCatalog}));
+                MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalog,
+                InconsistentDatabaseVersionInShardCatalogDetails{
+                    dbName, primaryShard, dbVersionInGlobalCatalog, dbVersionInShardCatalog}));
         }
 
-        auto cacheInconsistencies = checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
-            opCtx, dbName, dbVersionInGlobalCatalog, dbVersionInShardLocalCatalog, primaryShard);
+        auto cacheInconsistencies = checkDatabaseMetadataConsistencyInShardCatalogCache(
+            opCtx, dbName, dbVersionInGlobalCatalog, dbVersionInShardCatalog, primaryShard);
 
         inconsistencies.insert(inconsistencies.end(),
                                std::make_move_iterator(cacheInconsistencies.begin()),
                                std::make_move_iterator(cacheInconsistencies.end()));
     } catch (const AssertionException&) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalog,
-            MissingDatabaseMetadataInShardLocalCatalogDetails{
-                dbName, primaryShard, dbVersionInGlobalCatalog}));
+        inconsistencies.emplace_back(
+            makeInconsistency(MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog,
+                              MissingDatabaseMetadataInShardCatalogDetails{
+                                  dbName, primaryShard, dbVersionInGlobalCatalog}));
     }
 
     tassert(9980501,
-            "Found duplicated database metadata in the shard-local catalog with the same _id value",
+            "Found duplicated database metadata in the shard catalog with the same _id value",
             !cursor->more());
 
     return inconsistencies;
@@ -1138,7 +1138,7 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     const auto dbVersionInGlobalCatalog = dbInGlobalCatalog.getVersion();
     const auto primaryShard = dbInGlobalCatalog.getPrimary();
 
-    return checkDatabaseMetadataConsistencyInShardLocalCatalog(
+    return checkDatabaseMetadataConsistencyInShardCatalog(
         opCtx, dbName, dbVersionInGlobalCatalog, primaryShard);
 }
 

@@ -83,7 +83,7 @@ public:
 
             auto coordinatorDoc = CloneAuthoritativeMetadataCoordinatorDocument();
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{NamespaceString::kConfigShardDatabasesNamespace,
+                {{NamespaceString::kConfigShardCatalogDatabasesNamespace,
                   DDLCoordinatorTypeEnum::kCloneAuthoritativeMetadata}});
 
             auto service = ShardingDDLCoordinatorService::getService(opCtx);

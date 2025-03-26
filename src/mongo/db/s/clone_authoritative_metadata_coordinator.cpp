@@ -70,7 +70,7 @@ ExecutorFuture<void> CloneAuthoritativeMetadataCoordinator::_runImpl(
 }
 
 void CloneAuthoritativeMetadataCoordinator::_prepareDbsToClone(OperationContext* opCtx) {
-    // At this point, any new DDL operations first clone the metadata into the shard-local catalog
+    // At this point, any new DDL operations first clone the metadata into the shard catalog
     // before starting the DDL. This means that we only need to clone metadata for DDL operations
     // that committed before the most recent config time.
     auto dbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDatabasesForShard(

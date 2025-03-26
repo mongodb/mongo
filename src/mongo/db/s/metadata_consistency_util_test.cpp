@@ -560,15 +560,16 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
                            false);
 }
 
-TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardLocalCatalogCache) {
+TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardCatalogCache) {
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
 
-    // Mock database metadata in the shard-local catalog.
+    // Mock database metadata in the shard catalog.
     DBDirectClient client(operationContext());
-    client.insert(NamespaceString::kConfigShardDatabasesNamespace, dbInGlobalCatalog.toBSON());
+    client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace,
+                  dbInGlobalCatalog.toBSON());
 
-    // Introduce an inconsistency in the shard-local catalog cache.
+    // Introduce an inconsistency in the shard catalog cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
@@ -581,19 +582,20 @@ TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardLocalCatalogCa
         operationContext(), dbInGlobalCatalog);
 
     assertOneInconsistencyFound(
-        MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalogCache,
+        MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalogCache,
         inconsistencies);
 }
 
-TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardLocalCatalogCache) {
+TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCache) {
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
 
-    // Mock database metadata in the shard-local catalog.
+    // Mock database metadata in the shard catalog.
     DBDirectClient client(operationContext());
-    client.insert(NamespaceString::kConfigShardDatabasesNamespace, dbInGlobalCatalog.toBSON());
+    client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace,
+                  dbInGlobalCatalog.toBSON());
 
-    // Introduce an inconsistency in the shard-local catalog cache.
+    // Introduce an inconsistency in the shard catalog cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
@@ -607,7 +609,7 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardLocalCatal
         operationContext(), dbInGlobalCatalog);
 
     assertOneInconsistencyFound(
-        MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,
+        MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalogCache,
         inconsistencies);
 }
 
@@ -615,7 +617,7 @@ TEST_F(MetadataConsistencyTest, FindEmptyDurableDatabaseMetadataInShard) {
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
 
-    // Introduce an inconsistency in the shard-local catalog while mocking it in the cache.
+    // Introduce an inconsistency in the shard catalog while mocking it in the cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
@@ -628,15 +630,14 @@ TEST_F(MetadataConsistencyTest, FindEmptyDurableDatabaseMetadataInShard) {
         operationContext(), dbInGlobalCatalog);
 
     assertOneInconsistencyFound(
-        MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalog,
-        inconsistencies);
+        MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShardWithConfig) {
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
 
-    // Mock database metadata in the shard-local catalog cache.
+    // Mock database metadata in the shard catalog cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
@@ -644,19 +645,19 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShardWi
         scopedDss->setDbInfo(operationContext(), dbInGlobalCatalog);
     }
 
-    // Introduce an inconsistency in the shard-local catalog
+    // Introduce an inconsistency in the shard catalog
     DBDirectClient client(operationContext());
     DatabaseType shardDb{_dbName, _shardId, {_dbUuid, Timestamp(2, 0)}};
-    client.insert(NamespaceString::kConfigShardDatabasesNamespace, shardDb.toBSON());
+    client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace, shardDb.toBSON());
 
     // Validate that we can find the inconsistency.
     const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
         operationContext(), dbInGlobalCatalog);
 
     ASSERT_EQ(2, inconsistencies.size());
-    ASSERT_EQ(MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalog,
+    ASSERT_EQ(MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalog,
               inconsistencies[0].getType());
-    ASSERT_EQ(MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,
+    ASSERT_EQ(MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalogCache,
               inconsistencies[1].getType());
 }
 
@@ -664,7 +665,7 @@ TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard)
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
 
-    // Mock database metadata in the shard-local catalog cache.
+    // Mock database metadata in the shard catalog cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
@@ -672,25 +673,24 @@ TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard)
         scopedDss->setDbInfo(operationContext(), dbInGlobalCatalog);
     }
 
-    // Introduce an inconsistency in the shard-local catalog
+    // Introduce an inconsistency in the shard catalog
     DBDirectClient client(operationContext());
     DatabaseType shardDb{_dbName, ShardId{"otherShard"}, {_dbUuid, dbTimestamp}};
-    client.insert(NamespaceString::kConfigShardDatabasesNamespace, shardDb.toBSON());
+    client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace, shardDb.toBSON());
 
     // Validate that we can find the inconsistency.
     const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
         operationContext(), dbInGlobalCatalog);
 
     assertOneInconsistencyFound(
-        MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardLocalCatalog,
-        inconsistencies);
+        MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardCatalog, inconsistencies);
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) {
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
 
-    // Mock database metadata in the shard-local catalog cache.
+    // Mock database metadata in the shard catalog cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
@@ -698,9 +698,9 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) 
         scopedDss->setDbInfo(operationContext(), dbInGlobalCatalog);
     }
 
-    // Introduce an inconsistency in the shard-local catalog
+    // Introduce an inconsistency in the shard catalog
     DBDirectClient client(operationContext());
-    client.insert(NamespaceString::kConfigShardDatabasesNamespace,
+    client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace,
                   BSON(DatabaseType::kDbNameFieldName << _dbName.toString_forTest()));
 
     // Validate that we can find the inconsistency.
@@ -708,8 +708,7 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) 
         operationContext(), dbInGlobalCatalog);
 
     assertOneInconsistencyFound(
-        MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalog,
-        inconsistencies);
+        MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);
 }
 
 class MetadataConsistencyRandomRoutingTableTest : public MetadataConsistencyConfigTest {

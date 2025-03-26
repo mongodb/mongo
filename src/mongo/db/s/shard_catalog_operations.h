@@ -35,41 +35,41 @@
 
 namespace mongo {
 
-namespace shard_local_catalog_operations {
+namespace shard_catalog_operations {
 
 /**
- * Read database metadata from all databases in the shard-local catalog.
+ * Read database metadata from all databases in the shard catalog.
  *
  * This function reads the database metadata from the replicated durable collection
- * `config.shard.databases`.
+ * `config.shard.catalog.databases`.
  */
 std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx);
 
 /**
- * Read database metadata for a specific database in the shard-local catalog.
+ * Read database metadata for a specific database in the shard catalog.
  *
  * This function reads the database metadata from the replicated durable collection
- * `config.shard.databases`.
+ * `config.shard.catalog.databases`.
  */
 std::unique_ptr<DBClientCursor> readDatabaseMetadata(OperationContext* opCtx,
                                                      const DatabaseName& dbName);
 
 /**
- * Adds database metadata to the shard-local catalog.
+ * Adds database metadata to the shard catalog.
  *
  * This function inserts the database metadata into the replicated durable collection
- * `config.shard.databases`.
+ * `config.shard.catalog.databases`.
  */
 void insertDatabaseMetadata(OperationContext* opCtx, const DatabaseType& dbMetadata);
 
 /**
- * Deletes database metadata from the shard-local catalog.
+ * Deletes database metadata from the shard catalog.
  *
  * This function removes the database metadata from the replicated durable collection
- * `config.shard.databases`.
+ * `config.shard.catalog.databases`.
  */
 void deleteDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName);
 
-}  // namespace shard_local_catalog_operations
+}  // namespace shard_catalog_operations
 
 }  // namespace mongo

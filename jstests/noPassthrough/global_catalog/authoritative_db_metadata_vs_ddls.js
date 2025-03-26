@@ -18,13 +18,13 @@ function getDbMetadataFromGlobalCatalog(db) {
     return db.getSiblingDB('config').databases.findOne({_id: db.getName()});
 }
 
-function validateShardLocalCatalog(dbName, shard, expectedDbMetadata) {
+function validateShardCatalog(dbName, shard, expectedDbMetadata) {
     const dbMetadataFromShard =
-        shard.getDB('config').getCollection('shard.databases').findOne({_id: dbName});
+        shard.getDB('config').getCollection('shard.catalog.databases').findOne({_id: dbName});
     assert.eq(expectedDbMetadata, dbMetadataFromShard);
 }
 
-function validateShardLocalCatalogCache(dbName, shard, expectedDbMetadata) {
+function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
     const dbMetadataFromShard = shard.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(dbMetadataFromShard);
 
@@ -43,13 +43,13 @@ function validateShardLocalCatalogCache(dbName, shard, expectedDbMetadata) {
 
     st.awaitReplicationOnShards();
 
-    // Validate that the db metadata in the shard-local catalog mathes the global catalog.
+    // Validate that the db metadata in the shard catalog mathes the global catalog.
     const dbMetadataFromConfig = getDbMetadataFromGlobalCatalog(db);
-    validateShardLocalCatalog(db.getName(), st.shard0, dbMetadataFromConfig);
+    validateShardCatalog(db.getName(), st.shard0, dbMetadataFromConfig);
 
-    // Validate that the db metadata in the shard-local catalog cache mathes the global catalog.
+    // Validate that the db metadata in the shard catalog cache mathes the global catalog.
     st.rs0.nodes.forEach(node => {
-        validateShardLocalCatalogCache(db.getName(), node, dbMetadataFromConfig);
+        validateShardCatalogCache(db.getName(), node, dbMetadataFromConfig);
     });
 }
 
@@ -60,18 +60,18 @@ function validateShardLocalCatalogCache(dbName, shard, expectedDbMetadata) {
 
     st.awaitReplicationOnShards();
 
-    // Validate that the db metadata from the shard-local catalog is removed from shard0 and
+    // Validate that the db metadata from the shard catalog is removed from shard0 and
     // inserted in shard1.
     const dbMetadataFromConfig = getDbMetadataFromGlobalCatalog(db);
-    validateShardLocalCatalog(db.getName(), st.shard1, dbMetadataFromConfig);
-    validateShardLocalCatalog(db.getName(), st.shard0, null /* expectedDbMetadata */);
+    validateShardCatalog(db.getName(), st.shard1, dbMetadataFromConfig);
+    validateShardCatalog(db.getName(), st.shard0, null /* expectedDbMetadata */);
 
-    // Validate the same for the shard-local catalog cache.
+    // Validate the same for the shard catalog cache.
     st.rs1.nodes.forEach(node => {
-        validateShardLocalCatalogCache(db.getName(), node, dbMetadataFromConfig);
+        validateShardCatalogCache(db.getName(), node, dbMetadataFromConfig);
     });
     st.rs0.nodes.forEach(node => {
-        validateShardLocalCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
+        validateShardCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
     });
 }
 
@@ -82,15 +82,15 @@ function validateShardLocalCatalogCache(dbName, shard, expectedDbMetadata) {
 
     st.awaitReplicationOnShards();
 
-    // Validate that the db metadata is removed from the shard-local catalogs and cache for shard0
+    // Validate that the db metadata is removed from the shard catalogs and cache for shard0
     // and shard1.
-    validateShardLocalCatalog(db.getName(), st.shard0, null /* expectedDbMetadata */);
-    validateShardLocalCatalog(db.getName(), st.shard1, null /* expectedDbMetadata */);
+    validateShardCatalog(db.getName(), st.shard0, null /* expectedDbMetadata */);
+    validateShardCatalog(db.getName(), st.shard1, null /* expectedDbMetadata */);
     st.rs0.nodes.forEach(node => {
-        validateShardLocalCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
+        validateShardCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
     });
     st.rs1.nodes.forEach(node => {
-        validateShardLocalCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
+        validateShardCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
     });
 }
 

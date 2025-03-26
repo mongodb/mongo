@@ -14,7 +14,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function checkTimestampConsistencyInPersistentMetadata(
     dbName, nss, dbTimestampInConfig, collTimestampInConfig) {
-    // Checking consistency on shard-local catalog.
+    // Checking consistency on shard catalog.
     function getDbMetadata() {
         const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
             st.s.getDB('admin'), "ShardAuthoritativeDbMetadataDDL");
@@ -22,7 +22,7 @@ function checkTimestampConsistencyInPersistentMetadata(
             st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName, syncFromConfig: true});
             return st.shard0.getDB('config').cache.databases.findOne({_id: dbName});
         }
-        return st.shard0.getDB('config').shard.databases.findOne({_id: dbName});
+        return st.shard0.getDB('config').shard.catalog.databases.findOne({_id: dbName});
     }
 
     const dbTimestampInShard = getDbMetadata().version.timestamp;

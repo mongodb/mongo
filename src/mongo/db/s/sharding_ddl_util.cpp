@@ -865,7 +865,7 @@ void assertNamespaceLengthLimit(const NamespaceString& nss, bool isUnsharded) {
             nss.size() <= maxNsLen);
 }
 
-void commitCreateDatabaseMetadataToShardLocalCatalog(
+void commitCreateDatabaseMetadataToShardCatalog(
     OperationContext* opCtx,
     const DatabaseType& db,
     const OperationSessionInfo& osi,
@@ -884,7 +884,7 @@ void commitCreateDatabaseMetadataToShardLocalCatalog(
     sendAuthenticatedCommandToShards(opCtx, opts, {db.getPrimary()});
 }
 
-void commitDropDatabaseMetadataToShardLocalCatalog(
+void commitDropDatabaseMetadataToShardCatalog(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const ShardId& shardId,

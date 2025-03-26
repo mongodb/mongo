@@ -57,11 +57,11 @@ enums:
             kZonesRangeOverlap: "ZonesRangeOverlap"
             kTrackedUnshardedCollectionHasMultipleChunks: "TrackedUnshardedCollectionHasMultipleChunks"
             kTrackedUnshardedCollectionHasInvalidKey: "TrackedUnshardedCollectionHasInvalidKey"
-            kInconsistentDatabaseVersionInShardLocalCatalog: "InconsistentDatabaseVersionInShardLocalCatalog"
-            kInconsistentDatabaseVersionInShardLocalCatalogCache: "InconsistentDatabaseVersionInShardLocalCatalogCache"
-            kMissingDatabaseMetadataInShardLocalCatalog: "MissingDatabaseMetadataInShardLocalCatalog"
-            kMissingDatabaseMetadataInShardLocalCatalogCache: "MissingDatabaseMetadataInShardLocalCatalogCache"
-            kMisplacedDatabaseMetadataInShardLocalCatalog: "MisplacedDatabaseMetadataInShardLocalCatalog"
+            kInconsistentDatabaseVersionInShardCatalog: "InconsistentDatabaseVersionInShardCatalog"
+            kInconsistentDatabaseVersionInShardCatalogCache: "InconsistentDatabaseVersionInShardCatalogCache"
+            kMissingDatabaseMetadataInShardCatalog: "MissingDatabaseMetadataInShardCatalog"
+            kMissingDatabaseMetadataInShardCatalogCache: "MissingDatabaseMetadataInShardCatalogCache"
+            kMisplacedDatabaseMetadataInShardCatalog: "MisplacedDatabaseMetadataInShardCatalog"
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -86,11 +86,11 @@ enums:
             kZonesRangeOverlap: "Found two overlapping zones"
             kTrackedUnshardedCollectionHasMultipleChunks: "Found tracked unsharded collection with more than one chunks"
             kTrackedUnshardedCollectionHasInvalidKey: "Found tracked unsharded collection with invalid shard-key"
-            kInconsistentDatabaseVersionInShardLocalCatalog: "Found database metadata in the shard-local catalog that is not aligned with one in global catalog"
-            kInconsistentDatabaseVersionInShardLocalCatalogCache: "Found database metadata in the shard-local catalog cache that is not aligned with one in the global or shard-local catalog"
-            kMissingDatabaseMetadataInShardLocalCatalog: "Found database metadata in the global catalog but not in the shard-local catalog or not in a consistent state"
-            kMissingDatabaseMetadataInShardLocalCatalogCache: "Found database metadata in the global catalog but not in shard-local catalog cache"
-            kMisplacedDatabaseMetadataInShardLocalCatalog: "Found some database metadata in the shard-local catalog that is not owned by this shard"
+            kInconsistentDatabaseVersionInShardCatalog: "Found database metadata in the shard catalog that is not aligned with one in global catalog"
+            kInconsistentDatabaseVersionInShardCatalogCache: "Found database metadata in the shard catalog cache that is not aligned with one in the global or shard catalog"
+            kMissingDatabaseMetadataInShardCatalog: "Found database metadata in the global catalog but not in the shard catalog or not in a consistent state"
+            kMissingDatabaseMetadataInShardCatalogCache: "Found database metadata in the global catalog but not in shard catalog cache"
+            kMisplacedDatabaseMetadataInShardCatalog: "Found some database metadata in the shard catalog that is not owned by this shard"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
@@ -410,8 +410,8 @@ structs:
                 description: "The shard where the collection was supposed to be found"
                 type: shard_id
 
-    InconsistentDatabaseVersionInShardLocalCatalogDetails:
-        description: "Details about an inconsistent database metadata from the shard-local catalog compared to the one in the global catalog"
+    InconsistentDatabaseVersionInShardCatalogDetails:
+        description: "Details about an inconsistent database metadata from the shard catalog compared to the one in the global catalog"
         strict: false 
         fields:
             dbName:
@@ -423,12 +423,12 @@ structs:
             dbVersionInGlobalCatalog:
                 description: "The database version of the global catalog."
                 type: database_version
-            dbVersionInShardLocalCatalog:
-                description: "The database version of the shard-local catalog."
+            dbVersionInShardCatalog:
+                description: "The database version of the shard catalog."
                 type: database_version
 
-    InconsistentDatabaseVersionInShardLocalCatalogCacheDetails:
-        description: "Details about an inconsistent database metadata from the shard-local catalog cache compared to the one in the global or shard-local catalog"
+    InconsistentDatabaseVersionInShardCatalogCacheDetails:
+        description: "Details about an inconsistent database metadata from the shard catalog cache compared to the one in the global or shard catalog"
         strict: false 
         fields:
             dbName:
@@ -440,29 +440,15 @@ structs:
             dbVersionInGlobalCatalog:
                 description: "The database version of the global catalog."
                 type: database_version
-            dbVersionInShardLocalCatalogCache:
-                description: "The database version of the shard-local catalog."
+            dbVersionInShardCatalogCache:
+                description: "The database version of the shard catalog."
                 type: database_version
-            dbVersionInShardLocalCatalogCacheCache:
-                description: "The database version of the shard-local catalog cache."
-                type: database_version
-
-    MissingDatabaseMetadataInShardLocalCatalogDetails:
-        description: "Details about a missing database metadata entry in the shard-local catalog compared to the one in the global catalog"
-        strict: false 
-        fields:
-            dbName:
-                description: "The database name."
-                type: database_name
-            shardId:
-                description: "The shard where this database metadata has been found."
-                type: shard_id
-            dbVersionInGlobalCatalog:
-                description: "The database version of the global catalog."
+            dbVersionInShardCatalogCacheCache:
+                description: "The database version of the shard catalog cache."
                 type: database_version
 
-    MissingDatabaseMetadataInShardLocalCatalogCacheDetails:
-        description: "Details about a missing database metadata entry in the shard-local catalog cache compared to the one in global catalog"
+    MissingDatabaseMetadataInShardCatalogDetails:
+        description: "Details about a missing database metadata entry in the shard catalog compared to the one in the global catalog"
         strict: false 
         fields:
             dbName:
@@ -475,7 +461,21 @@ structs:
                 description: "The database version of the global catalog."
                 type: database_version
 
-    MisplacedDatabaseMetadataInShardLocalCatalogDetails:
+    MissingDatabaseMetadataInShardCatalogCacheDetails:
+        description: "Details about a missing database metadata entry in the shard catalog cache compared to the one in global catalog"
+        strict: false 
+        fields:
+            dbName:
+                description: "The database name."
+                type: database_name
+            shardId:
+                description: "The shard where this database metadata has been found."
+                type: shard_id
+            dbVersionInGlobalCatalog:
+                description: "The database version of the global catalog."
+                type: database_version
+
+    MisplacedDatabaseMetadataInShardCatalogDetails:
         description: "Details about an inconsistent database metadata placed in the wrong shard"
         strict: false 
         fields:
@@ -485,8 +485,8 @@ structs:
             shardId:
                 description: "The shard where this database metadata has been found."
                 type: shard_id
-            shardIdInShardLocalCatalog:
-                description: "The shard that the shard-local catalog thinks is the primary shard for the database."
+            shardIdInShardCatalog:
+                description: "The shard that the shard catalog thinks is the primary shard for the database."
                 type: shard_id
 
     MetadataInconsistencyItem:

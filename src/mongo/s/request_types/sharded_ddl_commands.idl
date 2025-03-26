@@ -845,7 +845,7 @@ commands:
     _shardsvrCommitCreateDatabaseMetadata:
         command_name: _shardsvrCommitCreateDatabaseMetadata
         cpp_name: ShardsvrCommitCreateDatabaseMetadata
-        description: "Internal command to commit a createDatabase operation to the shard-local catalog"
+        description: "Internal command to commit a createDatabase operation to the shard catalog"
         strict: false
         namespace: type
         type: namespacestring
@@ -859,7 +859,7 @@ commands:
     _shardsvrCommitDropDatabaseMetadata:
         command_name: _shardsvrCommitDropDatabaseMetadata
         cpp_name: ShardsvrCommitDropDatabaseMetadata
-        description: "Internal command to commit a dropDatabase operation to the shard-local catalog"
+        description: "Internal command to commit a dropDatabase operation to the shard catalog"
         strict: false
         namespace: type
         type: namespacestring
@@ -869,7 +869,7 @@ commands:
     _shardsvrCloneAuthoritativeMetadata:
         command_name: _shardsvrCloneAuthoritativeMetadata
         cpp_name: ShardsvrCloneAuthoritativeMetadata
-        description: "Internal command to clone metadata from global catalog to the shard-local catalog"
+        description: "Internal command to clone metadata from global catalog to the shard catalog"
         strict: false
         namespace: ignored
         api_version: ""
@@ -878,7 +878,7 @@ commands:
     _shardsvrFetchCollMetadata:
         command_name: _shardsvrFetchCollMetadata
         cpp_name: ShardsvrFetchCollMetadata
-        description: "Internal command to fetch collection metadata from the config server and install it into shard local catalog."
+        description: "Internal command to fetch collection metadata from the config server and install it into shard catalog."
         strict: false
         namespace: type
         type: namespacestring

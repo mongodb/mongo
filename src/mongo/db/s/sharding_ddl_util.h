@@ -314,11 +314,11 @@ void assertDataMovementAllowed();
 void assertNamespaceLengthLimit(const NamespaceString& nss, bool isUnsharded);
 
 /**
- *  Commits a create of the database metadata to the shard-local catalog by sending the command
+ *  Commits a create of the database metadata to the shard catalog by sending the command
  * `_shardsvrCommitCreateDatabaseMetadata` to the appropiate shard. This command can be
- * used to update the database metadata of the shard-local catalog of any shard.
+ * used to update the database metadata of the shard catalog of any shard.
  */
-void commitCreateDatabaseMetadataToShardLocalCatalog(
+void commitCreateDatabaseMetadataToShardCatalog(
     OperationContext* opCtx,
     const DatabaseType& db,
     const OperationSessionInfo& osi,
@@ -326,11 +326,11 @@ void commitCreateDatabaseMetadataToShardLocalCatalog(
     const CancellationToken& token);
 
 /**
- *  Commits a drop of the database metadata to the shard-local catalog by sending the command
+ *  Commits a drop of the database metadata to the shard catalog by sending the command
  * `_shardsvrCommitDropDatabaseMetadata` to the appropiate shard. This command can be
- * used to update the database metadata of the shard-local catalog of any shard.
+ * used to update the database metadata of the shard catalog of any shard.
  */
-void commitDropDatabaseMetadataToShardLocalCatalog(
+void commitDropDatabaseMetadataToShardCatalog(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const ShardId& shardId,

@@ -24,10 +24,10 @@ var st = new ShardingTest({
 });
 
 // Inserting the first document on a collection implicitly registers a database in the global
-// catalog and in the shard-local catalog. This requires to do some writes with majority write
-// concern on the shard and in the config server. Since this test intentionally disrupts
-// replication (via mongobridge), we need to create the database upfront while the network is
-// healthy to avoid hanging in the commit phase of the create database DDL.
+// catalog and in the shard catalog. This requires to do some writes with majority write concern on
+// the shard and in the config server. Since this test intentionally disrupts replication (via
+// mongobridge), we need to create the database upfront while the network is healthy to avoid
+// hanging in the commit phase of the create database DDL.
 assert.commandWorked(st.s.adminCommand({enableSharding: "testDB"}));
 
 var wc = {writeConcern: {w: 2, wtimeout: 4000}};

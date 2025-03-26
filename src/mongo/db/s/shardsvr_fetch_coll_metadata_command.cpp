@@ -55,7 +55,7 @@ public:
     std::string help() const override {
         return "Internal command. This command aims to fetch collection and chunks metadata, for a "
                "specific namespace, from the global catalog and persist it locally in the "
-               "shard-local catalog";
+               "shard catalog";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -91,7 +91,7 @@ public:
                 NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
 
             DBDirectClient dbClient(opCtx);
-            dbClient.update(NamespaceString::kConfigShardCollectionsNamespace,
+            dbClient.update(NamespaceString::kConfigShardCatalogCollectionsNamespace,
                             BSON(CollectionType::kNssFieldName << serializedNs),
                             collAndChunks.first.toBSON(),
                             true /* upsert */,
@@ -99,7 +99,7 @@ public:
 
             // Persist chunk metadata locally.
             for (const auto& chunk : collAndChunks.second) {
-                dbClient.update(NamespaceString::kConfigShardChunksNamespace,
+                dbClient.update(NamespaceString::kConfigShardCatalogChunksNamespace,
                                 BSON(ChunkType::name() << chunk.getName()),
                                 chunk.toConfigBSON(),
                                 true /* upsert */,
