@@ -1201,11 +1201,12 @@ void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
 }
 
 Status AsyncResultsMerger::_scheduleReleaseMemory(WithLock, OperationContext* opCtx) {
-    std::vector<AsyncRequestsSender::Request> asyncRequests;
-    asyncRequests.reserve(_remotes.size());
     for (auto& remote : _remotes) {
         if (!remote->status.isOK()) {
             return remote->status;
+        }
+        if (remote->exhausted()) {
+            continue;
         }
 
         const std::vector<mongo::CursorId> params{remote->cursorId};
