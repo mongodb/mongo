@@ -72,8 +72,8 @@ function isOperationPartOfStableAPI(commandName, commandObj) {
                     commandObj.showRecordId || commandObj.tailable)) {
             return false;
         } else if (commandName == "create" &&
-                   (commandObj.autoIndexId || commandObj.capped || commandObj.indexOptionDefaults ||
-                    commandObj.max || commandObj.size || commandObj.storageEngine)) {
+                   (commandObj.capped || commandObj.indexOptionDefaults || commandObj.max ||
+                    commandObj.size || commandObj.storageEngine)) {
             return false;
         } else if (commandName == "createIndexes" && commandObj.indexes &&
                    Array.isArray(commandObj.indexes)) {

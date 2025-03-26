@@ -672,7 +672,7 @@ public:
         _client.runCommand(_nss.dbName(),
                            BSON("create"
                                 << "querytests.TailableQueryOnId"
-                                << "capped" << true << "size" << 8192 << "autoIndexId" << true),
+                                << "capped" << true << "size" << 8192),
                            info);
         insertA(_nss, 0);
         insertA(_nss, 1);
@@ -1553,11 +1553,10 @@ public:
         }
 
         BSONObj info;
-        // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
         _client.runCommand(DatabaseName::kLocal,
                            BSON("create"
                                 << "oplog.querytests.findingstart"
-                                << "capped" << true << "size" << 4096 << "autoIndexId" << false),
+                                << "capped" << true << "size" << 4096),
                            info);
         // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
         // testing, so the oplog may already exist on the test node; in this case, trying to create
@@ -1620,11 +1619,10 @@ public:
         size_t startNumCursors = numCursorsOpen();
 
         BSONObj info;
-        // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
         _client.runCommand(DatabaseName::kLocal,
                            BSON("create"
                                 << "oplog.querytests.findingstart"
-                                << "capped" << true << "size" << 4096 << "autoIndexId" << false),
+                                << "capped" << true << "size" << 4096),
                            info);
         // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
         // testing, so the oplog may already exist on the test node; in this case, trying to create
@@ -1688,11 +1686,10 @@ public:
         ASSERT(!c0->more());
 
         BSONObj info;
-        // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
         _client.runCommand(DatabaseName::kLocal,
                            BSON("create"
                                 << "oplog.querytests.findingstart"
-                                << "capped" << true << "size" << 4096 << "autoIndexId" << false),
+                                << "capped" << true << "size" << 4096),
                            info);
         // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
         // testing, so the oplog may already exist on the test node; in this case, trying to create

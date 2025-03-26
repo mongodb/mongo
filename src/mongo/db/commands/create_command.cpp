@@ -92,7 +92,6 @@ constexpr auto kCreateCommandHelp =
     "{\n"
     "  create: <string: collection or view name> [,\n"
     "  capped: <bool: capped collection>,\n"
-    "  autoIndexId: <bool: automatic creation of _id index>,\n"
     "  idIndex: <document: _id index specification>,\n"
     "  size: <int: size in bytes of the capped collection>,\n"
     "  max: <int: max number of documents in the capped collection>,\n"
@@ -318,12 +317,6 @@ public:
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
             CreateCommandReply reply;
-            if (cmd.getAutoIndexId()) {
-                constexpr const char depr_23800[] =
-                    "The autoIndexId option is deprecated and will be removed in a future release";
-                LOGV2_WARNING(23800, depr_23800);
-                reply.setNote(std::string(depr_23800));
-            }
 
             if (!cmd.getClusteredIndex()) {
                 // Ensure that the 'size' field is present if 'capped' is set to true and this is
@@ -475,11 +468,6 @@ public:
                 uassert(ErrorCodes::InvalidOptions,
                         str::stream() << "'idIndex' is not allowed with 'viewOn': " << idIndexSpec,
                         !cmd.getViewOn());
-
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "'idIndex' is not allowed with 'autoIndexId': " << idIndexSpec,
-                        !cmd.getAutoIndexId());
 
                 // Perform index spec validation.
                 idIndexSpec =

@@ -29,9 +29,6 @@ selector:
     - jstests/core/**/find_and_modify_pipeline_update.js
     - jstests/core/**/update_pipeline_shell_helpers.js
     - jstests/core/**/idhack.js
-    # Uses the unsupported 'autoIndexId' option.
-    - jstests/core/**/queryoptimizera.js
-    - jstests/core/**/index9.js
     # Expects the rename options not to change.
     - jstests/core/**/internal_rename_if_options_and_indexes_match.js
     # The _id index is expected to not have a 'unique' field.

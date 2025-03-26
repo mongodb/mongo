@@ -200,7 +200,6 @@ testIncompatibleCreateOptions({expireAfterSeconds: NumberLong("46116860184273879
 testIncompatibleCreateOptions({expireAfterSeconds: ""}, ErrorCodes.TypeMismatch);
 testIncompatibleCreateOptions({capped: true, size: 100});
 testIncompatibleCreateOptions({capped: true, max: 100});
-testIncompatibleCreateOptions({autoIndexId: true});
 testIncompatibleCreateOptions({idIndex: {key: {_id: 1}, name: "_id_"}});
 testIncompatibleCreateOptions({validator: {}});
 testIncompatibleCreateOptions({validationLevel: "off"});

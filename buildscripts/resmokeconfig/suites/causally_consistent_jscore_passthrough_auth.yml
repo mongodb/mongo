@@ -30,7 +30,6 @@ selector:
     - jstests/core/**/dbhash.js # dbhash.
     - jstests/core/**/fsync.js # uses fsync.
     - jstests/core/**/geo_update_btree2.js # notablescan.
-    - jstests/core/**/index9.js # "local" database.
     - jstests/core/**/queryoptimizera.js # "local" database.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.

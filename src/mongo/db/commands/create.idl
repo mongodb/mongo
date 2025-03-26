@@ -64,12 +64,6 @@ structs:
                 # The capped parameter should actually be unstable, and in practice it is, because
                 # it is required to also set the 'size' field, which is properly marked as unstable.
                 stability: stable
-            autoIndexId:
-                description: "Specify false to disable the automatic creation of an index on the
-                              _id field."
-                type: safeBool
-                optional: true
-                stability: unstable
             idIndex:
                 description: "Specify the default _id index specification."
                 type: object

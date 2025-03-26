@@ -227,7 +227,6 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
     createRequest.setCapped(request.getCapped());
     createRequest.setTimeseries(request.getTimeseries());
     createRequest.setSize(request.getSize());
-    createRequest.setAutoIndexId(request.getAutoIndexId());
     createRequest.setClusteredIndex(request.getClusteredIndex());
     if (request.getCollation() && !request.getCollation()->isEmpty()) {
         auto collation = Collation::parse(IDLParserContext("collation"), *request.getCollation());

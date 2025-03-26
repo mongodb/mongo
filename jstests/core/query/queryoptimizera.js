@@ -40,8 +40,7 @@ let notCapped = db.getSiblingDB("local").getCollection(notCappedCollectionName);
 notCapped.drop();
 
 assert.commandWorked(db.createCollection(testCollectionName, {capped: true, size: 1000}));
-assert.commandWorked(
-    notCapped.getDB().createCollection(notCappedCollectionName, {autoIndexId: false}));
+assert.commandWorked(notCapped.getDB().createCollection(notCappedCollectionName));
 
 t.insert({});
 notCapped.insert({});

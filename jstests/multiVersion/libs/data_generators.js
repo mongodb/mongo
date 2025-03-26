@@ -607,8 +607,7 @@ function CollectionMetadataGenerator(options) {
     }
 
     // Collection metadata we are using as a source for testing
-    // db.createCollection(name, {capped: <Boolean>, autoIndexId: <Boolean>, size: <number>, max
-    // <number>} )
+    // db.createCollection(name, {capped: <Boolean>, size: <number>, max <number>} )
     var cappedCollectionMetadata = {
         "capped": true,
         "size": 100000,

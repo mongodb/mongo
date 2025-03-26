@@ -228,13 +228,6 @@ assert.commandFailedWithCode(
         {clusteredIndex: {key: {_id: 1}, unique: true}, viewOn: "sourceColl"}),
     6026500);
 
-// Validate that it's not possible to create a clustered collection with {autoIndexId: false}.
-assert.commandFailedWithCode(
-    replicatedDB.createCollection(
-        replicatedColl.getName(),
-        {clusteredIndex: {key: {_id: 1}, unique: true}, autoIndexId: false}),
-    6026501);
-
 // 'unique' field must be present and set to true.
 assert.commandFailedWithCode(
     replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}}}),
@@ -341,13 +334,6 @@ assert.commandFailedWithCode(
         nonReplicatedColl.getName(),
         {clusteredIndex: {key: {ts: 1}, unique: true}, viewOn: "sourceColl"}),
     6026500);
-
-// Validate that it's not possible to create a clustered collection with {autoIndexId: false}.
-assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(
-        nonReplicatedColl.getName(),
-        {clusteredIndex: {key: {ts: 1}, unique: true}, autoIndexId: false}),
-    6026501);
 
 // 'unique' field must be present and set to true.
 assert.commandFailedWithCode(

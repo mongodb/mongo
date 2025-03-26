@@ -61,7 +61,6 @@ selector:
     - jstests/core/**/dbhash.js
     - jstests/core/**/fsync.js
     - jstests/core/**/geo_update_btree2.js
-    - jstests/core/**/index9.js
     - jstests/core/**/queryoptimizera.js
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_getmore_batch_size.js

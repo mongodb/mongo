@@ -184,11 +184,6 @@ structs:
                               must also set a maximum size in the 'size' field."
                 type: safeBool
                 default: false
-            autoIndexId:
-                description: "Specify false to disable the automatic creation of an index on the
-                              _id field."
-                type: safeBool
-                optional: true
             idIndex:
                 description: "Specify the default _id index specification."
                 type: object

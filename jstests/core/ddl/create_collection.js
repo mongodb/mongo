@@ -55,13 +55,6 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              ErrorCodes.InvalidOptions);
 
-// "idIndex" field not allowed with "autoIndexId".
-assert.commandWorked(db.runCommand({drop: "create_collection"}));
-assert.commandFailedWithCode(
-    db.createCollection("create_collection",
-                        {autoIndexId: false, idIndex: {key: {_id: 1}, name: "_id_"}}),
-    ErrorCodes.InvalidOptions);
-
 // "idIndex" field must be an object.
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
 assert.commandFailedWithCode(db.createCollection("create_collection", {idIndex: 1}),
