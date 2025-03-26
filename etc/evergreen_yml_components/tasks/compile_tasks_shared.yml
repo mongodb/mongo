@@ -222,6 +222,7 @@ tasks:
             - "src/src/third_party/schemastore.org/**"
             - "src/poetry.lock"
             - "src/pyproject.toml"
+            - "src/x509/**"
           exclude_files:
             - "src/*_test.pdb"
 

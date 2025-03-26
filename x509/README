@@ -1,0 +1,93 @@
+This directory contains:
+
+- mkcert.py
+  Python script; uses the cryptography package to deterministically generate X509 certificates,
+  CRLs, and digests based on the contents of certs.yml.
+- certs.yml
+  Main certificate definition file.
+- apple-certs.yml
+  Certificate definitions for certs to be installed on provision of OSX machines.
+
+To run:
+
+python -m x509.mkcert [--config CONFIG] [--mkcrl | --no-mkcrl] [-o OUTPUT] [--static-dir STATIC_DIR] [certs ...]
+- CONFIG is the path to the certs.yml file specifying a list of certificates, default x509/certs.yml
+- OUTPUT is the path to a directory where the generated items will be stored, default .
+- STATIC_DIR is the path where signing keys needed by certificates are stored, default x509/static 
+- If --mkcrl is specified, CRLs will be generated after certificate generation ends. Default false.
+  These are hardcoded and require certain certificates to be generated to work.
+- certs is an optional list of certificate names to generate. If it is not specified, all
+  certificates specified in the config are generated.
+
+If a certificate specified in certs references other certificates, its dependencies and
+subdependencies will be generated.
+
+Deterministic generation is based on the current year. This means that if mkcert is run on the same
+definitions file twice, it will produce the same certificates if both runs were in the same year.
+One exception to this is the pkcs12 format; the cryptography library does not provide
+functionality for generating pkcs12 bundles deterministically.
+
+Future work:
+
+- Define CRLs in the definition file instead of hardcoding them.
+- Define keys in the definition file, and make a script to generate all necessary keys which would
+  be run whenever a new key was defined.
+
+certs.yml format:
+
+global: # Optional, default value to use for Key1 for all certs, overridden by values in cert entries.
+  Key1: Value1
+  ...
+
+certs:
+    # Required, this will be used as the name of the file, and for referencing issuers.
+  - name: 'name-of-cert.pem'
+    # Required, this will be included in the header of the generated certificate.
+    description: Tell us about yourself.
+    # Required, The X509 subject name.
+    Subject: { C: US, ST: New York, etc... }
+    # Required, Who is the (intermediate) CA for this certificate.  May be 'self'.
+    Issuer: 'ca.pem'
+    # Required, relative (within static directory) path to the keyfile to sign this certificate with.
+    keyfile: 'key.pem'
+    # Optional, set to true to ignore global.Subject values.
+    explicit_subject: false
+    # Optional, serial number to assign this certificate (default: sequential numbers starting from 1000)
+    serial: 42
+    # Optional, validity start date, expressed in seconds relative to midnight on the first day of the current year.
+    not_before: -86400 # 1 day before 
+    # Optional, validity end date, currently expressed in seconds relative to midnight on the first day of the current year.
+    # Note that not_after - not_before, the validity period, should be less than or equal to 825 days, see:
+    # https://support.apple.com/en-us/HT210176
+    not_after: 71107200 # 823 days after
+    # Optional, IDs of other public keys to append to the file
+    append_certs: ['ca.pem', 'intermediate-ca.pem', ...]
+    # Optional, passphrase to encript private key with
+    passphrase: 'secret'
+    # Optional, make a pkcs12 copy of the certificate
+    pkcs12: true | map with keys below
+        # Optional, all PKCS#12 keys must be encrypted. Will use cert.passphase if not provided.
+        passphrase: 'secret'
+        # Optional, name of PKCS#12 version of certificate. If not provided, the original cert will be overwritten with the PKCS#12 version
+        name: 'name-of-cert.pfx'
+    # Optional, in addition to the .pem file, write just the certificate to a .crt file and just the signing key to a .key file
+    split_cert_and_key: true
+    # Optional, don't write a header comment to this cert
+    include_header: false
+    # Optional, X.509 extensions to include in the certificate
+    extensions: # All extensions are optional.
+    - basicConstraints: {}
+    - keyUsage: {}
+    - extendedKeyUsage: {}
+    - subjectAltName: {DNS: [...], IP: [...]}
+    - subjectKeyIdentifier: hash
+    - authorityKeyIdentifier: keyid | issuer
+    - authorityInfoAccess: 
+      - method: OCSP
+      - location: uri-to-OCSP-server
+    - mustStaple: true
+    - nsComment: "Comment"
+    - mongoRoles:
+      - {role: readWrite, db: test1}
+      - {role: read, db: test2}
+    - mongoClusterMembership: clusterName
