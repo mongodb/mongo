@@ -5,7 +5,7 @@
  *   assumes_read_preference_unchanged,
  *   assumes_superuser_permissions,
  *   not_allowed_with_signed_security_token,
- *   requires_fcv_81,
+ *   requires_fcv_82,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
  *   uses_parallel_shell,
@@ -34,28 +34,19 @@ function waitForLog(logId, cursorId) {
     });
 }
 
-function makeParallelShellFunctionString(cursorId, collName, sessionId, txnNumber) {
-    let code = `const cursorId = ${cursorId};`;
-    code += `const collName = "${collName}";`;
-    TestData.sessionId = sessionId;
-    TestData.txnNumber = txnNumber;
-
-    const runGetMore = function() {
-        let getMoreCmd = {
-            getMore: cursorId,
-            collection: collName,
-            batchSize: 1,
-            lsid: TestData.sessionId,
-        };
-        if (TestData.txnNumber != -1) {
-            getMoreCmd.txnNumber = TestData.txnNumber;
-        }
-
-        assert.commandWorked(db.runCommand(getMoreCmd));
+function assertGetMore(cursorId, collName, sessionId, txnNumber) {
+    let getMoreCmd = {
+        getMore: cursorId,
+        collection: collName,
+        batchSize: 1,
+        lsid: sessionId,
     };
 
-    code += `(${runGetMore.toString()})();`;
-    return code;
+    if (txnNumber != -1) {
+        getMoreCmd.txnNumber = txnNumber;
+    }
+    jsTest.log.info("Running getMore in parallel shell: ", getMoreCmd);
+    assert.commandWorked(db.runCommand(getMoreCmd));
 }
 
 db.dropDatabase();
@@ -63,8 +54,9 @@ const coll = db[jsTestName()];
 setupCollection(coll);
 
 const createInactiveCursor = function(coll) {
-    const cmdRes =
-        coll.getDB().runCommand({find: coll.getName(), filter: {}, sort: {index: 1}, batchSize: 5});
+    const findCmd = {find: coll.getName(), filter: {}, sort: {index: 1}, batchSize: 5};
+    jsTest.log.info("Running findCmd: ", findCmd);
+    const cmdRes = coll.getDB().runCommand(findCmd);
     assert.commandWorked(cmdRes);
     return cmdRes.cursor.id;
 };
@@ -77,17 +69,20 @@ const cursorCurrentlyPinnedId =
     createInactiveCursor(session.getDatabase(db.getName())[jsTestName()]);
 const getMoreFailpoint = configureFailPoint(db, "getMoreHangAfterPinCursor");
 
-const joinGetMore =
-    startParallelShell(makeParallelShellFunctionString(cursorCurrentlyPinnedId,
-                                                       jsTestName(),
-                                                       session.getSessionId(),
-                                                       session.getTxnNumber_forTesting()));
+const joinGetMore = startParallelShell(funWithArgs(assertGetMore,
+                                                   cursorCurrentlyPinnedId,
+                                                   coll.getName(),
+                                                   session.getSessionId(),
+                                                   session.getTxnNumber_forTesting()));
 
 getMoreFailpoint.wait();
 waitForLog(20477, cursorCurrentlyPinnedId);
 
-const releaseMemoryRes =
-    db.runCommand({releaseMemory: [cursorToReleaseId, cursorNotFoundId, cursorCurrentlyPinnedId]});
+const releaseMemoryCmd = {
+    releaseMemory: [cursorToReleaseId, cursorNotFoundId, cursorCurrentlyPinnedId]
+};
+jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
 assert.commandWorked(releaseMemoryRes);
 
 assert.eq(releaseMemoryRes.cursorsReleased, [cursorToReleaseId], releaseMemoryRes);
@@ -104,9 +99,11 @@ const cursorIdForGetMore = createInactiveCursor(coll);
 
 const releaseMemoryFailPoint = configureFailPoint(db, "releaseMemoryHangAfterPinCursor");
 
-const joinReleaseMemory = startParallelShell(funWithArgs(function(collName, cursorId) {
-    assert.commandWorked(db.runCommand({releaseMemory: [cursorId]}));
-}, jsTestName(), cursorIdForGetMore));
+const joinReleaseMemory = startParallelShell(funWithArgs(function(cursorId) {
+    const releaseMemoryCmd = {releaseMemory: [cursorId]};
+    jsTest.log.info("Running releaseMemory in parallel shell: ", releaseMemoryCmd);
+    assert.commandWorked(db.runCommand(releaseMemoryCmd));
+}, cursorIdForGetMore));
 
 releaseMemoryFailPoint.wait();
 
