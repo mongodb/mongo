@@ -46,4 +46,65 @@ bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage);
  */
 bool isScoredPipeline(const Pipeline& pipeline);
 
+/**
+ * Return pipeline's associated weight, if it exists. Otherwise, return a default of 1.
+ */
+double getPipelineWeight(const StringMap<double>& weights, const std::string& pipelineName);
+
+namespace score_details {
+
+/**
+ * Builds and returns an $addFields stage that materializes scoreDetails for an individual input
+ * pipeline. The way we materialize scoreDetails depends on if the input pipeline generates "score"
+ * or "scoreDetails" metadata.
+ *
+ * Later, these individual input pipeline scoreDetails will be gathered together in order to build
+ * scoreDetails for the overall $rankFusion pipeline (see calculateFinalScoreDetails()).
+ */
+boost::intrusive_ptr<DocumentSource> addScoreDetails(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const std::string& prefix,
+    bool inputGeneratesScore,
+    bool inputGeneratesScoreDetails);
+
+/**
+ * Construct the scoreDetails field name and obj (ex: name_scoreDetails: {$mergeObjects:
+ * $name_scoreDetails}) for the grouping stage.
+ */
+std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(std::string pipelineName);
+
+// Calculate the final scoreDetails field for the entire stage. Creates the following object:
+/*
+    { $addFields: {
+        calculatedScoreDetails: [
+        {
+            $mergeObjects: [
+                {inputPipelineName: "name1", rank: "$name1_rank", weight: <weight>},
+                "$name1_scoreDetails"
+            ]
+        },
+        {
+            $mergeObjects: [
+                {inputPipelineName: "name2", rank: "$name2_rank", weight: <weight>},
+                "$name2_scoreDetails"
+            ]
+        },
+        ...
+        ]
+    }}
+*/
+boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs,
+    const StringMap<double>& weights,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
+ * Constuct the scoreDetails metadata object. Looks like the following:
+ * { "$setMetadata": {"scoreDetails": {"value": "$score", "description":
+ * {"scoreDetailsDescription..."}, "details": "$calculatedScoreDetails"}}},
+ */
+boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
+    const std::string& scoreDetailsDescription,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+}  // namespace score_details
 }  // namespace mongo::hybrid_scoring_util
