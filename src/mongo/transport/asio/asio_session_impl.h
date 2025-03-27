@@ -273,13 +273,6 @@ protected:
     template <typename Buffer>
     bool checkForHTTPRequest(const Buffer& buffers);
 
-    /**
-     * Called from read() to send an HTTP response back to a client that's trying to use HTTP
-     * over a native MongoDB port. This returns a Future<Message> to match its only caller, but it
-     * always contains an error, so it could really return Future<Anything>
-     */
-    Future<Message> sendHTTPResponse(const BatonHandle& baton = nullptr);
-
     bool shouldOverrideMaxConns(
         const std::vector<std::variant<CIDR, std::string>>& exemptions) const override;
 

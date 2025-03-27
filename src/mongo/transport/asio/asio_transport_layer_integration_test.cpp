@@ -61,44 +61,6 @@ private:
                                                               logv2::LogSeverity::Debug(4)};
 };
 
-TEST_F(AsioTransportLayerTest, HTTPRequestGetsHTTPError) {
-    auto connectionString = unittest::getFixtureConnectionString();
-    auto server = connectionString.getServers().front();
-
-    asio::io_context ioContext;
-    asio::ip::tcp::resolver resolver(ioContext);
-    asio::ip::tcp::socket socket(ioContext);
-
-    LOGV2(23028, "Connecting to server", "server"_attr = server);
-    auto resolverIt = resolver.resolve(server.host(), std::to_string(server.port()));
-    asio::connect(socket, resolverIt);
-
-    LOGV2(23029, "Sending HTTP request");
-    std::string httpReq = str::stream() << "GET /\r\n"
-                                           "Host: "
-                                        << server
-                                        << "\r\n"
-                                           "User-Agent: MongoDB Integration test\r\n"
-                                           "Accept: */*";
-    asio::write(socket, asio::buffer(httpReq.data(), httpReq.size()));
-
-    LOGV2(23030, "Waiting for response");
-    std::array<char, 256> httpRespBuf;
-    std::error_code ec;
-    auto size = asio::read(socket, asio::buffer(httpRespBuf.data(), httpRespBuf.size()), ec);
-    StringData httpResp(httpRespBuf.data(), size);
-
-    LOGV2(23031, "Received http response", "response"_attr = httpResp);
-    ASSERT_TRUE(httpResp.startsWith("HTTP/1.0 200 OK"));
-
-// Why oh why can't ASIO unify their error codes
-#ifdef _WIN32
-    ASSERT_EQ(ec, asio::error::connection_reset);
-#else
-    ASSERT_EQ(ec, asio::error::eof);
-#endif
-}
-
 class AsioAsyncClientIntegrationTest : public AsyncClientIntegrationTestFixture {
 public:
     void setUp() override {

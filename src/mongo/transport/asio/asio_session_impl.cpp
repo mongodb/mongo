@@ -544,10 +544,6 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
     _asyncOpState.start();
     return read(asio::buffer(ptr, kHeaderSize), baton)
         .then([headerBuffer = std::move(headerBuffer), this, baton]() mutable {
-            if (checkForHTTPRequest(asio::buffer(headerBuffer.get(), kHeaderSize))) {
-                return sendHTTPResponse(baton);
-            }
-
             const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
             if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
                 StringBuilder sb;
@@ -875,33 +871,6 @@ bool CommonAsioSession::checkForHTTPRequest(const Buffer& buffers) {
     invariant(asio::buffer_size(buffers) >= 4);
     const StringData bufferAsStr(asio::buffer_cast<const char*>(buffers), 4);
     return (bufferAsStr == "GET "_sd);
-}
-
-Future<Message> CommonAsioSession::sendHTTPResponse(const BatonHandle& baton) {
-    constexpr auto userMsg =
-        "It looks like you are trying to access MongoDB over HTTP"
-        " on the native driver port.\r\n"_sd;
-
-    static const std::string httpResp = str::stream() << "HTTP/1.0 200 OK\r\n"
-                                                         "Connection: close\r\n"
-                                                         "Content-Type: text/plain\r\n"
-                                                         "Content-Length: "
-                                                      << userMsg.size() << "\r\n\r\n"
-                                                      << userMsg;
-
-    return write(asio::buffer(httpResp.data(), httpResp.size()), baton)
-        .onError([](const Status& status) {
-            return Status(ErrorCodes::ProtocolError,
-                          str::stream()
-                              << "Client sent an HTTP request over a native MongoDB connection, "
-                                 "but there was an error sending a response: "
-                              << status.toString());
-        })
-        .then([] {
-            return StatusWith<Message>(
-                ErrorCodes::ProtocolError,
-                "Client sent an HTTP request over a native MongoDB connection");
-        });
 }
 
 bool CommonAsioSession::shouldOverrideMaxConns(
