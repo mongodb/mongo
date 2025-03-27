@@ -1292,8 +1292,6 @@ su
 subdir
 subdirectories
 subdirectory
-subfolder
-subfolders
 subget
 subgetraw
 subgets
@@ -1366,7 +1364,6 @@ uintAny
 ulock
 umount
 unallocated
-unbacked
 unbare
 unbuffered
 uncached

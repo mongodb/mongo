@@ -2499,39 +2499,6 @@ tasks:
 
   # End of Python unit test tasks
 
-  # Start of live restore tests
-
-  - name: live-restore-short
-    tags: ["pull_request"]
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/"
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            ../test/live_restore/short_test.sh
-
-  - name: live-restore-long
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/"
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            ../test/live_restore/long_test.sh
-
-  # End of live restore tests
-
   - name: s-all
     tags: ["lint"]
     commands:
@@ -5071,88 +5038,6 @@ tasks:
         vars:
           test-name: checkpoint-stress.wtperf
 
-  - name: perf-test-live-restore
-    tags: ["long-perf"]
-    patch_only: true
-    depends_on:
-      - name: perf-test-long-500m-btree-populate
-    commands:
-      - command: timeout.update
-        params:
-          exec_timeout_secs: 10800
-          timeout_secs: 10800
-      # Fetch the compile artifacts.
-      - func: "fetch artifacts"
-      # Fetch the database created by perf-test-long-500m-btree-populate task. This will be used
-      # as the source for live restore.
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: perf-test-long-500m-btree-populate
-          destination: "wiredtiger/cmake_build/bench/wtperf/SOURCE"
-      # Create an empty home directory to be used as the destination for live restore.
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/bench/wtperf"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            mkdir WT_TEST_0_0
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: 500m-btree-50r50u-live-restore.wtperf
-          maxruns: 1
-          no_create: true
-          wtarg: -ops ['"read", "update", "warnings", "max_latency_read_update"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: 500m-btree-50r50u-live-restore.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: 500m-btree-50r50u-live-restore.wtperf
-      - func: "cleanup"
-
-  - name: perf-test-live-restore-no-server
-    tags: ["long-perf"]
-    patch_only: true
-    depends_on:
-      - name: perf-test-long-500m-btree-populate
-    commands:
-      - command: timeout.update
-        params:
-          exec_timeout_secs: 10800
-          timeout_secs: 10800
-      # Fetch the compile artifacts.
-      - func: "fetch artifacts"
-      # Fetch the database created by perf-test-long-500m-btree-populate task. This will be used
-      # as the source for live restore.
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: perf-test-long-500m-btree-populate
-          destination: "wiredtiger/cmake_build/bench/wtperf/SOURCE"
-      # Create an empty home directory to be used as the destination for live restore.
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/bench/wtperf"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            mkdir WT_TEST_0_0
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: 500m-btree-50r50u-live-restore-no-server.wtperf
-          maxruns: 1
-          no_create: true
-          wtarg: -ops ['"read", "update", "warnings", "max_latency_read_update"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: 500m-btree-50r50u-live-restore-no-server.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: 500m-btree-50r50u-live-restore-no-server.wtperf
-      - func: "cleanup"
-
   - name: many-dhandle-stress
     depends_on:
       - name: compile
@@ -5400,7 +5285,6 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: csuite-long-running
       batchtime: 1440 # once a day
-    - name: live-restore-long
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -5423,7 +5307,6 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
-    - name: live-restore-long
 
 - name: ubuntu2004-tsan
   display_name: "! Ubuntu 20.04 TSAN"
@@ -6253,7 +6136,6 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
-    - name: live-restore-long
 
 - name: amazon2023-armv9-tsan
   display_name: "(ARMV9) Amazon Linux 2023 TSAN"

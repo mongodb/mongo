@@ -95,7 +95,7 @@ static const char *const uri_shadow = "shadow";
 static const char *const ckpt_file = "checkpoint_done";
 
 static bool backup_verify_immediately, backup_verify_quick;
-static bool columns, stress, use_backups, use_lazyfs, use_liverestore, use_ts, verify_model;
+static bool columns, stress, use_backups, use_lazyfs, use_ts, verify_model;
 static uint32_t backup_force_stop_interval, backup_full_interval, backup_granularity_kb;
 
 static TEST_OPTS *opts, _opts;
@@ -1083,7 +1083,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
     uint32_t i;
     int ret;
     char backup_dir[PATH_MAX], buf[PATH_MAX], fname[64], kname[64], verify_dir[PATH_MAX];
-    char open_cfg[256], ts_string[WT_TS_HEX_STRING_SIZE];
+    char ts_string[WT_TS_HEX_STRING_SIZE];
     bool fatal;
 
     if (backup_index == 0)
@@ -1108,14 +1108,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
         testutil_snprintf(backup_dir, sizeof(backup_dir), BACKUP_BASE "%" PRIu32, backup_index);
         testutil_snprintf(verify_dir, sizeof(verify_dir), CHECK_BASE "%" PRIu32, backup_index);
         testutil_remove(CHECK_BASE "*");
-        if (use_liverestore) {
-            testutil_mkdir(verify_dir);
-            testutil_snprintf(
-              open_cfg, sizeof(open_cfg), "live_restore=(enabled=true,path=%s)", backup_dir);
-        } else {
-            testutil_copy(backup_dir, verify_dir);
-            testutil_snprintf(open_cfg, sizeof(open_cfg), "live_restore=(enabled=false)");
-        }
+        testutil_copy(backup_dir, verify_dir);
 
         /*
          * Open the database connection to the backup. But don't pass the general event handler, so
@@ -1123,8 +1116,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
          * trying to create it would cause the test to abort as we currently allow only one
          * statistics thread at a time.
          */
-        printf("Recover_and_verify: Open %s with config %s\n", verify_dir, open_cfg);
-        testutil_wiredtiger_open(opts, verify_dir, open_cfg, &other_event, &conn, true, false);
+        testutil_wiredtiger_open(opts, verify_dir, NULL, &other_event, &conn, true, false);
     }
 
     /* Sleep to guarantee the statistics thread has enough time to run. */
@@ -1435,11 +1427,8 @@ main(int argc, char *argv[])
             if (num_iterations == 0)
                 num_iterations = 1;
             break;
-        case 'L':
-            use_lazyfs = true;
-            break;
         case 'l':
-            use_liverestore = true;
+            use_lazyfs = true;
             break;
         case 'M':
             verify_model = true;

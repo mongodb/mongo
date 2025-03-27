@@ -36,6 +36,7 @@ __wt_lex_compare_skip
 __wt_log_scan
 __wt_nlpo2
 __wt_nlpo2_round
+__wt_os_live_restore_fs
 __wt_session_breakpoint
 __wt_strcat
 __wt_stream_set_no_buffer
