@@ -856,7 +856,8 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                   "Could not build index key ",
                   "indexName"_attr = descriptor->indexName(),
                   "recordId"_attr = recordId,
-                  "record"_attr = redact(recordBson));
+                  "record"_attr = redact(recordBson),
+                  "error"_attr = ex.toString());
             results->addError(str::stream()
                                   << "Could not build key for index '" << descriptor->indexName()
                                   << "' from document with recordId '" << recordId << "'",
