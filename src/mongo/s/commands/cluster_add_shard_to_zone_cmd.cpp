@@ -116,20 +116,20 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
-                            ActionType::enableSharding));
+            auto* as = AuthorizationSession::get(opCtx->getClient());
 
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forExactNamespace(
-                                NamespaceString::kConfigsvrShardsNamespace),
-                            ActionType::update));
+            if (as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                    ActionType::enableSharding)) {
+                return;
+            }
+            if (as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(NamespaceString::kConfigsvrShardsNamespace),
+                    ActionType::update)) {
+                return;
+            }
+
+            uasserted(ErrorCodes::Unauthorized, "Unauthorized");
         }
     };
 
