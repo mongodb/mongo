@@ -1,7 +1,7 @@
 test_kind: cpp_unit_test
 
 selector:
-  root: build/unittests.txt
+  root: bazel-bin/install/install-mongo_unittest_test_list.txt
   include_files:
     - build/**/pipeline/*
     - build/**/query/*

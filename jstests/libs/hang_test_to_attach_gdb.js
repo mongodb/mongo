@@ -27,7 +27,7 @@ function isTimeToWake(waitFor) {
  *
  * Once you have your test hanging, you can use the 'ps' tool to find the process id (pid) of the
  * target node, and then do something like:
- * /opt/mongodbtoolchain/v4/bin/gdb build/install/bin/mongod
+ * /opt/mongodbtoolchain/v4/bin/gdb bazel-bin/install/bin/mongod
  * ...
  * (gdb prompt) attach <pid>
  *

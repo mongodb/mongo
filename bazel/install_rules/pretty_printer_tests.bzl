@@ -8,8 +8,7 @@ def mongo_pretty_printer_test_impl(ctx):
     # eg optimizer_gdb_test
     short_name = split_name[-1]
 
-    # eg /install-dist-test/bin/
-    final_output_directory = "/" + "-".join(split_name[:-1]) + "/bin/"
+    final_output_directory = "bazel-bin/install/bin/"
 
     runnable_binary = None
     for file in ctx.attr.test_binary.files.to_list():
@@ -49,8 +48,8 @@ def mongo_pretty_printer_test_impl(ctx):
             "--gdb-path=" + "/opt/mongodbtoolchain/v4/bin/gdb",
             # This is due to us being dependent on the final location of installed binaries - ideally we don't do this and run the tests
             # in place and not from another directory
-            "--final-binary-path=" + ctx.bin_dir.path + final_output_directory + runnable_binary.basename,
-            "--final-pretty-printer-path=" + ctx.bin_dir.path + final_output_directory + script_output.basename,
+            "--final-binary-path=" + final_output_directory + runnable_binary.basename,
+            "--final-pretty-printer-path=" + final_output_directory + script_output.basename,
             "--pretty-printer-launcher-output=" + launcher_output.path,
         ],
         mnemonic = "MongoPrettyPrinterTestCreation",

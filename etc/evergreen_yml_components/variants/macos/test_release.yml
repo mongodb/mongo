@@ -19,13 +19,9 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: macos
       push_arch: arm64
-      compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-      compile_flags: >-
-        --ssl
-        -j$(sysctl -n hw.logicalcpu)
-        --libc++
-        --variables-files=etc/scons/xcode_macosx_arm.vars
-        --modules=
+      bazel_compile_flags: >-
+        --build_enterprise=False
+        --developer_dir=/Applications/Xcode15.app
       resmoke_jobs_max: 6
       compile_variant: macos-arm64
     tasks:
@@ -43,18 +39,13 @@ buildvariants:
     expansions:
       test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       push_path: osx
       push_bucket: downloads.10gen.com
       push_name: macos
       push_arch: arm64-enterprise
-      compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-      compile_flags: >-
-        --ssl
-        -j$(sysctl -n hw.logicalcpu)
-        --libc++
-        --variables-files=etc/scons/xcode_macosx_arm.vars
+      bazel_compile_flags: --developer_dir=/Applications/Xcode15.app
       resmoke_jobs_max: 6
       compile_variant: enterprise-macos-arm64
     tasks:
@@ -77,13 +68,9 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: macos
       push_arch: x86_64
-      compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-      compile_flags: >-
-        --ssl
-        -j$(sysctl -n hw.logicalcpu)
-        --libc++
-        --variables-files=etc/scons/xcode_macosx.vars
-        --modules=
+      bazel_compile_flags: >-
+        --build_enterprise=False
+        --developer_dir=/Applications/Xcode15.app
       resmoke_jobs_max: 6
       compile_variant: macos
     tasks:
@@ -101,18 +88,13 @@ buildvariants:
     expansions:
       test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       push_path: osx
       push_bucket: downloads.10gen.com
       push_name: macos
       push_arch: x86_64-enterprise
-      compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-      compile_flags: >-
-        --ssl
-        -j$(sysctl -n hw.logicalcpu)
-        --libc++
-        --variables-files=etc/scons/xcode_macosx.vars
+      bazel_compile_flags: --developer_dir=/Applications/Xcode15.app
       resmoke_jobs_max: 6
       compile_variant: enterprise-macos
     tasks:

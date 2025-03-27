@@ -21,6 +21,14 @@ filegroup(
         "//conditions:default": [],
     }),
 )
+
+filegroup(
+    name = "vc_redist_x64",
+    srcs = select({
+        "@platforms//os:windows": glob(["**/vc_redist.x64.exe"]),
+        "//conditions:default": [],
+    }),
+)
 """,
         )
     else:

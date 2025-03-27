@@ -12,7 +12,7 @@ buildvariants:
     run_on:
       - windows-2022-small
     expansions:
-      additional_package_targets: msi
+      additional_package_targets: //src/mongo/installer/msi:mongodb-win32-x86_64-windows
       exe: ".exe"
       push_path: windows
       push_bucket: downloads.mongodb.org
@@ -21,16 +21,11 @@ buildvariants:
       multiversion_platform: windows
       multiversion_edition: base
       content_type: application/zip
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=windows
-        -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-        --win-version-min=win10
-        --modules=
-      num_scons_link_jobs_available: 0.25
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=windows
+        --build_enterprise=False
       python: "/cygdrive/c/python/python310/python.exe"
       ext: zip
-      scons_cache_scope: shared
       large_distro_name: windows-2022-large
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source
@@ -59,19 +54,14 @@ buildvariants:
     expansions:
       exe: ".exe"
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
-        msi
+        //src/mongo/installer/msi:mongodb-win32-x86_64-windows
       content_type: application/zip
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=windows
-        -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-        --win-version-min=win10
-      num_scons_link_jobs_available: 0.2
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=windows
       python: "/cygdrive/c/python/python310/python.exe"
       ext: zip
-      scons_cache_scope: shared
       multiversion_platform: windows
       multiversion_edition: enterprise
       jstestfuzz_num_generated_files: 35

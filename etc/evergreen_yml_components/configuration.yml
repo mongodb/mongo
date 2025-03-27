@@ -59,8 +59,6 @@ parameters:
   - key: project_weekly_cron
     value: "0 4 * * 0" # Every week starting 0400 UTC Sunday
     description: "Cron schedule for nightly variants"
-  - key: bazel_scons_diff_targets
-    description: "Targets to run the bazel-scons diff on in this patch"
   - key: convert_bazel_headers_target
     description: "Target to generate bazel headers for"
 
@@ -89,7 +87,6 @@ post:
   - func: "f_expansions_write"
   - func: "cleanup external auth OIDC resources"
   - func: "upload npm logs"
-  - func: "attach scons logs"
   - func: "attach local resmoke invocation"
   - func: "attach bazel invocation"
   - func: "create bazel test report"
@@ -111,7 +108,6 @@ post:
   - func: "save mongo coredumps"
   - func: "generate hang analyzer tasks"
   - func: "save failed unittests"
-  - func: "save unstripped dbtest"
   - func: "save hang analyzer debugger files"
   - func: "save disk statistics"
   - func: "save system resource information"
@@ -135,7 +131,6 @@ post:
         ${report_file|src/report.json}
         ${archive_file|src/archive.json}
         src/network_diagnostics.txt
-  - func: "umount shared scons directory"
   - func: "umount tmp directory"
   - func: "cleanup FUSE watchdog"
   - func: "cleanup environment"

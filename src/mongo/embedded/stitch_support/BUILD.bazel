@@ -9,8 +9,74 @@ exports_files(
     ]),
 )
 
+# make sure to modify stitch_support_for_test if you modify this definition
 mongo_cc_library(
     name = "stitch_support",
+    srcs = [
+        "stitch_support.cpp",
+    ],
+    hdrs = [
+        "stitch_support.h",
+        "//src/mongo/embedded:api_common.h",
+    ],
+    additional_linker_inputs = select({
+        "@platforms//os:linux": [
+            ":libstitch_support.version_script.lds",
+        ],
+        "@platforms//os:macos": [
+            ":libstitch_support.exported_symbols_list.lds",
+        ],
+        "@platforms//os:windows": [
+            ":stitch_support.def",
+        ],
+        "//conditions:default": [],
+    }),
+    copts = [
+        "-Isrc/mongo/embedded",
+    ],
+    linkshared = True,
+    local_defines = [
+        "STITCH_SUPPORT_COMPILING",
+    ] + select({
+        "//bazel/config:linkstatic_enabled": [
+            "STITCH_SUPPORT_STATIC",
+        ],
+        "//conditions:default": [],
+    }),
+    non_transitive_dyn_linkopts = select({
+        "@platforms//os:linux": [
+            "-Wl,--version-script=$(location :libstitch_support.version_script.lds)",
+        ],
+        "@platforms//os:macos": [
+            "-Wl,-exported_symbols_list,$(location :libstitch_support.exported_symbols_list.lds)",
+        ],
+        "@platforms//os:windows": [
+            "/DEF:$(location :stitch_support.def)",
+        ],
+        "//conditions:default": [],
+    }),
+    shared_lib_name = select({
+        "@platforms//os:windows": "stitch_support_shared_with_debug.dll",
+        "//conditions:default": "stitch_support_shared_with_debug.so",
+    }),
+    tags = ["stitch_support"],
+    target_compatible_with = select({
+        "//bazel/config:shared_archive_or_link_dynamic": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:vector_clock_trivial",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query/collation:collator_factory_icu",
+        "//src/mongo/db/query/collation:collator_factory_interface",
+        "//src/mongo/db/query/write_ops:parsed_update",
+    ],
+)
+
+# This is a duplicate definition so we can build a regular .so file for testing
+mongo_cc_library(
+    name = "stitch_support_duplicate",
     srcs = [
         "stitch_support.cpp",
     ],
@@ -82,7 +148,7 @@ mongo_cc_unit_test(
         "//conditions:default": [],
     }),
     deps = [
-        "stitch_support",
+        "stitch_support_duplicate",
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/unittest",
     ],

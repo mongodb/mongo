@@ -13,14 +13,8 @@ buildvariants:
     expansions:
       compile_variant: *enterprise-macos-arm64
       test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-      compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-      compile_flags: >-
-        --ssl
-        -j$(sysctl -n hw.logicalcpu)
-        --libc++
-        --variables-files=etc/scons/xcode_macosx_arm.vars
+      bazel_compile_flags: --developer_dir=/Applications/Xcode15.app
       resmoke_jobs_max: 6
-      num_scons_link_jobs_available: 0.99
     tasks:
       - name: compile_test_serial_TG
       - name: compile_test_parallel_unittest_stream_TG

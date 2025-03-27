@@ -1,14 +1,13 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
-load("//bazel/install_rules:install_rules.bzl", "mongo_install")
+load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "mongo_install")
 load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
 load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("@npm//:prettier/package_json.bzl", prettier = "bin")
 load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
-load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
-load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS")
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -175,6 +174,59 @@ mongo_install(
     ],
 )
 
+mongo_install(
+    name = "mongocryptd",
+    srcs = [],
+    deps = [
+        "//src/mongo/db/modules/enterprise:mongocryptd",
+    ],
+)
+
+# This reflects the package that actually gets released during packaging. Be careful
+# when changing this definition
+mongo_install(
+    name = "dist",
+    srcs = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/installer/compass:compass_files",
+        "//src/mongo/s:mongos",
+    ] + select({
+        "@platforms//os:windows": ["@local_windows_msvc//:vc_redist_x64"],
+        "//conditions:default": [],
+    }),
+    package_extract_name = select({
+        "//bazel/config:build_enterprise_linux_enabled": "mongodb-linux-{TARGET_CPU}-enterprise-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_linux_disabled": "mongodb-linux-{TARGET_CPU}-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_windows_enabled": "mongodb-win32-{TARGET_CPU}-enterprise-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_windows_disabled": "mongodb-win32-{TARGET_CPU}-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_mac_enabled": "mongodb-macos-{TARGET_CPU}-enterprise-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_mac_disabled": "mongodb-macos-{TARGET_CPU}-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//conditions:default": "mongodb-{TARGET_CPU}-{MONGO_DISTMOD}-{MONGO_VERSION}",
+    }),
+    publish_debug_in_stripped = select({
+        "@platforms//os:windows": True,
+        "//conditions:default": False,
+    }),
+    deps = [
+        "//src/mongo/db/modules/enterprise:dist",
+    ],
+)
+
+filegroup(
+    name = "archive_license_files",
+    srcs = [
+        "//distsrc:mpl",
+        "//distsrc:readme",
+        "//distsrc:third_party_notices",
+    ] + select({
+        "//bazel/config:build_enterprise_enabled": ["//src/mongo/db/modules/enterprise/distsrc:enterprise_license"],
+        "//conditions:default": ["//distsrc:community_license"],
+    }) + select({
+        "//bazel/config:build_enterprise_windows_enabled": ["//src/mongo/db/modules/enterprise/distsrc:windows_notices"],
+        "//conditions:default": [],
+    }),
+)
+
 copy_to_directory(
     name = "mongot_folder",
     srcs = select({
@@ -221,14 +273,19 @@ mongo_install(
 )
 
 mongo_install(
-    name = "mongo-crypt",
-    srcs = [
-        "//src/mongo/db:service_context_non_d",
-        "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/util/options_parser",
-    ],
+    name = "mongo_crypt",
+    srcs = [],
+    package_extract_name = "/",
     deps = [
-        "//src/mongo/db/modules/enterprise:mongo-crypt",
+        "//src/mongo/db/modules/enterprise:mongo_crypt",
+    ],
+)
+
+mongo_install(
+    name = "mongo_crypt_shlib_test",
+    srcs = [],
+    deps = [
+        "//src/mongo/db/modules/enterprise:mongo_crypt_shlib_test",
     ],
 )
 
@@ -253,10 +310,28 @@ mongo_install(
     ],
 )
 
+# This is because the install system hardlinks files so permission changes end up
+# being reflected on the source code version without this copy
+copy_file(
+    name = "stitch_header",
+    src = "//src/mongo/embedded/stitch_support:stitch_support.h",
+    out = "copied_files/stitch_support.h",
+)
+
 mongo_install(
-    name = "stitch_support_dev",
+    name = "stitch_support",
+    srcs = ["//src/mongo/embedded/stitch_support"],
+    package_extract_name = "/",
+    root_files = {
+        "stitch_header": "include/stitch_support/v1/stitch_support",
+    },
+)
+
+mongo_install(
+    name = "stitch_support_test",
+    testonly = True,
     srcs = [
-        "//src/mongo/embedded/stitch_support",
+        "//src/mongo/embedded/stitch_support:stitch_support_test",
     ],
 )
 
@@ -275,4 +350,19 @@ mongo_install(
         }),
     )
     for target_name in TEST_TAGS.keys()
+    if target_name != "mongo_integration_test"
 ]
+
+mongo_install(
+    name = "mongo_integration_test",
+    testonly = True,
+    srcs = select({
+        "//bazel/config:include_autogenerated_targets_enabled": [
+            "//src/mongo/db:mongod",
+            "//src/mongo/db/modules/enterprise/autogenerated_targets:mongo_integration_test",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+        ],
+        "//conditions:default": [],
+    }),
+)

@@ -34,15 +34,12 @@ variables:
     tasks: []
     setup_task:
       - func: "f_expansions_write"
-      - func: "apply compile expansions"
-      - func: "f_expansions_write"
       - func: "set task expansion macros"
       - func: "f_expansions_write"
       - func: "get engflow creds"
       - func: "fetch pgo profile"
     teardown_task:
       - func: "f_expansions_write"
-      - func: "attach scons logs"
       - func: "attach report"
       - func: "attach artifacts"
       - func: "attach local resmoke invocation"
@@ -52,7 +49,6 @@ variables:
       - func: "save mongo coredumps"
       - func: "generate hang analyzer tasks"
       - func: "save failed unittests"
-      - func: "save unstripped dbtest"
       - func: "save bazel headers"
       - func: "save bazel jvm dump"
       - func: "save hang analyzer debugger files"
@@ -99,11 +95,8 @@ variables:
       - func: "f_expansions_write"
       - func: "set up win mount script"
       - func: "f_expansions_write"
-      - func: "generate compile expansions"
-      - func: "f_expansions_write"
     teardown_group:
       - func: "f_expansions_write"
-      - func: "umount shared scons directory"
       - func: "cleanup environment"
     timeout:
       - func: "f_expansions_write"
@@ -163,50 +156,6 @@ variables:
 #                    Tasks                     #
 ################################################
 tasks:
-  ## compile - build bazel targets ##
-  ## The bazel migration is in progress & this
-  ## task ensures we can build with bazel.
-  - name: bazel_workstation_unittests
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "get engflow creds"
-      - func: "scons compile"
-        vars:
-          targets: >-
-            install-all
-            archive-all
-          bazel_build_tags: --bazel-build-tag=all
-          task_compile_flags: >-
-            ICECC=
-            CCACHE=
-            --build-profile=opt
-            --ninja=disabled
-            --keep-going
-      - command: s3.put
-        params:
-          optional: true
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: src/all-runtime.tgz
-          remote_file: ${all_mongo_binaries}
-          bucket: mciuploads
-          permissions: public-read
-          content_type: application/gzip
-          display_name: Binaries
-      - func: "scons compile"
-        vars:
-          targets: >-
-            prove-unittests
-          task_compile_flags: >-
-            ICECC=
-            CCACHE=
-            --build-profile=opt
-            --ninja=disabled
-            --keep-going
-
   # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
   - name: compile_dist_test_quick
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
@@ -214,20 +163,15 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
           targets: >-
-            build/opt/mongo/db/commands/libfsync_locked.a
-            build/opt/mongo/db/commands/libtest_commands_enabled.a
-          task_compile_flags: >-
-            ICECC=
-            --build-profile=opt
-            --ninja=disabled
-            --link-model=static
-            --modules=
+            //src/mongo/db/commands:fsync_locked_with_debug
+          bazel_args: >-
+            --config=evg
       - func: "verify build output present"
         vars:
-          output: build/opt/mongo/db/commands/libfsync_locked.a
+          output: bazel-bin/src/mongo/db/commands/libfsync_locked_with_debug.lo
 
   - name: run_bazel_program
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
@@ -250,7 +194,7 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: archive-dist-test
-          args: --config=opt --separate_debug=True
+          bazel_args: --config=opt --separate_debug=True
       - func: "run tests"
         vars:
           suite: core
@@ -274,7 +218,7 @@ tasks:
           targets: //src/...
           # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
           # on CppCompile as CppLink is performed locally and not cached remotely.
-          args: >-
+          bazel_args: >-
             --config=fastbuild
             --define GIT_COMMIT_HASH=nogitversion
             --output_groups=compilation_outputs
@@ -296,7 +240,7 @@ tasks:
         vars:
           targets: //src/...
           # TODO(SERVER-99213): limit to --jobs 32 once fission is enabled by default in CI
-          args: >-
+          bazel_args: >-
             --config=opt
             --define GIT_COMMIT_HASH=nogitversion
             --output_groups=compilation_outputs
@@ -319,7 +263,7 @@ tasks:
           targets: //src/...
           # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
           # on CppCompile as CppLink is performed locally and not cached remotely.
-          args: >-
+          bazel_args: >-
             --config=dbg
             --define GIT_COMMIT_HASH=nogitversion
             --output_groups=compilation_outputs
@@ -342,7 +286,7 @@ tasks:
           targets: //src/...
           # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
           # on CppCompile as CppLink is performed locally and not cached remotely.
-          args: >-
+          bazel_args: >-
             --config=dbg_aubsan
             --define GIT_COMMIT_HASH=nogitversion
             --output_groups=compilation_outputs
@@ -365,7 +309,7 @@ tasks:
           targets: //src/...
           # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
           # on CppCompile as CppLink is performed locally and not cached remotely.
-          args: >-
+          bazel_args: >-
             --config=dbg_tsan
             --define GIT_COMMIT_HASH=nogitversion
             --output_groups=compilation_outputs
@@ -375,7 +319,7 @@ tasks:
   - <<: *clang_tidy_task_template
     name: run_bazel_clang_tidy
     commands:
-      - func: "do scons setup"
+      - func: "do bazel setup"
       - func: "bazel compile"
         vars:
           # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
@@ -397,39 +341,26 @@ tasks:
           args: >-
             --compilation_mode=dbg
 
-  ## compile - build all scons targets except unittests ##
-  - name: compile_dist_test_half
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          targets: >-
-            compile_first_half_non_test_source
-            ${additional_compile_targets|}
-          task_compile_flags: >-
-            PREFIX=dist-test
-
   - name: compile_upload_benchmarks
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
           targets: >-
-            install-benchmarks
-            archive-benchmarks
-          bazel_build_tags: --bazel-build-tag=mongo_benchmark --bazel-build-tag=mongo_library --bazel-build-tag=-repl_bm --bazel-build-tag=-query_bm --bazel-build-tag=-bsoncolumn_bm --bazel-build-tag=-first_half_bm --bazel-build-tag=-second_half_bm --bazel-build-tag=-storage_bm --bazel-build-tag=-sharding_bm --bazel-build-tag=-sep_bm
+            archive-mongo_benchmark-stripped
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --build_tag_filters=-repl_bm,-query_bm,-bsoncolumn_bm,-first_half_bm,-second_half_bm,-storage_bm,-sharding_bm,-sep_bm
           compiling_for_test: true
       - command: s3.put
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: src/benchmarks.${ext|tgz}
+          local_file: src/bazel-bin/mongo_benchmark-stripped.${ext|tgz}
           remote_file: ${mongo_benchmarks}
           bucket: mciuploads
           permissions: public-read
@@ -443,116 +374,68 @@ tasks:
     depends_on:
       - name: compile_upload_benchmarks
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
           targets: >-
-            install-benchmarks-debug
-            archive-benchmarks-debug
+            archive-mongo_benchmark-debug
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --build_tag_filters=-repl_bm,-query_bm,-bsoncolumn_bm,-first_half_bm,-second_half_bm,-storage_bm,-sharding_bm,-sep_bm
           compiling_for_test: true
       - command: s3.put
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: src/benchmarks-debugsymbols.${ext|tgz}
+          local_file: src/bazel-bin/mongo_benchmark-debug.${ext|tgz}
           remote_file: ${mongo_benchmarks_debugsymbols}
           bucket: mciuploads
           permissions: public-read
           content_type: application/tar
           display_name: Benchmarks Debug
 
-  - name: libdeps_graph_linting
-    tags:
-      [
-        "assigned_to_jira_team_devprod_build",
-        "development_critical_single_variant",
-      ]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "do scons setup"
-      - func: "f_expansions_write"
-
-      - func: "scons compile"
-        vars:
-          task_compile_flags: >-
-            --link-model=dynamic
-            --force-macos-dynamic-link
-            --build-tools=next
-          targets: generate-libdeps-graph
-          bazel_build_tags: --bazel-build-tag=all
-      - command: subprocess.exec
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/libdeps_setup.sh"
-
-      - command: subprocess.exec
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/libdeps_run.sh"
-
-      - command: s3.put
-        params:
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: src/results.txt
-          remote_file: ${project}/${build_variant}/${revision}/artifacts/libdeps-results.txt.${build_id}-${task_name}.${execution}
-          bucket: mciuploads
-          permissions: public-read
-          content_type: text/plain
-          display_name: Libdeps Linter Results
-
-      - command: s3.put
-        params:
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: src/libdeps.graphml.gz
-          remote_file: ${project}/${build_variant}/${revision}/artifacts/libdeps.graphml.${build_id}-${task_name}.${execution}.gz
-          bucket: mciuploads
-          permissions: public-read
-          content_type: ${content_type|application/gzip}
-          display_name: Libdeps Graph Data
-
-  ## compile_all - build all scons targets ##
+  ## compile_all - build all bazel targets ##
   - name: compile_all_future_git_tag_multiversion
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
-      - name: compile_dist_test_future_git_tag_multiversion
+      - name: version_expansions_future_git_tag_multiversion_gen
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-all-meta
-          bazel_build_tags: --bazel-build-tag=all
+          targets: //src/...
+          bazel_args: >-
+            --config=evg
           compiling_for_test: true
 
   - name: compile_all_but_not_unittests
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
-      - name: compile_dist_test
+      - name: archive_dist_test
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-all-meta-but-not-unittests
+          targets: //src/...
           compiling_for_test: true
           # The executables generated by the install-all target are not used after successfully being
           # compiled. We therefore link them without debug symbols to compile them faster.
-          task_compile_flags: >-
-            ${compile_all_but_not_unittests_flags|BAZEL_FLAGS=--linkopt=-s}
-          skip_archive: on
-          bazel_build_tags: --bazel-build-tag=-mongo_unittest --bazel-build-tag=mongo_binary --bazel-build-tag=mongo_benchmark --bazel-build-tag=mongo_integration_test
+          bazel_args: >-
+            --config=evg
+            --build_tag_filters=-mongo_unittest,mongo_binary,mongo_benchmark,mongo_integration_test
+            --linkopt=-s
+            ${compile_all_but_not_unittests_flags|--linkopt=-s}
 
   ## compile_unittests ##
   - name: compile_unittests_future_git_tag_multiversion
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
-      - name: compile_dist_test_future_git_tag_multiversion
+      - name: version_expansions_future_git_tag_multiversion_gen
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-unittests install-unittests-debug
-          bazel_build_tags: --bazel-build-tag=mongo_unittest --bazel-build-tag=mongo_binary_unittest
+          targets: install-mongo_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
           compiling_for_test: true
 
   - name: compile_libraries_for_unittests
@@ -562,13 +445,15 @@ tasks:
         variant: generate-tasks-for-version
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
           # Target the conf to just run the bazel part of the build
-          targets: \$BUILD_ROOT/scons/\$VARIANT_DIR/sconf_temp
+          targets: //src/...
           compiling_for_test: true
           task_compile_flags: ${unittest_library_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_library
+          bazel_args: >-
+            --config=evg
+            --build_tag_filters=mongo_library
 
   - name: compile_and_run_unittests_first_group
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
@@ -578,12 +463,14 @@ tasks:
       - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-first_group_unittests install-first_group_unittests-debug
+          targets: install-mongo_unittest_first_group
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_first_group --bazel-build-tag=mongo_binary_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -592,7 +479,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests_first_group
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_second_group
@@ -603,12 +490,14 @@ tasks:
       - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-second_group_unittests install-second_group_unittests-debug
+          targets: install-mongo_unittest_second_group
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_second_group --bazel-build-tag=mongo_binary_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -617,7 +506,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests_second_group
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_third_group
@@ -628,12 +517,14 @@ tasks:
       - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-third_group_unittests install-third_group_unittests-debug
+          targets: install-mongo_unittest_third_group
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_third_group --bazel-build-tag=mongo_binary_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -642,7 +533,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests_third_group
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_fourth_group
@@ -653,12 +544,14 @@ tasks:
       - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-fourth_group_unittests install-fourth_group_unittests-debug
+          targets: install-mongo_unittest_fourth_group
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_fourth_group --bazel-build-tag=mongo_binary_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -667,7 +560,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests_fourth_group
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_fifth_group
@@ -678,12 +571,14 @@ tasks:
       - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-fifth_group_unittests install-fifth_group_unittests-debug
+          targets: install-mongo_unittest_fifth_group
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_fifth_group --bazel-build-tag=mongo_binary_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -692,7 +587,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests_fifth_group
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_sixth_group
@@ -703,12 +598,14 @@ tasks:
       - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-sixth_group_unittests install-sixth_group_unittests-debug
+          targets: install-mongo_unittest_sixth_group
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_sixth_group --bazel-build-tag=mongo_binary_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -717,7 +614,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests_sixth_group
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_seventh_group
@@ -728,12 +625,14 @@ tasks:
       - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-seventh_group_unittests install-seventh_group_unittests-debug
+          targets: install-mongo_unittest_seventh_group
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_seventh_group --bazel-build-tag=mongo_binary_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -742,7 +641,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests_seventh_group
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_eighth_group
@@ -753,12 +652,14 @@ tasks:
       - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-eighth_group_unittests install-eighth_group_unittests-debug
+          targets: install-mongo_unittest_eighth_group
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_eighth_group --bazel-build-tag=mongo_binary_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -767,7 +668,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests_eighth_group
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
   ## run_unittests ##
@@ -784,7 +685,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: unittests
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
 
   ##compile_and_archive_libfuzzertests - build libfuzzertests ##
   - name: compile_and_archive_libfuzzertests
@@ -793,17 +694,19 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: archive-fuzzertests
+          targets: archive-mongo_fuzzer_test
           compiling_for_test: true
-          bazel_build_tags: --bazel-build-tag=dist_test --bazel-build-tag=mongo_fuzzer_test
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
       # Store the fuzzer executable, which we use to generate and run fuzzer inputs.
       - command: s3.put
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: "src/fuzzertests-runtime.tgz"
+          local_file: "src/bazel-bin/mongo_fuzzer_test.${ext|tgz}"
           remote_file: "${project}/libfuzzer-tests/${build_variant}/${revision}/libfuzzer-tests.tgz"
           bucket: mciuploads
           permissions: private
@@ -816,19 +719,18 @@ tasks:
     name: compile_dbtest
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
-      - name: compile_dist_test
+      - name: archive_dist_test
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-dbtest install-dbtest-debug
-          compiling_for_test: true
-          skip_archive: on
-          bazel_build_tags: --bazel-build-tag=dbtest
+          targets: install-dbtest
+          bazel_args: >-
+            --config=evg
 
   - <<: *compile_dbtest
     name: compile_dbtest_future_git_tag_multiversion
     depends_on:
-      - name: compile_dist_test_future_git_tag_multiversion
+      - name: version_expansions_future_git_tag_multiversion_gen
 
   ## run_dbtest ##
   - &run_dbtest
@@ -845,7 +747,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: dbtest
-          install_dir: build/install/bin
+          install_dir: bazel-bin/install/bin
 
   - <<: *run_dbtest
     name: run_dbtest_future_git_tag_multiversion
@@ -858,12 +760,22 @@ tasks:
     depends_on:
       - name: compile_dbtest
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: archive-dbtest archive-dbtest-debug
-          compiling_for_test: true
-          skip_archive: on
-          bazel_build_tags: --bazel-build-tag=dbtest
+          targets: archive-dbtest
+          bazel_args: >-
+            --config=evg
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/dbtest.${ext|tgz}
+          remote_file: ${project}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: dbtest binary - Execution ${execution}
+          optional: true
 
   - <<: *archive_dbtest
     name: archive_dbtest_future_git_tag_multiversion
@@ -873,14 +785,15 @@ tasks:
   - name: compile_integration_test
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
-      - name: compile_dist_test
+      - name: archive_dist_test
     commands:
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-integration-tests
-          skip_archive: on
+          targets: install-mongo_integration_test
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
           task_compile_flags: ${integration_test_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_integration_test --bazel-build-tag=dist_test
           compiling_for_test: true
 
   - name: archive_jstestshell
@@ -892,24 +805,23 @@ tasks:
       - func: "activate task"
         vars:
           task_to_activate: archive_jstestshell_debug
-      - func: "scons compile"
+      - func: "bazel compile"
         vars: &archive_jstestshell_vars
-          targets: archive-jstestshell
-          compiling_for_test: true
-          separate_debug: on
-          skip_archive: on
-          bazel_build_tags: --bazel-build-tag=jstestshell
+          targets: archive-mongo-stripped
+          bazel_args: >-
+            --config=evg
           task_compile_flags: >-
-            PREFIX=dist-test
-            --link-model=static
-            --dbg=on
+            --asan=False
+            --tsan=False
+            --ubsan=False
+            --linkstatic=True
+            --dbg=True
             --opt=on
-            --sanitize=
       - command: s3.put
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: src/mongodb-jstestshell.${ext|tgz}
+          local_file: src/bazel-bin/mongo-stripped.${ext|tgz}
           remote_file: ${mongo_jstestshell}
           bucket: mciuploads
           permissions: public-read
@@ -922,16 +834,15 @@ tasks:
       - name: archive_jstestshell
     commands:
       - func: "f_expansions_write"
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
           <<: *archive_jstestshell_vars
-          targets: archive-jstestshell-debug
-          skip_archive: on
+          targets: archive-mongo-debug
       - command: s3.put
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: src/mongodb-jstestshell-debugsymbols.${ext|tgz}
+          local_file: src/bazel-bin/mongo-debug.${ext|tgz}
           remote_file: ${mongo_jstestshell_debugsymbols}
           bucket: mciuploads
           permissions: public-read
@@ -952,29 +863,20 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "do scons setup"
+      - func: "do bazel setup"
       - func: "f_expansions_write"
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-stitch-support install-stitch-support-debug install-stitch-support-dev
-          bazel_build_tags: --bazel-build-tag=stitch_support
-          task_compile_flags: >-
-            --link-model=dynamic-sdk
-            --ssl=off
-            --enable-http-client=off
-            --modules=
-            DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
+          targets: archive-stitch_support
+          bazel_args: >-
+            --config=evg_stitch
+          task_compile_flags: --linkstatic=True
       - func: "f_expansions_write"
-      - command: subprocess.exec
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/stitch_support_create_lib_tar.sh"
       - command: s3.put
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: "src/build/stitch-support.tgz"
+          local_file: "src/bazel-bin/stitch_support.${ext|tgz}"
           remote_file: "${project}/stitch-support/${build_variant}/${revision}/stitch-support-${version}.tgz"
           bucket: mciuploads
           permissions: public-read
@@ -995,18 +897,14 @@ tasks:
     depends_on:
       - name: stitch_support_create_lib
     commands:
-      - func: "do scons setup"
+      - func: "do bazel setup"
       - func: "f_expansions_write"
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: install-stitch-support-test
-          bazel_build_tags: --bazel-build-tag=stitch_support_test
+          targets: install-stitch_support_test
           compiling_for_test: true
-          task_compile_flags: >-
-            --ssl=off
-            --enable-http-client=off
-            --modules=
-            DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
+          bazel_args: >-
+            --config=evg_stitch_test
       - func: "get and apply version expansions"
       - func: "f_expansions_write"
       - command: subprocess.exec
@@ -1023,23 +921,17 @@ tasks:
         variant: generate-tasks-for-version
     commands:
       - func: "f_expansions_write"
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: archive-mongo-crypt-dev archive-mongo-crypt-debug
-          bazel_build_tags: --bazel-build-tag=mongo_crypt
-          task_compile_flags: >-
-            --dbg=on
-            --opt=off
-            --allocator=system
-            --enterprise-features=fle
-            --js-engine=none
-            --link-model=dynamic-sdk
-            DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
+          targets: archive-mongo_crypt-debug archive-mongo_crypt-stripped
+          bazel_args: >-
+            --config=evg_crypt_dbg
+          task_compile_flags: --linkstatic=True
       - command: s3.put
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: "src/mongo-crypt-dev.${ext|tgz}"
+          local_file: "src/bazel-bin/mongo_crypt-stripped.${ext|tgz}"
           remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1_dev-${version}.${ext|tgz}"
           bucket: mciuploads
           permissions: public-read
@@ -1049,7 +941,7 @@ tasks:
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: "src/mongo-crypt-debug.${ext|tgz}"
+          local_file: "src/bazel-bin/mongo_crypt-debug.${ext|tgz}"
           remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1_debug-${version}.${ext|tgz}"
           bucket: mciuploads
           permissions: public-read
@@ -1062,23 +954,17 @@ tasks:
       - name: crypt_create_debug_lib
     commands:
       - func: "f_expansions_write"
-      - func: "scons compile"
+      - func: "bazel compile"
         vars:
-          targets: archive-mongo-crypt-shlib-test
+          targets: archive-mongo_crypt_shlib_test-stripped
           compiling_for_test: true
-          bazel_build_tags: --bazel-build-tag=mongo_crypt
-          task_compile_flags: >-
-            --allocator=system
-            --enterprise-features=fle
-            --js-engine=none
-            --link-model=static
-            DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
-            RPATH='$$RPATH_ESCAPED_DOLLAR_ORIGIN/../lib'
+          bazel_args: >-
+            --config=evg_crypt_test
       - command: s3.put
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: "src/mongo-crypt-shlib-test-runtime.${ext|tgz}"
+          local_file: "src/bazel-bin/mongo_crypt_shlib_test-stripped.${ext|tgz}"
           remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shlib_test-${version}.${ext|tgz}"
           bucket: mciuploads
           permissions: public-read
@@ -1128,9 +1014,6 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "fetch packages"
-      - func: "f_expansions_write"
-      - func: "generate compile expansions"
-      - func: "apply compile expansions"
       - func: "f_expansions_write"
       - func: "set up remote credentials"
         vars:
@@ -1193,9 +1076,6 @@ tasks:
           bucket: mciuploads
           local_file: src/mongo-cryptd.tgz
           build_variants: *mongocryptd_variants
-      - func: "f_expansions_write"
-      - func: "generate compile expansions"
-      - func: "apply compile expansions"
       - func: "f_expansions_write"
       - func: "fetch dist debugsymbols"
       - func: "set up remote credentials"
@@ -1580,9 +1460,6 @@ tasks:
       - func: "f_expansions_write"
       - func: "get and apply version expansions"
       - func: "f_expansions_write"
-      - func: "generate compile expansions"
-      - func: "apply compile expansions"
-      - func: "f_expansions_write"
       - command: s3.get
         params:
           aws_key: ${aws_key}
@@ -1590,9 +1467,6 @@ tasks:
           remote_file: ${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1-${version}.${ext|tgz}
           bucket: mciuploads
           local_file: src/mongo_crypt_shared_v1.${ext|tgz}
-      - func: "f_expansions_write"
-      - func: "generate compile expansions"
-      - func: "apply compile expansions"
       - func: "f_expansions_write"
       - func: "set up remote credentials"
         vars:
@@ -1692,9 +1566,9 @@ tasks:
 ################################################
 task_groups:
   - <<: *compile_task_group_template
-    name: compile_dist_test_TG
+    name: archive_dist_test_TG
     tasks:
-      - compile_dist_test
+      - archive_dist_test
 
   - <<: *compile_bazel_task_group_template
     name: compile_bazel_TG
@@ -1706,11 +1580,6 @@ task_groups:
     tasks:
       - run_bazel_program
       - bazel_archive_and_run_dist_test
-
-  - <<: *compile_task_group_template
-    name: bazel_workstation_TG
-    tasks:
-      - bazel_workstation_unittests
 
   # We want to run these sequentially to put less load on the cluster
   - <<: *compile_task_group_template
@@ -1751,14 +1620,12 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_and_archive_dist_test_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
 
   - <<: *compile_task_group_template
     name: compile_and_archive_dist_test_then_package_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       - package
@@ -1773,7 +1640,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_serial_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       - compile_dbtest
@@ -1789,7 +1655,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_serial_future_git_tag_multiversion_TG
     tasks:
-      - compile_dist_test_future_git_tag_multiversion
       - archive_dist_test_future_git_tag_multiversion
       - archive_dist_test_debug_future_git_tag_multiversion
       - compile_unittests_future_git_tag_multiversion
@@ -1802,7 +1667,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_and_package_serial_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       # package task here to reduce peak diskspace SERVER-86662
@@ -1817,7 +1681,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_serial_no_unittests_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       - compile_dbtest
@@ -1828,7 +1691,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_and_package_serial_no_unittests_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       # package task here to reduce peak diskspace SERVER-86662
@@ -1842,7 +1704,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_and_package_serial_lto_no_unittests_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       # package task here to reduce peak diskspace SERVER-86662
@@ -1858,7 +1719,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_benchmark_and_package_serial_no_unittests_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       # package task here to reduce peak diskspace SERVER-86662
@@ -1892,8 +1752,7 @@ task_groups:
       - compile_libraries_for_unittests
 
   # These `parallel` task groups are only appropriate for builders that
-  # use --link-model=dynamic, and have scons_cache_scope: shared and
-  # scons_cache_mode: all. Such builders are able to share all build
+  # use --linkstatic=False. Such builders are able to share all build
   # artifacts, and therefore will not repeatedly re-link the same
   # code. In that mode, it makes sense to run all of these tasks
   # concurrently, since they will share state across machines and can
@@ -1903,7 +1762,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_parallel_core_stream_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       - compile_all_but_not_unittests
@@ -1911,7 +1769,6 @@ task_groups:
   - <<: *compile_task_group_template
     name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
     tasks:
-      - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
       - run_pretty_printer_tests
@@ -1931,13 +1788,9 @@ task_groups:
   - name: crypt_build_debug_and_test
     setup_task:
       - func: "f_expansions_write"
-      - func: "apply compile expansions"
-      - func: "f_expansions_write"
       - func: "set task expansion macros"
       - func: "f_expansions_write"
       - func: "get engflow creds"
-    teardown_task:
-      - func: "attach scons logs"
     setup_group_can_fail_task: true
     setup_group:
       - command: manifest.load
@@ -1951,11 +1804,6 @@ task_groups:
       - func: "get buildnumber"
       - func: "f_expansions_write"
       - func: "set up win mount script"
-      - func: "f_expansions_write"
-      - func: "generate compile expansions"
-    teardown_group:
-      - func: "f_expansions_write"
-      - func: "umount shared scons directory"
     max_hosts: 1
     tasks:
       - "crypt_create_debug_lib"

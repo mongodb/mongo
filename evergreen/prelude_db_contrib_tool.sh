@@ -58,4 +58,6 @@ function use_db_contrib_tool_mongot {
     # This should create the folder mongot-localdev, usually run at the root of mongo directory
     curl ${mongot_url} | tar xvz
   fi
+  # Hack to remove BUILD.bazel file that can be lying around in mongot
+  rm -f ./mongot-localdev/bin/jdk/BUILD.bazel
 }

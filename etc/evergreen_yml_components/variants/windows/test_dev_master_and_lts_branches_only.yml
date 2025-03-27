@@ -13,23 +13,18 @@ buildvariants:
       - windows-2022-small
     expansions:
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
-        msi
+        //src/mongo/installer/msi:mongodb-win32-x86_64-windows
       exe: ".exe"
       content_type: application/zip
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=windows
-        -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-        --win-version-min=win10
-      num_scons_link_jobs_available: 0.1
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=windows
       python: "/cygdrive/c/python/python310/python.exe"
       test_flags: >-
         --storageEngine=inMemory
         --excludeWithAnyTags=requires_persistence,requires_journaling,incompatible_with_windows_tls
       ext: zip
-      scons_cache_scope: shared
       multiversion_platform: windows
       multiversion_edition: enterprise
       large_distro_name: windows-2022-large

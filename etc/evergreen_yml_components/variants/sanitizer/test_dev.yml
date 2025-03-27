@@ -27,8 +27,6 @@ variables:
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
 
   # THIS HAS COPIES IN:
@@ -54,7 +52,6 @@ variables:
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
     core_analyzer_distro_name: rhel8.8-xlarge
-    num_scons_link_jobs_available: 0.99
     compile_variant: *linux_x86_dynamic_compile_variant_name
 
   # THIS HAS COPIES IN:
@@ -65,8 +62,6 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &enterprise-rhel-8-64-bit-dynamic-expansions
     <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
@@ -82,16 +77,12 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_debug_community_compile_expansions
     <<: *generic_linux_compile_expansions
-    compile_flags: >-
-      --dbg=on
+    bazel_compile_flags: >-
+      --dbg=True
       --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --enable-http-client=on
-      --link-model=dynamic
-      ENABLE_OTEL_BUILD=1
-      --modules=
-    num_scons_link_jobs_available: 0.99
+      --linkstatic=False
+      --build_otel=True
+      --build_enterprise=False
 
   - &linux_x86_dynamic_debug_compile_variant_dependency
     depends_on:
@@ -124,7 +115,7 @@ variables:
     #   variant: linux-debug-aubsan-compile-required
 
   # If you add anything to san_options, make sure the appropriate changes are
-  # also made to SConstruct.
+  # also made to in bazel.
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -146,7 +137,6 @@ variables:
     resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     max_sub_suites: 3
-    num_scons_link_jobs_available: 0.99
     large_distro_name: rhel8.8-large
     xlarge_distro_name: rhel8.8-xxlarge
     multiversion_platform: rhel80
@@ -175,13 +165,13 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &enterprise-rhel8-debug-tsan-expansions-template
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: stable
     compile_variant: *enterprise-rhel8-debug-tsan-compile
     # If you add anything to san_options, make sure the appropriate
-    # changes are also made to SConstruct.
+    # changes are also made in bazel.
     #
     # TODO SERVER-49121: die_after_fork=0 is a temporary setting to
     # allow tests to continue while we figure out why we're running
@@ -194,20 +184,12 @@ variables:
     san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
     build_mongot: true
     download_mongot_release: true
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
-      --dbg=on
+    bazel_compile_flags: >-
+      --config=dbg_tsan
       --opt=on
-      --allocator=system
-      --sanitize=thread
-      --ssl
-      --use-libunwind=off
-      --link-model=dynamic
-      -j$(grep -c ^processor /proc/cpuinfo)
+      --fission=no
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
-    scons_cache_scope: shared
-    separate_debug: off
     large_distro_name: &enterprise-rhel8-debug-tsan-large-distro-name rhel8.8-xlarge
     xlarge_distro_name: rhel8.8-xxlarge
     core_analyzer_distro_name: rhel8.8-xxlarge
@@ -251,17 +233,11 @@ buildvariants:
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     expansions:
       <<: *generic_linux_compile_expansions
-      separate_debug: off
       san_options: *aubsan_options
-      compile_flags: >-
-        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-        --dbg=on
+      bazel_compile_flags: >-
+        --config=dbg_aubsan
         --opt=on
-        --allocator=system
-        --sanitize=undefined,address
-        --ssl
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --link-model=dynamic
+        --fission=no
       build_mongot: true
       download_mongot_release: true
       evergreen_remote_exec: on
@@ -391,25 +367,22 @@ buildvariants:
     expansions:
       lang_environment: LANG=C
       san_options: *aubsan_options
-      compile_flags: >-
-        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+      bazel_compile_flags: >-
         --opt=on
         --allocator=system
-        --sanitize=address
-        --ssl
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --link-model=dynamic
-        --modules=
+        --asan=True
+        --compiler_type=clang
+        --linkstatic=False
+        --build_enterprise=False
+        --separate_debug=False
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under ASAN build.
       hang_analyzer_dump_core: false
-      scons_cache_scope: shared
       test_flags: >-
         --excludeWithAnyTags=requires_fast_memory,corrupts_data
         --enableEnterpriseTests=off
-      separate_debug: off
       compile_variant: rhel8-asan
     tasks:
       - name: compile_test_serial_TG
@@ -427,30 +400,23 @@ buildvariants:
     stepback: false
     expansions:
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       lang_environment: LANG=C
       toolchain_version: stable
       # If you add anything to san_options, make sure the appropriate changes are
-      # also made to SConstruct.
+      # also made in bazel
       san_options: *aubsan_options
-      compile_flags: >-
-        LINKFLAGS=-nostdlib++
-        LIBS=stdc++
-        --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
-        --dbg=on
+      bazel_compile_flags: >-
+        --config=dbg_aubsan
         --opt=on
-        --allocator=system
-        --sanitize=undefined,address,fuzzer
-        --ssl
-        -j$(grep -c ^processor /proc/cpuinfo)
+        --fission=no
+        --fsan=True
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
         --excludeWithAnyTags=corrupts_data
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
       hang_analyzer_dump_core: false
-      scons_cache_scope: shared
-      separate_debug: off
       compile_variant: *rhel8-debug-aubsan-lite_fuzzer
     display_tasks:
       - name: libfuzzertests!
@@ -596,13 +562,10 @@ buildvariants:
       # These modes correspond to a GC policy of generationalGC (mode 7) every 75 allocations, and a
       # consistency check of the heap after every GC cycle (mode 15).
       mongo_mozjs_options: "7;15,75"
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
-        --spider-monkey-dbg=on
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --linkstatic=False
+        --spider_monkey_dbg=True
       compile_variant: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout

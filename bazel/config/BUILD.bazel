@@ -1141,7 +1141,7 @@ config_setting(
 
 use_ocsp_stapling(
     name = "use_ocsp_stapling",
-    build_setting_default = False,
+    build_setting_default = True,
 )
 
 config_setting(
@@ -1873,6 +1873,46 @@ selects.config_setting_group(
     match_all = [
         ":build_enterprise_enabled",
         "@platforms//os:linux",
+    ],
+)
+
+selects.config_setting_group(
+    name = "build_enterprise_windows_enabled",
+    match_all = [
+        ":build_enterprise_enabled",
+        "@platforms//os:windows",
+    ],
+)
+
+selects.config_setting_group(
+    name = "build_enterprise_mac_enabled",
+    match_all = [
+        ":build_enterprise_enabled",
+        "@platforms//os:macos",
+    ],
+)
+
+selects.config_setting_group(
+    name = "build_enterprise_linux_disabled",
+    match_all = [
+        ":build_enterprise_disabled",
+        "@platforms//os:linux",
+    ],
+)
+
+selects.config_setting_group(
+    name = "build_enterprise_windows_disabled",
+    match_all = [
+        ":build_enterprise_disabled",
+        "@platforms//os:windows",
+    ],
+)
+
+selects.config_setting_group(
+    name = "build_enterprise_mac_disabled",
+    match_all = [
+        ":build_enterprise_disabled",
+        "@platforms//os:macos",
     ],
 )
 

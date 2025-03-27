@@ -46,6 +46,7 @@ def install(src, install_type):
                     if os.path.isdir(dst):
                         shutil.rmtree(dst)
                     else:
+                        os.chmod(dst, 0o755)
                         os.unlink(dst)
                 except FileNotFoundError as exc:
                     if link_dst == dst:
@@ -68,7 +69,11 @@ def install(src, install_type):
                                     os.makedirs(dest_dir)
                                 os.link(os.path.join(root, name), os.path.join(dest_dir, name))
                     else:
-                        os.link(src, dst)
+                        try:
+                            os.link(src, dst)
+                        # If you try hardlinking across drives link will fail
+                        except OSError:
+                            shutil.copy(src, dst)
                 except FileExistsError as exc:
                     if link_dst == dst:
                         # if multiple installs are requested at once and happen
@@ -91,5 +96,5 @@ for depfile in args.depfile:
             install(binary, "bin")
         for lib in content["libs"]:
             install(lib, "lib")
-        for root in content["roots"]:
-            install(root, "")
+        for file, folder in content["roots"].items():
+            install(file, folder)

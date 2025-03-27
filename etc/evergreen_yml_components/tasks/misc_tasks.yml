@@ -436,7 +436,7 @@ tasks:
         "development_critical_single_variant",
       ]
     commands:
-      - func: "do scons setup"
+      - func: "do bazel setup"
       - func: "f_expansions_write"
       - command: subprocess.exec
         params:

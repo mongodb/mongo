@@ -20,15 +20,10 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-x86-dynamic-enterprise-compile-expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
@@ -70,7 +65,6 @@ variables:
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
     core_analyzer_distro_name: rhel8.8-xlarge
-    num_scons_link_jobs_available: 0.99
     compile_variant: *linux_x86_dynamic_compile_variant_name
 
   # THIS HAS COPIES IN:
@@ -81,8 +75,6 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &enterprise-rhel-8-64-bit-dynamic-expansions
     <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10

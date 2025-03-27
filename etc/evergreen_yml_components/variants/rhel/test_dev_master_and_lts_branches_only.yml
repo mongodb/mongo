@@ -45,7 +45,6 @@ variables:
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
     core_analyzer_distro_name: rhel8.8-xlarge
-    num_scons_link_jobs_available: 0.99
     compile_variant: *linux_x86_dynamic_compile_variant_name
 
 buildvariants:
@@ -57,20 +56,16 @@ buildvariants:
       - rhel8.8-small
     expansions:
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       test_flags: >-
         --storageEngine=inMemory
         --excludeWithAnyTags=requires_persistence,requires_journaling
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
-      scons_cache_scope: shared
       large_distro_name: rhel8.8-large
       core_analyzer_distro_name: rhel8.8-xlarge
       compile_variant: enterprise-rhel-8-64-bit-inmem

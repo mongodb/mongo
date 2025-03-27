@@ -2,12 +2,12 @@
 test_kind: benchmark_test
 
 selector:
-  root: build/benchmarks.txt
+  root: bazel-bin/install/install-mongo_benchmark-stripped_test_list.txt
   include_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
-    - build/**/system_resource_canary_bm*
-    - build/install/bin/streams_operator_dag_bm*
-    - build/install/bin/streams_window_operator_bm*
+    - bazel-bin/**/system_resource_canary_bm*
+    - bazel-bin/**/streams_operator_dag_bm*
+    - bazel-bin/**/streams_window_operator_bm*
 
 executor:
   config: {}

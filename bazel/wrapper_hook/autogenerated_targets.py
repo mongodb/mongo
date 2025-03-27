@@ -20,6 +20,8 @@ bazel_tags_to_autogenerate = [
     "sharding_bm",
     "sep_bm",
     "storage_bm",
+    "first_half_bm",
+    "second_half_bm",
 ]
 
 

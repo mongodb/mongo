@@ -1690,6 +1690,7 @@ def mongo_cc_library(
         no_undefined_ref_DO_NOT_USE = True,
         linkshared = False,
         skip_windows_crt_flags = False,
+        shared_lib_name = "",
         **kwargs):
     """Wrapper around cc_library.
 
@@ -1953,6 +1954,7 @@ def mongo_cc_library(
         user_link_flags = MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags,
         target_compatible_with = shared_library_compatible_with + target_compatible_with + enterprise_compatible,
         dynamic_deps = dynamic_deps,
+        shared_lib_name = shared_lib_name,
         features = select({
             "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
             "//conditions:default": [],

@@ -11,8 +11,6 @@ mkdir -p $TMPDIR
 if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
   mkdir -p Z:/bazel_tmp
   touch Z:/bazel_tmp/mci_path
-  echo "--action_env=TMP=Z:/bazel_tmp" >> .bazelrc.evergreen
-  echo "--action_env=TEMP=Z:/bazel_tmp" >> .bazelrc.evergreen
   # TODO(SERVER-94605): remove when Windows temp directory is cleared between task runs
   if [[ "$PWD" != "$(cat Z:/bazel_tmp/mci_path)" ]]; then
     echo "Clearing bazel output root from previous task mci '$(cat Z:/bazel_tmp/mci_path)'"
@@ -24,8 +22,11 @@ if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
   # see https://jira.mongodb.org/browse/DEVPROD-11126
   abs_path=$(cygpath -w "$TMPDIR" | tr '\\' '/')
   echo "startup --output_user_root=Z:/bazel_tmp" > .bazelrc.evergreen
+  echo "common --action_env=TMP=Z:/bazel_tmp" >> .bazelrc.evergreen
+  echo "common --action_env=TEMP=Z:/bazel_tmp" >> .bazelrc.evergreen
   echo "BAZELISK_HOME=${abs_path}/bazelisk_home" >> .bazeliskrc
-  echo "common --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> .bazelrc.git
+  #  echo "common --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> .bazelrc.git
+  echo "common --define GIT_COMMIT_HASH=nogitversion" >> .bazelrc.git
 else
   echo "startup --output_user_root=${TMPDIR}/bazel-output-root" > .bazelrc.evergreen
   echo "BAZELISK_HOME=${TMPDIR}/bazelisk_home" >> .bazeliskrc

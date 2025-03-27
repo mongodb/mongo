@@ -93,7 +93,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: pretty-printer-tests
-          install_dir: build/install/dist-test/bin
+          install_dir: bazel-bin/install/bin
           exec_timeout_secs: 1800 # 30 min timeout.
 
   - name: buildscripts_test
@@ -180,6 +180,9 @@ tasks:
       ]
     commands:
       - func: "do setup"
+        vars:
+          extraction_change_dir: bazel-bin/install/
+          decompress: tar --strip-components=1 -zxvf
       - func: "run tests"
 
   - <<: *task_template
@@ -193,9 +196,6 @@ tasks:
       - name: archive_dist_test
     commands:
       - func: "do setup"
-        vars:
-          extraction_change_dir: build/install/
-          move_outputs: "--move-output=build/install/dist-test/pretty_printer_tests.txt:build/"
       - func: "run tests"
 
   - <<: *gen_task_template
@@ -207,6 +207,14 @@ tasks:
         "requires_compile_variant",
         "requires_execution_on_windows_patch_build",
       ]
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      - name: archive_dist_test
+      - name: archive_dist_test_debug
     commands:
       - func: "generate resmoke tasks"
         vars:

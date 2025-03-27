@@ -1,32 +1,32 @@
 test_kind: benchmark_test
 
 selector:
-  root: build/first_half_bm.txt
+  root: bazel-bin/install/install-first_half_bm_test_list.txt
 
   exclude_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
     # Hash table benchmark is really slow, don't run on evergreen
-    - build/install/bin/hash_table_bm*
+    - bazel-bin/**/hash_table_bm*
     # These benchmarks are being run as part of the benchmarks_query.yml
-    - build/install/bin/query_bm*
-    - build/install/bin/plan_cache_classic_bm*
-    - build/install/bin/point_query_bm*
-    - build/install/bin/distinct_scan_bm*
+    - bazel-bin/**/query_bm*
+    - bazel-bin/**/plan_cache_classic_bm*
+    - bazel-bin/**/point_query_bm*
+    - bazel-bin/**/distinct_scan_bm*
     # These benchmarks are being run as part of the benchmarks_expression*.yml
-    - build/install/bin/expression_bm*
-    - build/install/bin/sbe_expression_bm*
+    - bazel-bin/**/expression_bm*
+    - bazel-bin/**/sbe_expression_bm*
     # These benchmarks are being run as part of the benchmarks_streams.yml test suite.
-    - build/install/bin/streams_operator_dag_bm*
-    - build/install/bin/streams_window_operator_bm*
+    - bazel-bin/**/streams_operator_dag_bm*
+    - bazel-bin/**/streams_window_operator_bm*
     # These benchmarks are only run when modifying or upgrading the immutable library.
-    - build/install/bin/immutable_absl_comparison_bm*
-    - build/install/bin/immutable_std_comparison_bm*
+    - bazel-bin/**/immutable_absl_comparison_bm*
+    - bazel-bin/**/immutable_std_comparison_bm*
     # These benchmarks are being run as part of the benchmarks_util.yml test suite.
-    - build/install/bin/tracking_allocator_bm*
+    - bazel-bin/**/tracking_allocator_bm*
     # These benchmarks are being run as part of the benchmarks_sorter.yml test suite.
-    - build/install/bin/sorter_checksum_calculator_bm*
+    - bazel-bin/**/sorter_checksum_calculator_bm*
     # These benchmarks are being run as part of the benchmarks_audit.yml test suite.
-    - build/install/bin/audit_bm*
+    - bazel-bin/**/audit_bm*
 
 executor:
   config: {}

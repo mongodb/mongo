@@ -6,4 +6,4 @@ cd src
 set -o errexit
 set -o verbose
 
-"build/stitch-support-lib-${version}/bin/stitch_support_test"
+"bazel-bin/install/bin/stitch_support_test"

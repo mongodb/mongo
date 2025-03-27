@@ -10,8 +10,8 @@ if [ -z "${BOLT:-}" ]; then
   exit 0
 fi
 
-tar -xvf mongodb-binaries.tgz
-sudo rm mongodb-binaries.tgz
+tar -xvf bazel-bin/dist-test-stripped.tgz
+sudo rm bazel-bin/dist-test-stripped.tgz
 
 wget https://dsi-donot-remove.s3.us-west-2.amazonaws.com/llvm-bolt.gz
 wget https://dsi-donot-remove.s3.us-west-2.amazonaws.com/bolt.data.gz
@@ -24,4 +24,4 @@ gunzip bolt.data.gz
 sudo rm dist-test/bin/mongod
 cp mongod_new dist-test/bin/mongod
 
-tar -czvf mongodb-binaries.tgz dist-test
+tar -czvf bazel-bin/dist-test-stripped.tgz dist-test

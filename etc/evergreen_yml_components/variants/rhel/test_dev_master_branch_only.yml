@@ -20,15 +20,9 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-x86-dynamic-enterprise-compile-expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
+    bazel_compile_flags: >-
+      --linkstatic=False
 
   # THIS HAS COPIES IN
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -52,8 +46,6 @@ variables:
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
 
   # THIS HAS COPIES IN:
@@ -96,7 +88,6 @@ variables:
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
     core_analyzer_distro_name: rhel8.8-xlarge
-    num_scons_link_jobs_available: 0.99
     compile_variant: *linux_x86_dynamic_compile_variant_name
 
   # THIS HAS COPIES IN:
@@ -107,8 +98,6 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &enterprise-rhel-8-64-bit-dynamic-expansions
     <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
@@ -126,20 +115,14 @@ variables:
       - rhel8.8-small
     expansions: &enterprise-rhel-8-64-bit-expansions-template
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
       push_arch: x86_64-enterprise-rhel8
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
       test_flags: --excludeWithAnyTags=requires_ldap_pool
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
@@ -149,7 +132,6 @@ variables:
       packager_arch: x86_64
       packager_distro: rhel88
       repo_edition: enterprise
-      scons_cache_scope: shared
       core_analyzer_distro_name: rhel8.8-large
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
@@ -224,7 +206,6 @@ buildvariants:
     display_name: "* Linux x86 Stitch Enterprise Compile"
     tags: ["suggested"]
     expansions:
-      <<: *linux-x86-dynamic-enterprise-compile-expansions
       compile_variant: *linux-stitch-compile-suggested
     tasks:
       - name: .stitch
@@ -234,11 +215,6 @@ buildvariants:
     display_name: "* Linux x86 Crypt Enterprise Compile"
     tags: ["suggested"]
     expansions:
-      <<: *linux-x86-dynamic-enterprise-compile-expansions
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-        -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
       compile_variant: *linux-crypt-compile
     tasks:
       - name: .crypt
@@ -252,12 +228,9 @@ buildvariants:
     stepback: false
     expansions:
       <<: *generic_linux_compile_expansions
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --linkstatic=False
       compile_variant: *linux-x86-dynamic-grpc
       clang_tidy_toolchain: v5
       large_distro_name: rhel8.8-xlarge
@@ -284,7 +257,6 @@ buildvariants:
       - name: .concurrency !.auth !.embedded_router !concurrency_replication_causal_consistency_gen !concurrency_replication_multi_stmt_txn_gen !concurrency_replication_gen !concurrency_simultaneous_replication_gen !config_fuzzer_concurrency_replication_gen !config_fuzzer_concurrency_simultaneous_replication_gen
       - name: .grpc_misc_js
       - name: .lint
-      - name: libdeps_graph_linting
         distros:
           - rhel8.8-xlarge
       - name: .clang_tidy
@@ -368,15 +340,10 @@ buildvariants:
     run_on:
       - rhel8.8-large
     expansions:
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --debug-symbols=minimal
-      separate_debug: off
-      scons_cache_scope: shared
-      num_scons_link_jobs_available: 0.5
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --dbg_level=1
+        --separate_debug=False
       compile_variant: *enterprise-rhel-8-benchmarks
     tasks:
       - name: compile_upload_benchmarks_TG
@@ -421,8 +388,6 @@ buildvariants:
     tags: []
     expansions:
       <<: *linux_x86_generic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       resmoke_jobs_factor: 0.5
       bv_future_git_tag: r100.0.0-9999
       compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion-latest
@@ -455,18 +420,17 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel-8-64-bit-expansions-template
       additional_package_targets: ""
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --enterprise-features=hot_backups,magic_restore,ldap,sasl,encryptdb
-        --link-model=dynamic
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --//bazel/config:enterprise_feature_all=False
+        --//bazel/config:enterprise_feature_hot_backups=True
+        --//bazel/config:enterprise_feature_magic_restore=True
+        --//bazel/config:enterprise_feature_ldap=True
+        --//bazel/config:enterprise_feature_sasl=True
+        --//bazel/config:enterprise_feature_encryptdb=True
+        --linkstatic=False
       compile_variant: *hot_backups-rhel-8-64-bit
       has_packages: false
-      scons_cache_mode: all
-      scons_cache_scope: shared
-      num_scons_link_jobs_available: 0.99
     tasks:
       - name: compile_test_parallel_core_stream_TG
         distros:
@@ -489,11 +453,9 @@ buildvariants:
       - rhel8.8-small
     expansions:
       <<: *linux_x86_generic_expansions
-      compile_flags: >-
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --linkstatic=False
       test_flags: >-
         --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
         --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
@@ -573,12 +535,9 @@ buildvariants:
       - rhel8.8-small
     expansions:
       <<: *linux_x86_generic_expansions
-      scons_cache_scope: shared
-      compile_flags: >-
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --linkstatic=False
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise

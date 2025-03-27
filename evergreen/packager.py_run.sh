@@ -20,5 +20,5 @@ if [ -z ${packager_script+x} ]; then
 fi
 
 cd buildscripts
-$python ${packager_script} --prefix $(pwd)/.. --distros ${packager_distro} --tarball $(pwd)/../mongodb-dist.tgz -s ${version} -m HEAD -a ${packager_arch}
+$python ${packager_script} --prefix $(pwd)/.. --distros ${packager_distro} --tarball $(pwd)/../bazel-bin/dist-stripped.tgz -s ${version} -m HEAD -a ${packager_arch}
 cd ..

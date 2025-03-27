@@ -66,10 +66,10 @@ git_override(
 #
 ## We need skylib to be able to use config_setting_group in rule_poetry below
 ## https://github.com/bazelbuild/bazel-skylib/blob/main/docs/selects_doc.md#selectsconfig_setting_group
-bazel_dep(name = "bazel_skylib", version = "1.5.0")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
 single_version_override(
     module_name = "bazel_skylib",
-    version = "1.5.0",
+    version = "1.7.1",
 )
 
 bazel_dep(name = "rules_pkg", version = "0.9.1")

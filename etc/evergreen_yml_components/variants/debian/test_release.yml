@@ -16,14 +16,11 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: linux
       push_arch: x86_64-debian12
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=debian12
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --modules=
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=debian12
+        --build_enterprise=False
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
         --enableEnterpriseTests=off
@@ -34,7 +31,6 @@ buildvariants:
       packager_arch: x86_64
       packager_distro: debian12
       repo_edition: org
-      scons_cache_scope: shared
       large_distro_name: debian12-large
       compile_variant: debian12
     tasks:
@@ -61,22 +57,17 @@ buildvariants:
       - debian12-small
     expansions:
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
       push_arch: x86_64-enterprise-debian12
-      compile_flags: >-
-        --ssl MONGO_DISTMOD=debian12
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=debian12
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
       multiversion_platform: debian12
       multiversion_edition: enterprise
       has_packages: true
@@ -84,7 +75,6 @@ buildvariants:
       packager_arch: x86_64
       packager_distro: debian12
       repo_edition: enterprise
-      scons_cache_scope: shared
       large_distro_name: debian12-large
       compile_variant: enterprise-debian12-64
     tasks:

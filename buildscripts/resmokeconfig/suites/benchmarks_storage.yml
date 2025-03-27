@@ -1,7 +1,7 @@
 test_kind: benchmark_test
 
 selector:
-  root: build/storage_bm.txt
+  root: bazel-bin/install/install-storage_bm_test_list.txt
 
 executor:
   config: {}

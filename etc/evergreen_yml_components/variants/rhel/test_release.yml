@@ -13,13 +13,9 @@ buildvariants:
       - ubi8
     expansions:
       resmoke_jobs_factor: 1
-      disable_shared_scons_cache: true
-      compile_flags: >-
-        MONGO_DISTMOD=rhel88
-        --opt=on
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --modules=
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --build_enterprise=False
       tooltags: ""
       build_mongoreplay: true
       test_flags: >-
@@ -48,11 +44,9 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: linux
       push_arch: x86_64-rhel8
-      compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --modules=
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --build_enterprise=False
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
         --enableEnterpriseTests=off
@@ -64,7 +58,6 @@ buildvariants:
       packager_arch: x86_64
       packager_distro: rhel88
       repo_edition: org
-      scons_cache_scope: shared
       large_distro_name: rhel8.8-large
       compile_variant: rhel88
     tasks:
@@ -92,22 +85,17 @@ buildvariants:
       - rhel8.8-small
     expansions:
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
       push_arch: x86_64-enterprise-rhel8
-      compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: --excludeWithAnyTags=requires_external_data_source
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-        CFLAGS="-fno-gnu-unique"
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise
@@ -116,7 +104,6 @@ buildvariants:
       packager_arch: x86_64
       packager_distro: rhel88
       repo_edition: enterprise
-      scons_cache_scope: shared
       jstestfuzz_num_generated_files: 40
       jstestfuzz_concurrent_num_files: 10
       target_resmoke_time: 10
@@ -157,13 +144,11 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: linux
       push_arch: aarch64-rhel8
-      compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --modules=
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --build_enterprise=False
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
         --enableEnterpriseTests=off
@@ -172,7 +157,6 @@ buildvariants:
       packager_arch: aarch64
       packager_distro: rhel88
       repo_edition: org
-      scons_cache_scope: shared
       large_distro_name: rhel8.8-arm64-large
       compile_variant: rhel-8-arm64
     tasks:
@@ -199,29 +183,22 @@ buildvariants:
       - rhel8.8-arm64-small
     expansions:
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
       push_arch: aarch64-enterprise-rhel8
-      compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: --excludeWithAnyTags=requires_external_data_source,resource_intensive
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-        -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
       has_packages: true
       packager_script: packager_enterprise.py
       packager_arch: aarch64
       packager_distro: rhel88
       repo_edition: enterprise
-      scons_cache_scope: shared
       compile_variant: enterprise-rhel-8-arm64
       core_analyzer_distro_name: rhel8.8-arm64-large
     tasks:
@@ -254,13 +231,11 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: linux
       push_arch: x86_64-rhel93
-      compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel93
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --modules=
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel93
+        --build_enterprise=False
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
         --enableEnterpriseTests=off
@@ -271,7 +246,6 @@ buildvariants:
       packager_arch: x86_64
       packager_distro: rhel90
       repo_edition: org
-      scons_cache_scope: shared
       large_distro_name: rhel93-large
       compile_variant: rhel93
     tasks:
@@ -298,16 +272,15 @@ buildvariants:
     run_on:
       - rhel93-small
     expansions:
-      additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
       push_arch: x86_64-enterprise-rhel93
-      compile_flags: --ssl MONGO_DISTMOD=rhel93 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: --define=MONGO_DISTMOD=rhel93
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: --excludeWithAnyTags=requires_external_data_source
-      crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       multiversion_platform: rhel93
       multiversion_edition: enterprise
       has_packages: true
@@ -315,7 +288,6 @@ buildvariants:
       packager_arch: x86_64
       packager_distro: rhel90
       repo_edition: enterprise
-      scons_cache_scope: shared
       compile_variant: enterprise-rhel-93-64-bit
       core_analyzer_distro_name: rhel93-large
       large_distro_name: rhel93-large
@@ -350,13 +322,11 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: linux
       push_arch: aarch64-rhel93
-      compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel93
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --modules=
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel93
+        --build_enterprise=False
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
         --enableEnterpriseTests=off
@@ -365,7 +335,6 @@ buildvariants:
       packager_arch: aarch64
       packager_distro: rhel90
       repo_edition: org
-      scons_cache_scope: shared
       large_distro_name: rhel93-arm64-large
       compile_variant: rhel93-arm64
     tasks:
@@ -395,29 +364,22 @@ buildvariants:
       - rhel93-arm64-small
     expansions:
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
       push_arch: aarch64-enterprise-rhel93
-      compile_flags: >-
-        --ssl MONGO_DISTMOD=rhel93
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel93
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: --excludeWithAnyTags=requires_external_data_source
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-        -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
       has_packages: true
       packager_script: packager_enterprise.py
       packager_arch: aarch64
       packager_distro: rhel90
       repo_edition: enterprise
-      scons_cache_scope: shared
       large_distro_name: rhel93-arm64-large
       compile_variant: enterprise-rhel-93-arm64
     tasks:

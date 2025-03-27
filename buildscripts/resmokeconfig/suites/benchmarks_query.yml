@@ -2,26 +2,26 @@
 test_kind: benchmark_test
 
 selector:
-  root: build/benchmarks.txt
+  root: bazel-bin/install/install-query_bm_test_list.txt
   include_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
-    - build/install/bin/complex_query_bm*
-    - build/install/bin/query_bm*
-    - build/install/bin/point_query_bm*
-    - build/install/bin/plan_cache_classic_bm*
-    - build/install/bin/distinct_scan_bm*
-    - build/install/bin/shapifying_bm*
-    - build/install/bin/profile_filter_bm*
-    - build/install/bin/percentile_algo_bm*
-    - build/install/bin/window_function_percentile_bm*
-    - build/install/bin/window_function_concat_arrays_bm*
-    - build/install/bin/canonical_query_bm*
-    - build/install/bin/query_planner_bm*
-    - build/install/bin/plan_cache_key_encoding_bm*
-    - build/install/bin/query_settings_lookup_bm*
-    - build/install/bin/rate_limiting_bm*
-    - build/install/bin/shapifying_bm*
-    - build/install/bin/sbe_builder_bm*
+    - bazel-bin/**/complex_query_bm*
+    - bazel-bin/**/query_bm*
+    - bazel-bin/**/point_query_bm*
+    - bazel-bin/**/plan_cache_classic_bm*
+    - bazel-bin/**/distinct_scan_bm*
+    - bazel-bin/**/shapifying_bm*
+    - bazel-bin/**/profile_filter_bm*
+    - bazel-bin/**/percentile_algo_bm*
+    - bazel-bin/**/window_function_percentile_bm*
+    - bazel-bin/**/window_function_concat_arrays_bm*
+    - bazel-bin/**/canonical_query_bm*
+    - bazel-bin/**/query_planner_bm*
+    - bazel-bin/**/plan_cache_key_encoding_bm*
+    - bazel-bin/**/query_settings_lookup_bm*
+    - bazel-bin/**/rate_limiting_bm*
+    - bazel-bin/**/shapifying_bm*
+    - bazel-bin/**/sbe_builder_bm*
 
 executor:
   config: {}

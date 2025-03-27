@@ -40,7 +40,9 @@ filegroup(
 )
     """,
     sha256 = "3e22e2b16f802277123590f64dfda44f1c9c8a2b7e758180cd956d8ab0965817",
-    url = "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
+    urls = [
+        "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
+    ] * 5,
 )
 
 http_archive(
@@ -81,7 +83,9 @@ filegroup(
 )
     """,
     sha256 = "6ac824e1642d6f7277d0ed7ea09411a508f6116ba6fae0aa5f2c7daa2ff43d31",
-    url = "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip",
+    urls = [
+        "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip",
+    ] * 5,
 )
 
 load("//bazel/install_rules:windows_msvc.bzl", "windows_msvc")
@@ -177,7 +181,7 @@ new_local_repository(
 package(default_visibility = ["//visibility:public"])
 filegroup(
     name = "mongot_binaries",
-    srcs = glob(["**"], exclude = ["BUILD", "WORKSPACE"]),
+    srcs = glob(["**"], exclude = ["BUILD.bazel", "WORKSPACE", "MODULE.bazel", "MODULE.bazel.lock"]),
 )
 """,
     path = "mongot-localdev",

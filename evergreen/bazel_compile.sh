@@ -23,10 +23,6 @@ activate_venv
 build_patch_id="${build_patch_id:-${reuse_compile_from}}"
 if [ -n "${build_patch_id}" ]; then
   echo "build_patch_id detected, trying to skip task"
-  if [ "${task_name}" = "compile_dist_test" ] || [ "${task_name}" = "compile_dist_test_half" ]; then
-    echo "Skipping ${task_name} compile without downloading any files"
-    exit 0
-  fi
 
   # On windows we change the extension to zip
   if [ -z "${ext}" ]; then
@@ -38,22 +34,22 @@ if [ -n "${build_patch_id}" ]; then
   # get the platform of the dist archive. This is needed if
   # db-contrib-tool cannot autodetect the platform of the ec2 instance.
   regex='MONGO_DISTMOD=([a-z0-9]*)'
-  if [[ ${compile_flags} =~ ${regex} ]]; then
+  if [[ ${bazel_compile_flags} =~ ${regex} ]]; then
     extra_db_contrib_args="${extra_db_contrib_args} --platform=${BASH_REMATCH[1]}"
   fi
 
   download_dir="./tmp_db_contrib_tool_download_dir"
   rm -rf ${download_dir}
 
-  if [ "${task_name}" = "compile_dist_test" ]; then
-    file_name="mongodb-binaries.${ext}"
+  if [ "${task_name}" = "archive_dist_test" ]; then
+    file_name="dist-test-stripped.${ext}"
     invocation="db-contrib-tool setup-repro-env ${build_patch_id} \
       --variant=${compile_variant} --extractDownloads=False \
       --binariesName=${file_name} --installDir=${download_dir} ${extra_db_contrib_args}"
   fi
 
   if [ "${task_name}" = "archive_dist_test_debug" ]; then
-    file_name="mongo-debugsymbols.${ext}"
+    file_name="dist-test-debug.${ext}"
     invocation="db-contrib-tool setup-repro-env ${build_patch_id} \
       --variant=${compile_variant} --extractDownloads=False \
       --debugsymbolsName=${file_name} --installDir=${download_dir} \
@@ -71,7 +67,8 @@ if [ -n "${build_patch_id}" ]; then
     fi
     file_location=$(find "${download_dir}" -name "${file_name}")
     echo "Downloaded: ${file_location}"
-    mv "${file_location}" "${file_name}"
+    mkdir -p bazel-bin
+    mv "${file_location}" "bazel-bin/${file_name}"
     echo "Moved ${file_name} to the correct location"
     echo "Skipping ${task_name} compile"
     exit 0
@@ -85,6 +82,7 @@ fi
 if [ "${build_mongot}" = "true" ]; then
   setup_db_contrib_tool
   use_db_contrib_tool_mongot
+  bazel_args="${bazel_args} --include_mongot=True"
 fi
 
 set -o pipefail
@@ -114,11 +112,33 @@ if [ -n "${build_timeout_seconds}" ]; then
   TIMEOUT_CMD="timeout ${build_timeout_seconds}"
 fi
 
-for i in {1..5}; do
-  eval ${TIMEOUT_CMD} $BAZEL_BINARY build --verbose_failures $LOCAL_ARG ${args} ${targets} && RET=0 && break || RET=$? && sleep 1
+if is_ppc64le; then
+  LOCAL_ARG="$LOCAL_ARG --jobs=48"
+fi
+
+if is_s390x; then
+  LOCAL_ARG="$LOCAL_ARG --jobs=16"
+fi
+
+# If we are doing a patch build or we are building a non-push
+# build on the waterfall, then we don't need the --release
+# flag. Otherwise, this is potentially a build that "leaves
+# the building", so we do want that flag.
+if [ "${is_patch}" = "true" ] || [ -z "${push_bucket}" ] || [ "${compiling_for_test}" = "true" ]; then
+  echo "This is a non-release build."
+else
+  LOCAL_ARG="$LOCAL_ARG --config=public-release"
+fi
+
+for i in {1..3}; do
+  eval ${TIMEOUT_CMD} $BAZEL_BINARY build --verbose_failures $LOCAL_ARG ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} \
+    --define=MONGO_VERSION=${version} ${patch_compile_flags} ${targets} 2>&1 | tee bazel_stdout.log \
+    && RET=0 && break || RET=$? && sleep 1
   if [ $RET -eq 124 ]; then
     echo "Bazel timed out after ${build_timeout_seconds} seconds, retrying..."
   else
+    echo "Errors were found during the bazel run, here are the errors:" 1>&2
+    grep "ERROR:" bazel_stdout.log 1>&2
     echo "Bazel failed to execute, retrying..."
   fi
 done

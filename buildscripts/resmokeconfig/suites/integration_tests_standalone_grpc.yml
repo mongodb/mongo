@@ -1,10 +1,10 @@
 test_kind: cpp_integration_test
 
 selector:
-  root: build/integration_tests.txt
+  root: bazel-bin/install/install-mongo_integration_test_test_list.txt
   include_files:
-    - build/**/grpc_transport_integration_test*
-    - build/**/executor_integration_test*
+    - bazel-bin/**/grpc_transport_integration_test*
+    - bazel-bin/**/executor_integration_test*
 
 executor:
   archive:

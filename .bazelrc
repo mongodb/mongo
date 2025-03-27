@@ -16,6 +16,11 @@ common --enable_workspace=true
 # about 1 minute on developer machines
 common --experimental_remote_merkle_tree_cache
 
+# Linter will have issues with duplicate configurations due to some of our
+# install targets depending on tests that have testonly set. This flag can be removed
+# if we stop installing our test targets.
+common --experimental_retain_test_configuration_across_testonly
+
 # allow multiple execution infos to be set
 common --incompatible_modify_execution_info_additive
 
@@ -141,6 +146,7 @@ common --strip=never
 # To avoid the bazel warning about passing multiple configs
 common -c fastbuild
 common --fission=yes
+common --//bazel/config:dwarf_version=5
 common --//bazel/config:compress_debug_compile=True
 common --//bazel/config:opt=off
 common --//bazel/config:dbg=True
@@ -150,7 +156,6 @@ common --//bazel/config:separate_debug=False
 common --//bazel/config:compiler_type=clang
 common --//bazel/config:linkstatic=True
 common --//bazel/config:build_enterprise=True
-common --//bazel/config:release=False
 common --//bazel/config:skip_archive=True
 common --//bazel/config:allocator=auto
 common --//bazel/config:asan=False
@@ -166,6 +171,7 @@ common --enable_platform_specific_config=true
 --config=fastbuild
 common:fastbuild -c fastbuild
 common:fastbuild --fission=yes
+common:fastbuild --//bazel/config:dwarf_version=5
 common:fastbuild --//bazel/config:compress_debug_compile=True
 common:fastbuild --//bazel/config:opt=off
 common:fastbuild --//bazel/config:dbg=True
@@ -175,7 +181,6 @@ common:fastbuild --//bazel/config:separate_debug=False
 common:fastbuild --//bazel/config:compiler_type=clang
 common:fastbuild --//bazel/config:linkstatic=True
 common:fastbuild --//bazel/config:build_enterprise=True
-common:fastbuild --//bazel/config:release=False
 common:fastbuild --//bazel/config:skip_archive=True
 common:fastbuild --//bazel/config:allocator=auto
 common:fastbuild --//bazel/config:asan=False
@@ -188,6 +193,7 @@ common:fastbuild --enable_platform_specific_config=true
 --config=dbg
 common:dbg -c dbg
 common:dbg --fission=yes
+common:dbg --//bazel/config:dwarf_version=5
 common:dbg --//bazel/config:compress_debug_compile=True
 common:dbg --//bazel/config:opt=off
 common:dbg --//bazel/config:dbg=True
@@ -197,7 +203,6 @@ common:dbg --//bazel/config:separate_debug=False
 common:dbg --//bazel/config:compiler_type=clang
 common:dbg --//bazel/config:linkstatic=True
 common:dbg --//bazel/config:build_enterprise=True
-common:dbg --//bazel/config:release=False
 common:dbg --//bazel/config:skip_archive=True
 common:dbg --//bazel/config:allocator=auto
 common:dbg --//bazel/config:asan=False
@@ -231,6 +236,7 @@ common:dbg_tsan --enable_platform_specific_config=true
 --config=opt
 common:opt -c opt
 common:opt --fission=yes
+common:opt --//bazel/config:dwarf_version=5
 common:opt --//bazel/config:compress_debug_compile=True
 common:opt --//bazel/config:opt=on
 common:opt --//bazel/config:dbg=False
@@ -240,7 +246,6 @@ common:opt --//bazel/config:separate_debug=False
 common:opt --//bazel/config:compiler_type=gcc
 common:opt --//bazel/config:linkstatic=True
 common:opt --//bazel/config:build_enterprise=True
-common:opt --//bazel/config:release=False
 common:opt --//bazel/config:skip_archive=True
 common:opt --//bazel/config:allocator=auto
 common:opt --//bazel/config:asan=False
@@ -248,6 +253,40 @@ common:opt --//bazel/config:tsan=False
 common:opt --//bazel/config:ubsan=False
 common:opt --//bazel/config:libunwind=auto
 common:opt --enable_platform_specific_config=true
+
+--config=evg
+common:evg --config=opt
+common:evg --//bazel/config:opt=auto
+common:evg --//bazel/config:separate_debug=True
+common:evg --fission=no
+
+--config=evg_crypt
+common:evg_crypt --config=evg
+common:evg_crypt --//bazel/config:allocator=system
+common:evg_crypt --//bazel/config:js_engine=none
+common:evg_crypt --//bazel/config:ssl=False
+common:evg_crypt --//bazel/config:http_client=False
+common:evg_crypt --//bazel/config:shared_archive=True
+
+--config=evg_crypt_dbg
+common:evg_crypt_dbg --config=evg_crypt
+common:evg_crypt_dbg --//bazel/config:opt=off
+common:evg_crypt_dbg --//bazel/config:dbg=True
+
+--config=evg_crypt_test
+common:evg_crypt_test --config=evg_crypt
+common:evg_crypt_test --//bazel/config:shared_archive=False
+
+--config=evg_stitch
+common:evg_stitch --config=evg
+common:evg_stitch --//bazel/config:build_enterprise=False
+common:evg_stitch --//bazel/config:ssl=False
+common:evg_stitch --//bazel/config:http_client=False
+common:evg_stitch --//bazel/config:shared_archive=True
+
+--config=evg_stitch_test
+common:evg_stitch_test --config=evg_stitch
+common:evg_stitch_test --//bazel/config:shared_archive=False
 
 # TODO: Build the code as we would release it
 # common:opt_release --config=opt
@@ -301,6 +340,14 @@ common:windows --//bazel/config:linkstatic=True
 # The only Windows compiler we support is MSVC.
 common:windows --//bazel/config:compiler_type=msvc
 
+# Always use clang on macos
+common:macos --//bazel/config:compiler_type=clang
+
+common:macos --macos_minimum_os=11.0
+common:macos --use_libcxx=True
+# TODO(SERVER-102959): Find out why tests fail when mac is not in compilation mode dbg
+common:macos -c dbg
+
 # Windows and MacOS do not use the custom toolchain config, so the compiler flags need to be set here.
 common:macos --cxxopt=-std=c++20
 common:windows --cxxopt=/std:c++20
@@ -318,7 +365,9 @@ common:windows --cxxopt=-UCOMPILER_MSVC
 # the engflow cluster. External builders should use the --config=local option
 
 # Enable remote build execution:
-common:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
+common --remote_executor=grpcs://sodalite.cluster.engflow.com
+common:windows --remote_executor=
+common:macos --remote_executor=
 
 # Enable remote cache (also necessary for remote build execution):
 common --remote_cache=grpcs://sodalite.cluster.engflow.com
@@ -386,6 +435,7 @@ common:public-release --tls_client_key=
 common:public-release --remote_cache_compression=false
 common:public-release --grpc_keepalive_time=0s
 common:public-release --legacy_important_outputs
+common:public-release --//bazel/config:release=True
 
 --config=fission
 common:fission --fission=yes

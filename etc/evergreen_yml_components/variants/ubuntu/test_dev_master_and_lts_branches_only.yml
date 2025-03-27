@@ -14,7 +14,6 @@ variables:
       multiversion_edition: enterprise
       repo_edition: enterprise
       large_distro_name: ubuntu2204-large
-      scons_cache_scope: shared
     tasks:
       - name: compile_and_archive_dist_test_TG
       - name: .antithesis
@@ -29,14 +28,11 @@ buildvariants:
     expansions:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       compile_variant: *enterprise-ubuntu2204-64-libvoidstar
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=ubuntu2204
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-        BAZEL_FLAGS="--copt=-fsanitize-coverage=trace-pc-guard --linkopt=-lvoidstar"
-        CCFLAGS="-fsanitize-coverage=trace-pc-guard"
-        LIBS="voidstar"
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=ubuntu2204
+        --compiler_type=clang
+        --copt=-fsanitize-coverage=trace-pc-guard
+        --linkopt=-lvoidstar
 
   - <<: *enterprise-ubuntu2204-64-libvoidstar-template
     name: &enterprise-ubuntu2204-64-aubsan-libvoidstar enterprise-ubuntu2204-64-aubsan-libvoidstar
@@ -47,21 +43,14 @@ buildvariants:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: aubsan
       compile_variant: *enterprise-ubuntu2204-64-aubsan-libvoidstar
-      separate_debug: off
-      compile_flags: >-
-        --allocator=system
-        --sanitize=address,undefined
-        --ssl
+      bazel_compile_flags: >-
+        --config=dbg_aubsan
         --opt=on
-        --dbg=on
-        MONGO_DISTMOD=ubuntu2204
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-        --shared-libsan
-        --link-model=dynamic
-        BAZEL_FLAGS="--copt=-fsanitize-coverage=trace-pc-guard --linkopt=-lvoidstar"
-        CCFLAGS="-fsanitize-coverage=trace-pc-guard"
-        LIBS="voidstar"
+        --fission=no
+        --define=MONGO_DISTMOD=ubuntu2204
+        --copt=-shared-libsan
+        --copt=-fsanitize-coverage=trace-pc-guard
+        --linkopt=-lvoidstar
       # TODO SERVER-100334 Enable detect_stack_use_after_return
       san_options: >-
         UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/usr/lib/llvm-12/bin/llvm-symbolizer"
@@ -81,21 +70,13 @@ buildvariants:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: tsan
       compile_variant: *enterprise-ubuntu2204-64-tsan-libvoidstar
-      separate_debug: off
-      compile_flags: >-
-        --allocator=system
-        --sanitize=thread
-        --use-libunwind=off
+      bazel_compile_flags: >-
+        --config=dbg_tsan
         --opt=on
-        --dbg=on
-        --ssl
-        MONGO_DISTMOD=ubuntu2204
-        --link-model=dynamic
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-        BAZEL_FLAGS="--copt=-fsanitize-coverage=trace-pc-guard --linkopt=-lvoidstar"
-        CCFLAGS="-fsanitize-coverage=trace-pc-guard"
-        LIBS="voidstar"
+        --fission=no
+        --define=MONGO_DISTMOD=ubuntu2204
+        --copt=-fsanitize-coverage=trace-pc-guard
+        --linkopt=-lvoidstar
       san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4"
       test_flags: >-
         --excludeWithAnyTags=tsan_incompatible

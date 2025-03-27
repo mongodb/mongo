@@ -1,7 +1,7 @@
 test_kind: cpp_unit_test
 
 selector:
-  root: build/seventh_group_unittests.txt
+  root: bazel-bin/install/install-mongo_unittest_seventh_group_test_list.txt
 
 executor:
   config: {}

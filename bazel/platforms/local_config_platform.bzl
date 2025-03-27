@@ -51,6 +51,7 @@ def _setup_local_config_platform(ctx):
         result = {"USE_NATIVE_TOOLCHAIN": "1"}
     elif distro != None and distro in REMOTE_EXECUTION_CONTAINERS:
         constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
+        constraints_str += ',\n        "@//bazel/platforms:%s"' % (distro)
         container_url = REMOTE_EXECUTION_CONTAINERS[distro]["container-url"]
         web_url = REMOTE_EXECUTION_CONTAINERS[distro]["web-url"]
         dockerfile = REMOTE_EXECUTION_CONTAINERS[distro]["dockerfile"]
@@ -66,6 +67,7 @@ def _setup_local_config_platform(ctx):
         result = {"DISTRO": distro}
     elif distro != None and toolchain_exists:
         constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
+        constraints_str += ',\n        "@//bazel/platforms:%s"' % (distro)
         result = {"DISTRO": distro}
         exec_props = ""
     else:

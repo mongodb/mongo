@@ -16,19 +16,13 @@ variables:
     stepback: false
 
   - &linux-arm64-static-enterprise-compile-expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=static
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
     unittest_library_compile_flags: >-
-      --link-model=dynamic
+      --linkstatic=False
     unittest_compile_flags: >-
-      --link-model=dynamic
+      --linkstatic=False
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -43,7 +37,6 @@ variables:
     repo_edition: enterprise
     large_distro_name: amazon2023-arm64-latest-large
     core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
-    num_scons_link_jobs_available: 0.99
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -74,8 +67,6 @@ variables:
   - &sys_perf_compile_expansions
     platform: linux
     project_dir: dsi
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
 
 buildvariants:
@@ -157,8 +148,6 @@ buildvariants:
     stepback: true
     expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       jstestfuzz_num_generated_files: 40
       jstestfuzz_concurrent_num_files: 10
@@ -192,23 +181,14 @@ buildvariants:
     stepback: false
     expansions:
       <<: *linux_arm64_generic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       skip_symbolization: true
       evergreen_remote_exec: on
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-        -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
+      build_timeout_seconds: 1440
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --linkstatic=False
       clang_tidy_toolchain: v5
-      num_scons_unit_cc_jobs_available: 0.75
       compile_variant: *commit-queue
     depends_on: []
     tasks:
@@ -246,8 +226,6 @@ buildvariants:
     stepback: true
     expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       jstestfuzz_num_generated_files: 20
       jstestfuzz_concurrent_num_files: 5
@@ -300,13 +278,10 @@ buildvariants:
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2023-x86-compile
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --remote-exec-release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+        --config=local
       evergreen_remote_exec: on
     run_on:
       - amazon2023.3-xlarge
@@ -321,13 +296,10 @@ buildvariants:
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2023-arm64-compile
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --remote-exec-release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+        --config=local
       evergreen_remote_exec: on
     run_on:
       - amazon2023.3-arm64-xlarge
@@ -342,19 +314,16 @@ buildvariants:
       platform: linux
       project_dir: dsi
       has_packages: false
-      use_scons_cache: false
       pgo_profile_url: https://mciuploads.s3.amazonaws.com/dsi/perf-3-node-replSet.arm.aws.2024-05/b49fc707fb83a45727ad3f9f7cfa4c940a6805fe/sys_perf_perf_3_node_replSet.arm.aws.2024_05_ycsb.100read.2024_05_patch_b49fc707fb83a45727ad3f9f7cfa4c940a6805fe_66b035d75b27a40007f52c27_24_08_05_02_16_15/66b035d75b27a40007f52c27/logs/default.profdata.tgz
       compile_variant: amazon2023-arm64-compile-pgo
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --remote-exec-release
-        --thin-lto
-        --pgo
-        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-        BAZEL_FLAGS="--keep_going"
+      # TODO(SERVER-102852): This is supposed to have --pgo or use --copt=-fprofile-use=./default.profdata, but bazel will have to support passing the default.profdata into the compiles which it does not currently
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+        --config=local
+        --thin_lto=True
+        --compiler_type=clang
+        --keep_going
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
@@ -368,18 +337,14 @@ buildvariants:
       platform: linux
       project_dir: dsi
       has_packages: false
-      use_scons_cache: false
       bolt: true
       compile_variant: amazon2023-arm64-compile-BOLT
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --remote-exec-release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --bolt
-        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs"
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+        --config=local
+        --bolt=True
+        --linkopt=-Wl,--emit-relocs
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
@@ -393,22 +358,10 @@ buildvariants:
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2023-arm64-compile
-      use_scons_cache: true
-      compile_flags: >-
-        --separate-debug
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --remote-exec-release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --allocator=system
-        --enterprise-features=fle
-        --js-engine=none
-        --link-model=dynamic-sdk
-        --enable-http-client=off
-        --ssl=off
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+        --config=local
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
@@ -421,21 +374,17 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-small-m8g
     expansions:
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        BAZEL_FLAGS="--subcommands"
-        --modules=
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --subcommands
+        --build_enterprise=False
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
+        --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
         --enableEnterpriseTests=off
       has_packages: false
       repo_edition: org
-      scons_cache_scope: shared
       large_distro_name: amazon2023-arm64-latest-small-m8g
       compile_variant: amazon2023-arm64
     tasks:
@@ -459,21 +408,16 @@ buildvariants:
       - amazon2023-arm64-latest-small-m8g
     expansions:
       additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--linkopt=-s"
-      crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+        --linkopt=-s
       test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
       has_packages: false
       multiversion_platform: amazon2023
       multiversion_edition: enterprise
       multiversion_architecture: aarch64
       repo_edition: enterprise
-      scons_cache_scope: shared
       compile_variant: enterprise-amazon2023-arm64-grav4
     tasks:
       - name: compile_test_and_package_serial_TG

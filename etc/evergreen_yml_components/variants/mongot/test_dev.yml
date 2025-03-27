@@ -11,11 +11,8 @@ buildvariants:
       - amazon2023.3-small
     expansions: &amazon-linux-2023-x86-mongot-integration-expansions
       build_mongot: true
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source
         --runAllFeatureFlagTests
@@ -27,7 +24,6 @@ buildvariants:
       packager_arch: x86_64
       packager_distro: amazon2023
       repo_edition: enterprise
-      scons_cache_scope: shared
       compile_variant: amazon-linux-2023-x86-mongot-integration-cron-only
       core_analyzer_distro_name: amazon2023.3-large
     tasks: &amazon-linux-2023-x86-mongot-distro-tasks
@@ -73,13 +69,10 @@ buildvariants:
       - amazon2023.3-arm64-small
     expansions: &amazon2023-arm64-mongot-integration-expansions
       build_mongot: true
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        BAZEL_FLAGS="--subcommands"
-        --modules=
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --subcommands
+        --build_enterprise=False
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
         --enableEnterpriseTests=off
@@ -92,7 +85,6 @@ buildvariants:
       packager_arch: aarch64
       packager_distro: amazon2023
       repo_edition: enterprise
-      scons_cache_scope: shared
       compile_variant: amazon2023-arm64-mongot-integration-cron-only
     tasks: &amazon2023-arm64-mongot-distro-tasks
       - name: compile_and_archive_dist_test_TG
@@ -138,13 +130,8 @@ buildvariants:
     stepback: true
     expansions: &amazon-linux2-arm64-mongot-integration-expansions
       build_mongot: true
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      scons_cache_scope: shared
-      scons_cache_mode: all
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2
       has_packages: false
       target_resmoke_time: 10
       max_sub_suites: 5
@@ -195,11 +182,8 @@ buildvariants:
       - amazon2-latest-large
     expansions: &amazon2-x86-mongot-integration-expansions
       build_mongot: true
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source
         --runAllFeatureFlagTests
@@ -211,7 +195,6 @@ buildvariants:
       packager_arch: x86_64
       packager_distro: amazon2
       repo_edition: enterprise
-      scons_cache_scope: shared
       compile_variant: amazon2-x86-mongot-integration-cron-only
     tasks: &amazon2-x86-mongot-distro-tasks
       - name: compile_and_archive_dist_test_TG
@@ -253,17 +236,12 @@ buildvariants:
       - rhel8.8-medium
     tags: []
     expansions:
-      scons_cache_scope: shared
-      scons_cache_mode: all
       compile_variant: *enterprise-rhel-8-64-mongot-integration
       has_packages: false
       build_mongot: true
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel88
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --linkstatic=False
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:

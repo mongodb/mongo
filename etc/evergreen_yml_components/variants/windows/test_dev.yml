@@ -56,18 +56,13 @@ buildvariants:
       exe: ".exe"
       ext: zip
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
-        msi
+        //src/mongo/installer/msi:mongodb-win32-x86_64-windows
       content_type: application/zip
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=windows
-        -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-        --win-version-min=win10
-      num_scons_link_jobs_available: 0.1
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=windows
       python: "/cygdrive/c/python/python310/python.exe"
-      scons_cache_scope: shared
       compile_variant: *windows-compile-required
     tasks:
       - name: compile_test_serial_no_unittests_TG

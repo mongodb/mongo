@@ -16,15 +16,10 @@ variables:
     stepback: false
 
   - &linux-arm64-dynamic-enterprise-compile-expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --linkstatic=False
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -57,7 +52,6 @@ variables:
     repo_edition: enterprise
     large_distro_name: amazon2023-arm64-latest-large
     core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
-    num_scons_link_jobs_available: 0.99
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -86,14 +80,10 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-large
     expansions:
-      scons_cache_scope: none
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --link-model=dynamic
-        BAZEL_FLAGS=--config=local
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --linkstatic=False
+        --config=local
       compile_variant: *amazon-linux2023-arm64-local-compile
     tasks:
       - name: compile_test_parallel_unittest_stream_TG
@@ -125,11 +115,8 @@ buildvariants:
     stepback: false
     expansions:
       compile_variant: *rhel81-ppc64le-bazel-compile
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel81
-        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel81
     tasks:
       - name: compile_bazel_TG
 
@@ -144,12 +131,8 @@ buildvariants:
     stepback: false
     expansions:
       compile_variant: *rhel83-s390x-bazel-compile
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel83
-        -j3
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --linker=gold
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel83
     tasks:
       - name: compile_bazel_TG
 
@@ -164,8 +147,6 @@ buildvariants:
     stepback: true
     expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       jstestfuzz_num_generated_files: 40
       jstestfuzz_concurrent_num_files: 10
@@ -198,8 +179,6 @@ buildvariants:
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       jstestfuzz_num_generated_files: 40
       jstestfuzz_concurrent_num_files: 10
@@ -302,14 +281,10 @@ buildvariants:
     run_on:
       - amazon2023.3-arm64-large
     expansions:
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --debug-symbols=minimal
-      separate_debug: off
-      scons_cache_scope: shared
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --dbg_level=1
+        --separate_debug=False
       evergreen_remote_exec: on
       compile_variant: *al2023-arm64-sep-benchmark
     tasks:
@@ -327,8 +302,6 @@ buildvariants:
     stepback: false
     expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       jstestfuzz_num_generated_files: 20
       jstestfuzz_concurrent_num_files: 5
@@ -392,8 +365,6 @@ buildvariants:
     expansions:
       expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       jstestfuzz_num_generated_files: 20
       jstestfuzz_concurrent_num_files: 5
@@ -447,8 +418,6 @@ buildvariants:
     expansions:
       expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       jstestfuzz_num_generated_files: 20
       jstestfuzz_concurrent_num_files: 5

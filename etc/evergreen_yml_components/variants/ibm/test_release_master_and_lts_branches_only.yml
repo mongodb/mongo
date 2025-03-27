@@ -15,18 +15,11 @@ buildvariants:
     stepback: false
     expansions: &enterprise-rhel-81-ppc64le-expansions-template
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel81
-        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-        -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel81
       resmoke_jobs_factor: 0.25
       has_packages: true
       packager_script: packager_enterprise.py
@@ -66,12 +59,9 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel-81-ppc64le-expansions-template
       has_packages: false
-      compile_flags: >-
-        --link-model=dynamic
-        --ssl
-        MONGO_DISTMOD=rhel81
-        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --linkstatic=False
+        --define=MONGO_DISTMOD=rhel81
       compile_variant: enterprise-rhel-81-ppc64le-shared
     tasks:
       - name: compile_test_serial_TG
@@ -91,18 +81,11 @@ buildvariants:
     stepback: false
     expansions: &enterprise-rhel-9-ppc64le-expansions-template
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel9
-        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-        -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel9
       resmoke_jobs_factor: 0.25
       has_packages: true
       packager_script: packager_enterprise.py
@@ -142,12 +125,9 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel-9-ppc64le-expansions-template
       has_packages: false
-      compile_flags: >-
-        --link-model=dynamic
-        --ssl
-        MONGO_DISTMOD=rhel9
-        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      bazel_compile_flags: >-
+        --linkstatic=False
+        --define=MONGO_DISTMOD=rhel9
       compile_variant: enterprise-rhel-9-ppc64le-shared
     tasks:
       - name: compile_test_serial_TG
@@ -167,19 +147,12 @@ buildvariants:
     stepback: false
     expansions: &enterprise-rhel-83-s390x-expansions-template
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       release_buid: true
       test_flags: --excludeWithAnyTags=incompatible_with_s390x
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel83
-        -j3
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --linker=gold
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel83
       resmoke_jobs_max: 2
       has_packages: true
       packager_script: packager_enterprise.py
@@ -215,13 +188,9 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel-83-s390x-expansions-template
       has_packages: false
-      compile_flags: >-
-        --link-model=dynamic
-        --ssl
-        MONGO_DISTMOD=rhel83
-        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --linker=gold
+      bazel_compile_flags: >-
+        --linkstatic=False
+        --define=MONGO_DISTMOD=rhel83
       compile_variant: enterprise-rhel-83-s390x-shared
       exec_timeout_secs: 86400 # 24 hours exec timeout
     tasks:
@@ -242,19 +211,12 @@ buildvariants:
     stepback: false
     expansions: &enterprise-rhel-9-s390x-expansions-template
       additional_package_targets: >-
-        archive-mongocryptd
+        archive-mongocryptd-stripped
         archive-mongocryptd-debug
       release_buid: true
       test_flags: --excludeWithAnyTags=incompatible_with_s390x
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=rhel9
-        -j3
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --linker=gold
-      crypt_task_compile_flags: >-
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel9
       resmoke_jobs_max: 2
       has_packages: true
       packager_script: packager_enterprise.py
@@ -290,13 +252,9 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel-9-s390x-expansions-template
       has_packages: false
-      compile_flags: >-
-        --link-model=dynamic
-        --ssl
-        MONGO_DISTMOD=rhel9
-        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --linker=gold
+      bazel_compile_flags: >-
+        --linkstatic=False
+        --define=MONGO_DISTMOD=rhel9
       compile_variant: enterprise-rhel-9-s390x-shared
       exec_timeout_secs: 86400 # 24 hours exec timeout
     tasks:

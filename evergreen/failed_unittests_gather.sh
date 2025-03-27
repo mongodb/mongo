@@ -80,7 +80,7 @@ while read -r core_file; do
 done <<< "${core_files}"
 
 # Copy debug symbols for dynamic builds
-lib_dir=build/install/lib
+lib_dir=bazel-bin/install/lib
 if [ -d "$lib_dir" ] && [ -n "$core_files" ]; then
   cp -r "$lib_dir" dist-unittests
 fi

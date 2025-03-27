@@ -16,7 +16,7 @@ if [ "$(uname)" != "Linux" ]; then
   exit 0
 fi
 
-EXTRACT_DIR="build/crypt-lib-${version}"
+EXTRACT_DIR="bazel-bin/install"
 SOPATH="${EXTRACT_DIR}/lib/mongo_crypt_v1.so"
 UNITTEST_PATH="${EXTRACT_DIR}/bin/mongo_crypt_shlib_test"
 GDB_PATH="/opt/mongodbtoolchain/v5/bin/gdb"

@@ -23,9 +23,9 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
     # The 'CheckMetadataConsistency' hook relies on the 'isMaster' command to asses if the fixture cluster is sharded.
     SKIP_TESTS = [
         # Skip tests that set a failPoint to make the 'isMaster' command unconditionally fail.
-        "build/install/bin/executor_integration_test",
-        "build/install/bin/rpc_integration_test",
-        "build/install/bin/asio_transport_integration_test",
+        "bazel-bin/install/bin/executor_integration_test",
+        "bazel-bin/install/bin/rpc_integration_test",
+        "bazel-bin/install/bin/asio_transport_integration_test",
         # Skip tests that update the internalDocumentSourceGroupMaxMemoryBytes parameter and make
         # checkMetadataConsistency fail with QueryExceededMemoryLimitNoDiskUseAllowed error.
         "jstests/aggregation/sources/unionWith/unionWith.js",

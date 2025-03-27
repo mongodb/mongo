@@ -78,7 +78,7 @@ functions:
             else
               export PATH=/opt/mongodbtoolchain/v4/bin:$PATH
             fi
-  # Since Bazel (currently used in SCons) uses EngFlow's remote execution system instead of icecream,
+  # Since Bazel uses EngFlow's remote execution system
   # additional credentials need to be setup to maintain efficient compilation speed.
   "get engflow creds": &get_engflow_creds
   - command: s3.get
