@@ -14,6 +14,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkWriteConcernBehaviorAdditionalCRUDOps,
+    checkWriteConcernBehaviorUpdatingDocShardKey,
     precmdShardKey
 } from "jstests/libs/write_concern_all_commands.js";
 
@@ -44,6 +45,12 @@ checkWriteConcernBehaviorAdditionalCRUDOps(st.s,
                                            precmdShardKeyA,
                                            true /* shardedCollection */,
                                            false /* writeWithoutSk */);
+checkWriteConcernBehaviorUpdatingDocShardKey(st.s,
+                                             st,
+                                             "sharded" /* clusterType */,
+                                             precmdShardKeyA,
+                                             true /* shardedCollection */,
+                                             false /* writeWithoutSk */);
 
 jsTest.log(
     "Testing addl. CRUD commands on a sharded collection where {x : 1} is the shard key. The writes will take the target without shard key path.");
@@ -56,5 +63,11 @@ checkWriteConcernBehaviorAdditionalCRUDOps(st.s,
                                            precmdShardKeyX,
                                            true /* shardedCollection */,
                                            true /* writeWithoutSk */);
+checkWriteConcernBehaviorUpdatingDocShardKey(st.s,
+                                             st,
+                                             "sharded" /* clusterType */,
+                                             precmdShardKeyA,
+                                             true /* shardedCollection */,
+                                             true /* writeWithoutSk */);
 
 st.stop();

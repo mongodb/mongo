@@ -3805,13 +3805,22 @@ const shardedDDLCommandsRequiringMajorityCommit = [
     "shardCollection"
 ];
 
-function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, writeWithoutSk) {
+function shouldSkipTestCase(
+    clusterType, command, testCase, shardedCollection, writeWithoutSk, coll) {
     if (!shardedCollection &&
         (command == "moveChunk" || command == "moveRange" ||
-         command == "refineCollectionShardKey" || command == "setAllowMigrations")) {
+         command == "refineCollectionShardKey" || command == "setAllowMigrations" ||
+         command == "updateDocSk")) {
         jsTestLog(
             "Skipping " + command +
             " because requires sharded collection, and the current collection is not sharded.");
+        return true;
+    }
+
+    if (shardedCollection && command == "updateDocSk" &&
+        bsonWoCompare(getShardKey(coll, fullNs), {"_id": 1}) == 0) {
+        jsTestLog(
+            "Skipping updating a document's shard key because the shard key is {_id: 1}, and the _id field is immutable.");
         return true;
     }
 
@@ -3939,7 +3948,7 @@ function executeWriteConcernBehaviorTests(conn,
 
         if (cmd.noop) {
             if (!shouldSkipTestCase(
-                    clusterType, command, "noop", shardedCollection, writeWithoutSk))
+                    clusterType, command, "noop", shardedCollection, writeWithoutSk, coll))
                 runCommandTest(cmd.noop,
                                conn,
                                coll,
@@ -3952,7 +3961,7 @@ function executeWriteConcernBehaviorTests(conn,
 
         if (cmd.success) {
             if (!shouldSkipTestCase(
-                    clusterType, command, "success", shardedCollection, writeWithoutSk))
+                    clusterType, command, "success", shardedCollection, writeWithoutSk, coll))
                 runCommandTest(cmd.success,
                                conn,
                                coll,
@@ -3965,7 +3974,7 @@ function executeWriteConcernBehaviorTests(conn,
 
         if (cmd.failure) {
             if (!shouldSkipTestCase(
-                    clusterType, command, "failure", shardedCollection, writeWithoutSk))
+                    clusterType, command, "failure", shardedCollection, writeWithoutSk, coll))
                 runCommandTest(cmd.failure,
                                conn,
                                coll,
@@ -3973,7 +3982,8 @@ function executeWriteConcernBehaviorTests(conn,
                                clusterType,
                                preSetup,
                                secondariesRunning,
-                               forceUseMajorityWC);
+                               forceUseMajorityWC,
+                               writeWithoutSk);
         }
     });
 }
@@ -4080,6 +4090,95 @@ export function checkWriteConcernBehaviorAdditionalCRUDOps(
                                      preSetup,
                                      Object.keys(additionalCRUDOps),
                                      additionalCRUDOps,
+                                     [] /* secondariesRunning */,
+                                     shardedCollection);
+
+    restartSecondaries(cluster, clusterType);
+}
+
+export function checkWriteConcernBehaviorUpdatingDocShardKey(
+    conn, cluster, clusterType, preSetup, shardedCollection, writeWithoutSk) {
+    jsTestLog("Checking write concern behavior for updating a document's shard key");
+
+    let coll = conn.getDB(dbName).getCollection(collName);
+
+    stopSecondaries(cluster, clusterType);
+
+    // Note we don't need to check the transaction cases, because we will not wait for write concern
+    // on the individual transaction statements, but rather only on the commit. We test commit
+    // already separately above. We test the retryable write case because the server internally
+    // executes commit in this case, and builds a response object from the commit response.
+    let testCases = {
+        "updateDocSk": {
+            noop: {
+                req: () => ({
+                    update: collName,
+                    updates:
+                        [{q: {a: 1}, u: {$set: {[Object.keys(getShardKey(coll, fullNs))[0]]: -1}}}],
+                    lsid: getLSID(),
+                    txnNumber: getTxnNumber()
+                }),
+                setupFunc: (coll) => {
+                    let sk = getShardKey(coll, fullNs);
+                    if (bsonWoCompare(sk, {a: 1}) == 0) {
+                        assert.commandWorked(coll.insert({a: 1}));
+                        assert.commandWorked(coll.remove({a: 1}));
+                    } else {
+                        // Make sure doc has "a" to query on and the shard key
+                        assert.commandWorked(coll.insert({a: 1, [Object.keys(sk)[0]]: 2}));
+                        assert.commandWorked(coll.remove({[Object.keys(sk)[0]]: 2}));
+                    }
+
+                    assert.eq(coll.find().itcount(), 0);
+                },
+                confirmFunc: (res, coll) => {
+                    assert.commandWorkedIgnoringWriteConcernErrors(res);
+                    assert.eq(coll.find().itcount(), 0);
+                    genNextTxnNumber();
+                }
+            },
+            success: {
+                req: () => ({
+                    update: collName,
+                    updates:
+                        [{q: {a: 1}, u: {$set: {[Object.keys(getShardKey(coll, fullNs))[0]]: -1}}}],
+                    lsid: getLSID(),
+                    txnNumber: getTxnNumber()
+                }),
+                setupFunc: (coll) => {
+                    let sk = getShardKey(coll, fullNs);
+                    if (bsonWoCompare(sk, {a: 1}) == 0) {
+                        assert.commandWorked(coll.insert({a: 1}));
+                    } else {
+                        // Make sure doc has "a" to query on and the shard key
+                        assert.commandWorked(coll.insert({a: 1, [Object.keys(sk)[0]]: 2}));
+                    }
+
+                    assert.eq(coll.find().itcount(), 1);
+                },
+                confirmFunc: (res, coll) => {
+                    assert.commandWorkedIgnoringWriteConcernErrors(res);
+                    assert.eq(
+                        coll.find({[Object.keys(getShardKey(coll, fullNs))[0]]: -1}).itcount(), 1);
+                    genNextTxnNumber();
+                },
+            },
+            // We don't test a failure case, because if the insert or delete (executed internally by
+            // the server) fails for any reason, mongod will not wait for write concern at all
+            // (again, because it only waits on commit or abort, and in this case we won't try to
+            // commit). So, this becomes a similar case as the commit case in the tests above -
+            // there isn't a sequence of events that would mutate the data that would cause the
+            // commit to fail in such a way that the WCE is important.
+        }
+    };
+
+    executeWriteConcernBehaviorTests(conn,
+                                     coll,
+                                     cluster,
+                                     clusterType,
+                                     preSetup,
+                                     Object.keys(testCases),
+                                     testCases,
                                      [] /* secondariesRunning */,
                                      shardedCollection,
                                      writeWithoutSk);
