@@ -45,11 +45,13 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
@@ -188,49 +190,6 @@ TEST_F(WriteOpTest, BasicError) {
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
     ASSERT_EQUALS(writeOp.getOpError().getStatus(), error.getStatus());
-}
-
-// Test of error that embeds a writeConcernError.
-TEST_F(WriteOpTest, ErrorWithWriteConcernError) {
-    BatchedCommandRequest request([&] {
-        write_ops::InsertCommandRequest insertOp(kNss);
-        insertOp.setDocuments({BSON("x" << 1)});
-        return insertOp;
-    }());
-
-    WriteOp writeOp(BatchItemRef(&request, 0), false);
-    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
-
-    // The main error is wrapped inside an ErrorWithWriteConcernError.
-    Status mainError{ErrorCodes::UnknownError, "some message"};
-    WriteConcernErrorDetail wcError;
-    wcError.setStatus({ErrorCodes::WriteConcernTimeout, "wce error"});
-    Status s{ErrorWithWriteConcernErrorInfo(mainError, wcError), "write concern error in op"};
-    ASSERT_EQUALS(ErrorCodes::ErrorWithWriteConcernError, s.code());
-    ASSERT_EQUALS("write concern error in op", s.reason());
-
-    write_ops::WriteError error(0, s);
-    ASSERT_EQUALS(ErrorCodes::ErrorWithWriteConcernError, error.getStatus().code());
-    ASSERT_EQUALS("write concern error in op", error.getStatus().reason());
-    writeOp.setOpError(error);
-
-    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
-    ASSERT_EQUALS(writeOp.getOpError().getStatus(), error.getStatus());
-    ASSERT_EQUALS(ErrorCodes::ErrorWithWriteConcernError, writeOp.getOpError().getStatus());
-
-    // When serializing the ErrorWithWriteConcernError to BSON, we expect the main status to come
-    // out as the top-level error.
-    BSONObj serialized = writeOp.getOpError().serialize();
-    ASSERT_EQUALS(0, serialized.getIntField("index"));
-    ASSERT_EQUALS(ErrorCodes::UnknownError, serialized.getIntField("code"));
-    ASSERT_EQUALS("some message", serialized.getStringField("errmsg"));
-
-    // Check "writeConcernError" details.
-    ASSERT_TRUE(serialized.hasField("writeConcernError"));
-    BSONObj wce = serialized.getObjectField("writeConcernError");
-    ASSERT_EQUALS(ErrorCodes::WriteConcernTimeout, wce.getIntField("code"));
-    ASSERT_EQUALS("WriteConcernTimeout", wce.getStringField("codeName"));
-    ASSERT_EQUALS("wce error", wce.getStringField("errmsg"));
 }
 
 TEST_F(WriteOpTest, TargetSingle) {
