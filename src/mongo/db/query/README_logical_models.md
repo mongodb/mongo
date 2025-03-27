@@ -28,7 +28,7 @@ By converting all instances of syntactic sugar into their explicit forms, we sim
 
 A [`CanonicalQuery`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/canonical_query.h#L79) is a container that represents a parsed and normalized query. It contains the filter, projection, and sort components of the original query message. Each of these components is generated via the [`CanonicalQuery` constructor](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/canonical_query.cpp#L98). In order to create the `CanonicalQuery` in its "base" form, the `CanonicalQuery` delegates to three more processes and related data structures: `MatchExpression`, `Projection`, and `SortPattern` to handle the simplification, each of which is discussed in detail below.
 
-If a `CanonicalQuery` [cannot be generated](#parsing-aggregations) after parsing, we move the query straight to the Query Execution layer without optimization.
+If a `CanonicalQuery` [cannot be generated](../commands/query_cmd/README.md#parsing-aggregations) after parsing, we move the query straight to the Query Execution layer without optimization.
 
 > ### Aside: Canonicalization
 >

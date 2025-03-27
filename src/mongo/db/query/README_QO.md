@@ -41,7 +41,7 @@ flowchart TD
         update["update"]
         fam["findAndModify"]
   end
- subgraph s1["Query Execution"]
+ subgraph s1[" "]
         D1["DocumentSourceExecution"]
         D2["PlanExecutor"]
         D3["Storage API"]
@@ -55,7 +55,8 @@ flowchart TD
     fam -- filter --> cq
     me --> C1["MatchExpression::optimize()"]
     C1 --> C3["Plan Enumerator"]
-    C3 --> C4["Classic Multiplanner"] & C5["Classic Multiplanner for SBE"] & C6["Cost Based Ranker"]
+    C3 --> n2["Candidate QuerySolutions"]
+    n2 --> C4["Classic Multiplanner"] & C5["Classic Multiplanner for SBE"] & C6["Cost Based Ranker"]
     C7["Cardinality Estimation"] --o C6
     C8["Cost Model"] --o C6
     C4 --> C12["Winning QuerySolution"]
@@ -69,21 +70,22 @@ flowchart TD
     n1["Pipeline::optimize()"] --> C11
     agg --> B1["Pipeline"]
     mr -- "Deprecated in v5.0 in favor of agg" --> B1
-    cq -- "projection<br>sort" --> C3
+    cq -- projection<br>sort --> C3
     B1 --> n1
     D1@{ shape: subproc}
     D2@{ shape: lin-rect}
     D3@{ shape: cyl}
     cq@{ shape: dbl-circ}
     me@{ shape: dbl-circ}
-    B1@{ shape: dbl-circ}
     C1@{ shape: subproc}
     C3@{ shape: subproc}
-    C4@{ shape: procs}
-    C5@{ shape: procs}
-    C6@{ shape: procs}
+    n2@{ shape: docs}
+    C4@{ shape: subproc}
+    C5@{ shape: subproc}
+    C6@{ shape: subproc}
     C7@{ shape: lean-r}
     C8@{ shape: lean-r}
-    C12@{ shape: dbl-circ}
+    C12@{ shape: doc}
     n1@{ shape: subproc}
+    B1@{ shape: dbl-circ}
 ```
