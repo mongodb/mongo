@@ -182,7 +182,7 @@ private:
 };
 
 template <typename T>
-std::string stringifyForAssert(const StatusWith<T>& sw) {
+std::string stringify_forTest(const StatusWith<T>& sw) {
     if (sw.isOK()) {
         return unittest::stringify::invoke(sw.getValue());
     } else {

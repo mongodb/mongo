@@ -745,7 +745,7 @@ protected:
         std::min(sizeof(Storage) - sizeof(char), size_t(63));
 };
 
-inline std::string stringifyForAssert(const DatabaseName& dbName) {
+inline std::string stringify_forTest(const DatabaseName& dbName) {
     return toStringForLogging(dbName);
 }
 

@@ -315,7 +315,7 @@ TEST_F(UnitTestFormatTest, FormatEnumClass) {
 
 namespace test_extension {
 struct X {
-    friend std::string stringifyForAssert(const X& x) {
+    friend std::string stringify_forTest(const X& x) {
         return "X{" + std::to_string(x.x) + "}";
     }
 

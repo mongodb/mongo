@@ -979,7 +979,7 @@ inline bool NamespaceString::validCollectionName(StringData coll) {
     return true;
 }
 
-inline std::string stringifyForAssert(const NamespaceString& nss) {
+inline std::string stringify_forTest(const NamespaceString& nss) {
     return toStringForLogging(nss);
 }
 
