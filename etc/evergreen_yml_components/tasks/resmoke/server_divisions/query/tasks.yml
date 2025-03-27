@@ -1794,7 +1794,6 @@ tasks:
         vars:
           suite: query_correctness_generated_test
           should_shuffle: false
-          resmoke_args: "--mongodSetParameters='{internalQueryFrameworkControl: trySbeEngine}'"
 
   - <<: *task_template
     name: query_correctness_generated_test_2
@@ -1823,7 +1822,6 @@ tasks:
         vars:
           suite: query_correctness_generated_test
           should_shuffle: false
-          resmoke_args: "--mongodSetParameters='{internalQueryFrameworkControl: trySbeEngine}'"
 
   - <<: *task_template
     name: query_correctness_generated_test_3
@@ -1852,7 +1850,6 @@ tasks:
         vars:
           suite: query_correctness_generated_test
           should_shuffle: false
-          resmoke_args: "--mongodSetParameters='{internalQueryFrameworkControl: trySbeEngine}'"
 
   - <<: *task_template
     name: query_correctness_generated_test_4
@@ -1881,7 +1878,6 @@ tasks:
         vars:
           suite: query_correctness_generated_test
           should_shuffle: false
-          resmoke_args: "--mongodSetParameters='{internalQueryFrameworkControl: trySbeEngine}'"
 
   - <<: *task_template
     name: query_correctness_manual_test
