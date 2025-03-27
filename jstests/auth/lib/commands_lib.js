@@ -8034,7 +8034,26 @@ export const authCommandsLib = {
               }],
               cursor: {},
           },
-          testcases: testcases_transformationOnlyExpectFail,
+          testcases: [
+            {
+              runOnDb: firstDbName,
+              roles: {__system: 1},
+              // $mergeCursors requires __system role OR a user with internal and find action types as privileges.
+              expectFail: true,
+              privileges: [
+                {resource: {cluster: true}, actions: ["internal"]},
+                {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+              ],
+            },
+            {
+              runOnDb: firstDbName,
+              // Find action type as a privilege alone is not sufficient for $mergeCursors.
+              expectAuthzFailure: true,
+              privileges: [
+                {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+              ],
+            },
+          ],
         },
         {
           testname: "aggregate_$queue",
