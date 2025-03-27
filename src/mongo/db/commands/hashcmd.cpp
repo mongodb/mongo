@@ -100,7 +100,7 @@ public:
                     result, false /* ok */, "seed must be a number" /* errmsg */);
                 return false;
             }
-            seed = cmdObj["seed"].numberInt();
+            seed = cmdObj["seed"].safeNumberInt();
         }
         result.append("seed", seed);
 

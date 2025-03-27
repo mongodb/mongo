@@ -160,15 +160,15 @@ public:
 
             if (auto secsElem = cmdObj["secs"]) {
                 uassert(34344, "'secs' must be a number.", secsElem.isNumber());
-                msToSleep += secsElem.numberLong() * 1000;
+                msToSleep += secsElem.safeNumberLong() * 1000;
             } else if (auto secondsElem = cmdObj["seconds"]) {
                 uassert(51154, "'seconds' must be a number.", secondsElem.isNumber());
-                msToSleep += secondsElem.numberLong() * 1000;
+                msToSleep += secondsElem.safeNumberLong() * 1000;
             }
 
             if (auto millisElem = cmdObj["millis"]) {
                 uassert(34345, "'millis' must be a number.", millisElem.isNumber());
-                msToSleep += millisElem.numberLong();
+                msToSleep += millisElem.safeNumberLong();
             }
         } else {
             msToSleep = 10 * 1000;

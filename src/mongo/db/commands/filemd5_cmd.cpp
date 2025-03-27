@@ -151,7 +151,7 @@ public:
                 massert(16247, "md5 state not correct size", len == sizeof(st));
                 memcpy(&st, data, sizeof(st));
             }
-            n = jsobj["startAt"].numberInt();
+            n = jsobj["startAt"].safeNumberInt();
         }
 
         BSONObj query = BSON("files_id" << jsobj["filemd5"] << "n" << GTE << n);
@@ -189,7 +189,7 @@ public:
                 while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
                     BSONElement ne = obj["n"];
                     MONGO_verify(ne.isNumber());
-                    int myn = ne.numberInt();
+                    int myn = ne.safeNumberInt();
                     if (n != myn) {
                         if (partialOk) {
                             break;  // skipped chunk is probably on another shard
