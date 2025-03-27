@@ -345,7 +345,11 @@ be invoked as either:
     )
 
     with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
-        force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
+        # the ENABLED_FEATURE_FLAGS list already excludes the fully disabled features flags
+        # This keeps any feature flags enabled that were manually turned on from being excluded
+        force_disabled_flags = set(yaml.safe_load(fully_disabled_ffs)) - set(
+            _config.ENABLED_FEATURE_FLAGS
+        )
 
     _config.EXCLUDE_WITH_ANY_TAGS.extend(force_disabled_flags)
 
