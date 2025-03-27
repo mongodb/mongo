@@ -1398,10 +1398,9 @@ private:
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
     void pushStack(bool owned, value::TypeTags tag, value::Value val) {
+        dassert(_argStackEnd - _argStackTop >= static_cast<std::ptrdiff_t>(sizeOfElement),
+                "Invalid pushStack call leads to overflow");
         auto localPtr = _argStackTop += sizeOfElement;
-        if constexpr (kDebugBuild) {
-            invariant(localPtr != _argStackEnd);
-        }
 
         writeTuple(localPtr, owned, tag, val);
     }
