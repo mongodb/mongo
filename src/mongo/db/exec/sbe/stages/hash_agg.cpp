@@ -278,7 +278,8 @@ void HashAggStage::open(bool reOpen) {
 
         _seekKeys.resize(_seekKeysAccessors.size());
 
-        // Reset state since this stage may have been previously opened.
+        // Reset switch accessors to point to '_ht' (index 0) not '_recordStore' (index 1) since
+        // this stage may have been previously opened.
         for (auto&& accessor : _outKeyAccessors) {
             accessor->setIndex(0);
         }
@@ -304,7 +305,7 @@ void HashAggStage::open(bool reOpen) {
         bool first = true;
         const bool groupByListHasSlots = !_inKeyAccessors.empty();
         while (_children[0]->getNext() == PlanState::ADVANCED) {
-            bool newKey = false;
+            bool newKey = false;  // tells if the current key is NOT in '_ht' so must be inserted
             if (groupByListHasSlots || first) {
                 // Copy keys in order to do the lookup.
                 size_t idx = 0;
@@ -328,7 +329,7 @@ void HashAggStage::open(bool reOpen) {
 
                 _htIt = it;
 
-                // Run accumulator initializer if needed.
+                // Run all acc initializers for this key. Null entries in '_aggCodes' are no-ops.
                 for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
                     if (_aggCodes[idx].first) {
                         auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].first.get());
@@ -337,7 +338,8 @@ void HashAggStage::open(bool reOpen) {
                 }
             }
 
-            // Accumulate state in '_ht'.
+            // Accumulate state in '_ht' value, which is a materialized row of '_outAggAccessors'
+            // each of which contains the current accumulator state for one accumulator.
             for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
                 auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].second.get());
                 _outHashAggAccessors[idx]->reset(owned, tag, val);
@@ -358,7 +360,7 @@ void HashAggStage::open(bool reOpen) {
                     checkMemoryUsageAndSpillIfNecessary(memoryCheckData);
                 }
             }
-        }
+        }  // while child's getNext advanced
 
         if (_optimizedClose) {
             _children[0]->close();

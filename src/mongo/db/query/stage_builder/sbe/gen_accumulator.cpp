@@ -62,8 +62,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
-const StringData kAccumulatorCountName = "$count"_sd;
-
 AccumInputs::~AccumInputs() = default;
 
 AccumInputsPtr AddSingleInput::clone() const {
@@ -1778,6 +1776,8 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsTopBottomN(
 }
 }  // namespace
 
+// Map from accumulator name (e.g. "$avg" or "$count"), which is currently the only ID we have for
+// accumulators, to functions used for stage building various parts of them.
 static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
     // AddToSet
     {AccumulatorAddToSet::kName,
@@ -1787,7 +1787,7 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
 
     // Avg
     {AccumulatorAvg::kName,
-     AccumOpInfo{.numAggs = 2,
+     AccumOpInfo{.numAggs = 2,  // $avg is the only accumulator decomposed into two or more
                  .buildAddExprs = makeBuildFn(&buildAccumExprsAvg),
                  .buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsAvg),
                  .buildAddAggs = makeBuildFn(&buildAccumAggsAvg),
@@ -1994,9 +1994,9 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
                  .buildInit = makeBuildFn(&buildInitializeAccumN),
                  .buildFinalize = makeBuildFn(&buildFinalizeTopBottomN),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
-};
+};  // accumOpInfoMap
 
-std::string getOpNameForAccStmt(const AccumulationStatement& accStmt) {
+std::string AccumOp::getOpNameForAccStmt(const AccumulationStatement& accStmt) {
     std::string opName = accStmt.expr.name.toString();
 
     // The parser transforms "{$count: ..}" into "{$group: {..: {$sum: NumberInt(1)}}}".

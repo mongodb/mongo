@@ -1336,6 +1336,13 @@ private:
         return ret;
     }
 
+    /**
+     * Returns the value triple at the top of the VM stack, whether the stack owned it or not. If
+     * the stack DID own it, this transfers ownership to the caller (like a move). If the stack did
+     * NOT own it, no ownership transfer occurs, so something else still owns it.
+     *
+     * If you want the caller always to own the returned value, call moveOwnedFromStack() instead.
+     */
     MONGO_COMPILER_ALWAYS_INLINE_OPT
     FastTuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) noexcept {
         if (MONGO_likely(offset == 0)) {
@@ -1350,6 +1357,16 @@ private:
         }
     }
 
+    /**
+     * Returns the value triple at the top of the VM stack, whether the stack owned it or not, and
+     * also causes the caller to own it and the stack not to own it. If the stack DID own it, this
+     * transfers ownership to the caller (like a move). If the stack did NOT own it, this makes a
+     * copy and gives ownership of the copy to the caller, while something else still owns the
+     * original on the top of the stack.
+     *
+     * If you do not want ownership to transfer to the caller if the stack did not already own it,
+     * call moveFromStack() instead.
+     */
     MONGO_COMPILER_ALWAYS_INLINE_OPT
     std::pair<value::TypeTags, value::Value> moveOwnedFromStack(size_t offset) {
         auto [owned, tag, val] = moveFromStack(offset);
@@ -1389,6 +1406,9 @@ private:
         writeTuple(localPtr, owned, tag, val);
     }
 
+    /**
+     * Overwrites the current value at the top of the stack with the value triple passed in.
+     */
     MONGO_COMPILER_ALWAYS_INLINE void topStack(bool owned,
                                                value::TypeTags tag,
                                                value::Value val) noexcept {

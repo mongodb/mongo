@@ -1083,6 +1083,19 @@ private:
         PlanStageSlots childOutputs,
         const GroupNode* groupNode);
 
+    std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> buildGroupImplBlock(
+        SbStage stage,
+        const PlanStageReqs& reqs,
+        const PlanStageSlots& childOutputs,
+        const GroupNode* groupNode,
+        bool& blockSucceeded);
+
+    std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots>
+    buildGroupImplScalar(SbStage stage,
+                         const PlanStageReqs& reqs,
+                         PlanStageSlots& childOutputs,
+                         const GroupNode* groupNode);
+
     std::pair<SbStage, PlanStageSlots> buildEqLookup(const QuerySolutionNode* root,
                                                      const PlanStageReqs& reqs);
 

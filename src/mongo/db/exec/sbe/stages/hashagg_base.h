@@ -67,6 +67,11 @@ protected:
         return;
     }
 
+    /**
+     * The hash table '_ht' contains a map from $group keys to the current accumulator states for
+     * all accumulators of that $group stage. The first MaterializedRow in SpilledRow and TableType
+     * contains a key and the second contains the state values.
+     */
     using SpilledRow = std::pair<value::MaterializedRow, value::MaterializedRow>;
     using TableType = stdx::unordered_map<value::MaterializedRow,
                                           value::MaterializedRow,

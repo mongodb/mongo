@@ -470,7 +470,8 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySet(
     mergingExprs.emplace_back(std::move(aggSetUnionExpr), spillSlot);
 
     auto [packedKeyValuesStage, _, aggOutSlots] =
-        b.makeHashAgg(std::move(keyValuesStage),
+        b.makeHashAgg(VariableTypes{},
+                      std::move(keyValuesStage),
                       {}, /* groupBy slots - an empty vector means creating a single group */
                       std::move(sbAggExprs),
                       {}, /* We group _all_ key values to a single set so we can ignore collation */
@@ -515,7 +516,8 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
         b.makeFunction("aggConcatArraysCapped", spillSlot, b.makeInt32Constant(sizeCap)),
         spillSlot);
 
-    auto [hashAggStage, _, aggOutSlots] = b.makeHashAgg(std::move(innerBranch),
+    auto [hashAggStage, _, aggOutSlots] = b.makeHashAgg(VariableTypes{},
+                                                        std::move(innerBranch),
                                                         {}, /* groupBy slots */
                                                         std::move(sbAggExprs),
                                                         {}, /* collatorSlot */

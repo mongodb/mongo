@@ -491,46 +491,12 @@ public:
                      size_t memoryLimit);
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeHashAgg(
-        SbStage stage,
-        const SbSlotVector& groupBySlots,
-        SbAggExprVector sbAggExprs,
-        boost::optional<sbe::value::SlotId> collatorSlot,
-        SbExprSbSlotVector mergingExprs) {
-        return makeHashAgg(VariableTypes{},
-                           std::move(stage),
-                           groupBySlots,
-                           std::move(sbAggExprs),
-                           collatorSlot,
-                           std::move(mergingExprs));
-    }
-
-    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeHashAgg(
         const VariableTypes& varTypes,
         SbStage stage,
         const SbSlotVector& groupBySlots,
         SbAggExprVector sbAggExprs,
         boost::optional<sbe::value::SlotId> collatorSlot,
         SbExprSbSlotVector mergingExprs);
-
-    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
-        SbStage stage,
-        const SbSlotVector& groupBySlots,
-        SbAggExprVector sbAggExprs,
-        SbSlot selectivityBitmapSlot,
-        const SbSlotVector& blockAccArgSlots,
-        SbSlot bitmapInternalSlot,
-        const SbSlotVector& accumulatorDataSlots,
-        SbExprSbSlotVector mergingExprs) {
-        return makeBlockHashAgg(VariableTypes{},
-                                std::move(stage),
-                                groupBySlots,
-                                std::move(sbAggExprs),
-                                selectivityBitmapSlot,
-                                blockAccArgSlots,
-                                bitmapInternalSlot,
-                                accumulatorDataSlots,
-                                std::move(mergingExprs));
-    }
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
         const VariableTypes& varTypes,

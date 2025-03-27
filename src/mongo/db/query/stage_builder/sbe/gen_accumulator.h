@@ -44,6 +44,8 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo::stage_builder {
+const StringData kAccumulatorCountName = "$count"_sd;
+
 class PlanStageSlots;
 
 // This class serves as the base class for all the "AccumInputs" classes used by the build methods.
@@ -81,6 +83,13 @@ public:
     StringData getOpName() const {
         return _opName;
     }
+
+    /**
+     * Returns the name of this accumulator, such as "$avg" or "$count". AccumulationStatement does
+     * not save this, and AccumulationStatement.AccumulationExpression.name is not always the
+     * correct name (e.g. it shows "$sum" for a $count accumulator).
+     */
+    static std::string getOpNameForAccStmt(const AccumulationStatement& accStmt);
 
     /**
      * This method returns the number of agg expressions that need to be generated for this
@@ -181,7 +190,7 @@ private:
 
     // Info about the specific accumulation op named by '_opName'.
     const AccumOpInfo* _opInfo = nullptr;
-};
+};  // class AccumOp
 
 struct AddSingleInput : public AccumInputs {
     AddSingleInput(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}

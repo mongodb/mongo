@@ -233,8 +233,8 @@ private:
     std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreKeyAccessors;
     std::vector<std::unique_ptr<value::SwitchAccessor>> _outKeyAccessors;
 
-    // Accessors for the output aggregate results. The aggregates can either come from the hash
-    // table or can be computed after merging partial aggregates spilled to a record store. We use a
+    // Accessors for the accumulator states. These can either come from the values in the hash table
+    // '_ht' or can be computed after merging partial aggregates spilled to a record store. We use a
     // 'SwitchAccessor' to switch between these two cases.
     std::vector<std::unique_ptr<HashAggAccessor>> _outHashAggAccessors;
     // Row of agg values to output used when recovering spilled data from the record store.
@@ -245,8 +245,9 @@ private:
     std::vector<value::SlotAccessor*> _seekKeysAccessors;
     value::MaterializedRow _seekKeys;
 
-    // Bytecodes for the aggregate functions. The first code fragment is the aggregator initializer.
-    // The second code fragment aggregates incoming rows into the hash table.
+    // Vector of VM programs for the accumulators. The first code fragment is the accumulator
+    // initializer and may be nullptr. The second code fragment accumulates incoming rows into the
+    // "value" (accumulator state) row of '_ht' for the current $group key.
     std::vector<std::pair<std::unique_ptr<vm::CodeFragment>, std::unique_ptr<vm::CodeFragment>>>
         _aggCodes;
     // Bytecode for the merging expressions, executed if partial aggregates are spilled to a record
@@ -276,6 +277,6 @@ private:
     SpilledRow _stashedNextRow;
 
     HashAggStats _specificStats;
-};
+};  // class HashAggStage
 }  // namespace sbe
 }  // namespace mongo
