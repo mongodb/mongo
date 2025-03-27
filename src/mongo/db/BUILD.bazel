@@ -4239,6 +4239,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "read_write_concern_test",
     srcs = [
+        "read_concern_test.cpp",
         "read_write_concern_provenance_test.cpp",
         "write_concern_options_test.cpp",
         "write_concern_test.cpp",
@@ -4247,6 +4248,8 @@ mongo_cc_unit_test(
     deps = [
         ":rw_concern_d",
         ":service_context_test_fixture",
+        "//src/mongo/db/repl:repl_coordinator_impl",
+        "//src/mongo/db/repl:repl_coordinator_test_fixture",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/transport:service_entry_point_test_fixture",
