@@ -1,5 +1,7 @@
 /**
- * Tests the format of 'electionMetrics' serverStatus section.
+ * Verify that repl portion of serverStatus's metrics section has all the expected fields
+ *
+ * @tags: [multiversion_incompatible]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
