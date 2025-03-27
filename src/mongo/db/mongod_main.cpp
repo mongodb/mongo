@@ -222,6 +222,7 @@
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/ttl/ttl.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/db/wire_version.h"
@@ -1068,7 +1069,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     if (storageEngine->supportsReadConcernSnapshot()) {
         try {
             PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
-            PeriodicThreadToRollbackUnderCachePressure::get(serviceContext)->start();
+            if (gCachePressureQueryPeriodMilliseconds.load() != 0) {
+                PeriodicThreadToRollbackUnderCachePressure::get(serviceContext)->start();
+            }
         } catch (ExceptionFor<ErrorCodes::PeriodicJobIsStopped>&) {
             LOGV2_WARNING(4747501, "Not starting periodic jobs as shutdown is in progress");
             // Shutdown has already started before initialization is complete. Wait for the

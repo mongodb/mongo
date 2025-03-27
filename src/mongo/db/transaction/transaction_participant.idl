@@ -66,7 +66,7 @@ server_parameters:
         cpp_vartype: AtomicWord<decltype(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)::Argument>
         cpp_varname: gCachePressureQueryPeriodMilliseconds
         validator:
-            gte: 1
+            gte: 0
         on_update: std::ref(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)
         default: 1000
         redact: false

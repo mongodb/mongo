@@ -114,7 +114,6 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
             if (!feature_flags::gStorageEngineInterruptibility.isEnabled()) {
                 return;
             }
-
             try {
                 // The opCtx destructor handles unsetting itself from the Client. (The
                 // PeriodicRunner's Client must be reset before returning.)
@@ -159,6 +158,11 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
     TransactionParticipant::observeCachePressureQueryPeriodMilliseconds.addObserver(
         [anchor = tempAnchor](const Argument& millis) {
             try {
+                if (millis == 0) {
+                    anchor->stop();
+                } else if (anchor->getPeriod() == Milliseconds(0)) {
+                    anchor->start();
+                }
                 anchor->setPeriod(Milliseconds(millis));
             } catch (const DBException& ex) {
                 LOGV2(10036703,
