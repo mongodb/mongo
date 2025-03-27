@@ -74,6 +74,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
@@ -1411,7 +1412,8 @@ DrainingShardUsage getDrainingProgress(OperationContext* opCtx,
 }
 
 // Sets the addOrRemoveShardInProgress cluster parameter to prevent new ShardingDDLCoordinators from
-// starting, and then drains the ongoing ones. Must be called under the _kAddRemoveShardLock lock.
+// starting, and then drains the ongoing ones. Must be called under the kConfigsvrShardsNamespace
+// ddl lock.
 void blockDDLCoordinatorsAndDrain(OperationContext* opCtx) {
     if (MONGO_unlikely(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard.shouldFail())) {
         return;
@@ -1445,7 +1447,7 @@ void blockDDLCoordinatorsAndDrain(OperationContext* opCtx) {
 }
 
 // Unsets the addOrRemoveShardInProgress cluster parameter. Must be called under the
-// _kAddRemoveShardLock lock.
+// kConfigsvrShardsNamespace ddl lock.
 void unblockDDLCoordinators(OperationContext* opCtx) {
     if (MONGO_unlikely(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard.shouldFail())) {
         return;
@@ -1552,15 +1554,29 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
     const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
     while (true) {
         try {
-            if (auto drainingStatus =
-                    shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId)) {
-                return *drainingStatus;
+            {
+                DDLLockManager::ScopedCollectionDDLLock ddlLock(
+                    opCtx,
+                    NamespaceString::kConfigsvrShardsNamespace,
+                    "startDraining",
+                    LockMode::MODE_X);
+                if (auto drainingStatus =
+                        shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId)) {
+                    return *drainingStatus;
+                }
             }
             if (auto drainingStatus =
                     shardingCatalogManager->checkDrainingProgress(opCtx, shardId)) {
                 return *drainingStatus;
             }
-            return shardingCatalogManager->removeShard(opCtx, shardId);
+            {
+                DDLLockManager::ScopedCollectionDDLLock ddlLock(
+                    opCtx,
+                    NamespaceString::kConfigsvrShardsNamespace,
+                    "removeShardFunction",
+                    LockMode::MODE_X);
+                return shardingCatalogManager->removeShard(opCtx, shardId);
+            }
         } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
             LOGV2(10154101,
                   "Remove shard received retriable error and will be retried",

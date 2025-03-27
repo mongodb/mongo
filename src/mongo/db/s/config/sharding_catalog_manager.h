@@ -856,12 +856,6 @@ private:
     // _kZoneOpLock
 
     /**
-     * Lock that is held for the entire duration of an add/remove shard operation so that only one
-     * command can execute at a given time.
-     */
-    Lock::ResourceMutex _kAddRemoveShardLock;
-
-    /**
      * Lock that is held in exclusive mode during the commit phase of an add/remove shard operation.
      */
     Lock::ResourceMutex _kShardMembershipLock;

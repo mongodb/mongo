@@ -82,6 +82,8 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrAddShard can only be run on config servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
@@ -116,6 +118,12 @@ public:
         Response _runOldPath(OperationContext* opCtx,
                              const mongo::ConnectionString& target,
                              boost::optional<std::string> name) {
+            DDLLockManager::ScopedCollectionDDLLock ddlLock(
+                opCtx,
+                NamespaceString::kConfigsvrShardsNamespace,
+                "addShardFunction",
+                LockMode::MODE_X);
+
             StatusWith<std::string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
                 opCtx, name ? &(name.value()) : nullptr, target, false);
 

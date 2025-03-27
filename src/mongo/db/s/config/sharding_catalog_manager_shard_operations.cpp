@@ -101,6 +101,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag.h"
@@ -194,7 +195,8 @@ constexpr StringData kAddOrRemoveShardInProgressRecoveryDocumentId =
     "addOrRemoveShardInProgressRecovery"_sd;
 
 // If an add/removeShard recovery document is present on kServerConfigurationNamespace, unset the
-// addOrRemoveShardInProgress cluster parameter. Must be called under the _kAddRemoveShardLock lock.
+// addOrRemoveShardInProgress cluster parameter. Must be called under the kConfigsvrShardsNamespace
+// ddl lock.
 void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx) {
     // Check if we need to run recovery at all.
     {
@@ -545,8 +547,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-    Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
-
     // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
     // failed addShard/removeShard operation.
     resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
@@ -824,8 +824,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
         // the FixedFCVRegion and others take the FixedFCVRegion before the
         // _kClusterCardinalityParameterLock lock. However, all paths take the
-        // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
-        // problem. See SERVER-99708 for more information.
+        // kConfigsvrShardsNamespace ddl lock before either, so we do not actually have a lock
+        // ordering problem. See SERVER-99708 for more information.
         DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
         topology_change_helpers::unblockDDLCoordinators(opCtx);
         unblockDDLCoordinatorsGuard.dismiss();
@@ -864,9 +864,6 @@ void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
 
 boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsAndStartDrain(
     OperationContext* opCtx, const ShardId& shardId) {
-
-    Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
-
     // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
     // failed addShard/removeShard operation.
     resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
@@ -988,8 +985,6 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkDrainingProgre
 
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {
-    Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
-
     // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
     // failed addShard/removeShard operation.
     resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
@@ -1132,9 +1127,9 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // alongside the RSEndpoint.
     // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
     // the FixedFCVRegion and others take the FixedFCVRegion before the
-    // _kClusterCardinalityParameterLock lock. However, all paths take the
-    // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
-    // problem. See SERVER-99708 for more information.
+    // _kClusterCardinalityParameterLock lock. However, all paths take the kConfigsvrShardsNamespace
+    // ddl lock, so we do not actually have a lock ordering problem. See SERVER-99708 for more
+    // information.
     DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
     topology_change_helpers::unblockDDLCoordinators(opCtx);
     unblockDDLCoordinatorsGuard.dismiss();
@@ -1314,10 +1309,12 @@ void ShardingCatalogManager::scheduleAsyncUnblockDDLCoordinators(OperationContex
                         serviceContext->getService(ClusterRole::ShardServer)};
         auto uniqueOpCtx{tc->makeOperationContext()};
         auto opCtx{uniqueOpCtx.get()};
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-        // Take _kAddRemoveShardLock to ensure that the reset does not interleave with a new
-        // addShard/removeShard command.
-        Lock::ExclusiveLock addRemoveShardLock(opCtx, _kAddRemoveShardLock);
+        DDLLockManager::ScopedCollectionDDLLock ddlLock(opCtx,
+                                                        NamespaceString::kConfigsvrShardsNamespace,
+                                                        "scheduleAsyncUnblockDDLCoordinators",
+                                                        LockMode::MODE_X);
         resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
     })
         .until([serviceContext](Status status) {

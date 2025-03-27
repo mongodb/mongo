@@ -82,6 +82,8 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
             // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
             uassert(7368402,
                     "The transition to config shard feature is disabled",

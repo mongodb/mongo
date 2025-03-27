@@ -239,8 +239,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     // Some paths of add/remove shard take the _kClusterCardinalityParameterLock
                     // before the FixedFCVRegion and others take the FixedFCVRegion before the
                     // _kClusterCardinalityParameterLock lock. However, all paths take the
-                    // _kAddRemoveShardLock before either, so we do not actually have a lock
-                    // ordering problem. See SERVER-99708 for more information.
+                    // kConfigsvrShardsNamespace ddl lock before either, so we do not actually have
+                    // a lock ordering problem. See SERVER-99708 for more information.
                     DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
                     topology_change_helpers::unblockDDLCoordinators(opCtx);
                 }

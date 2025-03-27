@@ -119,6 +119,8 @@ public:
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) override {
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrRemoveShard can only be run on config servers",
                 serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));

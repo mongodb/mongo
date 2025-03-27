@@ -12,13 +12,6 @@ export const $config = (function() {
     // The 'setup' function is run once by the parent thread after the cluster has been initialized,
     // before the worker threads have been spawned. The 'this' argument is bound as '$config.data'.
     function setup(db, collName, cluster) {
-        // TODO(SERVER-SERVER-102539): reenable this test after handling concurrency properly
-        this.toSkip =
-            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'UseTopologyChangeCoordinators');
-
-        if (this.toSkip) {
-            return;
-        }
         // Obtain the list of shards present in the cluster. Used to remove and restore shards.
         this.shardList = db.getSiblingDB("config").shards.find().toArray();
         // Drop the test database. It's not needed and will complicate re-adding shards.
@@ -42,10 +35,6 @@ export const $config = (function() {
 
     var states = {
         runChangeStream: function(db, collName) {
-            if (this.toSkip) {
-                return;
-            }
-
             const res = db.adminCommand({
                 aggregate: 1,
                 pipeline: [{$changeStream: {allChangesForCluster: true}}],
@@ -55,19 +44,11 @@ export const $config = (function() {
         },
 
         runCurrentOp: function(db, collName) {
-            if (this.toSkip) {
-                return;
-            }
-
             const res = db.adminCommand({aggregate: 1, pipeline: [{$currentOp: {}}], cursor: {}});
             closeClusterWideCursor(db, res);
         },
 
         removeShard: function(db, collName) {
-            if (this.toSkip) {
-                return;
-            }
-
             // Make sure that only a single removeShard operation is running at any time.
             const testLocksColl = db.getSiblingDB("config").testLocks;
             if (!testLocksColl.insert({_id: "removeShard"}).nInserted) {
@@ -85,10 +66,6 @@ export const $config = (function() {
         },
 
         addShard: function addShard(db, collName) {
-            if (this.toSkip) {
-                return;
-            }
-
             const shardIdx = randomInt(this.shardList.length);
             const shardEntry = this.shardList[shardIdx];
             // TODO SERVER-83532 Check that the outcome of addShard meets expectations.
@@ -113,10 +90,6 @@ export const $config = (function() {
     // The 'teardown' function is run once by the parent thread before the cluster is destroyed, but
     // after the worker threads have been reaped. The 'this' argument is bound as '$config.data'.
     function teardown(db, collName, cluster) {
-        if (this.toSkip) {
-            return;
-        }
-
         // If any shards are draining, unset them so we don't impact subsequent tests.
         db.getSiblingDB("config").shards.update({}, {$unset: {draining: 1}}, {multi: true});
         // Ensure that all shards are present in the cluster before shutting down the ShardingTest.

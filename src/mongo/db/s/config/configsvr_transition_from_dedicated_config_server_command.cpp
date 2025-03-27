@@ -91,6 +91,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
             // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
             uassert(8454803,
                     "The transition to config shard feature is disabled",
@@ -116,6 +118,12 @@ public:
 
     private:
         void _runOldPath(OperationContext* opCtx) {
+            DDLLockManager::ScopedCollectionDDLLock ddlLock(
+                opCtx,
+                NamespaceString::kConfigsvrShardsNamespace,
+                "addShardFunction",
+                LockMode::MODE_X);
+
             ShardingCatalogManager::get(opCtx)->addConfigShard(opCtx);
         }
 
