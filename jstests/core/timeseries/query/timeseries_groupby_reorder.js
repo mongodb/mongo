@@ -11,12 +11,13 @@
  * ]
  */
 
-const coll = db[jsTestName()];
-coll.drop();
-
 import {
+    assertUnpackOptimizedAway,
     runGroupRewriteTest
 } from 'jstests/core/timeseries/libs/timeseries_groupby_reorder_helpers.js';
+
+const coll = db[jsTestName()];
+coll.drop();
 
 // Test with measurement group key -- a rewrite in this situation would be wrong.
 (function testNonMetaGroupKey() {
@@ -45,10 +46,12 @@ import {
         {time: t, myMeta: 1, val: 1},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(
-        coll, docs, [{$group: {_id: null, min: {$min: "$val"}}}], [{"_id": null, "min": 0}]);
-    runGroupRewriteTest(
-        coll, docs, [{$group: {_id: null, max: {$max: "$val"}}}], [{"_id": null, "max": 5}]);
+    const pipelineMin = [{$group: {_id: null, min: {$min: "$val"}}}];
+    const pipelineMax = [{$group: {_id: null, max: {$max: "$val"}}}];
+    runGroupRewriteTest(coll, docs, pipelineMin, [{"_id": null, "min": 0}]);
+    runGroupRewriteTest(coll, docs, pipelineMax, [{"_id": null, "max": 5}]);
+    assertUnpackOptimizedAway(coll, pipelineMin);
+    assertUnpackOptimizedAway(coll, pipelineMax);
 })();
 
 // Test with a group key that is optimized to a constant. The $group rewrite applies.
@@ -59,11 +62,9 @@ import {
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(
-        coll,
-        docs,
-        [{$group: {_id: {$mod: [10, 5]}, min: {$min: "$val"}, max: {$max: "$val"}}}],
-        [{_id: 0, min: 3, max: 5}]);
+    const pipeline = [{$group: {_id: {$mod: [10, 5]}, min: {$min: "$val"}, max: {$max: "$val"}}}];
+    runGroupRewriteTest(coll, docs, pipeline, [{_id: 0, min: 3, max: 5}]);
+    assertUnpackOptimizedAway(coll, pipeline);
 })();
 
 // Test with a null group key and the collection has no metaField. The $group rewrite applies.
@@ -74,11 +75,13 @@ import {
         {time: t, myMeta: 3, val: 4},
         {time: t, myMeta: 1, val: 5},
     ];
+    const pipeline = [{$group: {_id: null, min: {$min: "$val"}, max: {$max: "$val"}}}];
     runGroupRewriteTest(coll,
                         docs,
                         [{$group: {_id: null, min: {$min: "$val"}, max: {$max: "$val"}}}],
                         [{_id: null, min: 3, max: 5}],
                         true /* excludeMeta */);
+    assertUnpackOptimizedAway(coll, pipeline);
 })();
 
 // With a filter on meta the group re-write does apply if the group key is const.
@@ -90,14 +93,12 @@ import {
         {time: t, myMeta: 2, val: 3},
         {time: t, myMeta: 1, val: 5},
     ];
-    runGroupRewriteTest(coll,
-                        docs,
-                        [{$match: {myMeta: 2}}, {$group: {_id: null, min: {$min: "$val"}}}],
-                        [{"_id": null, "min": 1}]);
-    runGroupRewriteTest(coll,
-                        docs,
-                        [{$match: {myMeta: 2}}, {$group: {_id: null, max: {$max: "$val"}}}],
-                        [{"_id": null, "max": 3}]);
+    const pipelineMin = [{$match: {myMeta: 2}}, {$group: {_id: null, min: {$min: "$val"}}}];
+    const pipelineMax = [{$match: {myMeta: 2}}, {$group: {_id: null, max: {$max: "$val"}}}];
+    runGroupRewriteTest(coll, docs, pipelineMin, [{"_id": null, "min": 1}]);
+    runGroupRewriteTest(coll, docs, pipelineMax, [{"_id": null, "max": 3}]);
+    assertUnpackOptimizedAway(coll, pipelineMin);
+    assertUnpackOptimizedAway(coll, pipelineMax);
 })();
 
 // In presence of a non-meta filter the group re-write doesn't apply even if the group key is const.
@@ -127,14 +128,12 @@ import {
         {time: t, myMeta: 2, val: 3},
         {time: t, myMeta: 1, val: 1},
     ];
-    runGroupRewriteTest(coll,
-                        docs,
-                        [{$group: {_id: "$myMeta", min: {$min: "$val"}}}, {$match: {_id: 2}}],
-                        [{"_id": 2, "min": 3}]);
-    runGroupRewriteTest(coll,
-                        docs,
-                        [{$group: {_id: "$myMeta", max: {$max: "$val"}}}, {$match: {_id: 2}}],
-                        [{"_id": 2, "max": 4}]);
+    const pipelineMin = [{$group: {_id: "$myMeta", min: {$min: "$val"}}}, {$match: {_id: 2}}];
+    const pipelineMax = [{$group: {_id: "$myMeta", max: {$max: "$val"}}}, {$match: {_id: 2}}];
+    runGroupRewriteTest(coll, docs, pipelineMin, [{"_id": 2, "min": 3}]);
+    runGroupRewriteTest(coll, docs, pipelineMax, [{"_id": 2, "max": 4}]);
+    assertUnpackOptimizedAway(coll, pipelineMin);
+    assertUnpackOptimizedAway(coll, pipelineMax);
 })();
 
 // Test with meta group key preceeded by a filter on the meta key. The re-write still applies.
@@ -146,14 +145,13 @@ import {
         {time: t, myMeta: 2, val: 3},
         {time: t, myMeta: 1, val: 1},
     ];
-    runGroupRewriteTest(coll,
-                        docs,
-                        [{$match: {myMeta: 2}}, {$group: {_id: "$myMeta", min: {$min: "$val"}}}],
-                        [{"_id": 2, "min": 3}]);
-    runGroupRewriteTest(coll,
-                        docs,
-                        [{$match: {myMeta: 2}}, {$group: {_id: "$myMeta", max: {$max: "$val"}}}],
-                        [{"_id": 2, "max": 4}]);
+
+    const pipelineMin = [{$match: {myMeta: 2}}, {$group: {_id: "$myMeta", min: {$min: "$val"}}}];
+    const pipelineMax = [{$match: {myMeta: 2}}, {$group: {_id: "$myMeta", max: {$max: "$val"}}}];
+    runGroupRewriteTest(coll, docs, pipelineMin, [{"_id": 2, "min": 3}]);
+    runGroupRewriteTest(coll, docs, pipelineMax, [{"_id": 2, "max": 4}]);
+    assertUnpackOptimizedAway(coll, pipelineMin);
+    assertUnpackOptimizedAway(coll, pipelineMax);
 })();
 
 // Test with meta group key preceeded by a filter on a measurement key. The re-write doesn't apply.
@@ -177,6 +175,7 @@ import {
 })();
 
 // Test SERVER-73822 fix: complex $min and $max (i.e. not just straight field refs) work correctly.
+// Rewrite does not apply here.
 (function testMetaGroupKey_WithNonPathExpressionUnderMinMax() {
     const t = new Date();
     // min(a+b) != min(a) + min(b) and max(a+b) != max(a) + max(b)
@@ -243,10 +242,9 @@ import {
     const docs = [
         {time: ISODate("2023-07-20T23:16:47.683Z"), myMeta: 1},
     ];
-    runGroupRewriteTest(coll,
-                        docs,
-                        [{$group: {_id: "$myMeta", max: {$max: "$time"}}}],
-                        [{_id: 1, max: ISODate("2023-07-20T23:16:47.683Z")}]);
+    const pipeline = [{$group: {_id: "$myMeta", max: {$max: "$time"}}}];
+    runGroupRewriteTest(coll, docs, pipeline, [{_id: 1, max: ISODate("2023-07-20T23:16:47.683Z")}]);
+    assertUnpackOptimizedAway(coll, pipeline);
 })();
 
 // Test a group key that is a list of fields that are just referencing the metaField. The $group
@@ -258,14 +256,15 @@ import {
         {time: t, myMeta: {a: 3, b: 10}, val: 4},
         {time: t, myMeta: {a: 2, b: 10}, val: 5},
     ];
+    const pipeline = [
+        {$group: {_id: {a: "$myMeta.a", b: "$myMeta.b"}, min: {$min: "$val"}, max: {$max: "$val"}}}
+    ];
     runGroupRewriteTest(
         coll,
         docs,
-        [{
-            $group:
-                {_id: {a: "$myMeta.a", b: "$myMeta.b"}, min: {$min: "$val"}, max: {$max: "$val"}}
-        }],
+        pipeline,
         [{_id: {a: 3, b: 10}, min: 4, max: 4}, {_id: {a: 2, b: 10}, min: 3, max: 5}]);
+    assertUnpackOptimizedAway(coll, pipeline);
 })();
 
 // Test a group key that is a list of fields with some fields referencing the metaField and some

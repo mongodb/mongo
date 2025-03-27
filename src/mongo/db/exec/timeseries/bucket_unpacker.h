@@ -150,7 +150,7 @@ public:
     static const std::set<StringData> reservedBucketFieldNames;
 
     BucketUnpacker();
-    BucketUnpacker(BucketSpec spec);
+    explicit BucketUnpacker(BucketSpec spec);
     BucketUnpacker(const BucketUnpacker& other) = delete;
     BucketUnpacker(BucketUnpacker&& other);
     ~BucketUnpacker();
@@ -250,8 +250,27 @@ public:
         return std::string{kControlMaxFieldNamePrefix} + field;
     }
 
+    bool getUsesExtendedRange() const {
+        return _spec.usesExtendedRange();
+    }
+
     bool isClosedBucket() const {
         return _closedBucket;
+    }
+
+    bool providesField(StringData field) const {
+        auto& metaField = getMetaField();
+        if (metaField && *metaField == field) {
+            return _includeMetaField;
+        } else if (getTimeField() == field) {
+            return _includeTimeField;
+        }
+
+        return _spec.doesBucketSpecProvideField(static_cast<std::string>(field));
+    }
+
+    bool providesFieldWithoutModification(StringData field) const {
+        return providesField(field) && !_spec.fieldIsComputed(field);
     }
 
     void setBucketSpec(BucketSpec&& bucketSpec);

@@ -410,6 +410,8 @@ last-continuous:
       ticket: SERVER-81208
     - test_file: jstests/core_sharding/ddl/shard_collection_outside_db_primary_index_compatibility.js
       ticket: SERVER-100844
+    - test_file: jstests/core/timeseries/query/timeseries_groupby_reorder.js
+      ticket: SERVER-99773
   suites: null
 last-lts:
   all:
@@ -869,4 +871,6 @@ last-lts:
       ticket: SERVER-81208
     - test_file: jstests/core_sharding/ddl/shard_collection_outside_db_primary_index_compatibility.js
       ticket: SERVER-100844
+    - test_file: jstests/core/timeseries/query/timeseries_groupby_reorder.js
+      ticket: SERVER-99773
   suites: null

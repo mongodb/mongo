@@ -45,14 +45,14 @@ namespace {
 
 using InternalUnpackBucketGroupReorder = AggregationContextFixture;
 
-std::vector<BSONObj> makeAndOptimizePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
     boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
     std::vector<BSONObj> stages,
-
     int bucketMaxSpanSeconds,
     bool fixedBuckets,
-    BSONArray fields = BSONArray(),
-    bool exclude = true) {
+    BSONArray fields,
+    bool exclude) {
+
     BSONObjBuilder unpackSpecBuilder;
     if (exclude) {
         unpackSpecBuilder.append("exclude", fields);
@@ -66,11 +66,40 @@ std::vector<BSONObj> makeAndOptimizePipeline(
     auto unpackSpecObj = BSON("$_internalUnpackBucket" << unpackSpecBuilder.obj());
 
     stages.insert(stages.begin(), unpackSpecObj);
-    auto pipeline = Pipeline::parse(stages, expCtx);
+    return Pipeline::parse(stages, expCtx);
+}
+
+std::vector<BSONObj> makeAndOptimizePipeline(
+    boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
+    std::vector<BSONObj> stages,
+    int bucketMaxSpanSeconds,
+    bool fixedBuckets,
+    BSONArray fields = BSONArray(),
+    bool exclude = true) {
+    auto pipeline =
+        makePipeline(expCtx, stages, bucketMaxSpanSeconds, fixedBuckets, fields, exclude);
     pipeline->optimizePipeline();
     return pipeline->serializeToBson();
 }
 
+// This makes a pipeline and optimizes twice, once as the router, and once as a shard. This is meant
+// to simulate the path that is taken for an unsharded collection in a sharded cluster.
+std::vector<BSONObj> makePipelineAndOptimizeTwice(
+    boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
+    std::vector<BSONObj> stages,
+    int bucketMaxSpanSeconds,
+    bool fixedBuckets,
+    BSONArray fields = BSONArray(),
+    bool exclude = true) {
+
+    expCtx->setInRouter(true);
+    auto pipeline =
+        makePipeline(expCtx, stages, bucketMaxSpanSeconds, fixedBuckets, fields, exclude);
+    pipeline->optimizePipeline();
+    expCtx->setInRouter(false);
+    pipeline->optimizePipeline();
+    return pipeline->serializeToBson();
+}
 
 // The following tests confirm the expected behavior for the $count aggregation stage rewrite.
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountAggStage) {
@@ -351,6 +380,37 @@ TEST_F(InternalUnpackBucketGroupReorder, MaxGroupRewriteTimeField) {
         setExpCtx({.inRouter = testData.inRouter,
                    .requiresTimeseriesExtendedRangeSupport = testData.extendedRange});
         auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+
+        if (testData.shouldRewrite) {
+            // We should see the rewrite occur, since we are on mongod and do not have extended
+            // range data.
+            ASSERT_EQ(1, serialized.size());
+            ASSERT_BSONOBJ_EQ(rewrittenGroupStage, serialized[0]);
+        } else {
+            // No rewrite should occur since we are on mongos or have extended range data.
+            ASSERT_EQ(2, serialized.size());
+            ASSERT_BSONOBJ_EQ(testData.extendedRange ? expectedUnpackStageExtendedRangeTrue
+                                                     : expectedUnpackStageNoExtendedRange,
+                              serialized[0]);
+            ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+        }
+    }
+
+    struct TestDataRouterShard {
+        bool extendedRange = false;
+        bool shouldRewrite = false;
+    };
+    // Try the "in router" cases again, this time optimizing once as the router, and once as the
+    // shard, to simulate a query on an unsharded collection in a sharded cluster.
+    std::vector<TestDataRouterShard> testCasesRouterShard = {
+        {.extendedRange = false, .shouldRewrite = true},
+        {.extendedRange = true, .shouldRewrite = false},
+    };
+
+    for (auto&& testData : testCasesRouterShard) {
+        setExpCtx({.requiresTimeseriesExtendedRangeSupport = testData.extendedRange});
+        auto serialized = makePipelineAndOptimizeTwice(
             getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
 
         if (testData.shouldRewrite) {
