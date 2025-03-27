@@ -5,31 +5,29 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-  - name: enterprise-ubuntu1804-64
-    display_name: Jepsen Tests on Enterprise Ubuntu 18.04
+  - name: enterprise-ubuntu2204-jepsen-plain
+    display_name: Jepsen Tests
     tags: ["bazel_check"]
-    # TODO(SERVER-86538): Turn this back on for nightly builds when we can run it on a v5 toolchain-supported platform.
-    activate: false
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - ubuntu1804-small
-    # TODO SERVER-86538 see if we can use --allocator=tcmalloc-google on
-    # new distributions and/or fix the current libfaketime issues
+      - ubuntu2204-small
+    # TODO SERVER-102932 remove --allocator=tcmalloc-gperf
     expansions:
       bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=ubuntu1804
+        --define=MONGO_DISTMOD=ubuntu2204
         --allocator=tcmalloc-gperf
         --disable_streams=True
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
-      large_distro_name: ubuntu1804-large
-      compile_variant: enterprise-ubuntu1804-64
+      large_distro_name: ubuntu2204-large
+      compile_variant: enterprise-ubuntu2204-jepsen-plain
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
-          - ubuntu1804-large
+          - ubuntu2204-large
       - name: .jepsen
         distros:
-          - ubuntu1804-large
+          - ubuntu2204-large
 
   - &ubuntu2204-template
     name: &ubuntu2204 ubuntu2204
@@ -294,7 +292,7 @@ buildvariants:
           - ubuntu2204-large
 
   - name: enterprise-ubuntu2204-jepsen
-    display_name: Jepsen Tests on Enterprise Ubuntu 22.04
+    display_name: Jepsen Docker Tests
     tags: ["bazel_check"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
