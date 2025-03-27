@@ -941,4 +941,19 @@ void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
         fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
         "cache_max_wait_ms=0");
 }
+
+WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
+                                                   uint64_t tableID,
+                                                   bool allowOverwrite,
+                                                   bool random) {
+    WiredTigerCursor::Params cursorParams;
+    cursorParams.tableID = tableID;
+    cursorParams.isCheckpoint =
+        (wtRu.getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    cursorParams.readOnce = wtRu.getReadOnce();
+    cursorParams.allowOverwrite = allowOverwrite;
+    cursorParams.random = random;
+    return cursorParams;
+}
+
 }  // namespace mongo

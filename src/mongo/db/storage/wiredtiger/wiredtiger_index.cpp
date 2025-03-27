@@ -134,6 +134,7 @@ void setKey(WT_CURSOR* cursor, std::span<const char> value) {
 void setValue(WT_CURSOR* cursor, std::span<const char> value) {
     cursor->set_value(cursor, WiredTigerItem(value).get());
 }
+
 }  // namespace
 
 void WiredTigerIndex::getKey(WT_CURSOR* cursor,
@@ -305,7 +306,8 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndex::insert(
 
     auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
 
-    WiredTigerCursor curwrap(wtRu, _uri, _tableId, false);
+    auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId);
+    WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
     wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
 
@@ -320,7 +322,8 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
 
     auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
 
-    WiredTigerCursor curwrap(wtRu, _uri, _tableId, false);
+    auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId);
+    WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
     wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
@@ -382,13 +385,10 @@ boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
     OperationContext* opCtx, const key_string::View& key) {
     invariant(unique());
 
+    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
     // Allow overwrite because it's faster and this is a read-only cursor.
-    constexpr bool allowOverwrite = true;
-    WiredTigerCursor curwrap(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-        _uri,
-        _tableId,
-        allowOverwrite);
+    auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+    WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, curwrap.getSession(), key)) {
@@ -718,7 +718,10 @@ public:
         : _idx(idx),
           _opCtx(opCtx),
           _metrics(ResourceConsumption::MetricsCollector::get(opCtx)),
-          _cursor(opCtx, idx->uri()) {}
+          _cursor(opCtx,
+                  *WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx))
+                       .getSession(),
+                  idx->uri()) {}
 
 protected:
     void insert(std::span<const char> key, std::span<const char> value) {
@@ -789,12 +792,10 @@ public:
           _collectionUUID(idx.getCollectionUUID()),
           _metrics(&ResourceConsumption::MetricsCollector::get(opCtx)),
           _key(idx.getKeyStringVersion()) {
+        auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx));
         // Allow overwrite because it's faster and this is a read-only cursor.
-        constexpr bool allowOverwrite = true;
-        _cursor.emplace(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
-                        _uri,
-                        _tableId,
-                        allowOverwrite);
+        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+        _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
     }
 
     boost::optional<IndexKeyEntry> next(KeyInclusion keyInclusion) override {
@@ -902,13 +903,11 @@ public:
 
     void restore() override {
         if (!_cursor) {
+            auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx));
             // Allow overwrite because it's faster and this is a read-only cursor.
-            constexpr bool allowOverwrite = true;
-            _cursor.emplace(
-                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
-                _uri,
-                _tableId,
-                allowOverwrite);
+            auto cursorParams =
+                getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+            _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
         }
 
         // Ensure an active session exists, so any restored cursors will bind to it

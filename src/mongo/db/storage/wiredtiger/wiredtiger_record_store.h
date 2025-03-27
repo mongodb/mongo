@@ -60,6 +60,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_base.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/platform/atomic_word.h"

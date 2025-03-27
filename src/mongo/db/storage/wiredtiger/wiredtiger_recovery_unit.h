@@ -47,6 +47,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
@@ -307,5 +308,11 @@ private:
     // Detects any attempt to reconfigure options used by an open transaction.
     OpenSnapshotOptions _optionsUsedToOpenSnapshot;
 };
+
+// Constructs a WiredTigerCursor::Params instance from the given params and returns it.
+WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
+                                                   uint64_t tableID,
+                                                   bool allowOverwrite = false,
+                                                   bool random = false);
 
 }  // namespace mongo

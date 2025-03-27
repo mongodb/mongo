@@ -143,11 +143,9 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(OperationContext* opCtx,
 bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,
                                   const std::string& uri,
                                   uint64_t tableId) {
-    WiredTigerCursor curwrap(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-        uri,
-        tableId,
-        false);
+    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto cursorParams = getWiredTigerCursorParams(wtRu, tableId);
+    WiredTigerCursor curwrap(std::move(cursorParams), uri, *wtRu.getSession());
     WT_CURSOR* c = curwrap.get();
     if (!c)
         return true;

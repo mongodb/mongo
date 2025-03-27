@@ -32,6 +32,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
@@ -48,34 +49,28 @@ namespace {
 static constexpr StringData kOverwriteFalse = "overwrite=false"_sd;
 }  // namespace
 
-WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
+WiredTigerCursor::WiredTigerCursor(Params params,
                                    const std::string& uri,
-                                   uint64_t tableID,
-                                   bool allowOverwrite,
-                                   bool random) {
-    _tableID = tableID;
-    _session = ru.getSession();
-    _isCheckpoint =
-        (ru.getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
-
+                                   WiredTigerSession& session)
+    : _tableID(params.tableID), _isCheckpoint(params.isCheckpoint), _session(session) {
     // Passing nullptr is significantly faster for WiredTiger than passing an empty string.
     const char* configStr = nullptr;
 
     // If we have uncommon cursor options, use a costlier string builder.
-    if (ru.getReadOnce() || _isCheckpoint || random) {
+    if (params.readOnce || _isCheckpoint || params.random) {
         str::stream builder;
-        if (ru.getReadOnce()) {
+        if (params.readOnce) {
             builder << "read_once=true,";
         }
 
-        if (random) {
+        if (params.random) {
             builder << "next_random,";
         }
 
         if (_isCheckpoint) {
             // Type can be "lsm" or "file".
             std::string type, sourceURI;
-            WiredTigerUtil::fetchTypeAndSourceURI(*_session, uri, &type, &sourceURI);
+            WiredTigerUtil::fetchTypeAndSourceURI(_session, uri, &type, &sourceURI);
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "LSM does not support opening cursors by checkpoint",
                     type != "lsm");
@@ -84,7 +79,7 @@ WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
         }
 
         // Add this option last as the string does not have a trailing comma.
-        if (!allowOverwrite) {
+        if (!params.allowOverwrite) {
             builder << kOverwriteFalse;
         }
 
@@ -93,20 +88,20 @@ WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
     } else {
         // Add this option without a trailing comma. This enables an optimization in WiredTiger to
         // skip parsing the config string if this is the only option. See SERVER-43232 for details.
-        if (!allowOverwrite) {
+        if (!params.allowOverwrite) {
             _config = kOverwriteFalse.toString();
             configStr = kOverwriteFalse.data();
         }
     }
 
     // Attempt to retrieve a cursor from the cache.
-    _cursor = _session->getCachedCursor(tableID, _config);
+    _cursor = _session.getCachedCursor(_tableID, _config);
     if (_cursor) {
         return;
     }
 
     try {
-        _cursor = _session->getNewCursor(uri, configStr);
+        _cursor = _session.getNewCursor(uri, configStr);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         // A WiredTiger table will not be available in the latest checkpoint if the checkpoint
         // thread hasn't run after the initial WiredTiger table was created.
@@ -120,22 +115,19 @@ WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
 WiredTigerCursor::~WiredTigerCursor() {
     if (_isCheckpoint) {
         // Closes the checkpoint cursor to avoid outdated data view when opening a new one.
-        _session->closeCursor(_cursor);
+        _session.closeCursor(_cursor);
     } else {
-        _session->releaseCursor(_tableID, _cursor, std::move(_config));
+        _session.releaseCursor(_tableID, _cursor, std::move(_config));
     }
 }
 
 WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(OperationContext* opCtx,
+                                                   WiredTigerSession& outerSession,
                                                    const std::string& indexUri)
-    : _session(WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
-                   ->getConnection()
-                   ->getSession(*opCtx)) {
-    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
+    : _session(outerSession.getConnection().getSession(*opCtx)) {
     // Open cursors can cause bulk open_cursor to fail with EBUSY.
     // TODO any other cases that could cause EBUSY?
-    WiredTigerSession* outerSession = ru->getSession();
-    outerSession->closeAllCursors(indexUri);
+    outerSession.closeAllCursors(indexUri);
 
     // The 'checkpoint_wait=false' option is set to prefer falling back on the "non-bulk" cursor
     // over waiting a potentially long time for a checkpoint.

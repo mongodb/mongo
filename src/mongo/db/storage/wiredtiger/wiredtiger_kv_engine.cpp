@@ -2067,8 +2067,10 @@ std::vector<std::string> WiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) cons
     std::vector<std::string> all;
     int ret;
     // No need for a metadata:create cursor, since it gathers extra information and is slower.
-    WiredTigerCursor cursor(
-        WiredTigerRecoveryUnit::get(ru), "metadata:", WiredTigerUtil::kMetadataTableId, false);
+
+    auto wtRu = WiredTigerRecoveryUnit::get(&ru);
+    auto cursorParams = getWiredTigerCursorParams(*wtRu, WiredTigerUtil::kMetadataTableId);
+    WiredTigerCursor cursor(std::move(cursorParams), "metadata:", *wtRu->getSession());
     WT_CURSOR* c = cursor.get();
     if (!c)
         return all;
