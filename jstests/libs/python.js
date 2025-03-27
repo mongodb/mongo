@@ -14,6 +14,7 @@ export function getPython3Binary() {
     }
 
     const paths = [
+        "/opt/mongodbtoolchain/v5/bin/python3",
         "/opt/mongodbtoolchain/v4/bin/python3",
         "/cygdrive/c/python/python310/python.exe",
         "c:/python/python310/python.exe"
