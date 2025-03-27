@@ -6638,6 +6638,42 @@ var authCommandsLib = {
             ]
         },
         {
+          testname: "aggregate_$mergeCursors",
+          command: {
+              aggregate: "foo",
+              pipeline: [{
+                  $mergeCursors: {
+                      sort: {y: 1, z: 1},
+                      compareWholeSortKey: false,
+                      remotes: [],
+                      nss: "test.mergeCursors",
+                      allowPartialResults: false,
+                  }
+              }],
+              cursor: {},
+          },
+          testcases: [
+            {
+              runOnDb: firstDbName,
+              roles: {__system: 1},
+              // $mergeCursors requires __system role OR a user with internal and find action types as privileges.
+              expectFail: true,
+              privileges: [
+                {resource: {cluster: true}, actions: ["internal"]},
+                {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+              ],
+            },
+            {
+              runOnDb: firstDbName,
+              // Find action type as a privilege alone is not sufficient for $mergeCursors.
+              expectAuthzFailure: true,
+              privileges: [
+                {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+              ],
+            },
+          ],
+        },
+        {
           testname: "validate_db_metadata_command_specific_db",
           command: {
               validateDBMetadata: 1,
