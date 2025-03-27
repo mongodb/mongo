@@ -135,8 +135,6 @@ private:
         _components.appendTo(bob, opts);
     }
 
-    std::unique_ptr<FindCommandRequest> reparse(OperationContext* opCtx) const;
-
     FindCmdComponents _components;
 };
 

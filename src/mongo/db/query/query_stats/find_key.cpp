@@ -54,16 +54,4 @@ void FindCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions
     }
 }
 
-std::unique_ptr<FindCommandRequest> FindKey::reparse(OperationContext* opCtx) const {
-    auto fcr =
-        static_cast<const query_shape::FindCmdShape*>(universalComponents()._queryShape.get())
-            ->toFindCommandRequest();
-    if (_components._hasField.allowPartialResults)
-        fcr->setAllowPartialResults(_components._allowPartialResults);
-    if (_components._hasField.noCursorTimeout)
-        fcr->setNoCursorTimeout(_components._noCursorTimeout);
-    if (_components._hasField.batchSize)
-        fcr->setBatchSize(1ll);
-    return fcr;
-}
 }  // namespace mongo::query_stats
