@@ -445,6 +445,11 @@ public:
                     _validateSessionsCollectionSharded(opCtx);
                 }
 
+                if (role && role->has(ClusterRole::ConfigServer) &&
+                    requestedVersion > actualVersion) {
+                    _fixConfigShardsTopologyTime(opCtx);
+                }
+
                 // Start transition to 'requestedVersion' by updating the local FCV document to a
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(
@@ -1473,6 +1478,61 @@ private:
                     return collection->isChangeStreamPreAndPostImagesEnabled();
                 });
         }
+    }
+
+    /**
+     * For sharded clusters created before 5.0, it is possible that entries in config.shards do not
+     * contain a topologyTime field. To make all entries consistent with the behaviour on 5.0+, we
+     * insert a topologyTime in any entries which do not have it. This will simplify reasoning about
+     * the topologyTime and ShardRegistry. Moreover, this has another objective, which is to heal
+     * clusters affected by SERVER-63742, which caused a corrupted topologyTime to be persisted and
+     * gossiped in the cluster. Note that this healing is only possible when config.shards doesn't
+     * contain any topologyTime, as this is known to be benign. The case where config.shards does
+     * have some topologyTime, but an inconsistent $topologyTime which is greater is gossiped, is
+     * disallowed by the ShardRegistry, and requires manual intervention. This latter case would
+     * trigger a tassert and force user intervention, and thus we do not need to explicitly check
+     * for it here.
+     *
+     * The new topologyTime will make it into the vector clock following the usual
+     * ConfigServerOpObserver mechanism.
+     *
+     * TODO (SERVER-102087): remove after 9.0 is branched.
+     */
+    void _fixConfigShardsTopologyTime(OperationContext* opCtx) {
+        // Prevent concurrent add/remove shard operations.
+        Lock::ExclusiveLock shardMembershipLock =
+            ShardingCatalogManager::get(opCtx)->acquireShardMembershipLockForTopologyChange(opCtx);
+
+        const auto time = VectorClock::get(opCtx)->getTime();
+        const auto newTopologyTime = time.configTime().asTimestamp();
+
+        LOGV2(10216200,
+              "Updating 'config.shards' entries which do not have a topologyTime field with the "
+              "current $configTime",
+              "newTopologyTime"_attr = newTopologyTime);
+
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrShardsNamespace);
+        updateOp.setUpdates({[&] {
+            // Filter by $exists to prevent modifying entries which already have a topologyTime.
+            const auto filter = BSON(ShardType::topologyTime << BSON("$exists" << false));
+            const auto update = BSON("$set" << BSON(ShardType::topologyTime << newTopologyTime));
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(filter);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setUpsert(false);
+            // We want all entries to contain a topologyTime field.
+            entry.setMulti(true);
+            return entry;
+        }()});
+        updateOp.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
+
+        DBDirectClient client(opCtx);
+        const auto result = client.update(updateOp);
+        write_ops::checkWriteErrors(result);
+
+        LOGV2(10216201,
+              "Update of 'config.shards' entries succeeded",
+              "updateResponse"_attr = result.toBSON());
     }
 
     void _validateSessionsCollectionSharded(OperationContext* opCtx) {
