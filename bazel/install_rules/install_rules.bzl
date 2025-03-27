@@ -526,6 +526,7 @@ def mongo_install(
             compressor = compressor,
             package_dir = package_extract_name,
             package_file_name = name + install_type + ".tgz",
+            extension = "tgz",
             exec_properties = {
                 "no-cache": "1",
                 "no-sandbox": "1",

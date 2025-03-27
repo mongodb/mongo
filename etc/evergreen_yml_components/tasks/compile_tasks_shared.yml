@@ -130,12 +130,6 @@ tasks:
       - command: subprocess.exec
         params:
           binary: bash
-          args:
-            - "./src/evergreen/functions/fix_tar.sh"
-            - "bazel-bin/dist-test-stripped.tgz"
-      - command: subprocess.exec
-        params:
-          binary: bash
           add_expansions_to_env: true
           args:
             - "src/evergreen/run_python_script.sh"
@@ -333,12 +327,6 @@ tasks:
             ${additional_package_targets|}
           bazel_args: >-
             --config=evg
-      - command: subprocess.exec
-        params:
-          binary: bash
-          args:
-            - "./src/evergreen/functions/fix_tar.sh"
-            - "bazel-bin/dist-stripped.tgz"
       - command: subprocess.exec
         params:
           binary: bash
