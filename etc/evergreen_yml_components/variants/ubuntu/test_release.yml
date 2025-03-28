@@ -5,30 +5,6 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-  - name: enterprise-ubuntu2204-jepsen-plain
-    display_name: Jepsen Tests
-    tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    run_on:
-      - ubuntu2204-small
-    # TODO SERVER-102932 remove --allocator=tcmalloc-gperf
-    expansions:
-      bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=ubuntu2204
-        --allocator=tcmalloc-gperf
-        --disable_streams=True
-      compile_all_but_not_unittests_flags: >-
-        --linkopt=-s
-      large_distro_name: ubuntu2204-large
-      compile_variant: enterprise-ubuntu2204-jepsen-plain
-    tasks:
-      - name: compile_and_archive_dist_test_TG
-        distros:
-          - ubuntu2204-large
-      - name: .jepsen
-        distros:
-          - ubuntu2204-large
-
   - &ubuntu2204-template
     name: &ubuntu2204 ubuntu2204
     display_name: Ubuntu 22.04
@@ -291,6 +267,30 @@ buildvariants:
         distros:
           - ubuntu2204-large
 
+  - name: enterprise-ubuntu2204-jepsen-plain
+    display_name: Jepsen Tests
+    tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2204-small
+    # TODO SERVER-102932 remove --allocator=tcmalloc-gperf
+    expansions:
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=ubuntu2204
+        --allocator=tcmalloc-gperf
+        --disable_streams=True
+      compile_all_but_not_unittests_flags: >-
+        --linkopt=-s
+      large_distro_name: ubuntu2204-large
+      compile_variant: enterprise-ubuntu2204-jepsen-plain
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+        distros:
+          - ubuntu2204-large
+      - name: .jepsen
+        distros:
+          - ubuntu2204-large
+
   - name: enterprise-ubuntu2204-jepsen
     display_name: Jepsen Docker Tests
     tags: ["bazel_check"]
@@ -304,7 +304,7 @@ buildvariants:
       large_distro_name: ubuntu2204-large
       compile_variant: enterprise-ubuntu2204-64
     tasks:
-      - name: compile_test_and_package_serial_TG
+      - name: compile_and_archive_dist_test_TG
         distros:
           - ubuntu2204-large
       - name: .jepsen_docker
