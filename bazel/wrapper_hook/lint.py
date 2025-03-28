@@ -115,8 +115,6 @@ def list_files_without_targets(
         "src/mongo/db/auth/authz_manager_external_state_s.cpp",
         # TODO(SERVER-101365): Remove the exemptions below once resolved.
         "src/mongo/db/service_entry_point_test_fixture.cpp",
-        # TODO(SERVER-101366): Remove the exemptions below once resolved.
-        "src/mongo/db/read_concern_test.cpp",
         # TODO(SERVER-101367): Remove the exemptions below once resolved.
         "src/mongo/db/timeseries/timeseries_collmod_test.cpp",
         # TODO(SERVER-101368): Remove the exemptions below once resolved.
