@@ -79,6 +79,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -1453,7 +1454,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
 
         auto shardId = shardResult.shardId.toString();
         const auto& data = shardResult.swResponse.getValue().data;
-        BSONObjBuilder explain(shardExplains.subobjStart(shardId));
+        BSONObjBuilder explain;
         explain << "host" << shardResult.shardHostAndPort->toString();
 
         // Add the per shard explainVersion to the final explain output.
@@ -1473,7 +1474,9 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
                 explain << "executionStats" << executionStatsElement;
             }
         }
+        explain_common::appendIfRoom(explain.done(), shardId, &shardExplains);
     }
+
     return Status::OK();
 }
 

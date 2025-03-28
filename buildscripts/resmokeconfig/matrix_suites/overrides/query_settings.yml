@@ -61,7 +61,8 @@
 - name: common_aggregation_excludes
   value:
     exclude_files:
-      # TODO SERVER-96338: Investigate why 'accumulator_js_size_limits' is failling on PQS suites.
+      # The results of this explain contains very large arrays which take a lot of time to compare
+      # with anyEq(), causing timeouts.
       - jstests/aggregation/accumulators/accumulator_js_size_limits.js
       # Test which overcomes the imposed 16Mb query settings limit making the 'setQuerySettings' command fail.
       - jstests/aggregation/exec/query_limits_test.js
