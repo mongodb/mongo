@@ -121,6 +121,8 @@ optimizer::ABT makeUnaryOp(optimizer::Operations unaryOp, optimizer::ABT operand
 
 optimizer::ABT makeBinaryOp(optimizer::Operations binaryOp, optimizer::ABT lhs, optimizer::ABT rhs);
 
+optimizer::ABT makeNaryOp(optimizer::Operations naryOp, optimizer::ABTVector args);
+
 optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var);
 optimizer::ABT generateABTNullOrMissing(optimizer::ABT var);
 

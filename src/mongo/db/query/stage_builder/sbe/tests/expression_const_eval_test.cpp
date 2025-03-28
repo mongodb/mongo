@@ -116,6 +116,11 @@ TEST(SbeStageBuilderConstEvalTest, ConstEval) {
     ABT tree = _binary("Add", "1"_cint64, "2"_cint64)._n;
     Constant* result = constEval(tree);
     ASSERT_EQ(result->getValueInt64(), 3);
+
+    // 1 + 2 + 3
+    tree = _nary("Add", "1"_cint64, "2"_cint64, "3"_cint64)._n;
+    result = constEval(tree);
+    ASSERT_EQ(result->getValueInt64(), 6);
 }
 
 
@@ -139,6 +144,11 @@ TEST(SbeStageBuilderConstEvalTest, ConstEval3) {
     auto tree = _binary("Add", "1.5"_cdouble, "0.5"_cdouble)._n;
     Constant* result = constEval(tree);
     ASSERT_EQ(result->getValueDouble(), 2.0);
+
+    // 1.5 + 0.5 + 1.0
+    tree = _nary("Add", "1.5"_cdouble, "0.5"_cdouble, "1.0"_cdouble)._n;
+    result = constEval(tree);
+    ASSERT_EQ(result->getValueDouble(), 3.0);
 }
 
 TEST(SbeStageBuilderConstEvalTest, ConstEval4) {
@@ -419,6 +429,53 @@ TEST(ConstEvalTest, NaryAndOrFoldNonNothingLhs) {
         "|   |   Variable [z]\n"
         "|   Variable [y]\n"
         "Variable [x]\n",
+        abt);
+}
+
+TEST(ConstEvalTest, NaryAddMultFold) {
+    ExpressionConstEval evaluator{nullptr};
+
+    ABT abt = _nary("Add", "1"_cint64, "x"_var, "y"_var, "z"_var)._n;
+    evaluator.optimize(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "NaryOp [Add]\n"
+        "|   |   |   Variable [z]\n"
+        "|   |   Variable [y]\n"
+        "|   Variable [x]\n"
+        "Const [1]\n",
+        abt);
+
+    abt = _nary("Add", "1"_cint64, "2"_cint64, "y"_var, "z"_var)._n;
+    evaluator.optimize(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "NaryOp [Add]\n"
+        "|   |   Variable [z]\n"
+        "|   Variable [y]\n"
+        "Const [3]\n",
+        abt);
+
+    abt = _nary("Add", "1"_cint64, "2"_cint64, "3"_cint64, "z"_var)._n;
+    evaluator.optimize(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "NaryOp [Add]\n"
+        "|   Variable [z]\n"
+        "Const [6]\n",
+        abt);
+
+    abt = _nary("Add", "1"_cint64, "2"_cint64, "3"_cint64, "4"_cint64)._n;
+    evaluator.optimize(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [10]\n",
+        abt);
+
+    abt = _nary("Add", "1"_cint64, "2"_cint64, "x"_var, "3"_cint64, "4"_cint64)._n;
+    evaluator.optimize(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "NaryOp [Add]\n"
+        "|   |   |   Const [4]\n"
+        "|   |   Const [3]\n"
+        "|   Variable [x]\n"
+        "Const [3]\n",
         abt);
 }
 

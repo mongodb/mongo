@@ -3621,6 +3621,337 @@ void assertArithmeticOperationScalarScalar(const std::string& opStr,
         *processed.expr);
 }
 
+void assertArithmeticOperationBlockBlockBlock(const std::string& fnStr,
+                                              const Vectorizer::Tree& processed) {
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"" +
+            fnStr +
+            "\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"var1\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"" +
+            fnStr +
+            "\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"Nothing\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var2\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var3\"\n"
+            "                }\n"
+            "            ]\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+        *processed.expr);
+}
+
+void assertArithmeticOperationBlockScalarScalar(const std::string& fnStr,
+                                                const std::string& opStr,
+                                                const Vectorizer::Tree& processed) {
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"" +
+            fnStr +
+            "\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"var\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"BinaryOp\", \n"
+            "            op: \"" +
+            opStr +
+            "\", \n"
+            "            left: {\n"
+            "                nodeType: \"Const\", \n"
+            "                tag: \"NumberInt32\", \n"
+            "                value: 9\n"
+            "            }, \n"
+            "            right: {\n"
+            "                nodeType: \"Const\", \n"
+            "                tag: \"NumberInt32\", \n"
+            "                value: 20\n"
+            "            }\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+        *processed.expr);
+}
+
+void assertArithmeticOperationScalarBlockScalar(const std::string& fnStr,
+                                                const Vectorizer::Tree& processed) {
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"" +
+            fnStr +
+            "\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"" +
+            fnStr +
+            "\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"Nothing\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 20\n"
+            "                }\n"
+            "            ]\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+        *processed.expr);
+}
+
+void assertArithmeticOperationScalarScalarBlock(const std::string& fnStr,
+                                                const Vectorizer::Tree& processed) {
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"" +
+            fnStr +
+            "\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"" +
+            fnStr +
+            "\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"Nothing\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 20\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var\"\n"
+            "                }\n"
+            "            ]\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+        *processed.expr);
+}
+
+void assertArithmeticOperationBlockBlockScalar(const std::string& fnStr,
+                                               const Vectorizer::Tree& processed) {
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"" +
+            fnStr +
+            "\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"var1\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"" +
+            fnStr +
+            "\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"Nothing\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var2\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 9\n"
+            "                }\n"
+            "            ]\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+        *processed.expr);
+}
+
+void assertArithmeticOperationBlockScalarBlock(const std::string& fnStr,
+                                               const Vectorizer::Tree& processed) {
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"" +
+            fnStr +
+            "\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"var1\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"" +
+            fnStr +
+            "\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"Nothing\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 9\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var2\"\n"
+            "                }\n"
+            "            ]\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+        *processed.expr);
+}
+
+void assertArithmeticOperationScalarBlockBlock(const std::string& fnStr,
+                                               const Vectorizer::Tree& processed) {
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"" +
+            fnStr +
+            "\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"" +
+            fnStr +
+            "\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"Nothing\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var1\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var2\"\n"
+            "                }\n"
+            "            ]\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+        *processed.expr);
+}
+
+void assertArithmeticOperationScalarScalarScalar(const std::string& opStr,
+                                                 const Vectorizer::Tree& processed) {
+    ASSERT_EXPLAIN_BSON(
+        "{\n"
+        "    nodeType: \"BinaryOp\", \n"
+        "    op: \"" +
+            opStr +
+            "\", \n"
+            "    left: {\n"
+            "        nodeType: \"Const\", \n"
+            "        tag: \"NumberInt32\", \n"
+            "        value: 9\n"
+            "    }, \n"
+            "    right: {\n"
+            "        nodeType: \"BinaryOp\", \n"
+            "        op: \"" +
+            opStr +
+            "\", \n"
+            "        left: {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 20\n"
+            "        }, \n"
+            "        right: {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 100\n"
+            "        }\n"
+            "    }\n"
+            "}\n",
+        *processed.expr);
+}
+
 TEST(VectorizerTest, ConvertAdd) {
     std::string fnStr{"valueBlockAdd"};
     std::string opStr{"Add"};
@@ -3693,6 +4024,166 @@ TEST(VectorizerTest, ConvertAdd) {
 
         ASSERT_TRUE(processed.expr.has_value());
         assertArithmeticOperationScalarScalar(opStr, processed);
+    }
+
+    {
+        auto treeBlocks = make<NaryOp>(
+            op, ABTVector{make<Variable>("var1"), make<Variable>("var2"), make<Variable>("var3")});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var1"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var3"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeBlocks, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationBlockBlockBlock(fnStr, processed);
+    }
+
+    {
+        auto treeBlockScalarScalar = make<NaryOp>(
+            op, ABTVector{make<Variable>("var"), Constant::int32(9), Constant::int32(20)});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeBlockScalarScalar, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationBlockScalarScalar(fnStr, opStr, processed);
+    }
+
+    {
+        auto treeScalarBlockScalar = make<NaryOp>(
+            op, ABTVector{Constant::int32(9), make<Variable>("var"), Constant::int32(20)});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeScalarBlockScalar, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationScalarBlockScalar(fnStr, processed);
+    }
+
+    {
+        auto treeScalarScalarBlock = make<NaryOp>(
+            op, ABTVector{Constant::int32(9), Constant::int32(20), make<Variable>("var")});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeScalarScalarBlock, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationScalarScalarBlock(fnStr, processed);
+    }
+
+    {
+        auto treeScalarScalarScalar = make<NaryOp>(
+            op, ABTVector{Constant::int32(9), Constant::int32(20), Constant::int32(100)});
+
+        Vectorizer::VariableTypes bindings;
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeScalarScalarScalar, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationScalarScalarScalar(opStr, processed);
+    }
+
+    {
+        auto treeBlockBlockScalar = make<NaryOp>(
+            op, ABTVector{make<Variable>("var1"), make<Variable>("var2"), Constant::int32(9)});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeBlockBlockScalar, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationBlockBlockScalar(fnStr, processed);
+    }
+
+    {
+        auto treeScalarBlockBlock = make<NaryOp>(
+            op, ABTVector{Constant::int32(9), make<Variable>("var1"), make<Variable>("var2")});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeScalarBlockBlock, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationScalarBlockBlock(fnStr, processed);
+    }
+
+    {
+        auto treeBlockScalarBlock = make<NaryOp>(
+            op, ABTVector{make<Variable>("var1"), Constant::int32(9), make<Variable>("var2")});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeBlockScalarBlock, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationBlockScalarBlock(fnStr, processed);
     }
 }
 

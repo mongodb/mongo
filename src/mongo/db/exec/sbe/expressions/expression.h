@@ -334,6 +334,9 @@ public:
         // Logical operations. These operations are short-circuiting.
         logicAnd,
         logicOr,
+
+        // Math operations.
+        add,
     };
 
     EPrimNary(Op op, std::vector<std::unique_ptr<EExpression>> args) : _op(op) {
@@ -371,7 +374,7 @@ public:
         fillEmpty,
 
         // Math operations.
-        add,
+        add,  // TODO: remove with SERVER-100579
         sub,
         mul,
         div,

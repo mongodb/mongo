@@ -414,5 +414,36 @@ TEST_F(AbtToSbeExpression, LowerMultiLet) {
         ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), 11);
     }
 }
+
+TEST_F(AbtToSbeExpression, LowerNaryAdd) {
+    {
+        auto tree = make<NaryOp>(Operations::Add,
+                                 ABTVector{Constant::int64(1),
+                                           Constant::int64(5),
+                                           Constant::int64(10),
+                                           Constant::int64(20),
+                                           Constant::int64(100)});
+
+        auto [resultTag, resultVal] = evalExpr(tree, boost::none);
+
+        ASSERT_EQ(sbe::value::TypeTags::NumberInt64, resultTag);
+        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), 136);
+    }
+    {
+        auto tree = make<NaryOp>(
+            Operations::Add,
+            ABTVector{make<BinaryOp>(Operations::Sub, Constant::int64(10), make<Variable>("var")),
+                      make<BinaryOp>(Operations::Sub, Constant::int64(20), make<Variable>("var")),
+                      make<BinaryOp>(Operations::Sub, Constant::int64(30), make<Variable>("var")),
+                      make<BinaryOp>(Operations::Sub, Constant::int64(40), make<Variable>("var")),
+                      make<BinaryOp>(Operations::Sub, Constant::int64(50), make<Variable>("var"))});
+
+        auto [resultTag, resultVal] =
+            evalExpr(tree, std::pair{ProjectionName{"var"}, sbe::value::makeIntOrLong(5)});
+
+        ASSERT_EQ(sbe::value::TypeTags::NumberInt64, resultTag);
+        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), 125);
+    }
+}
 }  // namespace
 }  // namespace mongo::stage_builder::abt

@@ -115,6 +115,21 @@ optimizer::ABT makeBinaryOp(optimizer::Operations binaryOp,
     return optimizer::make<optimizer::BinaryOp>(binaryOp, std::move(lhs), std::move(rhs));
 }
 
+optimizer::ABT makeNaryOp(optimizer::Operations op, optimizer::ABTVector args) {
+    tassert(10199700, "Expected at least one argument", !args.empty());
+    if (feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+        if (args.size() == 1) {
+            return std::move(args[0]);
+        }
+        return optimizer::make<optimizer::NaryOp>(op, std::move(args));
+    } else {
+        return std::accumulate(
+            args.begin() + 1, args.end(), std::move(args.front()), [&](auto&& acc, auto&& ex) {
+                return optimizer::make<optimizer::BinaryOp>(op, std::move(acc), std::move(ex));
+            });
+    }
+}
+
 optimizer::ABT generateABTNullOrMissing(optimizer::ABT var) {
     return makeFillEmptyTrue(
         makeABTFunction("typeMatch"_sd,

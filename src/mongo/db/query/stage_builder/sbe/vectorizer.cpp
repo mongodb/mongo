@@ -218,6 +218,60 @@ Vectorizer::Tree Vectorizer::vectorizeLogicalOp(optimizer::Operations opType,
     return {{}, TypeSignature::kAnyScalarType, {}};
 }
 
+template <typename Lhs, typename Rhs>
+Vectorizer::Tree Vectorizer::vectorizeArithmeticOp(optimizer::Operations opType,
+                                                   Lhs lhsNode,
+                                                   Rhs rhsNode) {
+    Tree lhs = lhsNode();
+    if (!lhs.expr.has_value()) {
+        return lhs;
+    }
+    Tree rhs = rhsNode();
+    if (!rhs.expr.has_value()) {
+        return rhs;
+    }
+
+    StringData fnName = [&]() {
+        switch (opType) {
+            case optimizer::Operations::Add:
+                return "valueBlockAdd"_sd;
+            case optimizer::Operations::Sub:
+                return "valueBlockSub"_sd;
+            case optimizer::Operations::Div:
+                return "valueBlockDiv"_sd;
+            case optimizer::Operations::Mult:
+                return "valueBlockMult"_sd;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+
+    auto returnTS =
+        TypeSignature::kNumericType.include(getTypeSignature(sbe::value::TypeTags::Date));
+
+    if (TypeSignature::kBlockType.isSubset(lhs.typeSignature) ||
+        TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+        boost::optional<optimizer::ProjectionName> sameCell = lhs.sourceCell.has_value() &&
+                rhs.sourceCell.has_value() && *lhs.sourceCell == *rhs.sourceCell
+            ? lhs.sourceCell
+            : boost::none;
+        // If we can't identify a single cell for both branches, fold them.
+        if (!sameCell.has_value()) {
+            foldIfNecessary(lhs);
+            foldIfNecessary(rhs);
+        }
+        return {
+            makeABTFunction(fnName, generateMaskArg(), std::move(*lhs.expr), std::move(*rhs.expr)),
+            TypeSignature::kBlockType.include(returnTS),
+            sameCell};
+    } else {
+        // Preserve scalar operation.
+        return {make<optimizer::BinaryOp>(opType, std::move(*lhs.expr), std::move(*rhs.expr)),
+                returnTS,
+                {}};
+    }
+}
+
 Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::BinaryOp& op) {
     switch (op.op()) {
         case optimizer::Operations::FillEmpty: {
@@ -436,55 +490,10 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
         case optimizer::Operations::Sub:
         case optimizer::Operations::Div:
         case optimizer::Operations::Mult: {
-            Tree lhs = op.getLeftChild().visit(*this);
-            if (!lhs.expr.has_value()) {
-                return lhs;
-            }
-            Tree rhs = op.getRightChild().visit(*this);
-            if (!rhs.expr.has_value()) {
-                return rhs;
-            }
-
-            StringData fnName = [&]() {
-                switch (op.op()) {
-                    case optimizer::Operations::Add:
-                        return "valueBlockAdd"_sd;
-                    case optimizer::Operations::Sub:
-                        return "valueBlockSub"_sd;
-                    case optimizer::Operations::Div:
-                        return "valueBlockDiv"_sd;
-                    case optimizer::Operations::Mult:
-                        return "valueBlockMult"_sd;
-                    default:
-                        MONGO_UNREACHABLE;
-                }
-            }();
-
-            auto returnTS =
-                TypeSignature::kNumericType.include(getTypeSignature(sbe::value::TypeTags::Date));
-
-            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature) ||
-                TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
-                boost::optional<optimizer::ProjectionName> sameCell = lhs.sourceCell.has_value() &&
-                        rhs.sourceCell.has_value() && *lhs.sourceCell == *rhs.sourceCell
-                    ? lhs.sourceCell
-                    : boost::none;
-                // If we can't identify a single cell for both branches, fold them.
-                if (!sameCell.has_value()) {
-                    foldIfNecessary(lhs);
-                    foldIfNecessary(rhs);
-                }
-                return {makeABTFunction(
-                            fnName, generateMaskArg(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                        TypeSignature::kBlockType.include(returnTS),
-                        sameCell};
-            } else {
-                // Preserve scalar operation.
-                return {
-                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                    returnTS,
-                    {}};
-            }
+            return vectorizeArithmeticOp(
+                op.op(),
+                [&]() { return op.getLeftChild().visit(*this); },
+                [&]() { return op.getRightChild().visit(*this); });
             break;
         }
         default:
@@ -497,22 +506,32 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
 Vectorizer::Tree Vectorizer::vectorizeNaryHelper(const optimizer::NaryOp& op, size_t argIdx) {
     // Verify that we have at least 2 items to process.
     tassert(10199602, "index out of range", argIdx < op.nodes().size() - 1);
-    return vectorizeLogicalOp(
-        op.op(),
-        [&]() { return op.nodes()[argIdx].visit(*this); },
-        [&]() {
-            // If this is the last item, process it directly, otherwise recurse simulating
-            // the presence of a nested logical operation.
-            size_t rhsIdx = argIdx + 1;
-            return (rhsIdx == op.nodes().size() - 1) ? op.nodes()[rhsIdx].visit(*this)
-                                                     : vectorizeNaryHelper(op, rhsIdx);
-        });
+    auto lhsNode = [&]() {
+        return op.nodes()[argIdx].visit(*this);
+    };
+    auto rhsNode = [&]() {
+        // If this is the last item, process it directly, otherwise recurse simulating
+        // the presence of a nested logical operation.
+        size_t rhsIdx = argIdx + 1;
+        return (rhsIdx == op.nodes().size() - 1) ? op.nodes()[rhsIdx].visit(*this)
+                                                 : vectorizeNaryHelper(op, rhsIdx);
+    };
+    switch (op.op()) {
+        case optimizer::Operations::And:
+        case optimizer::Operations::Or:
+            return vectorizeLogicalOp(op.op(), lhsNode, rhsNode);
+        case optimizer::Operations::Add:
+            return vectorizeArithmeticOp(op.op(), lhsNode, rhsNode);
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::NaryOp& op) {
     switch (op.op()) {
         case optimizer::Operations::And:
-        case optimizer::Operations::Or: {
+        case optimizer::Operations::Or:
+        case optimizer::Operations::Add: {
             return vectorizeNaryHelper(op, 0);
         }
         default:

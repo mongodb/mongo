@@ -249,7 +249,7 @@ public:
     NaryOp(Operations inOp, ABTVector exprs) : Base(std::move(exprs)), _op(inOp) {
         tassert(10199600,
                 "operation doesn't allow multiple operands",
-                _op == Operations::And || _op == Operations::Or);
+                _op == Operations::And || _op == Operations::Or || _op == Operations::Add);
         tassert(10199601, "operation needs at least two operands", nodes().size() >= 2);
         for (auto&& expr : nodes()) {
             assertExprSort(expr);

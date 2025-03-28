@@ -279,7 +279,33 @@ vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx, const Vector& clauses, b
 }
 
 vm::CodeFragment EPrimNary::compileDirect(CompileCtx& ctx) const {
-    return buildShortCircuitCode(ctx, _nodes, _op == EPrimNary::logicOr /*isDisjunction*/);
+    if (_op == EPrimNary::logicAnd || _op == EPrimNary::logicOr) {
+        return buildShortCircuitCode(ctx, _nodes, _op == EPrimNary::logicOr /*isDisjunction*/);
+    }
+
+    vm::CodeFragment code;
+    vm::Instruction::Parameter lhsParam, rhsParam;
+
+    lhsParam = appendParameter(code, ctx, _nodes[0].get());
+
+    auto appendInstr = [&](vm::Instruction::Parameter lhsParam,
+                           vm::Instruction::Parameter rhsParam) {
+        switch (_op) {
+            case EPrimNary::add:
+                code.appendAdd(lhsParam, rhsParam);
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    };
+
+    for (size_t idx = 1; idx < _nodes.size(); ++idx) {
+        rhsParam = appendParameter(code, ctx, _nodes[idx].get());
+        appendInstr(lhsParam, rhsParam);
+        lhsParam = {};
+    }
+
+    return code;
 }
 
 std::vector<DebugPrinter::Block> EPrimNary::debugPrint() const {
@@ -295,6 +321,9 @@ std::vector<DebugPrinter::Block> EPrimNary::debugPrint() const {
                     break;
                 case EPrimNary::logicOr:
                     ret.emplace_back("||");
+                    break;
+                case EPrimNary::add:
+                    ret.emplace_back("+");
                     break;
                 default:
                     MONGO_UNREACHABLE;

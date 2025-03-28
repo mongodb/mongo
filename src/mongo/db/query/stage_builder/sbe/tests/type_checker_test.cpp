@@ -483,5 +483,48 @@ TEST(TypeCheckerTest, TypeCheckMultiLet) {
     }
 }
 
+TEST(TypeCheckerTest, TypeCheckNaryAdd) {
+    {
+        auto tree = make<NaryOp>(
+            Operations::Add,
+            ABTVector{
+                Constant::int32(1), Constant::int32(2), Constant::int32(3), Constant::int32(4)});
+        auto signature = TypeChecker{}.typeCheck(tree);
+        ASSERT_EQ(signature.typesMask, TypeSignature::kNumericType.typesMask);
+    }
+    {
+        auto tree = make<NaryOp>(Operations::Add,
+                                 ABTVector{Constant::int32(1),
+                                           Constant::date(Date_t::fromMillisSinceEpoch(10000000)),
+                                           Constant::int32(1),
+                                           Constant::int32(1)});
+        auto signature = TypeChecker{}.typeCheck(tree);
+        ASSERT_EQ(
+            signature.typesMask,
+            (TypeSignature::kNumericType.include(getTypeSignature(sbe::value::TypeTags::Date)))
+                .typesMask);
+    }
+    {
+        auto tree = make<NaryOp>(
+            Operations::Add,
+            ABTVector{
+                Constant::int32(1), Constant::int32(2), Constant::int32(3), Constant::nothing()});
+        auto signature = TypeChecker{}.typeCheck(tree);
+        ASSERT_EQ(signature.typesMask,
+                  (TypeSignature::kNothingType.include(TypeSignature::kNumericType)).typesMask);
+    }
+    {
+        auto tree = make<NaryOp>(
+            Operations::Add,
+            ABTVector{
+                Constant::int32(1), Constant::int32(2), Constant::int32(3), make<Variable>("var")});
+        auto signature = TypeChecker{}.typeCheck(tree);
+        ASSERT_EQ(signature.typesMask,
+                  (TypeSignature::kNumericType.include(TypeSignature::kDateTimeType)
+                       .include(TypeSignature::kNothingType))
+                      .typesMask);
+    }
+}
+
 }  // namespace
 }  // namespace mongo::stage_builder

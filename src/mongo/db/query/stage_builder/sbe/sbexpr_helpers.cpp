@@ -215,6 +215,10 @@ SbExpr SbExprBuilder::makeBinaryOp(optimizer::Operations binaryOp, SbExpr lhs, S
     return makeBinaryOp(abt::getEPrimBinaryOp(binaryOp), std::move(lhs), std::move(rhs));
 }
 
+SbExpr SbExprBuilder::makeNaryOp(optimizer::Operations naryOp, SbExpr::Vector args) {
+    return abt::wrap(stage_builder::makeNaryOp(naryOp, extractABT(args)));
+}
+
 SbExpr SbExprBuilder::makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
     return abt::wrap(optimizer::make<optimizer::Constant>(tag, val));
 }

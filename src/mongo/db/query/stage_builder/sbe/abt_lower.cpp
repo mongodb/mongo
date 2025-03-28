@@ -262,6 +262,9 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
         case Operations::Or:
             sbeOp = sbe::EPrimNary::logicOr;
             break;
+        case Operations::Add:
+            sbeOp = sbe::EPrimNary::add;
+            break;
         default:
             MONGO_UNREACHABLE;
     }

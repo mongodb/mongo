@@ -449,6 +449,35 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
             }
             break;
         }
+        case optimizer::Operations::Add: {
+            auto it = args.begin();
+            if (!it->cast<optimizer::Constant>()) {
+                return;
+            }
+            it++;
+            for (; it < args.end(); it++) {
+                optimizer::ABT& rhs = *it;
+                auto rhsConst = rhs.cast<optimizer::Constant>();
+                if (!rhsConst) {
+                    break;
+                }
+                optimizer::ABT& lhs = *(it - 1);
+                auto lhsConst = lhs.cast<optimizer::Constant>();
+
+                auto [lhsTag, lhsValue] = lhsConst->get();
+                auto [rhsTag, rhsValue] = rhsConst->get();
+
+                auto [_, resultType, resultValue] =
+                    sbe::value::genericAdd(lhsTag, lhsValue, rhsTag, rhsValue);
+                swapAndUpdate(rhs, optimizer::make<optimizer::Constant>(resultType, resultValue));
+            }
+            args.erase(args.begin(), it - 1);
+            invariant(args.size() > 0);
+            if (args.size() == 1) {
+                swapAndUpdate(n, std::exchange(args[0], optimizer::make<optimizer::Blackhole>()));
+            }
+            break;
+        }
         default:
             // Not implemented.
             break;

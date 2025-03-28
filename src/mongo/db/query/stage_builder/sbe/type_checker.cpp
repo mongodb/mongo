@@ -388,6 +388,15 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         // The signature of the Or is boolean plus Nothing if any operands can be Nothing.
         return canBeNothing ? TypeSignature::kBooleanType.include(TypeSignature::kNothingType)
                             : TypeSignature::kBooleanType;
+    } else if (op.op() == optimizer::Operations::Add) {
+        // The signature of the Add is either numeric or date, plus Nothing.
+        TypeSignature sig = {};
+        for (auto& node : op.nodes()) {
+            TypeSignature nodeType = node.visit(*this, false);
+            sig = sig.include(nodeType);
+        }
+        return TypeSignature::kNumericType.include(sig.intersect(TypeSignature::kDateTimeType))
+            .include(sig.intersect(TypeSignature::kNothingType));
     }
     return TypeSignature::kAnyScalarType;
 }

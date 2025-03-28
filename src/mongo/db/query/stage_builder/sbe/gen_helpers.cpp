@@ -659,12 +659,12 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                         b.makeBoolConstant(false));
                 };
 
-                auto numArraysExpr = makeIsArrayCheck(*sortPattern[0].fieldPath);
-                for (size_t idx = 1; idx < sortPattern.size(); ++idx) {
-                    numArraysExpr = b.makeBinaryOp(sbe::EPrimBinary::add,
-                                                   std::move(numArraysExpr),
-                                                   makeIsArrayCheck(*sortPattern[idx].fieldPath));
+                SbExpr::Vector args;
+                for (size_t idx = 0; idx < sortPattern.size(); ++idx) {
+                    args.emplace_back(makeIsArrayCheck(*sortPattern[idx].fieldPath));
                 }
+
+                auto numArraysExpr = b.makeNaryOp(optimizer::Operations::Add, std::move(args));
 
                 return b.makeBinaryOp(
                     sbe::EPrimBinary::lessEq, std::move(numArraysExpr), b.makeInt32Constant(1));

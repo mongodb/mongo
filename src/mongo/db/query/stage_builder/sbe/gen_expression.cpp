@@ -684,7 +684,8 @@ public:
 
         // Build a linear tree for a small number of children so that we can pre-validate all
         // arguments.
-        if (arity < kArgumentCountForBinaryTree) {
+        if (arity < kArgumentCountForBinaryTree ||
+            feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
             visitFast(expr);
             return;
         }
@@ -751,10 +752,12 @@ public:
         } else {
             optimizer::ABTVector binds;
             optimizer::ProjectionNameVector names;
+            optimizer::ABTVector variables;
             optimizer::ABTVector checkArgIsNull;
             optimizer::ABTVector checkArgHasValidType;
             binds.reserve(arity);
             names.reserve(arity);
+            variables.reserve(arity);
             checkArgIsNull.reserve(arity);
             checkArgHasValidType.reserve(arity);
 
@@ -774,6 +777,7 @@ public:
 
                 checkArgIsNull.push_back(generateABTNullMissingOrUndefined(name));
                 names.push_back(std::move(name));
+                variables.emplace_back(makeVariable(names[idx]));
             }
 
             // At this point 'binds' vector contains arguments of $add expression in the reversed
@@ -786,13 +790,9 @@ public:
                 makeBooleanOpTree(optimizer::Operations::Or, std::move(checkArgIsNull));
 
             auto checkValidTypeAndCountDates =
-                makeBooleanOpTree(optimizer::Operations::Add, std::move(checkArgHasValidType));
+                makeNaryOp(optimizer::Operations::Add, std::move(checkArgHasValidType));
 
-            auto addOp = makeVariable(names[0]);
-            for (size_t idx = 1; idx < arity; ++idx) {
-                addOp = optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::Add, std::move(addOp), makeVariable(names[idx]));
-            }
+            auto addOp = makeNaryOp(optimizer::Operations::Add, std::move(variables));
 
             auto addExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
                 {ABTCaseValuePair{std::move(checkNullAllArguments), optimizer::Constant::null()},
