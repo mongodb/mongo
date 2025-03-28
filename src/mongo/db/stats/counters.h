@@ -515,10 +515,6 @@ public:
         groupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
     }
 
-    void incrementGroupCountersPerQuery(int64_t spilledDataStorageSize) {
-        groupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
-    }
-
     // The total number of spills from group stages.
     Counter64& groupSpills = *MetricBuilder<Counter64>{"query.group.spills"};
     // The total number of bytes spilled from group stages. The spilled storage size after

@@ -231,7 +231,7 @@ server_parameters:
     default: false
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
-  
+
   internalQueryConcurrentMultiPlanningThreshold:
     description: "The number of concurrent trialing multiplan candidates required to enable the MultiPlan rate limiter."
     set_at: [ startup, runtime ]
@@ -244,8 +244,8 @@ server_parameters:
 
   internalQueryMaxConcurrentMultiPlanJobsPerCacheKey:
     description: "The maximum number of concurrent trialing multiplan candidates per plan cache key.
-     If the MultiPlan rate limiter is enabled and we reach this number of trailing candidates 
-     we block multiplanning for the plan cache key until some of the previous multiplanning jobs are 
+     If the MultiPlan rate limiter is enabled and we reach this number of trailing candidates
+     we block multiplanning for the plan cache key until some of the previous multiplanning jobs are
      finished or an active plan cache entry is added."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryMaxConcurrentMultiPlanJobsPerCacheKey"
@@ -915,8 +915,8 @@ server_parameters:
     redact: false
 
   internalQuerySlotBasedExecutionHashAggIncreasedSpilling:
-    description: "Define whether the HashAgg stage will perform increased spilling It supports 3 values: kAlways, kNever, kInDebug. 
-    When set to kAlways, increased spilling will be enabled. When set to kNever, increases spilling will be disabled. 
+    description: "Define whether the HashAgg stage will perform increased spilling It supports 3 values: kAlways, kNever, kInDebug.
+    When set to kAlways, increased spilling will be enabled. When set to kNever, increases spilling will be disabled.
     When set to kInDebug, increased spilling will be enabled only in debug builds."
     set_at: [ startup, runtime ]
     cpp_class:
@@ -1465,9 +1465,9 @@ server_parameters:
 
   internalQueryEnableAggressiveSpillsInGroup:
     description: "Enable spilling in $group every time there is a duplicate id to stress merge logic."
-    set_at: [ startup ]
+    set_at: [ startup, runtime ]
     cpp_varname: "internalQueryEnableAggressiveSpillsInGroup"
-    cpp_vartype: bool
+    cpp_vartype: AtomicWord<bool>
     default: false
     redact: false
 
@@ -1548,7 +1548,7 @@ server_parameters:
   internalQuerySamplingBySequentialScan:
     description: "Indicate sampling CE to generate a repeatable sample by sequentially scanning
     documents from the start of the target collection. This sampling method is useful for testing
-    purposes and should not be used in production." 
+    purposes and should not be used in production."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySamplingBySequentialScan"
     cpp_vartype: AtomicWord<bool>
