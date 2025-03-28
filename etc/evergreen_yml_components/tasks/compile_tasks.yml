@@ -324,7 +324,7 @@ tasks:
         vars:
           # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
           targets: //src/mongo/...
-          args: --config=clang-tidy --mongo_toolchain_version=${clang_tidy_toolchain|v5} --keep_going
+          bazel_args: --config=clang-tidy --mongo_toolchain_version=${clang_tidy_toolchain|v5} --keep_going
       - func: "generate clang-tidy report"
 
   - name: run_bazel_program_windows
