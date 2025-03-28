@@ -9,8 +9,8 @@ from testlib.test_utils import (
 )
 from testlib.test_utils import _discover_test_file as discover_test_file
 
-test_file = pathlib.Path(discover_test_file("skip_bad_queries.test"))
-exit_code, output = run_mongotest(("skip_bad_queries",), Mode.RUN, out_result=True)
+test_file = pathlib.Path(discover_test_file("output_error.test"))
+exit_code, output = run_mongotest(("output_error",), Mode.RUN, out_result=True)
 assert_exit_code(exit_code, ExitCode.FAILURE, output)
 assert_output_contains(output, '''codeName: "ConversionFailure"''')
 

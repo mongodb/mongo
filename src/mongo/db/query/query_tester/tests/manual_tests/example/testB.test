@@ -1,0 +1,12 @@
+testB
+test
+basic.coll as fuzzer_coll
+
+1
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {_id: {$lt: 0}}}], cursor: {}}
+
+2
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit: -1}], cursor: {}}
+
+3
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit: 5}], cursor: {}}

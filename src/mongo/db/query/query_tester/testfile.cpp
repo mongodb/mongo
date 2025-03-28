@@ -524,7 +524,7 @@ void QueryFile::runTestFile(DBClientConnection* conn, const ModeOption mode) {
     _testsRun = 0;
     for (auto& test : _tests) {
         // Skip tests that have already been failed during input/parsing.
-        if (test.hasErrored()) {
+        if (test.getErrorMessage()) {
             continue;
         }
         try {
@@ -614,12 +614,9 @@ bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
     // Write out each test.
     for (const auto& test : _tests) {
         _testNumToQuery[test.getTestNum()] = test.getTestLine();
-        // Skip writeout if the test did not execute successfully.
-        if (!test.hasErrored()) {
-            // Newline before each test write-out.
-            fs << std::endl;
-            test.writeToStream(fs, opt);
-        }
+        // Newline before each test write-out.
+        fs << std::endl;
+        test.writeToStream(fs, opt, test.getErrorMessage());
     }
 
     return true;

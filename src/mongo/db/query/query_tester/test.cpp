@@ -93,8 +93,8 @@ size_t Test::getTestNum() const {
     return _testNum;
 }
 
-bool Test::hasErrored() const {
-    return _errored;
+boost::optional<std::string> Test::getErrorMessage() const {
+    return _errorMessage;
 }
 
 std::vector<std::string> Test::normalize(const std::vector<BSONObj>& objs,
@@ -342,7 +342,7 @@ void Test::parseTestQueryLine() {
     try {
         _query = fromFuzzerJson(queryline);
     } catch (AssertionException& ex) {
-        _errored = true;
+        _errorMessage = ex.reason();
         ex.addContext(str::stream{} << "Failed to read test number " << _testNum);
         throw;
     }
@@ -357,7 +357,7 @@ void Test::runTestAndRecord(DBClientConnection* const conn, const ModeOption mod
                                           : getAllResults(conn, runCommand(conn, _db, _query)),
                                       _testType);
     } catch (AssertionException& ex) {
-        _errored = true;
+        _errorMessage = ex.reason();
         ex.addContext(str::stream{} << "Error when executing query " << _testNum);
         throw;
     }
@@ -381,7 +381,9 @@ ModeOption stringToModeOption(const std::string& modeString) {
     }
 }
 
-void Test::writeToStream(std::fstream& fs, const WriteOutOptions resultOpt) const {
+void Test::writeToStream(std::fstream& fs,
+                         const WriteOutOptions resultOpt,
+                         const boost::optional<std::string>& errorMsg) const {
     tassert(9670452,
             "Expected file to be open and ready for writing, but it wasn't",
             fs.is_open() && fs.good());
@@ -416,20 +418,24 @@ void Test::writeToStream(std::fstream& fs, const WriteOutOptions resultOpt) cons
         }
     }();
 
-    // This helps guard against WriteOutOptions that might get added but not handled.
-    switch (resultOpt) {
-        case WriteOutOptions::kOnelineResult: {
-            // Print out just the array.
-            fs << LineResult<std::string>{resultRef};
-            break;
-        }
-        case WriteOutOptions::kResult: {
-            // Print out each result in the result set on its own line.
-            fs << ArrayResult<std::string>{resultRef};
-            break;
-        }
-        default: {
-            uasserted(9670436, "Writeout is not supported for that --out argument.");
+    if (errorMsg) {
+        fs << errorMsg.get() << std::endl;
+    } else {
+        // This helps guard against WriteOutOptions that might get added but not handled.
+        switch (resultOpt) {
+            case WriteOutOptions::kOnelineResult: {
+                // Print out just the array.
+                fs << LineResult<std::string>{resultRef};
+                break;
+            }
+            case WriteOutOptions::kResult: {
+                // Print out each result in the result set on its own line.
+                fs << ArrayResult<std::string>{resultRef};
+                break;
+            }
+            default: {
+                uasserted(9670436, "Writeout is not supported for that --out argument.");
+            }
         }
     }
 

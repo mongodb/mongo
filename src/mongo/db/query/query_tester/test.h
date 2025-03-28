@@ -72,7 +72,7 @@ public:
 
     size_t getTestNum() const;
 
-    bool hasErrored() const;
+    boost::optional<std::string> getErrorMessage() const;
 
     /**
      * Compute the normalized version of the input set.
@@ -102,7 +102,9 @@ public:
 
     void setDB(const std::string& db);
 
-    void writeToStream(std::fstream&, WriteOutOptions = WriteOutOptions::kNone) const;
+    void writeToStream(std::fstream&,
+                       WriteOutOptions = WriteOutOptions::kNone,
+                       const boost::optional<std::string>& errorMessage = boost::none) const;
 
 private:
     void parseTestQueryLine();
@@ -120,7 +122,7 @@ private:
     std::vector<std::string> _normalizedResult = {};
     NormalizationOptsSet _testType = {};
     BSONObj _query = {};
-    bool _errored = false;
+    boost::optional<std::string> _errorMessage;
     std::string _db = {};
 };
 
