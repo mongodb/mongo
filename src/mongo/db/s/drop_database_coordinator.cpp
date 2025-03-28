@@ -465,9 +465,15 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 {
                     // Acquire the database critical section in order to disallow implicit
                     // collection creations from happening concurrently with dropDatabase
+                    const bool clearDbInfo = _doc.getAuthoritativeMetadataAccessLevel() ==
+                        AuthoritativeMetadataAccessLevelEnum::kNone;
                     auto recoveryService = ShardingRecoveryService::get(opCtx);
                     recoveryService->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx, dbNss, _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+                        opCtx,
+                        dbNss,
+                        _critSecReason,
+                        ShardingCatalogClient::kLocalWriteConcern,
+                        clearDbInfo);
                     recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
                         opCtx, dbNss, _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
 
@@ -566,13 +572,22 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
+
+            const bool clearDbInfo = _doc.getAuthoritativeMetadataAccessLevel() ==
+                AuthoritativeMetadataAccessLevelEnum::kNone;
+
+            const auto& beforeReleasingAction = clearDbInfo
+                ? static_cast<const ShardingRecoveryService::BeforeReleasingCustomAction&>(
+                      ShardingRecoveryService::FilteringMetadataClearer())
+                : static_cast<const ShardingRecoveryService::BeforeReleasingCustomAction&>(
+                      ShardingRecoveryService::NoCustomAction());
+
             ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                 opCtx,
                 dbNss,
                 _critSecReason,
                 WriteConcerns::kMajorityWriteConcernNoTimeout,
-                ShardingRecoveryService::FilteringMetadataClearer(
-                    true /*includeStepsForNamespaceDropped*/),
+                beforeReleasingAction,
                 false /* throwIfReasonDiffers */);
         })
         .then([this, token, dbNss, executor = executor, anchor = shared_from_this()] {

@@ -324,14 +324,15 @@ void DatabaseShardingState::setAuthoritativeDbInfo(OperationContext* opCtx,
     _dbInfo.emplace(dbInfo);
 }
 
-void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh) {
-    if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // When the feature flag for authoritative database metadata is enabled, this should act as
-        // a noop. Clearing and setting the database metadata is only managed by the recover from
-        // disk during startup/rollback or as part of a DDL commit to the shard catalog.
-        return;
-    }
+void DatabaseShardingState::clearDbInfo_DEPRECATED(OperationContext* opCtx,
+                                                   bool cancelOngoingRefresh) {
+    tassert(
+        10250100,
+        "Clearing the database metadata should only be done through the authoritative model, "
+        "which is managed by the DDL commit to the shard catalog. This method is being called in a "
+        "non-authoritative way, which is not correct in the current implementation.",
+        !feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
@@ -344,7 +345,7 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngo
     _dbInfo = boost::none;
 }
 
-void DatabaseShardingState::clearAuthoritativeDbInfo(OperationContext* opCtx) {
+void DatabaseShardingState::clearDbInfo(OperationContext* opCtx) {
     tassert(10003601,
             "Expected to find the authoritative database metadata feature flag enabled",
             feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(

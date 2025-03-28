@@ -655,8 +655,13 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
             // Set the refreshed database metadata in the local catalog.
             scopedDss->setDbInfo(opCtx, *swDbMetadata.getValue());
         } else if (swDbMetadata == ErrorCodes::NamespaceNotFound) {
-            // The database has been dropped, so clear its metadata in the local catalog.
-            scopedDss->clearDbInfo(opCtx, false /* cancelOngoingRefresh */);
+            // The non-authoritative database model stores metadata from other shards in the DSS to
+            // respond to stale routers without requiring a refresh each time. While clearing
+            // database information at this stage can optimize the old protocol, it is not strictly
+            // necessary since this shard does not own the database.
+
+            // Because the authoritative and non-authoritative models must coexist during the
+            // upgrade transition, it is safer to not clear the database metadata.
         }
     }
 

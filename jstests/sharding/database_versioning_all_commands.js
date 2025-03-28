@@ -191,20 +191,10 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
     assertMatchingDatabaseVersion(primaryShardBefore, dbName, dbVersionBefore);
     assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
 
-    // Drop and recreate the database through the second mongos. Insert the entry for the new
-    // database explicitly to ensure it is assigned the other shard as the primary shard.
+    // Drop and recreate the database through the second mongos.
     assert.commandWorked(st.s1.getDB(dbName).dropDatabase());
-    let currDbVersion = {
-        uuid: UUID(),
-        timestamp: Timestamp(dbVersionBefore.timestamp.getTime() + 1, 0),
-        lastMod: NumberInt(1)
-    };
-    assert.commandWorked(st.s1.getDB("config").getCollection("databases").insert({
-        _id: dbName,
-        partitioned: false,
-        primary: primaryShardAfter.shardName,
-        version: currDbVersion
-    }));
+    assert.commandWorked(
+        st.s1.adminCommand({enableSharding: dbName, primaryShard: primaryShardAfter.shardName}));
 
     const dbVersionAfter =
         st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
@@ -221,7 +211,6 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
     // have cleared its dbVersion.
     assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
     assertMatchingDatabaseVersion(primaryShardBefore, dbName, {});
-    assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
 
     // Run the test case's command.
     const res = st.s0.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
@@ -249,7 +238,6 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
         // 2. The old primary shard should have returned an ok response
         assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
         assertMatchingDatabaseVersion(primaryShardBefore, dbName, {});
-        assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
     }
 
     // Clean up.

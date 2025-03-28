@@ -56,3 +56,13 @@ structs:
                 type: bool
                 description: "It states whether this critical section should block reads (CS in
                              commit phase) or not (CS in catch up phase)."
+            clearDbInfo:
+                type: safeBool
+                description: >-
+                    If true, and this collection critical section is acting on a database level, the
+                    filtering database metadata will be cleared, forcing a refresh the next time
+                    this metadata is needed. When the shard is database authoritative, it is no
+                    longer necessary to clear the filtering metadata. This information is only
+                    expected to be consumed by secondary nodes upon receiving an `onDelete()`
+                    notification from `ShardServerOpObserver`.
+                default: true

@@ -127,6 +127,8 @@ void CreateDatabaseCoordinator::_enterCriticalSection(
         NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(nss().dbName()));
     blockCRUDOperationsRequest.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
     blockCRUDOperationsRequest.setReason(_critSecReason);
+    blockCRUDOperationsRequest.setClearDbInfo(_doc.getAuthoritativeMetadataAccessLevel() ==
+                                              AuthoritativeMetadataAccessLevelEnum::kNone);
 
     generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
@@ -157,6 +159,8 @@ void CreateDatabaseCoordinator::_exitCriticalSection(
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
     unblockCRUDOperationsRequest.setThrowIfReasonDiffers(throwIfReasonDiffers);
+    unblockCRUDOperationsRequest.setClearDbInfo(_doc.getAuthoritativeMetadataAccessLevel() ==
+                                                AuthoritativeMetadataAccessLevelEnum::kNone);
 
     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,

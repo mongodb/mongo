@@ -181,7 +181,7 @@ void ShardingRecoveryService::FilteringMetadataClearer::operator()(
         AutoGetDb autoDb(opCtx, nssBeingReleased.dbName(), MODE_IX);
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
             opCtx, nssBeingReleased.dbName());
-        scopedDss->clearDbInfo(opCtx);
+        scopedDss->clearDbInfo_DEPRECATED(opCtx);
         return;
     }
 
@@ -215,7 +215,8 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
-    const WriteConcernOptions& writeConcern) {
+    const WriteConcernOptions& writeConcern,
+    bool clearDbInfo) {
     LOGV2_DEBUG(5656600,
                 3,
                 "Acquiring recoverable critical section blocking writes",
@@ -292,6 +293,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         // - Otherwise this call will fail and the CS won't be taken (neither persisted nor
         // in-mem)
         CollectionCriticalSectionDocument newDoc(nss, reason, false /* blockReads */);
+        newDoc.setClearDbInfo(clearDbInfo);
 
         const auto commandResponse = dbClient.runCommand([&] {
             write_ops::InsertCommandRequest insertOp(
@@ -657,7 +659,7 @@ void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
     const auto allDatabases = DatabaseShardingState::getDatabaseNames(opCtx);
     for (const auto& dbName : allDatabases) {
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->clearAuthoritativeDbInfo(opCtx);
+        scopedDss->clearDbInfo(opCtx);
     }
 
     const auto dssMetadataCursor = shard_catalog_operations::readAllDatabaseMetadata(opCtx);

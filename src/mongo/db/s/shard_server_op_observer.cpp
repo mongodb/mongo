@@ -702,8 +702,10 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
             IDLParserContext("ShardServerOpObserver"), deletedDoc);
 
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
-                OperationContext* opCtx, boost::optional<Timestamp>) {
+            [deletedNss = collCSDoc.getNss(),
+             reason = collCSDoc.getReason().getOwned(),
+             clearDbInfo = collCSDoc.getClearDbInfo()](OperationContext* opCtx,
+                                                       boost::optional<Timestamp>) {
                 if (deletedNss.isDbOnly()) {
                     // Primaries take locks when writing to certain internal namespaces. It must
                     // be ensured that those locks are also taken on secondaries, when
@@ -727,8 +729,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
                     // Secondaries that are in oplog application must clear the database metadata
                     // before releasing the in-memory critical section.
-                    if (!opCtx->isEnforcingConstraints()) {
-                        scopedDss->clearDbInfo(opCtx);
+                    if (!opCtx->isEnforcingConstraints() && clearDbInfo) {
+                        scopedDss->clearDbInfo_DEPRECATED(opCtx);
                     }
 
                     scopedDss->exitCriticalSection(opCtx, reason);
@@ -998,7 +1000,7 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
     {
         AutoGetDb autoDb(opCtx, dbName, MODE_IX);
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->clearAuthoritativeDbInfo(opCtx);
+        scopedDss->clearDbInfo(opCtx);
     }
 
     // Step 3: Write an oplog 'c' entry to inform secondaries.

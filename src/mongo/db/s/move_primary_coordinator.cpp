@@ -62,6 +62,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
@@ -295,7 +296,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      blockWrites(opCtx);
                                  }))
         .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
-                                 [this, executor, anchor = shared_from_this()] {
+                                 [this, token, executor, anchor = shared_from_this()] {
                                      const auto opCtxHolder = cc().makeOperationContext();
                                      auto* opCtx = opCtxHolder.get();
                                      getForwardableOpMetadata().setOn(opCtx);
@@ -317,7 +318,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      }
 
                                      blockReads(opCtx);
-                                     enterCriticalSectionOnRecipient(opCtx);
+                                     enterCriticalSectionOnRecipient(opCtx, executor, token);
                                  }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
@@ -357,7 +358,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      dropStaleDataOnDonor(opCtx);
                                  }))
         .then(_buildPhaseHandler(Phase::kExitCriticalSection,
-                                 [this, executor, anchor = shared_from_this()] {
+                                 [this, token, executor, anchor = shared_from_this()] {
                                      const auto opCtxHolder = cc().makeOperationContext();
                                      auto* opCtx = opCtxHolder.get();
                                      getForwardableOpMetadata().setOn(opCtx);
@@ -372,7 +373,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      }
 
                                      unblockReadsAndWrites(opCtx);
-                                     exitCriticalSectionOnRecipient(opCtx);
+                                     exitCriticalSectionOnRecipient(opCtx, executor, token);
 
                                      LOGV2(7120206,
                                            "Completed movePrimary operation",
@@ -419,7 +420,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
     const CancellationToken& token,
     const Status& status) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([this, executor, status, anchor = shared_from_this()] {
+        .then([this, token, executor, status, anchor = shared_from_this()] {
             const auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
@@ -434,7 +435,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             try {
                 // Even if the error is `ShardNotFound`, the recipient may still be in draining
                 // mode, so try to exit the critical section anyway.
-                exitCriticalSectionOnRecipient(opCtx);
+                exitCriticalSectionOnRecipient(opCtx, executor, token);
             } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
                 LOGV2_INFO(7392902,
                            "Failed to exit critical section on recipient as it has been removed",
@@ -830,8 +831,14 @@ void MovePrimaryCoordinator::unblockWritesLegacy(OperationContext* opCtx) const 
 }
 
 void MovePrimaryCoordinator::blockWrites(OperationContext* opCtx) const {
+    const bool clearDbInfo =
+        _doc.getAuthoritativeMetadataAccessLevel() == AuthoritativeMetadataAccessLevelEnum::kNone;
     ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx, NamespaceString(_dbName), _csReason, ShardingCatalogClient::kLocalWriteConcern);
+        opCtx,
+        NamespaceString(_dbName),
+        _csReason,
+        ShardingCatalogClient::kLocalWriteConcern,
+        clearDbInfo);
 }
 
 void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
@@ -842,79 +849,126 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
     // In case of step-down, this operation could be re-executed and trigger the invariant in case
     // the new primary runs a DDL that acquires the critical section in the old primary shard
+    const bool clearDbInfo =
+        _doc.getAuthoritativeMetadataAccessLevel() == AuthoritativeMetadataAccessLevelEnum::kNone;
+
+    const auto& beforeReleasingAction = clearDbInfo
+        ? static_cast<const ShardingRecoveryService::BeforeReleasingCustomAction&>(
+              ShardingRecoveryService::FilteringMetadataClearer())
+        : static_cast<const ShardingRecoveryService::BeforeReleasingCustomAction&>(
+              ShardingRecoveryService::NoCustomAction());
+
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx,
         NamespaceString(_dbName),
         _csReason,
         ShardingCatalogClient::kLocalWriteConcern,
-        ShardingRecoveryService::FilteringMetadataClearer(),
+        beforeReleasingAction,
         false /*throwIfReasonDiffers*/);
 }
 
-void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* opCtx) {
-    const auto enterCriticalSectionCommand = [&] {
-        ShardsvrMovePrimaryEnterCriticalSection request(_dbName);
-        request.setDbName(DatabaseName::kAdmin);
+void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    if (_doc.getAuthoritativeMetadataAccessLevel() > AuthoritativeMetadataAccessLevelEnum::kNone) {
+        ShardsvrParticipantBlock request(
+            NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(_dbName));
+        request.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
         request.setReason(_csReason);
+        request.setClearDbInfo(false);
+
         generic_argument_util::setMajorityWriteConcern(request);
         generic_argument_util::setOperationSessionInfo(request, getNewSession(opCtx));
+        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+            **executor, token, request);
+        sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {_doc.getToShardId()});
+    } else {
+        const auto enterCriticalSectionCommand = [&] {
+            ShardsvrMovePrimaryEnterCriticalSection request(_dbName);
+            request.setDbName(DatabaseName::kAdmin);
+            request.setReason(_csReason);
+            generic_argument_util::setMajorityWriteConcern(request);
+            generic_argument_util::setOperationSessionInfo(request, getNewSession(opCtx));
 
-        return request.toBSON();
-    }();
+            return request.toBSON();
+        }();
 
-    const auto& toShardId = _doc.getToShardId();
+        const auto& toShardId = _doc.getToShardId();
 
-    const auto enterCriticalSectionResponse = [&] {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
+        const auto enterCriticalSectionResponse = [&] {
+            const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+            const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
-        return toShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            DatabaseName::kAdmin,
-            enterCriticalSectionCommand,
-            Shard::RetryPolicy::kIdempotent);
-    }();
+            return toShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                DatabaseName::kAdmin,
+                enterCriticalSectionCommand,
+                Shard::RetryPolicy::kIdempotent);
+        }();
 
-    uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(enterCriticalSectionResponse),
-        fmt::format("movePrimary operation on database {} failed to block read/write operations on "
-                    "recipient {}",
-                    _dbName.toStringForErrorMsg(),
-                    toShardId.toString()));
+        uassertStatusOKWithContext(
+            Shard::CommandResponse::getEffectiveStatus(enterCriticalSectionResponse),
+            fmt::format(
+                "movePrimary operation on database {} failed to block read/write operations on "
+                "recipient {}",
+                _dbName.toStringForErrorMsg(),
+                toShardId.toString()));
+    }
 }
 
-void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* opCtx) {
-    const auto exitCriticalSectionCommand = [&] {
-        ShardsvrMovePrimaryExitCriticalSection request(_dbName);
-        request.setDbName(DatabaseName::kAdmin);
+void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    if (_doc.getAuthoritativeMetadataAccessLevel() > AuthoritativeMetadataAccessLevelEnum::kNone) {
+        ShardsvrParticipantBlock request(
+            NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(_dbName));
+        request.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
         request.setReason(_csReason);
+        request.setThrowIfReasonDiffers(false);
+        request.setClearDbInfo(false);
+
         generic_argument_util::setMajorityWriteConcern(request);
         generic_argument_util::setOperationSessionInfo(request, getNewSession(opCtx));
 
-        return request.toBSON();
-    }();
+        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+            **executor, token, request);
+        sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {_doc.getToShardId()});
+    } else {
+        const auto exitCriticalSectionCommand = [&] {
+            ShardsvrMovePrimaryExitCriticalSection request(_dbName);
+            request.setDbName(DatabaseName::kAdmin);
+            request.setReason(_csReason);
+            generic_argument_util::setMajorityWriteConcern(request);
+            generic_argument_util::setOperationSessionInfo(request, getNewSession(opCtx));
 
-    const auto& toShardId = _doc.getToShardId();
+            return request.toBSON();
+        }();
 
-    const auto exitCriticalSectionResponse = [&] {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
+        const auto& toShardId = _doc.getToShardId();
 
-        return toShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            DatabaseName::kAdmin,
-            exitCriticalSectionCommand,
-            Shard::RetryPolicy::kIdempotent);
-    }();
+        const auto exitCriticalSectionResponse = [&] {
+            const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+            const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
-    uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(exitCriticalSectionResponse),
-        fmt::format("movePrimary operation on database {} failed to unblock read/write operations "
-                    "on recipient {}",
-                    _dbName.toStringForErrorMsg(),
-                    toShardId.toString()));
+            return toShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                DatabaseName::kAdmin,
+                exitCriticalSectionCommand,
+                Shard::RetryPolicy::kIdempotent);
+        }();
+
+        uassertStatusOKWithContext(
+            Shard::CommandResponse::getEffectiveStatus(exitCriticalSectionResponse),
+            fmt::format(
+                "movePrimary operation on database {} failed to unblock read/write operations "
+                "on recipient {}",
+                _dbName.toStringForErrorMsg(),
+                toShardId.toString()));
+    }
 }
 
 }  // namespace mongo

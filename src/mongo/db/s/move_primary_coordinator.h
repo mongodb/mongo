@@ -213,13 +213,19 @@ private:
      * Requests the recipient to enter the critical section on the database, causing the database
      * metadata refreshes to block.
      */
-    void enterCriticalSectionOnRecipient(OperationContext* opCtx);
+    void enterCriticalSectionOnRecipient(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
 
     /**
      * Requests the recipient to exit the critical section on the database, causing the database
      * metadata refreshes to unblock.
      */
-    void exitCriticalSectionOnRecipient(OperationContext* opCtx);
+    void exitCriticalSectionOnRecipient(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
 
     const DatabaseName _dbName;
     const BSONObj _csReason;

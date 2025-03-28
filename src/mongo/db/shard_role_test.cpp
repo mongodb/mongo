@@ -464,7 +464,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
         AutoGetDb autoDb(operationContext(), dbNameTestDb, MODE_X, {}, {});
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
             operationContext(), dbNameTestDb);
-        scopedDss->clearDbInfo(operationContext());
+        scopedDss->clearDbInfo_DEPRECATED(operationContext());
     }
 
     auto validateException = [&](const DBException& ex) {

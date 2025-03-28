@@ -47,7 +47,7 @@ void applyOplogEntryToInsertDatabaseMetadata(OperationContext* opCtx, const Data
 void applyOplogEntryToRemoveDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
     AutoGetDb autoDb(opCtx, dbName, MODE_IX);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDss->clearAuthoritativeDbInfo(opCtx);
+    scopedDss->clearDbInfo(opCtx);
 }
 
 }  // namespace

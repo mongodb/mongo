@@ -48,6 +48,7 @@
 #include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/chunk_version.h"
@@ -561,6 +562,11 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
 }
 
 TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardCatalogCache) {
+    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
+        "featureFlagShardAuthoritativeDbMetadataDDL", true);
+    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+        "featureFlagShardAuthoritativeDbMetadataCRUD", true);
+
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
 
@@ -587,8 +593,13 @@ TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardCatalogCache) 
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCache) {
+    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
+        "featureFlagShardAuthoritativeDbMetadataDDL", true);
+    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+        "featureFlagShardAuthoritativeDbMetadataCRUD", true);
+
     Timestamp dbTimestamp{1, 0};
-    DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
 
     // Mock database metadata in the shard catalog.
     DBDirectClient client(operationContext());
@@ -600,8 +611,8 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCac
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
-        scopedDss->setDbInfo(operationContext(),
-                             DatabaseType{_dbName, _shardId, {_dbUuid, Timestamp(2, 0)}});
+        scopedDss->setAuthoritativeDbInfo(
+            operationContext(), DatabaseType{_dbName, kMyShardName, {_dbUuid, Timestamp(2, 0)}});
     }
 
     // Validate that we can find the inconsistency.
@@ -614,15 +625,20 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCac
 }
 
 TEST_F(MetadataConsistencyTest, FindEmptyDurableDatabaseMetadataInShard) {
+    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
+        "featureFlagShardAuthoritativeDbMetadataDDL", true);
+    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+        "featureFlagShardAuthoritativeDbMetadataCRUD", true);
+
     Timestamp dbTimestamp{1, 0};
-    DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
 
     // Introduce an inconsistency in the shard catalog while mocking it in the cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
-        scopedDss->setDbInfo(operationContext(), dbInGlobalCatalog);
+        scopedDss->setAuthoritativeDbInfo(operationContext(), dbInGlobalCatalog);
     }
 
     // Validate that we can find the inconsistency.
@@ -634,20 +650,25 @@ TEST_F(MetadataConsistencyTest, FindEmptyDurableDatabaseMetadataInShard) {
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShardWithConfig) {
+    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
+        "featureFlagShardAuthoritativeDbMetadataDDL", true);
+    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+        "featureFlagShardAuthoritativeDbMetadataCRUD", true);
+
     Timestamp dbTimestamp{1, 0};
-    DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
 
     // Mock database metadata in the shard catalog cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
-        scopedDss->setDbInfo(operationContext(), dbInGlobalCatalog);
+        scopedDss->setAuthoritativeDbInfo(operationContext(), dbInGlobalCatalog);
     }
 
     // Introduce an inconsistency in the shard catalog
     DBDirectClient client(operationContext());
-    DatabaseType shardDb{_dbName, _shardId, {_dbUuid, Timestamp(2, 0)}};
+    DatabaseType shardDb{_dbName, kMyShardName, {_dbUuid, Timestamp(2, 0)}};
     client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace, shardDb.toBSON());
 
     // Validate that we can find the inconsistency.
@@ -662,15 +683,20 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShardWi
 }
 
 TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard) {
+    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
+        "featureFlagShardAuthoritativeDbMetadataDDL", true);
+    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+        "featureFlagShardAuthoritativeDbMetadataCRUD", true);
+
     Timestamp dbTimestamp{1, 0};
-    DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
 
     // Mock database metadata in the shard catalog cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
-        scopedDss->setDbInfo(operationContext(), dbInGlobalCatalog);
+        scopedDss->setAuthoritativeDbInfo(operationContext(), dbInGlobalCatalog);
     }
 
     // Introduce an inconsistency in the shard catalog
@@ -687,15 +713,20 @@ TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard)
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) {
+    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
+        "featureFlagShardAuthoritativeDbMetadataDDL", true);
+    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+        "featureFlagShardAuthoritativeDbMetadataCRUD", true);
+
     Timestamp dbTimestamp{1, 0};
-    DatabaseType dbInGlobalCatalog{_dbName, _shardId, {_dbUuid, dbTimestamp}};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
 
     // Mock database metadata in the shard catalog cache.
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
-        scopedDss->setDbInfo(operationContext(), dbInGlobalCatalog);
+        scopedDss->setAuthoritativeDbInfo(operationContext(), dbInGlobalCatalog);
     }
 
     // Introduce an inconsistency in the shard catalog

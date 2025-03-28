@@ -178,15 +178,17 @@ public:
      * `cancelOngoingRefresh`. This parameter must be ignored in any other case.
      *
      * The caller must hold the database lock in MODE_IX.
+     *
+     * NOTE: This method is deprecated and should not be used. In the authoritative model, database
+     * refreshes are not required, and there is no need to lock the database. The method is retained
+     * for backward compatibility, but its usage is discouraged in favor of the updated approach.
      */
-    void clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh = true);
+    void clearDbInfo_DEPRECATED(OperationContext* opCtx, bool cancelOngoingRefresh = true);
 
     /**
      * Resets this node's cached database info.
-     *
-     * The caller must hold the database lock in MODE_IX.
      */
-    void clearAuthoritativeDbInfo(OperationContext* opCtx);
+    void clearDbInfo(OperationContext* opCtx);
 
 
     /**
