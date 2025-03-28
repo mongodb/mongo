@@ -223,13 +223,8 @@ public:
             return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
         }
         KVListIt found = i->second;
-
         // Promote the kv-store entry to the front of the list. It is now the most recently used.
-        const auto& newEntry = _kvList.emplace_front(key, std::move(found->second));
-        _kvMap.erase(i);
-        _kvList.erase(found);
-        _kvMap[&newEntry.first] = _kvList.begin();
-
+        _kvList.splice(_kvList.begin(), _kvList, found);
         return _kvList.begin();
     }
 
