@@ -956,10 +956,6 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
 
-        if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            dropCollectionShardingIndexCatalog(opCtx.get(), _metadata.getSourceNss());
-        }
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }

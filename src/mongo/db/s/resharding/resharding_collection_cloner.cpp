@@ -854,7 +854,6 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
         return resharding::data_copy::insertBatchTransactionally(opCtx,
                                                                  _outputNss,
-                                                                 cri.getIndexesInfo(),
                                                                  txnNum,
                                                                  batch,
                                                                  _reshardingUUID,

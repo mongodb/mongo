@@ -111,24 +111,6 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         opCtx, metadata.getTempReshardingNss(), collOptionsAndIndexes);
 
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto optSii = getCollectionIndexInfoWithRefresh(opCtx, metadata.getTempReshardingNss());
-
-        if (optSii) {
-            std::vector<IndexCatalogType> indexes;
-            optSii->forEachIndex([&](const auto& index) {
-                indexes.push_back(index);
-                return true;
-            });
-            replaceCollectionShardingIndexCatalog(opCtx,
-                                                  metadata.getTempReshardingNss(),
-                                                  metadata.getReshardingUUID(),
-                                                  optSii->getCollectionIndexes().indexVersion(),
-                                                  indexes);
-        }
-    }
-
     AutoGetCollection autoColl(opCtx, metadata.getTempReshardingNss(), MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
         opCtx, metadata.getTempReshardingNss())
@@ -212,13 +194,6 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
             afterClusterTime,
             expandSimpleCollation);
     });
-}
-
-boost::optional<ShardingIndexesCatalogCache>
-RecipientStateMachineExternalStateImpl::getCollectionIndexInfoWithRefresh(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return uassertStatusOK(catalogCache->getCollectionIndexInfoWithRefresh(opCtx, nss));
 }
 
 void RecipientStateMachineExternalStateImpl::withShardVersionRetry(

@@ -814,16 +814,6 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                auto cancelableOpCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                auto opCtx = cancelableOpCtx.get();
 
-               // Ensure indexes are loaded in the catalog cache, along with the collection
-               // placement.
-               if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-
-                   uassertStatusOK(
-                       RoutingInformationCache::get(opCtx)->getCollectionIndexInfoWithRefresh(
-                           opCtx, _coordinatorDoc.getSourceNss()));
-               }
-
                const auto cm = uassertStatusOK(
                    RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
                        opCtx, _coordinatorDoc.getSourceNss()));
@@ -969,11 +959,6 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
     updatedCoordinatorDoc.setPresetReshardedChunks(boost::none);
     updatedCoordinatorDoc.setZones(boost::none);
 
-    auto indexVersion = _reshardingCoordinatorExternalState->getCatalogIndexVersion(
-        opCtx.get(),
-        updatedCoordinatorDoc.getSourceNss(),
-        updatedCoordinatorDoc.getReshardingUUID());
-
     auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
                               opCtx.get(), updatedCoordinatorDoc.getSourceNss()) ||
         (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection);
@@ -983,7 +968,6 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
                                                       updatedCoordinatorDoc,
                                                       std::move(shardsAndChunks.initialChunks),
                                                       std::move(zones),
-                                                      std::move(indexVersion),
                                                       isUnsplittable);
     installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
 
@@ -1458,9 +1442,6 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
         return now.clusterTime().asTimestamp();
     }();
 
-    auto indexVersion = _reshardingCoordinatorExternalState->getCatalogIndexVersionForCommit(
-        opCtx.get(), updatedCoordinatorDoc.getTempReshardingNss());
-
     // Retrieve the exact placement of the resharded collection from the routing table.
     // The 'recipientShards' field of the coordinator doc cannot be used for this purpose as it
     // always includes the primary shard for the parent database (even when it doesn't own any chunk
@@ -1488,7 +1469,6 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
                                             updatedCoordinatorDoc,
                                             std::move(newCollectionEpoch),
                                             std::move(newCollectionTimestamp),
-                                            std::move(indexVersion),
                                             reshardedCollectionPlacement);
 
     // Update the in memory state

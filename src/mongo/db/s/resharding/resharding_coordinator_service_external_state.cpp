@@ -110,34 +110,11 @@ ChunkVersion ReshardingCoordinatorExternalState::calculateChunkVersionForInitial
     return ChunkVersion({OID::gen(), timestamp}, {1, 0});
 }
 
-boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalogIndexVersion(
-    OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
-    const auto cri =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
-    if (cri.getIndexesInfo()) {
-        VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
-        auto time = vt.clusterTime().asTimestamp();
-        return CollectionIndexes{uuid, time};
-    }
-    return boost::none;
-}
-
 bool ReshardingCoordinatorExternalState::getIsUnsplittable(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
     const auto cri =
         uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
     return cri.getChunkManager().isUnsplittable();
-}
-
-boost::optional<CollectionIndexes>
-ReshardingCoordinatorExternalState::getCatalogIndexVersionForCommit(OperationContext* opCtx,
-                                                                    const NamespaceString& nss) {
-    const auto cri =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
-    if (const auto& indexesInfo = cri.getIndexesInfo()) {
-        return indexesInfo->getCollectionIndexes();
-    }
-    return boost::none;
 }
 
 ReshardingCoordinatorExternalState::ParticipantShardsAndChunks

@@ -295,7 +295,6 @@ protected:
                                                coordinatorDoc,
                                                ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}),
                                                BSONObj(),
-                                               boost::none,
                                                boost::none);
         client.insert(CollectionType::ConfigNS, tempNssCatalogEntry.toBSON());
 
@@ -593,7 +592,6 @@ protected:
                 expectedCoordinatorDoc,
                 ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}),
                 BSONObj(),
-                boost::none,
                 boost::none);
 
             // It's necessary to add the userCanceled field because the call into
@@ -691,13 +689,8 @@ protected:
         expectedCoordinatorDoc.setZones(boost::none);
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
 
-        writeParticipantShardsAndTempCollInfo(opCtx,
-                                              _metrics.get(),
-                                              expectedCoordinatorDoc,
-                                              initialChunks,
-                                              zones,
-                                              boost::none,
-                                              boost::none);
+        writeParticipantShardsAndTempCollInfo(
+            opCtx, _metrics.get(), expectedCoordinatorDoc, initialChunks, zones, boost::none);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -735,7 +728,6 @@ protected:
                                     expectedCoordinatorDoc,
                                     _finalEpoch,
                                     _finalTimestamp,
-                                    boost::none,
                                     std::vector<ShardId>(reshardedCollectionPlacement.begin(),
                                                          reshardedCollectionPlacement.end()));
 
@@ -975,7 +967,6 @@ TEST_F(ReshardingCoordinatorPersistenceTest, ThrowsWhenZoneSpecifiedDoesNotExist
                                                              expectedCoordinatorDoc,
                                                              initialChunks,
                                                              zones,
-                                                             boost::none,
                                                              boost::none),
                        DBException,
                        ErrorCodes::ZoneNotFound);

@@ -155,18 +155,11 @@ public:
                                                boost::none /* reshardingFields */,
                                                true /* allowMigrations */,
                                                chunks);
-        IndexCatalogTypeMap shardingIndexesCatalogMap;
-        shardingIndexesCatalogMap.emplace(
-            "randomKey_1",
-            IndexCatalogType(
-                "randomKey_1", BSON("randomKey" << 1), BSONObj(), Timestamp(1, 0), _sourceUUID));
-
         return CollectionRoutingInfo{
             ChunkManager(
                 ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)),
                 boost::none /* clusterTime */),
-            ShardingIndexesCatalogCache(CollectionIndexes(_sourceUUID, Timestamp(1, 0)),
-                                        std::move(shardingIndexesCatalogMap)),
+            boost::none /* indexVersion */,
             DatabaseTypeValueHandle(DatabaseType{
                 nss.dbName(), _someDonorId, DatabaseVersion(UUID::gen(), Timestamp(1, 1))})};
     }
@@ -203,11 +196,6 @@ public:
         bool expandSimpleCollation) override {
         invariant(nss == _sourceNss);
         return {std::vector<BSONObj>{}, BSONObj()};
-    }
-
-    boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss) override {
-        return boost::none;
     }
 
     void withShardVersionRetry(OperationContext* opCtx,

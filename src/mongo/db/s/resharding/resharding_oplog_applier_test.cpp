@@ -256,13 +256,6 @@ public:
             return _colls;
         }
 
-        std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
-            OperationContext* opCtx,
-            const NamespaceString& nss,
-            const repl::ReadConcernArgs& readConcern) {
-            return std::make_pair(CollectionType(), std::vector<IndexCatalogType>());
-        }
-
         void setCollections(std::vector<CollectionType> colls) {
             _colls = std::move(colls);
         }

@@ -65,14 +65,7 @@ public:
 
     ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx);
 
-    boost::optional<CollectionIndexes> getCatalogIndexVersion(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              const UUID& uuid);
-
     bool getIsUnsplittable(OperationContext* opCtx, const NamespaceString& nss);
-
-    boost::optional<CollectionIndexes> getCatalogIndexVersionForCommit(OperationContext* opCtx,
-                                                                       const NamespaceString& nss);
 
     template <typename CommandType>
     std::vector<AsyncRequestsSender::Response> sendCommandToShards(

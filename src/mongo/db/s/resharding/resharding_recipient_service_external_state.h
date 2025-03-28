@@ -99,9 +99,6 @@ public:
         StringData reason,
         bool expandSimpleCollation = true) = 0;
 
-    virtual boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss) = 0;
-
     virtual void withShardVersionRetry(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        StringData reason,
@@ -160,9 +157,6 @@ public:
         StringData reason,
         bool expandSimpleCollation = true) override;
 
-
-    boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss) override;
 
     void withShardVersionRetry(OperationContext* opCtx,
                                const NamespaceString& nss,

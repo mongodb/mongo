@@ -186,19 +186,12 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
     // because the coordinator will prevent two resharding operations from running for the same
     // namespace at the same time.
 
-    boost::optional<Timestamp> indexVersion;
     auto tempReshardingNssExists = [&] {
         AutoGetCollection tempReshardingColl(opCtx, metadata.getTempReshardingNss(), MODE_IS);
         uassert(ErrorCodes::InvalidUUID,
                 "Temporary resharding collection exists but doesn't have a UUID matching the"
                 " resharding operation",
                 !tempReshardingColl || tempReshardingColl->uuid() == metadata.getReshardingUUID());
-        auto sii = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
-                       opCtx, metadata.getTempReshardingNss())
-                       ->getIndexesInCritSec(opCtx);
-        indexVersion = sii
-            ? boost::make_optional<Timestamp>(sii->getCollectionIndexes().indexVersion())
-            : boost::none;
         return bool(tempReshardingColl);
     }();
 
@@ -210,11 +203,6 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
         uassert(
             ErrorCodes::InvalidUUID, errmsg, sourceColl->uuid() == metadata.getReshardingUUID());
         return;
-    }
-
-    if (indexVersion) {
-        renameCollectionShardingIndexCatalog(
-            opCtx, metadata.getTempReshardingNss(), metadata.getSourceNss(), *indexVersion);
     }
 
     RenameCollectionOptions options;
@@ -320,7 +308,6 @@ std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSiz
 
 int insertBatchTransactionally(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               const boost::optional<ShardingIndexesCatalogCache>& sii,
                                TxnNumber& txnNumber,
                                std::vector<InsertStatement>& batch,
                                const UUID& reshardingUUID,
@@ -349,7 +336,7 @@ int insertBatchTransactionally(OperationContext* opCtx,
         try {
             ++txnNumber;
             opCtx->setTxnNumber(txnNumber);
-            runWithTransactionFromOpCtx(opCtx, nss, sii, [&](OperationContext* opCtx) {
+            runWithTransactionFromOpCtx(opCtx, nss, [&](OperationContext* opCtx) {
                 const auto outputColl =
                     acquireCollection(opCtx,
                                       CollectionAcquisitionRequest::fromOpCtx(
@@ -462,7 +449,6 @@ int insertBatch(OperationContext* opCtx,
 
 void runWithTransactionFromOpCtx(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 const boost::optional<ShardingIndexesCatalogCache>& sii,
                                  unique_function<void(OperationContext*)> func) {
     auto* const client = opCtx->getClient();
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -478,9 +464,7 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
     ScopedSetShardRole scopedSetShardRole(
         opCtx,
         nss,
-        ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                  sii ? boost::make_optional(sii->getCollectionIndexes())
-                                      : boost::none) /* shardVersion */,
+        ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none) /* shardVersion */,
         boost::none /* databaseVersion */);
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);

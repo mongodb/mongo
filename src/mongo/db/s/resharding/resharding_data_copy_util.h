@@ -145,7 +145,6 @@ std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSiz
  */
 int insertBatchTransactionally(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               const boost::optional<ShardingIndexesCatalogCache>& sii,
                                TxnNumber& txnNumber,
                                std::vector<InsertStatement>& batch,
                                const UUID& reshardingUUID,
@@ -170,7 +169,6 @@ int insertBatch(OperationContext* opCtx,
  */
 void runWithTransactionFromOpCtx(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 const boost::optional<ShardingIndexesCatalogCache>& sii,
                                  unique_function<void(OperationContext*)> func);
 
 /**

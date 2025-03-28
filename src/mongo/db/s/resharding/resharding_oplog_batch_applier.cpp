@@ -110,17 +110,13 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                        ->catalogCache()
                                        ->getCollectionRoutingInfo(opCtx.get(),
                                                                   _crudApplication.getOutputNss()));
-                               const auto& sii = cri.getIndexesInfo();
                                ScopedSetShardRole scopedSetShardRole(
                                    opCtx.get(),
                                    _crudApplication.getOutputNss(),
-                                   ShardVersionFactory::make(
-                                       ChunkVersion::IGNORED(),
-                                       sii ? boost::make_optional(sii->getCollectionIndexes())
-                                           : boost::none) /* shardVersion */,
+                                   ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
                                    boost::none /* databaseVersion */);
                                uassertStatusOK(
-                                   _crudApplication.applyOperation(opCtx.get(), sii, oplogEntry));
+                                   _crudApplication.applyOperation(opCtx.get(), oplogEntry));
                            });
                        }
                    }

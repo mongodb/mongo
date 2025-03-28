@@ -50,7 +50,6 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 
 namespace mongo {
 class Collection;
@@ -79,15 +78,11 @@ public:
      * Wraps the op application in a writeConflictRetry loop and is responsible for creating and
      * committing the WUOW.
      */
-    Status applyOperation(OperationContext* opCtx,
-                          const boost::optional<ShardingIndexesCatalogCache>& gii,
-                          const repl::OplogEntry& op) const;
+    Status applyOperation(OperationContext* opCtx, const repl::OplogEntry& op) const;
 
 private:
     // Applies an insert or update operation
-    void _applyInsertOrUpdate(OperationContext* opCtx,
-                              const boost::optional<ShardingIndexesCatalogCache>& gii,
-                              const repl::OplogEntry& op) const;
+    void _applyInsertOrUpdate(OperationContext* opCtx, const repl::OplogEntry& op) const;
     // Applies an insert operation
     void _applyInsert_inlock(OperationContext* opCtx,
                              CollectionAcquisition& outputColl,
@@ -101,9 +96,7 @@ private:
                              const repl::OplogEntry& op) const;
 
     // Applies a delete operation
-    void _applyDelete(OperationContext* opCtx,
-                      const boost::optional<ShardingIndexesCatalogCache>& gii,
-                      const repl::OplogEntry& op) const;
+    void _applyDelete(OperationContext* opCtx, const repl::OplogEntry& op) const;
 
     // Queries '_stashNss' using 'idQuery'.
     BSONObj _queryStashCollById(OperationContext* opCtx,

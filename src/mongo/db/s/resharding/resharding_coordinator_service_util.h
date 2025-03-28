@@ -52,7 +52,6 @@ CollectionType createTempReshardingCollectionType(
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const ChunkVersion& chunkVersion,
     const BSONObj& collation,
-    boost::optional<CollectionIndexes> indexVersion,
     boost::optional<bool> isUnsplittable);
 
 void removeChunkDocs(OperationContext* opCtx, const UUID& collUUID);
@@ -62,7 +61,6 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp,
-                                 boost::optional<CollectionIndexes> indexVersion,
                                  const std::vector<ShardId>& reshardedCollectionPlacement);
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
@@ -78,7 +76,6 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
                                            const ReshardingCoordinatorDocument& coordinatorDoc,
                                            std::vector<ChunkType> initialChunks,
                                            std::vector<ReshardingZoneType> zones,
-                                           boost::optional<CollectionIndexes> indexVersion,
                                            boost::optional<bool> isUnsplittable);
 
 void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
