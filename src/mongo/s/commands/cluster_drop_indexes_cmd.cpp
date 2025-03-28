@@ -84,6 +84,10 @@ public:
         return false;
     }
 
+    bool supportsRawData() const override {
+        return true;
+    }
+
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {

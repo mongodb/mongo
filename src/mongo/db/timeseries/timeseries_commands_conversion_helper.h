@@ -55,16 +55,4 @@ BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
 CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                                                         const CreateIndexesCommand& origCmd,
                                                         const TimeseriesOptions& options);
-
-/**
- * Returns a DropIndexes for dropping indexes on the bucket collection.
- *
- * The 'index' dropIndexes parameter may refer to an index name, or array of names, or "*" for all
- * indexes, or an index spec key (an object). Only the index spec key has to be translated for the
- * bucket collection. The other forms of 'index' can be passed along unmodified.
- */
-DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
-                                             const DropIndexes& origCmd,
-                                             const TimeseriesOptions& options);
-
 }  // namespace mongo::timeseries

@@ -286,31 +286,4 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
 
     return cmd;
 }
-
-DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
-                                             const DropIndexes& origCmd,
-                                             const TimeseriesOptions& options) {
-    const auto& origNs = origCmd.getNamespace();
-    auto ns = makeTimeseriesBucketsNamespace(origNs);
-
-    const auto& origIndex = origCmd.getIndex();
-    if (auto keyPtr = get_if<BSONObj>(&origIndex)) {
-        auto bucketsIndexSpecWithStatus =
-            timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options, *keyPtr);
-
-        uassert(ErrorCodes::IndexNotFound,
-                str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                              << " Command request: " << redact(origCmd.toBSON()),
-                bucketsIndexSpecWithStatus.isOK());
-
-        DropIndexes dropIndexCmd(ns);
-        dropIndexCmd.setDropIndexesRequest({std::move(bucketsIndexSpecWithStatus.getValue())});
-        return dropIndexCmd;
-    }
-
-    DropIndexes dropIndexCmd(ns);
-    dropIndexCmd.setDropIndexesRequest(origIndex);
-    return dropIndexCmd;
-}
-
 }  // namespace mongo::timeseries

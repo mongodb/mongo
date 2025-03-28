@@ -67,7 +67,7 @@
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/catalog_helper.h"
-#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -107,6 +107,11 @@ public:
         bool supportsWriteConcern() const final {
             return true;
         }
+
+        bool supportsRawData() const final {
+            return true;
+        }
+
         NamespaceString ns() const final {
             return request().getNamespace();
         }
@@ -124,24 +129,11 @@ public:
                                                             ActionType::dropIndex));
         }
         Reply typedRun(OperationContext* opCtx) final {
-            // If the request namespace refers to a time-series collection, transform the user
-            // time-series index request to one on the underlying bucket.
-            auto isCommandOnTimeseriesBucketNamespace =
-                request().getIsTimeseriesNamespace() && *request().getIsTimeseriesNamespace();
-            if (auto options = timeseries::getTimeseriesOptions(
-                    opCtx, request().getNamespace(), !isCommandOnTimeseriesBucketNamespace)) {
-                auto timeseriesCmd =
-                    timeseries::makeTimeseriesDropIndexesCommand(opCtx, request(), *options);
-                return dropIndexes(opCtx,
-                                   timeseriesCmd.getNamespace(),
-                                   request().getCollectionUUID(),
-                                   timeseriesCmd.getIndex());
-            }
-
             return dropIndexes(opCtx,
                                request().getNamespace(),
                                request().getCollectionUUID(),
-                               request().getIndex());
+                               request().getIndex(),
+                               timeseries::isRawDataRequest(opCtx, request()));
         }
     };
 };

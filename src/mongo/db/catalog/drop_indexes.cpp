@@ -57,6 +57,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
@@ -70,6 +71,8 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -418,24 +421,60 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
         throw;
     }
 }
+/**
+ * Translate the index spec according to the underelying collection metadata.
+ *
+ * TODO SERVER-102344 remove the forceRawDataMode once 9.0 becomes last LTS
+ */
+BSONObj translateIndexSpec(OperationContext* opCtx,
+                           const CollectionAcquisition& collAcq,
+                           const BSONObj& origIndexSpec,
+                           const bool forceRawDataMode) {
+    // If the request namespace refers to a time-series collection translate the index spec for
+    if (!forceRawDataMode && !isRawDataOperation(opCtx) &&
+        collAcq.getCollectionPtr()->isTimeseriesCollection()) {
+
+        auto swBucketsIndexSpec = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+            collAcq.getCollectionPtr()->getTimeseriesOptions().get(), origIndexSpec);
+
+        uassert(ErrorCodes::IndexNotFound,
+                fmt::format("{}. Failed to translate index spec for timeseries collection '{}'",
+                            swBucketsIndexSpec.getStatus().toString(),
+                            collAcq.nss().toStringForErrorMsg()),
+                swBucketsIndexSpec.isOK());
+
+        return std::move(swBucketsIndexSpec.getValue());
+    }
+    return origIndexSpec;
+}
 
 }  // namespace
 
 DropIndexesReply dropIndexes(OperationContext* opCtx,
                              const NamespaceString& origNss,
                              const boost::optional<UUID>& expectedUUID,
-                             const IndexArgument& index) {
+                             const IndexArgument& origIndexArgument,
+                             const bool forceRawDataMode) {
 
     // We only need to hold an intent lock to send abort signals to the active index builder(s) we
     // intend to abort.
-    auto collAcq = boost::make_optional<CollectionAcquisition>(acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, origNss, AcquisitionPrerequisites::OperationType::kRead, expectedUUID),
-        LockMode::MODE_IX));
+    auto collAcq = boost::make_optional<CollectionAcquisition>(
+        timeseries::acquireCollectionWithBucketsLookup(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, origNss, AcquisitionPrerequisites::OperationType::kRead, expectedUUID),
+            LockMode::MODE_IX)
+            .first);
 
     uassertStatusOK(checkCollExists(origNss, *collAcq));
     uassertStatusOK(checkReplState(opCtx, collAcq->getCollectionPtr()));
+
+    const auto index = [&]() -> IndexArgument {
+        if (auto origIndexSpec = std::get_if<BSONObj>(&origIndexArgument)) {
+            return translateIndexSpec(opCtx, *collAcq, *origIndexSpec, forceRawDataMode);
+        }
+        return origIndexArgument;
+    }();
 
     const UUID collectionUUID = collAcq->uuid();
     if (!serverGlobalParams.quiet.load()) {

@@ -57,11 +57,14 @@ using IndexArgument = std::variant<std::string, std::vector<std::string>, mongo:
  * 3) { keyPattern } <-- Aborts an index builder or drops a ready index with a matching key pattern.
  * 4) ["indexName1", ..., "indexNameN"] <-- Aborts an index builder or drops ready indexes that
  *                                          match the given names.
+ *
+ * TODO SERVER-102344 remove the forceRawDataMode once 9.0 becomes last LTS
  */
 DropIndexesReply dropIndexes(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<UUID>& expectedUUID,
-                             const IndexArgument& index);
+                             const IndexArgument& index,
+                             bool forceRawDataMode = false);
 
 /**
  * Same behaviour as "dropIndexes" but only drops ready indexes.
