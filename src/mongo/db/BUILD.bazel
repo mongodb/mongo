@@ -213,7 +213,6 @@ mongo_cc_library(
     deps = [
         ":server_base",
         ":server_options_helpers_idl",
-        "//src/mongo/util:fail_point",  #  TODO(SERVER-93876): Remove.
         "//src/mongo/util/cmdline_utils",
     ],
 )
@@ -268,7 +267,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/query/query_stats",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -1063,7 +1061,6 @@ mongo_cc_library(
         "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:rewrite_state_change_errors",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:service_executor",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:progress_meter",
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:ticketholder_queue_stats",
@@ -1737,7 +1734,6 @@ mongo_cc_library(
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -1936,6 +1932,8 @@ mongo_cc_library(
         "//src/mongo/s:shard_version_gen",
         "//src/mongo/s:sharding_types_gen",
         "//src/mongo/util:database_name_util.cpp",
+        "//src/mongo/util:fail_point.cpp",
+        "//src/mongo/util:fail_point_server_parameter_gen",
         "//src/mongo/util:namespace_string_util.cpp",
     ],
     hdrs = [
@@ -2018,7 +2016,6 @@ mongo_cc_library(
         ":commands",
         "//src/mongo/db/pipeline:lite_parsed_document_source",
         "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -2365,7 +2362,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage:write_unit_of_work",
         "//src/mongo/util:clock_sources",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:periodic_runner",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
@@ -3390,7 +3386,6 @@ mongo_cc_library(
         "//src/mongo/util:assert_util_params",
         "//src/mongo/util:clock_sources",
         "//src/mongo/util:elapsed_tracker",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util/net:network",
         "//src/mongo/util:ntservice",
         "//src/mongo/util/options_parser:options_parser_init",
@@ -3978,7 +3973,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:change_stream_pipeline",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/idl:server_parameter_test_util",
-        "//src/mongo/util:fail_point",
         "//src/third_party/asio-master:asio",
     ],
 )

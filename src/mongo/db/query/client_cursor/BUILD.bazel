@@ -119,7 +119,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/util:fail_point",
     ],
 )
 

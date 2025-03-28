@@ -803,7 +803,6 @@ filegroup(
         "//src/mongo/util:cancellation.h",
         "//src/mongo/util:container_size_helper.h",
         "//src/mongo/util:database_name_util.h",
-        "//src/mongo/util:fail_point.h",
         "//src/mongo/util:headers",
         "//src/mongo/util:inline_memory.h",
         "//src/mongo/util:invalidating_lru_cache.h",

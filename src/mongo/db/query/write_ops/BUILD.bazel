@@ -217,7 +217,6 @@ mongo_cc_library(
         "//src/mongo/db/transaction:transaction_api",
         "//src/mongo/executor:inline_executor",
         "//src/mongo/s:query_analysis_sampler",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:log_and_backoff",
     ],
 )

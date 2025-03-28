@@ -50,7 +50,6 @@ mongo_cc_library(
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer",
         "//src/mongo/transport:transport_layer_manager",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:ntservice",
         "//src/mongo/util:signal_handlers",
         "//src/mongo/util:testing_options",

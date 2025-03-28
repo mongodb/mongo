@@ -20,7 +20,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/repl:oplog_entry",
-        "//src/mongo/util:fail_point",  #  TODO(SERVER-93876): Remove.
     ],
 )
 

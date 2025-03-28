@@ -222,7 +222,6 @@ mongo_cc_library(
         "ssl_options",
         "//src/mongo:base",
         "//src/mongo/util:background_job",
-        "//src/mongo/util:fail_point",
     ] + select({
         "//bazel/config:ssl_enabled": [
             ":http_client",
@@ -440,7 +439,6 @@ mongo_cc_unit_test(
         "//src/mongo/client:connection_string",
         "//src/mongo/db:server_options_servers",
         "//src/mongo/transport:transport_layer",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util/cmdline_utils",
     ],
 )

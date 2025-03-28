@@ -260,7 +260,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/repl:hello_command",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -600,7 +599,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/rpc:metadata",
         "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -867,7 +865,6 @@ mongo_cc_library(
         "//src/mongo/transport:transport_layer_manager",
         "//src/mongo/util:assert_util_params",
         "//src/mongo/util:clock_sources",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util/net:http_client_impl",
         "//src/mongo/util:ntservice",
         "//src/mongo/util/options_parser",

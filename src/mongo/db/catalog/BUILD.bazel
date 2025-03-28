@@ -343,7 +343,6 @@ mongo_cc_library(
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/storage:storage_options",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -359,7 +358,6 @@ mongo_cc_library(
         "//src/mongo/db/catalog/validate:validate_idl",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/query_stats",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )
@@ -764,7 +762,6 @@ mongo_cc_unit_test(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:pcre_wrapper",
     ],
 )

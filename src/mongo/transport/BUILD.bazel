@@ -294,7 +294,6 @@ mongo_cc_library(
         "//src/mongo/db/stats:counters",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/rpc:message",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/net:ssl_manager",

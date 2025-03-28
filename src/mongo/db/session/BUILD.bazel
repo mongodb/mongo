@@ -162,7 +162,6 @@ mongo_cc_library(
         "//src/mongo/db:internal_transactions_feature_flag",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
         "//src/mongo/db/concurrency:lock_manager",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ],
 )

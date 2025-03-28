@@ -55,7 +55,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:durable_catalog",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/views",
-        "//src/mongo/util:fail_point",
     ],
 )
 

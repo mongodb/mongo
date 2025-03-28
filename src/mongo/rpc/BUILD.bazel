@@ -94,7 +94,6 @@ mongo_cc_library(
         "//src/mongo/db:write_block_bypass",
         "//src/mongo/db/auth:security_token",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ],
 )

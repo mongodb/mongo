@@ -47,7 +47,6 @@ mongo_cc_library(
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/rpc:metadata",
         "//src/mongo/util:clock_sources",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 

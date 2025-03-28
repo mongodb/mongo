@@ -443,7 +443,6 @@ mongo_cc_library(
         "//src/mongo/rpc:command_status",
         "//src/mongo/rpc:metadata",
         "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -461,7 +460,6 @@ mongo_cc_library(
         ":replica_set_messages",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -777,7 +775,6 @@ mongo_cc_library(
         ":optime",  # TODO(SERVER-93876): Remove.
         "//src/mongo:base",
         "//src/mongo/db/storage:remove_saver",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -995,7 +992,6 @@ mongo_cc_library(
         ":replication_consistency_markers_impl",
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_network",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -1265,7 +1261,6 @@ mongo_cc_library(
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/auth:authorization_manager_global",
         "//src/mongo/executor:task_executor_interface",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/concurrency:thread_pool",
@@ -1451,7 +1446,6 @@ mongo_cc_library(
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/stats:counters",
         "//src/mongo/transport:message_compressor",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -1474,7 +1468,6 @@ mongo_cc_library(
         "//src/mongo/db:query_exec",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/index:index_access_method",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -1505,7 +1498,6 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:commit_quorum_options",
         "//src/mongo/db/stats:counters",
         "//src/mongo/rpc:metadata",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -1754,7 +1746,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:flow_control",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/rpc:client_metadata",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -1837,7 +1828,6 @@ mongo_cc_library(
         "//src/mongo/rpc:command_status",
         "//src/mongo/rpc:metadata",
         "//src/mongo/transport:transport_layer_common",
-        "//src/mongo/util:fail_point",
     ],
 )
 

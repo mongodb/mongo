@@ -260,7 +260,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:pcre_wrapper",
     ],
 )

@@ -60,18 +60,6 @@ idl_generator(
     src = "fail_point_server_parameter.idl",
 )
 
-mongo_cc_library(
-    name = "fail_point",
-    srcs = [
-        "fail_point.cpp",
-        "fail_point_server_parameter_gen",
-    ],
-    deps = [
-        "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db:server_base",
-    ],
-)
-
 idl_generator(
     name = "testing_options_gen",
     src = "testing_options.idl",
@@ -1035,7 +1023,6 @@ mongo_cc_unit_test(
         ":clock_source_mock",
         ":clock_sources",
         ":dns_query",
-        ":fail_point",
         ":future_util",
         ":icu",
         ":pcre_util",
@@ -1121,7 +1108,7 @@ mongo_cc_benchmark(
         "fail_point_bm.cpp",
     ],
     deps = [
-        ":fail_point",
+        "//src/mongo/db:server_base",
     ],
 )
 

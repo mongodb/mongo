@@ -1010,7 +1010,6 @@ mongo_cc_library(
         "//src/mongo/bson:bson_validate",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/util:fail_point",
     ],
 )
 

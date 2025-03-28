@@ -24,7 +24,6 @@ mongo_cc_library(
         "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:metadata",  # TODO(SERVER-93876): Remove.
         "//src/mongo/s:mongos_server_parameters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -69,7 +68,6 @@ mongo_cc_library(
     ],
     deps = [
         ":task_executor_interface",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -83,7 +81,6 @@ mongo_cc_library(
     ],
     deps = [
         ":task_executor_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -99,7 +96,6 @@ mongo_cc_library(
         ":network_interface",  # TODO(SERVER-93876): Remove.
         ":task_executor_interface",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:future_util",
     ],
 )
@@ -296,7 +292,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:service_context",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:thread_pool",
     ],
 )
@@ -452,7 +447,6 @@ mongo_cc_library(
         ":remote_command",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
     ],
 )

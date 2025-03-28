@@ -56,7 +56,6 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:bucket_compression_failure",
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/db/timeseries:timeseries_options",
-        "//src/mongo/util:fail_point",
     ],
 )
 

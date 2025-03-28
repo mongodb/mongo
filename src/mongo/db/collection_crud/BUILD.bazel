@@ -32,7 +32,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:index_entry_comparison",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:record_store_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 

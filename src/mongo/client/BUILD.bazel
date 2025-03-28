@@ -184,7 +184,6 @@ mongo_cc_library(
         "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
     ],
 )

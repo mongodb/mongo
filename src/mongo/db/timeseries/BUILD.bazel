@@ -143,7 +143,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/collection_crud:capped_visibility",
         "//src/mongo/db/storage:storage_options",
-        "//src/mongo/util:fail_point",
     ],
 )
 

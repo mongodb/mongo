@@ -63,7 +63,6 @@ mongo_cc_library(
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:client_metadata",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:buildinfo",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
     ],

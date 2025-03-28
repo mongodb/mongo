@@ -30,7 +30,6 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/storage:recovery_unit_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:log_and_backoff",
     ],
 )
@@ -65,7 +64,6 @@ mongo_cc_library(
         "//src/mongo/db/stats:counter_ops",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/util:background_job",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:ticketholder",  # TODO(SERVER-93876): Remove.
     ],

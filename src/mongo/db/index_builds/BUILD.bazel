@@ -140,7 +140,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage:storage_repair_observer",
         "//src/mongo/executor:task_executor_interface",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:progress_meter",
     ],
 )
@@ -192,7 +191,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:durable_catalog",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/executor:task_executor_interface",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -250,7 +248,6 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
-        "//src/mongo/util:fail_point",
         "//src/mongo/util:log_and_backoff",
         "//src/mongo/util:progress_meter",
     ],
