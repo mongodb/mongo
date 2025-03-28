@@ -103,8 +103,6 @@
       - jstests/core/query/single_field_hashed_index.js
       # TODO SERVER-100915 Re-enable geo6.js on PQS implicit fallback suites.
       - jstests/core/index/geo/geo6.js
-      # TODO SERVER-100911 Ensure PQS fallback preserves $natural sort order.
-      - jstests/core/capped/capped.js
       # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
       - jstests/core/index/wildcard/*.js
       - jstests/core/query/index_correctness_pbt.js
