@@ -223,6 +223,7 @@ public:
                 expCtx, countRequest, ExtensionsCallbackNoop(), nss));
 
             if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 query_stats::registerRequest(opCtx, nss, [&]() {
                     return std::make_unique<query_stats::CountKey>(

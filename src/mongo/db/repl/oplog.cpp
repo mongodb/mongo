@@ -134,6 +134,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -425,7 +426,8 @@ void logOplogRecords(OperationContext* opCtx,
     }
 
     // Insert the oplog records to the respective tenants change collections.
-    if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+    if (change_stream_serverless_helpers::isChangeCollectionsModeActive(
+            VersionContext::getDecoration(opCtx))) {
         ChangeStreamChangeCollectionManager::get(opCtx).insertDocumentsToChangeCollection(
             opCtx, *records, timestamps);
     }

@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -96,6 +97,7 @@ intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
         "$score is not allowed in the current configuration. You may need to enable the "
         "correponding feature flag",
         feature_flags::gFeatureFlagSearchHybridScoringFull.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(pExpCtx->getOperationContext()),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName

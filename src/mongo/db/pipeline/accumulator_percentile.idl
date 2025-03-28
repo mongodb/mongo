@@ -51,8 +51,6 @@ structs:
                 description: "The method we will use to find the percentile."
                 type: string
                 optional: false
-                validator:
-                    {callback: "AccumulatorPercentile::validatePercentileMethod"}
     AccumulatorMedianSpec:
         description: "Specification for the $median accumulator."
         strict: true
@@ -65,5 +63,3 @@ structs:
                 description: "The method we will use to find the percentile."
                 type: string
                 optional: false
-                validator:
-                    {callback: "AccumulatorPercentile::validatePercentileMethod"}

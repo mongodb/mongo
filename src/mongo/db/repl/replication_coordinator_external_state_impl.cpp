@@ -120,6 +120,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -697,7 +698,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     });
 
     // Create the pre-images collection if it doesn't exist yet in the non-serverless environment.
-    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive(
+            VersionContext::getDecoration(opCtx))) {
         ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(
             opCtx, boost::none /* tenantId */);
     }

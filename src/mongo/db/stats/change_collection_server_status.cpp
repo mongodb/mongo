@@ -37,6 +37,7 @@
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/version_context.h"
 
 namespace mongo {
 /**
@@ -55,7 +56,8 @@ public:
                        const BSONElement& configElement,
                        BSONObjBuilder* result) const override {
         // Append the section only when running in serverless.
-        if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+        if (!change_stream_serverless_helpers::isChangeCollectionsModeActive(
+                VersionContext::getDecoration(opCtx))) {
             return;
         }
 

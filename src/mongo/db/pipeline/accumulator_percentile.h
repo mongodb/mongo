@@ -64,11 +64,6 @@ public:
     }
 
     /**
-     * Blocks the percentile methods that aren't supported yet.
-     */
-    static Status validatePercentileMethod(StringData method);
-
-    /**
      * Parsing and creating the accumulator. A separate accumulator object is created per group.
      */
     static AccumulationExpression parseArgs(ExpressionContext* expCtx,

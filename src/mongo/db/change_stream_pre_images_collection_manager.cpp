@@ -78,6 +78,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/database_version.h"
@@ -167,7 +168,8 @@ void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
             "Failpoint failPreimagesCollectionCreation enabled. Throwing exception",
             !MONGO_unlikely(failPreimagesCollectionCreation.shouldFail()));
     const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
-        change_stream_serverless_helpers::resolveTenantId(tenantId));
+        change_stream_serverless_helpers::resolveTenantId(VersionContext::getDecoration(opCtx),
+                                                          tenantId));
 
     CollectionOptions preImagesCollectionOptions;
 
@@ -186,7 +188,8 @@ void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
 void ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
-        change_stream_serverless_helpers::resolveTenantId(tenantId));
+        change_stream_serverless_helpers::resolveTenantId(VersionContext::getDecoration(opCtx),
+                                                          tenantId));
     DropReply dropReply;
     const auto status =
         dropCollection(opCtx,
@@ -216,7 +219,8 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
             preImage.getId().getApplyOpsIndex() >= 0);
 
     const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
-        change_stream_serverless_helpers::resolveTenantId(tenantId));
+        change_stream_serverless_helpers::resolveTenantId(VersionContext::getDecoration(opCtx),
+                                                          tenantId));
 
     // This lock acquisition can block on a stronger lock held by another operation modifying
     // the pre-images collection. There are no known cases where an operation holding an
@@ -280,7 +284,8 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
         size_t numberOfRemovals = 0;
 
         if (useUnreplicatedTruncates()) {
-            if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+            if (change_stream_serverless_helpers::isChangeCollectionsModeActive(
+                    VersionContext::getDecoration(opCtx.get()))) {
                 const auto tenantIds =
                     change_stream_serverless_helpers::getConfigDbTenants(opCtx.get());
                 for (const auto& tenantId : tenantIds) {
@@ -291,7 +296,8 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
                     _deleteExpiredPreImagesWithTruncate(opCtx.get(), boost::none /** tenantId **/);
             }
         } else {
-            if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+            if (change_stream_serverless_helpers::isChangeCollectionsModeActive(
+                    VersionContext::getDecoration(opCtx.get()))) {
                 // A serverless environment is enabled and removal logic must take the tenantId into
                 // account.
                 const auto tenantIds =
@@ -432,15 +438,15 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
         opCtx, AdmissionContext::Priority::kExempt);
 
     // Acquire intent-exclusive lock on the change collection.
-    const auto preImageColl =
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest(
-                              NamespaceString::makePreImageCollectionNSS(
-                                  change_stream_serverless_helpers::resolveTenantId(tenantId)),
-                              PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                              repl::ReadConcernArgs::get(opCtx),
-                              AcquisitionPrerequisites::kWrite),
-                          MODE_IX);
+    const auto preImageColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(
+                                         change_stream_serverless_helpers::resolveTenantId(
+                                             VersionContext::getDecoration(opCtx), tenantId)),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Early exit if the collection doesn't exist or running on a secondary.
     if (!preImageColl.exists() ||

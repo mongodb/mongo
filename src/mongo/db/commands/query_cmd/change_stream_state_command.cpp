@@ -49,6 +49,7 @@
 #include "mongo/db/set_change_stream_state_coordinator.h"
 #include "mongo/db/set_change_stream_state_coordinator_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/version_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -95,10 +96,11 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     str::stream() << SetChangeStreamStateCommandRequest::kCommandName
                                   << " command is only supported in serverless",
-                    change_stream_serverless_helpers::isChangeCollectionsModeActive());
+                    change_stream_serverless_helpers::isChangeCollectionsModeActive(
+                        VersionContext::getDecoration(opCtx)));
 
-            const auto tenantId =
-                change_stream_serverless_helpers::resolveTenantId(request().getDbName().tenantId());
+            const auto tenantId = change_stream_serverless_helpers::resolveTenantId(
+                VersionContext::getDecoration(opCtx), request().getDbName().tenantId());
             uassert(ErrorCodes::BadValue,
                     str::stream() << SetChangeStreamStateCommandRequest::kCommandName
                                   << " command must be provided with a tenant id",
@@ -169,10 +171,11 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     str::stream() << GetChangeStreamStateCommandRequest::kCommandName
                                   << " command is only supported in serverless",
-                    change_stream_serverless_helpers::isChangeCollectionsModeActive());
+                    change_stream_serverless_helpers::isChangeCollectionsModeActive(
+                        VersionContext::getDecoration(opCtx)));
 
-            const auto tenantId =
-                change_stream_serverless_helpers::resolveTenantId(request().getDbName().tenantId());
+            const auto tenantId = change_stream_serverless_helpers::resolveTenantId(
+                VersionContext::getDecoration(opCtx), request().getDbName().tenantId());
             uassert(ErrorCodes::BadValue,
                     str::stream() << GetChangeStreamStateCommandRequest::kCommandName
                                   << " command must be provided with a tenant id",

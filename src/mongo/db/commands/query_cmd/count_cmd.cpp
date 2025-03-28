@@ -94,6 +94,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -509,6 +510,7 @@ public:
                                           const ParsedFindCommand& parsedFind) {
             if (feature_flags::gFeatureFlagQueryStatsCountDistinct
                     .isEnabledUseLastLTSFCVWhenUninitialized(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 query_stats::registerRequest(opCtx, _ns, [&]() {
                     return std::make_unique<query_stats::CountKey>(

@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/version_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
@@ -123,7 +124,8 @@ public:
             ChangeStreamPreImagesCollectionManager::get(opCtx).getPurgingJobStats();
         builder.append("purgingJob", jobStats.toBSON());
 
-        if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+        if (!change_stream_serverless_helpers::isChangeCollectionsModeActive(
+                VersionContext::getDecoration(opCtx))) {
             // Only report pre-images collection specific metrics in single tenant environments.
             // Multi-tenant environments would have the aggregate result of all the tenants (one
             // pre-images collection per tenant), making it difficult to pinpoint where the metrics

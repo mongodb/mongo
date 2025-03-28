@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/socket_utils.h"
@@ -135,6 +136,7 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
         uassert(ErrorCodes::FailedToParse,
                 "BSON field '$collStats.operationStats' is an unknown field.",
                 mongo::feature_flags::gFeatureFlagCursorBasedTop.isEnabled(
+                    VersionContext::getDecoration(expCtx->getOperationContext()),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
         expCtx->getMongoProcessInterface()->appendOperationStats(

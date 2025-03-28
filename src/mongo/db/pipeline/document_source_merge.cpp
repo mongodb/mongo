@@ -56,6 +56,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -333,6 +334,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
     bool allowMergeOnNullishValues = false;
     if (feature_flags::gFeatureFlagAllowMergeOnNullishValues
             .isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(expCtx->getOperationContext()),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         allowMergeOnNullishValues = mergeSpec.getAllowMergeOnNullishValues().value_or(
             supportingUniqueIndex == MongoProcessInterface::SupportingUniqueIndex::Full);
@@ -421,6 +423,7 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
         spec.setTargetCollectionVersion(_mergeProcessor->getCollectionPlacementVersion());
         if (feature_flags::gFeatureFlagAllowMergeOnNullishValues
                 .isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(pExpCtx->getOperationContext()),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             spec.setAllowMergeOnNullishValues(_mergeProcessor->getAllowMergeOnNullishValues());
         }

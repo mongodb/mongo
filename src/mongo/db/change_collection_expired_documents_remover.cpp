@@ -61,6 +61,7 @@
 #include "mongo/db/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/database_version.h"
@@ -84,7 +85,8 @@ namespace {
 
 change_stream_serverless_helpers::TenantSet getConfigDbTenants(OperationContext* opCtx) {
     auto tenantIds = change_stream_serverless_helpers::getConfigDbTenants(opCtx);
-    if (auto testTenantId = change_stream_serverless_helpers::resolveTenantId(boost::none)) {
+    if (auto testTenantId = change_stream_serverless_helpers::resolveTenantId(
+            VersionContext::getDecoration(opCtx), boost::none)) {
         tenantIds.insert(*testTenantId);
     }
 

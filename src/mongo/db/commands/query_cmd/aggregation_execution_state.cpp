@@ -815,8 +815,8 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState(bool useAcqui
         // In case of serverless the change stream will be opened on the change collection.
         const bool isServerless = change_stream_serverless_helpers::isServerlessEnvironment();
         if (isServerless) {
-            const auto tenantId =
-                change_stream_serverless_helpers::resolveTenantId(getOriginalNss().tenantId());
+            const auto tenantId = change_stream_serverless_helpers::resolveTenantId(
+                VersionContext::getDecoration(getOpCtx()), getOriginalNss().tenantId());
 
             uassert(
                 ErrorCodes::BadValue, "Change streams cannot be used without tenant id", tenantId);

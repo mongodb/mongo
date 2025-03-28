@@ -237,7 +237,8 @@ bool OplogWriterImpl::writeOplogBatch(OperationContext* opCtx, const std::vector
     invariant(!ops.empty());
 
     // Don't do anything if not writing to the oplog collection nor the change collections.
-    auto [writeOplogColl, writeChangeColl] = _checkWriteOptions();
+    auto [writeOplogColl, writeChangeColl] =
+        _checkWriteOptions(VersionContext::getDecoration(opCtx));
     if (!writeOplogColl && !writeChangeColl) {
         return false;
     }
@@ -253,7 +254,8 @@ bool OplogWriterImpl::scheduleWriteOplogBatch(OperationContext* opCtx,
     invariant(!ops.empty());
 
     // Don't do anything if not writing to the oplog collection nor the change collections.
-    auto [writeOplogColl, writeChangeColl] = _checkWriteOptions();
+    auto [writeOplogColl, writeChangeColl] =
+        _checkWriteOptions(VersionContext::getDecoration(opCtx));
     if (!writeOplogColl && !writeChangeColl) {
         return false;
     }
@@ -329,10 +331,10 @@ void OplogWriterImpl::finalizeOplogBatch(OperationContext* opCtx,
     }
 }
 
-std::pair<bool, bool> OplogWriterImpl::_checkWriteOptions() {
+std::pair<bool, bool> OplogWriterImpl::_checkWriteOptions(const VersionContext& vCtx) {
     bool writeOplogColl = !getOptions().skipWritesToOplogColl;
     bool writeChangeColl = !getOptions().skipWritesToChangeColl &&
-        change_stream_serverless_helpers::isChangeCollectionsModeActive();
+        change_stream_serverless_helpers::isChangeCollectionsModeActive(vCtx);
 
     return {writeOplogColl, writeChangeColl};
 }

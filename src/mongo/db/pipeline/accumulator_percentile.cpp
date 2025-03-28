@@ -40,6 +40,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator_percentile_gen.h"
 #include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -113,26 +114,14 @@ Value ExpressionFromAccumulatorQuantile<AccumulatorMedian>::evaluate(const Docum
     return evaluateAccumulatorQuantile(*this, root, variables);
 }
 
-Status AccumulatorPercentile::validatePercentileMethod(StringData method) {
-    if (feature_flags::gFeatureFlagAccuratePercentiles.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        if (method != kApproximate && method != kDiscrete && method != kContinuous) {
-            return {ErrorCodes::BadValue,
-                    "Currently only 'approximate', 'discrete', and 'continuous' "
-                    "can be used as percentile 'method'."};
-        }
-        return Status::OK();
-    } else {
-        if (method != kApproximate) {
-            return {ErrorCodes::BadValue,
-                    "Currently only 'approximate' can be used as percentile 'method'."};
-        }
-        return Status::OK();
-    }
-}
-
 namespace {
-PercentileMethodEnum methodNameToEnum(StringData method) {
+PercentileMethodEnum methodNameToEnum(const VersionContext& vCtx, StringData method) {
+    uassert(ErrorCodes::BadValue,
+            "Currently only 'approximate' can be used as a percentile 'method'.",
+            feature_flags::gFeatureFlagAccuratePercentiles.isEnabled(
+                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+                method == AccumulatorPercentile::kApproximate);
+
     if (method == AccumulatorPercentile::kApproximate) {
         return PercentileMethodEnum::kApproximate;
     }
@@ -142,8 +131,10 @@ PercentileMethodEnum methodNameToEnum(StringData method) {
     if (method == AccumulatorPercentile::kContinuous) {
         return PercentileMethodEnum::kContinuous;
     }
-    // The idl should have validated the input string (see 'validatePercentileMethod()').
-    uasserted(7766600, "Currently only approximate percentiles are supported");
+
+    uasserted(
+        ErrorCodes::BadValue,
+        "Only 'approximate', 'discrete', and 'continuous' can be used as percentile 'method'.");
 }
 
 StringData percentileMethodEnumToString(PercentileMethodEnum method) {
@@ -210,7 +201,8 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
 
     std::vector<double> ps = parseP(expCtx, spec.getP().getElement(), vps);
 
-    const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
+    const PercentileMethodEnum method = methodNameToEnum(
+        VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
 
     auto factory = [expCtx, ps, method] {
         return make_intrusive<AccumulatorPercentile>(expCtx, ps, method);
@@ -227,8 +219,10 @@ AccumulatorPercentile::parsePercentileAndMethod(ExpressionContext* expCtx,
                                                 BSONElement elem,
                                                 VariablesParseState vps) {
     auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
-    return std::make_pair(parseP(expCtx, spec.getP().getElement(), vps),
-                          methodNameToEnum(spec.getMethod()));
+    return std::make_pair(
+        parseP(expCtx, spec.getP().getElement(), vps),
+        methodNameToEnum(VersionContext::getDecoration(expCtx->getOperationContext()),
+                         spec.getMethod()));
 }
 
 boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
@@ -243,7 +237,8 @@ boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
     std::vector<double> ps = parseP(expCtx, spec.getP().getElement(), vps);
-    const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
+    const PercentileMethodEnum method = methodNameToEnum(
+        VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
 
     return make_intrusive<ExpressionFromAccumulatorQuantile<AccumulatorPercentile>>(
         expCtx, ps, input, method);
@@ -369,7 +364,8 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
 
-    const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
+    const PercentileMethodEnum method = methodNameToEnum(
+        VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
 
     auto factory = [expCtx, method] {
         return make_intrusive<AccumulatorMedian>(
@@ -383,11 +379,14 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
 }
 
 std::pair<std::vector<double> /*ps*/, PercentileMethodEnum>
-AccumulatorMedian::parsePercentileAndMethod(ExpressionContext* /*expCtx*/,
+AccumulatorMedian::parsePercentileAndMethod(ExpressionContext* expCtx,
                                             BSONElement elem,
                                             VariablesParseState /*vps*/) {
     auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
-    return std::make_pair(std::vector<double>({0.5}), methodNameToEnum(spec.getMethod()));
+    return std::make_pair(
+        std::vector<double>({0.5}),
+        methodNameToEnum(VersionContext::getDecoration(expCtx->getOperationContext()),
+                         spec.getMethod()));
 }
 
 boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionContext* const expCtx,
@@ -405,7 +404,8 @@ boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionCo
 
     std::vector<double> p = {0.5};
 
-    const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
+    const PercentileMethodEnum method = methodNameToEnum(
+        VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
 
     return make_intrusive<ExpressionFromAccumulatorQuantile<AccumulatorMedian>>(
         expCtx, p, input, method);

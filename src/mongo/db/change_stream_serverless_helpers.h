@@ -34,6 +34,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/version_context.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
@@ -45,7 +46,7 @@ using TenantSet = stdx::unordered_set<TenantId, TenantId::Hasher>;
  * Returns true if the server is configured such that change collections can be used to record
  * oplog entries; ie, we are running in a Serverless context. Returns false otherwise.
  */
-bool isChangeCollectionsModeActive();
+bool isChangeCollectionsModeActive(const VersionContext& vCtx);
 
 /**
  * Returns true if the change stream is enabled for the provided tenant, false otherwise.
@@ -74,7 +75,8 @@ const TenantId& getTenantIdForTesting();
  * If the provided 'tenantId' is missing and 'internalChangeStreamUseTenantIdForTesting' is true,
  * returns a special 'TenantId' for testing purposes. Otherwise, returns the provided 'tenantId'.
  */
-boost::optional<TenantId> resolveTenantId(boost::optional<TenantId> tenantId);
+boost::optional<TenantId> resolveTenantId(const VersionContext& vCtx,
+                                          boost::optional<TenantId> tenantId);
 
 /**
  * Returns the list of the tenants associated with a 'config' database.

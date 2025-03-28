@@ -33,6 +33,7 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -142,7 +143,7 @@ private:
                                   bool writeChangeColl);
 
 
-    std::pair<bool, bool> _checkWriteOptions();
+    std::pair<bool, bool> _checkWriteOptions(const VersionContext& vCtx);
 
     // Not owned by us.
     OplogBuffer* const _applyBuffer;

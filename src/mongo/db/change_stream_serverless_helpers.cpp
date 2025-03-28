@@ -65,19 +65,19 @@ MONGO_FAIL_POINT_DEFINE(injectCurrentWallTimeForChangeCollectionRemoval);
 
 namespace change_stream_serverless_helpers {
 namespace {
-bool isServerlessChangeStreamFeatureFlagEnabled() {
+bool isServerlessChangeStreamFeatureFlagEnabled(const VersionContext& vCtx) {
     // We need to use isEnabledUseLastLTSFCVWhenUninitialized since this could run during startup
     // while the FCV is still uninitialized.
     return feature_flags::gFeatureFlagServerlessChangeStreams
         .isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 }  // namespace
 
-bool isChangeCollectionsModeActive() {
+bool isChangeCollectionsModeActive(const VersionContext& vCtx) {
     // A change collection mode is declared as active if the required services can be initialized,
     // the feature flag is enabled and the FCV version is already initialized.
-    return canInitializeServices() && isServerlessChangeStreamFeatureFlagEnabled();
+    return canInitializeServices() && isServerlessChangeStreamFeatureFlagEnabled(vCtx);
 }
 
 bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId) {
@@ -85,7 +85,7 @@ bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId) {
 
     // A change stream in the serverless is declared as enabled if both the change collection and
     // the pre-images collection exist for the provided tenant.
-    return isChangeCollectionsModeActive() &&
+    return isChangeCollectionsModeActive(VersionContext::getDecoration(opCtx)) &&
         static_cast<bool>(catalog->lookupCollectionByNamespace(
             opCtx, NamespaceString::makeChangeCollectionNSS(tenantId))) &&
         static_cast<bool>(catalog->lookupCollectionByNamespace(
@@ -119,8 +119,9 @@ const TenantId& getTenantIdForTesting() {
     return kTestTenantId;
 }
 
-boost::optional<TenantId> resolveTenantId(boost::optional<TenantId> tenantId) {
-    if (isServerlessChangeStreamFeatureFlagEnabled()) {
+boost::optional<TenantId> resolveTenantId(const VersionContext& vCtx,
+                                          boost::optional<TenantId> tenantId) {
+    if (isServerlessChangeStreamFeatureFlagEnabled(vCtx)) {
         if (tenantId) {
             return tenantId;
         } else if (MONGO_unlikely(internalChangeStreamUseTenantIdForTesting.load())) {
