@@ -68,13 +68,8 @@ def download_coveralls_reporter(arch: str) -> str:
 
 
 def get_bazel_coverage_report_file() -> str:
-    workdir = get_expansion("workdir")
-    bazelisk_path = os.path.join(workdir, "tmp", "bazelisk")
-    if not os.path.exists(bazelisk_path):
-        return ""
-
-    print("Found bazel, looking for output path")
-    proc = subprocess.run([bazelisk_path, "info", "output_path"], check=True, capture_output=True)
+    BAZEL_BINARY = "bazel"  # simplified since we already restrict which platforms can run coverage
+    proc = subprocess.run([BAZEL_BINARY, "info", "output_path"], check=True, capture_output=True)
     bazel_output_location = proc.stdout.decode("utf-8").strip()
     bazel_coverage_report_location = os.path.join(
         bazel_output_location, "_coverage", "_coverage_report.dat"
@@ -114,7 +109,6 @@ def main():
     # this keeps coverage reports consistent across evergreen tasks and merge queue maneuvers
     github_commit = get_expansion("github_commit")
 
-    workdir = get_expansion("workdir")
     bazel_coverage_report_location = get_bazel_coverage_report_file()
     if os.path.exists(bazel_coverage_report_location):
         print("Found bazel coverage report.")
@@ -144,10 +138,13 @@ def main():
         # no gcda files are generated from bazel coverage so we can exit early here
         return 0
 
+    print(f"No bazel coverage report found at {bazel_coverage_report_location}")
+
     # because of bazel symlink shenanigans, the bazel gcda and gcno files are put in different
     # directories when the GCOV_PREFIX and GCOV_PREFIX_STRIP env vars are used. We manually
     # put the gcno files where the gcda files are generated to fix this.
     has_bazel_gcno = False
+    workdir = get_expansion("workdir")
     bazel_output_dir = os.path.join(workdir, "bazel-out")
     for file in glob.iglob("./**/bazel-out/**/*.gcno", root_dir=workdir, recursive=True):
         has_bazel_gcno = True

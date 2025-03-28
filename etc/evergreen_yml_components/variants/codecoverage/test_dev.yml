@@ -3,7 +3,7 @@
 buildvariants:
   # Variant to support Code Coverage on arm64
   - name: &AL2023-arm64-coverage AL2023-arm64-coverage
-    display_name: "~ AL2023.3 Arm64 Code Coverage"
+    display_name: "~ Code Coverage AL2023.3 Arm64"
     run_on:
       - amazon2023.3-arm64-large
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -53,7 +53,7 @@ buildvariants:
 
   # Variant to support Code Coverage on amd64/x86_64
   - name: &rhel-93-64-bit-coverage rhel-93-64-bit-coverage
-    display_name: "~ RHEL 9.3 Code Coverage"
+    display_name: "~ Code Coverage RHEL 9.3"
     run_on:
       - rhel93-medium
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
