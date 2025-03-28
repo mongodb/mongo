@@ -1822,7 +1822,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreated(
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
                            operationContext(), std::move(yieldedTransactionResources)),
                        DBException,
-                       743870);
+                       ErrorCodes::QueryPlanKilled);
 }
 TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionBecomesCreated) {
     testRestoreFailsIfCollectionBecomesCreated(AcquisitionPrerequisites::kRead);

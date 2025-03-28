@@ -1562,7 +1562,7 @@ void restoreTransactionResourcesToOperationContext(
             const auto& prerequisites = acquiredCollection.prerequisites;
 
             auto uassertCollectionAppearedAfterRestore = [&] {
-                uasserted(743870,
+                uasserted(ErrorCodes::QueryPlanKilled,
                           str::stream()
                               << "Collection " << prerequisites.nss.toStringForErrorMsg()
                               << " appeared after a restore, which violates the semantics of "
