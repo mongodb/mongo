@@ -150,6 +150,13 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
     return Document::fromBsonWithMetaData(*next.getResult());
 }
 
+void DocumentSourceMergeCursors::doForceSpill() {
+    tassert(
+        10249800, "releaseMemory command requires BlockingResultsMerger", _blockingResultsMerger);
+    auto status = _blockingResultsMerger->releaseMemory();
+    uassertStatusOK(status);
+}
+
 Value DocumentSourceMergeCursors::serialize(const SerializationOptions& opts) const {
     if (_blockingResultsMerger) {
         return Value(Document{

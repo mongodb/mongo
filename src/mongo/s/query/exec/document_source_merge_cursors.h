@@ -198,6 +198,7 @@ public:
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
+    void doForceSpill() final;
 
 private:
     friend class DocumentSourceMergeCursorsMultiTenancyTest;

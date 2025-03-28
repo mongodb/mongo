@@ -168,9 +168,9 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::next(OperationContext* opC
                                                                      : blockUntilNext(opCtx));
 }
 
-Status BlockingResultsMerger::releaseMemory(OperationContext* opCtx) {
-    _arm->releaseMemory(opCtx).wait();
-    return _arm->releaseMemoryResult(opCtx);
+Status BlockingResultsMerger::releaseMemory() {
+    _arm->releaseMemory().wait();
+    return _arm->releaseMemoryResult();
 }
 
 StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEvent() {

@@ -232,11 +232,11 @@ public:
      */
     Status scheduleGetMores();
 
-    stdx::shared_future<void> releaseMemory(OperationContext* opCtx);
+    stdx::shared_future<void> releaseMemory();
 
     // It merges the releaseMemory results from all the remote requests. At the moment it returns
     // only a status but it can be extended to return more in the future.
-    Status releaseMemoryResult(OperationContext* opCtx);
+    Status releaseMemoryResult();
 
     /**
      * Adds the specified shard cursors to the set of cursors to be merged.  The results from the
@@ -617,7 +617,7 @@ private:
     /**
      * Schedules a releaseMemory command to be run on all remote hosts that have stored cursors.
      */
-    Status _scheduleReleaseMemory(WithLock, OperationContext* opCtx);
+    Status _scheduleReleaseMemory(WithLock);
 
     /**
      * Updates the given remote's metadata (e.g. the cursor id) based on information in

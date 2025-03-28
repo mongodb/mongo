@@ -647,7 +647,7 @@ Status AsyncResultsMerger::scheduleGetMores() {
 }
 
 
-stdx::shared_future<void> AsyncResultsMerger::releaseMemory(OperationContext* opCtx) {
+stdx::shared_future<void> AsyncResultsMerger::releaseMemory() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_releaseMemoryCompleteInfo) {
@@ -659,7 +659,7 @@ stdx::shared_future<void> AsyncResultsMerger::releaseMemory(OperationContext* op
     // responded to the releaseMemory command.
     _releaseMemoryCompleteInfo.emplace();
 
-    _status = _scheduleReleaseMemory(lk, opCtx);
+    _status = _scheduleReleaseMemory(lk);
     if (!_status.isOK()) {
         LOGV2_ERROR(
             9745606, "Scheduling releaseMemory encountered an issue", "status"_attr = _status);
@@ -674,7 +674,7 @@ stdx::shared_future<void> AsyncResultsMerger::releaseMemory(OperationContext* op
     return _releaseMemoryCompleteInfo->getFuture();
 }
 
-Status AsyncResultsMerger::releaseMemoryResult(OperationContext* opCtx) {
+Status AsyncResultsMerger::releaseMemoryResult() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (!_status.isOK()) {
@@ -1200,7 +1200,7 @@ void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
         .ignore();
 }
 
-Status AsyncResultsMerger::_scheduleReleaseMemory(WithLock, OperationContext* opCtx) {
+Status AsyncResultsMerger::_scheduleReleaseMemory(WithLock) {
     for (auto& remote : _remotes) {
         if (!remote->status.isOK()) {
             return remote->status;

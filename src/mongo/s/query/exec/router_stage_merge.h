@@ -61,7 +61,7 @@ public:
     }
 
     Status releaseMemory() final {
-        auto res = _resultsMerger.releaseMemory(getOpCtx());
+        auto res = _resultsMerger.releaseMemory();
         return res;
     }
 
