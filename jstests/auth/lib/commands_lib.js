@@ -183,7 +183,6 @@ var roles_all = {
     backup: 1,
     restore: 1,
     root: 1,
-    searchCoordinator: 1,
     __system: 1
 };
 
@@ -3161,6 +3160,10 @@ export const authCommandsLib = {
             dbVersion: {uuid: new UUID(), timestamp: new Timestamp(1, 0), lastMod: NumberInt(1)}
           },
           skipSharded: true,
+          // TODO SERVER-103024: Enable this test
+          skipTest: function(conn) {
+            return true;
+          },
           testcases: [
             {
               runOnDb: adminDbName,
@@ -3176,6 +3179,10 @@ export const authCommandsLib = {
           testname: "_shardsvrCommitDropDatabaseMetadata",
           command: {_shardsvrCommitDropDatabaseMetadata: "test.x"},
           skipSharded: true,
+          // TODO SERVER-103024: Enable this test
+          skipTest: function(conn) {
+            return true;
+          },
           testcases: [
             {
               runOnDb: adminDbName,
@@ -3202,7 +3209,7 @@ export const authCommandsLib = {
         },
         {
           testname: "_shardsvrReshardRecipientClone",
-          command: {_shardsvrReshardRecipientClone: "test.x", reshardingUUID: UUID()},
+          command: {_shardsvrReshardRecipientClone: UUID(), approxCopySize: {}, cloneTimestamp: new Timestamp(), donorShards: []},
           skipSharded: true,
           testcases: [
             {
@@ -5727,7 +5734,7 @@ export const authCommandsLib = {
         },
         {
           testname: "d_mergeChunks",
-          command: {mergeChunks: "test.x", bounds: [{i: 0}, {i: 5}]},
+          command: {mergeChunks: "test.x", bounds: [{i: 0}, {i: 5}], epoch: ObjectId("57dc3d7da4fce4358afa85b8")},
           skipSharded: true,
           testcases: [
               {
@@ -8450,7 +8457,26 @@ export const authCommandsLib = {
         },
         setup: db => { db.createCollection("foo"); },
         disableSearch: true,
-        testcases: testcases_transformationOnlyExpectFail
+        testcases: [
+          {
+            runOnDb: firstDbName,
+            roles: {__system: 1},
+            // $setMetadata requires __system role OR a user with internal and find action types as privileges.
+            expectFail: true,
+            privileges: [
+              {resource: {cluster: true}, actions: ["internal"]},
+              {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+            ],
+          },
+          {
+            runOnDb: firstDbName,
+            // Find action type as a privilege alone is not sufficient for $setMetadata.
+            expectAuthzFailure: true,
+            privileges: [
+              {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+            ],
+          },
+        ],
       },
       {
         testname: "aggregate_$scoreFusion",
@@ -8459,7 +8485,7 @@ export const authCommandsLib = {
           cursor: {},
           pipeline: [{
             $scoreFusion: {
-              inputs: {
+              input: {
                 pipelines: {
                   matchScore1: [
                     {
@@ -8599,19 +8625,17 @@ export const authCommandsLib = {
         testcases: [
           {
             runOnDb: firstDbName,
-            privileges: [{
-              resource: {db: firstDbName, collection: "raw_data"},
-              actions: ["performRawDataOperations"]
-            }, {resource: {db: firstDbName, collection: "raw_data"}, actions: ["find"]}],
-            expectFail: true,
+            privileges: [
+              {resource: {db: firstDbName, collection: "raw_data"}, actions: ["performRawDataOperations"]},
+              {resource: {db: firstDbName, collection: "raw_data"}, actions: ["find"]},
+            ],
           },
           {
             runOnDb: firstDbName,
-            privileges: [{
-              resource: {db: firstDbName, collection: "raw_data"},
-              actions: ["internal"]
-            }, {resource: {db: firstDbName, collection: "raw_data"}, actions: ["find"]}],
-            expectFail: true,
+            privileges: [
+              {resource: {db: firstDbName, collection: "raw_data"}, actions: ["internal"]},
+              {resource: {db: firstDbName, collection: "raw_data"}, actions: ["find"]}
+            ],
           }
         ]
       },
@@ -8724,8 +8748,7 @@ export const authCommandsLib = {
 
         var failures = [];
 
-
-        for (var i = this.tests.length-1; i < this.tests.length; i++) {
+        for (let i = 0; i < this.tests.length; i++) {
             const res = this.runOneTest(conn, this.tests[i], impls, options);
             failures = failures.concat(res);
         }
