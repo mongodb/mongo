@@ -186,9 +186,10 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate(WithLock lk
               "latestKnownOpTime"_attr = (pair.second ? (*pair.second).toString() : "unknown"));
     }
 
-    auto targetOpTimeCB = [this, &lk](Status status) {
+    auto targetOpTimeCB = [this](Status status) {
         // Double check the target time since stepdown may signal us too.
-        const auto myLastApplied = _repl->_getMyLastAppliedOpTime(lk);
+        const auto myLastApplied = _repl->_getMyLastAppliedOpTime(
+            WithLock::withoutLock() /* We hold _mutex when we execute this. */);
         if (_targetOpTime <= myLastApplied) {
             LOGV2(21368,
                   "Caught up to the latest known optime successfully after becoming primary",
@@ -197,7 +198,8 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate(WithLock lk
             // Report the number of ops applied during catchup in replSetGetStatus once the primary
             // is caught up.
             ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
-            abort(lk, PrimaryCatchUpConclusionReason::kSucceeded);
+            abort(WithLock::withoutLock() /* We hold _mutex when we execute this. */,
+                  PrimaryCatchUpConclusionReason::kSucceeded);
         }
     };
     auto pf = makePromiseFuture<void>();

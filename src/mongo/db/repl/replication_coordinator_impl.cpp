@@ -3599,8 +3599,12 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     }
 
     _setConfigState(lk, kConfigReconfiguring);
-    auto configStateGuard = ScopeGuard(
-        [&] { lockAndCall(&lk, [=, this, &lk] { _setConfigState(lk, kConfigSteady); }); });
+    auto configStateGuard = ScopeGuard([&] {
+        lockAndCall(&lk, [=, this] {
+            _setConfigState(WithLock::withoutLock() /* We hold lk in lockAndCall. */,
+                            kConfigSteady);
+        });
+    });
 
     ReplSetConfig oldConfig = _rsConfig.unsafePeek();
     int myIndex = _selfIndex;
@@ -4159,7 +4163,10 @@ Status ReplicationCoordinatorImpl::_runReplSetInitiate(const BSONObj& configObj,
     _setConfigState(lk, kConfigInitiating);
 
     ScopeGuard configStateGuard = [&] {
-        lockAndCall(&lk, [=, this, &lk] { _setConfigState(lk, kConfigUninitialized); });
+        lockAndCall(&lk, [=, this] {
+            _setConfigState(WithLock::withoutLock() /* We hold lk in lockAndCall. */,
+                            kConfigUninitialized);
+        });
     };
 
     lk.unlock();
