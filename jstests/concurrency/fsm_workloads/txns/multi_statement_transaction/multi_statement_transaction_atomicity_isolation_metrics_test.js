@@ -8,6 +8,8 @@
  *  assumes_snapshot_transactions,
  *  # serverStatus does not include transaction metrics on mongos.
  *  assumes_against_mongod_not_mongos,
+ *  # This test runs slow on TSAN builds and might trigger evergreen timeout.
+ *  tsan_incompatible,
  * ]
  */
 
