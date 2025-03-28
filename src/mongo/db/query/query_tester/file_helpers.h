@@ -71,6 +71,11 @@ struct CollectionSpec {
     const std::string rawString;
 };
 
+inline bool isTerminal() {
+    static const bool isTerminal = isatty(STDOUT_FILENO) != 0;
+    return isTerminal;
+}
+
 class ConditionalColor {
 public:
     explicit ConditionalColor(std::string_view colorCode) : _colorCode(colorCode) {}
@@ -83,11 +88,6 @@ public:
     }
 
 private:
-    static inline bool isTerminal() {
-        static const bool isTerminal = isatty(STDOUT_FILENO) != 0;
-        return isTerminal;
-    }
-
     std::string_view _colorCode;
 };
 
@@ -155,11 +155,6 @@ std::string getMongoRepoRoot();
  * output.
  */
 std::string gitDiff(const std::filesystem::path&, const std::filesystem::path&, DiffStyle);
-
-inline bool isTerminal() {
-    static const bool isTerminal = isatty(STDOUT_FILENO) != 0;
-    return isTerminal;
-}
 
 bool matchesPrefix(const std::string& key);
 void printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
