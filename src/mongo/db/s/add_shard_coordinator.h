@@ -33,6 +33,7 @@
 #include "mongo/db/s/add_shard_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/topology_change_helpers.h"
 
 namespace mongo {
 class AddShardCoordinator final
@@ -99,8 +100,11 @@ private:
     void _blockUserWrites(OperationContext* opCtx,
                           std::shared_ptr<executor::TaskExecutor> executor);
 
-    void _unblockUserWrites(OperationContext* opCtx,
+    void _restoreUserWrites(OperationContext* opCtx,
                             std::shared_ptr<executor::TaskExecutor> executor);
+
+    topology_change_helpers::UserWriteBlockingLevel _getUserWritesBlockFromReplicaSet(
+        OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor);
 
     void _dropSessionsCollection(OperationContext* opCtx,
                                  std::shared_ptr<executor::TaskExecutor> executor);

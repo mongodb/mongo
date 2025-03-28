@@ -505,30 +505,6 @@ std::unique_ptr<Fetcher> createFetcher(OperationContext* opCtx,
                                      maxTimeMS /* getMore network timeout */);
 }
 
-std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
-                                           RemoteCommandTargeter& targeter,
-                                           const NamespaceString& nss,
-                                           const repl::ReadConcernLevel& readConcernLevel,
-                                           FetcherDocsCallbackFn processDocsCallback,
-                                           FetcherStatusCallbackFn processStatusCallback,
-                                           std::shared_ptr<executor::TaskExecutor> executor) {
-    FindCommandRequest findCommand(nss);
-    const auto readConcern = repl::ReadConcernArgs(readConcernLevel);
-    findCommand.setReadConcern(readConcern);
-    const Milliseconds maxTimeMS =
-        std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
-    findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
-
-    return createFetcher(opCtx,
-                         targeter,
-                         nss.dbName(),
-                         maxTimeMS,
-                         findCommand.toBSON(),
-                         processDocsCallback,
-                         processStatusCallback,
-                         executor);
-}
-
 void deleteAllDocumentsInCollection(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
@@ -541,7 +517,7 @@ void deleteAllDocumentsInCollection(
     auto fetcherStatus =
         Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
     std::vector<BSONObj> docsToDelete;
-    auto fetcher = createFindFetcher(
+    auto fetcher = topology_change_helpers::createFindFetcher(
         opCtx,
         targeter,
         nss,
@@ -642,6 +618,30 @@ ShardIdentityType createShardIdentity(OperationContext* opCtx, const ShardId& sh
         repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString());
 
     return shardIdentity;
+}
+
+std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
+                                           RemoteCommandTargeter& targeter,
+                                           const NamespaceString& nss,
+                                           const repl::ReadConcernLevel& readConcernLevel,
+                                           FetcherDocsCallbackFn processDocsCallback,
+                                           FetcherStatusCallbackFn processStatusCallback,
+                                           std::shared_ptr<executor::TaskExecutor> executor) {
+    FindCommandRequest findCommand(nss);
+    const auto readConcern = repl::ReadConcernArgs(readConcernLevel);
+    findCommand.setReadConcern(readConcern);
+    const Milliseconds maxTimeMS =
+        std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
+    findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+
+    return createFetcher(opCtx,
+                         targeter,
+                         nss.dbName(),
+                         maxTimeMS,
+                         findCommand.toBSON(),
+                         processDocsCallback,
+                         processStatusCallback,
+                         executor);
 }
 
 long long getRangeDeletionCount(OperationContext* opCtx) {
@@ -827,7 +827,7 @@ Shard::CommandResponse runCommandForAddShard(OperationContext* opCtx,
 void setUserWriteBlockingState(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
-    UserWriteBlockingLevel level,
+    uint8_t level,
     bool block,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor) {

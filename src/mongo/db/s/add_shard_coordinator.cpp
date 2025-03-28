@@ -35,6 +35,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/topology_change_helpers.h"
+#include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
@@ -102,6 +103,12 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 // sharded cluster is implemented correctly
                 if (!_isFirstShard(opCtx)) {
                     if (!_doc.getIsConfigShard()) {
+                        auto level = _doc.getOriginalUserWriteBlockingLevel();
+                        if (!level.has_value()) {
+                            level = _getUserWritesBlockFromReplicaSet(opCtx, **executor);
+                            _doc.setOriginalUserWriteBlockingLevel(static_cast<int32_t>(*level));
+                            _updateStateDocument(opCtx, StateDoc(_doc));
+                        }
                         _blockUserWrites(opCtx, **executor);
                     }
                     _checkExistingDataOnShard(opCtx, targeter, **executor);
@@ -296,8 +303,9 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
         .then([this, token, status, executor, _ = shared_from_this()] {
             const auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-
-            _unblockUserWrites(opCtx, **executor);
+            if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
+                _restoreUserWrites(opCtx, **executor);
+            }
             topology_change_helpers::unblockDDLCoordinators(opCtx,
                                                             /*removeRecoveryDocument*/ false);
             topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
@@ -514,15 +522,55 @@ void AddShardCoordinator::_blockUserWrites(OperationContext* opCtx,
         executor);
 }
 
-void AddShardCoordinator::_unblockUserWrites(OperationContext* opCtx,
+void AddShardCoordinator::_restoreUserWrites(OperationContext* opCtx,
                                              std::shared_ptr<executor::TaskExecutor> executor) {
-    topology_change_helpers::setUserWriteBlockingState(
+    uint8_t level = static_cast<uint8_t>(*_doc.getOriginalUserWriteBlockingLevel());
+    if (level & topology_change_helpers::UserWriteBlockingLevel::Writes) {
+        level |= topology_change_helpers::UserWriteBlockingLevel::DDLOperations;
+    }
+    topology_change_helpers::setUserWriteBlockingState(opCtx,
+                                                       _getTargeter(opCtx),
+                                                       level,
+                                                       true, /* block writes */
+                                                       _osiGenerator(),
+                                                       executor);
+}
+
+topology_change_helpers::UserWriteBlockingLevel
+AddShardCoordinator::_getUserWritesBlockFromReplicaSet(
+    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
+    auto& targeter = _getTargeter(opCtx);
+    auto fetcherStatus =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+    uint8_t level = topology_change_helpers::UserWriteBlockingLevel::None;
+
+    // Retrieve the specific user write block level
+    auto fetcher = topology_change_helpers::createFindFetcher(
         opCtx,
-        _getTargeter(opCtx),
-        topology_change_helpers::UserWriteBlockingLevel::All,
-        false, /* unblock writes */
-        _osiGenerator(),
+        targeter,
+        NamespaceString::kUserWritesCriticalSectionsNamespace,
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        [&](const std::vector<BSONObj>& docs) -> bool {
+            for (const BSONObj& doc : docs) {
+                const auto parsedDoc = UserWriteBlockingCriticalSectionDocument::parse(
+                    IDLParserContext("UserWriteBlockingCriticalSectionDocument"), doc);
+                if (parsedDoc.getBlockNewUserShardedDDL()) {
+                    level |= topology_change_helpers::UserWriteBlockingLevel::DDLOperations;
+                }
+
+                if (parsedDoc.getBlockUserWrites()) {
+                    level |= topology_change_helpers::UserWriteBlockingLevel::Writes;
+                }
+            }
+            return true;
+        },
+        [&](const Status& status) { fetcherStatus = status; },
         executor);
+    uassertStatusOK(fetcher->schedule());
+    uassertStatusOK(fetcher->join(opCtx));
+    uassertStatusOK(fetcherStatus);
+
+    return topology_change_helpers::UserWriteBlockingLevel(level);
 }
 
 // TODO(SERVER-102352): add OSI support here

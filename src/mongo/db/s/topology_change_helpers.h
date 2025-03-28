@@ -125,9 +125,18 @@ enum UserWriteBlockingLevel {
 void setUserWriteBlockingState(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
-    UserWriteBlockingLevel level,
+    uint8_t level,
     bool block,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor);
+
+
+/**
+ * Retrieves all the user write blocks from the given replica set
+ */
+UserWriteBlockingLevel getUserWriteBlocksFromReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
     std::shared_ptr<executor::TaskExecutor> executor);
 
 /**
@@ -344,6 +353,20 @@ boost::optional<ShardType> getShardIfExists(OperationContext* opCtx,
 void propagateClusterUserWriteBlockToReplicaSet(OperationContext* opCtx,
                                                 RemoteCommandTargeter& targeter,
                                                 std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Creates a fetcher responsible for finding documents in a given namespace
+ */
+using FetcherDocsCallbackFn = std::function<bool(const std::vector<BSONObj>& batch)>;
+using FetcherStatusCallbackFn = std::function<void(const Status& status)>;
+
+std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
+                                           RemoteCommandTargeter& targeter,
+                                           const NamespaceString& nss,
+                                           const repl::ReadConcernLevel& readConcernLevel,
+                                           FetcherDocsCallbackFn processDocsCallback,
+                                           FetcherStatusCallbackFn processStatusCallback,
+                                           std::shared_ptr<executor::TaskExecutor> executor);
 
 }  // namespace topology_change_helpers
 }  // namespace mongo
