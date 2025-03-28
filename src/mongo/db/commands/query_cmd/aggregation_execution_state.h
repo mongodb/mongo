@@ -195,7 +195,7 @@ public:
      *
      * TODO SERVER-93539 remove this function and construct a ResolvedViewAggExState instead.
      */
-    void setView(std::unique_ptr<AggCatalogState>& catalog, const ViewDefinition* view);
+    void setView(std::unique_ptr<AggCatalogState>& catalog, const ViewDefinition& view);
 
     /**
      * Only to be used after this class has been set as a resolved view.
@@ -272,9 +272,8 @@ public:
      * Create an AggCatalogState instance for this pipeline. This method may also have the side
      * effect of updating the execution namespace and adjusting the read concern in the case of
      * change stream pipelines.
-     * If useAcquisition is set, the internal acquisition will happen via shard role api.
      */
-    std::unique_ptr<AggCatalogState> createAggCatalogState(bool useAcquisition);
+    std::unique_ptr<AggCatalogState> createAggCatalogState();
 
 private:
     /**
@@ -406,17 +405,10 @@ public:
     virtual bool lockAcquired() const = 0;
 
     /**
-     * Return the primary collection for this pipeline. This will fail an invariant if called for a
-     * collectionless pipeline.
+     * Return the main collection or view for this pipeline. This will fail an invariant if called
+     * for a collectionless pipeline.
      */
-    virtual const CollectionPtr& getPrimaryCollection() const = 0;
-
-
-    /**
-     * Return the view on primary namespace for this pipeline. This will fail an invariant if
-     * called for a collectionless pipeline.
-     */
-    virtual const ViewDefinition* getPrimaryView() const = 0;
+    virtual const CollectionOrViewAcquisition& getMainCollectionOrView() const = 0;
 
     /**
      * Collectionless pipelines may need an 'AutoStatsTracker' to track stats. This method will
@@ -443,7 +435,7 @@ public:
         const NamespaceString& nss,
         boost::optional<BSONObj> timeSeriesCollator) const = 0;
     /**
-     * Get the UUID, if any, for the primary collection of the pipeline.
+     * Get the UUID, if any, for the main collection of the pipeline.
      */
     virtual boost::optional<UUID> getUUID() const = 0;
 
@@ -457,12 +449,6 @@ public:
      * 'transactionResourcesStasher' must not be nullptr.
      */
     virtual void stashResources(TransactionResourcesStasher* transactionResourcesStasher) = 0;
-
-    /**
-     * Returns true if the catalog acquisitions were done through ShardRole API. Returns false if
-     * not.
-     */
-    virtual bool usesCollectionAcquisitions() const = 0;
 
     query_shape::CollectionType determineCollectionType() const;
 
@@ -479,10 +465,10 @@ protected:
     explicit AggCatalogState(const AggExState& aggExState) : _aggExState{aggExState} {}
 
     /**
-     * Return the primary collection type for this pipeline. This will fail an invariant if called
-     * for a collectionless pipeline.
+     * Return the main collection type for this pipeline. This will fail an invariant if called for
+     * a collectionless pipeline.
      */
-    virtual query_shape::CollectionType getPrimaryCollectionType() const = 0;
+    virtual query_shape::CollectionType getMainCollectionType() const = 0;
 
     // Reference to the aggregation execution state, which is owned by the caller of
     // _runAggregate(). Since AggCatalogState is always allocated from within _runAggregate(),
@@ -503,14 +489,12 @@ public:
     /**
      * Create an AggCatalogState instance for a pipeline that has a $changeStream stage.
      */
-    static std::unique_ptr<AggCatalogState> createOplogAggCatalogState(const AggExState&,
-                                                                       bool useAcquisition);
+    static std::unique_ptr<AggCatalogState> createOplogAggCatalogState(const AggExState&);
 
     /**
      * Create an AggCatalogState instance for "normal" pipelines.
      */
-    static std::unique_ptr<AggCatalogState> createDefaultAggCatalogState(const AggExState&,
-                                                                         bool useAcquisition);
+    static std::unique_ptr<AggCatalogState> createDefaultAggCatalogState(const AggExState&);
 };
 
 }  // namespace mongo

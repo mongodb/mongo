@@ -1453,7 +1453,8 @@ public:
         ASSERT_EQUALS(50, count());
 
         BSONObj res;
-        ASSERT(Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res));
+        ASSERT(Helpers::findOne(
+            &_opCtx, ctx.getCollection().getCollectionPtr(), BSON("_id" << 20), res));
         ASSERT_EQUALS(40, res["x"].numberInt());
 
         ASSERT(Helpers::findById(&_opCtx, nss(), BSON("_id" << 20), res));
@@ -1468,7 +1469,8 @@ public:
         {
             Timer t;
             for (int i = 0; i < n; i++) {
-                ASSERT(Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res));
+                ASSERT(Helpers::findOne(
+                    &_opCtx, ctx.getCollection().getCollectionPtr(), BSON("_id" << 20), res));
             }
             slow = t.micros();
         }

@@ -104,8 +104,9 @@ protected:
     }
 
     std::unique_ptr<PlanYieldPolicy> yieldPolicy() {
-        return std::make_unique<NoopYieldPolicy>(
-            opCtx(), opCtx()->getServiceContext()->getFastClockSource());
+        return std::make_unique<NoopYieldPolicy>(opCtx(),
+                                                 opCtx()->getServiceContext()->getFastClockSource(),
+                                                 PlanYieldPolicy::YieldThroughAcquisitions());
     }
 
     OperationContext* opCtx() {

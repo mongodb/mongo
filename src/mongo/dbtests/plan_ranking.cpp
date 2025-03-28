@@ -167,7 +167,9 @@ public:
             _mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
         }
         // This is what sets a backup plan, should we test for it.
-        NoopYieldPolicy yieldPolicy(&_opCtx, _opCtx.getServiceContext()->getFastClockSource());
+        NoopYieldPolicy yieldPolicy(&_opCtx,
+                                    _opCtx.getServiceContext()->getFastClockSource(),
+                                    PlanYieldPolicy::YieldThroughAcquisitions{});
         _mps->pickBestPlan(&yieldPolicy).transitional_ignore();
         ASSERT(_mps->bestPlanChosen());
 

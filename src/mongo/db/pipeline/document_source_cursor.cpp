@@ -179,49 +179,19 @@ void DocumentSourceCursor::loadBatch() {
             "Expected PlanExecutor to use an external lock policy",
             _exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally);
 
-    auto catalogResources = [&]() -> std::variant<AutoGetCollectionForReadMaybeLockFree,
-                                                  HandleTransactionResourcesFromStasher> {
-        if (_exec->usesCollectionAcquisitions()) {
-            tassert(10096100,
-                    "Expected _transactionResourcesStasher to exist",
-                    _transactionResourcesStasher);
-            // Restore the TransactionResources for this ShardRole collection acquisition. On
-            // destruction of this object, the TransactionResources will be stashed back.
-            return std::variant<AutoGetCollectionForReadMaybeLockFree,
-                                HandleTransactionResourcesFromStasher>(
-                std::in_place_type<HandleTransactionResourcesFromStasher>,
-                opCtx,
-                _transactionResourcesStasher.get());
-        } else {
-            return std::variant<AutoGetCollectionForReadMaybeLockFree,
-                                HandleTransactionResourcesFromStasher>(
-                std::in_place_type<AutoGetCollectionForReadMaybeLockFree>,
-                opCtx,
-                _exec->nss(),
-                AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                    _exec->getSecondaryNamespaces().cbegin(),
-                    _exec->getSecondaryNamespaces().cend()));
-        }
-    }();
+    // Restore the TransactionResources for this ShardRole collection acquisition. On destruction of
+    // this object, the TransactionResources will be stashed back.
+    tassert(
+        10096100, "Expected _transactionResourcesStasher to exist", _transactionResourcesStasher);
+    HandleTransactionResourcesFromStasher handleTransactionResourcesFromStasher(
+        opCtx, _transactionResourcesStasher.get());
 
-    RestoreContext restoreContext = [&]() {
-        return std::visit(OverloadedVisitor{
-                              [&](const AutoGetCollectionForReadMaybeLockFree& autoColl) {
-                                  return RestoreContext(&autoColl.getCollection());
-                              },
-                              [&](const HandleTransactionResourcesFromStasher& autoColl) {
-                                  return RestoreContext(nullptr);
-                              },
-                          },
-                          catalogResources);
-    }();
-
-    if (!_exec->usesCollectionAcquisitions() ||
-        !shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
+    if (!shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
         uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
             opCtx, _exec->nss(), true));
     }
 
+    RestoreContext restoreContext(nullptr);
     _exec->restoreState(restoreContext);
 
     try {
@@ -447,11 +417,11 @@ DocumentSourceCursor::DocumentSourceCursor(
             cursorType != CursorType::kEmptyDocuments ||
                 resumeTrackingType == ResumeTrackingType::kNone);
 
-    if (_exec->usesCollectionAcquisitions()) {
-        tassert(10096101,
-                "Expected _transactionResourcesStasher to exist",
-                _transactionResourcesStasher);
-    }
+    tassert(10240803,
+            "Expected enclosed executor to use ShardRole",
+            _exec->usesCollectionAcquisitions());
+    tassert(
+        10096101, "Expected _transactionResourcesStasher to exist", _transactionResourcesStasher);
 
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _exec->saveState();

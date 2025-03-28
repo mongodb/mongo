@@ -220,6 +220,13 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     invariant(db == _clientContext->db());
 }
 
+CollectionAcquisition WriteContextForTests::getCollection() const {
+    return acquireCollection(_opCtx,
+                             CollectionAcquisitionRequest::fromOpCtx(
+                                 _opCtx, _nss, AcquisitionPrerequisites::OperationType::kWrite),
+                             MODE_IX);
+}
+
 int dbtestsMain(int argc, char** argv) {
     ::mongo::setTestCommandsEnabled(true);
     ::mongo::TestingProctor::instance().setEnabled(true);

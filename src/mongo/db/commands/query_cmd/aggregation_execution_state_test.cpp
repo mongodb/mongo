@@ -314,31 +314,25 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogState) {
     StringData coll{"coll"};
     auto nss = createTestCollection(coll, false /*sharded*/);
     std::unique_ptr<AggExState> aggExState = createDefaultAggExState(coll);
-    for (int i = 0; i < 2; i++) {
-        const bool useAcquisition = i == 1;
-        std::unique_ptr<AggCatalogState> aggCatalogState =
-            aggExState->createAggCatalogState(useAcquisition);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
-        // This call should not throw.
-        aggCatalogState->validate();
+    ASSERT_DOES_NOT_THROW(aggCatalogState->validate());
 
-        ASSERT_TRUE(aggCatalogState->lockAcquired());
+    ASSERT_TRUE(aggCatalogState->lockAcquired());
 
-        boost::optional<AutoStatsTracker> tracker;
-        aggCatalogState->getStatsTrackerIfNeeded(tracker);
-        ASSERT_FALSE(tracker.has_value());
+    boost::optional<AutoStatsTracker> tracker;
+    aggCatalogState->getStatsTrackerIfNeeded(tracker);
+    ASSERT_FALSE(tracker.has_value());
 
-        auto [collator, matchesDefault] = aggCatalogState->resolveCollator();
-        ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
-        ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
+    auto [collator, matchesDefault] = aggCatalogState->resolveCollator();
+    ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
+    ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
 
-        ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
+    ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
 
-        ASSERT_TRUE(aggCatalogState->getUUID().has_value());
+    ASSERT_TRUE(aggCatalogState->getUUID().has_value());
 
-        // This call should not throw.
-        aggCatalogState->relinquishResources();
-    }
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryCollection) {
@@ -348,38 +342,31 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryC
     auto mainNss = createTestCollection(main, false /*sharded*/);
     auto secondaryNssColl = createTestCollection(secondaryColl, false /*sharded*/);
 
-    for (int i = 0; i < 2; i++) {
-        const bool useAcquisition = i == 1;
-        std::unique_ptr<AggExState> aggExState =
-            createDefaultAggExStateWithSecondaryCollections(main, secondaryColl);
+    std::unique_ptr<AggExState> aggExState =
+        createDefaultAggExStateWithSecondaryCollections(main, secondaryColl);
 
-        std::unique_ptr<AggCatalogState> aggCatalogState =
-            aggExState->createAggCatalogState(useAcquisition);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
-        // This call should not throw.
-        aggCatalogState->validate();
+    ASSERT_DOES_NOT_THROW(aggCatalogState->validate());
 
-        ASSERT_TRUE(aggCatalogState->lockAcquired());
+    ASSERT_TRUE(aggCatalogState->lockAcquired());
 
-        // Verify main collection
-        ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
+    // Verify main collection
+    ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
 
-        // Verify secondary collections
-        {
-            auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
-            ASSERT_EQ(1, secondaryColls.size());
-            ASSERT_TRUE(secondaryColls.contains(secondaryNssColl));
-        }
-
-        // Verify MultipleCollectionAccessor
-        ASSERT_FALSE(
-            aggCatalogState->getCollections().isAnySecondaryNamespaceAViewOrNotFullyLocal());
-
-        ASSERT_TRUE(aggCatalogState->getUUID().has_value());
-
-        // This call should not throw.
-        aggCatalogState->relinquishResources();
+    // Verify secondary collections
+    {
+        auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
+        ASSERT_EQ(1, secondaryColls.size());
+        ASSERT_TRUE(secondaryColls.contains(secondaryNssColl));
     }
+
+    // Verify MultipleCollectionAccessor
+    ASSERT_FALSE(aggCatalogState->getCollections().isAnySecondaryNamespaceAViewOrNotFullyLocal());
+
+    ASSERT_TRUE(aggCatalogState->getUUID().has_value());
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryShardedCollection) {
@@ -389,42 +376,35 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryS
     auto mainNss = createTestCollection(main, false /*sharded*/);
     auto secondaryNssColl = createTestCollection(secondaryColl, true /*sharded*/);
 
-    for (int i = 0; i < 2; i++) {
-        // Add at least 1 shard version to the opCtx to simulate a router request. This is necessary
-        // to correctly set the isAnySecondaryNamespaceAViewOrNotFullyLocal.
-        ScopedSetShardRole setShardRole(
-            operationContext(), mainNss, ShardVersion::UNSHARDED(), getDbVersion());
-        const bool useAcquisition = i == 1;
-        std::unique_ptr<AggExState> aggExState =
-            createDefaultAggExStateWithSecondaryCollections(main, secondaryColl);
+    // Add at least 1 shard version to the opCtx to simulate a router request. This is necessary
+    // to correctly set the isAnySecondaryNamespaceAViewOrNotFullyLocal.
+    ScopedSetShardRole setShardRole(
+        operationContext(), mainNss, ShardVersion::UNSHARDED(), getDbVersion());
+    std::unique_ptr<AggExState> aggExState =
+        createDefaultAggExStateWithSecondaryCollections(main, secondaryColl);
 
-        std::unique_ptr<AggCatalogState> aggCatalogState =
-            aggExState->createAggCatalogState(useAcquisition);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
-        // This call should not throw.
-        aggCatalogState->validate();
+    ASSERT_DOES_NOT_THROW(aggCatalogState->validate());
 
-        ASSERT_TRUE(aggCatalogState->lockAcquired());
+    ASSERT_TRUE(aggCatalogState->lockAcquired());
 
-        // Verify main collection
-        ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
+    // Verify main collection.
+    ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
 
-        // Verify secondary collections
-        {
-            auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
-            ASSERT_EQ(1, secondaryColls.size());
-            ASSERT_TRUE(secondaryColls.contains(secondaryNssColl));
-        }
-
-        // Verify MultipleCollectionAccessor
-        ASSERT_TRUE(
-            aggCatalogState->getCollections().isAnySecondaryNamespaceAViewOrNotFullyLocal());
-
-        ASSERT_TRUE(aggCatalogState->getUUID().has_value());
-
-        // This call should not throw.
-        aggCatalogState->relinquishResources();
+    // Verify secondary collections
+    {
+        auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
+        ASSERT_EQ(1, secondaryColls.size());
+        ASSERT_TRUE(secondaryColls.contains(secondaryNssColl));
     }
+
+    // Verify MultipleCollectionAccessor
+    ASSERT_TRUE(aggCatalogState->getCollections().isAnySecondaryNamespaceAViewOrNotFullyLocal());
+
+    ASSERT_TRUE(aggCatalogState->getUUID().has_value());
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryView) {
@@ -436,40 +416,32 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryV
     auto secondaryNssColl = createTestCollection(secondaryColl, false /*sharded*/);
     auto [secondaryNssView, _] = createTestView(secondaryView, secondaryColl);
 
-    for (int i = 0; i < 2; i++) {
-        const bool useAcquisition = i == 1;
+    std::unique_ptr<AggExState> aggExState =
+        createDefaultAggExStateWithSecondaryCollections(main, secondaryView);
 
-        std::unique_ptr<AggExState> aggExState =
-            createDefaultAggExStateWithSecondaryCollections(main, secondaryView);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
-        std::unique_ptr<AggCatalogState> aggCatalogState =
-            aggExState->createAggCatalogState(useAcquisition);
+    ASSERT_DOES_NOT_THROW(aggCatalogState->validate());
 
-        // This call should not throw.
-        aggCatalogState->validate();
+    ASSERT_TRUE(aggCatalogState->lockAcquired());
 
-        ASSERT_TRUE(aggCatalogState->lockAcquired());
+    // Verify main collection
+    ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
+    ASSERT_FALSE(aggCatalogState->getMainCollectionOrView().isView());
 
-        // Verify main collection
-        ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
-        ASSERT_FALSE(bool(aggCatalogState->getPrimaryView()));
-
-        // Verify secondary collections
-        {
-            auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
-            ASSERT_EQ(1, secondaryColls.size());
-            ASSERT_TRUE(secondaryColls.contains(secondaryNssView));
-        }
-
-        // Verify MultipleCollectionAccessor
-        ASSERT_TRUE(
-            aggCatalogState->getCollections().isAnySecondaryNamespaceAViewOrNotFullyLocal());
-
-        ASSERT_TRUE(aggCatalogState->getUUID().has_value());
-
-        // This call should not throw.
-        aggCatalogState->relinquishResources();
+    // Verify secondary collections
+    {
+        auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
+        ASSERT_EQ(1, secondaryColls.size());
+        ASSERT_TRUE(secondaryColls.contains(secondaryNssView));
     }
+
+    // Verify MultipleCollectionAccessor
+    ASSERT_TRUE(aggCatalogState->getCollections().isAnySecondaryNamespaceAViewOrNotFullyLocal());
+
+    ASSERT_TRUE(aggCatalogState->getUUID().has_value());
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
@@ -478,75 +450,63 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
     auto viewOn = createTestCollection(coll, false /*sharded*/);
     auto [viewNss, expectedPipeline] = createTestView(view, coll);
     std::unique_ptr<AggExState> aggExState = createDefaultAggExState(view);
-    for (int i = 0; i < 2; i++) {
-        const bool useAcquisition = i == 1;
-        std::unique_ptr<AggCatalogState> aggCatalogState =
-            aggExState->createAggCatalogState(useAcquisition);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
-        // This call should not throw.
-        aggCatalogState->validate();
+    ASSERT_DOES_NOT_THROW(aggCatalogState->validate());
 
-        ASSERT_TRUE(bool(aggCatalogState->getPrimaryView()));
-        ASSERT_TRUE(aggCatalogState->lockAcquired());
+    ASSERT_TRUE(aggCatalogState->getMainCollectionOrView().isView());
+    ASSERT_TRUE(aggCatalogState->lockAcquired());
 
-        boost::optional<AutoStatsTracker> tracker;
-        aggCatalogState->getStatsTrackerIfNeeded(tracker);
-        ASSERT_FALSE(tracker.has_value());
+    boost::optional<AutoStatsTracker> tracker;
+    aggCatalogState->getStatsTrackerIfNeeded(tracker);
+    ASSERT_FALSE(tracker.has_value());
 
-        auto [collator, matchesDefault] = aggCatalogState->resolveCollator();
-        ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
-        ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
+    auto [collator, matchesDefault] = aggCatalogState->resolveCollator();
+    ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
+    ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
 
-        // Check the resolved view correspond to the expected one
-        auto resolvedView = aggCatalogState->resolveView(operationContext(), viewNss, boost::none);
-        ASSERT_TRUE(resolvedView.isOK());
-        ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);
-        std::vector<BSONObj> result = resolvedView.getValue().getPipeline();
-        ASSERT_EQ(expectedPipeline.size(), result.size());
-        for (uint32_t i = 0; i < expectedPipeline.size(); i++) {
-            ASSERT(SimpleBSONObjComparator::kInstance.evaluate(expectedPipeline[i] == result[i]));
-        }
-
-        // It's a view so apparently there is no main collection, per se.
-        ASSERT_FALSE(aggCatalogState->getCollections().hasMainCollection());
-
-        ASSERT_FALSE(aggCatalogState->getUUID().has_value());
-
-        // This call should not throw.
-        aggCatalogState->relinquishResources();
+    // Check the resolved view correspond to the expected one
+    auto resolvedView = aggCatalogState->resolveView(operationContext(), viewNss, boost::none);
+    ASSERT_TRUE(resolvedView.isOK());
+    ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);
+    std::vector<BSONObj> result = resolvedView.getValue().getPipeline();
+    ASSERT_EQ(expectedPipeline.size(), result.size());
+    for (uint32_t i = 0; i < expectedPipeline.size(); i++) {
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(expectedPipeline[i] == result[i]));
     }
+
+    // It's a view so apparently there is no main collection, per se.
+    ASSERT_FALSE(aggCatalogState->getCollections().hasMainCollection());
+
+    ASSERT_FALSE(aggCatalogState->getUUID().has_value());
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
 TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogState) {
     StringData coll{"coll"};
     createTestCollection(coll, false /*sharded*/);
     std::unique_ptr<AggExState> aggExState = createOplogAggExState(coll);
-    for (int i = 0; i < 2; i++) {
-        const bool useAcquisition = i == 1;
-        std::unique_ptr<AggCatalogState> aggCatalogState =
-            aggExState->createAggCatalogState(useAcquisition);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
-        // This call should not throw.
-        aggCatalogState->validate();
+    ASSERT_DOES_NOT_THROW(aggCatalogState->validate());
 
-        ASSERT_TRUE(aggCatalogState->lockAcquired());
+    ASSERT_TRUE(aggCatalogState->lockAcquired());
 
-        boost::optional<AutoStatsTracker> tracker;
-        aggCatalogState->getStatsTrackerIfNeeded(tracker);
-        ASSERT_FALSE(tracker.has_value());
+    boost::optional<AutoStatsTracker> tracker;
+    aggCatalogState->getStatsTrackerIfNeeded(tracker);
+    ASSERT_FALSE(tracker.has_value());
 
-        auto [collator, matchesDefault] = aggCatalogState->resolveCollator();
-        ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
-        ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
+    auto [collator, matchesDefault] = aggCatalogState->resolveCollator();
+    ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
+    ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
 
-        ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
+    ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
 
-        // UUIDs are not used for change stream queries.
-        ASSERT_FALSE(aggCatalogState->getUUID().has_value());
+    // UUIDs are not used for change stream queries.
+    ASSERT_FALSE(aggCatalogState->getUUID().has_value());
 
-        // This call should not throw.
-        aggCatalogState->relinquishResources();
-    }
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
 TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogStateFailsOnView) {
@@ -559,12 +519,8 @@ TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogStateFailsOnView) {
 
     // This will call the validate() method which will fail because you cannot open a change
     // stream on a view.
-    for (int i = 0; i < 2; i++) {
-        const bool useAcquisition = i == 1;
-        ASSERT_THROWS_CODE(aggExState->createAggCatalogState(useAcquisition),
-                           DBException,
-                           ErrorCodes::CommandNotSupportedOnView);
-    }
+    ASSERT_THROWS_CODE(
+        aggExState->createAggCatalogState(), DBException, ErrorCodes::CommandNotSupportedOnView);
 }
 
 }  // namespace

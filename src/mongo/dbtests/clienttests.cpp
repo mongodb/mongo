@@ -142,11 +142,11 @@ public:
         db.insert(nss(), BSON("x" << 1 << "y" << 2));
         db.insert(nss(), BSON("x" << 2 << "y" << 2));
 
-        ASSERT(ctx.getCollection());
+        ASSERT(ctx.getCollection().exists());
         // Helper to refetch the IndexCatalog from the catalog in order to see any changes made to
         // it after a Collection write inside 'createIndex'.
         auto indexCatalog = [&ctx]() -> const IndexCatalog* {
-            return ctx.getCollection()->getIndexCatalog();
+            return ctx.getCollection().getCollectionPtr()->getIndexCatalog();
         };
 
         const bool includeBuildUUIDs = false;

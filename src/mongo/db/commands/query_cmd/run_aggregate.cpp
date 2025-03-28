@@ -556,7 +556,7 @@ void executeUntilFirstBatch(const AggExState& aggExState,
         auto exec =
             maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
         const auto& planExplainer = exec->getPlanExplainer();
-        if (const auto& coll = aggCatalogState.getPrimaryCollection()) {
+        if (const auto& coll = aggCatalogState.getMainCollectionOrView().getCollectionPtr()) {
             auto& debugInfo = CurOp::get(aggExState.getOpCtx())->debug();
             CollectionIndexUsageTrackerDecoration::get(coll.get())
                 .recordCollectionIndexUsage(debugInfo.collectionScans,
@@ -825,17 +825,21 @@ Status runAggregateOnView(AggExState& aggExState,
     // Resolve the request's collation and check that the default collation of 'view' is compatible
     // with the operation's collation. The collation resolution and check are both skipped if the
     // request did not specify a collation.
-    const ViewDefinition* view = aggCatalogState->getPrimaryView();
+    tassert(10240800, "Expected a view", aggCatalogState->getMainCollectionOrView().isView());
+    const auto& view = aggCatalogState->getMainCollectionOrView().getView();
+    const auto& viewDefinition = view.getViewDefinition();
+
     if (!aggExState.getRequest().getCollation().get_value_or(BSONObj()).isEmpty()) {
         auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState->resolveCollator();
-        if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collatorToUse.get()) &&
-            !view->timeseries()) {
+        if (!CollatorInterface::collatorsMatch(viewDefinition.defaultCollator(),
+                                               collatorToUse.get()) &&
+            !viewDefinition.timeseries()) {
             return {ErrorCodes::OptionNotSupportedOnView,
                     "Cannot override a view's default collation"};
         }
     }
 
-    aggExState.setView(aggCatalogState, view);
+    aggExState.setView(aggCatalogState, viewDefinition);
     // Resolved view will be available after view has been set on AggregationExecutionState
     auto resolvedView = aggExState.getResolvedView().value();
 
@@ -938,8 +942,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Register query stats with the pre-optimized pipeline. Exclude queries against collections
     // with encrypted fields. We still collect query stats on collection-less aggregations.
     bool hasEncryptedFields = aggCatalogState.lockAcquired() &&
-        aggCatalogState.getPrimaryCollection() &&
-        aggCatalogState.getPrimaryCollection()->getCollectionOptions().encryptedFieldConfig;
+        aggCatalogState.getMainCollectionOrView().collectionExists() &&
+        aggCatalogState.getMainCollectionOrView()
+            .getCollectionPtr()
+            ->getCollectionOptions()
+            .encryptedFieldConfig;
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     query_shape::DeferredQueryShape deferredShape{[&]() {
@@ -1091,7 +1098,7 @@ void rewritePipelineIfTimeseries(const AggExState& aggExState,
     // Conditions for enabling the viewless code path: feature flag is on, request does not use
     // the rawData flag, and we're querying against a viewless timeseries collection.
     if (aggCatalogState.lockAcquired()) {
-        if (const auto& coll = aggCatalogState.getPrimaryCollection();
+        if (const auto& coll = aggCatalogState.getMainCollectionOrView().getCollectionPtr();
             timeseries::isEligibleForViewlessTimeseriesRewrites(aggExState.getOpCtx(), coll)) {
             const auto timeseriesOptions = coll->getTimeseriesOptions();
             tassert(10000200,
@@ -1124,15 +1131,15 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     InterruptibleLockGuard interruptibleLockAcquisition(aggExState.getOpCtx());
 
     // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
-    const bool useAcquisition = true;
-    std::unique_ptr<AggCatalogState> aggCatalogState =
-        aggExState.createAggCatalogState(useAcquisition);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState.createAggCatalogState();
 
     BSONObj shardKey = BSONObj();
-    if (aggCatalogState->lockAcquired() && aggCatalogState->getPrimaryCollection()) {
-        const auto& coll = aggCatalogState->getPrimaryCollection();
-        if (coll.isSharded_DEPRECATED()) {
-            shardKey = coll.getShardKeyPattern().toBSON();
+    if (aggCatalogState->lockAcquired() &&
+        aggCatalogState->getMainCollectionOrView().isCollection()) {
+        const auto& mainCollShardingDescription =
+            aggCatalogState->getMainCollectionOrView().getCollection().getShardingDescription();
+        if (mainCollShardingDescription.isSharded()) {
+            shardKey = mainCollShardingDescription.getShardKeyPattern().toBSON();
         }
     }
     // Create an RAII object that prints the collection's shard key in the case of a tassert
@@ -1145,13 +1152,14 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
     // If this is a view, we must resolve the view, then recursively call runAggregate from
     // runAggregateOnView.
-    if (aggCatalogState->lockAcquired() && aggCatalogState->getPrimaryView()) {
+    if (aggCatalogState->lockAcquired() && aggCatalogState->getMainCollectionOrView().isView()) {
         // We do not need to expand the view pipeline when there is a $collStats stage, as
         // $collStats is supported on a view namespace. For a time-series collection, however,
         // the view is abstracted out for the users, so we needed to resolve the namespace to
         // get the underlying bucket collection.
+        const auto& view = aggCatalogState->getMainCollectionOrView().getView();
         bool shouldViewBeExpanded =
-            !aggExState.startsWithCollStats() || aggCatalogState->getPrimaryView()->timeseries();
+            !aggExState.startsWithCollStats() || view.getViewDefinition().timeseries();
         if (shouldViewBeExpanded) {
             return runAggregateOnView(aggExState, std::move(aggCatalogState), result);
         }

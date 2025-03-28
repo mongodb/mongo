@@ -122,7 +122,7 @@ public:
      * capable of executing a simple collection scan.
      */
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeCollScanExec(
-        const CollectionPtr* coll,
+        const CollectionAcquisition& coll,
         BSONObj& filterObj,
         PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
         TailableModeEnum tailableMode = TailableModeEnum::kNormal) {
@@ -165,10 +165,10 @@ public:
      * over the specified index with the specified bounds.
      */
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIndexScanExec(
-        Database* db, const CollectionPtr* coll, BSONObj& indexSpec, int start, int end) {
+        Database* db, const CollectionAcquisition& coll, BSONObj& indexSpec, int start, int end) {
         // Build the index scan stage.
         auto descriptor = getIndex(db, indexSpec);
-        IndexScanParams ixparams(&_opCtx, *coll, descriptor);
+        IndexScanParams ixparams(&_opCtx, coll.getCollectionPtr(), descriptor);
         ixparams.bounds.isSimpleRange = true;
         ixparams.bounds.startKey = BSON("" << start);
         ixparams.bounds.endKey = BSON("" << end);
@@ -229,28 +229,36 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     BSONObj indexSpec = BSON("a" << 1);
     addIndex(indexSpec);
 
-    CollectionPtr collection = ctx.getCollection();
+    auto outerExec = [&]() {
+        const auto collection = ctx.getCollection();
 
-    // Create the aggregation pipeline.
-    std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
+        // Create the aggregation pipeline.
+        std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
 
-    // Create an "inner" plan executor and register it with the cursor manager so that it can
-    // get notified when the collection is dropped.
-    unique_ptr<PlanExecutor, PlanExecutor::Deleter> innerExec(
-        makeIndexScanExec(ctx.db(), &collection, indexSpec, 7, 10));
+        // Create an "inner" plan executor and register it with the cursor manager so that it can
+        // get notified when the collection is dropped.
+        unique_ptr<PlanExecutor, PlanExecutor::Deleter> innerExec(
+            makeIndexScanExec(ctx.db(), collection, indexSpec, 7, 10));
 
-    // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
-    // in the pipeline.
-    innerExec->saveState();
-    MultipleCollectionAccessor collections(collection);
-    auto cursorSource = DocumentSourceCursor::create(collections,
-                                                     std::move(innerExec),
-                                                     nullptr /* transactionResourcesStasher */,
-                                                     _expCtx,
-                                                     DocumentSourceCursor::CursorType::kRegular);
-    auto pipeline = Pipeline::create({cursorSource}, _expCtx);
+        // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
+        // in the pipeline.
+        innerExec->saveState();
+        MultipleCollectionAccessor collections(collection);
+        auto transactionResourcesStasher =
+            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+        auto cursorSource =
+            DocumentSourceCursor::create(collections,
+                                         std::move(innerExec),
+                                         transactionResourcesStasher,
+                                         _expCtx,
+                                         DocumentSourceCursor::CursorType::kRegular);
+        auto pipeline = Pipeline::create({cursorSource}, _expCtx);
 
-    auto outerExec = plan_executor_factory::make(_expCtx, std::move(pipeline));
+        // Stash the ShardRole resources.
+        stashTransactionResourcesFromOperationContext(&_opCtx, transactionResourcesStasher.get());
+
+        return plan_executor_factory::make(_expCtx, std::move(pipeline));
+    }();
 
     dropCollection();
 
@@ -268,8 +276,8 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    CollectionPtr coll = ctx.getCollection();
-    auto exec = makeCollScanExec(&coll, filterObj, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT);
+    auto coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll, filterObj, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT);
 
     BSONObj resultObj;
     ASSERT_THROWS_CODE_AND_WHAT(exec->getNext(&resultObj, nullptr),
@@ -285,8 +293,8 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwa
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    CollectionPtr coll = ctx.getCollection();
-    auto exec = makeCollScanExec(&coll,
+    auto coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll,
                                  filterObj,
                                  PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
                                  TailableModeEnum::kTailableAndAwaitData);
@@ -305,8 +313,8 @@ TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailabl
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    CollectionPtr coll = ctx.getCollection();
-    auto exec = makeCollScanExec(&coll,
+    auto coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll,
                                  filterObj,
                                  PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
                                  TailableModeEnum::kTailable);
@@ -325,9 +333,8 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    CollectionPtr coll = ctx.getCollection();
-    auto exec =
-        makeCollScanExec(&coll, filterObj, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED);
+    auto coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll, filterObj, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED);
 
     BSONObj resultObj;
     ASSERT_THROWS_CODE_AND_WHAT(exec->getNext(&resultObj, nullptr),
@@ -391,8 +398,8 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
 
     BSONObj filterObj = fromjson("{a: {$gte: 2}}");
 
-    CollectionPtr coll = ctx.getCollection();
-    auto exec = makeCollScanExec(&coll, filterObj);
+    auto coll = ctx.getCollection();
+    auto exec = makeCollScanExec(coll, filterObj);
 
     BSONObj objOut;
     ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, nullptr));
@@ -416,8 +423,8 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotTest) {
     addIndex(indexSpec);
 
     BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-    CollectionPtr coll = ctx.getCollection();
-    auto exec = makeIndexScanExec(ctx.db(), &coll, indexSpec, 2, 5);
+    const auto coll = ctx.getCollection();
+    auto exec = makeIndexScanExec(ctx.db(), coll, indexSpec, 2, 5);
 
     BSONObj objOut;
     ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, nullptr));

@@ -96,17 +96,17 @@ public:
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
     }
 
-    const IndexDescriptor* getIndex(const BSONObj& obj, const CollectionPtr& coll) {
+    const IndexDescriptor* getIndex(const BSONObj& obj, const CollectionAcquisition& coll) {
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(
+        coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
     }
 
     IndexScanParams makeIndexScanParams(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
+                                        const CollectionAcquisition& collection,
                                         const IndexDescriptor* descriptor) {
-        IndexScanParams params(opCtx, collection, descriptor);
+        IndexScanParams params(opCtx, collection.getCollectionPtr(), descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
@@ -127,8 +127,8 @@ public:
         _client.update(nss(), predicate, update);
     }
 
-    void getRecordIds(std::set<RecordId>* out, const CollectionPtr& coll) {
-        auto cursor = coll->getCursor(&_opCtx);
+    void getRecordIds(std::set<RecordId>* out, const CollectionAcquisition& coll) {
+        auto cursor = coll.getCollectionPtr()->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
         }
@@ -174,7 +174,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -192,7 +192,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
-        CollectionPtr coll = ctx.getCollection();
+        auto coll = ctx.getCollection();
 
         std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         // Sort by c:1
@@ -202,20 +202,20 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         std::unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -243,7 +243,7 @@ class QueryStageMergeSortDups : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -271,19 +271,19 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -311,7 +311,7 @@ class QueryStageMergeSortDupsNoDedup : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -339,19 +339,19 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -380,7 +380,7 @@ class QueryStageMergeSortPrefixIndexReverse : public QueryStageMergeSortTestBase
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -411,21 +411,21 @@ public:
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -453,7 +453,7 @@ class QueryStageMergeSortOneStageEOF : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -481,21 +481,21 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:51 (EOF)
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         params.bounds.startKey = BSON("" << 51 << "" << MinKey);
         params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -520,7 +520,7 @@ class QueryStageMergeSortManyShort : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -543,20 +543,20 @@ public:
             indexSpec[i] = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec[i]);
         }
-        const auto& coll = ctx.getCollection();
+        const auto coll = ctx.getCollection();
         for (int i = 0; i < numIndices; ++i) {
             auto params = makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec[i], coll));
             ms->addChild(
-                std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+                std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         }
         std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -581,7 +581,7 @@ class QueryStageMergeSortDeletedDocument : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -605,11 +605,11 @@ public:
             indexSpec[i] = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec[i]);
         }
-        const auto& coll = ctx.getCollection();
+        const auto coll = ctx.getCollection();
         for (int i = 0; i < numIndices; ++i) {
             auto params =
                 makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec[i], ctx.getCollection()));
-            ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr));
+            ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
         }
 
         std::set<RecordId> recordIds;
@@ -642,7 +642,7 @@ public:
         // stage, and therefore should still be returned.
         ms->saveState();
         remove(BSON(std::string(1u, 'a' + count) << 1));
-        ms->restoreState(&coll);
+        ms->restoreState(RestoreContext(nullptr));
 
         // Make sure recordIds[11] is returned as expected. We expect the corresponding working set
         // member to remain in RID_AND_IDX state. It should have been marked as "suspicious", since
@@ -668,8 +668,9 @@ public:
             // An attempt to fetch the WSM should show that the key is no longer present in the
             // index.
             NamespaceString fakeNS = NamespaceString::createNamespaceString_forTest("test", "coll");
+            const auto& collPtr = coll.getCollectionPtr();
             ASSERT_FALSE(WorkingSetCommon::fetch(
-                &_opCtx, &ws, id, coll->getCursor(&_opCtx).get(), coll, fakeNS));
+                &_opCtx, &ws, id, collPtr->getCursor(&_opCtx).get(), collPtr, fakeNS));
 
             ++it;
             ++count;
@@ -703,7 +704,7 @@ class QueryStageMergeSortConcurrentUpdateDedup : public QueryStageMergeSortTestB
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -735,9 +736,9 @@ public:
             auto fetchStage = std::make_unique<FetchStage>(
                 _expCtx.get(),
                 &ws,
-                std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr),
+                std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr),
                 nullptr,
-                &coll);
+                coll);
             ms->addChild(std::move(fetchStage));
         }
 
@@ -749,9 +750,9 @@ public:
             auto fetchStage = std::make_unique<FetchStage>(
                 _expCtx.get(),
                 &ws,
-                std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr),
+                std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr),
                 nullptr,
-                &coll);
+                coll);
             ms->addChild(std::move(fetchStage));
         }
 
@@ -765,7 +766,7 @@ public:
         // Update doc {a: 5} such that the postimage will no longer match the query.
         ms->saveState();
         update(BSON("a" << 5), BSON("$set" << BSON("a" << 15)));
-        ms->restoreState(&coll);
+        ms->restoreState(RestoreContext(nullptr));
 
         // Invalidated doc {a: 5} should still get returned. We expect an RID_AND_OBJ working set
         // member with an owned BSONObj.
@@ -804,7 +805,7 @@ class QueryStageMergeSortStringsWithNullCollation : public QueryStageMergeSortTe
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -835,20 +836,20 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         auto fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -875,7 +876,7 @@ class QueryStageMergeSortStringsRespectsCollation : public QueryStageMergeSortTe
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection()) {
+        if (!ctx.getCollection().exists()) {
             WriteUnitOfWork wuow(&_opCtx);
             ctx.db()->createCollection(&_opCtx, nss());
             wuow.commit();
@@ -907,25 +908,25 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        auto idxScan = std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr);
+        auto idxScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
 
         // Wrap 'idxScan' with a FETCH stage so a document is fetched and MERGE_SORT is forced to
         // use the provided collator 'collator'. Also, this permits easier retrieval of result
         // objects in the result verification code.
         ms->addChild(
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, &coll));
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        idxScan = std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr);
+        idxScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
         ms->addChild(
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, &coll));
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(ms),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());

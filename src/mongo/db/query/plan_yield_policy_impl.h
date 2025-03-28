@@ -126,11 +126,11 @@ std::unique_ptr<PlanYieldPolicy> makeClassicYieldPolicy(
         }
         case PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT: {
             return std::make_unique<AlwaysTimeOutYieldPolicy>(
-                opCtx, opCtx->getServiceContext()->getFastClockSource());
+                opCtx, opCtx->getServiceContext()->getFastClockSource(), yieldable);
         }
         case PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED: {
             return std::make_unique<AlwaysPlanKilledYieldPolicy>(
-                opCtx, opCtx->getServiceContext()->getFastClockSource());
+                opCtx, opCtx->getServiceContext()->getFastClockSource(), yieldable);
         }
     }
     MONGO_UNREACHABLE;

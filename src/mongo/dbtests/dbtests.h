@@ -43,6 +43,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
@@ -79,10 +80,7 @@ public:
         return _clientContext->db();
     }
 
-    CollectionPtr getCollection() const {
-        return CollectionPtr(
-            CollectionCatalog::get(_opCtx)->lookupCollectionByNamespace(_opCtx, _nss));
-    }
+    CollectionAcquisition getCollection() const;
 
 private:
     OperationContext* const _opCtx;

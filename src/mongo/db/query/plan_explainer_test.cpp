@@ -78,11 +78,18 @@ protected:
         }
         std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
 
-        AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
+        const auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest::fromOpCtx(
+                operationContext(), nss, AcquisitionPrerequisites::OperationType::kWrite),
+            MODE_IX);
         {
             WriteUnitOfWork wuow{operationContext()};
-            ASSERT_OK(collection_internal::insertDocuments(
-                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
+            ASSERT_OK(collection_internal::insertDocuments(operationContext(),
+                                                           coll.getCollectionPtr(),
+                                                           inserts.begin(),
+                                                           inserts.end(),
+                                                           nullptr /* opDebug */));
             wuow.commit();
         }
     }
@@ -111,13 +118,13 @@ protected:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> buildFindExecAndIter(
         BSONObj filter, bool limitOne = false) {
-        AutoGetCollection coll(operationContext(), kNss, LockMode::MODE_IX);
-        auto colls =
-            MultipleCollectionAccessor(operationContext(),
-                                       &coll.getCollection(),
-                                       kNss,
-                                       false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                       {});
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest::fromOpCtx(
+                operationContext(), kNss, AcquisitionPrerequisites::OperationType::kRead),
+            MODE_IS);
+        auto colls = MultipleCollectionAccessor(
+            std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
         findCommand->setFilter(filter);
@@ -153,13 +160,13 @@ protected:
         auto pipeline = Pipeline::create(sources, expCtx);
 
         {
-            AutoGetCollection collPtr(operationContext(), kNss, LockMode::MODE_IX);
-            auto colls =
-                MultipleCollectionAccessor(operationContext(),
-                                           &collPtr.getCollection(),
-                                           kNss,
-                                           false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                           {});
+            auto coll = acquireCollection(
+                operationContext(),
+                CollectionAcquisitionRequest::fromOpCtx(
+                    operationContext(), kNss, AcquisitionPrerequisites::OperationType::kRead),
+                MODE_IS);
+            auto colls = MultipleCollectionAccessor(
+                std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
             // The explain printer checks the CurOp's Command to see if it is allowed to print it.
             auto request = AggregateCommandRequest(kNss, stages);
@@ -171,8 +178,14 @@ protected:
                         clientLock, kNss, cmd, BSONObj(), NetworkOp::dbQuery);
             }
 
+            auto transactionResourcesStasher =
+                make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
             PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-                colls, kNss, &request, pipeline.get(), nullptr /* transactionResourcesStasher */);
+                colls, kNss, &request, pipeline.get(), transactionResourcesStasher);
+
+            // Stash the ShardRole resources.
+            stashTransactionResourcesFromOperationContext(operationContext(),
+                                                          transactionResourcesStasher.get());
         }
 
         auto exec = plan_executor_factory::make(expCtx, std::move(pipeline));
