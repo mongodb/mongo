@@ -58,6 +58,7 @@ common --strategy=SolibSymlink=local
 common --strategy=StripDebuginfo=local
 common --strategy=ExtractDebuginfo=local
 common --strategy=TestRunner=local
+common --strategy=CoverageReport=local
 common --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo)$=+no-remote-cache
 
 # Aliases for config flags
@@ -313,8 +314,9 @@ coverage --combined_report=lcov
 coverage --experimental_use_llvm_covmap
 coverage --experimental_generate_llvm_lcov
 coverage --remote_download_outputs=all
-coverage --config=no-remote-exec
 coverage --fission=no
+# This is set in .bazelrc.evergreen:
+# coverage --config=no-remote-exec
 
 # Don't detect the native toolchain on linux, only use the hermetic toolchains.
 # Opt out of this by passing --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0 on the command line.

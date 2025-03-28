@@ -51,3 +51,7 @@ echo "common --bes_keywords=engflow:CiCdJobName=${task_name:?}" >> .bazelrc.ever
 echo "common --bes_keywords=engflow:CiCdUri=${uri:?}" >> .bazelrc.evergreen
 echo "common --bes_keywords=evg:project=${project:?}" >> .bazelrc.evergreen
 echo "common --remote_upload_local_results=True" >> .bazelrc.evergreen
+
+# Disable remote execution in evergreen only since it runs on every PR, but we still
+# want it to be fast on workstations
+echo "coverage --config=no-remote-exec" >> .bazelrc.evergreen
