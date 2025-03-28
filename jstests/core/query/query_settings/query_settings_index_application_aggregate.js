@@ -87,6 +87,7 @@ function testAggregateQuerySettingsApplicationWithoutSecondaryCollections(collOr
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
 }
 
@@ -153,6 +154,8 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
     // query settings being set.
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
     qstests.assertQuerySettingsFallback(aggregateCmd, secondaryNs);
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(aggregateCmd, secondaryNs);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
@@ -193,6 +196,7 @@ function testAggregateQuerySettingsApplicationWithMerge(collOrViewName, outputCo
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
 }
 
@@ -240,6 +244,9 @@ function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
 
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
     qstests.assertQuerySettingsFallback(aggregateCmd, secondaryNs);
+
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(aggregateCmd, secondaryNs);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
@@ -322,6 +329,9 @@ function testAggregateQuerySettingsApplicationWithUnionWithPipeline(collOrViewNa
 
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
     qstests.assertQuerySettingsFallback(aggregateCmd, secondaryNs);
+
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(aggregateCmd, secondaryNs);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);

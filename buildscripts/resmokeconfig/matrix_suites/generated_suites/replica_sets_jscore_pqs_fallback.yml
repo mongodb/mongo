@@ -81,7 +81,6 @@ selector:
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
-    - jstests/core/query/api/api_version_unstable_indexes.js
     - jstests/core/txns/disallow_operations_on_prepared_transaction.js
     - jstests/core/index/index_multiple_compatibility.js
     - jstests/core/query/single_field_hashed_index.js

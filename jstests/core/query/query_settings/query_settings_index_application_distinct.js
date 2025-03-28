@@ -112,6 +112,7 @@ function testDistinctQuerySettingsApplication(collOrViewName) {
     qstests.assertQuerySettingsNaturalApplication(querySettingsDistinctQuery, ns);
     qstests.assertQuerySettingsIgnoreCursorHints(querySettingsDistinctQuery, ns);
     qstests.assertQuerySettingsFallback(querySettingsDistinctQuery, ns);
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(querySettingsDistinctQuery, ns);
     qstests.assertQuerySettingsCommandValidation(querySettingsDistinctQuery, ns);
 }
 

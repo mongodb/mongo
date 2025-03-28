@@ -94,8 +94,6 @@
 - name: fallback_core_excludes
   value:
     exclude_files:
-      # TODO SERVER-102392 Re-enable api_version_unstable_indexes.js.
-      - jstests/core/query/api/api_version_unstable_indexes.js
       # TODO SERVER-101603 Validate against explain commands in prepared transactions.
       - jstests/core/txns/disallow_operations_on_prepared_transaction.js
       # TODO SERVER-101455 Re-enable index_multiple_compatibility.js.

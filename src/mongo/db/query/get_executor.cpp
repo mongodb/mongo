@@ -1338,7 +1338,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                 // retry if any are present. Otherwise just propagate the exception.
                 const auto& querySettings = canonicalQuery->getExpCtx()->getQuerySettings();
                 const bool hasQuerySettings = querySettings.getIndexHints().has_value();
-                if (!hasQuerySettings) {
+                // Planning has been tried without query settings and no execution plan was found.
+                const bool ignoreQuerySettings =
+                    plannerOptions & QueryPlannerParams::IGNORE_QUERY_SETTINGS;
+                if (!hasQuerySettings || ignoreQuerySettings) {
                     throw;
                 }
                 LOGV2_DEBUG(

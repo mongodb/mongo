@@ -18,7 +18,8 @@ export function getInnerCommand(cmdObj) {
     }
 
     if (typeof cmdObj.explain === "object") {
-        return cmdObj.explain;
+        const [{explain}, genericArgs] = extractGenericArgs(cmdObj);
+        return {...explain, ...genericArgs};
     }
 
     const {explain, ...cmdWithoutExplain} = cmdObj;

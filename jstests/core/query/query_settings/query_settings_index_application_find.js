@@ -73,6 +73,7 @@ function testFindQuerySettingsApplication(collOrViewName) {
     qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery, ns);
     qstests.assertQuerySettingsIgnoreCursorHints(querySettingsFindQuery, ns);
     qstests.assertQuerySettingsFallback(querySettingsFindQuery, ns);
+    qstests.assertQuerySettingsFallbackNoQueryExecutionPlans(querySettingsFindQuery, ns);
     qstests.assertQuerySettingsCommandValidation(querySettingsFindQuery, ns);
 }
 

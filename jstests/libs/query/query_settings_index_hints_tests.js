@@ -488,6 +488,37 @@ export class QuerySettingsIndexHintsTests {
     }
 
     /**
+     * Ensure that queries with no valid plans throw the 'NoQueryExecutionPlans' exception.
+     */
+    assertQuerySettingsFallbackNoQueryExecutionPlans(querySettingsQuery, ns) {
+        const collName = getCollectionName(this._db, querySettingsQuery);
+        const coll = this._db[collName];
+        const indexWildcardC = {"c.$**": 1};
+
+        const indexCreationRes = coll.createIndex(indexWildcardC);
+        // If we can't create a wildcard index and force a 'NoQueryExecutionPlan', skip this case.
+        if (!indexCreationRes.ok)
+            return;
+
+        const invalidQuery = {...querySettingsQuery, hint: indexWildcardC};
+
+        const query = this._qsutils.withoutDollarDB(invalidQuery);
+        const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
+
+        const resultWithoutPqs = this._db.runCommand(query);
+        // If the initial query throws another error, the query with PQS won't throw
+        // 'NoQueryExecutionPlans'.
+        if (resultWithoutPqs.code === ErrorCodes.NoQueryExecutionPlans) {
+            this._qsutils.withQuerySettings(invalidQuery, settings, () => {
+                assert.commandFailedWithCode(this._db.runCommand(query),
+                                             ErrorCodes.NoQueryExecutionPlans);
+            });
+        }
+
+        assert.commandWorked(coll.dropIndex(indexWildcardC));
+    }
+
+    /**
      * Ensure that users can not pass query settings to the commands explicitly.
      */
     assertQuerySettingsCommandValidation(querySettingsQuery, ns) {
