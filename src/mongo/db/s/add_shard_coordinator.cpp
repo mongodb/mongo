@@ -182,7 +182,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 _setFCVOnReplicaSet(opCtx, currentFCV, **executor);
 
-                topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
+                topology_change_helpers::blockDDLCoordinatorsAndDrain(
+                    opCtx, /*persistRecoveryDocument*/ false);
 
                 auto& shardingCatalogManager = *ShardingCatalogManager::get(opCtx);
 
@@ -242,7 +243,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     // kConfigsvrShardsNamespace ddl lock before either, so we do not actually have
                     // a lock ordering problem. See SERVER-99708 for more information.
                     DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-                    topology_change_helpers::unblockDDLCoordinators(opCtx);
+                    topology_change_helpers::unblockDDLCoordinators(
+                        opCtx, /*removeRecoveryDocument*/ false);
                 }
 
                 topology_change_helpers::updateClusterCardinalityParameter(
@@ -296,7 +298,8 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
 
             _unblockUserWrites(opCtx, **executor);
-            topology_change_helpers::unblockDDLCoordinators(opCtx);
+            topology_change_helpers::unblockDDLCoordinators(opCtx,
+                                                            /*removeRecoveryDocument*/ false);
             topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
         });
 }

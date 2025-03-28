@@ -265,13 +265,13 @@ DrainingShardUsage getDrainingProgress(OperationContext* opCtx,
  * operations from beginning. Additionally persists a recovery document which tells that DDLs are
  * currently blocked.
  */
-void blockDDLCoordinatorsAndDrain(OperationContext* opCtx);
+void blockDDLCoordinatorsAndDrain(OperationContext* opCtx, bool persistRecoveryDocument = true);
 
 /**
  * Unsets the cluster parameter which prevents DDL operations from running. Additionally, cleans up
  * the recovery document.
  */
-void unblockDDLCoordinators(OperationContext* opCtx);
+void unblockDDLCoordinators(OperationContext* opCtx, bool removeRecoveryDocument = true);
 
 /**
  * Checks every collection in every database tracked on the config server to ensure that the local
