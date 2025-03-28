@@ -4,13 +4,21 @@
 # compiler_type
 # =============
 
+compiler_type_values = ["gcc", "clang", "msvc"]
+
 compiler_type_provider = provider(
     doc = "Select the compiler (e.g.: gcc)",
-    fields = {"compiler_type": "Choose one of [gcc, clang]"},
+    fields = {"compiler_type": "Choose one of " + ".".join(compiler_type_values)},
 )
 
+def compiler_type_impl(ctx):
+    compiler_type_value = ctx.build_setting_value
+    if compiler_type_value not in compiler_type_values:
+        fail(str(ctx.label) + " compiler_type allowed to take values {" + ", ".join(compiler_type_values) + "} but was set to unallowed value " + compiler_type_value)
+    return compiler_type_provider(compiler_type = compiler_type_value)
+
 compiler_type = rule(
-    implementation = lambda ctx: compiler_type_provider(compiler_type = ctx.build_setting_value),
+    implementation = compiler_type_impl,
     build_setting = config.string(flag = True),
 )
 
@@ -18,13 +26,21 @@ compiler_type = rule(
 # mongo_toolchain_version
 # =========
 
+mongo_toolchain_version_values = ["v4", "v5"]
+
 mongo_toolchain_version_provider = provider(
     doc = "Select the mongo toolchain version (e.g.: v4)",
     fields = {"mongo_toolchain_version": "Choose one of [v4, v5]"},
 )
 
+def mongo_toolchain_version_impl(ctx):
+    mongo_toolchain_version_value = ctx.build_setting_value
+    if mongo_toolchain_version_value not in mongo_toolchain_version_values:
+        fail(str(ctx.label) + " mongo_toolchain_version allowed to take values {" + ", ".join(mongo_toolchain_version_value) + "} but was set to unallowed value " + mongo_toolchain_version_value)
+    return mongo_toolchain_version_provider(mongo_toolchain_version = mongo_toolchain_version_value)
+
 mongo_toolchain_version = rule(
-    implementation = lambda ctx: mongo_toolchain_version_provider(mongo_toolchain_version = ctx.build_setting_value),
+    implementation = mongo_toolchain_version_impl,
     build_setting = config.string(flag = True),
 )
 
