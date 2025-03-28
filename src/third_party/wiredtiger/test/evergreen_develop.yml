@@ -58,7 +58,7 @@ buildvariants:
    - amazon2023-arm64-latest-large-m8g
   expansions:
     <<: *ubuntu2004-perf-tests-expansions-template
-    collection: AllPerfTestsARM64
+    collection: AllPerfTestsARM64_v9
 
 - <<: *perf-tasks-template
   name: ubuntu2004-perf-tests-arm64-only

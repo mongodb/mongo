@@ -324,7 +324,7 @@ err:
      * loading files.
      */
     if (cursor != NULL && (tret = cursor->close(cursor)) != 0) {
-        tret = util_err(session, tret, "%s: cursor.close", uri);
+        tret = util_err(session, tret, "%s: cursor.close", uri != NULL ? uri : "NULL");
         if (ret == 0)
             ret = tret;
     }

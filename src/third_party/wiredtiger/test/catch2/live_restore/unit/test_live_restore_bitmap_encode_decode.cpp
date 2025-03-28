@@ -32,11 +32,6 @@ TEST_CASE("Encode various bitmaps", "[live_restore_bitmap],[live_restore_bitmap_
     std::shared_ptr<mock_session> mock_session = mock_session::build_test_mock_session();
     WT_SESSION_IMPL *session = mock_session->get_wt_session_impl();
 
-    WTI_LIVE_RESTORE_FILE_HANDLE lr_fh;
-    WT_CLEAR(lr_fh);
-    WTI_LIVE_RESTORE_FILE_HANDLE lr_fh2;
-    WT_CLEAR(lr_fh2);
-
     test_data test1 = test_data("00", 8, new uint8_t[1]{0x0});
     test_data test2 = test_data("ab", 8, new uint8_t[1]{0xab});
     test_data test3 = test_data("11", 8, new uint8_t[1]{0x11});
@@ -52,29 +47,44 @@ TEST_CASE("Encode various bitmaps", "[live_restore_bitmap],[live_restore_bitmap_
     WT_ITEM buf;
     WT_CLEAR(buf);
 
-    REQUIRE(__wt_rwlock_init(session, &lr_fh.lock) == 0);
-
+    live_restore_test_env env;
     for (const auto &test : test_bitmaps) {
-        lr_fh.bitmap = test.bitmap;
-        lr_fh.nbits = test.nbits;
-        // We need to have a non NULL pointer here for the encoding to take place.
-        lr_fh.source = reinterpret_cast<WT_FILE_HANDLE *>(0xab);
-        __wt_readlock(session, &lr_fh.lock);
-        REQUIRE(__ut_live_restore_encode_bitmap(session, &lr_fh, &buf) == 0);
-        __wt_readunlock(session, &lr_fh.lock);
+        size_t filesize = test.nbits == 0 ? 4096 : 4096 * test.nbits;
+        std::string dest_file = env.dest_file_path("file");
+        std::string source_file = env.source_file_path("file");
+        create_file(source_file, filesize);
+
+        WT_FILE_HANDLE *fh;
+        REQUIRE(env.lr_fs->iface.fs_open_file((WT_FILE_SYSTEM *)env.lr_fs,
+                  reinterpret_cast<WT_SESSION *>(env.session), dest_file.c_str(),
+                  WT_FS_OPEN_FILE_TYPE_DATA, 0, &fh) == 0);
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh = (WTI_LIVE_RESTORE_FILE_HANDLE *)fh;
+
+        REQUIRE(testutil_exists(".", dest_file.c_str()));
+
+        lr_fh->bitmap = test.bitmap;
+        lr_fh->nbits = test.nbits;
+
+        __wt_readlock(session, &lr_fh->lock);
+        REQUIRE(__ut_live_restore_encode_bitmap(session, lr_fh, &buf) == 0);
+        __wt_readunlock(session, &lr_fh->lock);
         // In the live restore code we only call decode if nbits is not zero.
         if (test.nbits != 0) {
             REQUIRE(
               std::string(static_cast<const char *>(buf.data)) == std::string(test.bitmap_str));
+            lr_fh->allocsize = 4096;
             REQUIRE(__ut_live_restore_decode_bitmap(
-                      session, test.bitmap_str.c_str(), test.nbits, &lr_fh2) == 0);
+                      session, test.bitmap_str.c_str(), test.nbits, lr_fh) == 0);
         }
         if (test.nbits != 0)
-            REQUIRE(memcmp(lr_fh2.bitmap, test.bitmap, test.nbits / 8) == 0);
+            REQUIRE(memcmp(lr_fh->bitmap, test.bitmap, test.nbits / 8) == 0);
+
+        lr_fh->iface.close((WT_FILE_HANDLE *)lr_fh, (WT_SESSION *)env.session);
+        testutil_remove(dest_file.c_str());
+        testutil_remove(source_file.c_str());
+
         delete[] test.bitmap;
-        __wt_free(session, lr_fh2.bitmap);
         __wt_buf_free(session, &buf);
         WT_CLEAR(buf);
     }
-    __wt_rwlock_destroy(session, &lr_fh.lock);
 }

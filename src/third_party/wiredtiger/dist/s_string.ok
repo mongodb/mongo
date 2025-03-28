@@ -439,6 +439,7 @@ WTI
 WTPERF
 WaitForSingleObject
 WaitOn
+Warray
 Wconditional
 Wduplicated
 WeakHashLen

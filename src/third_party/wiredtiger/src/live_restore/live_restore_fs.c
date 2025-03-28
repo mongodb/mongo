@@ -209,9 +209,26 @@ __live_restore_fs_find_layer(WT_FILE_SYSTEM *fs, WT_SESSION_IMPL *session, const
         return (0);
     }
 
+    /*
+     * If the file is only in the source and there is a stop file in the destination then we've
+     * either moved or deleted the file in the destination, meaning it no longer exists for the
+     * user.
+     */
+    bool has_stop = false;
+    WT_RET(__dest_has_stop_file((WTI_LIVE_RESTORE_FS *)fs, name, session, &has_stop));
+    if (has_stop)
+        return (0);
+
+    /*
+     * If migration completes and the file isn't in the destination it must have been deleted or
+     * moved by the user. We can't depend on stop files here as post-migration clean up may have
+     * deleted the stop file already.
+     */
+    if (__wti_live_restore_migration_complete(session))
+        return (0);
+
     WT_RET(__live_restore_fs_has_file(lr_fs, &lr_fs->source, session, name, &exists));
     if (exists) {
-        /* The file exists in the source we don't need to look any further. */
         *whichp = WTI_LIVE_RESTORE_FS_LAYER_SOURCE;
     }
 
@@ -414,37 +431,7 @@ __live_restore_fs_exist(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, const char *
     WTI_LIVE_RESTORE_FS_LAYER_TYPE layer;
     WT_RET(__live_restore_fs_find_layer(fs, (WT_SESSION_IMPL *)wt_session, name, &layer));
 
-    switch (layer) {
-    case WTI_LIVE_RESTORE_FS_LAYER_NONE:
-        *existp = false;
-        break;
-
-    case WTI_LIVE_RESTORE_FS_LAYER_DESTINATION:
-        *existp = true;
-        break;
-
-    case WTI_LIVE_RESTORE_FS_LAYER_SOURCE:
-        *existp = true;
-
-        /*
-         * If the file is only in the source and there is a stop file in the destination then we've
-         * either moved or deleted the file in the destination, meaning it no longer exists for the
-         * user.
-         */
-        bool has_stop = false;
-        WT_RET(__dest_has_stop_file(
-          (WTI_LIVE_RESTORE_FS *)fs, name, (WT_SESSION_IMPL *)wt_session, &has_stop));
-        if (has_stop)
-            *existp = false;
-
-        /*
-         * If migration completes and the file isn't in the destination it must have been deleted or
-         * moved by the user. We can't depend on stop files here as post-migration clean up may have
-         * deleted the stop file already.
-         */
-        if (__wti_live_restore_migration_complete((WT_SESSION_IMPL *)wt_session))
-            *existp = false;
-    }
+    *existp = layer != WTI_LIVE_RESTORE_FS_LAYER_NONE;
 
     return (0);
 }
@@ -960,6 +947,37 @@ __wti_live_restore_fs_restore_file(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
 
     __wt_verbose_debug2(session, WT_VERB_LIVE_RESTORE, "%s: Restoring in the background", fh->name);
 
+    /*
+     * Live restore dirties btrees to ensure its bitmap updates are persisted, through the
+     * application write path this is a non issue as the application writes would also dirty the
+     * btree but for the background thread which does not perform writes in the traditional sense it
+     * is a requirement.
+     *
+     * However, there are a number of edge cases in dirtying the btree, particularly with regards to
+     * the btree->original flag. It is possible to backup a database with trees still in the
+     * "original" state, on restore the background thread would visit the file, mark the btree as
+     * dirty but also original. This is an invalid state. To workaround this we also disable bulk
+     * loading into the btree which has the side effect of making it no longer original.
+     *
+     * Now consider what happens if an application opens a bulk cursor concurrently with live
+     * restore which can disable bulk cursors. WiredTiger does not guarantee that opening a bulk
+     * cursor must succeed so the application be prepared to handle EBUSY. Additionally, the
+     * background worker threads in live restore open cursor on any file they intend to restore.
+     * This cursor prevents the application bulk cursor from opening which would then generate an
+     * EBUSY for the application. If the application succeeded in opening the bulk cursor prior to
+     * the live restore worker opening its cursor, then the live restore worker will get EBUSY and
+     * return the item to the queue.
+     *
+     * Historically, while fixing this issue, we ran into an edge case where the application would
+     * call schema->alter on a btree which was original. Live restore had concurrently dirtied the
+     * btree but not modified the original state, schema alter expected that after a system wide
+     * checkpoint the tree being altered would be in a clean state. The original flag being true
+     * prevents checkpoints from being taken which means that the tree never left the dirty state
+     * and schema alter would fail crashing the application. This is the second reason we disable
+     * bulk loading on the btree and clear the original flag.
+     */
+    __wt_btree_disable_bulk(session);
+
     char *buf = NULL;
     WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh = (WTI_LIVE_RESTORE_FILE_HANDLE *)fh;
     /*
@@ -988,6 +1006,11 @@ __wti_live_restore_fs_restore_file(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
               " seconds. Currently copying offset %" PRId64 " of file size %" PRId64,
               lr_fh->iface.name, time_diff_ms / WT_THOUSAND, read_offset, WTI_BITMAP_END(lr_fh));
             msg_count = time_diff_ms / (WT_THOUSAND * WT_PROGRESS_MSG_PERIOD);
+
+            /*
+             * Dirty the tree periodically to ensure the live restore metadata is written out by the
+             * next checkpoint.
+             */
             __wt_tree_modify_set(session);
         }
 
@@ -1004,6 +1027,11 @@ __wti_live_restore_fs_restore_file(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
         __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
           "%s: Finished background restoration, closing source file", fh->name);
         WT_ERR(__live_restore_fh_close_source(session, lr_fh, true));
+
+        /*
+         * Dirty the tree again to ensure the live restore metadata is written out by the next
+         * checkpoint.
+         */
         __wt_tree_modify_set(session);
     }
 err:
@@ -1124,39 +1152,40 @@ __live_restore_fh_sync(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
 static int
 __live_restore_fh_truncate(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t len)
 {
-    WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh;
-    wt_off_t old_len, truncate_end, truncate_start;
+    WT_DECL_RET;
+    wt_off_t old_len = 0;
 
-    lr_fh = (WTI_LIVE_RESTORE_FILE_HANDLE *)fh;
-    old_len = 0;
-    /*
-     * If we truncate a range we'll never need to read that range from the source file. Mark it as
-     * such.
-     */
     WT_RET(__live_restore_fh_size(fh, wt_session, &old_len));
-
+    /* Sometimes we call truncate but don't change the length. Ignore */
     if (old_len == len)
-        /* Sometimes we call truncate but don't change the length. Ignore */
         return (0);
 
     __wt_verbose_debug2((WT_SESSION_IMPL *)wt_session, WT_VERB_LIVE_RESTORE,
       "truncating file %s from %" PRId64 " to %" PRId64, fh->name, old_len, len);
 
-    /*
-     * Truncate can be used to shorten a file or to extend it. In both cases the truncated/extended
-     * range doesn't need to be read from the source directory.
-     */
-    truncate_start = WT_MIN(len, old_len);
-    truncate_end = WT_MAX(len, old_len);
-
     WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
+    WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh = (WTI_LIVE_RESTORE_FILE_HANDLE *)fh;
 
-    WTI_WITH_LIVE_RESTORE_FH_WRITE_LOCK(
-      session, lr_fh,
-      __live_restore_fh_fill_bit_range(
-        lr_fh, session, truncate_start, (size_t)(truncate_end - truncate_start)););
+    bool locked = false;
+    if (!WTI_DEST_COMPLETE(lr_fh)) {
+        /* Lock so we can't race with background threads moving chunks. */
+        __wt_writelock(session, &lr_fh->lock);
+        locked = true;
+    }
 
-    return (lr_fh->destination->fh_truncate(lr_fh->destination, wt_session, len));
+    WT_ERR(lr_fh->destination->fh_truncate(lr_fh->destination, wt_session, len));
+    /* Only modify the bitmap if we are shortening the file and we have taken the lock. */
+    if (old_len > len && locked) {
+        /*
+         * Set the relevant bits in the bitmap. This won't be persisted across a crash without a
+         * metadata write. We catch this rare scenario with an assertion on file reopen.
+         */
+        __live_restore_fh_fill_bit_range(lr_fh, session, len, (size_t)(old_len - len));
+    }
+err:
+    if (locked)
+        __wt_writeunlock(session, &lr_fh->lock);
+    return (ret);
 }
 
 /*
@@ -1195,30 +1224,6 @@ err:
 }
 
 /*
- * __live_restore_decode_bitmap --
- *     Decode a bitmap from a hex string.
- */
-static int
-__live_restore_decode_bitmap(WT_SESSION_IMPL *session, const char *bitmap_str, uint64_t nbits,
-  WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh)
-{
-    WT_DECL_RET;
-    WT_ASSERT_ALWAYS(session, bitmap_str != NULL, "Live restore bitmap string is NULL");
-
-    WT_RET(__bit_alloc(session, nbits, &lr_fh->bitmap));
-    lr_fh->nbits = nbits;
-
-    WT_ITEM buf;
-    WT_CLEAR(buf);
-    WT_ERR(__wt_hex_to_raw(session, bitmap_str, &buf));
-    memcpy(lr_fh->bitmap, buf.mem, buf.size);
-    /* FIXME-WT-13813: Add check here for shorter dest than bitmap, set end to 1. */
-err:
-    __wt_buf_free(session, &buf);
-    return (ret);
-}
-
-/*
  * __live_restore_compute_nbits --
  *     Compute the number of bits needed for the bitmap, based off the destination file size.
  */
@@ -1232,6 +1237,43 @@ __live_restore_compute_nbits(
       "The file size isn't a multiple of the file allocation size!");
     *nbitsp = (uint64_t)size / (uint64_t)lr_fh->allocsize;
     return (0);
+}
+
+/*
+ * __live_restore_decode_bitmap --
+ *     Decode a bitmap from a hex string.
+ */
+static int
+__live_restore_decode_bitmap(WT_SESSION_IMPL *session, const char *bitmap_str,
+  uint64_t metadata_nbits, WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh)
+{
+    WT_DECL_RET;
+    WT_ASSERT_ALWAYS(session, bitmap_str != NULL, "Live restore bitmap string is NULL");
+
+    WT_RET(__bit_alloc(session, metadata_nbits, &lr_fh->bitmap));
+    lr_fh->nbits = metadata_nbits;
+
+    WT_ITEM buf;
+    WT_CLEAR(buf);
+    WT_ERR(__wt_hex_to_raw(session, bitmap_str, &buf));
+    memcpy(lr_fh->bitmap, buf.mem, buf.size);
+
+    uint64_t file_size_nbits;
+    WT_ERR(__live_restore_compute_nbits(session, lr_fh, &file_size_nbits));
+    /*
+     * We may have truncated a file and the filesize on disk is shorter than that in the bitmap
+     * itself. This would happen even without a crash, we can assert that all the bits in the file
+     * past the file size nbits are set.
+     */
+    if (file_size_nbits < metadata_nbits)
+        for (uint64_t i = file_size_nbits; i < metadata_nbits; i++)
+            WT_ASSERT_ALWAYS(session, __bit_test(lr_fh->bitmap, i),
+              "Live restore bitmap corruption detected in %s, bit %" PRIu64 " of %" PRIu64
+              " is unset!",
+              lr_fh->iface.name, i, metadata_nbits);
+err:
+    __wt_buf_free(session, &buf);
+    return (ret);
 }
 
 /*

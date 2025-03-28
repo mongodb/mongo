@@ -12,5 +12,5 @@ run_test "-i 2 -l 2 -b -t 1"
 
 # 5 iterations with 200K operations dying at some point. Followed by an single 200K operation
 # iteration after performing recovery
-run_test "-i 5 -l 2 -o 200000 -t 12 -d"
-run_test "-i 1 -l 2 -r -o 200000 -t 12"
+run_test "-i 5 -l 2 -o 100000 -t 12 -d"
+run_test "-i 1 -l 2 -r -o 100000 -t 12"

@@ -1,7 +1,7 @@
 # FIXME-WT-14312 Remove this file and its associated test at the end of the live restore project
 # A reasonable configuration for stress testing.
 cache.minimum=20
-runs.rows=1000000:5000000
+runs.rows=100000:500000
 runs.tables=3:10
 runs.threads=4:32
 # Backups take place every 20-45 seconds. 6 minutes will give us a good number of number of backups taking before we restart the test

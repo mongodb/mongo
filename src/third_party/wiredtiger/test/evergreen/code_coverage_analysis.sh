@@ -34,9 +34,9 @@ pip3 install lxml==4.8.0 Pygments==2.11.2 Jinja2==3.0.3 gcovr==5.0
 mkdir -p coverage_report
 output_flags="--html-self-contained --html-details coverage_report/2_coverage_report.html --json-summary-pretty --json-summary coverage_report/1_coverage_report_summary.json --json coverage_report/full_coverage_report.json"
 if [ ! -z $combine_coverage_report ]; then
-  gcovr -f $coverage_filter --add-tracefile $first_coverage_file_path --add-tracefile $second_coverage_file_path -j $num_jobs $output_flags
+  gcovr --gcov-ignore-parse-errors -f $coverage_filter --add-tracefile $first_coverage_file_path --add-tracefile $second_coverage_file_path -j $num_jobs $output_flags
 else
-  gcovr -f $coverage_filter -j $num_jobs $output_flags
+  gcovr --gcov-ignore-parse-errors -f $coverage_filter -j $num_jobs $output_flags
   $python_binary test/evergreen/code_coverage_analysis.py -s coverage_report/1_coverage_report_summary.json -t time.txt
 fi
 
