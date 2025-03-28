@@ -44,6 +44,7 @@
 #include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
@@ -62,6 +63,8 @@ namespace mongo {
 
 class ShardingDDLCoordinatorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
+    using FCV = multiversion::FeatureCompatibilityVersion;
+
     ShardingDDLCoordinatorServiceTest() {
         _externalState = std::make_shared<ShardingDDLCoordinatorExternalStateForTest>();
         _externalStateFactory =
@@ -138,6 +141,19 @@ public:
         ASSERT_EQ(ShardingDDLCoordinatorService::State::kRecovered, ddlService()->_state);
     }
 
+    void assertNumActiveCoordinatorsWithGivenOfcv(boost::optional<FCV> ofcvToCount,
+                                                  size_t expectedVal) {
+        const size_t cnt = ddlService()->_countActiveCoordinators(
+            [ofcvToCount](auto type, auto ofcv) { return ofcv == ofcvToCount; });
+        ASSERT_EQ(cnt, expectedVal);
+    }
+
+    void assertNoActiveCoordinators() {
+        const size_t cnt =
+            ddlService()->_countActiveCoordinators(([](auto type, auto ofcv) { return true; }));
+        ASSERT_EQ(cnt, 0);
+    }
+
 protected:
     using ScopedBaseDDLLock = DDLLockManager::ScopedBaseDDLLock;
 
@@ -179,16 +195,37 @@ protected:
             opCtx, ns, reason, mode, timeoutMillisecs, false /*waitForRecovery*/);
     }
 
-    MigrationBlockingOperationCoordinatorDocument createMBOCDoc(OperationContext* opCtx) {
-        const auto coordinatorId = ShardingDDLCoordinatorId{
-            NamespaceString::createNamespaceString_forTest("testDb", "coll"),
-            DDLCoordinatorTypeEnum::kMigrationBlockingOperation};
+    MigrationBlockingOperationCoordinatorDocument createMBOCDoc(
+        OperationContext* opCtx, NamespaceString nss, boost::optional<FCV> ofcv = boost::none) {
+        const auto coordinatorId =
+            ShardingDDLCoordinatorId{nss, DDLCoordinatorTypeEnum::kMigrationBlockingOperation};
         ShardingDDLCoordinatorMetadata metadata(coordinatorId);
-        metadata.setForwardableOpMetadata(ForwardableOperationMetadata(opCtx));
+        ForwardableOperationMetadata fom(opCtx);
+        if (ofcv) {
+            fom.setVersionContext(VersionContext{ofcv.value()});
+        }
+        metadata.setForwardableOpMetadata(fom);
         metadata.setDatabaseVersion(DatabaseVersion{UUID::gen(), Timestamp(1, 0)});
         MigrationBlockingOperationCoordinatorDocument doc;
         doc.setShardingDDLCoordinatorMetadata(metadata);
         return doc;
+    }
+
+    std::shared_ptr<MigrationBlockingOperationCoordinator>
+    spawnMigrationBlockingOperationCoordinator(OperationContext* opCtx,
+                                               NamespaceString nss,
+                                               boost::optional<FCV> ofcv = boost::none) {
+        return checked_pointer_cast<MigrationBlockingOperationCoordinator>(
+            MigrationBlockingOperationCoordinator::getOrCreate(
+                opCtx, ddlService(), createMBOCDoc(opCtx, nss, ofcv).toBSON()));
+    }
+
+    stdx::thread startBackgroundThread(std::function<void(OperationContext*)>&& fn) {
+        return stdx::thread([=, this] {
+            ThreadClient tc("backgroundTask", getServiceContext()->getService());
+            auto sideOpCtx = tc->makeOperationContext();
+            fn(sideOpCtx.get());
+        });
     }
 
     std::shared_ptr<executor::TaskExecutor> _testExecutor;
@@ -354,8 +391,8 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
 TEST_F(ShardingDDLCoordinatorServiceTest, StepdownStepupWhileCreatingCoordinator) {
     auto opCtx = makeOperationContext();
 
-    MigrationBlockingOperationCoordinator::getOrCreate(
-        opCtx.get(), ddlService(), createMBOCDoc(opCtx.get()).toBSON());
+    spawnMigrationBlockingOperationCoordinator(
+        opCtx.get(), NamespaceString::createNamespaceString_forTest("testDB.coll"));
 
     for (size_t i = 0u; i < 10u; ++i) {
         stepDown();
@@ -363,6 +400,100 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StepdownStepupWhileCreatingCoordinator
     }
 
     ddlService()->waitForRecovery(opCtx.get());
+}
+
+TEST_F(ShardingDDLCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType) {
+    auto opCtxHolder = makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    // Reaching a steady state to start the test
+    ddlService()->waitForRecovery(opCtx);
+
+    struct MbocTask {
+        std::shared_ptr<MigrationBlockingOperationCoordinator> instance;
+        const UUID opId = UUID::gen();
+
+        void beginOperation(OperationContext* opCtx) {
+            instance->beginOperation(opCtx, opId);
+        }
+
+        void endOperation(OperationContext* opCtx) {
+            instance->endOperation(opCtx, opId);
+        }
+    };
+
+    assertNoActiveCoordinators();
+
+    std::vector<MbocTask> mbocTasks;
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    mbocTasks.push_back({spawnMigrationBlockingOperationCoordinator(
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("testDB.collA"),
+        multiversion::GenericFCV::kLastLTS)});
+    mbocTasks.push_back({spawnMigrationBlockingOperationCoordinator(
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("testDB.collB"),
+        multiversion::GenericFCV::kLatest)});
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    mbocTasks.push_back({spawnMigrationBlockingOperationCoordinator(
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("testDB.collC"),
+        multiversion::GenericFCV::kLatest)});
+    mbocTasks.push_back({spawnMigrationBlockingOperationCoordinator(
+        opCtx, NamespaceString::createNamespaceString_forTest("testDB.collD"))});
+
+    mbocTasks[0].beginOperation(opCtx);
+    mbocTasks[1].beginOperation(opCtx);
+    mbocTasks[2].beginOperation(opCtx);
+    mbocTasks[3].beginOperation(opCtx);
+
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    assertNumActiveCoordinatorsWithGivenOfcv(multiversion::GenericFCV::kLatest, 2);
+    assertNumActiveCoordinatorsWithGivenOfcv(multiversion::GenericFCV::kLastLTS, 1);
+    assertNumActiveCoordinatorsWithGivenOfcv(boost::none, 1);
+
+    PseudoRandom prng(Date_t::now().asInt64());
+
+    auto endLatestAndNoOfcvTasksThread = startBackgroundThread([&](OperationContext* sideOpCtx) {
+        sideOpCtx->sleepFor(Milliseconds{prng.nextInt32(5000)});
+        mbocTasks[1].endOperation(sideOpCtx);
+        mbocTasks[2].endOperation(sideOpCtx);
+        mbocTasks[3].endOperation(sideOpCtx);
+    });
+
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    ddlService()->waitForCoordinatorsOfGivenOfcvToComplete(
+        opCtx, [](boost::optional<FCV> ofcv) -> bool {
+            return ofcv != multiversion::GenericFCV::kLastLTS;
+        });
+
+    ASSERT_FALSE(mbocTasks[0].instance->getCompletionFuture().isReady());
+    ASSERT_TRUE(mbocTasks[1].instance->getCompletionFuture().isReady());
+    ASSERT_TRUE(mbocTasks[2].instance->getCompletionFuture().isReady());
+    ASSERT_TRUE(mbocTasks[3].instance->getCompletionFuture().isReady());
+
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    assertNumActiveCoordinatorsWithGivenOfcv(multiversion::GenericFCV::kLatest, 0);
+    assertNumActiveCoordinatorsWithGivenOfcv(multiversion::GenericFCV::kLastLTS, 1);
+    assertNumActiveCoordinatorsWithGivenOfcv(boost::none, 0);
+
+    endLatestAndNoOfcvTasksThread.join();
+
+    auto endLastLTSTaskThread = startBackgroundThread([&](OperationContext* sideOpCtx) {
+        sideOpCtx->sleepFor(Milliseconds{prng.nextInt32(5000)});
+        mbocTasks[0].endOperation(sideOpCtx);
+    });
+
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    ddlService()->waitForCoordinatorsOfGivenOfcvToComplete(
+        opCtx, [](boost::optional<FCV> ofcv) -> bool {
+            return ofcv == multiversion::GenericFCV::kLastLTS;
+        });
+
+    ASSERT_TRUE(mbocTasks[0].instance->getCompletionFuture().isReady());
+    assertNoActiveCoordinators();
+
+    endLastLTSTaskThread.join();
 }
 
 }  // namespace mongo

@@ -72,5 +72,5 @@ structs:
                 type: version_context
                 description: "Snapshot of the FCV used by the operation,
                               which ensures that feature flag checks are stable through its execution."
-                # TODO SERVER-101449: make non-optional after 9.0 becomes last LTS.
+                # TODO SERVER-99655: make non-optional once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
                 optional: true

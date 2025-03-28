@@ -134,6 +134,7 @@ namespace mongo {
 namespace {
 
 using GenericFCV = multiversion::GenericFCV;
+using FCV = multiversion::FeatureCompatibilityVersion;
 
 MONGO_FAIL_POINT_DEFINE(failBeforeTransitioning);
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
@@ -205,8 +206,7 @@ void abortAllReshardCollection(OperationContext* opCtx) {
     }
 }
 
-void _setShardedClusterCardinalityParameter(
-    OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+void _setShardedClusterCardinalityParameter(OperationContext* opCtx, const FCV requestedVersion) {
     // If the replica set endpoint is not active, then it isn't safe to allow direct connections
     // again after a second shard has been added. The replica set endpoint requires the cluster
     // parameter to be correct (go back to false when the second shard is removed) so we will need
@@ -230,10 +230,9 @@ void uassertStatusOKIgnoreNSNotFound(Status status) {
  * the server expects the user to modify data themselves. In testing, as there may not
  * actually be a real user, we need to do it ourselves.
  */
-void maybeModifyDataOnDowngradeForTest(
-    OperationContext* opCtx,
-    const multiversion::FeatureCompatibilityVersion requestedVersion,
-    const multiversion::FeatureCompatibilityVersion originalVersion) {
+void maybeModifyDataOnDowngradeForTest(OperationContext* opCtx,
+                                       const FCV requestedVersion,
+                                       const FCV originalVersion) {
     if (MONGO_unlikely(automaticallyCollmodToRecordIdsReplicatedFalse.shouldFail())) {
         // If the test-only failpoint 'automaticallyCollmodToRecordIdsReplicatedFalse' is set,
         // we automatically strip the 'recordIdsReplicated' parameter from the collection
@@ -641,59 +640,73 @@ private:
     // The fact that the FCV has already transitioned to kDowngrading ensures that no
     // new backward-incompatible ShardingDDLCoordinators can start.
     // We do not expect any other feature-specific work to be done in the 'start' phase.
-    void _shardServerPhase1Tasks(OperationContext* opCtx,
-                                 multiversion::FeatureCompatibilityVersion requestedVersion) {
+    void _shardServerPhase1Tasks(OperationContext* opCtx, FCV requestedVersion) {
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
         const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
         const auto isDowngrading = originalVersion > requestedVersion;
         const auto isUpgrading = originalVersion < requestedVersion;
 
-        // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
-        if (isDowngrading &&
-            feature_flags::gGlobalIndexesShardingCatalog
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
-        }
+        if (isDowngrading) {
+            // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled
+            // on the lastLTS
+            if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledOnVersion(originalVersion)) {
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForCoordinatorsOfGivenOfcvToComplete(
+                        opCtx, [originalVersion](boost::optional<FCV> ofcv) -> bool {
+                            return ofcv == originalVersion;
+                        });
+            } else {
+                // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
+                if (feature_flags::gGlobalIndexesShardingCatalog
+                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                      originalVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
+                }
 
-        // TODO SERVER-77915: Remove once v8.0 branches out
-        if (isDowngrading &&
-            feature_flags::gTrackUnshardedCollectionsUponMoveCollection
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
-        }
+                // TODO SERVER-77915: Remove once v8.0 branches out
+                if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection
+                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                      originalVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
+                }
 
-        // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
-        if (isDowngrading &&
-            (feature_flags::gSessionsCollectionCoordinatorOnConfigServer)
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
-        }
+                // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
+                if (feature_flags::gSessionsCollectionCoordinatorOnConfigServer
+                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                      originalVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
+                }
 
-        // TODO SERVER-77915: Remove once v8.0 branches out.
-        if (isDowngrading &&
-            feature_flags::gTrackUnshardedCollectionsUponMoveCollection
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx, DDLCoordinatorTypeEnum::kCollMod);
-        }
+                // TODO SERVER-77915: Remove once v8.0 branches out.
+                if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection
+                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                      originalVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kCollMod);
+                }
 
-        // TODO (SERVER-76436) Remove once global balancing becomes last lts.
-        if (isDowngrading &&
-            feature_flags::gBalanceUnshardedCollections
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kMovePrimary);
+                // TODO (SERVER-76436) Remove once global balancing becomes last lts.
+                if (feature_flags::gBalanceUnshardedCollections
+                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                      originalVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kMovePrimary);
+                }
+            }
         }
 
         if (isUpgrading) {
+            // TODO SERVER-102084: drain all coordinators that started under the original FCV
+
             // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
             if (feature_flags::gShardAuthoritativeDbMetadataDDL
                     .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
@@ -703,7 +716,7 @@ private:
                 // waitForOngoingCoordinatorsToFinish() could also wait for coordinators that
                 // started AFTER the transition to kUpgrading. That's OK, it's a performance
                 // penalty, but there is no correctness issue.
-                // TODO (SERVER-101537): use new draining mechanism.
+                // TODO (SERVER-102084): update draining mechanism.
                 ShardingDDLCoordinatorService::getService(opCtx)
                     ->waitForOngoingCoordinatorsToFinish(
                         opCtx, [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
@@ -762,8 +775,7 @@ private:
     // in this helper function is idempotent and could be done after _runDowngrade even if it
     // failed at any point in the middle of _userCollectionsUassertsForDowngrade or
     // _internalServerCleanupForDowngrade.
-    void _upgradeServerMetadata(OperationContext* opCtx,
-                                const multiversion::FeatureCompatibilityVersion requestedVersion) {
+    void _upgradeServerMetadata(OperationContext* opCtx, const FCV requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         if (role && role->has(ClusterRole::ConfigServer)) {
@@ -773,8 +785,7 @@ private:
     }
 
     // TODO (SERVER-83704): Remove this function once 8.0 becomes last LTS.
-    void _initializePlacementHistory(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+    void _initializePlacementHistory(OperationContext* opCtx, const FCV requestedVersion) {
         const auto originalVersion =
             getTransitionFCVInfo(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
@@ -785,10 +796,9 @@ private:
         }
     }
 
-    void _dropSessionsCollectionLocally(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion originalVersion) {
+    void _dropSessionsCollectionLocally(OperationContext* opCtx,
+                                        const FCV requestedVersion,
+                                        const FCV originalVersion) {
         if (feature_flags::gSessionsCollectionCoordinatorOnConfigServer
                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             // Only drop the collection locally if the config server is not acting as a shard. Since
@@ -812,10 +822,9 @@ private:
         }
     }
 
-    void _createShardingIndexCatalogIndexes(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const NamespaceString& indexCatalogNss) {
+    void _createShardingIndexCatalogIndexes(OperationContext* opCtx,
+                                            const FCV requestedVersion,
+                                            const NamespaceString& indexCatalogNss) {
         // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
         const auto actualVersion =
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
@@ -959,8 +968,7 @@ private:
     // InterruptedDueToReplStateChange) or ErrorCode::CannotDowngrade. The uasserts added to this
     // helper function can only have the CannotDowngrade error code indicating that the user must
     // manually clean up some user data in order to retry the FCV downgrade.
-    void _userCollectionsUassertsForDowngrade(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+    void _userCollectionsUassertsForDowngrade(OperationContext* opCtx, const FCV requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
@@ -1058,8 +1066,7 @@ private:
 
     // Remove cluster parameters from the clusterParameters collections which are not enabled on
     // requestedVersion.
-    void _cleanUpClusterParameters(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+    void _cleanUpClusterParameters(OperationContext* opCtx, const FCV requestedVersion) {
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
         const auto fromVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
@@ -1141,8 +1148,7 @@ private:
     // (indicating a server bug and that the data is corrupted). ManualInterventionRequired
     // and fasserts are errors that are not expected to occur in practice, but if they did,
     // they would turn into a Support case.
-    void _internalServerCleanupForDowngrade(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+    void _internalServerCleanupForDowngrade(OperationContext* opCtx, const FCV requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
@@ -1213,11 +1219,10 @@ private:
         }
     }
 
-    void _dropInternalShardingIndexCatalogCollection(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion originalVersion,
-        const NamespaceString& indexCatalogNss) {
+    void _dropInternalShardingIndexCatalogCollection(OperationContext* opCtx,
+                                                     const FCV requestedVersion,
+                                                     const FCV originalVersion,
+                                                     const NamespaceString& indexCatalogNss) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         // TODO SERVER-67392: Remove when 7.0 branches-out.
         // Coordinators that commits indexes to the csrs must be drained before this point. Older
@@ -1295,10 +1300,9 @@ private:
         }
     }
 
-    void abortAllMultiUpdateCoordinators(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion originalVersion) {
+    void abortAllMultiUpdateCoordinators(OperationContext* opCtx,
+                                         const FCV requestedVersion,
+                                         const FCV originalVersion) {
         if (!migration_blocking_operation::gFeatureFlagPauseMigrationsDuringMultiUpdatesAvailable
                  .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             return;
@@ -1618,42 +1622,51 @@ private:
     // cluster is already in the requestedVersion (i.e. requestedVersion == actualVersion). However,
     // the cluster should retry/complete the tasks from _finalizeUpgrade before sending ok:1
     // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
-    void _finalizeUpgrade(OperationContext* opCtx,
-                          const multiversion::FeatureCompatibilityVersion requestedVersion) {
+    void _finalizeUpgrade(OperationContext* opCtx, const FCV requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
-        // TODO SERVER-77915: Remove once v8.0 branches out.
-        if (role && role->has(ClusterRole::ShardServer) &&
-            feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabledOnVersion(
-                requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
-        }
+        if (role && role->has(ClusterRole::ShardServer)) {
+            // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled
+            // on the lastLTS
+            if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledOnVersion(requestedVersion)) {
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForCoordinatorsOfGivenOfcvToComplete(
+                        opCtx, [requestedVersion](boost::optional<FCV> ofcv) -> bool {
+                            return ofcv != requestedVersion;
+                        });
+            } else {
+                // TODO SERVER-77915: Remove once v8.0 branches out.
+                if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabledOnVersion(
+                        requestedVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
+                }
 
-        // TODO SERVER-77915: Remove once v8.0 branches out.
-        if (role && role->has(ClusterRole::ShardServer) &&
-            feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabledOnVersion(
-                requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx, DDLCoordinatorTypeEnum::kCollMod);
-        }
+                // TODO SERVER-77915: Remove once v8.0 branches out.
+                if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabledOnVersion(
+                        requestedVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kCollMod);
+                }
 
-        // TODO SERVER-94362: Remove once create database coordinator becomes last lts.
-        if (role && role->has(ClusterRole::ShardServer) &&
-            feature_flags::gCreateDatabaseDDLCoordinator.isEnabledOnVersion(requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kDropDatabase);
-        }
+                // TODO SERVER-94362: Remove once create database coordinator becomes last lts.
+                if (feature_flags::gCreateDatabaseDDLCoordinator.isEnabledOnVersion(
+                        requestedVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kDropDatabase);
+                }
 
-        // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
-        if (role && role->has(ClusterRole::ShardServer) &&
-            feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
-                requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
+                // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
+                if (feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
+                        requestedVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
+                }
+            }
         }
 
         // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
@@ -1669,6 +1682,8 @@ private:
     void _finalizeDowngrade(OperationContext* opCtx,
                             const multiversion::FeatureCompatibilityVersion requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
+
+        // TODO SERVER-102084: drain all coordinators that started during kDowngrading
 
         // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
         if (role && role->has(ClusterRole::ConfigServer) &&

@@ -71,7 +71,7 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
         setAuditClientMetadata(std::move(auditClientAttrs));
     }
 
-    // TODO SERVER-101449: update once 9.0 becomes last LTS.
+    // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
     if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
         setVersionContext(VersionContext::getDecoration(opCtx));
     }
@@ -103,7 +103,7 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
         rpc::AuditClientAttrs::set(client, optAuditClientMetadata.value());
     }
 
-    // TODO SERVER-101449: update once versionContext becomes a required field.
+    // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
     if (const auto& vCtx = getVersionContext()) {
         ClientLock lk(opCtx->getClient());
         VersionContext::setDecoration(lk, opCtx, vCtx.value());

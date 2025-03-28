@@ -72,6 +72,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
+#include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -124,6 +125,15 @@ public:
     const ForwardableOperationMetadata& getForwardableOpMetadata() const {
         invariant(_forwardableOpMetadata);
         return _forwardableOpMetadata.get();
+    }
+
+    // TODO SERVER-99655: update once the operationFCV is always present for sharded DDLs
+    boost::optional<multiversion::FeatureCompatibilityVersion> getOperationFCV() const {
+        const auto versionContext = getForwardableOpMetadata().getVersionContext();
+        invariant(!versionContext || versionContext->getOperationFCV());
+        return versionContext
+            ? boost::make_optional(versionContext->getOperationFCV()->getVersion())
+            : boost::none;
     }
 
     const boost::optional<mongo::DatabaseVersion>& getDatabaseVersion() const& {
