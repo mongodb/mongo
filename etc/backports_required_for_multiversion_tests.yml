@@ -406,7 +406,7 @@ last-continuous:
       ticket: SERVER-98664
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_limit.js
       ticket: SERVER-100299
-    - test_file: jstests/hot_backups_multiversion/*.js
+    - test_file: src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/*.js
       ticket: SERVER-81208
     - test_file: jstests/core_sharding/ddl/shard_collection_outside_db_primary_index_compatibility.js
       ticket: SERVER-100844
@@ -875,7 +875,7 @@ last-lts:
       ticket: SERVER-98664
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_limit.js
       ticket: SERVER-100299
-    - test_file: jstests/hot_backups_multiversion/*.js
+    - test_file: src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/*.js
       ticket: SERVER-81208
     - test_file: jstests/core_sharding/ddl/shard_collection_outside_db_primary_index_compatibility.js
       ticket: SERVER-100844
