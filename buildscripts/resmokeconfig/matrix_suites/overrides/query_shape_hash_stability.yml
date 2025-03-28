@@ -10,6 +10,7 @@
       - jstests/core/query/distinct/distinct_semantics.js
       # Explain cannot target shards directly.
       - jstests/core/index/text/text_ignore_regex.js
+      - jstests/core/index/fts/fts_spilling.js
       - jstests/core/timeseries/query/timeseries_merge.js
       - jstests/core/query/or_use_clustered_collection.js
       # Tests which assert on the number of execution metrics. The additional commands emitted by
