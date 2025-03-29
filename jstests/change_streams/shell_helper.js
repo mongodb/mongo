@@ -77,6 +77,7 @@ resumeToken = change._id;
 delete change._id;
 delete change.clusterTime;
 delete change.wallTime;
+delete change.collectionUUID;
 assert.docEq(expected, change);
 
 jsTestLog("Testing watch() with pipeline");

@@ -27,6 +27,10 @@ function compareChanges(expectedChanges, observedChanges) {
             assert.eq(expectedChanges[i].fullDocument, observedChanges[i].fullDocument);
         }
         if (expectedChanges[i].hasOwnProperty("updateDescription")) {
+            // Need to remove this field because it is only exposed by default from v8.2 onwards,
+            // but in previous versions it is only exposed when the change stream is opened with
+            // '{showExpandedEvents: true}'.
+            delete observedChanges[i].updateDescription.disambiguatedPaths;
             assert.eq(expectedChanges[i].updateDescription, observedChanges[i].updateDescription);
         }
         if (expectedChanges[i].hasOwnProperty("documentKey")) {
@@ -91,11 +95,7 @@ function runTest(downgradeVersion) {
     const changeStreamCursor = rst.getPrimary().getDB(dbName)[watchedCollName].watch();
     performDBOps(rst.getPrimary());
 
-    // Starting with MongoDB 4.8 we expect update descriptions to include truncatedArrays.
-    const updateDescription = {updatedFields: {a: 1}, removedFields: []};
-    if (MongoRunner.compareBinVersions(downgradeVersion, "4.8") >= 0) {
-        updateDescription.truncatedArrays = [];
-    }
+    const updateDescription = {updatedFields: {a: 1}, removedFields: [], truncatedArrays: []};
 
     const expectedChanges = [
         {operationType: "insert", fullDocument: {_id: 2}},

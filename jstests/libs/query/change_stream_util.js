@@ -90,6 +90,16 @@ export function canonicalizeEventForTesting(event, expected) {
         }
     }
 
+    // Exclude "updateDescription.disambiguatedPaths" if not explicitly specified in the expected
+    // event. This is necessary because from 8.2 onwards, we expose this field by default, but in
+    // previous versions it is only exposed when the change stream was opened with
+    // '{showExpandedEvents: true}'.
+    if (expected.hasOwnProperty("updateDescription") &&
+        !expected.updateDescription.hasOwnProperty("disambiguatedPaths") &&
+        event.hasOwnProperty("updateDescription")) {
+        delete event.updateDescription.disambiguatedPaths;
+    }
+
     return event;
 }
 
