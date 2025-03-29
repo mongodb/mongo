@@ -224,14 +224,12 @@ public:
     bool groupIsOnShardKey(const Pipeline& pipeline,
                            const boost::optional<OrderedPathSet>& initialShardKeyPaths) const;
 
-    void doForceSpill() override {
-        _groupProcessor.spill();
-    }
-
 protected:
     DocumentSourceGroupBase(StringData stageName,
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
+
+    ~DocumentSourceGroupBase() override;
 
     void initializeFromBson(BSONElement elem);
     virtual bool isSpecFieldReserved(StringData fieldName) = 0;

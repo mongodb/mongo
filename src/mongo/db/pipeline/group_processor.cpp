@@ -102,12 +102,14 @@ boost::optional<Document> GroupProcessor::getNextSpilled() {
 }
 
 boost::optional<Document> GroupProcessor::getNextStandard() {
-    if (_groups.empty()) {
+    // Not spilled, and not streaming.
+    if (!_groupsIterator || _groupsIterator == _groups.end())
         return boost::none;
-    }
-    auto it = _groups.begin();
+
+    auto& it = *_groupsIterator;
+
     Document out = makeDocument(it->first, it->second);
-    _groups.erase(it);
+    ++it;
     return out;
 }
 
@@ -179,31 +181,40 @@ void GroupProcessor::readyGroups() {
 
         MONGO_verify(_sorterIterator->more());  // we put data in, we should get something out.
         _firstPartOfNextGroup = _sorterIterator->next();
+    } else {
+        // start the group iterator
+        _groupsIterator = _groups.begin();
     }
-
-    _groupsReady = true;
 }
 
 void GroupProcessor::reset() {
     // Free our resources.
     GroupProcessorBase::reset();
 
-    _groupsReady = false;
-
     _sorterIterator.reset();
     _sortedFiles.clear();
+    // Make us look done.
+    _groupsIterator = _groups.end();
 }
 
 bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
     if (!_memoryTracker.allowDiskUse() && !_memoryTracker.withinMemoryLimit()) {
         freeMemory();
     }
-    return !_memoryTracker.withinMemoryLimit();
+
+    if (!_memoryTracker.withinMemoryLimit()) {
+        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Exceeded memory limit for $group, but didn't allow external sort."
+                " Pass allowDiskUse:true to opt in.",
+                _memoryTracker.allowDiskUse());
+        return true;
+    }
+    return false;
 }
 
 bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
     // Spill every time we have a duplicate id to stress merge logic.
-    return (internalQueryEnableAggressiveSpillsInGroup.loadRelaxed() &&
+    return (internalQueryEnableAggressiveSpillsInGroup &&
             !_expCtx->getOperationContext()->readOnly() && !isNewGroup &&  // is not a new group
             !_expCtx->getInRouter() &&        // can't spill to disk in router
             _memoryTracker.allowDiskUse() &&  // never spill when disk use is explicitly prohibited
@@ -211,15 +222,6 @@ bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
 }
 
 void GroupProcessor::spill() {
-    if (_groups.empty()) {
-        return;
-    }
-
-    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            "Exceeded memory limit for $group, but didn't allow external sort."
-            " Pass allowDiskUse:true to opt in.",
-            _memoryTracker.allowDiskUse());
-
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
         _expCtx->getTempDir(), internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
@@ -275,14 +277,6 @@ void GroupProcessor::spill() {
     // Zero out the current per-accumulation statement memory consumption, as the memory has been
     // freed by spilling.
     GroupProcessorBase::reset();
-
-    if (_groupsReady) {
-        tassert(9917000,
-                "Expect everything to be spilled if groups are ready and it is not the first spill",
-                !_spilled);
-        // Ready groups again to read from disk instead of from memory.
-        readyGroups();
-    }
 }
 
 }  // namespace mongo

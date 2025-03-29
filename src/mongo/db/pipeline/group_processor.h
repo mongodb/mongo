@@ -87,13 +87,6 @@ public:
         return _stats.spillingStats.getSpills() > 0;
     }
 
-    /**
-     * Spills the GroupsMap to a new file and empties the map so that subsequent groups can be added
-     * to it. Later when the groups need to be returned back to the caller, all groups in all the
-     * spilled files are read, merged and returned to the caller.
-     */
-    void spill();
-
 private:
     boost::optional<Document> getNextSpilled();
     boost::optional<Document> getNextStandard();
@@ -112,8 +105,15 @@ private:
      */
     bool shouldSpillOnEveryDuplicateId(bool isNewGroup);
 
-    // Are groups ready to be returned?
-    bool _groupsReady{false};
+    /**
+     * Spills the GroupsMap to a new file and empties the map so that subsequent groups can be added
+     * to it. Later when the groups need to be returned back to the caller, all groups in all the
+     * spilled files are read, merged and returned to the caller.
+     */
+    void spill();
+
+    // Only used when '_spilled' is false.
+    boost::optional<GroupProcessorBase::GroupsMap::iterator> _groupsIterator;
 
     // Tracks the size of the spill file.
     std::unique_ptr<SorterFileStats> _spillStats;
