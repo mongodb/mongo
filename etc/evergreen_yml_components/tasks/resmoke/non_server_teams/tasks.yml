@@ -250,8 +250,11 @@ tasks:
     name: streams_kafka_gwproxy
     tags: ["assigned_to_jira_team_streams", "experimental"]
     commands:
+      - command: ec2.assume_role
+        params:
+          role_arn: "arn:aws:iam::664315256653:role/streams-evergreen-ecr-access-ro"
       - func: "do setup"
-      - func: "run tests"
+      - func: "run tests with aws credentials"
 
   - <<: *task_template
     name: streams_kafka_benchmark
