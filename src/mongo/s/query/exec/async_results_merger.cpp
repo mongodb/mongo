@@ -681,6 +681,9 @@ Status AsyncResultsMerger::releaseMemoryResult() {
         return _status;
     }
     for (const auto& remote : _remotes) {
+        if (remote->exhausted()) {
+            continue;
+        }
         // If we are done, all remotes should have sent a response.
         tassert(9745603, "remote should have releaseMemoryResponse", remote->releaseMemoryResponse);
         auto response = remote->releaseMemoryResponse.get();
