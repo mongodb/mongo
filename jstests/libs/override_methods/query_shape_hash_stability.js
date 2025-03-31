@@ -67,24 +67,32 @@ function assertAllEqual(array) {
  * assert that all the explain results for 'explainCmd' have identical query shape hashes.
  */
 export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
+    let queryShapeHashes;
     try {
         // We run explain on all connections in the topology and assert that the query shape hash is
         // the same on all nodes.
-        const queryShapeHashes =
-            getTopologyConnections(conn).map(conn => conn.getDB(dbName)).map(db => {
-                jsTest.log.info(`About to run the explain on host: ${db.getMongo().host}`);
-                const explainResult = retryOnRetryableError(
-                    () => assert.commandWorked(db.runCommand(explainCmd)), 50);
-                return explainResult.queryShapeHash;
-            });
-        assertAllEqual(queryShapeHashes);
+        queryShapeHashes = getTopologyConnections(conn).map(conn => conn.getDB(dbName)).map(db => {
+            jsTest.log.info('About to run the explain', {host: db.getMongo().host});
+            const explainResult =
+                retryOnRetryableError(() => assert.commandWorked(db.runCommand(explainCmd)), 50);
+            return explainResult.queryShapeHash;
+        });
     } catch (ex) {
+        // Fuzzer may generate invalid commands, which will fail on assert.commandWorked().
+        // If explain command failed, ignore the exception.
+        if (TestData.isRunningQueryShapeHashFuzzer) {
+            return;
+        }
+
         const expectedErrorCodes =
             [ErrorCodes.CommandOnShardedViewNotSupportedOnMongod, ErrorCodes.NamespaceNotFound];
-        if (!expectedErrorCodes.includes(ex.code)) {
-            throw ex;
+        if (expectedErrorCodes.includes(ex.code)) {
+            return;
         }
+
+        throw ex;
     }
+    assertAllEqual(queryShapeHashes);
 }
 
 function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {

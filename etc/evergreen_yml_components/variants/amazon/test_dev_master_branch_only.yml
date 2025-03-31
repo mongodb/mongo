@@ -252,6 +252,7 @@ buildvariants:
       - name: .query_fuzzer
       - name: .updatefuzzer
       - name: .jstestfuzz
+      - name: .query_shape_hash_stability_fuzzer
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-cluster-scalability-only

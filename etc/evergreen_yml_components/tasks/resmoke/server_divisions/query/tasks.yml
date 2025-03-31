@@ -1380,6 +1380,99 @@ tasks:
         vars:
           use_large_distro: "true"
 
+  ## jstestfuzz run_commands fuzzer generating find runs ##
+  - <<: *jstestfuzz_template
+    name: query_shape_hash_stability_fuzzer_find_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "query_shape_hash_stability_fuzzer",
+        "non_deterministic",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_find_fuzzer_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_find_fuzzer_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: run-command-generator
+          jstestfuzz_vars: --commandType=find
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
+  ## jstestfuzz run_commands fuzzer generating aggregate runs ##
+  - <<: *jstestfuzz_template
+    name: query_shape_hash_stability_fuzzer_aggregate_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "query_shape_hash_stability_fuzzer",
+        "non_deterministic",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_aggregate_fuzzer_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_aggregate_fuzzer_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: run-command-generator
+          jstestfuzz_vars: --commandType=aggregate
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
+  ## jstestfuzz run_commands fuzzer generating distinct runs ##
+  - <<: *jstestfuzz_template
+    name: query_shape_hash_stability_fuzzer_distinct_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "query_shape_hash_stability_fuzzer",
+        "non_deterministic",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_distinct_fuzzer_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_distinct_fuzzer_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: run-command-generator
+          jstestfuzz_vars: --commandType=distinct
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
   ## jstestfuzz standalone update generational fuzzer ##
   - <<: *jstestfuzz_template
     name: update_fuzzer_gen
