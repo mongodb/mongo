@@ -481,6 +481,7 @@ buildvariants:
       - name: streams_kafka_benchmark
       - name: streams_https
       - name: streams_lambda
+      - name: streams_s3
 
   - name: enterprise-amazon2-streams
     display_name: "Amazon Linux 2 enterprise build with streams"
@@ -525,6 +526,7 @@ buildvariants:
       - name: streams_kafka_benchmark
       - name: streams_https
       - name: streams_lambda
+      - name: streams_s3
 
   - name: enterprise-amazon2-streams-arm64
     display_name: "Amazon Linux 2 enterprise build with streams arm64"
@@ -570,6 +572,7 @@ buildvariants:
       # - name: streams_kafka_benchmark
       - name: streams_https
       - name: streams_lambda
+      - name: streams_s3
 
   - <<: *enterprise-amazon2023-arm64-template
     name: enterprise-amazon2023-arm64-fuzzers

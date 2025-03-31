@@ -155,6 +155,7 @@ rules:
             "streams_kafka",
             "streams_kafka_gwproxy",
             "streams_lambda",
+            "streams_s3",
             # TODO: remove these exceptions when SERVER-94573 is resolved
             "selinux_rhel9_enterprise",
             "selinux_rhel8_org",

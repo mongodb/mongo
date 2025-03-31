@@ -311,6 +311,7 @@ buildvariants:
       - name: streams_kafka
       - name: streams_kafka_gwproxy
       - name: streams_lambda
+      - name: streams_s3
       - name: product_limits
         cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
 
