@@ -1402,7 +1402,7 @@ private:
     int expectedSpills() const {
         // 'DocumentSourceGroup' has the knob called 'internalQueryEnableAggressiveSpillsInGroup'
         // used to spill more aggressively when turned on.
-        return internalQueryEnableAggressiveSpillsInGroup ? kCount : 4;
+        return internalQueryEnableAggressiveSpillsInGroup.loadRelaxed() ? kCount : 4;
     }
 
     std::deque<DocumentSource::GetNextResult> inputData() final {

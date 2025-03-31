@@ -214,7 +214,7 @@ bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
 
 bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
     // Spill every time we have a duplicate id to stress merge logic.
-    return (internalQueryEnableAggressiveSpillsInGroup &&
+    return (internalQueryEnableAggressiveSpillsInGroup.loadRelaxed() &&
             !_expCtx->getOperationContext()->readOnly() && !isNewGroup &&  // is not a new group
             !_expCtx->getInRouter() &&        // can't spill to disk in router
             _memoryTracker.allowDiskUse() &&  // never spill when disk use is explicitly prohibited
