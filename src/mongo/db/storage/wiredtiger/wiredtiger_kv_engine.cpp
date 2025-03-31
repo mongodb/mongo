@@ -531,7 +531,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
     }
 
-    _connection.reset(new WiredTigerConnection(this));
+    _connection = std::make_unique<WiredTigerConnection>(_conn, _clockSource, this);
 
     _sessionSweeper = std::make_unique<WiredTigerSessionSweeper>(_connection.get());
     _sessionSweeper->go();

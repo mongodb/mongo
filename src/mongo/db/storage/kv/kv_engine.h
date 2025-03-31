@@ -76,7 +76,9 @@ public:
      */
     virtual void notifyReplStartupRecoveryComplete(RecoveryUnit&) {}
 
-    virtual RecoveryUnit* newRecoveryUnit() = 0;
+    virtual RecoveryUnit* newRecoveryUnit() {
+        MONGO_UNREACHABLE;
+    }
 
     /**
      * Requesting multiple copies for the same ns/ident is a rules violation; Calling on a

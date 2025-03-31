@@ -50,7 +50,7 @@
 namespace mongo {
 
 class StatsCollectionPermit;
-class WiredTigerKVEngine;
+class WiredTigerKVEngineBase;
 
 /**
  *  This is a wrapper class for WT_CONNECTION and contains a shared pool of cached WiredTiger
@@ -59,10 +59,9 @@ class WiredTigerKVEngine;
  */
 class WiredTigerConnection {
 public:
-    WiredTigerConnection(WiredTigerKVEngine* engine);
     WiredTigerConnection(WT_CONNECTION* conn,
                          ClockSource* cs,
-                         WiredTigerKVEngine* engine = nullptr);
+                         WiredTigerKVEngineBase* engine = nullptr);
     ~WiredTigerConnection();
 
 
@@ -163,7 +162,7 @@ public:
         return _snapshotManager;
     }
 
-    WiredTigerKVEngine* getKVEngine() const {
+    WiredTigerKVEngineBase* getKVEngine() const {
         return _engine;
     }
 
@@ -201,9 +200,9 @@ private:
 
     friend class WiredTigerSession;
     friend class WiredTigerManagedSession;
-    WT_CONNECTION* _conn;             // not owned
-    ClockSource* const _clockSource;  // not owned
-    WiredTigerKVEngine* _engine;      // not owned, might be NULL
+    WT_CONNECTION* _conn;                      // not owned
+    ClockSource* const _clockSource;           // not owned
+    WiredTigerKVEngineBase* _engine{nullptr};  // not owned, might be NULL
     WiredTigerSnapshotManager _snapshotManager;
     CompiledConfigurationsPerConnection _compiledConfigurations;
 

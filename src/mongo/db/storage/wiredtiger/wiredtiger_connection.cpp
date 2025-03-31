@@ -54,12 +54,9 @@
 
 namespace mongo {
 
-WiredTigerConnection::WiredTigerConnection(WiredTigerKVEngine* engine)
-    : WiredTigerConnection(engine->getConn(), engine->getClockSource(), engine) {}
-
 WiredTigerConnection::WiredTigerConnection(WT_CONNECTION* conn,
                                            ClockSource* cs,
-                                           WiredTigerKVEngine* engine)
+                                           WiredTigerKVEngineBase* engine)
     : _conn(conn), _clockSource(cs), _engine(engine) {
     uassertStatusOK(_compiledConfigurations.compileAll(_conn));
     uassert(9728400,

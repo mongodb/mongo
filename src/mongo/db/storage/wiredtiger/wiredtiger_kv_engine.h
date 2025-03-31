@@ -186,7 +186,24 @@ private:
     WT_CONNECTION* _conn{nullptr};
 };
 
-class WiredTigerKVEngine final : public KVEngine {
+// Base class of all KVEngine implementations that use WiredTiger.
+class WiredTigerKVEngineBase : public KVEngine {
+public:
+    virtual WiredTigerOplogManager* getOplogManager() const {
+        return nullptr;
+    }
+
+    virtual Status alterMetadata(StringData uri, StringData config) {
+        MONGO_UNREACHABLE;
+    }
+
+    /**
+     * Flushes any WiredTigerSizeStorer updates to the storage engine if necessary.
+     */
+    virtual void sizeStorerPeriodicFlush() {}
+};
+
+class WiredTigerKVEngine final : public WiredTigerKVEngineBase {
 public:
     static StringData kTableUriPrefix;
 
@@ -343,7 +360,7 @@ public:
                             const IndexConfig& config,
                             bool isForceUpdateMetadata) override;
 
-    Status alterMetadata(StringData uri, StringData config);
+    Status alterMetadata(StringData uri, StringData config) override;
 
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
@@ -463,7 +480,7 @@ public:
      *
      * See WiredTigerOplogManager for details on thread safety.
      */
-    WiredTigerOplogManager* getOplogManager() const {
+    WiredTigerOplogManager* getOplogManager() const override {
         return _oplogManager.get();
     }
 
@@ -582,7 +599,7 @@ public:
      * Flushes any WiredTigerSizeStorer updates to the storage engine if enough time has elapsed, as
      * dictated by the _sizeStorerSyncTracker.
      */
-    void sizeStorerPeriodicFlush();
+    void sizeStorerPeriodicFlush() override;
 
     /**
      * WiredTiger statistics cursors can be used if the WT connection is ready and it is not
