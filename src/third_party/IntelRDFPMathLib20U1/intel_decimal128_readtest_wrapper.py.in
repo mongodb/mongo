@@ -1,8 +1,6 @@
 #!@readtest_python_interpreter@
 """
-Wrapper python script to launch the readtest_program program as interpolated
-by scons with the standard input set to the test file readtest_input, also as
-interpolated by scons.
+Wrapper python script to launch the readtest_program program with the standard input set to the test file readtest_input.
 """
 
 import os

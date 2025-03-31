@@ -1,11 +1,11 @@
 """Generate vcxproj and vcxproj.filters files for browsing code in Visual Studio 2015.
 
-To build mongodb, you must use scons. You can use this project to navigate code during debugging.
+To build mongodb, you must use bazel. You can use this project to navigate code during debugging.
 
  HOW TO USE
 
  First, you need a compile_commands.json file, to generate run the following command:
-   scons compiledb
+   bazel build compiledb
 
  Next, run the following command
    python buildscripts/make_vcxproj.py FILE_NAME
@@ -257,10 +257,6 @@ class ProjFileGenerator(object):
                 break
             prev_arg = arg
 
-        # Skip files made by scons for configure testing
-        if "sconf_temp" in file_name:
-            return
-
         if file_name not in self.files:
             self.files.add(file_name)
 
@@ -300,7 +296,7 @@ class ProjFileGenerator(object):
         # 3. Output these lists of files to vcxproj and vcxproj.headers
         # Note: order of these lists does not matter, VS will sort them anyway
         dirs = set()
-        scons_files = set()
+        bazel_files = set()
 
         for file_name in self.files:
             dirs.add(os.path.dirname(file_name))
@@ -331,13 +327,12 @@ class ProjFileGenerator(object):
 
         dirs = dirs.union(base_dirs)
 
-        # Get all the scons files
+        # Get all the bazel files
         for directory in dirs:
             if os.path.exists(directory):
                 for file_name in os.listdir(directory):
-                    if file_name == "SConstruct" or "SConscript" in file_name:
-                        scons_files.add(directory + "\\" + file_name)
-        scons_files.add("SConstruct")
+                    if file_name == "BUILD.bazel" or ".bazel" in file_name:
+                        bazel_files.add(directory + "\\" + file_name)
 
         # Write a list of directory entries with unique guids
         self.filters.write("  <ItemGroup>\n")
@@ -365,9 +360,9 @@ class ProjFileGenerator(object):
                 self.filters.write("    </ClInclude>\n")
         self.filters.write("  </ItemGroup>\n")
 
-        # Write a list of scons files
+        # Write a list of bazel files
         self.filters.write("  <ItemGroup>\n")
-        for file_name in sorted(scons_files):
+        for file_name in sorted(bazel_files):
             self.filters.write("    <None Include='%s'>\n" % file_name)
             self.filters.write("        <Filter>%s</Filter>\n" % os.path.dirname(file_name))
             self.filters.write("    </None>\n")
@@ -380,9 +375,9 @@ class ProjFileGenerator(object):
                 self.vcxproj.write("    <ClInclude Include='%s' />\n" % file_name)
         self.vcxproj.write("  </ItemGroup>\n")
 
-        # Write a list of scons files into the vcxproj
+        # Write a list of bazel files into the vcxproj
         self.vcxproj.write("  <ItemGroup>\n")
-        for file_name in sorted(scons_files):
+        for file_name in sorted(bazel_files):
             self.vcxproj.write("    <None Include='%s' />\n" % file_name)
         self.vcxproj.write("  </ItemGroup>\n")
 

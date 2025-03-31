@@ -29,6 +29,6 @@ mv $LIB_GIT_DIR/* $DEST_DIR/dist
 pushd $DEST_DIR/dist
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 rm -rf ci
-rm -rf scons_gen_build
+rm -rf gen_build
 find tcmalloc -type d -name "testdata" -exec rm -rf {} \;
 popd

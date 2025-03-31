@@ -8,11 +8,9 @@ import re
 from pathlib import Path
 from typing import Callable, List
 
-from buildscripts import moduleconfig
 from buildscripts.linter import git_base as _git
 
 # Path to the modules in the mongodb source tree
-# Has to match the string in SConstruct
 MODULE_DIR = "src/mongo/db/modules"
 
 
@@ -31,25 +29,9 @@ def get_base_dir():
         return os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
-def get_module_paths() -> List[str]:
-    """Get a list of paths that contain modules."""
-    base_dir = get_base_dir()
-
-    # Get a list of modules
-    mongo_modules = moduleconfig.discover_module_directories(
-        os.path.join(base_dir, MODULE_DIR), None
-    )
-
-    paths = [os.path.join(base_dir, MODULE_DIR, m) for m in mongo_modules]
-    paths.append(base_dir)
-
-    return paths
-
-
 def get_repos() -> List[Repo]:
     """Get a list of Repos to check linters for."""
-    paths = get_module_paths()
-    return [Repo(p) for p in paths]
+    return [Repo(get_base_dir())]
 
 
 class Repo(_git.Repository):

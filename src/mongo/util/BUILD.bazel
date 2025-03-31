@@ -1240,7 +1240,7 @@ mongo_cc_unit_test(
         "stacktrace_test.cpp",
     ],
     # deps=stacktrace_test_LIBDEPS,
-    # From SCons, unclear if necessasry:
+    # From SCons, unclear if necessary:
     # EXPORT_SYMBOLS=[
     #     "mongo_stacktrace_test_detail_testFunctionWithLinkage",
     # ],

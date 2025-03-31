@@ -31,9 +31,8 @@ a fixture class derived from `mongo::workload_simulation::Simulation`. The secon
 name of the workload, and any additional parameters will be passed as input to the constructor of
 the fixture class.
 
-A C++ file that defines these macros can be compiled using the scons helper `WorkloadSimulator` to
-link the relevant `main` implementation that runs all the workloads defined using the macro. The
-name of the target _must_ end in `_simulator`.
+A C++ file that defines these macros can be compiled using the `simulator_main` bazel target to
+link the relevant `main` implementation that runs all the workloads defined using the macro.
 
 ## Generating Visualizations
 

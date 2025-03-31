@@ -315,8 +315,8 @@ def get_list_from_lines(lines):
 
 
 def _get_build_dir():
-    """Return the location of the scons' build directory."""
-    return os.path.join(git.get_base_dir(), "build")
+    """Return the location of the default clang cache directory."""
+    return os.path.join(git.get_base_dir(), ".clang_format_cache")
 
 
 def _lint_files(clang_format, files):

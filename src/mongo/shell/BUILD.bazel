@@ -68,7 +68,7 @@ mongo_cc_library(
     ],
     copts = select({
         "@platforms//os:windows": [
-            # See the /Zc:preprocessor comment in third_party/mozjs/SConscript
+            # See the /Zc:preprocessor comment in third_party/mozjs/BUILD.bazel
             "/Zc:preprocessor",
             "/wd5104",
             "/wd5105",
@@ -292,10 +292,10 @@ MONGOJS_CPP_JSFILES = [
 render_template(
     name = "mongojs_cpp",
     srcs = [
-        "//site_scons/site_tools:jstoh.py",
+        "//buildscripts:jstoh.py",
     ] + MONGOJS_CPP_JSFILES,
     cmd = [
-        "$(location //site_scons/site_tools:jstoh.py)",
+        "$(location //buildscripts:jstoh.py)",
         "$(location mongojs.cpp)",
     ] + [
         "$(location {})".format(file)
@@ -316,10 +316,10 @@ MONGO_SERVER_CPP_JS_FILES = [
 render_template(
     name = "mongo_server_cpp",
     srcs = [
-        "//site_scons/site_tools:jstoh.py",
+        "//buildscripts:jstoh.py",
     ] + MONGO_SERVER_CPP_JS_FILES,
     cmd = [
-        "$(location //site_scons/site_tools:jstoh.py)",
+        "$(location //buildscripts:jstoh.py)",
         "$(location mongo-server.cpp)",
     ] + [
         "$(location {})".format(file)

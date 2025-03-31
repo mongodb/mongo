@@ -94,8 +94,7 @@ def get_toolchain_ver(tool, compiler_path, env_vars):
 #   value: <string>
 #   inBuildInfo: <bool> : should it be included in buildInfo output
 #   inVersion: <bool> : should it be included in --version output
-# The `value` field will be passed through env.subst, so you can use any SCons variables you
-# want to define them.
+# The `value` field will be passed to bazel
 def default_buildinfo_environment_data(compiler_path, extra_definitions, env_vars):
     data = (
         (

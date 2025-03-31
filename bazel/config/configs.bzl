@@ -409,12 +409,6 @@ detect_odr_violations = rule(
 # build_enterprise_module
 # =========
 
-# Original documentation is:
-#   Comma-separated list of modules to build. Empty means none. Default is all.
-# As Bazel will not support the module building in the same way as Scons, the only
-# module is supported at present is the enterprise
-# more: https://mongodb.slack.com/archives/C05V4F6GZ6J/p1705687513581639
-
 build_enterprise_provider = provider(
     doc = """Build enterprise module""",
     fields = ["enabled"],

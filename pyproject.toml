@@ -197,12 +197,7 @@ resmoke = "buildscripts.resmoke:entrypoint"
 
 [tool.ruff]
 extend-exclude = [
-    "site_scons/third_party",
     "src/third_party",
-]
-extend-include = [
-    "SConstruct",
-    "*/SConscript"
 ]
 
 line-length = 100

@@ -11,9 +11,7 @@ load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:header_deps.bzl",
     "HEADER_DEP_SUFFIX",
-    "LINK_DEP_SUFFIX",
     "create_header_dep",
-    "create_link_deps",
 )
 load(
     "//bazel:separate_debug.bzl",
@@ -502,13 +500,6 @@ CLANG_WARNINGS_COPTS = select({
         # only) flag that turns it on.
         "-Wunused-exception-parameter",
 
-        # TODO: Note that the following two flags are added to CCFLAGS even
-        # though they are really C++ specific. We need to do this because SCons
-        # passes CXXFLAGS *before* CCFLAGS, but CCFLAGS contains -Wall, which
-        # re-enables the warnings we are trying to suppress. In the future, we
-        # should move all warning flags to CCWARNFLAGS and CXXWARNFLAGS and add
-        # these to CCOM and CXXCOM as appropriate.
-        #
         # Clang likes to warn about unused private fields, but some of our
         # third_party libraries have such things.
         "-Wno-unused-private-field",
@@ -1195,9 +1186,6 @@ DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
 GDWARF_FEATURES = select({
     "//bazel/config:linux_clang": ["dwarf32"],
     "//bazel/config:linux_gcc_fission": ["dwarf32"],  # gdb crashes with -gsplit-dwarf and -gdwarf64
-    # SCons implementation originally used a compiler check to verify that
-    # -gdwarf64 was supported. If this creates incompatibility issues, we may
-    # need to fallback to -gdwarf32 in certain cases.
     "//bazel/config:linux_gcc": ["dwarf64"],
     # SUSE15 builds system libraries with dwarf32, use dwarf32 to be keep consistent
     "//bazel/config:suse15_gcc": ["dwarf32"],
@@ -1861,14 +1849,6 @@ def mongo_cc_library(
         header_deps = header_deps,
     )
 
-    create_link_deps(
-        name = name + LINK_DEP_SUFFIX,
-        target_name = name,
-        link_deps = [name] + deps + cc_deps,
-        tags = ["scons_link_lists"],
-        target_compatible_with = target_compatible_with + enterprise_compatible,
-    )
-
     # Create a cc_library entry to generate a shared archive of the target.
     cc_library(
         name = name + SHARED_ARCHIVE_SUFFIX,
@@ -2187,21 +2167,6 @@ def _mongo_cc_binary_and_test(
         }),
         "env": env | SANITIZER_ENV,
     } | kwargs
-
-    create_link_deps(
-        name = name + LINK_DEP_SUFFIX,
-        target_name = name,
-        link_deps = all_deps,
-        tags = ["scons_link_lists"],
-        testonly = testonly,
-        target_compatible_with = target_compatible_with + enterprise_compatible,
-    )
-
-    write_sources(
-        name = name + "_sources_list",
-        sources = srcs,
-        tags = ["scons_link_lists"],
-    )
 
     original_tags = list(args["tags"])
     if _program_type == "binary":
@@ -2548,11 +2513,6 @@ write_target = rule(
 )
 
 def idl_generator(name, tags = [], **kwargs):
-    write_target(
-        name = name + "_gen_source_tag",
-        target_name = name,
-        tags = ["scons_link_lists"],
-    )
     idl_generator_rule(
         name = name,
         tags = tags + ["gen_source"],
@@ -2646,12 +2606,6 @@ def mongo_proto_library(
         tags = tags + ["gen_source"],
         features = features + MONGO_GLOBAL_FEATURES,
         **kwargs
-    )
-
-    dummy_file(
-        name = name + "_exclude_link",
-        output = "lib" + name + ".so.exclude_lib",
-        tags = ["scons_link_lists"],
     )
 
 def mongo_cc_proto_library(

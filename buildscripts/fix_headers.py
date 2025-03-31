@@ -84,22 +84,7 @@ def useful_print(fixes: Dict) -> None:
 
 class HeaderFixer:
     def __init__(self):
-        # TODO(SERVER-94781) Remove SCons dep
-        subprocess.run(
-            [
-                sys.executable,
-                "buildscripts/scons.py",
-                "--build-profile=opt",
-                "--bazel-includes-info=dummy",  # TODO Allow no library to be passed.
-                "--libdeps-linting=off",
-                "--ninja=disabled",
-                "$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp",
-            ]
-        )
-        with open(".bazel_include_info.json") as f:
-            bazel_include_info = json.load(f)
-        self.bazel_exec = bazel_include_info["bazel_exec"]
-        self.bazel_config = bazel_include_info["config"]
+        self.bazel_exec = "bazel"
         auth = JiraAuth()
         auth.pat = os.environ["JIRA_TOKEN"]
         self.jira_client = JiraClient(JIRA_SERVER, auth, dry_run=False)
@@ -110,13 +95,9 @@ class HeaderFixer:
         self, query: str, config: bool = False, args: List[str] = []
     ) -> subprocess.CompletedProcess:
         query_cmd = "cquery"
-        config_args = self.bazel_config
-        if not config:
-            query_cmd = "query"
-            config_args = []
 
         p = subprocess.run(
-            [self.bazel_exec, query_cmd] + config_args + args + [query],
+            [self.bazel_exec, query_cmd] + args + [query],
             capture_output=True,
             text=True,
             check=True,
@@ -125,7 +106,7 @@ class HeaderFixer:
 
     def _build(self, target: str) -> subprocess.CompletedProcess:
         p = subprocess.run(
-            [self.bazel_exec, "build"] + self.bazel_config + [target],
+            [self.bazel_exec, "build"] + [target],
             capture_output=True,
             text=True,
         )

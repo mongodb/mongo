@@ -8,19 +8,17 @@ The basics of implementing a check are in the [clang docs](https://releases.llvm
 
 #### Basic usage of the custom checks
 
-The current directory contains the individual check source files, the main `MongoTidyModule.cpp` source file which registers the checks, and the SConscript responsible for building the check library module. The module will be installed into the DESTDIR, by default `build/install/lib/libmongo_tidy_checks.so`.
+The current directory contains the individual check source files, the main `MongoTidyModule.cpp` source file which registers the checks, and the BUILD.bazel file responsible for building the check library module. To build the custom checks use this command:
 
-Our internal `buildscripts/clang_tidy.py` will automatically check this location and attempt to load the module if it exists. If it is installed to a non-default location you will need to supply the `--check-module` argument with the location to the module.
+The bazel clang-tidy config will automatically build and use the custom checks module. To run clang tidy with the checks module use:
 
-The check will only be run if you add the name of the check to the `.clang-tidy.in` configuration file. Note you can also customized options for the specific check in this configuration file. Please reference some of the other checks and clang docs on how to add check specific options.
-
-Each check should be contained in its own `cpp` and `h` file, and have one or more unit tests. The h file must be `#include`'d to the `MongoTidyModule.cpp` file where the check class will be registered with a given check name.
+    bazel build --config=clang-tidy //src/mongo/...
 
 #### Adding check unittests
 
 A simple unittest framework is included with the checks so that they will automatically be run in quick, isolated, and minimal fashion. This allows for faster development and ensures the checks continue working.
 
-The `test` directory contains the python unittest script, the test source files, and the SConscript which builds and runs the tests. NOTE: The python unittest script requires arguments to function correctly, you must supply compile_commands.json files matching the correct location and filename to the corresponding tests. For this reason, you should use the scons build as the interface for running the tests as it will create the compile_commands files, and run the unittest script automatically with the correct arguments. To build and test the checks use the scons command `python buildscripts/scons.py --build-profile=compiledb VERBOSE=1 +mongo-tidy-tests`. Note that currently the `--ninja` option does not support running the mongo tidy unittests.
+The `test` directory contains the python unittest script, the test source files, and the BUILD.bazel which builds and runs the tests. NOTE: The python unittest script requires arguments to function correctly, you must supply compile_commands.json files matching the correct location and filename to the corresponding tests. For this reason, you should use the bazel build as the interface for running the tests as it will create the compile_commands files, and run the unittest script automatically with the correct arguments. To build and test the checks use the bazel command `bazel test //src/mongo/tools/mongo_tidy_checks/test:mongo_tidy_checks`.
 
 #### Writing your own check checklist
 
@@ -29,12 +27,12 @@ Below is a checklist of all the steps to make sure to perform when writing a new
 1. Implement the check in the respectively named `.h` and `.cpp` files.
 2. Add the check's `#include` to the `MongoTidyModule.cpp`.
 3. Register the check class with a check name in the `MongoTidyModule.cpp`.
-4. Add the `.cpp` file to the source list in the `SConscript` file.
+4. Add the `.cpp` file to the source list in the `BUILD.bazel` file.
 5. Write a unittest file named `tests/test_{CHECK_NAME}.cpp` which minimally reproduces the issue.
-6. Add the test file to the list of test sources in `tests/SConscript`.
+6. Add the test file to the list of test sources in `tests/BUILD.bazel`.
 7. Add a `def test_{CHECK_NAME}():` function to the `MongoTidyCheck_unittest.py` file which writes the config file, and finds the expected error output in the stdout. Reference the other check funcions for details.
-8. Run the scons build with `python buildscripts/scons.py --build-profile=compiledb VERBOSE=1 +mongo-tidy-tests` to run the tests and see the detailed output of each test.
+8. Run the bazel build with `bazel test //src/mongo/tools/mongo_tidy_checks/test:mongo_tidy_checks` to run the tests and see the detailed output of each test.
 
 #### Questions and Troubleshooting
 
-If you have any questions please reach out to the `#server-build-help` slack channel.
+If you have any questions please reach out to the `#ask-devprod-build` slack channel.

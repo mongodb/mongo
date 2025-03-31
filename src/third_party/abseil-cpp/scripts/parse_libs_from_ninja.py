@@ -77,7 +77,7 @@ logging.basicConfig(
 original_target_libs = target_libs.copy()
 logging.info(f"Original list: {original_target_libs}")
 
-ninja_build_dir = pathlib.Path(__file__).parent.parent / "dist" / "scons_gen_build"
+ninja_build_dir = pathlib.Path(__file__).parent.parent / "dist" / "gen_build"
 if not os.path.exists(ninja_build_dir):
     os.mkdir(ninja_build_dir)
     environ = os.environ.copy()
@@ -90,34 +90,7 @@ if not os.path.exists(ninja_build_dir):
 with open(ninja_build_dir / "build.ninja") as fninja:
     content = fninja.readlines()
 
-with open(pathlib.Path(__file__).parent.parent / "SConscript", "w") as sconscript:
     with open(pathlib.Path(__file__).parent.parent / "BUILD.bazel", "w") as bazel:
-        sconscript.write("""\
-# AUTO-GENERATED FILE DO NOT MANUALLY EDIT
-# generated from the parse_libs_from_ninja.py script in scripts directory via `python ./parse_libs_from_ninja.py`
-Import("env")
-env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True, LIBDEPS_NO_INHERIT=[
-    # libunwind and tcmalloc are both added as global dependencies. Skip
-    # inheriting global dependencies to avoid a circular dependency.
-    '$BUILD_DIR/third_party/unwind/unwind',
-    "$BUILD_DIR/third_party/tcmalloc/tcmalloc",
-    "$BUILD_DIR/third_party/gperftools/tcmalloc_minimal",
-]
-env.InjectThirdParty(libraries=['abseil-cpp'])
-if env.ToolchainIs('msvc'):
-    env.Append(
-        CPPDEFINES=[
-            'NOMINMAX',
-        ],
-        CCFLAGS=[],
-    )
-
-if env.ToolchainIs('gcc'):
-    env.Append(
-        CCFLAGS=[
-            '-Wno-error=ignored-attributes',
-        ], )
-""")
 
         abseil_headers = glob.glob(
             str(pathlib.Path(__file__).parent.parent / "dist/absl/**/*.h"), recursive=True
@@ -231,20 +204,6 @@ ABSEIL_SKIP_GLOBAL_DEPS = [
                     logging.info(f"Found library {found_target_lib}")
                     logging.info(f"Libbraries left to find: {target_libs.difference(written_libs)}")
 
-                    sconscript.write(f"""\
-{f'# {found_target_lib} added as a dependency of other abseil libraries' 
-if found_target_lib not in original_target_libs 
-else f'# {found_target_lib} is an explicit dependency to the server build'}
-env.BazelLibrary(
-    target='{found_target_lib}',
-    source=[
-{os.linesep.join([f"        '{source}'," for source in source_files])}
-    ],
-    LIBDEPS=[
-{os.linesep.join([f"        '{libdep}'," for libdep in sorted(libdeps)])}
-    ],
-)
-""")
                     bazel.write(f"""\
 {f'# {found_target_lib} added as a dependency of other abseil libraries' 
 if found_target_lib not in original_target_libs 

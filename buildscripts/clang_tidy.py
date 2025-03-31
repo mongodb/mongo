@@ -183,7 +183,7 @@ def _run_tidy(args, parser_defaults):
         if args.compile_commands == parser_defaults.compile_commands:
             print(
                 f"Could not find compile commands: '{args.compile_commands}', to generate it, use the build command:\n\n"
-                + "python3 buildscripts/scons.py --build-profile=compiledb compiledb\n"
+                + "bazel build compiledb\n"
             )
         else:
             print(f"Could not find compile commands: {args.compile_commands}")
@@ -196,7 +196,7 @@ def _run_tidy(args, parser_defaults):
         if args.clang_tidy_cfg == parser_defaults.clang_tidy_cfg:
             print(
                 f"Could not find config file: '{args.clang_tidy_cfg}', to generate it, use the build command:\n\n"
-                + "python3 buildscripts/scons.py --build-profile=compiledb compiledb\n"
+                + "bazel build compiledb\n"
             )
         else:
             print(f"Could not find config file: {args.clang_tidy_cfg}")

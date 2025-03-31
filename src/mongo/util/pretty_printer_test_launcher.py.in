@@ -1,8 +1,7 @@
 #! /usr/bin/env python3
 """
-Wrapper python script to launch the pretty_printer_test_py program as interpolated
-by scons with the standard input set to the test file readtest_input, also as
-interpolated by scons.
+Wrapper python script to launch the pretty_printer_test_py program
+with the standard input set to the test file readtest_input.
 """
 
 import subprocess

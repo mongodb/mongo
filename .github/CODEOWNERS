@@ -6,16 +6,14 @@
 
 # The following patterns are parsed from ./OWNERS.yml
 OWNERS.yml @10gen/server-root-ownership @svc-auto-approve-bot
-.bazelignore @10gen/devprod-build @svc-auto-approve-bot
-.bazelrc @10gen/devprod-build @svc-auto-approve-bot
-.bazelversion @10gen/devprod-build @svc-auto-approve-bot
+.bazel* @10gen/devprod-build @svc-auto-approve-bot
 .clang-format @10gen/server-programmability @svc-auto-approve-bot
 .clang-tidy.in @10gen/server-programmability @svc-auto-approve-bot
 .gitignore @10gen/devprod-build @svc-auto-approve-bot
 .mypy.ini @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 .prettierignore @10gen/devprod-correctness @svc-auto-approve-bot
 .prettierrc @10gen/devprod-correctness @svc-auto-approve-bot
-/BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot
+BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot
 copy.bara.sky @IamXander @smcclure15 @svc-auto-approve-bot
 copy.bara.staging.sky @10gen/devprod-correctness @svc-auto-approve-bot
 eslint.config.mjs @10gen/devprod-correctness @svc-auto-approve-bot
@@ -25,7 +23,7 @@ pnpm-lock.yaml @10gen/devprod-correctness @svc-auto-approve-bot
 poetry.lock @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 pyproject.toml @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 sbom.json @10gen/server-security @svc-auto-approve-bot
-SConstruct @10gen/devprod-build @svc-auto-approve-bot
+MODULE.bazel* @10gen/devprod-build @svc-auto-approve-bot
 WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./bazel/OWNERS.yml
@@ -163,9 +161,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/tracing_profiler/**/* @10gen/query @svc-auto-approve-bot
 
 # The following patterns are parsed from ./docs/OWNERS.yml
-/docs/**/bazel.md @10gen/devprod-build @svc-auto-approve-bot
-/docs/**/build_system_reference.md @10gen/devprod-build @svc-auto-approve-bot
-/docs/**/build_system.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/building.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/poetry_execution.md @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/linting.md @10gen/devprod-build @svc-auto-approve-bot
@@ -1232,9 +1227,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/with_mongot/OWNERS.yml
 /jstests/with_mongot/**/* @10gen/query-integration-search @svc-auto-approve-bot
 
-# The following patterns are parsed from ./site_scons/OWNERS.yml
-/site_scons/**/* @10gen/devprod-build @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/OWNERS.yml
 /src/mongo/**/config.h.in @10gen/server-programmability @svc-auto-approve-bot
 
@@ -1606,8 +1598,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/OWNERS.yml
 /src/mongo/db/modules/enterprise/BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot
-/src/mongo/db/modules/enterprise/build.py @10gen/devprod-build @svc-auto-approve-bot
-/src/mongo/db/modules/enterprise/SConscript @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/.gitignore @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/.git-blame-ignore-revs @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/.clang-format @10gen/server-programmability @svc-auto-approve-bot
@@ -2620,7 +2610,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/SafeInt @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/sasl @10gen/server-security @svc-auto-approve-bot
 /src/third_party/**/schemastore.org @10gen/query-optimization @svc-auto-approve-bot
-/src/third_party/**/scons* @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/snappy @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/tcmalloc @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/third_party/**/timelib @10gen/query-execution @svc-auto-approve-bot
@@ -2631,7 +2620,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/yaml-cpp @10gen/server-security @svc-auto-approve-bot
 /src/third_party/**/zlib @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/zstandard @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/third_party/**/SConscript @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/*.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/third_party/libmongocrypt/OWNERS.yml

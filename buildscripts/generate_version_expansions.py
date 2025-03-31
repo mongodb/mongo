@@ -19,7 +19,7 @@ VERSION_JSON = "version.json"
 def generate_expansions():
     """Entry point for the script.
 
-    This calls functions to generate version and scons cache expansions and
+    This calls functions to generate version and
     writes them to a file.
     """
     args = parse_args()

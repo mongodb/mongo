@@ -1,9 +1,0 @@
-Import("env")
-
-env = env.Clone()
-
-env.CppUnitTest(
-    target="ttl_test",
-    source=[],
-    LIBDEPS=[],
-)

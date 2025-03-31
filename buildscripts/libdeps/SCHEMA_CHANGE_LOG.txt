@@ -1,3 +1,0 @@
-3 removed shim node property
-2 flipped edge direction in graph file data
-1 initial schema

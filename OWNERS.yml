@@ -6,13 +6,7 @@ filters:
     metadata:
       emeritus_approvers:
         - visemet # TODO: add back to approvers once project work is finished
-  - ".bazelignore":
-    approvers:
-      - 10gen/devprod-build
-  - ".bazelrc":
-    approvers:
-      - 10gen/devprod-build
-  - ".bazelversion":
+  - ".bazel*":
     approvers:
       - 10gen/devprod-build
   - ".clang-format":
@@ -34,7 +28,7 @@ filters:
   - ".prettierrc":
     approvers:
       - 10gen/devprod-correctness
-  - "/BUILD.bazel":
+  - "BUILD.bazel":
     approvers:
       - 10gen/devprod-build
   - "copy.bara.sky":
@@ -67,7 +61,7 @@ filters:
   - "sbom.json":
     approvers:
       - 10gen/server-security
-  - "SConstruct":
+  - "MODULE.bazel*":
     approvers:
       - 10gen/devprod-build
   - "WORKSPACE.bazel":

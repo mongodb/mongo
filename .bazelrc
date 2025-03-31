@@ -405,10 +405,7 @@ common:mod-scanner --aspects //modules_poc:mod_scanner.bzl%mod_scanner_aspect
 common:mod-scanner --remote_download_regex=.*\.mod_scanner_decls.json$
 
 # if you don't have access to the remote execution cluster above, use the local config
-# described below.
-# pass local config to SCons like:
-# > buildscripts/scons.py BAZEL_FLAGS=--config=local <others args>
-# or if invoking bazel directly pass "--config=local" on the bazel command line
+# by passing "--config=local" on the bazel command line
 --config=local
 common:local --remote_executor=
 common:local --remote_cache=

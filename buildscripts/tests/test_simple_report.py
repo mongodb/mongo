@@ -3,9 +3,8 @@
 import os
 import random
 import sys
-import textwrap
 import unittest
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 from click.testing import CliRunner
 
@@ -54,58 +53,4 @@ class TestSimpleReport(unittest.TestCase):
         else:
             self.assertEqual(results[0]["status"], "fail")
             self.assertEqual(report["failures"], 1)
-        self.assertEqual(result.exit_code, 0)
-
-    @patch(ns("try_combine_reports"))
-    @patch(ns("put_report"))
-    def test_truncate_scons(self, mock_put_report, _mock_try_combine_reports):
-        exit_code = 0
-        data = fix_newlines(
-            textwrap.dedent("""\
-TO BE TRUNCATED
-TO BE TRUNCATED
-TO BE TRUNCATED
-TO BE TRUNCATED
-scons: done reading SConscript files.
-scons: Building targets ...
-interesting part""")
-        )
-
-        with patch("builtins.open", mock_open(read_data=data)) as _mock_file:
-            runner = CliRunner()
-            result = runner.invoke(
-                buildscripts.simple_report.main,
-                ["--test-name", "potato", "--log-file", "test.log", "--exit-code", str(exit_code)],
-            )
-        report = mock_put_report.call_args[0][0]
-        results = mock_put_report.call_args[0][0]["results"]
-        self.assertEqual(results[0]["status"], "pass")
-        self.assertEqual(results[0]["log_raw"], "interesting part")
-        self.assertEqual(report["failures"], 0)
-        self.assertEqual(result.exit_code, 0)
-
-    @patch(ns("try_combine_reports"))
-    @patch(ns("put_report"))
-    def test_non_scons_log(self, mock_put_report, _mock_try_combine_reports):
-        exit_code = 0
-        data = fix_newlines(
-            textwrap.dedent("""\
-*NOT* TO BE TRUNCATED
-*NOT* TO BE TRUNCATED
-*NOT* TO BE TRUNCATED
-*NOT* TO BE TRUNCATED
-interesting part""")
-        )
-
-        with patch("builtins.open", mock_open(read_data=data)) as _mock_file:
-            runner = CliRunner()
-            result = runner.invoke(
-                buildscripts.simple_report.main,
-                ["--test-name", "potato", "--log-file", "test.log", "--exit-code", str(exit_code)],
-            )
-        report = mock_put_report.call_args[0][0]
-        results = mock_put_report.call_args[0][0]["results"]
-        self.assertEqual(results[0]["status"], "pass")
-        self.assertEqual(results[0]["log_raw"], data)
-        self.assertEqual(report["failures"], 0)
         self.assertEqual(result.exit_code, 0)

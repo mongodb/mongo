@@ -5,7 +5,7 @@ sequenceDiagram
 participant e as Evergreen
 participant osfs as Obtain SBOM from Silk
 participant silk as Silk
-participant scons as SCons
+participant bazel as Bazel
 participant p as Packager
 participant s3 as S3
 participant curator as Curator
@@ -16,9 +16,9 @@ e ->> osfs: Invoke script
 osfs ->> silk: Query for SBOM
 silk ->> osfs: Return SBOM
 osfs ->> e: Return SBOM
-e ->> scons: Invoke build (including SCons)
-scons ->> scons: Build distribution tarball (including SBOM)
-scons ->> e: Return distribution tarball
+e ->> bazel: Invoke build (including Bazel)
+bazel ->> bazel: Build distribution tarball (including SBOM)
+bazel ->> e: Return distribution tarball
 e ->> p: Invoke packager
 p ->> p: Build local package
 p ->> s3: Upload package

@@ -20,7 +20,7 @@ fast functions.
 ## Building
 
 To use the profiler, enable the profilerStats while building:
-./buildscripts/scons.py ... --use-tracing-profiler=on
+bazel build --use-tracing-profiler=on ...
 
 When using MONGO_PROFILER_SCOPE_XYZ macros without --use-tracing-profiler=on they will resolve to
 no-op empty definitions.

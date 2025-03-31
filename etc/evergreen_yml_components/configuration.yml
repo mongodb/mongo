@@ -15,7 +15,7 @@ stepback: true
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
   - key: patch_compile_flags
-    description: "Additional SCons flags to be applied during scons compile invocations in this patch"
+    description: "Additional bazel flags to be applied during bazel compile invocations in this patch"
 
   - key: future_git_tag
     description: "Future git tag to be added. If empty, we will use the most recent git tag instead."
@@ -116,7 +116,6 @@ post:
     vars:
       files: >-
         src/resmoke_error_code
-        src/build/scons/config.log
         src/*.gcda.gcov
         src/gcov-intermediate-files.tgz
         src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz

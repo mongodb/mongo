@@ -2275,18 +2275,6 @@ config_setting(
     },
 )
 
-bool_flag(
-    name = "scons_query",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "scons_query_enabled",
-    flag_values = {
-        "//bazel/config:scons_query": "True",
-    },
-)
-
 # --------------------------------------
 # crypto options
 # --------------------------------------
@@ -2321,9 +2309,8 @@ selects.config_setting_group(
 # ssl_provider options
 # --------------------------------------
 
-# TODO(SERVER-94377): The `mongo_crypto` setting refers to the old
-# `MONGO_CRYPTO` variable in SCons. The `ssl_provider` usually coincides with
-# that, but if ssl is disabled it'll get overridden to `none`. That is,
+# TODO(SERVER-94377): The `ssl_provider` usually coincides with
+# mongo_crypto, but if ssl is disabled it'll get overridden to `none`. That is,
 # regardless of operating system, you'll get `ssl_provider_none` here if ssl is
 # disabled. We should figure out a more intuitive/robust solution to this.
 

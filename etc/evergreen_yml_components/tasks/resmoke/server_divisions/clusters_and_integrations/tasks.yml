@@ -149,7 +149,6 @@ variables:
         vars:
           files: >-
             src/resmoke_error_code
-            src/build/scons/config.log
             src/*.gcda.gcov
             src/gcov-intermediate-files.tgz
             src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
@@ -182,8 +181,6 @@ variables:
       - func: "set up credentials"
       - func: "f_expansions_write"
       - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-      - func: "f_expansions_write"
-      - func: "set up win mount script"
       - func: "f_expansions_write"
     teardown_group:
       - func: "f_expansions_write"

@@ -1,12 +1,12 @@
 #!/bin/bash
 # This script downloads and imports gperftools.
 # It can be run on Linux, Windows WSL or Mac OS X.
-# The actual integration via SConscript is not done by this script
+# The actual integration via BUILD.bazel is not done by this script
 #
 # NOTES
 # 1. Gperftools is autotools based except for Windows where it has a checked in config.h
 # 2. On Linux, we generate config.h on the oldest supported distribution for each architecture
-#    But to support newer distributions we must set some defines via SConscript instead of config.h
+#    But to support newer distributions we must set some defines via BUILD.bazel instead of config.h
 # 3. tcmalloc.h is configured by autotools for system installation purposes, but we modify it
 #    to be used across platforms via an ifdef instead. This matches the corresponding logic used in
 #    tcmalloc.cc to control functions that are guarded by HAVE_STRUCT_MALLINFO.

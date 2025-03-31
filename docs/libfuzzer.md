@@ -45,18 +45,21 @@ happens! As just a few ideas:
 - You could tease out individual bytes from `Data` and provide them as
   different arguments to the function under test.
 
-Finally, your cpp file will need a SCons target. There is a method which
+Finally, your cpp file will need a bazel target. There is a method which
 defines fuzzer targets, much like how we define unittests. For example:
 
 ```python
-  env.CppLibfuzzerTest(
-    target='op_msg_fuzzer',
-    source=[
+  mongo_cc_fuzzer_test(
+    name = 'op_msg_fuzzer',
+    srcs = [
         'op_msg_fuzzer.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'op_msg_fuzzer_fixture',
+    hdrs = [
+        'op_msg_fuzzer.h',
+    ]
+    deps = [
+        '//src/mongo:base',
+        ':op_msg_fuzzer_fixture',
     ],
 )
 ```
@@ -70,7 +73,7 @@ variant, whose name will include the string "FUZZER", which will compile
 and run all of the fuzzer tests.
 
 The fuzzers can be built locally, for development and debugging. Check
-our Evergreen configuration for the current SCons arguments.
+our Evergreen configuration for the current bazel arguments.
 
 LibFuzzer binaries will accept a path to a directory containing its
 "corpus". A corpus is a list of examples known to produce interesting

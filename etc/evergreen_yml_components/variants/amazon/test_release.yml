@@ -549,7 +549,6 @@ buildvariants:
       packager_arch: aarch64
       packager_distro: amazon2
       repo_edition: enterprise
-      scons_cache_scope: shared
       compile_variant: enterprise-amazon2-streams-arm64
       large_distro_name: amazon2-arm64-latest-large
     tasks:

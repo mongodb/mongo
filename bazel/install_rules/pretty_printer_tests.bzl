@@ -67,7 +67,7 @@ mongo_pretty_printer_test = rule(
         # TODO have a way to get to gdb from inside bazel
         #"_gdb": attr.label(allow_single_file = True, default = "//:gdb"),
         "_pretty_printer_creation_script": attr.label(allow_single_file = True, default = "//bazel/install_rules:pretty_printer_test_creator.py"),
-        "_pip_requirements_script": attr.label(allow_single_file = True, default = "//site_scons/mongo:pip_requirements.py"),
+        "_pip_requirements_script": attr.label(allow_single_file = True, default = "//buildscripts:pip_requirements.py"),
         "_pretty_printer_launcher_infile": attr.label(allow_single_file = True, default = "//src/mongo/util:pretty_printer_test_launcher.py.in"),
     },
     doc = "Create pretty printer tests",

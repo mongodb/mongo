@@ -23,6 +23,6 @@ pushd $DEST_DIR/dist
 git apply $PATCH_DIR/*.patch
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 rm -rf ci
-rm -rf scons_gen_build
+rm -rf gen_build
 find absl -depth -type d -name "testdata" -exec rm -rf {} \;
 popd

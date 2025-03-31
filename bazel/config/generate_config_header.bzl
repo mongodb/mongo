@@ -149,11 +149,6 @@ generate_config_header_rule = rule(
 )
 
 def generate_config_header(name, tags = [], **kwargs):
-    write_target(
-        name = name + "_gen_source_tag",
-        target_name = name,
-        tags = ["scons_link_lists"],
-    )
     generate_config_header_rule(
         name = name,
         tags = tags + ["gen_source"],

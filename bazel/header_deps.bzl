@@ -1,5 +1,4 @@
 HEADER_DEP_SUFFIX = "_header_dep"
-LINK_DEP_SUFFIX = "_link_dep"
 
 def create_header_dep_impl(ctx):
     compilation_context = cc_common.create_compilation_context(

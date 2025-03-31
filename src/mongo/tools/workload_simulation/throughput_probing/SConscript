@@ -1,8 +1,0 @@
-Import("env")
-
-env = env.Clone()
-
-env.WorkloadSimulator(
-    target="throughput_probing_simulator",
-    source=[],
-)

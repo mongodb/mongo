@@ -97,9 +97,6 @@ filters:
   - "schemastore.org":
     approvers:
       - 10gen/query-optimization
-  - "scons*":
-    approvers:
-      - 10gen/devprod-build
   - "snappy":
     approvers:
       - 10gen/server-networking-and-observability
@@ -134,9 +131,6 @@ filters:
   - "zstandard":
     approvers:
       - 10gen/server-networking-and-observability
-  - "SConscript":
-    approvers:
-      - 10gen/devprod-build
   - "*.bazel":
     approvers:
       - 10gen/devprod-build

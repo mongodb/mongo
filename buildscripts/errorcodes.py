@@ -142,11 +142,7 @@ def is_terminated(lines):
 
 
 def get_next_code(seen, server_ticket=0):
-    """Find next unused assertion code.
-
-    Called by: SConstruct and main()
-    Since SConstruct calls us, codes[] must be global OR WE REPARSE EVERYTHING
-    """
+    """Find next unused assertion code."""
     if not codes:
         (_, _, seen) = read_error_codes()
 
@@ -167,12 +163,6 @@ def get_next_code(seen, server_ticket=0):
     # No server ticket. Return a generator that counts starting at highest + 1.
     highest = reduce(lambda x, y: max(int(x), int(y)), (loc.code for loc in codes))
     return iter(range(highest + 1, MAXIMUM_CODE))
-
-
-def check_error_codes():
-    """Check error codes as SConstruct expects a boolean response from this function."""
-    (_, errors, _) = read_error_codes()
-    return len(errors) == 0
 
 
 def read_error_codes(src_root="src/mongo"):

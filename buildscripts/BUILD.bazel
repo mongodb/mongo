@@ -5,7 +5,9 @@ exports_files([
     "candle_wrapper.py",
     "cheetah_source_generator.py",
     "clang_tidy_config_gen.py",
+    "jstoh.py",
     "msitrim.py",
+    "pip_requirements.py",
 ])
 
 py_binary(

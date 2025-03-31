@@ -488,15 +488,6 @@ functions:
       args:
         - "./src/evergreen/functions/credentials_setup.sh"
 
-  "set up win mount script": &set_up_win_mount_script
-    command: subprocess.exec
-    display_name: "win mount script setup"
-    params:
-      binary: bash
-      silent: true
-      args:
-        - "./src/evergreen/functions/win_mount_script_setup.sh"
-
   "set up notary client credentials":
     - *f_expansions_write
     - command: subprocess.exec
@@ -654,17 +645,6 @@ functions:
       binary: bash
       args:
         - "src/evergreen/functions/venv_setup.sh"
-
-  # This needs to be run after "set up venv"
-  # This depends on having a venv already setup
-  # This just installs the extra deps needed for libdeps
-  "set up libdeps venv":
-    command: subprocess.exec
-    display_name: "set up libdeps venv"
-    params:
-      binary: bash
-      args:
-        - "src/evergreen/libdeps_setup.sh"
 
   "upload pip requirements": &upload_pip_requirements
     command: s3.put
@@ -2546,102 +2526,6 @@ functions:
     params:
       file_location: ${report_file|src/report.json}
 
-  "combine build metrics":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        add_expansions_to_env: true
-        args:
-          - "src/evergreen/run_python_script.sh"
-          - "site_scons/site_tools/build_metrics/combine_metrics_unittest.py"
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        add_expansions_to_env: true
-        args:
-          - "src/evergreen/run_python_script.sh"
-          - "site_scons/site_tools/build_metrics/combine_metrics.py"
-          - "--prefix-name=build_metrics"
-          - "--prefix-name=populate_cache"
-          - "--prefix-name=pull_cache"
-
-  "print top N metrics":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        add_expansions_to_env: true
-        args:
-          - "src/evergreen/run_python_script.sh"
-          - "site_scons/site_tools/build_metrics/top_n_metrics.py"
-          - "--input=build_metrics.json"
-          - "--output=top_15_metrics.txt"
-          - "--num=15"
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/top_15_metrics.txt
-        remote_file: ${project}/${build_variant}/${revision}/${build_id}-${task_name}-${execution}-top_15_metrics.txt
-        bucket: mciuploads
-        permissions: public-read
-        content_type: text/plain
-        display_name: Top 15 Metrics
-
-  "attach build metrics":
-    - command: archive.targz_pack
-      params:
-        target: build-metrics.tgz
-        source_dir: src
-        include:
-          - "./build_metrics.json"
-          - "./populate_cache.json"
-          - "./pull_cache.json"
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: build-metrics.tgz
-        remote_file: ${project}/${build_variant}/${revision}/${build_id}-${task_name}-${execution}-build-metrics.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Metrics JSON
-
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        add_expansions_to_env: true
-        args:
-          - "src/evergreen/run_python_script.sh"
-          - "evergreen/build_metric_cedar_report.py"
-          - "--build-metrics=build_metrics.json"
-          - "--cache-push-metrics=populate_cache.json"
-          - "--cache-pull-metrics=pull_cache.json"
-
-    - command: archive.targz_pack
-      params:
-        target: build_metrics_cedar_report.tgz
-        source_dir: src
-        include:
-          - "./build_metrics_cedar_report.json"
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: build_metrics_cedar_report.tgz
-        remote_file: ${project}/${build_variant}/${revision}/${build_id}-${task_name}-${execution}-build_metrics_cedar_report.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Cedar Report JSON
-
   "attach artifacts":
     command: attach.artifacts
     params:
@@ -2886,8 +2770,6 @@ functions:
     - *set_up_credentials
     - *f_expansions_write
     - *use_wiredtiger_develop
-    - *f_expansions_write
-    - *set_up_win_mount_script
     - *f_expansions_write
     - *set_task_expansion_macros
     - *f_expansions_write

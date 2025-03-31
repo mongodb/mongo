@@ -207,8 +207,8 @@ buildvariants:
       - name: .commit_check
         create_check_run:
           path_to_outputs: "github_annotations.json"
-      - name: .development_critical_single_variant !.requires_large_host !.clang_tidy !libdeps_graph_linting
-      - name: .development_critical_single_variant .requires_large_host !.clang_tidy !libdeps_graph_linting
+      - name: .development_critical_single_variant !.requires_large_host !.clang_tidy
+      - name: .development_critical_single_variant .requires_large_host !.clang_tidy
         distros:
           - amazon2023-arm64-latest-large
       - name: .development_critical !.requires_large_host_commit_queue

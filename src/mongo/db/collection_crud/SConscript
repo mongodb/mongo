@@ -1,9 +1,0 @@
-Import("env")
-
-env = env.Clone()
-
-env.CppUnitTest(
-    target="db_capped_test",
-    source=[],
-    LIBDEPS=[],
-)

@@ -214,8 +214,6 @@ buildvariants:
     cron: "0 0 * * *" # Run once a day.
     expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      scons_cache_scope: shared
-      scons_cache_mode: all
       has_packages: false
       jstestfuzz_num_generated_files: 40
       jstestfuzz_concurrent_num_files: 10

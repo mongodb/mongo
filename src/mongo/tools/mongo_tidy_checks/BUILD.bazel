@@ -60,7 +60,7 @@ cc_library(
         "MongoVolatileCheck.h",
     ],
     copts = [
-        "-Isrc/mongo/tools/mongo_tidy_checks/",  # Ensures that `#include "Mongo..."` calls continue to work in Bazel AND in SCons
+        "-Isrc/mongo/tools/mongo_tidy_checks/",  # Ensures that `#include "Mongo..."` calls continue to work in Bazel
         "-DNDEBUG",
         "-Wall",
         "-fdiagnostics-color",

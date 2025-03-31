@@ -10,55 +10,7 @@ REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
 
-def check_for_missing_test_stubs():
-    bazel_tests = (
-        subprocess.check_output(
-            [
-                "bazel",
-                "query",
-                "attr(tags, 'mongo_unittest', //...) intersect attr(tags, 'final_target', //...)",
-            ],
-            stderr=subprocess.DEVNULL,
-        )
-        .decode("utf-8")
-        .splitlines()
-    )
-    bazel_tests = [bazel_test.split(":")[1] for bazel_test in bazel_tests]
-
-    scons_targets = (
-        subprocess.check_output(
-            ["grep -rPo 'target\s*=\s*\"\K\w*' ./src  | awk -F: '{print $2}'"],
-            stderr=subprocess.STDOUT,
-            shell=True,
-        )
-        .decode("utf-8")
-        .splitlines()
-    )
-
-    missing_tests = []
-    for bazel_test in bazel_tests:
-        if bazel_test not in scons_targets:
-            missing_tests += [bazel_test]
-
-    if len(missing_tests) == 0:
-        print("All bazel tests have SConscript stubs")
-        return True
-
-    print("Tests found without SConscript stubs:")
-    for missing_test in missing_tests:
-        print(missing_test)
-    print("\nPlease add a stub in the SConscript file in the directory of each test similar to:")
-    print("""
-env.CppUnitTest(
-    target="test_name",
-    source=[],
-)
-
-""")
-    return False
-
-
-def create_build_files_in_new_js_dirs():
+def create_build_files_in_new_js_dirs() -> None:
     base_dirs = ["src/mongo/db/modules/enterprise/jstests", "jstests"]
     for base_dir in base_dirs:
         for root, dirs, _ in os.walk(base_dir):
@@ -86,7 +38,7 @@ js_library(
                         print(f"Created BUILD.bazel in {full_dir}")
 
 
-def list_files_with_targets(bazel_bin: str):
+def list_files_with_targets(bazel_bin: str) -> List:
     return [
         line.strip()
         for line in subprocess.run(
@@ -103,7 +55,7 @@ def list_files_without_targets(
     type_name: str,
     ext: str,
     dirs: List[str],
-):
+) -> bool:
     # rules_lint only checks files that are in targets, verify that all files in the source tree
     # are contained within targets.
 
@@ -184,7 +136,7 @@ def list_files_without_targets(
     return True
 
 
-def run_rules_lint(bazel_bin, args) -> bool:
+def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     if platform.system() == "Windows":
         print("eslint not supported on windows")
         return False
@@ -199,9 +151,6 @@ def run_rules_lint(bazel_bin, args) -> bool:
     if not list_files_without_targets(
         files_with_targets, "javascript", "js", ["src/mongo", "jstests"]
     ):
-        return False
-
-    if not check_for_missing_test_stubs():
         return False
 
     # Default to linting everything if no path was passed in

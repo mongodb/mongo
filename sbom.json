@@ -1626,45 +1626,6 @@
     },
     {
       "supplier": {
-        "name": "Organization: github"
-      },
-      "name": "SCons - a Software Construction tool",
-      "version": "3.1.2",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "purl": "pkg:github/SCons/scons@3.1.2",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Build"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/SCons/scons"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "144a085e-96cd-4061-acf6-262fd1b69abe",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/scons-3.1.2"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "supplier": {
         "name": ""
       },
       "name": "smhasher",

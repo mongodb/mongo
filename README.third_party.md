@@ -64,7 +64,6 @@ a notice will be included in
 | [pyiso8601]                                          | MIT                                                                                                 | 2.1.0                                    | unknown              |                                 |
 | [RoaringBitmap/CRoaring]                             | Unknown License                                                                                     | v3.0.1                                   |                      | ✗                               |
 | [SchemaStore/schemastore]                            | Apache-2.0                                                                                          | Unknown                                  |                      |                                 |
-| [SCons - a Software Construction tool]               | MIT                                                                                                 | 3.1.2                                    |                      | ✗                               |
 | [smhasher]                                           | Unknown License                                                                                     | Unknown                                  | unknown              | ✗                               |
 | [Snowball Stemming Algorithms]                       | BSD-3-Clause                                                                                        | 7b264ffa0f767c579d052fd8142558dc8264d795 | ✗                    | ✗                               |
 | [subunit]                                            | BSD-3-Clause, Apache-2.0                                                                            | 1.4.4                                    | unknown              |                                 |
@@ -90,7 +89,6 @@ a notice will be included in
 [PCRE2]: http://www.pcre.org/
 [Protobuf]: https://github.com/protocolbuffers/protobuf
 [RoaringBitmap/CRoaring]: https://github.com/RoaringBitmap/CRoaring
-[SCons - a Software Construction tool]: https://github.com/SCons/scons
 [SchemaStore/schemastore]: https://www.schemastore.org/json/
 [Snowball Stemming Algorithms]: https://github.com/snowballstem/snowball
 [arximboldi/immer]: https://github.com/arximboldi/immer

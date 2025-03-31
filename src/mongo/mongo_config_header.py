@@ -124,7 +124,6 @@ def memset_s_present_flag() -> list[HeaderDefinition]:
 
 def strnlen_present_flag() -> list[HeaderDefinition]:
     if platform.system() == "Windows":
-        # Match SCons behavior
         return []
 
     log_check("[MONGO_CONFIG_HAVE_STRNLEN] Checking for strnlen...")
@@ -384,7 +383,6 @@ def altivec_vbpermq_output_flag() -> list[HeaderDefinition]:
 
 def usdt_provider_flags() -> list[HeaderDefinition]:
     if platform.system() == "Darwin":
-        # Match SCons behavior
         return []
 
     log_check("[MONGO_CONFIG_USDT_PROVIDER] Checking if SDT usdt provider is available...")

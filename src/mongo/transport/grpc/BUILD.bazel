@@ -139,7 +139,6 @@ mongo_cc_proto_library(
     deps = [":core_test_proto"],
 )
 
-# This is referenced in src/mongo/transport/grpc/SConscript
 mongo_cc_grpc_library(
     name = "core_test_cc_grpc",
     srcs = [":core_test_proto"],

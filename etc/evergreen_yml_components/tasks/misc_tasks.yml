@@ -429,22 +429,6 @@ tasks:
       - func: "upload pip requirements"
       - func: "run idl tests"
 
-  - name: iwyu_self_test
-    tags:
-      [
-        "assigned_to_jira_team_devprod_build",
-        "development_critical_single_variant",
-      ]
-    commands:
-      - func: "do bazel setup"
-      - func: "f_expansions_write"
-      - command: subprocess.exec
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/run_python_script.sh"
-            - "buildscripts/iwyu/test/run_tests.py"
-
   - <<: *run_jepsen_template
     name: jepsen_config_fuzzer_list-append
     tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen_docker"]
