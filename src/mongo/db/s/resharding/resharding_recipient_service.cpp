@@ -444,34 +444,7 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](const auto& factory) {
             auto opCtx = factory.makeOperationContext(&cc());
-            {
-                AutoGetCollection coll(opCtx.get(), _metadata.getTempReshardingNss(), MODE_IS);
-                if (coll) {
-                    if (_metadata.getPerformVerification() && _changeStreamsMonitorCtx) {
-                        uassert(9858303,
-                                "Donor failed to record total number of documents copied "
-                                "despite performVerification being enabled",
-                                _recipientCtx.getTotalNumDocuments() != boost::none);
-                        _recipientCtx.setTotalNumDocuments(
-                            *_recipientCtx.getTotalNumDocuments() +
-                            _changeStreamsMonitorCtx->getDocumentsDelta());
-                    } else {
-                        _recipientCtx.setTotalNumDocuments(coll->numRecords(opCtx.get()));
-                    }
-                    _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx.get()));
-
-                    if (coll->isClustered()) {
-                        // There is an implicit 'clustered' index on a clustered collection.
-                        // Increment the total index count similar to storage stats:
-                        // https://github.com/10gen/mongo/blob/29d8030f8aa7f3bc119081007fb09777daffc591/src/mongo/db/stats/storage_stats.cpp#L249C1-L251C22
-                        _recipientCtx.setNumOfIndexes(coll->getIndexCatalog()->numIndexesTotal() +
-                                                      1);
-                    } else {
-                        _recipientCtx.setNumOfIndexes(coll->getIndexCatalog()->numIndexesTotal());
-                    }
-                }
-            }
-            _metrics->fillRecipientCtxOnCompletion(_recipientCtx);
+            _updateContextMetrics(opCtx.get());
             return _updateCoordinator(opCtx.get(), executor, factory);
         })
         .onTransientError([](const Status& status) {
@@ -511,6 +484,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                         _renameTemporaryReshardingCollection(factory);
                         return ExecutorFuture<void>(**executor, Status::OK());
                     }
+                })
+                .then([this, &factory] {
+                    auto opCtx = factory.makeOperationContext(&cc());
+                    _updateContextMetrics(opCtx.get());
                 })
                 .then([this, aborted, &factory] {
                     // It is safe to drop the oplog collections once either (1) the
@@ -1864,6 +1841,38 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
     _metrics->restoreExternallyTrackedRecipientFields(externalMetrics);
 }
 
+void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
+    OperationContext* opCtx) {
+    AutoGetCollection coll(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
+    if (coll) {
+        auto totalDocumentCount = [&]() -> long long {
+            if (_metadata.getPerformVerification() && _changeStreamsMonitorCtx) {
+                uassert(9858303,
+                        "Donor failed to record total number of documents copied "
+                        "despite performVerification being enabled",
+                        _recipientCtx.getTotalNumDocuments() != boost::none);
+                return *_recipientCtx.getTotalNumDocuments() +
+                    _changeStreamsMonitorCtx->getDocumentsDelta();
+            } else {
+                return coll->numRecords(opCtx);
+            }
+        }();
+        _recipientCtx.setTotalNumDocuments(totalDocumentCount);
+        _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx));
+
+        auto indexCount = coll->getIndexCatalog()->numIndexesTotal();
+        if (coll->isClustered()) {
+            // There is an implicit 'clustered' index on a clustered collection.
+            // Increment the total index count similar to storage stats:
+            // https://github.com/10gen/mongo/blob/29d8030f8aa7f3bc119081007fb09777daffc591/src/mongo/db/stats/storage_stats.cpp#L249C1-L251C22
+            indexCount += 1;
+        }
+        _recipientCtx.setNumOfIndexes(indexCount);
+    }
+
+    _metrics->fillRecipientCtxOnCompletion(_recipientCtx);
+}
+
 CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(
     const CancellationToken& stepdownToken) {
     {
@@ -1880,11 +1889,12 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
 
     if (auto future = _coordinatorHasDecisionPersisted.getFuture(); future.isReady()) {
         if (auto status = future.getNoThrow(); !status.isOK()) {
-            // onReshardingFieldsChanges() missed canceling _abortSource because _initAbortSource()
-            // hadn't been called yet. We used an error status stored in
-            // _coordinatorHasDecisionPersisted as an indication that an abort had been received.
-            // Canceling _abortSource immediately allows callers to use the returned abortToken as a
-            // definitive means of checking whether the operation has been aborted.
+            // onReshardingFieldsChanges() missed canceling _abortSource because
+            // _initAbortSource() hadn't been called yet. We used an error status stored in
+            // _coordinatorHasDecisionPersisted as an indication that an abort had been
+            // received. Canceling _abortSource immediately allows callers to use the returned
+            // abortToken as a definitive means of checking whether the operation has been
+            // aborted.
             _abortSource->cancel();
         }
     }
@@ -1933,8 +1943,8 @@ void ReshardingRecipientService::RecipientStateMachine::CloningMetrics::add(int6
 boost::optional<ReshardingRecipientService::RecipientStateMachine::CloningMetrics>
 ReshardingRecipientService::RecipientStateMachine::_tryFetchCloningMetrics(
     OperationContext* opCtx) {
-    // The cloning metrics are only available when verification is enabled and this recipient did
-    // not skip cloning.
+    // The cloning metrics are only available when verification is enabled and this recipient
+    // did not skip cloning.
     if (!_metadata.getPerformVerification()) {
         return boost::none;
     }

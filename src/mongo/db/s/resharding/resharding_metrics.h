@@ -201,7 +201,7 @@ public:
 
     void restoreExternallyTrackedRecipientFields(const ExternallyTrackedRecipientFields& values);
 
-    void reportOnCompletion(BSONObjBuilder* builder);
+    void reportPhaseDurationsOnCompletion(BSONObjBuilder* builder);
 
     // Update donor and recipient related metrics in _recipientCtx so the coordinator can get them.
     void fillDonorCtxOnCompletion(DonorShardContext& donorCtx);

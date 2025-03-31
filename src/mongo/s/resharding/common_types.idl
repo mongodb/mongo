@@ -184,6 +184,10 @@ structs:
                 type: long
                 description: "Number of writes during critical section on this donor shard."
                 optional: true
+            phaseDurations:
+                type: object_owned
+                description: "Time spent in each phase so far."
+                optional: true
 
     DonorShardFetchTimestamp:
         description: "Used for tracking donor min fetch timestamp"
@@ -237,6 +241,10 @@ structs:
             numOfIndexes:
                 type: long
                 description: "Number of indexes on this recipient shard for the resharded collection."
+                optional: true
+            phaseDurations:
+                type: object_owned
+                description: "Time spent in each phase so far."
                 optional: true
 
     ReshardingApproxCopySize:

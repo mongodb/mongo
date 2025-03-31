@@ -328,15 +328,22 @@ void ReshardingMetrics::restoreIndexBuildDurationFields(const ReshardingRecipien
     }
 }
 
-void ReshardingMetrics::reportOnCompletion(BSONObjBuilder* builder) {
+void ReshardingMetrics::reportPhaseDurationsOnCompletion(BSONObjBuilder* builder) {
     invariant(builder);
-    reportDurationsForAllPhases<Seconds>(
-        kTimedPhaseNamesMap, getClockSource(), builder, Seconds{0});
-    builder->appendElements(BSON("provenance" << ReshardingProvenance_serializer(_provenance)));
+    const auto fieldNames = ReshardingMetrics::TimedPhaseNameMap{
+        {TimedPhase::kCloning, "copyDurationMs"},
+        {TimedPhase::kBuildingIndex, "buildingIndexDurationMs"},
+        {TimedPhase::kApplying, "applyDurationMs"},
+        {TimedPhase::kCriticalSection, "criticalSectionDurationMs"},
+    };
+    reportDurationsForAllPhases<Milliseconds>(fieldNames, getClockSource(), builder);
 }
 
 void ReshardingMetrics::fillDonorCtxOnCompletion(DonorShardContext& donorCtx) {
     donorCtx.setWritesDuringCriticalSection(getWritesDuringCriticalSection());
+    BSONObjBuilder bob;
+    reportPhaseDurationsOnCompletion(&bob);
+    donorCtx.setPhaseDurations(bob.obj());
 }
 
 void ReshardingMetrics::fillRecipientCtxOnCompletion(RecipientShardContext& recipientCtx) {
@@ -345,6 +352,9 @@ void ReshardingMetrics::fillRecipientCtxOnCompletion(RecipientShardContext& reci
     }
     recipientCtx.setOplogFetched(getOplogEntriesFetched());
     recipientCtx.setOplogApplied(getOplogEntriesApplied());
+    BSONObjBuilder bob;
+    reportPhaseDurationsOnCompletion(&bob);
+    recipientCtx.setPhaseDurations(bob.obj());
 }
 
 void ReshardingMetrics::onStarted() {

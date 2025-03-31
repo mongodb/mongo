@@ -66,34 +66,24 @@ export function getNonPrimaryShardName(db) {
  * [min, max]
  */
 export function createChunks(shardNames, shardKey, min, max) {
-    let chunks = [];
-    let rangeSize = (max - min) / 2;
+    const chunks = [];
+    const rangeSize = max - min + 1;
 
-    if ((max - min + 1) < shardNames.length) {
+    if (rangeSize < shardNames.length) {
         throw new Error("[min, max] range is not large enough");
     }
 
-    if (shardNames.length == 1) {
-        return [{shard: shardNames[0], min: {[shardKey]: MinKey}, max: {[shardKey]: MaxKey}}];
+    const chunkSize = Math.floor(rangeSize / shardNames.length);
+    for (let i = 0; i < shardNames.length; i++) {
+        chunks.push({
+            min: {[shardKey]: min + chunkSize * i},
+            max: {[shardKey]: min + chunkSize * (i + 1)},
+            shard: shardNames[i]
+        });
     }
 
-    for (let i = 0; i < shardNames.length; i++) {
-        if (i == 0) {
-            chunks.push({min: {[shardKey]: MinKey}, max: {[shardKey]: min}, shard: shardNames[i]});
-        } else if (i == shardNames.length - 1) {
-            chunks.push({
-                min: {[shardKey]: min + (i - 1) * rangeSize},
-                max: {[shardKey]: MaxKey},
-                shard: shardNames[i]
-            });
-        } else {
-            chunks.push({
-                min: {[shardKey]: min + (i - 1) * rangeSize},
-                max: {[shardKey]: min + i * (rangeSize)},
-                shard: shardNames[i]
-            });
-        }
-    }
+    chunks[0].min = {[shardKey]: MinKey};
+    chunks[chunks.length - 1].max = {[shardKey]: MaxKey};
 
     return chunks;
 }

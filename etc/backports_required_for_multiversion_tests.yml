@@ -420,6 +420,8 @@ last-continuous:
       ticket: SERVER-102582
     - test_file: jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
       ticket: SERVER-102543
+    - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
+      ticket: SERVER-100421
   suites: null
 last-lts:
   all:
@@ -889,4 +891,6 @@ last-lts:
       ticket: SERVER-102582
     - test_file: jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
       ticket: SERVER-102543
+    - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
+      ticket: SERVER-100421
   suites: null
