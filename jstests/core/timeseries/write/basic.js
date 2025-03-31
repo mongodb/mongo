@@ -1,8 +1,7 @@
 /**
  * @tags: [
  *   requires_timeseries,
- *   # TODO (SERVER-101293): Remove this tag.
- *   known_query_shape_computation_problem,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  *   featureFlagRawDataCrudOperations,
  *   requires_fastcount,
  * ]

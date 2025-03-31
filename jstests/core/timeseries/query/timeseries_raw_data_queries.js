@@ -5,8 +5,7 @@
  *   requires_timeseries,
  *   featureFlagRawDataCrudOperations,
  *   does_not_support_transactions,
- *   # TODO (SERVER-101293): Remove this tag.
- *   known_query_shape_computation_problem,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 
