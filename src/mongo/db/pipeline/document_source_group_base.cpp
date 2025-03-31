@@ -65,11 +65,6 @@
 
 namespace mongo {
 
-DocumentSourceGroupBase::~DocumentSourceGroupBase() {
-    const auto& stats = _groupProcessor.getStats();
-    groupCounters.incrementGroupCountersPerQuery(stats.spillingStats.getSpilledDataStorageSize());
-}
-
 Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {
     MutableDocument insides;
 
