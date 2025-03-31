@@ -49,6 +49,7 @@
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -259,6 +260,9 @@ write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
     write_ops::UpdateCommandRequest updateCommand(nsEntry.getNs(), updates);
 
     updateCommand.setLet(req.getLet());
+    if (req.getRawData()) {
+        updateCommand.setRawData(true);
+    }
 
     auto& requestBase = updateCommand.getWriteCommandRequestBase();
     requestBase.setIsTimeseriesNamespace(nsEntry.getIsTimeseriesNamespace());
@@ -292,6 +296,9 @@ write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
     write_ops::DeleteCommandRequest deleteRequest(nsEntry.getNs(), deletes);
     deleteRequest.setLet(req.getLet());
     deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+    if (isRawDataOperation(opCtx)) {
+        deleteRequest.setRawData(true);
+    }
 
     auto& requestBase = deleteRequest.getWriteCommandRequestBase();
     requestBase.setCollectionUUID(nsEntry.getCollectionUUID());

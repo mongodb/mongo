@@ -1387,7 +1387,10 @@ public:
 
             const BulkWriteCRUDOp bulkOp(ops[0]);
             const auto opType = bulkOp.getType();
-            const auto& nsEntry = req.getNsInfo()[bulkOp.getNsInfoIdx()];
+            auto nsEntry = req.getNsInfo()[bulkOp.getNsInfoIdx()];
+            if (isRawDataOperation(opCtx)) {
+                nsEntry.setNs(timeseries::isTimeseriesViewRequest(opCtx, nsEntry).second);
+            }
 
             if (opType == BulkWriteCRUDOp::kInsert) {
                 uasserted(ErrorCodes::IllegalOperation, "Cannot explain insert cmd for bulkWrite");
