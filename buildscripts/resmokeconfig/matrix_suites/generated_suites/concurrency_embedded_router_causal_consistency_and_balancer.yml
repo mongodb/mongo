@@ -31,7 +31,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagRouterPort: 1
-        orphanCleanupDelaySecs: 10
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 1
         reshardingMinimumOperationDurationMillis: 0

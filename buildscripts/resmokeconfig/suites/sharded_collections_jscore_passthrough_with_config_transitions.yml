@@ -254,7 +254,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        orphanCleanupDelaySecs: 1
         skipDroppingHashedShardKeyIndex: true
         featureFlagReshardingForTimeseries: true
         reshardingMinimumOperationDurationMillis: 0
