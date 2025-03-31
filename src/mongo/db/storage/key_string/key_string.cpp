@@ -2700,21 +2700,20 @@ uint8_t TypeBits::ExplainReader::readDecimalExponent() {
 size_t getKeySize(std::span<const char> data, Ordering ord, Version version) {
     invariant(data.size() > 0);
     auto reader = makeBufReader(data);
-    unsigned remainingBytes;
-    for (int i = 0; (remainingBytes = reader.remaining()); i++) {
+    for (int i = 0;; i++) {
+        // We reached the end of the buffer without reading a valid complete key
+        if (reader.remaining() == 0)
+            return 0;
+
         const bool invert = (ord.get(i) == -1);
         uint8_t ctype = readType<uint8_t>(&reader, invert);
-        // We have already read the Key.
+        // We have reached the end of the Key. The Key size is the number of bytes we used.
         if (ctype == kEnd)
-            break;
+            return data.size() - reader.remaining();
 
         // Read the Key that comes after the first byte in KeyString.
         filterKeyFromKeyString(ctype, &reader, invert, version);
     }
-
-    invariant(data.size() > remainingBytes);
-    // Key size = buffer len - number of bytes comprising the RecordId
-    return data.size() - (remainingBytes - 1);
 }
 
 // This discriminator byte only exists in KeyStrings for queries, not in KeyStrings stored in an

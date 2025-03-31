@@ -255,8 +255,8 @@ TEST_F(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
     // Construct a KeyString with more than the limit of 32 elements in a compound index key. Encode
     // 33 kBoolTrue ('o') values.
     // Note that this KeyString encoding is legal, but it may not be legally stored in an index.
-    const char* data = "ooooooooooooooooooooooooooooooooo";
-    const size_t size = 33;
+    const char* data = "ooooooooooooooooooooooooooooooooo\x4";
+    const size_t size = 34;
 
     key_string::Builder ks(key_string::Version::V1);
     ks.resetFromBuffer({data, size});
@@ -264,7 +264,7 @@ TEST_F(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
     // No exceptions should be thrown.
     key_string::toBsonSafe({data, size}, ALL_ASCENDING, ks.getTypeBits());
     key_string::decodeDiscriminator(ks.getView(), ALL_ASCENDING, ks.getTypeBits());
-    key_string::getKeySize(ks.getView(), ALL_ASCENDING, ks.version);
+    ASSERT_EQ(size, key_string::getKeySize(ks.getView(), ALL_ASCENDING, ks.version));
 }
 
 TEST_F(KeyStringBuilderTest, MaxElementsInCompoundKey) {
@@ -279,7 +279,33 @@ TEST_F(KeyStringBuilderTest, MaxElementsInCompoundKey) {
     // No exceptions should be thrown.
     key_string::toBsonSafe({data, size}, ALL_ASCENDING, ks.getTypeBits());
     key_string::decodeDiscriminator(ks.getView(), ALL_ASCENDING, ks.getTypeBits());
-    key_string::getKeySize(ks.getView(), ALL_ASCENDING, ks.version);
+    ASSERT_EQ(size, key_string::getKeySize(ks.getView(), ALL_ASCENDING, ks.version));
+}
+
+TEST_F(KeyStringBuilderTest, SizeOfIncompleteKey) {
+    // The key portion of a keystring is terminated with kEnd, so missing that means the key size is
+    // zero
+    const char* data = "oooo\x4";
+    const size_t size = 5;
+    ASSERT_EQ(size, key_string::getKeySize({data, size}, ALL_ASCENDING, key_string::Version::V1));
+    ASSERT_EQ(0, key_string::getKeySize({data, size - 1}, ALL_ASCENDING, key_string::Version::V1));
+}
+
+TEST_F(KeyStringBuilderTest, SizeWithTrailingDataInBuffer) {
+    // Verify that we actually stop counting key bytes when we reach kEnd
+    const char data[] = {'o', 'o', 4, 'a', 'b', 'c'};
+    ASSERT_EQ(3, key_string::getKeySize(data, ALL_ASCENDING, key_string::Version::V1));
+}
+
+TEST_F(KeyStringBuilderTest, EmbeddedkEnd) {
+    // Construct a KeyString which contains kEnd inside a string key and verify that getKeySize()
+    // does not report that the size ends at that spot
+    key_string::Builder ks(version, ALL_ASCENDING);
+    ks.appendString("_\0_\4_"_sd);
+    ks.appendString("abc"_sd);
+    auto buffer = ks.finishAndGetBuffer();
+    ASSERT_EQ(buffer.size(), 14);
+    ASSERT_EQ(key_string::getKeySize(buffer, ALL_ASCENDING, version), buffer.size());
 }
 
 TEST_F(KeyStringBuilderTest, EmbeddedNullString) {
