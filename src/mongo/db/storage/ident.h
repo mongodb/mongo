@@ -32,11 +32,15 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/database_name.h"
 
 namespace mongo {
 
 /**
- * Stores the storage catalog persisted identifier for a collection or index.
+ * Every collection / index persisted by the server has a corresponding table in the storage engine.
+ * An 'ident' uniquely identifies the storage engine table for a collection or index.
+ *
+ * Simple wrapper around the 'ident' string.
  */
 class Ident {
 public:
@@ -52,17 +56,65 @@ protected:
 };
 
 namespace ident {
-bool isUserDataIdent(StringData ident);
+/**
+ * By default, a storage engine table is uniquely identified by an 'ident' that comes in 1 of 4
+ * forms - dependent on the 'directoryPerDB' and 'directoryForIndexes' parameters.
+ *      Neither:                 <collection|index>-<unique identifier>
+ *      directoryPerDB:          <db>/<collection|index>-<unique identifier>
+ *      directoryForIndexes:     <collection|index>/<unique identifier>
+ *      directoryPerDB and directoryForIndexes:
+ *                                <db>/<collection|index>/<unique identifier>
+ * <collection|index> is a placeholder for either the string 'collection' or string 'index'.
+ *
+ * As of 8.2, the <unique identifier> of an ident is a generated UUID. In previous versions, the
+ * <unique identifier> is a combination of '<counter>-<random number>'.
+ *
+ * TODO SERVER-102875: Consolidate default generated idents (for collections and indexes)
+ * where 'directoryPerDB' and 'directoryForIndexes' are automatically obtained to
+ * ensure idents are stored in their intended locations.
+ *
+ * The 'generateNew<Collection|Index>Ident()' methods produce a new, unique ident for a
+ * 'collection|index' table. Default method for generating user-data table idents.
+ */
+std::string generateNewCollectionIdent(const DatabaseName& dbName,
+                                       bool directoryPerDB,
+                                       bool directoryForIndexes);
 
-bool isInternalIdent(StringData ident);
+std::string generateNewIndexIdent(const DatabaseName& dbName,
+                                  bool directoryPerDB,
+                                  bool directoryForIndexes);
 
-bool isResumableIndexBuildIdent(StringData ident);
+/**
+ * Marking an ident as internal implies the underlying data is subject to different handling by the
+ * server than that of standard collections and indexes.
+ *
+ * Generates a unique ident tagged with an 'internal-' prefix. Returns in ident in the form of
+ * 'internal-<identStem><unique identifier>'.
+ */
+std::string generateNewInternalIdent(StringData identStem = ""_sd);
+
+/**
+ * Returns true if the ident specifies a basic "collection" or "index" table type.
+ */
+bool isCollectionOrIndexIdent(StringData ident);
+
+/**
+ * True if the ident contains the 'internal-<identStem>' prefix.
+ */
+bool isInternalIdent(StringData ident, StringData identStem = ""_sd);
 
 bool isCollectionIdent(StringData ident);
 
-StringData getInternalIdentPrefix();
+/**
+ * When idents are generated with 'directoryPerDB', the name of the database is encoded within the
+ * ident. Idents must be capable of conversion into valid filesystem path components to guarantee
+ * correct mapping from the server to the file that holds the storage engine table.
+ *
+ * Given a 'dbName', generates 'dbName' as a string that is escaped so that it can be used as a
+ * valid path component in an ident/ file system path.
+ */
+std::string createDBNamePathComponent(const DatabaseName& dbName);
 
-StringData getResumableIndexBuildIdentStem();
 }  // namespace ident
 
 }  // namespace mongo

@@ -113,7 +113,12 @@ protected:
                            const CollectionOptions& options,
                            DurableCatalog* catalog) {
         Lock::DBLock dbLk(opCtx, ns.dbName(), MODE_IX);
-        auto swEntry = catalog->_addEntry(opCtx, ns, options);
+        // TODO SERVER-103136: Evaluate the better way to test idents generated with different
+        // <Directory<PerDb/ForIndexes>> options without relying on the DurableCatalog's tracking of
+        // the parameters.
+        const auto ident = ident::generateNewCollectionIdent(
+            ns.dbName(), catalog->_directoryPerDb, catalog->_directoryForIndexes);
+        auto swEntry = catalog->_addEntry(opCtx, ns, ident, options);
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;
     }
@@ -1199,7 +1204,7 @@ TEST_F(DurableCatalogTest, Idx1) {
                                   CollectionOptions(),
                                   catalog.get());
         ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
-        ASSERT_TRUE(ident::isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isCollectionOrIndexIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1231,7 +1236,8 @@ TEST_F(DurableCatalogTest, Idx1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         ASSERT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
-        ASSERT_TRUE(ident::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+        ASSERT_TRUE(
+            ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
     }
 
     {
@@ -1290,7 +1296,7 @@ TEST_F(DurableCatalogTest, DirectoryPerDb1) {
                                   CollectionOptions(),
                                   catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/");
-        ASSERT_TRUE(ident::isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isCollectionOrIndexIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1309,7 +1315,8 @@ TEST_F(DurableCatalogTest, DirectoryPerDb1) {
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/");
-        ASSERT_TRUE(ident::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+        ASSERT_TRUE(
+            ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
@@ -1345,7 +1352,7 @@ TEST_F(DurableCatalogTest, Split1) {
                                   CollectionOptions(),
                                   catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "collection/");
-        ASSERT_TRUE(ident::isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isCollectionOrIndexIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1364,7 +1371,8 @@ TEST_F(DurableCatalogTest, Split1) {
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "index/");
-        ASSERT_TRUE(ident::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+        ASSERT_TRUE(
+            ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
@@ -1374,6 +1382,8 @@ TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
 
     std::unique_ptr<RecordStore> rs;
     std::unique_ptr<DurableCatalog> catalog;
+    const bool directoryPerDB = true;
+    const bool directoryPerIndexes = true;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
@@ -1386,7 +1396,8 @@ TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
                                     NamespaceString::createNamespaceString_forTest("catalog"),
                                     "catalog",
                                     CollectionOptions());
-        catalog = std::make_unique<DurableCatalog>(rs.get(), true, true, nullptr);
+        catalog = std::make_unique<DurableCatalog>(
+            rs.get(), directoryPerDB, directoryPerIndexes, nullptr);
         uow.commit();
     }
 
@@ -1400,7 +1411,7 @@ TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
                                   CollectionOptions(),
                                   catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/collection/");
-        ASSERT_TRUE(ident::isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isCollectionOrIndexIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1419,7 +1430,8 @@ TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/index/");
-        ASSERT_TRUE(ident::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+        ASSERT_TRUE(
+            ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }

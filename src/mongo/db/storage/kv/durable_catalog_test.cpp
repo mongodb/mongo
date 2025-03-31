@@ -73,6 +73,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -94,12 +95,6 @@
 namespace mongo {
 namespace {
 
-static std::string kSideWritesTableIdent("sideWrites");
-static std::string kConstraintViolationsTableIdent("constraintViolations");
-
-// Update version as breaking changes are introduced into the index build procedure.
-static const long kExpectedVersion = 1;
-
 class DurableCatalogTest : public CatalogTestFixture {
 public:
     explicit DurableCatalogTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
@@ -117,6 +112,13 @@ public:
 
     DurableCatalog* getDurableCatalog() {
         return operationContext()->getServiceContext()->getStorageEngine()->getDurableCatalog();
+    }
+
+    std::string generateNewCollectionIdent(const NamespaceString& nss) {
+        auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+        const auto directoryPerDB = storageEngine->isUsingDirectoryPerDb();
+        const auto directoryForIndexes = storageEngine->isUsingDirectoryPerDb();
+        return ident::generateNewCollectionIdent(nss.dbName(), directoryPerDB, directoryForIndexes);
     }
 
     CollectionPtr getCollection() {
@@ -142,8 +144,9 @@ public:
         WriteUnitOfWork wuow(operationContext());
 
         options.uuid = UUID::gen();
-
-        auto swColl = getDurableCatalog()->createCollection(operationContext(), nss, options);
+        const auto ident = generateNewCollectionIdent(nss);
+        auto swColl =
+            getDurableCatalog()->createCollection(operationContext(), nss, ident, options);
         ASSERT_OK(swColl.getStatus());
 
         std::pair<RecordId, std::unique_ptr<RecordStore>> coll = std::move(swColl.getValue());
@@ -251,10 +254,12 @@ protected:
 
         WriteUnitOfWork wuow{operationContext()};
 
-        auto catalogId =
-            unittest::assertGet(getDurableCatalog()->createCollection(operationContext(), nss, {}))
-                .first;
+        const auto generatedIdent = generateNewCollectionIdent(nss);
+        auto catalogId = unittest::assertGet(getDurableCatalog()->createCollection(
+                                                 operationContext(), nss, generatedIdent, {}))
+                             .first;
         ident = getDurableCatalog()->getEntry(catalogId).ident;
+        ASSERT_EQ(generatedIdent, ident);
 
         IndexDescriptor descriptor{"",
                                    BSON(IndexDescriptor::kKeyPatternFieldName

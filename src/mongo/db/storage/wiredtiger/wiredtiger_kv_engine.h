@@ -92,12 +92,11 @@ class WiredTigerGlobalOptions;
  * See the unit test WiredTigerKVEngineTest::ExtractIdentFromPath for example usage.
  *
  * Note (2) idents use unix-style separators (always, see
- * durable_catalog.cpp:generateUniqueIdent) but ident paths are platform-dependant.
+ * ident::generateNew<Collection/Index>Ident) but ident paths are platform-dependant.
  * This method returns the unix-style "/" separators always.
  */
 std::string extractIdentFromPath(const boost::filesystem::path& dbpath,
                                  const boost::filesystem::path& identAbsolutePath);
-
 
 Status validateExtraDiagnostics(const std::vector<std::string>& value,
                                 const boost::optional<TenantId>& tenantId);

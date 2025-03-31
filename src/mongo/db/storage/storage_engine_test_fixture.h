@@ -38,6 +38,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_repair_observer.h"
@@ -70,8 +71,12 @@ public:
         std::unique_ptr<RecordStore> rs;
         {
             WriteUnitOfWork wuow(opCtx);
+            const auto ident =
+                ident::generateNewCollectionIdent(ns.dbName(),
+                                                  _storageEngine->isUsingDirectoryPerDb(),
+                                                  _storageEngine->isUsingDirectoryForIndexes());
             std::tie(catalogId, rs) = unittest::assertGet(
-                _storageEngine->getDurableCatalog()->createCollection(opCtx, ns, options));
+                _storageEngine->getDurableCatalog()->createCollection(opCtx, ns, ident, options));
             wuow.commit();
         }
         std::shared_ptr<Collection> coll = std::make_shared<CollectionImpl>(

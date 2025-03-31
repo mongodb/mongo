@@ -601,6 +601,40 @@ TEST_F(WiredTigerKVEngineTest, TestOldestStableTimestampEndOfStartupRecoveryStab
 TEST_F(WiredTigerKVEngineTest, ExtractIdentFromPath) {
     boost::filesystem::path dbpath = "/data/db";
     boost::filesystem::path identAbsolutePathDefault =
+        "/data/db/collection-8a3a1418-4f05-44d6-aca7-59a2f7b30248.wt";
+    std::string identDefault = "collection-8a3a1418-4f05-44d6-aca7-59a2f7b30248";
+
+    ASSERT_EQ(extractIdentFromPath(dbpath, identAbsolutePathDefault), identDefault);
+
+    boost::filesystem::path identAbsolutePathDirectoryPerDb =
+        "/data/db/test/collection-8a3a1418-4f05-44d6-aca7-59a2f7b30248.wt";
+    std::string identDirectoryPerDb = "test/collection-8a3a1418-4f05-44d6-aca7-59a2f7b30248";
+
+    ASSERT_EQ(extractIdentFromPath(dbpath, identAbsolutePathDirectoryPerDb), identDirectoryPerDb);
+
+    boost::filesystem::path identAbsolutePathWiredTigerDirectoryForIndexes =
+        "/data/db/collection/8a3a1418-4f05-44d6-aca7-59a2f7b30248.wt";
+    std::string identWiredTigerDirectoryForIndexes =
+        "collection/8a3a1418-4f05-44d6-aca7-59a2f7b30248";
+
+    ASSERT_EQ(extractIdentFromPath(dbpath, identAbsolutePathWiredTigerDirectoryForIndexes),
+              identWiredTigerDirectoryForIndexes);
+
+    boost::filesystem::path identAbsolutePathDirectoryPerDbAndWiredTigerDirectoryForIndexes =
+        "/data/db/test/collection/8a3a1418-4f05-44d6-aca7-59a2f7b30248.wt";
+    std::string identDirectoryPerDbWiredTigerDirectoryForIndexes =
+        "test/collection/8a3a1418-4f05-44d6-aca7-59a2f7b30248";
+
+    ASSERT_EQ(extractIdentFromPath(dbpath,
+                                   identAbsolutePathDirectoryPerDbAndWiredTigerDirectoryForIndexes),
+              identDirectoryPerDbWiredTigerDirectoryForIndexes);
+}
+
+// Prior to v8.2, idents were suffixed with a unique <counter> + <random number> combination. All
+// future versions must also maintain compatibility with the legacy ident format.
+TEST_F(WiredTigerKVEngineTest, ExtractLegacyIdentFromPath) {
+    boost::filesystem::path dbpath = "/data/db";
+    boost::filesystem::path identAbsolutePathDefault =
         "/data/db/collection-9-11733751379908443489.wt";
     std::string identDefault = "collection-9-11733751379908443489";
 

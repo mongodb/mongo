@@ -75,15 +75,6 @@ class DurableCatalog final {
 public:
     /**
      * `Entry` ties together the common identifiers of a single `_mdb_catalog` document.
-     *
-     * Idents can come in 4 forms depending on server parameters:
-     * wtdfi    = --wiredTigerDirectoryForIndexes
-     * dirperdb = --directoryperdb
-     *
-     * default:          <collection|index>-<counter>-<random number>
-     * dirperdb:         <db>/<collection|index>-<counter>-<random number>
-     * wtdfi:            <collection|index>/<counter>-<random number>
-     * dirperdb & wtdfi: <db>/<collection|index>/<counter>-<random number>
      */
     struct EntryIdentifier {
         EntryIdentifier() {}
@@ -182,38 +173,15 @@ public:
                                              std::string ident,
                                              const CollectionOptions& optionsWithUUID);
 
-    std::string getFilesystemPathForDb(const DatabaseName& dbName) const;
-
-    /**
-     * Generate an internal ident name.
-     */
-    std::string newInternalIdent() {
-        return _newInternalIdent("");
-    }
-
-    /**
-     * Generates a new unique identifier for a new "thing".
-     * @param nss - the containing namespace
-     * @param kind - what this "thing" is, likely collection or index
-     *
-     * Warning: It's only unique as far as we know without checking every file on disk, but it is
-     * possible that this ident collides with an existing one.
-     */
-    std::string generateUniqueIdent(NamespaceString nss, const char* kind);
-
-    /**
-     * Generate an internal resumable index build ident name.
-     */
-    std::string newInternalResumableIndexBuildIdent() {
-        return _newInternalIdent(ident::getResumableIndexBuildIdentStem());
-    }
-
     /**
      * On success, returns the RecordId which identifies the new record store in the durable catalog
      * in addition to ownership of the new RecordStore.
      */
     StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
-        OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options);
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const std::string& ident,
+        const CollectionOptions& options);
 
     Status createIndex(OperationContext* opCtx,
                        const RecordId& catalogId,
@@ -250,8 +218,7 @@ public:
                                               const BSONObj& storageMetadata,
                                               bool generateNewUUID,
                                               bool panicOnCorruptWtMetadata = true,
-                                              bool repair = false,
-                                              bool skipIdentCollisionCheck = false);
+                                              bool repair = false);
 
     Status renameCollection(OperationContext* opCtx,
                             const RecordId& catalogId,
@@ -311,6 +278,7 @@ private:
     BSONObj _findEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) const;
     StatusWith<EntryIdentifier> _addEntry(OperationContext* opCtx,
                                           NamespaceString nss,
+                                          const std::string& ident,
                                           const CollectionOptions& options);
     StatusWith<EntryIdentifier> _importEntry(OperationContext* opCtx,
                                              NamespaceString nss,
@@ -319,9 +287,6 @@ private:
 
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> _parseMetaData(
         const BSONElement& mdElement) const;
-
-
-    std::string _newInternalIdent(StringData identStem);
 
     RecordStore* _rs;  // not owned
     const bool _directoryPerDb;

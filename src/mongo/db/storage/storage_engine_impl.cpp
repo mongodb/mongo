@@ -50,11 +50,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/deferred_drop_record_store.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/durable_history_pin.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
@@ -84,6 +85,21 @@ namespace {
 const std::string kCatalogInfo = DatabaseName::kMdbCatalog.db(omitTenant).toString();
 const NamespaceString kCatalogInfoNamespace = NamespaceString(DatabaseName::kMdbCatalog);
 const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
+const auto kResumableIndexIdentStem = "resumable-index-build-"_sd;
+
+// Returns true if the ident refers to a resumable index build table.
+bool isResumableIndexBuildIdent(StringData ident) {
+    return ident::isInternalIdent(ident, kResumableIndexIdentStem);
+}
+
+// Idents corresponding to resumable index build tables are encoded as an 'internal' table and
+// tagged 'kResumableIndexIdentStem'.
+// Generates an ident to unique identify a new resumable index build table.
+std::string generateNewResumableIndexBuildIdent() {
+    const auto resumableIndexIdent = ident::generateNewInternalIdent(kResumableIndexIdentStem);
+    invariant(isResumableIndexBuildIdent(resumableIndexIdent));
+    return resumableIndexIdent;
+}
 }  // namespace
 
 StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
@@ -461,7 +477,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
         return true;
     }
 
-    if (!ident::isResumableIndexBuildIdent(ident)) {
+    if (!isResumableIndexBuildIdent(ident)) {
         return false;
     }
 
@@ -581,7 +597,9 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             continue;
         }
 
-        if (!ident::isUserDataIdent(it)) {
+        if (!ident::isCollectionOrIndexIdent(it)) {
+            // Only indexes and collections are candidates for dropping when the storage engine's
+            // metadata does not align with the catalog metadata.
             continue;
         }
 
@@ -777,7 +795,11 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 }
 
 std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName) const {
-    return _catalog->getFilesystemPathForDb(dbName);
+    if (_options.directoryPerDB) {
+        return storageGlobalParams.dbpath + '/' + ident::createDBNamePathComponent(dbName);
+    } else {
+        return storageGlobalParams.dbpath;
+    }
 }
 
 void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {
@@ -920,7 +942,7 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(
     OperationContext* opCtx, KeyFormat keyFormat) {
     std::unique_ptr<RecordStore> rs =
-        _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalIdent(), keyFormat);
+        _engine->makeTemporaryRecordStore(opCtx, ident::generateNewInternalIdent(), keyFormat);
     LOGV2_DEBUG(22258, 1, "Created temporary record store", "ident"_attr = rs->getIdent());
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
@@ -928,8 +950,8 @@ std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStor
 std::unique_ptr<TemporaryRecordStore>
 StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationContext* opCtx,
                                                                   KeyFormat keyFormat) {
-    std::unique_ptr<RecordStore> rs = _engine->makeTemporaryRecordStore(
-        opCtx, _catalog->newInternalResumableIndexBuildIdent(), keyFormat);
+    std::unique_ptr<RecordStore> rs =
+        _engine->makeTemporaryRecordStore(opCtx, generateNewResumableIndexBuildIdent(), keyFormat);
     LOGV2_DEBUG(4921500,
                 1,
                 "Created temporary record store for resumable index build",

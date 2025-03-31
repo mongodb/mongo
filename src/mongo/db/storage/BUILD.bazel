@@ -317,7 +317,6 @@ mongo_cc_library(
     deps = [
         ":bson_collection_catalog_entry",
         ":record_store_base",
-        ":storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/storage:feature_document_util",
@@ -539,10 +538,21 @@ mongo_cc_library(
     ],
     hdrs = [
         "ident.h",
-        "//src/mongo/base:string_data.h",
     ],
     deps = [
-        "//src/mongo:base",
+        "//src/mongo/db:common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ident_test",
+    srcs = [
+        "ident_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":ident",
+        "//src/mongo/unittest",
     ],
 )
 

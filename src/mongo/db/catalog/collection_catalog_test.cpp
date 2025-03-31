@@ -1187,9 +1187,13 @@ private:
 
         // Adds the collection to the durable catalog.
         auto storageEngine = getServiceContext()->getStorageEngine();
+        const auto ident =
+            ident::generateNewCollectionIdent(nss.dbName(),
+                                              storageEngine->isUsingDirectoryPerDb(),
+                                              storageEngine->isUsingDirectoryForIndexes());
         std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
             uassertStatusOK(
-                storageEngine->getDurableCatalog()->createCollection(opCtx, nss, options));
+                storageEngine->getDurableCatalog()->createCollection(opCtx, nss, ident, options));
         auto& catalogId = catalogIdRecordStorePair.first;
         auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
         auto metadata = catalogEntry->metadata;

@@ -739,9 +739,13 @@ Collection* DatabaseImpl::_createCollection(
             }
 
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            const bool directoryPerDB = storageEngine->isUsingDirectoryPerDb();
+            const bool directoryPerIndexes = storageEngine->isUsingDirectoryForIndexes();
+            const auto ident = ident::generateNewCollectionIdent(
+                nss.dbName(), directoryPerDB, directoryPerIndexes);
             std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
                 uassertStatusOK(storageEngine->getDurableCatalog()->createCollection(
-                    opCtx, nss, optionsWithUUID));
+                    opCtx, nss, ident, optionsWithUUID));
             auto& catalogId = catalogIdRecordStorePair.first;
 
             auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
