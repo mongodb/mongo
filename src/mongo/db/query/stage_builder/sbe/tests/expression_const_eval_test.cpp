@@ -987,6 +987,24 @@ TEST(Optimizer, ConstFoldMultiLet) {
             "Variable [v1]\n",
             tree);
     }
+    {
+        ExpressionConstEval evaluator{nullptr};
+        auto tree =
+            _multiLet(
+                "x"_sd,
+                _fn("floor", "v1"_var),
+                _multiLet("y"_sd, _fn("floor", "v2"_var), _binary("Mult", "1"_cint64, "y"_var)))
+                ._n;
+
+        evaluator.optimize(tree);
+
+        ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+            "BinaryOp [Mult]\n"
+            "|   FunctionCall [floor]\n"
+            "|   Variable [v2]\n"
+            "Const [1]\n",
+            tree);
+    }
 }
 
 // The following nullability tests verify that ExpressionConstEval, which performs rewrites and

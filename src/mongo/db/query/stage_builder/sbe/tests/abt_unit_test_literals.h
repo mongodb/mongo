@@ -225,6 +225,11 @@ inline auto _let(StringData pn, ExprHolder inBind, ExprHolder inExpr) {
     return ExprHolder{make<Let>(ProjectionName{pn}, std::move(inBind._n), std::move(inExpr._n))};
 }
 
+inline auto _multiLet(StringData pn1, ExprHolder inBind1, ExprHolder inExpr) {
+    return ExprHolder{make<MultiLet>(
+        std::vector{std::pair{ProjectionName{pn1}, std::move(inBind1._n)}}, std::move(inExpr._n))};
+}
+
 inline auto _multiLet(
     StringData pn1, ExprHolder inBind1, StringData pn2, ExprHolder inBind2, ExprHolder inExpr) {
     return ExprHolder{
