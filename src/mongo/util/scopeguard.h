@@ -45,6 +45,9 @@ namespace mongo {
  *     ScopeGuard cleanup([&] { ... });
  *     auto cleanup = ScopeGuard([&] { ... });
  *     ScopeGuard cleanup = [&] { ... };
+ *
+ * The callback is invoked in a destructor, an implicitly `noexcept` context. As
+ * a result, any exceptions escaping the callback are process-fatal.
  */
 template <typename F>
 class [[nodiscard]] ScopeGuard {
@@ -86,5 +89,8 @@ ScopeGuard(F&&) -> ScopeGuard<std::decay_t<F>>;
  * Declares a ScopeGuard having a variable name based on line number.
  * Example:
  *     ON_BLOCK_EXIT([&] { ... });
+ *
+ * The callback is invoked in a destructor, an implicitly `noexcept` context. As
+ * a result, any exceptions escaping the callback are process-fatal.
  */
 #define ON_BLOCK_EXIT ScopeGuard MONGO_SCOPEGUARD_ANON(onBlockExit)

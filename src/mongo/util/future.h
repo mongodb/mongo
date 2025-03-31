@@ -494,6 +494,7 @@ public:
      * This can be used to inform some outside system of the result.
      *
      * The callback takes a const T& and must return void.
+     * It is process-fatal for the callback to exit by throwing an exception.
      */
     template <typename Func>
     requires(future_details::isCallableExactR<void, Func, const T>)
@@ -507,6 +508,7 @@ public:
      * This can be used to log.
      *
      * The callback takes a non-OK Status and must return void.
+     * It is process-fatal for the callback to exit by throwing an exception.
      */
     template <typename Func>
     requires(future_details::isCallableExactR<void, Func, const Status>)
@@ -521,6 +523,7 @@ public:
      * match the common semantic from other languages.
      *
      * The callback takes a StatusOrStatusWith<T> and must return void.
+     * It is process-fatal for the callback to exit by throwing an exception.
      */
     template <typename Func>
     requires(future_details::isCallableExactR<void, Func, const StatusOrStatusWith<T>>)
