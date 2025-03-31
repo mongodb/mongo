@@ -647,7 +647,6 @@ void MatchesSingleElementEvaluator::visit(
     }
 
     _result = matchesBSONObj(expr, _elem.embeddedObject());
-    return;
 }
 
 /**

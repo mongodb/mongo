@@ -258,7 +258,7 @@ class MatchesSingleElementEvaluator final : public MatchExpressionConstVisitor {
 
 public:
     MatchesSingleElementEvaluator(const BSONElement& e, MatchDetails* details)
-        : _elem(e), _details(details) {}
+        : _elem(e), _details(details), _result(false) {}
 
     bool getResult() {
         return _result;
