@@ -118,6 +118,11 @@ struct QueryStatsEntry {
     AggregatedMetric<int64_t> workingTimeMillis;
 
     /**
+     * Aggregates the executing time including getMore requests.
+     */
+    AggregatedMetric<int64_t> cpuNanos;
+
+    /**
      * Counts the frequency of the boolean value hasSortStage.
      */
     AggregatedBool hasSortStage;

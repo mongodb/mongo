@@ -96,6 +96,10 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.executionTime = Microseconds{80};
     currentAdditiveMetrics.writeConflicts.store(7);
     additiveMetricsToAdd.writeConflicts.store(0);
+    currentAdditiveMetrics.clusterWorkingTime = Milliseconds{30};
+    additiveMetricsToAdd.clusterWorkingTime = Milliseconds{10};
+    currentAdditiveMetrics.cpuNanos = Nanoseconds{1000};
+    additiveMetricsToAdd.cpuNanos = Nanoseconds{21};
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -130,6 +134,11 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
               additiveMetricsBeforeAdd.writeConflicts.load() +
                   additiveMetricsToAdd.writeConflicts.load());
+    ASSERT_EQ(*currentAdditiveMetrics.clusterWorkingTime,
+              *additiveMetricsBeforeAdd.clusterWorkingTime +
+                  *additiveMetricsToAdd.clusterWorkingTime);
+    ASSERT_EQ(*currentAdditiveMetrics.cpuNanos,
+              *additiveMetricsBeforeAdd.cpuNanos + *additiveMetricsToAdd.cpuNanos);
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -149,6 +158,7 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.keysDeleted = 2;
     currentAdditiveMetrics.writeConflicts.store(7);
     additiveMetricsToAdd.writeConflicts.store(0);
+    additiveMetricsToAdd.cpuNanos = Nanoseconds(1);
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -192,6 +202,10 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
               additiveMetricsBeforeAdd.writeConflicts.load() +
                   additiveMetricsToAdd.writeConflicts.load());
+
+    // The 'cpuNanos' field for the current AdditiveMetrics object was not initialized, so it
+    // should be treated as zero.
+    ASSERT_EQ(*currentAdditiveMetrics.cpuNanos, *additiveMetricsToAdd.cpuNanos);
 }
 
 TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
@@ -230,6 +244,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.bytesRead = 5;
     additiveMetrics.hasSortStage = false;
     additiveMetrics.usedDisk = false;
+    additiveMetrics.cpuNanos = Nanoseconds(8);
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
@@ -239,7 +254,8 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
                                 true /* hasSortStage */,
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
-                                false /* fromPlanCache */);
+                                false /* fromPlanCache */,
+                                9 /* cpuNanos */);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -250,6 +266,28 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.bytesRead, 15);
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
+    ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(17));
+}
+
+TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
+    // CPU time can be negative -1 if the platform doesn't support collecting cpu time.
+    OpDebug::AdditiveMetrics additiveMetrics;
+
+    additiveMetrics.cpuNanos = Nanoseconds(-1);
+
+    CursorMetrics cursorMetrics(1 /* keysExamined */,
+                                2 /* docsExamined */,
+                                3 /* bytesRead */,
+                                10 /* workingTimeMillis */,
+                                11 /* readingTimeMicros */,
+                                true /* hasSortStage */,
+                                false /* usedDisk */,
+                                true /* fromMultiPlanner */,
+                                false /* fromPlanCache */,
+                                -1 /* cpuNanos */);
+
+    additiveMetrics.aggregateCursorMetrics(cursorMetrics);
+    ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(-2));
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
@@ -267,7 +305,8 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
                                 true /* hasSortStage */,
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
-                                false /* fromPlanCache */);
+                                false /* fromPlanCache */,
+                                10 /* cpuNanos */);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -284,6 +323,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.clusterWorkingTime = Milliseconds(3);
     additiveMetrics.hasSortStage = false;
     additiveMetrics.usedDisk = false;
+    additiveMetrics.cpuNanos = Nanoseconds(5);
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
     remoteMetrics.keysExamined = 3;
@@ -291,6 +331,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.clusterWorkingTime = Milliseconds(5);
     remoteMetrics.hasSortStage = true;
     remoteMetrics.usedDisk = false;
+    remoteMetrics.cpuNanos = Nanoseconds(6);
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
 
@@ -299,6 +340,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(additiveMetrics.clusterWorkingTime, Milliseconds(8));
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
+    ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(11));
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) {

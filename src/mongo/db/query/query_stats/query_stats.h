@@ -215,6 +215,15 @@ inline uint64_t microsecondsToUint64(boost::optional<Microseconds> duration) {
 }
 
 /**
+ * Convert an optional Duration to a count of Nanoseconds int64_t.
+ */
+inline int64_t nanosecondsToInt64(boost::optional<Nanoseconds> duration) {
+    return duration.has_value() && duration.value() >= Nanoseconds::zero()
+        ? static_cast<int64_t>(duration->count())
+        : static_cast<int64_t>(-1);
+}
+
+/**
  * Snapshot of query stats from CurOp::OpDebug to store in query stats store.
  */
 struct QueryStatsSnapshot {
@@ -227,6 +236,7 @@ struct QueryStatsSnapshot {
     uint64_t bytesRead;
     int64_t readTimeMicros;
     int64_t workingTimeMillis;
+    int64_t cpuNanos;
     bool hasSortStage;
     bool usedDisk;
     bool fromMultiPlanner;

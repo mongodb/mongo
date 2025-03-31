@@ -1196,6 +1196,7 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setReadingTimeMicros(additiveMetrics.readingTime.value_or(Microseconds(0)).count());
     metrics.setWorkingTimeMillis(
         additiveMetrics.clusterWorkingTime.value_or(Milliseconds(0)).count());
+    metrics.setCpuNanos(additiveMetrics.cpuNanos.value_or(Nanoseconds(0)).count());
 
     metrics.setHasSortStage(additiveMetrics.hasSortStage);
     metrics.setUsedDisk(additiveMetrics.usedDisk);
@@ -1290,6 +1291,7 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     keysDeleted = addOptionals(keysDeleted, otherMetrics.keysDeleted);
     readingTime = addOptionals(readingTime, otherMetrics.readingTime);
     clusterWorkingTime = addOptionals(clusterWorkingTime, otherMetrics.clusterWorkingTime);
+    cpuNanos = addOptionals(cpuNanos, otherMetrics.cpuNanos);
     writeConflicts.fetchAndAdd(otherMetrics.writeConflicts.load());
     temporarilyUnavailableErrors.fetchAndAdd(otherMetrics.temporarilyUnavailableErrors.load());
     executionTime = addOptionals(executionTime, otherMetrics.executionTime);
@@ -1313,6 +1315,8 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     bytesRead = bytesRead.value_or(0) + metrics.bytesRead;
     readingTime = readingTime.value_or(Microseconds(0)) + metrics.readingTime;
     clusterWorkingTime = clusterWorkingTime.value_or(Milliseconds(0)) + metrics.clusterWorkingTime;
+    cpuNanos = cpuNanos.value_or(Nanoseconds(0)) + metrics.cpuNanos;
+
     hasSortStage = hasSortStage || metrics.hasSortStage;
     usedDisk = usedDisk || metrics.usedDisk;
     fromMultiPlanner = fromMultiPlanner || metrics.fromMultiPlanner;
@@ -1339,6 +1343,7 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
                                             static_cast<uint64_t>(metrics.getBytesRead()),
                                             Microseconds(metrics.getReadingTimeMicros()),
                                             Milliseconds(metrics.getWorkingTimeMillis()),
+                                            Nanoseconds(metrics.getCpuNanos()),
                                             metrics.getHasSortStage(),
                                             metrics.getUsedDisk(),
                                             metrics.getFromMultiPlanner(),

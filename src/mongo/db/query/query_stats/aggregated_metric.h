@@ -133,6 +133,12 @@ public:
             .append("sumOfSquares", bsonValue(sumOfSquares));
     }
 
+    void appendToIfNonNegative(BSONObjBuilder& builder, StringData fieldName) const {
+        if (sum >= 0) {
+            appendTo(builder, fieldName);
+        }
+    }
+
 private:
     Summation<T> sum{kInitialSummation<T>};
     T max{kInitialMax<T>};

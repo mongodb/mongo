@@ -6,6 +6,7 @@
  * TODO SERVER-84678: move this test into core once mongos supports includeQueryStatsMetrics
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isLinux} from "jstests/libs/os_helpers.js";
 
 function assertMetricEqual(metrics, name, expectedValue) {
     if (typeof expectedValue === 'undefined') {
@@ -16,6 +17,20 @@ function assertMetricEqual(metrics, name, expectedValue) {
     }
 }
 
+function assertCpuNanosMetricEqual(metrics) {
+    // cpuNanos will be positive on Linux systems and negative on all other systems, since
+    // the metric is only collected on Linux.
+    const name = "cpuNanos";
+    assert(name in metrics, ` ${name} is missing. Returned metrics: ${tojson(metrics)}`);
+    if (isLinux()) {
+        assert.gte(
+            metrics[name], 0, `${name} should be positive. Returned metrics: ${tojson(metrics)}`);
+        return;
+    }
+    assert.lte(
+        metrics[name], 0, `${name} should be negative. Returned metrics: ${tojson(metrics)}`);
+}
+
 function assertMetricsEqual(cursor, {
     keysExamined,
     docsExamined,
@@ -23,7 +38,7 @@ function assertMetricsEqual(cursor, {
     hasSortStage,
     usedDisk,
     fromMultiPlanner,
-    fromPlanCache
+    fromPlanCache,
 } = {}) {
     assert(cursor.hasOwnProperty("metrics"), "cursor is missing metrics field");
     const metrics = cursor.metrics;
@@ -31,6 +46,7 @@ function assertMetricsEqual(cursor, {
     assertMetricEqual(metrics, "keysExamined", keysExamined);
     assertMetricEqual(metrics, "docsExamined", docsExamined);
     assertMetricEqual(metrics, "workingTimeMillis", workingTimeMillis);
+    assertCpuNanosMetricEqual(metrics);
     assertMetricEqual(metrics, "hasSortStage", hasSortStage);
     assertMetricEqual(metrics, "usedDisk", usedDisk);
     assertMetricEqual(metrics, "fromMultiPlanner", fromMultiPlanner);

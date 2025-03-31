@@ -86,6 +86,10 @@ structs:
                 description: "Boolean value that is true if the plan came from the plan cache."
                 type: bool
                 stability: unstable
+            cpuNanos:
+                description: "Amount of CPU time spent by a query operation. "
+                type: long
+                stability: unstable
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."

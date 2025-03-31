@@ -2883,7 +2883,8 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                                    false /* hasSortStage */,
                                    true /* usedDisk */,
                                    true /* fromMultiPlanner */,
-                                   true /* fromPlanCache */));
+                                   true /* fromPlanCache */,
+                                   37 /*cpuNanos */));
 
     // Wait for the batch to be processed and read the single object.
     executor()->waitForEvent(readyEvent);
@@ -2903,6 +2904,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.usedDisk, true);
         ASSERT_EQ(remoteMetrics.fromMultiPlanner, true);
         ASSERT_EQ(remoteMetrics.fromPlanCache, true);
+        ASSERT_EQ(remoteMetrics.cpuNanos, Nanoseconds(37));
     }
 
     // Schedule a second response.
@@ -2916,7 +2918,8 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                                    false /* hasSortStage */,
                                    true /* usedDisk */,
                                    true /* fromMultiPlanner */,
-                                   false /* fromPlanCache */));
+                                   false /* fromPlanCache */,
+                                   121 /* cpuNanos */));
 
     // Wait for the final batch to be processed and read the object.
     executor()->waitForEvent(readyEvent);
@@ -2934,6 +2937,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.usedDisk, true);
         ASSERT_EQ(remoteMetrics.fromMultiPlanner, true);
         ASSERT_EQ(remoteMetrics.fromPlanCache, false);
+        ASSERT_EQ(remoteMetrics.cpuNanos, Nanoseconds(158));
     }
 
     {
@@ -2946,6 +2950,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.usedDisk, false);
         ASSERT_EQ(remoteMetrics.fromMultiPlanner, false);
         ASSERT_EQ(remoteMetrics.fromPlanCache, true);
+        ASSERT_EQ(remoteMetrics.cpuNanos, Nanoseconds(0));
     }
 
     // Read the EOF

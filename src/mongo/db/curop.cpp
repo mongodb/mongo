@@ -403,6 +403,9 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
             (duration_cast<Milliseconds>(elapsed - (_sumBlockedTimeTotal() - _blockedTimeAtStart)));
 
+        calculateCpuTime();
+        metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
+
         try {
             // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
             // but the lock acquisition could still be interrupted, which we catch and log.

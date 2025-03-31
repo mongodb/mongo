@@ -237,6 +237,9 @@ following way:
   while executing this query, including getMores.
 - `metrics.lastExecutionMicros`: Estimated time spent processing the latest query (akin to
   "totalExecMicros", not "firstResponseExecMicros").
+- `metrics.cpuNanos`: Estimated total CPU time spent by a query operation in nanoseconds. This value
+  should always be greater than 0 and will not be returned on platforms other than Linux, since collecting
+  cpu time is only supported on Linux.
 
 #### Permissions
 

@@ -46,6 +46,9 @@ struct DataBearingNodeMetrics {
     uint64_t bytesRead = 0;
     Microseconds readingTime{0};
     Milliseconds clusterWorkingTime{0};
+    // This value will be negative if we are not running on Linux since collecting cpu time is only
+    // supported on Linux systems.
+    Nanoseconds cpuNanos{0};
     bool hasSortStage : 1 = false;
     bool usedDisk : 1 = false;
     bool fromMultiPlanner : 1 = false;
@@ -61,6 +64,7 @@ struct DataBearingNodeMetrics {
         bytesRead += other.bytesRead;
         readingTime += other.readingTime;
         clusterWorkingTime += other.clusterWorkingTime;
+        cpuNanos += other.cpuNanos;
         hasSortStage = hasSortStage || other.hasSortStage;
         usedDisk = usedDisk || other.usedDisk;
         fromMultiPlanner = fromMultiPlanner || other.fromMultiPlanner;
@@ -83,6 +87,7 @@ struct DataBearingNodeMetrics {
         bytesRead += metrics.getBytesRead();
         readingTime += Microseconds(metrics.getReadingTimeMicros());
         clusterWorkingTime += Milliseconds(metrics.getWorkingTimeMillis());
+        cpuNanos += Nanoseconds(metrics.getCpuNanos());
         hasSortStage = hasSortStage || metrics.getHasSortStage();
         usedDisk = usedDisk || metrics.getUsedDisk();
         fromMultiPlanner = fromMultiPlanner || metrics.getFromMultiPlanner();

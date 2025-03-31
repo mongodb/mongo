@@ -58,7 +58,8 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     hasSortStage: true,
     usedDisk: true,
     fromMultiPlanner: true,
-    fromPlanCache: true
+    fromPlanCache: true,
+    cpuNanos: {"$numberLong": "18"}
 })");
 
 static const std::string defaultNssStr = "db.coll";
@@ -308,6 +309,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_TRUE(metrics.getUsedDisk());
     ASSERT_TRUE(metrics.getFromMultiPlanner());
     ASSERT_TRUE(metrics.getFromPlanCache());
+    ASSERT_EQ(metrics.getCpuNanos(), 18);
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorMetricsWrongType) {
@@ -341,7 +343,8 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsIncomplete) {
                                    CursorMetrics::kHasSortStageFieldName,
                                    CursorMetrics::kUsedDiskFieldName,
                                    CursorMetrics::kFromMultiPlannerFieldName,
-                                   CursorMetrics::kFromPlanCacheFieldName};
+                                   CursorMetrics::kFromPlanCacheFieldName,
+                                   CursorMetrics::kCpuNanosFieldName};
     for (auto fieldName : fields) {
         auto badMetrics = metrics.copy().removeField(fieldName);
         auto badCursor = makeCursorBSON(badMetrics);
@@ -922,7 +925,8 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
                           false /* hasSortStage */,
                           true /* usedDisk */,
                           true /* fromMultiPlanner */,
-                          false /* fromPlanCache */);
+                          false /* fromPlanCache */,
+                          -1 /* cpuNanos */);
 
     auto pbrToken = BSON("n" << 1);
     builder.setPostBatchResumeToken(pbrToken);
@@ -951,6 +955,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_TRUE(parsedMetrics->getUsedDisk());
     ASSERT_TRUE(parsedMetrics->getFromMultiPlanner());
     ASSERT_FALSE(parsedMetrics->getFromPlanCache());
+    ASSERT_EQ(parsedMetrics->getCpuNanos(), -1);
 
     ASSERT_TRUE(response.getPartialResultsReturned());
     ASSERT_TRUE(response.getInvalidated());

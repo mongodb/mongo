@@ -222,6 +222,14 @@ public:
         // query involved missed the cache. Optional because we need tri-state (true, false, not
         // set) to make the "sticky towards false" logic work.
         boost::optional<bool> fromPlanCache;
+
+        // If query stats are being collected for this operation, stores the estimated cpu time
+        // across the cluster. In a mongod, this is the local cpu time and in mongos this track the
+        // total cpu time across the cluster.
+        // This value will be negative if the platform does not support collecting cpu time, since
+        // collecting cpu time is only supported Linux systems. If the value is greater than 0, the
+        // cpu time reported is the cpu time collected.
+        boost::optional<Nanoseconds> cpuNanos{0};
     };
 
     OpDebug() = default;

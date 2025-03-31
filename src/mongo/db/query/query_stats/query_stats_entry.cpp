@@ -50,6 +50,7 @@ BSONObj QueryStatsEntry::toBSON(bool includeDiskUsageMetrics) const {
         bytesRead.appendTo(builder, "bytesRead");
         readTimeMicros.appendTo(builder, "readTimeMicros");
         workingTimeMillis.appendTo(builder, "workingTimeMillis");
+        cpuNanos.appendToIfNonNegative(builder, "cpuNanos");
         hasSortStage.appendTo(builder, "hasSortStage");
         usedDisk.appendTo(builder, "usedDisk");
         fromMultiPlanner.appendTo(builder, "fromMultiPlanner");
