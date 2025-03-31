@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MongoDB, Inc.
+ * Copyright 2009-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -452,6 +452,25 @@ bson_validate (const bson_t *bson, bson_validate_flags_t flags, size_t *offset);
  */
 BSON_EXPORT (bool)
 bson_validate_with_error (const bson_t *bson, bson_validate_flags_t flags, bson_error_t *error);
+
+
+/**
+ * bson_validate_with_error_and_offset:
+ * @bson: A bson_t.
+ * @offset: A location for the error offset.
+ * @error: A location for the error info.
+ *
+ * Validates a BSON document by walking through the document and inspecting
+ * the fields for valid content.
+ *
+ * Returns: true if @bson is valid; otherwise false, @offset is set
+ * and @error is filled out.
+ */
+BSON_EXPORT (bool)
+bson_validate_with_error_and_offset (const bson_t *bson,
+                                     bson_validate_flags_t flags,
+                                     size_t *offset,
+                                     bson_error_t *error);
 
 
 /**

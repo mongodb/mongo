@@ -1191,7 +1191,7 @@
         "name": "Organization: github"
       },
       "name": "MongoDB C Driver",
-      "version": "1.27.6",
+      "version": "1.28.1",
       "licenses": [
         {
           "license": {
@@ -1199,7 +1199,7 @@
           }
         }
       ],
-      "purl": "pkg:github/mongodb/mongo-c-driver@1.27.6",
+      "purl": "pkg:github/mongodb/mongo-c-driver@1.28.1",
       "properties": [
         {
           "name": "internal:team_responsible",

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MongoDB, Inc.
+ * Copyright 2009-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -231,6 +231,10 @@
          abort ();                                                                                   \
       }                                                                                              \
    } while (0)
+
+// `BSON_OPTIONAL_PARAM` is a documentation-only macro to document X may be NULL.
+// Useful in combination with `BSON_ASSERT_PARAM` to document and assert pointer parameters.
+#define BSON_OPTIONAL_PARAM(param) (void) 0
 
 /* obsolete macros, preserved for compatibility */
 #define BSON_STATIC_ASSERT(s) BSON_STATIC_ASSERT_ (s, __LINE__)

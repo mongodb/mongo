@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MongoDB, Inc.
+ * Copyright 2009-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -3299,29 +3299,35 @@ _bson_validate_internal (const bson_t *bson, bson_validate_state_t *state)
 bool
 bson_validate (const bson_t *bson, bson_validate_flags_t flags, size_t *offset)
 {
-   bson_validate_state_t state;
-
-   state.flags = flags;
-   _bson_validate_internal (bson, &state);
-
-   if (state.err_offset > 0 && offset) {
-      *offset = (size_t) state.err_offset;
-   }
-
-   return state.err_offset < 0;
+   return bson_validate_with_error_and_offset (bson, flags, offset, NULL);
 }
 
 
 bool
 bson_validate_with_error (const bson_t *bson, bson_validate_flags_t flags, bson_error_t *error)
 {
+   return bson_validate_with_error_and_offset (bson, flags, NULL, error);
+}
+
+
+bool
+bson_validate_with_error_and_offset (const bson_t *bson,
+                                     bson_validate_flags_t flags,
+                                     size_t *offset,
+                                     bson_error_t *error)
+{
    bson_validate_state_t state;
 
    state.flags = flags;
    _bson_validate_internal (bson, &state);
 
-   if (state.err_offset > 0 && error) {
-      memcpy (error, &state.error, sizeof *error);
+   if (state.err_offset > 0) {
+      if (offset) {
+         *offset = (size_t) state.err_offset;
+      }
+      if (error) {
+         memcpy (error, &state.error, sizeof *error);
+      }
    }
 
    return state.err_offset < 0;

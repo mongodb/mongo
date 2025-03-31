@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MongoDB, Inc.
+ * Copyright 2009-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,11 +36,11 @@
 
 
 #ifdef BSON_OS_WIN32
-#if defined(_WIN32_WINNT) && (_WIN32_WINNT < 0x0600)
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT < 0x0601)
 #undef _WIN32_WINNT
 #endif
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0600
+#define _WIN32_WINNT 0x0601
 #endif
 #ifndef NOMINMAX
 #define NOMINMAX

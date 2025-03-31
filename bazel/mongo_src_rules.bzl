@@ -1574,7 +1574,7 @@ def force_includes_hdr(package_name, name):
 
     return []
 
-# TODO(SERVER-102596): Stop including this flag when ASP is able to upgrade mongoc and mongocxx
+# TODO(SERVER-103006): Stop including this flag when ASP is able to upgrade mongoc and mongocxx
 STREAMS_THIRD_PARTY_DIR = "src/mongo/db/modules/enterprise/src/streams/third_party"
 
 def package_specific_copt(package_name):

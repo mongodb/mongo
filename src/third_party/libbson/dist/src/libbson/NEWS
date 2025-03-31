@@ -1,3 +1,33 @@
+libbson 1.28.1
+==============
+
+Fixes:
+
+  * Fix large string handling in `bson_string_truncate`.
+  * Fix possible crash in `bson_value_copy`.
+
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Joshua Siegel
+  * Kevin Albertson
+
+
+
+libbson 1.28.0
+==============
+
+New features:
+
+  * Add `bson_validate_with_error_and_offset`.
+
+Build Configuration:
+
+  * Remove automatic ccache detection and usage (CCache.cmake).
+      * Set [`CMAKE_<LANG>_COMPILER_LAUNCHER`](https://cmake.org/cmake/help/latest/envvar/CMAKE_LANG_COMPILER_LAUNCHER.html) to build with ccache.
+  * Remove `MONGO_USE_CCACHE` (no longer applicable; see above).
+
+
 libbson 1.27.6
 ==============
 

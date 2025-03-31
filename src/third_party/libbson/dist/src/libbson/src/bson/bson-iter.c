@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2014 MongoDB, Inc.
+ * Copyright 2009-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,6 +62,7 @@ bson_iter_init (bson_iter_t *iter,  /* OUT */
    iter->d4 = 0;
    iter->next_off = 4;
    iter->err_off = 0;
+   iter->value = (bson_value_t){0};
 
    return true;
 }
@@ -640,7 +641,7 @@ fill_data_fields:
          /* subtype 2 has a redundant length header in the data */
          memcpy (&binary_len, (iter->raw + iter->d3), sizeof (binary_len));
          binary_len = BSON_UINT32_FROM_LE (binary_len);
-         if (binary_len + 4 != l) {
+         if (binary_len != l - 4) {
             iter->err_off = iter->d3;
             goto mark_invalid;
          }

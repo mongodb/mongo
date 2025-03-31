@@ -34,7 +34,7 @@ BEGIN
             VALUE "OriginalFilename", BSON_OUTPUT_BASENAME "-" BSON_API_VERSION ".dll"
             VALUE "ProductName", "MongoDB C Driver"
             VALUE "ProductVersion", BSON_VERSION_S
-            VALUE "LegalCopyright", "Copyright (C) 2013-present MongoDB, Inc."
+            VALUE "LegalCopyright", "Copyright 2009-present MongoDB, Inc."
         END
     END
     BLOCK "VarFileInfo"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-present MongoDB, Inc.
+ * Copyright 2009-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ mcommon_thread_create (bson_thread_t *thread, BSON_THREAD_FUN_TYPE (func), void 
 {
    BSON_ASSERT_PARAM (thread);
    BSON_ASSERT_PARAM (func);
-   BSON_ASSERT (arg || true); // optional.
+   BSON_OPTIONAL_PARAM (arg); // optional.
    return pthread_create (thread, NULL, func, arg);
 }
 int
@@ -47,7 +47,7 @@ mcommon_thread_create (bson_thread_t *thread, BSON_THREAD_FUN_TYPE (func), void 
 {
    BSON_ASSERT_PARAM (thread);
    BSON_ASSERT_PARAM (func);
-   BSON_ASSERT (arg || true); // optional.
+   BSON_OPTIONAL_PARAM (arg); // optional.
 
    *thread = (HANDLE) _beginthreadex (NULL, 0, func, arg, 0, NULL);
    if (0 == *thread) {

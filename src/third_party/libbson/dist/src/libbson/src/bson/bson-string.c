@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MongoDB, Inc.
+ * Copyright 2009-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -292,7 +292,7 @@ bson_string_append_printf (bson_string_t *string, const char *format, ...)
  *       Truncate the string @string to @len bytes.
  *
  *       The underlying memory will be released via realloc() down to
- *       the minimum required size specified by @len.
+ *       the minimum required size (at power-of-two boundary) specified by @len.
  *
  * Returns:
  *       None.
@@ -307,19 +307,17 @@ void
 bson_string_truncate (bson_string_t *string, /* IN */
                       uint32_t len)          /* IN */
 {
-   uint32_t alloc;
-
-   BSON_ASSERT (string);
-   BSON_ASSERT (len < INT_MAX);
-
-   alloc = len + 1;
-
-   if (alloc < 16) {
-      alloc = 16;
+   BSON_ASSERT_PARAM (string);
+   if (len == string->len) {
+      return;
    }
-
-   if (!bson_is_power_of_two (alloc)) {
-      alloc = (uint32_t) bson_next_power_of_two ((size_t) alloc);
+   uint32_t needed = len;
+   BSON_ASSERT (needed < UINT32_MAX);
+   needed += 1u; // Add one for trailing NULL byte.
+   uint32_t alloc = bson_next_power_of_two_u32 (needed);
+   if (alloc == 0) {
+      // Overflowed: saturate at UINT32_MAX.
+      alloc = UINT32_MAX;
    }
 
    string->str = bson_realloc (string->str, alloc);
