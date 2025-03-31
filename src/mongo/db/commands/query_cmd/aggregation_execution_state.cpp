@@ -37,6 +37,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/version_context.h"
@@ -641,7 +642,7 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
     } else {
         collectionState = AggCatalogStateFactory::createDefaultAggCatalogState(*this);
 
-        if (getRequest().getRawData()) {
+        if (isRawDataOperation(getOpCtx())) {
             auto [isTimeseriesViewRequest, translatedNs] =
                 timeseries::isTimeseriesViewRequest(getOpCtx(), getRequest());
             if (isTimeseriesViewRequest) {

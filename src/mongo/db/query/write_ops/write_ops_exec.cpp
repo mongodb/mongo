@@ -106,6 +106,7 @@
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -1162,7 +1163,7 @@ WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& wholeOp,
                            OperationSource source) {
     auto actualNs = wholeOp.getNamespace();
-    if (wholeOp.getRawData()) {
+    if (isRawDataOperation(opCtx)) {
         actualNs = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
     }
 
@@ -1676,7 +1677,7 @@ WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& wholeOp,
                            OperationSource source) {
     auto ns = wholeOp.getNamespace();
-    if (wholeOp.getRawData()) {
+    if (isRawDataOperation(opCtx)) {
         ns = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
     }
     NamespaceString originalNs;
@@ -2013,7 +2014,7 @@ WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& wholeOp,
                            OperationSource source) {
     auto ns = wholeOp.getNamespace();
-    if (wholeOp.getRawData()) {
+    if (isRawDataOperation(opCtx)) {
         ns = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
     }
     if (source == OperationSource::kTimeseriesDelete) {

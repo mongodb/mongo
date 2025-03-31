@@ -560,7 +560,7 @@ public:
                 } else if (type == BulkWriteCRUDOp::kUpdate) {
                     return BatchedCommandRequest(
                         bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
-                            op.getUpdate(), _request, 0));
+                            opCtx, op.getUpdate(), _request, 0));
                 } else if (type == BulkWriteCRUDOp::kDelete) {
                     return BatchedCommandRequest(bulk_write_common::makeDeleteCommandRequestForFLE(
                         opCtx, op.getDelete(), _request, _request.getNsInfo()[op.getNsInfoIdx()]));

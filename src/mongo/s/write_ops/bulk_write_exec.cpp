@@ -59,6 +59,7 @@
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
@@ -352,7 +353,7 @@ BatchedCommandRequest makeFLECommandRequest(OperationContext* opCtx,
 
         write_ops::UpdateCommandRequest updateCommand =
             bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
-                firstOp.getUpdate(), clientRequest, /*currentOpIdx=*/0);
+                opCtx, firstOp.getUpdate(), clientRequest, /*currentOpIdx=*/0);
 
         return BatchedCommandRequest(updateCommand);
     } else {
@@ -1061,7 +1062,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
             // For tracked timeseries collections, only the bucket collections are tracked. This
             // sets the namespace to the namespace of the tracked bucket collection.
             nsInfoEntry.setNs(targeter->getNS());
-            if (!_clientRequest.getRawData()) {
+            if (!isRawDataOperation(_opCtx)) {
                 nsInfoEntry.setIsTimeseriesNamespace(true);
             }
         }

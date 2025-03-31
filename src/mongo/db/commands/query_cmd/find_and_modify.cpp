@@ -84,6 +84,7 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -511,7 +512,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     }
 
     auto nsString = req.getNamespace();
-    if (request().getRawData()) {
+    if (isRawDataOperation(opCtx)) {
         nsString = timeseries::isTimeseriesViewRequest(opCtx, this->request()).second;
     }
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));

@@ -106,6 +106,7 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -886,7 +887,7 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
     }
 
     write_ops::UpdateCommandRequest updateCommand =
-        bulk_write_common::makeUpdateCommandRequestFromUpdateOp(op, req, currentOpIdx);
+        bulk_write_common::makeUpdateCommandRequestFromUpdateOp(opCtx, op, req, currentOpIdx);
     write_ops::UpdateCommandReply updateReply = processFLEUpdate(opCtx, updateCommand);
 
     if (updateReply.getWriteErrors()) {
@@ -1345,7 +1346,7 @@ public:
         Reply typedRun(OperationContext* opCtx) final {
             auto& req = request();
 
-            if (req.getRawData()) {
+            if (isRawDataOperation(opCtx)) {
                 for (auto& nsEntry : req.getNsInfo()) {
                     nsEntry.setNs(timeseries::isTimeseriesViewRequest(opCtx, nsEntry).second);
                 }
@@ -1608,8 +1609,8 @@ bool handleUpdateOp(OperationContext* opCtx,
                 ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
                       opCtx->getServiceContext())
                 : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-            auto updateRequest =
-                bulk_write_common::makeUpdateCommandRequestFromUpdateOp(op, req, currentOpIdx);
+            auto updateRequest = bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
+                opCtx, op, req, currentOpIdx);
 
             write_ops_exec::runTimeseriesRetryableUpdates(
                 opCtx, bucketNs, updateRequest, executor, &out);

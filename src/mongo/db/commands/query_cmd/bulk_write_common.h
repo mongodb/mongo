@@ -116,7 +116,10 @@ DeleteRequest makeDeleteRequestFromDeleteOp(OperationContext* opCtx,
  * request at index currentOpIdx.
  */
 write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
-    const BulkWriteUpdateOp* op, const BulkWriteCommandRequest& req, size_t currentOpIdx);
+    OperationContext* opCtx,
+    const BulkWriteUpdateOp* op,
+    const BulkWriteCommandRequest& req,
+    size_t currentOpIdx);
 
 /**
  * Helper for FLE support. Build a DeleteCommandRequest from a BulkWriteDeleteOp.

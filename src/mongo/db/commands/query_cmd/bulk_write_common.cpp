@@ -250,7 +250,10 @@ DeleteRequest makeDeleteRequestFromDeleteOp(OperationContext* opCtx,
 }
 
 write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
-    const BulkWriteUpdateOp* op, const BulkWriteCommandRequest& req, size_t currentOpIdx) {
+    OperationContext* opCtx,
+    const BulkWriteUpdateOp* op,
+    const BulkWriteCommandRequest& req,
+    size_t currentOpIdx) {
     auto idx = op->getUpdate();
     auto nsEntry = req.getNsInfo()[idx];
 
@@ -260,7 +263,7 @@ write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
     write_ops::UpdateCommandRequest updateCommand(nsEntry.getNs(), updates);
 
     updateCommand.setLet(req.getLet());
-    if (req.getRawData()) {
+    if (isRawDataOperation(opCtx)) {
         updateCommand.setRawData(true);
     }
 

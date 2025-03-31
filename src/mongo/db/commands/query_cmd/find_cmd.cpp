@@ -457,7 +457,7 @@ public:
                 acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
 
             auto ns = [&] {
-                if (_cmdRequest->getRawData()) {
+                if (isRawDataOperation(opCtx)) {
                     auto [isTimeseriesViewRequest, translatedNs] =
                         timeseries::isTimeseriesViewRequest(opCtx, *_cmdRequest);
                     if (isTimeseriesViewRequest) {
@@ -730,7 +730,7 @@ public:
 
             boost::optional<CollectionOrViewAcquisition> collectionOrView =
                 acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
-            if (_cmdRequest->getRawData()) {
+            if (isRawDataOperation(opCtx)) {
                 auto [isTimeseriesViewRequest, translatedNs] =
                     timeseries::isTimeseriesViewRequest(opCtx, *_cmdRequest);
                 if (isTimeseriesViewRequest) {

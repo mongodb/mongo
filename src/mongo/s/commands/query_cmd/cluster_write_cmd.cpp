@@ -305,7 +305,7 @@ static BSONObj translateCmdObjForRawData(OperationContext* opCtx,
                                          const BatchedCommandRequest& batchedRequest,
                                          const BSONObj& cmdObj,
                                          NamespaceString& ns) {
-    if (!batchedRequest.getGenericArguments().getRawData() ||
+    if (!isRawDataOperation(opCtx) ||
         !CollectionRoutingInfoTargeter{opCtx, ns}.timeseriesNamespaceNeedsRewrite(ns)) {
         return cmdObj;
     }

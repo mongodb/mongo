@@ -84,6 +84,7 @@
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -224,7 +225,7 @@ public:
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             auto ns = [&] {
-                if (request().getRawData()) {
+                if (isRawDataOperation(opCtx)) {
                     auto [isTimeseriesViewRequest, ns] =
                         timeseries::isTimeseriesViewRequest(opCtx, request());
                     if (isTimeseriesViewRequest) {
@@ -324,7 +325,7 @@ public:
                 &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, _ns);
 
             auto ns = [&] {
-                if (request().getRawData()) {
+                if (isRawDataOperation(opCtx)) {
                     auto [isTimeseriesViewRequest, ns] =
                         timeseries::isTimeseriesViewRequest(opCtx, request());
                     if (isTimeseriesViewRequest) {

@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
@@ -151,13 +152,13 @@ public:
                 _runAggOnNamespace(opCtx,
                                    result,
                                    verbosity,
-                                   _aggregationRequest.getRawData() &&
+                                   isRawDataOperation(opCtx) &&
                                            CollectionRoutingInfoTargeter{opCtx, nss}
                                                .timeseriesNamespaceNeedsRewrite(nss)
                                        ? nss.makeTimeseriesBucketsNamespace()
                                        : nss);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-                if (!_aggregationRequest.getRawData() ||
+                if (!isRawDataOperation(opCtx) ||
                     !ex->getNamespace().isTimeseriesBucketsCollection()) {
                     // If the aggregation failed because the namespace is a view, re-run the command
                     // with the resolved view pipeline and namespace.

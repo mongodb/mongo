@@ -207,7 +207,7 @@ public:
             doFLERewriteIfNeeded(opCtx);
 
             NamespaceString expNs = ns();
-            if (_cmdRequest->getRawData() &&
+            if (isRawDataOperation(opCtx) &&
                 _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&
                 CollectionRoutingInfoTargeter{opCtx, _cmdRequest->getNamespaceOrUUID().nss()}
                     .timeseriesNamespaceNeedsRewrite(_cmdRequest->getNamespaceOrUUID().nss())) {
@@ -281,7 +281,7 @@ public:
                 }
 
                 const auto explainCmd = ClusterExplain::wrapAsExplain(
-                    !_cmdRequest->getRawData() || expNs == ns()
+                    !isRawDataOperation(opCtx) || expNs == ns()
                         ? _cmdRequest->toBSON()
                         : rewriteCommandForRawDataOperation<FindCommandRequest>(
                               _cmdRequest->toBSON(), expNs.coll()),
@@ -346,7 +346,7 @@ public:
             Impl::checkCanRunHere(opCtx);
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            if (_cmdRequest->getRawData() &&
+            if (isRawDataOperation(opCtx) &&
                 _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&
                 CollectionRoutingInfoTargeter{opCtx, _cmdRequest->getNamespaceOrUUID().nss()}
                     .timeseriesNamespaceNeedsRewrite(_cmdRequest->getNamespaceOrUUID().nss())) {
