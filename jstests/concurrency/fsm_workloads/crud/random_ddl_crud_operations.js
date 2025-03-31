@@ -235,9 +235,20 @@ export const $config = (function() {
                 tid = Random.randInt(this.threadCount);
 
             const targetThreadColl = threadCollectionName(collName, tid);
-            // Note this command will behave as no-op in case the collection is not tracked.
             const namespace = `${db}.${targetThreadColl}`;
             jsTestLog(`Started to untrack collection ${namespace}`);
+            // Attempt to unshard the collection first
+            jsTestLog(`1. Attempting to unshard collection ${namespace}`);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand({unshardCollection: namespace}), [
+                // Handles the case where the collection/db does not exist
+                ErrorCodes.NamespaceNotFound,
+                // Handles the case where another resharding operation is in progress
+                ErrorCodes.ConflictingOperationInProgress,
+                ErrorCodes.ReshardCollectionInProgress,
+            ]);
+            jsTestLog(`Unsharding completed ${namespace}`);
+            jsTestLog(`2. Untracking collection ${namespace}`);
+            // Note this command will behave as no-op in case the collection is not tracked.
             assert.commandWorkedOrFailedWithCode(
                 db.adminCommand({untrackUnshardedCollection: namespace}), [
                     // Handles the case where the collection is not located on its primary
