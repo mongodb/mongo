@@ -37,7 +37,8 @@
 
 namespace mongo {
 
-StackLocator::StackLocator() {
+StackLocator::StackLocator(const void* capturedStackPointer)
+    : _capturedStackPointer(capturedStackPointer) {
     const auto self = pthread_self();
     _begin = pthread_get_stackaddr_np(self);
     invariant(_begin);
@@ -46,7 +47,7 @@ StackLocator::StackLocator() {
     invariant(size);
 
     // TODO: Assumes stack grows downward on OS X.
-    _end = static_cast<char*>(_begin) - size;
+    _end = static_cast<const char*>(_begin) - size;
 }
 
 }  // namespace mongo

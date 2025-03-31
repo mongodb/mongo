@@ -45,6 +45,7 @@
 #endif
 
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/platform/stack_locator.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/exit_code.h"
 
@@ -119,8 +120,8 @@ struct StackLocationTestChildThreadInfo {
 static StackLocationTestChildThreadInfo stackLocationTestChildInfo{};
 
 extern "C" void stackLocationTestAction(int, siginfo_t*, void*) {
-    char n;
-    stackLocationTestChildInfo.handlerLocal = reinterpret_cast<uintptr_t>(&n);
+    stackLocationTestChildInfo.handlerLocal =
+        reinterpret_cast<uintptr_t>(StackLocator::getFramePointer());
 }
 
 int stackLocationTest() {

@@ -79,13 +79,6 @@ def list_files_without_targets(
         "src/mongo/executor/network_interface_thread_pool_test.cpp",
         # TODO(SERVER-101375): Remove the exemptions below once resolved.
         "src/mongo/platform/decimal128_dummy.cpp",
-        # TODO(SERVER-101376): Remove the exemptions below once resolved.
-        "src/mongo/platform/stack_locator_emscripten.cpp",
-        "src/mongo/platform/stack_locator_freebsd.cpp",
-        "src/mongo/platform/stack_locator_macOS.cpp",
-        "src/mongo/platform/stack_locator_openbsd.cpp",
-        "src/mongo/platform/stack_locator_solaris.cpp",
-        "src/mongo/platform/stack_locator_unknown.cpp",
         # TODO(SERVER-101377): Remove the exemptions below once resolved.
         "src/mongo/util/icu_init_stub.cpp",
         # TODO(SERVER-101377): Remove the exemptions below once resolved.

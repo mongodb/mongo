@@ -38,7 +38,8 @@
 
 namespace mongo {
 
-StackLocator::StackLocator() {
+StackLocator::StackLocator(const void* capturedStackPointer)
+    : _capturedStackPointer(capturedStackPointer) {
     pthread_t self = pthread_self();
     pthread_attr_t selfAttrs;
     invariant(pthread_attr_init(&selfAttrs) == 0);
@@ -58,7 +59,7 @@ StackLocator::StackLocator() {
     // getstack returns the stack *base*, being the bottom of the
     // stack, so we need to add size to it.
     _end = base;
-    _begin = static_cast<char*>(_end) + size;
+    _begin = static_cast<const char*>(_end) + size;
 }
 
 }  // namespace mongo
