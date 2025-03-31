@@ -108,11 +108,6 @@ public:
           _inlineNextChild(false),
           _cmdInsertPos(-1) {}
 
-    ~ExplainPrinterImpl() {
-        uassert(6624003, "Unmatched indentations", _indentCount == 0);
-        uassert(6624004, "Incorrect child count mark", _childrenRemaining == 0);
-    }
-
     ExplainPrinterImpl(const ExplainPrinterImpl& other) = delete;
     ExplainPrinterImpl& operator=(const ExplainPrinterImpl& other) = delete;
 
