@@ -45,8 +45,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/validate/validate_options.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -561,22 +559,6 @@ void WiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordI
     setKey(c, &key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, wtRu, [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
-        HealthLogEntry entry;
-        entry.setCollectionUUID(uuid());
-        entry.setTimestamp(Date_t::now());
-        entry.setSeverity(SeverityEnum::Error);
-        entry.setScope(ScopeEnum::Collection);
-        entry.setOperation("WT_Cursor::remove");
-        entry.setMsg("Record to be deleted not found");
-
-        BSONObjBuilder bob;
-        bob.append("RecordId", id.toString());
-        bob.append("ident", getIdent());
-        bob.appendElements(getStackTrace().getBSONRepresentation());
-        entry.setData(bob.obj());
-
-        HealthLogInterface::get(opCtx)->log(entry);
-
         if (TestingProctor::instance().isEnabled()) {
             LOGV2_FATAL(9099700,
                         "Record to be deleted not found",
@@ -1807,24 +1789,6 @@ RecordId WiredTigerRecordStoreCursor::nextIdCommon() {
 
 void WiredTigerRecordStoreCursor::reportOutOfOrderRead(const RecordId& id,
                                                        bool failWithOutOfOrderForTest) const {
-    HealthLogEntry entry;
-    entry.setCollectionUUID(_uuid);
-    entry.setTimestamp(Date_t::now());
-    entry.setSeverity(SeverityEnum::Error);
-    entry.setScope(ScopeEnum::Collection);
-    entry.setOperation("WT_Cursor::next");
-    entry.setMsg("Cursor returned out-of-order keys");
-
-    BSONObjBuilder bob;
-    bob.append("forward", _forward);
-    bob.append("next", id.toString());
-    bob.append("last", _lastReturnedId.toString());
-    bob.append("ident", _ident);
-    bob.appendElements(getStackTrace().getBSONRepresentation());
-    entry.setData(bob.obj());
-
-    HealthLogInterface::get(_opCtx)->log(entry);
-
     if (!failWithOutOfOrderForTest) {
         // Crash when testing diagnostics are enabled and not explicitly uasserting on
         // out-of-order keys.

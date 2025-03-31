@@ -577,8 +577,6 @@ mongo_cc_library(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/catalog:collection_options",
-        "//src/mongo/db/catalog:health_log_interface",
-        "//src/mongo/db/catalog:health_log_mock",
         "//src/mongo/db/update:update_document_diff",
         "//src/mongo/unittest",
     ],

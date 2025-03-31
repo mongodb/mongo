@@ -45,8 +45,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
@@ -192,22 +190,6 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
                                                     keyString->getTypeBitsView(),
                                                     keyString->getVersion());
             auto hydratedKey = IndexKeyEntry::rehydrateKey(bsonKeyPattern, bsonKeyString);
-
-            HealthLogEntry entry;
-            entry.setNss(nss);
-            entry.setTimestamp(Date_t::now());
-            entry.setSeverity(SeverityEnum::Error);
-            entry.setScope(ScopeEnum::Index);
-            entry.setOperation("Index scan");
-            entry.setMsg("Erroneous index key found with reference to non-existent record id");
-
-            BSONObjBuilder bob;
-            bob.append("recordId", rid.toString());
-            bob.append("indexKeyData", hydratedKey);
-            bob.appendElements(getStackTrace().getBSONRepresentation());
-            entry.setData(bob.obj());
-
-            HealthLogInterface::get(opCtx)->log(entry);
 
             LOGV2_ERROR_OPTIONS(
                 5113709,

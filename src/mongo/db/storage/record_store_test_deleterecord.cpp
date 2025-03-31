@@ -35,8 +35,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/health_log_interface.h"
-#include "mongo/db/catalog/health_log_mock.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
@@ -137,11 +135,6 @@ DEATH_TEST_REGEX(RecordStoreTestHarness,
                  "Record to be deleted not found") {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
-
-    // Start a HealthLogMock for deleteRecord() to log to.
-    auto serviceContext = harnessHelper->serviceContext();
-    HealthLogInterface::set(serviceContext, std::make_unique<HealthLogMock>());
-    HealthLogInterface::get(serviceContext)->startup();
 
     string data = "my record";
     RecordId loc;

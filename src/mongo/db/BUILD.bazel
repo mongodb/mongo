@@ -1399,7 +1399,6 @@ mongo_cc_library(
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/catalog:collection_query_info",
         "//src/mongo/db/catalog:database_holder",
-        "//src/mongo/db/catalog:health_log_interface",
         "//src/mongo/db/catalog:local_oplog_info",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/commands:server_status_core",
@@ -1526,7 +1525,6 @@ mongo_cc_library(
     ],
     deps = [
         ":server_base",
-        "//src/mongo/db/catalog:health_log_interface",
         "//src/mongo/db/exec:working_set",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index:preallocated_container_pool",  # TODO(SERVER-93876): Remove.

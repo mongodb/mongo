@@ -30,9 +30,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/health_log.h"
-#include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/validate/validate_options.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
@@ -83,34 +82,6 @@ static CompiledConfiguration lowerInclusiveBoundConfig("WT_CURSOR.bound",
 static CompiledConfiguration upperInclusiveBoundConfig("WT_CURSOR.bound",
                                                        "bound=upper,inclusive=true");
 static CompiledConfiguration clearBoundConfig("WT_CURSOR.bound", "action=clear");
-
-/**
- * Add a data corruption entry to the health log.
- */
-void addDataCorruptionEntryToHealthLog(OperationContext* opCtx,
-                                       const UUID& uuid,
-                                       StringData operation,
-                                       StringData message,
-                                       const BSONObj& key,
-                                       StringData indexName,
-                                       StringData uri) {
-    HealthLogEntry entry;
-    entry.setCollectionUUID(uuid);
-    entry.setTimestamp(Date_t::now());
-    entry.setSeverity(SeverityEnum::Error);
-    entry.setScope(ScopeEnum::Index);
-    entry.setOperation(operation);
-    entry.setMsg(message);
-
-    BSONObjBuilder bob;
-    bob.append("key", key);
-    bob.append("indexName", indexName);
-    bob.append("uri", uri);
-    bob.appendElements(getStackTrace().getBSONRepresentation());
-    entry.setData(bob.obj());
-
-    HealthLog::get(opCtx)->log(entry);
-}
 
 /**
  * Returns the logv2::LogOptions controlling the behaviour after logging a data corruption error.
@@ -1230,15 +1201,6 @@ public:
                 key_string::TypeBits::getReaderFromBuffer(_version, &br);
                 if (!br.atEof()) {
                     const auto bsonKey = redact(curr(KeyInclusion::kInclude)->key);
-                    addDataCorruptionEntryToHealthLog(
-                        _opCtx,
-                        _collectionUUID,
-                        "WiredTigerIndexUniqueCursor::updatePosition",
-                        "Unique index cursor seeing multiple records for key in index",
-                        bsonKey,
-                        _indexName,
-                        _uri);
-
                     LOGV2_ERROR_OPTIONS(
                         7623202,
                         getLogOptionsForDataCorruption(
@@ -1323,15 +1285,6 @@ public:
 
         if (!br.atEof()) {
             const auto bsonKey = redact(curr(KeyInclusion::kInclude)->key);
-
-            addDataCorruptionEntryToHealthLog(
-                _opCtx,
-                _collectionUUID,
-                "WiredTigerIdIndexCursor::updatePosition",
-                "Index cursor seeing multiple records for key in _id index",
-                bsonKey,
-                _indexName,
-                _uri);
 
             LOGV2_ERROR_OPTIONS(
                 5176200,
@@ -1581,14 +1534,6 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     key_string::TypeBits typeBits = key_string::TypeBits::fromBuffer(getKeyStringVersion(), &br);
     if (!br.atEof() || MONGO_unlikely(failWithDataCorruptionForTest)) {
         auto bsonKey = key_string::toBson(keyString, _ordering);
-
-        addDataCorruptionEntryToHealthLog(opCtx,
-                                          _collectionUUID,
-                                          "WiredTigerIdIndex::_unindex",
-                                          "Un-index seeing multiple records for key",
-                                          bsonKey,
-                                          _indexName,
-                                          _uri);
 
         LOGV2_ERROR_OPTIONS(
             5176201,

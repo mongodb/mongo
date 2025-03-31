@@ -46,8 +46,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -141,29 +139,6 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                 return builder.obj();
             };
 
-            HealthLogEntry entry;
-            entry.setNss(ns);
-            entry.setTimestamp(Date_t::now());
-            entry.setSeverity(SeverityEnum::Error);
-            entry.setScope(ScopeEnum::Index);
-            entry.setOperation("Index scan");
-            entry.setMsg("Erroneous index key found with reference to non-existent record id");
-
-            BSONObjBuilder bob;
-            bob.append("recordId", member->recordId.toString());
-
-            const BSONArray indexKeyData =
-                logv2::seqLog(
-                    boost::make_transform_iterator(member->keyData.begin(), indexKeyEntryToObjFn),
-                    boost::make_transform_iterator(member->keyData.end(), indexKeyEntryToObjFn))
-                    .toBSONArray();
-            bob.append("indexKeyData", indexKeyData);
-
-            bob.appendElements(getStackTrace().getBSONRepresentation());
-            entry.setData(bob.obj());
-
-            HealthLogInterface::get(opCtx)->log(entry);
-
             auto options = [&] {
                 if (shard_role_details::getRecoveryUnit(opCtx)->getDataCorruptionDetectionMode() ==
                     DataCorruptionDetectionMode::kThrow) {
@@ -173,6 +148,12 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                     return logv2::LogOptions(logv2::LogComponent::kAutomaticDetermination);
                 }
             }();
+
+            const BSONArray indexKeyData =
+                logv2::seqLog(
+                    boost::make_transform_iterator(member->keyData.begin(), indexKeyEntryToObjFn),
+                    boost::make_transform_iterator(member->keyData.end(), indexKeyEntryToObjFn))
+                    .toBSONArray();
             LOGV2_ERROR_OPTIONS(
                 4615603,
                 options,

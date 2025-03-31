@@ -24,14 +24,4 @@ assert.commandFailedWithCode(coll.remove({a: "first"}), ErrorCodes.DataCorruptio
 assert.commandWorked(primary.adminCommand(
     {configureFailPoint: "WTIndexUassertDuplicateRecordForKeyOnIdUnindex", mode: "off"}));
 
-assert.soonNoExcept(() => {
-    // The health log entry is written asynchronously by a background worker, expect it to be
-    // eventually found.
-    let entry = primary.getDB('local').system.healthlog.findOne({severity: 'error'});
-    assert(entry, "No healthlog entry found on " + tojson(primary));
-    assert.eq("Un-index seeing multiple records for key", entry.msg, tojson(entry));
-    assert.eq(1, primary.getDB('local').system.healthlog.count({severity: 'error'}));
-    return true;
-});
-
 replSet.stopSet();

@@ -62,8 +62,6 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
-#include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/local_oplog_info.h"
@@ -1296,21 +1294,8 @@ void logOplogConstraintViolation(OperationContext* opCtx,
                                  const std::string& operation,
                                  const BSONObj& opObj,
                                  boost::optional<Status> status) {
-    // Log the violation.
+    // Log the violation to initialized OplogConstraintViolationLogger
     oplogConstraintViolationLogger->logViolationIfReady(type, opObj, status);
-
-    // Write a new entry to the health log.
-    HealthLogEntry entry;
-    entry.setNss(nss);
-    entry.setTimestamp(Date_t::now());
-    // Oplog constraint violations should always be marked as warning.
-    entry.setSeverity(SeverityEnum::Warning);
-    entry.setScope(ScopeEnum::Document);
-    entry.setMsg(toString(type));
-    entry.setOperation(operation);
-    entry.setData(opObj);
-
-    HealthLogInterface::get(opCtx->getServiceContext())->log(entry);
 }
 
 // @return failure status if an update should have happened and the document DNE.
