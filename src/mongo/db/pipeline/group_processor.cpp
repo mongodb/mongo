@@ -233,7 +233,7 @@ void GroupProcessor::spill() {
         ptrs.push_back(&*it);
     }
 
-    stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(_expCtx->getValueComparator()));
+    std::sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(_expCtx->getValueComparator()));
 
     // Initialize '_file' in a lazy manner only when it is needed.
     if (!_file) {
