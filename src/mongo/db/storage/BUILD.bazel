@@ -434,7 +434,6 @@ mongo_cc_library(
     deps = [
         ":storage_options",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_role_api",
     ],
 )
 
