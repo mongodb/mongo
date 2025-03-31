@@ -731,12 +731,21 @@ function shouldRetryWithNetworkErrorOverride(
         // If an explain is interrupted by a stepdown, and it returns before its connection is
         // closed, it will return incomplete results. To prevent failing the test, force retries
         // of interrupted explains.
-        if (res.hasOwnProperty("executionStats") && !res.executionStats.executionSuccess &&
-            (RetryableWritesUtil.isRetryableCode(res.executionStats.errorCode) ||
-             isRetryableExecutorCodeAndMessage(res.executionStats.errorCode,
-                                               res.executionStats.errorMessage))) {
-            logError("Forcing retry of interrupted explain");
-            return kContinue;
+        if (res.hasOwnProperty("executionStats")) {
+            const shouldRetryExplain = function(executionStats) {
+                return !executionStats.executionSuccess &&
+                    (RetryableWritesUtil.isRetryableCode(executionStats.errorCode) ||
+                     isRetryableExecutorCodeAndMessage(executionStats.errorCode,
+                                                       executionStats.errorMessage));
+            };
+            const executionStats = res.executionStats.executionStages.hasOwnProperty("shards")
+                ? res.executionStats.executionStages.shards
+                : [res.executionStats];
+
+            if (executionStats.some(shouldRetryExplain)) {
+                logError("Forcing retry of interrupted explain");
+                return kContinue;
+            }
         }
 
         // An explain command can fail if its child command cannot be run on the current server.

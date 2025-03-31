@@ -4,8 +4,23 @@
  */
 
 export function hasError(res) {
-    const hasExecutionStatsErrorCode =
-        res.hasOwnProperty("executionStats") && res.executionStats.hasOwnProperty("errorCode");
+    const hasExecutionStatsErrorCode = function() {
+        if (!res.hasOwnProperty("executionStats")) {
+            return false;
+        }
+
+        if (!res.executionStats.executionStages.hasOwnProperty("shards")) {
+            return res.executionStats.hasOwnProperty("errorCode");
+        }
+
+        for (const shardExecutionStats of res.executionStats.executionStages.shards) {
+            if (shardExecutionStats.hasOwnProperty("errorCode")) {
+                return true;
+            }
+        }
+
+        return false;
+    }();
     return res.ok !== 1 || res.writeErrors || (res.hasOwnProperty("nErrors") && res.nErrors != 0) ||
         hasExecutionStatsErrorCode;
 }
