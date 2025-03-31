@@ -24,7 +24,7 @@ buildvariants:
       # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout
-      gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
+      gcov_tool: /opt/mongodbtoolchain/v5/bin/gcov
       # The gcov instrumentation saves the path the .gcno files were created in as the default path
       # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
       # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
@@ -73,7 +73,7 @@ buildvariants:
       # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout
-      gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
+      gcov_tool: /opt/mongodbtoolchain/v5/bin/gcov
       # The gcov instrumentation saves the path the .gcno files were created in as the default path
       # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
       # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
