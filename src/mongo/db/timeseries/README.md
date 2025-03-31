@@ -461,9 +461,6 @@ See:
 - **active bucket**: A bucket that is either archived or open. It forms the cardinality managed by the
   BucketCatalog.
 
-- **alternate bucket**: Used in the context of [useAlternateBucket()](https://github.com/mongodb/mongo/blob/4fb9fe8ef26cde41d3fe1c261bae1ef75c2c3bfc/src/mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h#L158-L163) and refers to any eligible bucket
-  that can be found in memory for reopening.
-
 - **archived bucket**: A bucket that resides on-disk with a crumb of info [still in memory](https://github.com/10gen/mongo/blob/883a40fdd73056c88221aa668a627cd2e6c621a6/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L166-L175)
   to support efficient reopening without querying. Adding new measurements to this
   bucket will require materializing data from disk.

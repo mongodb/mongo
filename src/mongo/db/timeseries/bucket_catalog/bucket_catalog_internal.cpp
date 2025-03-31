@@ -54,8 +54,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
@@ -63,7 +61,6 @@
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
-#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -178,29 +175,6 @@ std::shared_ptr<WriteBatch> findPreparedBatch(const Stripe& stripe,
 tracking::shared_ptr<ExecutionStats> getEmptyStats() {
     static const auto kEmptyStats{std::make_shared<ExecutionStats>()};
     return kEmptyStats;
-}
-
-void doRollover(BucketCatalog& catalog,
-                Stripe& stripe,
-                WithLock stripeLock,
-                Bucket& bucket,
-                RolloverReason reason) {
-    invariant(reason != RolloverReason::kNone);
-    auto action = getRolloverAction(reason);
-    if (allCommitted(bucket)) {
-        // The bucket does not contain any measurements that are yet to be committed, so we can take
-        // action now.
-        ExecutionStatsController stats = getExecutionStats(catalog, bucket.bucketId.collectionUUID);
-        if (action == RolloverAction::kArchive) {
-            archiveBucket(catalog, stripe, stripeLock, bucket, stats);
-        } else {
-            closeOpenBucket(catalog, stripe, stripeLock, bucket, stats);
-        }
-    } else {
-        // We must keep the bucket around until all measurements are committed, just mark
-        // the reason we chose now so it we know what to do when the last batch finishes.
-        bucket.rolloverReason = reason;
-    }
 }
 }  // namespace
 
@@ -340,16 +314,13 @@ Bucket* useBucket(BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
                   InsertContext& info,
-                  AllowBucketCreation mode,
                   const Date_t& time,
                   const StringDataComparator* comparator) {
     auto it = stripe.openBucketsByKey.find(info.key);
     if (it == stripe.openBucketsByKey.end()) {
         // No open bucket for this metadata.
-        return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(
-                  catalog, stripe, stripeLock, info.key, info.options, time, comparator, info.stats)
-            : nullptr;
+        return &allocateBucket(
+            catalog, stripe, stripeLock, info.key, info.options, time, comparator, info.stats);
     }
 
     absl::InlinedVector<Bucket*, 4> bucketsToCleanUp;
@@ -388,68 +359,8 @@ Bucket* useBucket(BucketCatalog& catalog,
     cleanup.dismiss();
     cleanupFn();
 
-    return mode == AllowBucketCreation::kYes
-        ? &allocateBucket(
-              catalog, stripe, stripeLock, info.key, info.options, time, comparator, info.stats)
-        : nullptr;
-}
-
-Bucket* useAlternateBucket(BucketCatalog& catalog,
-                           Stripe& stripe,
-                           WithLock stripeLock,
-                           InsertContext& insertContext,
-                           const Date_t& time) {
-    auto it = stripe.openBucketsByKey.find(insertContext.key);
-    if (it == stripe.openBucketsByKey.end()) {
-        // No open bucket for this metadata.
-        return nullptr;
-    }
-
-    absl::InlinedVector<Bucket*, 4> bucketsToCleanUp;
-    ScopeGuard cleanup{[&]() {
-        ExecutionStatsController statsStorage;
-        for (Bucket* bucket : bucketsToCleanUp) {
-            statsStorage = getExecutionStats(catalog, bucket->bucketId.collectionUUID);
-            abort(catalog,
-                  stripe,
-                  stripeLock,
-                  *bucket,
-                  statsStorage,
-                  /*batch=*/nullptr,
-                  getTimeseriesBucketClearedError(bucket->bucketId.oid));
-        }
-    }};
-
-    auto& openSet = it->second;
-    // In order to potentially erase elements of the set while we iterate it (via _abort), we need
-    // to advance the iterator before we call erase. This means we can't use the more
-    // straightforward range iteration, and use the somewhat awkward pattern below.
-    for (auto it = openSet.begin(); it != openSet.end();) {
-        Bucket* potentialBucket = *it++;
-        auto action = getRolloverAction(potentialBucket->rolloverReason);
-        if (action == RolloverAction::kNone || action == RolloverAction::kHardClose) {
-            continue;
-        }
-
-        auto bucketTime = potentialBucket->minTime;
-        if (time - bucketTime >= Seconds(*insertContext.options.getBucketMaxSpanSeconds()) ||
-            time < bucketTime) {
-            continue;
-        }
-
-        auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, potentialBucket);
-        if (state && !conflictsWithInsertions(state.value())) {
-            invariant(!potentialBucket->idleListEntry.has_value());
-            return potentialBucket;
-        }
-
-        // Clean up the bucket if it has been cleared.
-        if (state && (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value()))) {
-            bucketsToCleanUp.push_back(potentialBucket);
-        }
-    }
-
-    return nullptr;
+    return &allocateBucket(
+        catalog, stripe, stripeLock, info.key, info.options, time, comparator, info.stats);
 }
 
 Status compressAndWriteBucket(OperationContext* opCtx,
@@ -751,14 +662,11 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     WithLock stripeLock,
     const BSONObj& doc,
     const OperationId opId,
-    AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
     const Date_t& time,
     uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator,
-    Bucket* excludedBucket,
-    boost::optional<RolloverReason> excludedReason) {
+    const StringDataComparator* comparator) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
@@ -772,35 +680,29 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                        newFieldNamesToBeInserted,
                                        sizesToBeAdded);
     if (!isNewlyOpenedBucket) {
-        auto [action, reason] =
-            determineRolloverAction(doc,
-                                    insertContext,
+        auto reason =
+            determineRolloverReason(doc,
+                                    insertContext.options,
                                     existingBucket,
                                     catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
-                                    newFieldNamesToBeInserted,
                                     sizesToBeAdded,
-                                    mode,
                                     time,
                                     storageCacheSizeBytes,
-                                    comparator);
-        if ((action == RolloverAction::kSoftClose || action == RolloverAction::kArchive) &&
-            mode == AllowBucketCreation::kNo) {
-            // We don't actually want to roll this bucket over yet, bail out.
-            return reason;
-        } else if (action != RolloverAction::kNone) {
+                                    comparator,
+                                    insertContext.stats);
+        auto action = getRolloverAction(reason);
+        if (action != RolloverAction::kNone) {
             openedDueToMetadata = false;
-            bucketToUse = rollover(catalog,
-                                   stripe,
-                                   stripeLock,
-                                   existingBucket,
-                                   insertContext.key,
-                                   insertContext.options,
-                                   reason,
-                                   time,
-                                   comparator,
-                                   excludedBucket,
-                                   excludedReason,
-                                   insertContext.stats);
+            bucketToUse = rolloverAndAllocateBucket(catalog,
+                                                    stripe,
+                                                    stripeLock,
+                                                    existingBucket,
+                                                    insertContext.key,
+                                                    insertContext.options,
+                                                    reason,
+                                                    time,
+                                                    comparator,
+                                                    insertContext.stats);
             isNewlyOpenedBucket = true;
             // Recalculate the fields and size change for the newly opened bucket we got from
             // rolling over our original one.
@@ -870,19 +772,19 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
             return false;
         }
     }
-    newAddMeasurementToBatchAndBucket(catalog,
-                                      measurement,
-                                      index,
-                                      opId,
-                                      timeseriesOptions,
-                                      stripeNumber,
-                                      stats,
-                                      comparator,
-                                      newFieldNamesToBeInserted,
-                                      sizesToBeAdded,
-                                      isNewlyOpenedBucket,
-                                      bucket,
-                                      writeBatch);
+    addMeasurementToBatchAndBucket(catalog,
+                                   measurement,
+                                   index,
+                                   opId,
+                                   timeseriesOptions,
+                                   stripeNumber,
+                                   stats,
+                                   comparator,
+                                   newFieldNamesToBeInserted,
+                                   sizesToBeAdded,
+                                   isNewlyOpenedBucket,
+                                   bucket,
+                                   writeBatch);
     return true;
 }
 
@@ -1057,66 +959,6 @@ std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSi
         static_cast<int32_t>(std::min(storageCacheSizeBytes / (2 * workloadCardinality), intMax)),
         gTimeseriesBucketMinSize.load());
     return {std::min(gTimeseriesBucketMaxSize, derivedMaxSize), derivedMaxSize};
-}
-
-InsertResult getReopeningContext(BucketCatalog& catalog,
-                                 Stripe& stripe,
-                                 WithLock stripeLock,
-                                 InsertContext& info,
-                                 uint64_t catalogEra,
-                                 AllowQueryBasedReopening allowQueryBasedReopening,
-                                 const Date_t& time,
-                                 uint64_t storageCacheSizeBytes) {
-    if (auto archived =
-            findArchivedCandidate(catalog, stripe, stripeLock, info.key, info.options, time)) {
-        // Synchronize concurrent disk accesses. An outstanding query-based reopening request for
-        // this series or an outstanding archived-based reopening request or prepared batch for this
-        // bucket would potentially conflict with our choice to reopen here, so we must wait for any
-        // such operation to finish and retry.
-        if (auto waiter =
-                checkForReopeningConflict(stripe, stripeLock, info.key, archived.value())) {
-            return waiter.value();
-        }
-
-        return ReopeningContext{
-            catalog, stripe, stripeLock, info.key, catalogEra, archived.value()};
-    }
-
-    if (allowQueryBasedReopening == AllowQueryBasedReopening::kDisallow) {
-        return ReopeningContext{catalog, stripe, stripeLock, info.key, catalogEra, {}};
-    }
-
-    // Synchronize concurrent disk accesses. An outstanding reopening request or prepared batch for
-    // this series would potentially conflict with our choice to reopen here, so we must wait for
-    // any such operation to finish and retry.
-    if (auto waiter = checkForReopeningConflict(stripe, stripeLock, info.key)) {
-        return waiter.value();
-    }
-
-    boost::optional<BSONElement> metaElement;
-    if (info.options.getMetaField().has_value()) {
-        metaElement = info.key.metadata.element();
-    }
-
-    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + info.options.getTimeField();
-    auto maxDataTimeFieldPath = kDataFieldNamePrefix.toString() + info.options.getTimeField() +
-        "." + std::to_string(gTimeseriesBucketMaxCount - 1);
-
-    // Derive the maximum bucket size.
-    auto [bucketMaxSize, _] = getCacheDerivedBucketMaxSize(
-        storageCacheSizeBytes, catalog.globalExecutionStats.numActiveBuckets.loadRelaxed());
-
-    return ReopeningContext{catalog,
-                            stripe,
-                            stripeLock,
-                            info.key,
-                            catalogEra,
-                            generateReopeningPipeline(time,
-                                                      metaElement,
-                                                      controlMinTimePath,
-                                                      maxDataTimeFieldPath,
-                                                      *info.options.getBucketMaxSpanSeconds(),
-                                                      bucketMaxSize)};
 }
 
 boost::optional<OID> getArchiveReopeningCandidate(BucketCatalog& catalog,
@@ -1426,23 +1268,17 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     return *bucket;
 }
 
-Bucket& rollover(BucketCatalog& catalog,
-                 Stripe& stripe,
-                 WithLock stripeLock,
-                 Bucket& bucket,
-                 const BucketKey& key,
-                 const TimeseriesOptions& timeseriesOptions,
-                 RolloverReason reason,
-                 const Date_t& time,
-                 const StringDataComparator* comparator,
-                 Bucket* additionalBucket,
-                 boost::optional<RolloverReason> additionalReason,
-                 ExecutionStatsController& stats) {
-    doRollover(catalog, stripe, stripeLock, bucket, reason);
-    if (additionalBucket) {
-        invariant(additionalReason.has_value());
-        doRollover(catalog, stripe, stripeLock, *additionalBucket, additionalReason.value());
-    }
+Bucket& rolloverAndAllocateBucket(BucketCatalog& catalog,
+                                  Stripe& stripe,
+                                  WithLock stripeLock,
+                                  Bucket& bucket,
+                                  const BucketKey& key,
+                                  const TimeseriesOptions& timeseriesOptions,
+                                  RolloverReason reason,
+                                  const Date_t& time,
+                                  const StringDataComparator* comparator,
+                                  ExecutionStatsController& stats) {
+    rollover(catalog, stripe, stripeLock, bucket, reason);
 
     return allocateBucket(
         catalog, stripe, stripeLock, key, timeseriesOptions, time, comparator, stats);
@@ -1470,87 +1306,6 @@ void rollover(BucketCatalog& catalog,
         // the reason we chose now so we know what to do when the last batch finishes.
         bucket.rolloverReason = reason;
     }
-}
-
-std::pair<RolloverAction, RolloverReason> determineRolloverAction(
-    const BSONObj& measurement,
-    InsertContext& info,
-    Bucket& bucket,
-    uint32_t numberOfActiveBuckets,
-    Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    const Sizes& sizesToBeAdded,
-    AllowBucketCreation mode,
-    const Date_t& time,
-    uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator) {
-    // If the mode is enabled to create new buckets, then we should update stats for soft closures
-    // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
-    // we want to soft close the bucket yet and should wait to update closure stats.
-    const bool shouldUpdateStats = (mode == AllowBucketCreation::kYes);
-
-    auto bucketTime = bucket.minTime;
-    if (time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds())) {
-        if (shouldUpdateStats) {
-            info.stats.incNumBucketsClosedDueToTimeForward();
-        }
-        return {RolloverAction::kSoftClose, RolloverReason::kTimeForward};
-    }
-    if (time < bucketTime) {
-        if (shouldUpdateStats) {
-            info.stats.incNumBucketsArchivedDueToTimeBackward();
-        }
-        return {RolloverAction::kArchive, RolloverReason::kTimeBackward};
-    }
-    if (bucket.numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
-        info.stats.incNumBucketsClosedDueToCount();
-        return {RolloverAction::kHardClose, RolloverReason::kCount};
-    }
-
-    // In scenarios where we have a high cardinality workload and face increased cache pressure we
-    // will decrease the size of buckets before we close them.
-    auto [effectiveMaxSize, cacheDerivedBucketMaxSize] =
-        getCacheDerivedBucketMaxSize(storageCacheSizeBytes, numberOfActiveBuckets);
-
-    // We restrict the ceiling of the bucket max size under cache pressure.
-    int32_t absoluteMaxSize =
-        std::min(Bucket::kLargeMeasurementsMaxBucketSize, cacheDerivedBucketMaxSize);
-    if (bucket.size + sizesToBeAdded.total() > effectiveMaxSize) {
-        bool keepBucketOpenForLargeMeasurements =
-            bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount);
-        if (keepBucketOpenForLargeMeasurements) {
-            if (bucket.size + sizesToBeAdded.total() > absoluteMaxSize) {
-                if (absoluteMaxSize != Bucket::kLargeMeasurementsMaxBucketSize) {
-                    info.stats.incNumBucketsClosedDueToCachePressure();
-                    return {RolloverAction::kHardClose, RolloverReason::kCachePressure};
-                }
-                info.stats.incNumBucketsClosedDueToSize();
-                return {RolloverAction::kHardClose, RolloverReason::kSize};
-            }
-
-            // There's enough space to add this measurement and we're still below the large
-            // measurement threshold.
-            if (!bucket.keptOpenDueToLargeMeasurements) {
-                // Only increment this metric once per bucket.
-                bucket.keptOpenDueToLargeMeasurements = true;
-                info.stats.incNumBucketsKeptOpenDueToLargeMeasurements();
-            }
-            return {RolloverAction::kNone, RolloverReason::kNone};
-        } else {
-            if (effectiveMaxSize == gTimeseriesBucketMaxSize) {
-                info.stats.incNumBucketsClosedDueToSize();
-                return {RolloverAction::kHardClose, RolloverReason::kSize};
-            }
-            info.stats.incNumBucketsClosedDueToCachePressure();
-            return {RolloverAction::kHardClose, RolloverReason::kCachePressure};
-        }
-    }
-
-    if (schemaIncompatible(bucket, measurement, info.options.getMetaField(), comparator)) {
-        info.stats.incNumBucketsClosedDueToSchemaChange();
-        return {RolloverAction::kHardClose, RolloverReason::kSchemaChange};
-    }
-
-    return {RolloverAction::kNone, RolloverReason::kNone};
 }
 
 void updateRolloverStats(ExecutionStatsController& stats, const RolloverReason reason) {
@@ -1761,19 +1516,19 @@ bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
     return true;
 }
 
-void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
-                                       const BSONObj& measurement,
-                                       const UserBatchIndex& index,
-                                       const OperationId opId,
-                                       const TimeseriesOptions& timeseriesOptions,
-                                       const StripeNumber& stripeNumber,
-                                       ExecutionStatsController& stats,
-                                       const StringDataComparator* comparator,
-                                       Bucket::NewFieldNames& newFieldNamesToBeInserted,
-                                       const Sizes& sizesToBeAdded,
-                                       bool isNewlyOpenedBucket,
-                                       Bucket& bucket,
-                                       std::shared_ptr<WriteBatch>& writeBatch) {
+void addMeasurementToBatchAndBucket(BucketCatalog& catalog,
+                                    const BSONObj& measurement,
+                                    const UserBatchIndex& index,
+                                    const OperationId opId,
+                                    const TimeseriesOptions& timeseriesOptions,
+                                    const StripeNumber& stripeNumber,
+                                    ExecutionStatsController& stats,
+                                    const StringDataComparator* comparator,
+                                    Bucket::NewFieldNames& newFieldNamesToBeInserted,
+                                    const Sizes& sizesToBeAdded,
+                                    bool isNewlyOpenedBucket,
+                                    Bucket& bucket,
+                                    std::shared_ptr<WriteBatch>& writeBatch) {
     writeBatch->measurements.push_back(measurement);
     writeBatch->userBatchIndices.push_back(index);
     for (auto&& field : newFieldNamesToBeInserted) {

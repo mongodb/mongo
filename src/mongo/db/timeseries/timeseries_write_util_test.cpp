@@ -970,8 +970,6 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
             /*fromMigrate=*/false,
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
-            /*compressAndWriteBucketFunc=*/
-            nullptr,
             minTime));
         ASSERT_EQ(bucketIds.size(), 1);
     }
@@ -1049,8 +1047,6 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*fromMigrate=*/false,
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
-            /*compressAndWriteBucketFunc=*/
-            nullptr,
             minTime));
         ASSERT_EQ(bucketIds.size(), 1);
     }
@@ -1070,8 +1066,6 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*fromMigrate=*/false,
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
-            /*compressAndWriteBucketFunc=*/
-            nullptr,
             minTime));
         ASSERT_EQ(bucketIds.size(), 1);
     }
@@ -1091,8 +1085,6 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*fromMigrate=*/false,
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
-            /*compressAndWriteBucketFunc=*/
-            nullptr,
             minTime));
         ASSERT_EQ(bucketIds.size(), 2);
     }

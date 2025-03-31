@@ -550,8 +550,6 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
                                                              bucketFromMigrate,
                                                              _params.stmtId,
                                                              &_insertedBucketIds,
-                                                             /*compressAndWriteBucketFunc=*/
-                                                             nullptr,
                                                              currentMinTime);
                 } else {
                     timeseries::performAtomicWritesForDelete(opCtx(),

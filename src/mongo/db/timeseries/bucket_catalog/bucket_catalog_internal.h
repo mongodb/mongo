@@ -58,12 +58,6 @@
 namespace mongo::timeseries::bucket_catalog::internal {
 
 /**
- * Mode enum to control whether bucket retrieval methods will create new buckets if no suitable
- * bucket exists.
- */
-enum class AllowBucketCreation { kYes, kNo };
-
-/**
  * Mode to signal to 'removeBucket' what's happening to the bucket, and how to handle the bucket
  * state change.
  */
@@ -139,14 +133,13 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
                                         BucketPrepareAction prepare);
 
 /**
- * Retrieve the open bucket for write use if one exists. If none exists and 'mode' is set to kYes,
- * then we will create a new bucket.
+ * Retrieve the open bucket for write use if one exists. If none exists then we will create a new
+ * bucket.
  */
 Bucket* useBucket(BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
                   InsertContext& info,
-                  AllowBucketCreation mode,
                   const Date_t& time,
                   const StringDataComparator* comparator);
 
@@ -176,16 +169,6 @@ void rollover(BucketCatalog& catalog,
               WithLock stripeLock,
               Bucket& bucket,
               RolloverReason reason);
-
-/**
- * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
- * that are pending closure or archival but which are still eligible to receive new measurements.
- */
-Bucket* useAlternateBucket(BucketCatalog& catalog,
-                           Stripe& stripe,
-                           WithLock stripeLock,
-                           InsertContext& info,
-                           const Date_t& time);
 
 /**
  * Perform archived-based reopening and returns the fetched bucket document.
@@ -245,10 +228,8 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
     std::uint64_t targetEra);
 
 /**
- * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and 'mode'
- * is set to 'kYes', we will create a new bucket and insert into that bucket. If `existingBucket`
- * was selected via `useAlternateBucket`, then the previous bucket returned by `useBucket` should be
- * passed in as `excludedBucket`.
+ * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, we will
+ * create a new bucket and insert into that bucket.
  */
 std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     BucketCatalog& catalog,
@@ -256,14 +237,11 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     WithLock stripeLock,
     const BSONObj& doc,
     OperationId opId,
-    AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
     const Date_t& time,
     uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator,
-    Bucket* excludedBucket = nullptr,
-    boost::optional<RolloverReason> excludedReason = boost::none);
+    const StringDataComparator* comparator);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -310,20 +288,6 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
  */
 std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSizeBytes,
                                                          uint32_t workloadCardinality);
-
-/**
- * Identifies a previously archived bucket that may be able to accommodate the measurement
- * represented by 'info', if one exists. Otherwise returns a pipeline to use for query-based
- * reopening if allowed.
- */
-InsertResult getReopeningContext(BucketCatalog& catalog,
-                                 Stripe& stripe,
-                                 WithLock stripeLock,
-                                 InsertContext& info,
-                                 uint64_t catalogEra,
-                                 AllowQueryBasedReopening allowQueryBasedReopening,
-                                 const Date_t& time,
-                                 uint64_t storageCacheSizeBytes);
 
 /**
  * Returns an archived bucket eligible for new insert with 'time'.
@@ -421,40 +385,19 @@ Bucket& allocateBucket(BucketCatalog& catalog,
                        ExecutionStatsController& stats);
 
 /**
- * Close the existing, full bucket and open a new one for the same metadata.
- *
- * Writes information about the closed bucket to the 'info' parameter. Optionally, if `bucket` was
- * selected via `useAlternateBucket`, pass the current open bucket as `additionalBucket` to mark for
- * archival and preserve the invariant of only one open bucket per key.
+ * Closes the existing, full bucket and open a new one for the same metadata.
+ * Writes information about the closed bucket to the 'info' parameter.
  */
-Bucket& rollover(BucketCatalog& catalog,
-                 Stripe& stripe,
-                 WithLock stripeLock,
-                 Bucket& bucket,
-                 const BucketKey& key,
-                 const TimeseriesOptions& timeseriesOptions,
-                 RolloverReason reason,
-                 const Date_t& time,
-                 const StringDataComparator* comparator,
-                 Bucket* additionalBucket,
-                 boost::optional<RolloverReason> additionalReason,
-                 ExecutionStatsController& stats);
-
-/**
- * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether
- * to archive or close 'bucket'.
- */
-std::pair<RolloverAction, RolloverReason> determineRolloverAction(
-    const BSONObj& doc,
-    InsertContext& info,
-    Bucket& bucket,
-    uint32_t numberOfActiveBuckets,
-    Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    const Sizes& sizesToBeAdded,
-    AllowBucketCreation mode,
-    const Date_t& time,
-    uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator);
+Bucket& rolloverAndAllocateBucket(BucketCatalog& catalog,
+                                  Stripe& stripe,
+                                  WithLock stripeLock,
+                                  Bucket& bucket,
+                                  const BucketKey& key,
+                                  const TimeseriesOptions& timeseriesOptions,
+                                  RolloverReason reason,
+                                  const Date_t& time,
+                                  const StringDataComparator* comparator,
+                                  ExecutionStatsController& stats);
 
 /**
  * Determines if and why 'bucket' needs to be rolled over to accommodate 'doc'.
@@ -595,19 +538,18 @@ std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
  * measurement. This includes updating the batch/bucket estimated sizes and the bucket's schema.
  * We also store the index of the measurement in the original user batch, for retryability and
  * error-handling.
- * TODO(SERVER-100294) Remove the new prefix after deleting legacy timeseries write path code.
  */
-void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
-                                       const BSONObj& measurement,
-                                       const UserBatchIndex& index,
-                                       OperationId opId,
-                                       const TimeseriesOptions& timeseriesOptions,
-                                       const StripeNumber& stripeNumber,
-                                       ExecutionStatsController& stats,
-                                       const StringDataComparator* comparator,
-                                       Bucket::NewFieldNames& newFieldNamesToBeInserted,
-                                       const Sizes& sizesToBeAdded,
-                                       bool isNewlyOpenedBucket,
-                                       Bucket& bucket,
-                                       std::shared_ptr<WriteBatch>& writeBatch);
+void addMeasurementToBatchAndBucket(BucketCatalog& catalog,
+                                    const BSONObj& measurement,
+                                    const UserBatchIndex& index,
+                                    OperationId opId,
+                                    const TimeseriesOptions& timeseriesOptions,
+                                    const StripeNumber& stripeNumber,
+                                    ExecutionStatsController& stats,
+                                    const StringDataComparator* comparator,
+                                    Bucket::NewFieldNames& newFieldNamesToBeInserted,
+                                    const Sizes& sizesToBeAdded,
+                                    bool isNewlyOpenedBucket,
+                                    Bucket& bucket,
+                                    std::shared_ptr<WriteBatch>& writeBatch);
 }  // namespace mongo::timeseries::bucket_catalog::internal

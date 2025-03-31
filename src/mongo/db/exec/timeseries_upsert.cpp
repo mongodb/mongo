@@ -199,8 +199,6 @@ void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
                                                  _params.fromMigrate,
                                                  _params.stmtId,
                                                  &_insertedBucketIds,
-                                                 /*compressAndWriteBucketFunc=*/
-                                                 nullptr,
                                                  /*currentMinTime=*/
                                                  boost::none);
     });

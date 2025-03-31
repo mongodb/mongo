@@ -116,29 +116,6 @@ void finishWriteBatch(WriteBatch& batch) {
 }
 
 /**
- * Updates stats to reflect the status of bucket fetches and queries based off of the
- * 'ReopeningContext' (which is populated when attempting to reopen a bucket).
- */
-void updateBucketFetchAndQueryStats(const ReopeningContext& context,
-                                    ExecutionStatsController& stats) {
-    if (context.fetchedBucket) {
-        if (context.bucketToReopen.has_value()) {
-            stats.incNumBucketsFetched();
-        } else {
-            stats.incNumBucketFetchesFailed();
-        }
-    }
-
-    if (context.queriedBucket) {
-        if (context.bucketToReopen.has_value()) {
-            stats.incNumBucketsQueried();
-        } else {
-            stats.incNumBucketQueriesFailed();
-        }
-    }
-}
-
-/**
  * Determines if 'measurement' will cause rollover to 'bucket'.
  * Returns the rollover reason and marks the bucket with rollover reason if it needs to be rolled
  * over.
@@ -355,197 +332,18 @@ void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builde
 #endif
 }
 
-StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
-                                   const StringDataComparator* comparator,
-                                   const BSONObj& doc,
-                                   OperationId opId,
-                                   InsertContext& insertContext,
-                                   const Date_t& time,
-                                   uint64_t storageCacheSizeBytes) {
-    // Save the catalog era value from before we make any further checks. This guarantees that we
-    // don't miss a direct write that happens sometime in between our decision to potentially reopen
-    // a bucket below, and actually reopening it in a subsequent reentrant call. Any direct write
-    // will increment the era, so the reentrant call can check the current value and return a write
-    // conflict if it sees a newer era.
-    const auto catalogEra = getCurrentEra(catalog.bucketStateRegistry);
-
-    // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
-    // bucket to a stripe by hashing the BucketKey.
+InsertResult insert(BucketCatalog& catalog,
+                    const StringDataComparator* comparator,
+                    const BSONObj& doc,
+                    OperationId opId,
+                    InsertContext& insertContext,
+                    const Date_t& time,
+                    uint64_t storageCacheSizeBytes) {
     auto& stripe = *catalog.stripes[insertContext.stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
-    Bucket* bucket = internal::useBucket(catalog,
-                                         stripe,
-                                         stripeLock,
-                                         insertContext,
-                                         internal::AllowBucketCreation::kNo,
-                                         time,
-                                         comparator);
-    // If there are no open buckets for our measurement that we can use, we return a
-    // reopeningContext to try reopening a closed bucket from disk.
-    if (!bucket) {
-        return getReopeningContext(catalog,
-                                   stripe,
-                                   stripeLock,
-                                   insertContext,
-                                   catalogEra,
-                                   internal::AllowQueryBasedReopening::kAllow,
-                                   time,
-                                   storageCacheSizeBytes);
-    }
-
-    auto insertionResult = internal::insertIntoBucket(catalog,
-                                                      stripe,
-                                                      stripeLock,
-                                                      doc,
-                                                      opId,
-                                                      internal::AllowBucketCreation::kNo,
-                                                      insertContext,
-                                                      *bucket,
-                                                      time,
-                                                      storageCacheSizeBytes,
-                                                      comparator);
-    // If our insert was successful, return a SuccessfulInsertion with our
-    // WriteBatch.
-    if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
-        return SuccessfulInsertion{std::move(*batch)};
-    }
-
-    auto* reason = get_if<RolloverReason>(&insertionResult);
-    invariant(reason);
-    if (allCommitted(*bucket)) {
-        internal::markBucketIdle(stripe, stripeLock, *bucket);
-    }
-
-    // If we were time forward or backward, we might be able to "reopen" a bucket we still have
-    // in memory that's set to be closed when pending operations finish.
-    if ((*reason == RolloverReason::kTimeBackward || *reason == RolloverReason::kTimeForward)) {
-        if (Bucket* alternate =
-                internal::useAlternateBucket(catalog, stripe, stripeLock, insertContext, time)) {
-            insertionResult = internal::insertIntoBucket(catalog,
-                                                         stripe,
-                                                         stripeLock,
-                                                         doc,
-                                                         opId,
-                                                         internal::AllowBucketCreation::kNo,
-                                                         insertContext,
-                                                         *alternate,
-                                                         time,
-                                                         storageCacheSizeBytes,
-                                                         comparator,
-                                                         bucket,
-                                                         *reason);
-            if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
-                return SuccessfulInsertion{std::move(*batch)};
-            }
-
-            // We weren't able to insert into the other bucket, so fall through to the regular
-            // reopening procedure.
-        }
-    }
-
-    return getReopeningContext(catalog,
-                               stripe,
-                               stripeLock,
-                               insertContext,
-                               catalogEra,
-                               (*reason == RolloverReason::kTimeBackward)
-                                   ? internal::AllowQueryBasedReopening::kAllow
-                                   : internal::AllowQueryBasedReopening::kDisallow,
-                               time,
-                               storageCacheSizeBytes);
-}
-
-StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
-                                                    const StringDataComparator* comparator,
-                                                    const BSONObj& doc,
-                                                    OperationId opId,
-                                                    ReopeningContext& reopeningContext,
-                                                    InsertContext& insertContext,
-                                                    const Date_t& time,
-                                                    uint64_t storageCacheSizeBytes) {
-    updateBucketFetchAndQueryStats(reopeningContext, insertContext.stats);
-
-    // We try to create a bucket in-memory from one on disk that we can potentially insert our
-    // measurement into.
-    auto rehydratedBucket = (reopeningContext.bucketToReopen.has_value())
-        ? internal::rehydrateBucket(catalog,
-                                    reopeningContext.bucketToReopen->bucketDocument,
-                                    insertContext.key,
-                                    insertContext.options,
-                                    reopeningContext.catalogEra,
-                                    comparator,
-                                    reopeningContext.bucketToReopen->validator,
-                                    insertContext.stats)
-        : StatusWith<tracking::unique_ptr<Bucket>>{ErrorCodes::BadValue, "No bucket to rehydrate"};
-    if (rehydratedBucket.getStatus().code() == ErrorCodes::WriteConflict) {
-        return rehydratedBucket.getStatus();
-    }
-
-    // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
-    // bucket to a stripe by hashing the BucketKey.
-    auto& stripe = *catalog.stripes[insertContext.stripeNumber];
-    stdx::lock_guard stripeLock{stripe.mutex};
-
-    // Can safely clear reentrant coordination state now that we have acquired the lock.
-    reopeningContext.clear(stripeLock);
-
-    if (rehydratedBucket.isOK()) {
-        hangTimeseriesInsertBeforeReopeningBucket.pauseWhileSet();
-
-        auto existingIt = stripe.openBucketsById.find(rehydratedBucket.getValue()->bucketId);
-        if (existingIt == stripe.openBucketsById.end()) {
-            // No existing bucket matches this one, go ahead and try to reopen our rehydrated
-            // bucket.
-            auto swBucket = internal::loadBucketIntoCatalog(catalog,
-                                                            stripe,
-                                                            stripeLock,
-                                                            insertContext.stats,
-                                                            insertContext.key,
-                                                            std::move(rehydratedBucket.getValue()),
-                                                            reopeningContext.catalogEra);
-
-            if (swBucket.isOK()) {
-                // We reopened the bucket successfully. Now we'll use it directly as an optimization
-                // to bypass normal bucket selection.
-                Bucket& reopenedBucket = swBucket.getValue().get();
-                auto insertionResult =
-                    internal::insertIntoBucket(catalog,
-                                               stripe,
-                                               stripeLock,
-                                               doc,
-                                               opId,
-                                               internal::AllowBucketCreation::kYes,
-                                               insertContext,
-                                               reopenedBucket,
-                                               time,
-                                               storageCacheSizeBytes,
-                                               comparator);
-                auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
-                invariant(batch);
-                return SuccessfulInsertion{std::move(*batch)};
-            } else {
-                insertContext.stats.incNumBucketReopeningsFailed();
-                if (swBucket.getStatus().code() == ErrorCodes::WriteConflict) {
-                    return swBucket.getStatus();
-                }
-                // If we had a different type of error, then we should fall through to normal bucket
-                // selection/allocation.
-            }
-        } else {
-            // We tried to reopen a bucket we already had open. Record the metric and then fall
-            // through to normal bucket selection/allocation.
-            insertContext.stats.incNumDuplicateBucketsReopened();
-        }
-    }
-
-    Bucket* bucket = useBucket(catalog,
-                               stripe,
-                               stripeLock,
-                               insertContext,
-                               internal::AllowBucketCreation::kYes,
-                               time,
-                               comparator);
+    Bucket* bucket =
+        internal::useBucket(catalog, stripe, stripeLock, insertContext, time, comparator);
     invariant(bucket);
 
     auto insertionResult = internal::insertIntoBucket(catalog,
@@ -553,42 +351,6 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                                       stripeLock,
                                                       doc,
                                                       opId,
-                                                      internal::AllowBucketCreation::kYes,
-                                                      insertContext,
-                                                      *bucket,
-                                                      time,
-                                                      storageCacheSizeBytes,
-                                                      comparator);
-    auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
-    invariant(batch);
-    return SuccessfulInsertion{std::move(*batch)};
-}
-
-StatusWith<InsertResult> insert(BucketCatalog& catalog,
-                                const StringDataComparator* comparator,
-                                const BSONObj& doc,
-                                OperationId opId,
-                                InsertContext& insertContext,
-                                const Date_t& time,
-                                uint64_t storageCacheSizeBytes) {
-    auto& stripe = *catalog.stripes[insertContext.stripeNumber];
-    stdx::lock_guard stripeLock{stripe.mutex};
-
-    Bucket* bucket = useBucket(catalog,
-                               stripe,
-                               stripeLock,
-                               insertContext,
-                               internal::AllowBucketCreation::kYes,
-                               time,
-                               comparator);
-    invariant(bucket);
-
-    auto insertionResult = internal::insertIntoBucket(catalog,
-                                                      stripe,
-                                                      stripeLock,
-                                                      doc,
-                                                      opId,
-                                                      internal::AllowBucketCreation::kYes,
                                                       insertContext,
                                                       *bucket,
                                                       time,

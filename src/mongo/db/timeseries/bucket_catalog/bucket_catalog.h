@@ -121,20 +121,16 @@ public:
 };
 
 /**
- * Return type indicating that a call to 'tryInsert' must retry after waiting for a conflicting
- * operation to resolve. Caller should wait using 'waitToInsert'.
- *
- * In particular, if 'tryInsert' would have generated a 'ReopeningContext', but there is already an
- * outstanding 'ReopeningRequest' or a prepared 'WriteBatch' for a bucket in the series (same
- * metaField value), that represents a conflict.
+ * An insert or reopening operation can conflict with an outstanding 'ReopeningRequest' or a
+ * prepared 'WriteBatch' for a bucket in the series (same metaField value). Caller should wait using
+ * 'waitToInsert'.
  */
 using InsertWaiter = std::variant<std::shared_ptr<WriteBatch>, std::shared_ptr<ReopeningRequest>>;
 
 /**
- * Variant representing the possible outcomes of 'tryInsert' or 'insert'. See 'tryInsert' and
- * 'insert' for more details.
+ * Variant representing the possible outcomes of staging an insert.
  */
-using InsertResult = std::variant<SuccessfulInsertion, ReopeningContext, InsertWaiter>;
+using InsertResult = std::variant<SuccessfulInsertion, InsertWaiter>;
 
 /**
  * Struct to hold a portion of the buckets managed by the catalog.
@@ -234,62 +230,16 @@ uint64_t getMemoryUsage(const BucketCatalog& catalog);
 void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builder);
 
 /**
- * Tries to insert 'doc' into a suitable bucket. If an open bucket is full (or has incompatible
- * schema), but is otherwise suitable, we will close it and open a new bucket. If we find no bucket
- * with matching data and a time range that can accommodate 'doc', we will not open a new bucket,
- * but rather let the caller know to either
- *  - search for an archived or closed bucket that can accommodate 'doc' by returning a
- *    'ReopeningContext', or
- *  - retry the insert after waiting on the returned 'InsertWaiter'.
- *
- * If a suitable bucket is found or opened, returns a 'SuccessfulInsertion' containing the
- * 'WriteBatch' into which 'doc' was inserted and a list of any buckets that were closed to make
- * space to insert 'doc'.
- *
- * If a 'ReopeningContext' is returned, it contains either a bucket ID, corresponding to an archived
- * bucket which should be fetched, an aggregation pipeline that can be used to search for a
- * previously-closed bucket that can accommodate 'doc', or (in hopefully rare cases) a
- * std::monostate which requires no intermediate action, The caller should then proceed to call
- * 'insert' to insert 'doc', passing any fetched bucket back as a member of the 'ReopeningContext'.
- */
-StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
-                                   const StringDataComparator* comparator,
-                                   const BSONObj& doc,
-                                   OperationId,
-                                   InsertContext& insertContext,
-                                   const Date_t& time,
-                                   uint64_t storageCacheSizeBytes);
-
-/**
- * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
- * closed in order to make space to insert the document.
- *
- * We will attempt to reopen the bucket passed via 'reopeningContext' and attempt to add
- * 'doc' to that bucket. Otherwise we will attempt to find a suitable open bucket, or open a new
- * bucket if none exists.
- */
-StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
-                                                    const StringDataComparator* comparator,
-                                                    const BSONObj& doc,
-                                                    OperationId,
-                                                    ReopeningContext& reopeningContext,
-                                                    InsertContext& insertContext,
-                                                    const Date_t& time,
-                                                    uint64_t storageCacheSizeBytes);
-
-/**
- * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
- * closed in order to make space to insert the document.
- *
+ * Returns the WriteBatch into which the document was inserted.
  * We will attempt to find a suitable open bucket, or open a new bucket if none exists.
  */
-StatusWith<InsertResult> insert(BucketCatalog& catalog,
-                                const StringDataComparator* comparator,
-                                const BSONObj& doc,
-                                OperationId,
-                                InsertContext& insertContext,
-                                const Date_t& time,
-                                uint64_t storageCacheSizeBytes);
+InsertResult insert(BucketCatalog& catalog,
+                    const StringDataComparator* comparator,
+                    const BSONObj& doc,
+                    OperationId,
+                    InsertContext& insertContext,
+                    const Date_t& time,
+                    uint64_t storageCacheSizeBytes);
 
 /**
  * If a 'tryInsert' call returns a 'InsertWaiter' object, the caller should use this function to

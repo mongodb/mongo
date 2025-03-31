@@ -103,7 +103,7 @@ protected:
     std::string _bigStr = std::string(1000, 'a');
 
     // Should not be called
-    CompressAndWriteBucketFunc _compressBucket = nullptr;
+    bucket_catalog::CompressAndWriteBucketFunc _compressBucket = nullptr;
 };
 
 boost::optional<bucket_catalog::BucketMetadata> TimeseriesWriteOpsInternalTest::getBucketMetadata(

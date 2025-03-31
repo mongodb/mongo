@@ -47,16 +47,13 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/update_request.h"
@@ -75,10 +72,6 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
-#include "mongo/db/timeseries/bucket_compression.h"
-#include "mongo/db/timeseries/bucket_compression_failure.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -155,141 +148,6 @@ uint64_t getStorageCacheSizeBytes(OperationContext* opCtx) {
     return opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
         1024;
 }
-
-BSONObj getSuitableBucketForReopening(OperationContext* opCtx,
-                                      const Collection* bucketsColl,
-                                      const TimeseriesOptions& options,
-                                      bucket_catalog::ReopeningContext& reopeningContext) {
-    return visit(
-        OverloadedVisitor{
-            [](const std::monostate&) { return BSONObj{}; },
-            [&](const OID& bucketId) {
-                reopeningContext.fetchedBucket = true;
-                return DBDirectClient{opCtx}.findOne(bucketsColl->ns(), BSON("_id" << bucketId));
-            },
-            [&](const std::vector<BSONObj>& pipeline) {
-                // Ensure we have a index on meta and time for the time-series collection before
-                // performing the query. Without the index we will perform a full collection scan
-                // which could cause us to take a performance hit.
-                if (auto index = getIndexSupportingReopeningQuery(
-                        opCtx, bucketsColl->getIndexCatalog(), options)) {
-                    // Resort to Query-Based reopening approach.
-                    reopeningContext.queriedBucket = true;
-                    DBDirectClient client{opCtx};
-
-                    // Run an aggregation to find a suitable bucket to reopen.
-                    AggregateCommandRequest aggRequest(bucketsColl->ns(), pipeline);
-                    aggRequest.setHint(index);
-
-                    // TODO SERVER-86094: remove after fixing perf regression.
-                    query_settings::QuerySettings querySettings;
-                    querySettings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
-                    aggRequest.setQuerySettings(querySettings);
-
-                    auto swCursor = DBClientCursor::fromAggregationRequest(
-                        &client, aggRequest, false /* secondaryOk */, false /* useExhaust */);
-                    if (swCursor.isOK() && swCursor.getValue()->more()) {
-                        return swCursor.getValue()->next();
-                    }
-                }
-                return BSONObj{};
-            },
-        },
-        reopeningContext.candidate);
-}
-
-StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
-    OperationContext* opCtx,
-    bucket_catalog::BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    const TimeseriesOptions& options,
-    const BSONObj& measurementDoc,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    bucket_catalog::InsertContext& insertContext,
-    const Date_t& time) {
-    boost::optional<bucket_catalog::BucketId> uncompressedBucketId{boost::none};
-    // The purpose of this scope is to destroy the ReopeningContext for the
-    // compress-and-write-uncompressed-bucket scenario.
-    {
-        auto swResult = bucket_catalog::tryInsert(bucketCatalog,
-                                                  bucketsColl->getDefaultCollator(),
-                                                  measurementDoc,
-                                                  opCtx->getOpID(),
-                                                  insertContext,
-                                                  time,
-                                                  getStorageCacheSizeBytes(opCtx));
-        if (!swResult.isOK()) {
-            return swResult;
-        }
-
-        auto visitResult = visit(
-            OverloadedVisitor{
-                [&](const bucket_catalog::SuccessfulInsertion&)
-                    -> StatusWith<bucket_catalog::InsertResult> { return std::move(swResult); },
-                [&](bucket_catalog::ReopeningContext& reopeningContext)
-                    -> StatusWith<bucket_catalog::InsertResult> {
-                    auto suitableBucket = getSuitableBucketForReopening(
-                        opCtx, bucketsColl, options, reopeningContext);
-
-                    if (!suitableBucket.isEmpty()) {
-                        reopeningContext.bucketToReopen = bucket_catalog::BucketToReopen{
-                            suitableBucket, [opCtx, bucketsColl](const BSONObj& bucketDoc) {
-                                return bucketsColl->checkValidation(opCtx, bucketDoc);
-                            }};
-
-
-                        if (!timeseries::isCompressedBucket(suitableBucket)) {
-                            uncompressedBucketId = extractBucketId(
-                                bucketCatalog, options, bucketsColl->uuid(), suitableBucket);
-                            return StatusWith<bucket_catalog::InsertResult>{
-                                bucket_catalog::InsertResult{
-                                    std::in_place_type<bucket_catalog::ReopeningContext>,
-                                    std::move(reopeningContext)}};
-                        }
-                    }
-
-                    return bucket_catalog::insertWithReopeningContext(
-                        bucketCatalog,
-                        bucketsColl->getDefaultCollator(),
-                        measurementDoc,
-                        opCtx->getOpID(),
-                        reopeningContext,
-                        insertContext,
-                        time,
-                        getStorageCacheSizeBytes(opCtx));
-                },
-                [](bucket_catalog::InsertWaiter& waiter)
-                    -> StatusWith<bucket_catalog::InsertResult> {
-                    // Need to wait for another operation to finish, then retry. This could be
-                    // another reopening request or a previously prepared write batch for the same
-                    // series (metaField value). The easiest way to retry here is to return a write
-                    // conflict.
-                    bucket_catalog::waitToInsert(&waiter);
-                    return Status{ErrorCodes::WriteConflict, "waited to retry"};
-                },
-            },
-            swResult.getValue());
-
-        if (!uncompressedBucketId.has_value()) {
-            return visitResult;
-        }
-    }
-
-    if (const auto& status =
-            bucket_catalog::internal::compressAndWriteBucket(opCtx,
-                                                             bucketCatalog,
-                                                             bucketsColl,
-                                                             uncompressedBucketId.get(),
-                                                             options.getTimeField(),
-                                                             compressAndWriteBucketFunc);
-        !status.isOK()) {
-        return status;
-    }
-
-    return Status{ErrorCodes::WriteConflict,
-                  "existing uncompressed bucket was compressed, retry insert on compressed bucket"};
-}
-
 }  // namespace
 
 std::shared_ptr<bucket_catalog::WriteBatch>& extractFromSelf(
@@ -343,69 +201,31 @@ void getOpTimeAndElectionId(OperationContext* opCtx,
     *electionId = isReplSet ? boost::make_optional(replCoord->getElectionId()) : boost::none;
 }
 
+/**
+ * Attempts to insert a measurement doc into a bucket in the bucket catalog.
+ * Returns the write batch of the insert and other information if succeeded.
+ */
 StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
     const Collection* bucketsColl,
     TimeseriesOptions& timeSeriesOptions,
-    const BSONObj& measurementDoc,
-    BucketReopeningPermittance reopening,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
+    const BSONObj& measurementDoc) {
     auto insertContextAndDate = bucket_catalog::prepareInsert(
         bucketCatalog, bucketsColl->uuid(), timeSeriesOptions, measurementDoc);
 
     if (!insertContextAndDate.isOK()) {
         return insertContextAndDate.getStatus();
     }
-    switch (reopening) {
-        case BucketReopeningPermittance::kAllowed:
-            while (true) {
-                auto result = attemptInsertIntoBucketWithReopening(
-                    opCtx,
-                    bucketCatalog,
-                    bucketsColl,
-                    timeSeriesOptions,
-                    measurementDoc,
-                    compressAndWriteBucketFunc,
-                    std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue()),
-                    std::get<Date_t>(insertContextAndDate.getValue()));
-                if (!result.isOK()) {
-                    if (result.getStatus().code() == ErrorCodes::WriteConflict) {
-                        // If there is an era offset (between the bucket we want to reopen and the
-                        // catalog's current era), we could hit a WriteConflict error indicating we
-                        // will need to refetch a bucket document as it is potentially stale. The
-                        // other scenario this will happen is when an uncompressed bucket is
-                        // encountered and must be compressed before reattempting a write to the
-                        // compressed bucket.
-                        continue;
-                    } else if (result.getStatus().code() ==
-                               ErrorCodes::TimeseriesBucketCompressionFailed) {
-                        // This is the case where the reopened bucket was corrupted. Retry the
-                        // insert directly on a new bucket.
-                        return bucket_catalog::insert(
-                            bucketCatalog,
-                            bucketsColl->getDefaultCollator(),
-                            measurementDoc,
-                            opCtx->getOpID(),
-                            std::get<bucket_catalog::InsertContext>(
-                                insertContextAndDate.getValue()),
-                            std::get<Date_t>(insertContextAndDate.getValue()),
-                            getStorageCacheSizeBytes(opCtx));
-                    }
-                }
-                return result;
-            }
-        case BucketReopeningPermittance::kDisallowed:
-            return bucket_catalog::insert(
-                bucketCatalog,
-                bucketsColl->getDefaultCollator(),
-                measurementDoc,
-                opCtx->getOpID(),
-                std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue()),
-                std::get<Date_t>(insertContextAndDate.getValue()),
-                getStorageCacheSizeBytes(opCtx));
-    }
-    MONGO_UNREACHABLE;
+
+    return bucket_catalog::insert(
+        bucketCatalog,
+        bucketsColl->getDefaultCollator(),
+        measurementDoc,
+        opCtx->getOpID(),
+        std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue()),
+        std::get<Date_t>(insertContextAndDate.getValue()),
+        getStorageCacheSizeBytes(opCtx));
 }
 
 TimeseriesWriteBatches insertIntoBucketCatalogForUpdate(
@@ -414,19 +234,12 @@ TimeseriesWriteBatches insertIntoBucketCatalogForUpdate(
     const CollectionPtr& bucketsColl,
     const std::vector<BSONObj>& measurements,
     const NamespaceString& bucketsNs,
-    TimeseriesOptions& timeSeriesOptions,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
+    TimeseriesOptions& timeSeriesOptions) {
     TimeseriesWriteBatches batches;
 
     for (const auto& measurement : measurements) {
-        auto result =
-            uassertStatusOK(attemptInsertIntoBucket(opCtx,
-                                                    bucketCatalog,
-                                                    bucketsColl.get(),
-                                                    timeSeriesOptions,
-                                                    measurement,
-                                                    BucketReopeningPermittance::kDisallowed,
-                                                    compressAndWriteBucketFunc));
+        auto result = uassertStatusOK(attemptInsertIntoBucket(
+            opCtx, bucketCatalog, bucketsColl.get(), timeSeriesOptions, measurement));
         auto* insertResult = get_if<bucket_catalog::SuccessfulInsertion>(&result);
         invariant(insertResult);
         batches.emplace_back(std::move(insertResult->batch));
@@ -599,16 +412,10 @@ void performAtomicWritesForUpdate(
     bool fromMigrate,
     StmtId stmtId,
     std::set<bucket_catalog::BucketId>* bucketIds,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     const boost::optional<Date_t> currentMinTime) {
     auto timeSeriesOptions = *coll->getTimeseriesOptions();
-    auto batches = insertIntoBucketCatalogForUpdate(opCtx,
-                                                    sideBucketCatalog,
-                                                    coll,
-                                                    modifiedMeasurements,
-                                                    coll->ns(),
-                                                    timeSeriesOptions,
-                                                    compressAndWriteBucketFunc);
+    auto batches = insertIntoBucketCatalogForUpdate(
+        opCtx, sideBucketCatalog, coll, modifiedMeasurements, coll->ns(), timeSeriesOptions);
 
     auto modificationRequest = unchangedMeasurements
         ? boost::make_optional(write_ops_utils::makeModificationOp(

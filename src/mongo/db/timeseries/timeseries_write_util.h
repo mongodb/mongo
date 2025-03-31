@@ -36,7 +36,6 @@
 #include <variant>
 #include <vector>
 
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -88,30 +87,6 @@ using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::
 void getOpTimeAndElectionId(OperationContext* opCtx,
                             boost::optional<repl::OpTime>* opTime,
                             boost::optional<OID>* electionId);
-
-enum class BucketReopeningPermittance {
-    kAllowed,
-    kDisallowed,
-};
-
-using CompressAndWriteBucketFunc = std::function<void(
-    OperationContext*, const bucket_catalog::BucketId&, const NamespaceString&, StringData)>;
-
-/**
- * Attempts to insert a measurement doc into a bucket in the bucket catalog and retries
- * automatically on certain errors. Only reopens existing buckets if the insert was initiated from a
- * user insert.
- *
- * Returns the write batch of the insert and other information if succeeded.
- */
-StatusWith<timeseries::bucket_catalog::InsertResult> attemptInsertIntoBucket(
-    OperationContext* opCtx,
-    bucket_catalog::BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    TimeseriesOptions& timeSeriesOptions,
-    const BSONObj& measurementDoc,
-    BucketReopeningPermittance,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc);
 
 /**
  * Prepares the final write batches needed for performing the writes to storage.
@@ -183,7 +158,6 @@ void performAtomicWritesForUpdate(
     bool fromMigrate,
     StmtId stmtId,
     std::set<bucket_catalog::BucketId>* bucketIds,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     boost::optional<Date_t> currentMinTime);
 
 /**

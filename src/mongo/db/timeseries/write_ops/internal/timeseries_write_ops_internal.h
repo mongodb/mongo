@@ -114,23 +114,6 @@ Status performAtomicTimeseriesWrites(
     const std::vector<mongo::write_ops::UpdateCommandRequest>& updateOps);
 
 /**
- * Given a WriteBatch, will commit and finish the write batch and perform a write to the underlying
- * system.buckets collection for a time-series collection.
- * Returns whether the request can continue.
- */
-bool commitTimeseriesBucket(OperationContext* opCtx,
-                            std::shared_ptr<bucket_catalog::WriteBatch> batch,
-                            size_t start,
-                            size_t index,
-                            std::vector<StmtId>&& stmtIds,
-                            std::vector<mongo::write_ops::WriteError>* errors,
-                            boost::optional<repl::OpTime>* opTime,
-                            boost::optional<OID>* electionId,
-                            std::vector<size_t>* docsToRetry,
-                            absl::flat_hash_map<int, int>& retryAttemptsForDup,
-                            const mongo::write_ops::InsertCommandRequest& request);
-
-/**
  * Given a WriteBatch, will commit the write batch and perform a write to the
  * underlying system.buckets collection for a time-series collection.
  *
@@ -229,7 +212,7 @@ TimeseriesWriteBatches stageInsertBatch(
     const OperationId& opId,
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const bucket_catalog::CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     bucket_catalog::BatchedInsertContext& batch);
 
 /**
@@ -249,7 +232,7 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
     bool earlyReturnOnError,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const bucket_catalog::CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     const std::vector<BSONObj>& userMeasurementsBatch,
     size_t startIndex,
     size_t numDocsToStage,
