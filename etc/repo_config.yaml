@@ -426,10 +426,10 @@ repos:
   - name: rhel9
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.org
+    bucket: repo.mongodb.com
     repos:
-      - yum/redhat/9/mongodb-org
-      - yum/redhat/9Server/mongodb-org
+      - yum/redhat/9/mongodb-enterprise
+      - yum/redhat/9Server/mongodb-enterprise
 
   - name: rhel90
     type: rpm
