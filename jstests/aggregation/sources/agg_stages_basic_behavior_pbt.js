@@ -29,6 +29,7 @@ import {
     limitArb,
     sortArb
 } from "jstests/libs/property_test_helpers/models/query_models.js";
+import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -216,15 +217,18 @@ for (const {stageArb, checkResultsFn, failMsg} of testCases) {
                          });
 
     // Run the property with a regular collection.
-    testProperty(propFn,
-                 {experimentColl},
-                 {collModel: getCollectionModel(), aggModel},
-                 {numRuns, numQueriesPerRun: 20});
+    testProperty(
+        propFn,
+        {experimentColl},
+        makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun: 20}),
+        numRuns);
 
     // TODO SERVER-101271 re-enable timeseries PBT testing.
     // Run the property with a TS collection.
     // testProperty(propFn,
     //              {experimentColl},
-    //              {collModel: getCollectionModel({isTS: true}), aggModel},
-    //              {numRuns, numQueriesPerRun: 20});
+    //              makeWorkloadModel(
+    //                  {collModel: getCollectionModel({isTS: true}), aggModel, numQueriesPerRun:
+    //                  20}),
+    //              numRuns);
 }

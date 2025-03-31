@@ -16,6 +16,7 @@
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {
     getPlanCache,
     testProperty
@@ -83,11 +84,13 @@ function repeatQueriesUseCache(getQuery, testHelpers) {
 
 const aggModel = getAggPipelineModel();
 
-testProperty(repeatQueriesUseCache,
-             {experimentColl},
-             {collModel: getCollectionModel({isTS: false}), aggModel},
-             {numRuns, numQueriesPerRun});
-testProperty(repeatQueriesUseCache,
-             {experimentColl},
-             {collModel: getCollectionModel({isTS: true}), aggModel},
-             {numRuns, numQueriesPerRun});
+testProperty(
+    repeatQueriesUseCache,
+    {experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel({isTS: false}), aggModel, numQueriesPerRun}),
+    numRuns);
+testProperty(
+    repeatQueriesUseCache,
+    {experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel, numQueriesPerRun}),
+    numRuns);

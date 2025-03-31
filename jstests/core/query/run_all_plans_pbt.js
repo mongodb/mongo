@@ -28,6 +28,7 @@
 import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {
     runDeoptimized,
     testProperty
@@ -95,8 +96,8 @@ const aggModel = getAggPipelineModel();
 // Test with a regular collection.
 testProperty(hintedQueryHasSameResultsAsControlCollScan,
              {controlColl, experimentColl},
-             {collModel: getCollectionModel(), aggModel},
-             {numRuns, numQueriesPerRun});
+             makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
+             numRuns);
 
 // TODO SERVER-101271 re-enable PBT testing for time-series
 // // Test with a TS collection.
@@ -112,6 +113,10 @@ testProperty(hintedQueryHasSameResultsAsControlCollScan,
 //     });
 //     testProperty(hintedQueryHasSameResultsAsControlCollScan,
 //                  {controlColl, experimentColl},
-//                  {collModel: getCollectionModel({isTS: true}), aggModel: tsAggModel},
-//                  {numRuns, numQueriesPerRun});
+//                  makeWorkloadModel({
+//                      collModel: getCollectionModel({isTS: true}),
+//                      aggModel: tsAggModel,
+//                      numQueriesPerRun
+//                  }),
+//                  numRuns);
 // }

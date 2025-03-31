@@ -46,7 +46,40 @@ There are inconsistencies in our query language that are accepted behavior, but 
 
 Floating point values are another area the PBTs avoid. Results can differ depending on the order of floating point operations. These differences can propogate. For this reason the only number values allowed are integers.
 
-#### Schema
+## Modeling Workloads
+
+A workload consists of a collection model and an aggregation model, in the following format:
+
+```
+{
+   collSpec: {
+       isTS:      true/false to indicate if the collection should be time-series
+       docs:      a list of documents
+       indexes:   a list of indexes
+   },
+   queries:  a list of aggregation pipelines
+}
+```
+
+Using one workload model instead of separate (and independent) collection models and agg models allows them to be interrelated.
+For example, if we want to model a PBT to test partial indexes where every query should satisfy the partial index filter, we can write:
+
+```
+fc.record({
+    partialFilter: partialFilterPredicateModel,
+    docs: docsModel,
+    indexes: indexesModel,
+    aggs: aggsModel
+}).map(({partialFilter, docs, indexes, aggs}) => {
+    // Append {partialFilterExpression: partialFilter} to all index options
+    // Prefix every query with {$match: partialFilter}
+    // Return our workload object.
+});
+```
+
+and this is a valid workload model. If the collection and aggregation models are passed separately, they would be independent an unable to coordinate with shared arbitraries (like `partialFilter`).
+
+### Schema
 
 The Core PBT schema is:
 

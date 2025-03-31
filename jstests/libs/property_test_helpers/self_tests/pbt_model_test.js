@@ -15,6 +15,7 @@ import {
     addFieldsConstArb,
     getAggPipelineModel
 } from "jstests/libs/property_test_helpers/models/query_models.js";
+import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {
     concreteQueryFromFamily,
     testProperty
@@ -56,11 +57,15 @@ function testModelMetrics(isTS, allowOrs) {
         return {passed: true};
     }
     let numRuns = 100;
-    let numQueriesPerRun = 0;
+    let numQueriesPerRun = 1;
     testProperty(mockProperty,
                  {experimentColl},
-                 {collModel: getCollectionModel({isTS}), aggModel: getAggPipelineModel({allowOrs})},
-                 {numRuns, numQueriesPerRun});
+                 makeWorkloadModel({
+                     collModel: getCollectionModel({isTS}),
+                     aggModel: getAggPipelineModel({allowOrs}),
+                     numQueriesPerRun
+                 }),
+                 numRuns);
 
     const avgNumDocs = avg(numDocs);
     assert.eq(numDocs.length, numRuns);
@@ -104,10 +109,11 @@ function testModelMetrics(isTS, allowOrs) {
         // Run 100 queries total.
         numRuns = 20;
         numQueriesPerRun = 5;
-        testProperty(mockProperty,
-                     {experimentColl},
-                     {collModel: getCollectionModel({isTS}), aggModel},
-                     {numRuns, numQueriesPerRun});
+        testProperty(
+            mockProperty,
+            {experimentColl},
+            makeWorkloadModel({collModel: getCollectionModel({isTS}), aggModel, numQueriesPerRun}),
+            numRuns);
 
         const avgNumDocsReturned = avg(numDocsReturned);
         assert.eq(numDocsReturned.length, numRuns * numQueriesPerRun);

@@ -77,20 +77,21 @@ const okIndexCreationErrorCodes = [
  * TODO SERVER-98132 redesign getQuery to be more opaque about how many query shapes and constants
  * there are.
  */
-function runProperty(propertyFn, namespaces, collectionSpec, queries) {
+function runProperty(propertyFn, namespaces, workload) {
+    const {collSpec, queries} = workload;
     const {controlColl, experimentColl} = namespaces;
 
     // Setup the control/experiment collections, define the helper functions, then run the property.
     if (controlColl) {
         assert(controlColl.drop());
         createColl(controlColl);
-        assert.commandWorked(controlColl.insert(collectionSpec.docs));
+        assert.commandWorked(controlColl.insert(collSpec.docs));
     }
 
     assert(experimentColl.drop());
-    createColl(experimentColl, collectionSpec.isTS);
-    assert.commandWorked(experimentColl.insert(collectionSpec.docs));
-    collectionSpec.indexes.forEach((indexSpec, num) => {
+    createColl(experimentColl, collSpec.isTS);
+    assert.commandWorked(experimentColl.insert(collSpec.docs));
+    collSpec.indexes.forEach((indexSpec, num) => {
         const name = "index_" + num;
         assert.commandWorkedOrFailedWithCode(
             experimentColl.createIndex(indexSpec.def, Object.extend(indexSpec.options, {name})),
@@ -123,9 +124,9 @@ function reporter(propertyFn, namespaces) {
             // about the property failure.
             jsTestLog('Failed property: ' + propertyFn.name);
             jsTestLog(runDetails);
-            const {collSpec, queries} = runDetails.counterexample[0];
-            jsTestLog({collSpec, queries});
-            jsTestLog(runProperty(propertyFn, namespaces, collSpec, queries));
+            const workload = runDetails.counterexample[0];
+            jsTestLog(workload);
+            jsTestLog(runProperty(propertyFn, namespaces, workload));
             assert(false);
         }
     };
@@ -137,8 +138,12 @@ function reporter(propertyFn, namespaces) {
  * failure, `runProperty` is called again in the reporter, and prints out more details about the
  * failed property.
  */
-export function testProperty(
-    propertyFn, namespaces, {collModel, aggModel}, {numRuns, numQueriesPerRun}) {
+export function testProperty(propertyFn, namespaces, workloadModel, numRuns) {
+    assert.eq(typeof propertyFn, 'function');
+    assert(Object.keys(namespaces)
+               .every(collName => collName === 'controlColl' || collName === 'experimentColl'));
+    assert.eq(typeof numRuns, 'number');
+
     const seed = 4;
     jsTestLog('Running property `' + propertyFn.name + '` from test file `' + jsTestName() +
               '`, seed = ' + seed);
@@ -150,21 +155,17 @@ export function testProperty(
     // True PBT failures (uncaught) are still readable and have stack traces.
     TestData.traceExceptions = false;
 
-    const nPipelinesModel =
-        fc.array(aggModel, {minLength: numQueriesPerRun, maxLength: numQueriesPerRun});
-    const scenarioArb = fc.record({collSpec: collModel, queries: nPipelinesModel});
-
     let alwaysPassed = true;
-    fc.assert(fc.property(scenarioArb, ({collSpec, queries}) => {
+    fc.assert(fc.property(workloadModel, workload => {
         // Only return if the property passed or not. On failure,
         // `runProperty` is called again and more details are exposed.
-        const result = runProperty(propertyFn, namespaces, collSpec, queries);
+        const result = runProperty(propertyFn, namespaces, workload);
         // If it failed for the first time, print that out so we have the first failure available
         // in case shrinking fails.
         if (!result.passed && alwaysPassed) {
             jsTestLog('The property ' + propertyFn.name + ' from ' + jsTestName() + ' failed');
             jsTestLog('Initial inputs **before minimization**');
-            jsTestLog({collSpec, queries});
+            jsTestLog(workload);
             jsTestLog('Initial failure details **before minimization**');
             jsTestLog(result);
             alwaysPassed = false;

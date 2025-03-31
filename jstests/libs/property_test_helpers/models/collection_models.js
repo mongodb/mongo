@@ -13,15 +13,14 @@ import {
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 // Maximum number of documents that our collection model can generate.
-const kMaxNumQueries = 250;
+const kMaxNumDocs = 250;
 
 // An array of [0...249] to label our documents with.
 const docIds = [];
-for (let i = 0; i < kMaxNumQueries; i++) {
+for (let i = 0; i < kMaxNumDocs; i++) {
     docIds.push(i);
 }
-const uniqueIdsArb =
-    fc.shuffledSubarray(docIds, {minLength: kMaxNumQueries, maxLength: kMaxNumQueries});
+const uniqueIdsArb = fc.shuffledSubarray(docIds, {minLength: kMaxNumDocs, maxLength: kMaxNumDocs});
 
 function getDocsModel(isTS) {
     const docModel = isTS ? timeseriesDocModel : defaultDocModel;
@@ -31,7 +30,7 @@ function getDocsModel(isTS) {
     // failure, fast-check will still minimize down to 1 document if possible.
     // These docs are 'unlabeled' because we have not assigned them unique _ids yet.
     const unlabeledDocsModel =
-        fc.array(docModel, {minLength: 1, maxLength: kMaxNumQueries, size: '+2'});
+        fc.array(docModel, {minLength: 1, maxLength: kMaxNumDocs, size: '+2'});
     // Now label the docs with unique _ids.
     return fc.record({unlabeledDocs: unlabeledDocsModel, _ids: uniqueIdsArb})
         .map(({unlabeledDocs, _ids}) => {

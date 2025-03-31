@@ -28,8 +28,8 @@ export function getSingleFieldProjectArb(isInclusion, {simpleFieldsOnly = false}
             return {$project: {_id: includeIdVal, [field]: includeFieldVal}};
         });
 }
-const projectArb = fc.oneof(getSingleFieldProjectArb(true /*isInclusion*/),
-                            getSingleFieldProjectArb(false /*isInclusion*/));
+const projectArb = oneof(getSingleFieldProjectArb(true /*isInclusion*/),
+                         getSingleFieldProjectArb(false /*isInclusion*/));
 
 // Project from one field to another. {$project {a: '$b'}}
 const computedProjectArb = fc.tuple(fieldArb, dollarFieldArb).map(function([destField, srcField]) {

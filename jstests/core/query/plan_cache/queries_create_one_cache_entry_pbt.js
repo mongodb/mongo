@@ -15,6 +15,7 @@
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {
     getPlanCache,
     testProperty
@@ -60,11 +61,13 @@ function identicalQueryCreatesAtMostOneCacheEntry(getQuery, testHelpers) {
 
 const aggModel = getAggPipelineModel({allowOrs: false});
 
-testProperty(identicalQueryCreatesAtMostOneCacheEntry,
-             {experimentColl},
-             {collModel: getCollectionModel({isTS: false}), aggModel},
-             {numRuns, numQueriesPerRun});
-testProperty(identicalQueryCreatesAtMostOneCacheEntry,
-             {experimentColl},
-             {collModel: getCollectionModel({isTS: true}), aggModel},
-             {numRuns, numQueriesPerRun});
+testProperty(
+    identicalQueryCreatesAtMostOneCacheEntry,
+    {experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel({isTS: false}), aggModel, numQueriesPerRun}),
+    numRuns);
+testProperty(
+    identicalQueryCreatesAtMostOneCacheEntry,
+    {experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel, numQueriesPerRun}),
+    numRuns);
