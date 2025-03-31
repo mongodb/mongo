@@ -97,12 +97,6 @@
     exclude_files:
       # TODO SERVER-101603 Validate against explain commands in prepared transactions.
       - jstests/core/txns/disallow_operations_on_prepared_transaction.js
-      # TODO SERVER-101455 Re-enable index_multiple_compatibility.js.
-      - jstests/core/index/index_multiple_compatibility.js
-      # TODO SERVER-101454 Re-enable single_field_hashed_index.js.
-      - jstests/core/query/single_field_hashed_index.js
-      # TODO SERVER-100915 Re-enable geo6.js on PQS implicit fallback suites.
-      - jstests/core/index/geo/geo6.js
       # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
       - jstests/core/index/wildcard/*.js
       - jstests/core/query/index_correctness_pbt.js
