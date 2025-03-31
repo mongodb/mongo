@@ -140,6 +140,13 @@ public:
     int64_t numBatchesForTest();
 
     /**
+     * Returns the 'comment' for the $changeStream aggregate command that is unique for the given
+     * resharding UUID. The 'comment' is used to identify the cursors to kill when the monitor
+     * completes.
+     */
+    BSONObj makeAggregateComment(const UUID& reshardingUUID);
+
+    /**
      * Creates the aggregation command request for the change streams monitor.
      */
     AggregateCommandRequest makeAggregateCommandRequest();

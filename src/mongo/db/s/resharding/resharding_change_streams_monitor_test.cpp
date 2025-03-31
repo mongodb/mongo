@@ -328,7 +328,7 @@ public:
     /**
      * Returns true if there is an idle cursor with the given namespace.
      */
-    bool hasIdleCursor(const NamespaceString& nss) {
+    bool hasOpenCursor(const NamespaceString& nss, const BSONObj& aggComment) {
         // Create an alternative client and opCtx since the original opCtx may have been used to
         // run a transaction and $currentOp is not supported in a transaction.
         auto client = opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
@@ -337,11 +337,15 @@ public:
 
         std::vector<BSONObj> pipeline;
         pipeline.push_back(BSON("$currentOp" << BSON("allUsers" << true << "idleCursors" << true)));
+        // Filter by aggregation comment to identify reshardingChangeStreamsMonitor cursors and ops.
         pipeline.push_back(
-            BSON("$match" << BSON("type" << "idleCursor"
-                                         << "ns"
-                                         << NamespaceStringUtil::serialize(
-                                                nss, SerializationContext::stateDefault()))));
+            BSON("$match" << BSON("$or" << BSON_ARRAY(
+                                      BSON("cursor.originatingCommand.comment"
+                                           << aggComment << "ns"
+                                           << NamespaceStringUtil::serialize(
+                                                  nss, SerializationContext::stateDefault()))
+                                      << BSON("command.aggregate" << nss.coll() << "command.comment"
+                                                                  << aggComment)))));
 
         DBDirectClient dbclient(opCtx.get());
         AggregateCommandRequest aggRequest(
@@ -490,7 +494,9 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
         monitor->startMonitoring(executor, cleanupExecutor, cancelSource.token(), *factory);
 
     // Wait for the monitor to open a change stream cursor.
-    resharding_test_util::assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+    resharding_test_util::assertSoon(opCtx, [&] {
+        return hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID));
+    });
 
     cancelSource.cancel();
     executor->shutdown();
@@ -499,7 +505,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
     // The cleanup should still succeed.
     monitor->awaitCleanup().get();
     // Verify that the cursor got killed.
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID)));
     awaitCompletion.get();
 }
 
@@ -514,7 +520,9 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
         monitor0->startMonitoring(executor, cleanupExecutor, cancelSource.token(), *factory);
 
     // Wait for the monitor to open a change stream cursor.
-    resharding_test_util::assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+    resharding_test_util::assertSoon(opCtx, [&] {
+        return hasOpenCursor(tempNss, monitor0->makeAggregateComment(reshardingUUID));
+    });
 
     // Start another monitor and make it run to completion successfully.
     auto executor1 = makeTaskExecutor("New");
@@ -533,7 +541,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
     awaitCompletion1.get();
 
     // Verify that the cursor from the previous try got killed.
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss, monitor0->makeAggregateComment(reshardingUUID)));
 
     tearDownExecutors({executor1, cleanupExecutor1});
 }
@@ -586,8 +594,12 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
                                                                       recipientFactory);
 
     // Wait for both donor and recipient monitors to open a change stream cursor.
-    resharding_test_util::assertSoon(opCtx, [&] { return hasIdleCursor(sourceNss); });
-    resharding_test_util::assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+    resharding_test_util::assertSoon(opCtx, [&] {
+        return hasOpenCursor(sourceNss, donorMonitor->makeAggregateComment(reshardingUUID));
+    });
+    resharding_test_util::assertSoon(opCtx, [&] {
+        return hasOpenCursor(tempNss, recipientMonitor->makeAggregateComment(reshardingUUID));
+    });
 
     DBDirectClient client(opCtx);
     client.insert(sourceNss, BSON("_id" << 10));
@@ -601,8 +613,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
     awaitDonorCompletion.get();
 
     // Verify that the donor monitor's cursor got killed but the recipient monitor's cursor did not.
-    ASSERT(!hasIdleCursor(sourceNss));
-    ASSERT(hasIdleCursor(tempNss));
+    ASSERT(!hasOpenCursor(sourceNss, donorMonitor->makeAggregateComment(reshardingUUID)));
+    ASSERT(hasOpenCursor(tempNss, recipientMonitor->makeAggregateComment(reshardingUUID)));
 
     client.insert(tempNss, BSON("_id" << 11));
 
@@ -613,8 +625,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
     recipientMonitor->awaitCleanup().get();
     awaitRecipientCompletion.get();
 
-    ASSERT(!hasIdleCursor(sourceNss));
-    ASSERT(!hasIdleCursor(tempNss));
+    ASSERT(!hasOpenCursor(sourceNss, donorMonitor->makeAggregateComment(reshardingUUID)));
+    ASSERT(!hasOpenCursor(tempNss, recipientMonitor->makeAggregateComment(reshardingUUID)));
 
     tearDownExecutors({donorExecutor, donorCleanupExecutor, donorMarkKilledExecutor});
     tearDownExecutors({recipientExecutor, recipientCleanupExecutor, recipientMarkKilledExecutor});
@@ -778,7 +790,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ProcessMultipleInsertsDeletes) {
     ASSERT_EQ(delta, 4);
 
     monitor->awaitCleanup().get();
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID)));
     awaitCompletion.get();
 }
 
@@ -1016,7 +1028,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ResumeWithLastTokenAfterFailure) {
         ASSERT_EQ(monitor->awaitFinalChangeEvent().getNoThrow().code(), ErrorCodes::InternalError);
         // The cleanup should still succeed.
         monitor->awaitCleanup().get();
-        ASSERT_FALSE(hasIdleCursor(tempNss));
+        ASSERT_FALSE(hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID)));
         awaitCompletion.get();
     });
 
@@ -1041,7 +1053,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ResumeWithLastTokenAfterFailure) {
     ASSERT(completed);
 
     monitor->awaitCleanup().get();
-    ASSERT_FALSE(hasIdleCursor(tempNss));
+    ASSERT_FALSE(hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID)));
     awaitCompletion.get();
 }
 
@@ -1095,6 +1107,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen)
 
         ASSERT_EQ(monitor->numEventsTotalForTest(), numEventsTotal);
         ASSERT_EQ(monitor->numBatchesForTest(), numBatches);
+        ASSERT_FALSE(hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID)));
     });
 
     monitortHangFp->waitForTimesEntered(timesEntered + 1);
@@ -1114,7 +1127,6 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen)
     monitorInternalErrorFp->setMode(FailPoint::off);
 
     ASSERT_EQ(delta, numInserts);
-    ASSERT_FALSE(hasIdleCursor(tempNss));
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDonor) {

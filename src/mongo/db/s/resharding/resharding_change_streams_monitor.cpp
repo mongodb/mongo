@@ -55,28 +55,16 @@ const StringData kReshardingUUIDFieldName = "reshardingUUID"_sd;
 const UUID commonUUID = UUID::gen();
 
 /**
- * Returns the 'comment' for the $changeStream aggregate command that is unique for the given
- * resharding UUID. The 'comment' is used to identify the cursors to kill when the monitor
- * completes. The common UUID generated above is included to prevent accidentally killing other
- * cursors whose originating command happens to include the resharding UUID in its 'comment'.
- */
-BSONObj makeAggregateComment(const UUID& reshardingUUID) {
-    return BSON(kAggregateCommentFieldName
-                << BSON(kCommonUUIDFieldName << commonUUID.toString() << kReshardingUUIDFieldName
-                                             << reshardingUUID.toString()));
-}
-
-/**
- * Runs $currentOp to check if there are open change stream cursors with the given resharding UUID.
+ * Runs $currentOp to check if there are open cursors with the given namespace and comment.
  * If there are, returns their cursor ids.
  */
 std::vector<CursorId> lookUpCursorIds(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      const UUID& reshardingUUID) {
+                                      const BSONObj& aggComment) {
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$currentOp" << BSON("allUsers" << true << "idleCursors" << true)));
     pipeline.push_back(BSON("$match" << BSON("cursor.originatingCommand.comment"
-                                             << makeAggregateComment(reshardingUUID) << "ns"
+                                             << aggComment << "ns"
                                              << NamespaceStringUtil::serialize(
                                                     nss, SerializationContext::stateDefault()))));
 
@@ -101,8 +89,9 @@ std::vector<CursorId> lookUpCursorIds(OperationContext* opCtx,
  */
 Status killCursors(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   const UUID& reshardingUUID) {
-    auto cursorIds = lookUpCursorIds(opCtx, nss, reshardingUUID);
+                   const UUID& reshardingUUID,
+                   const BSONObj& aggComment) {
+    auto cursorIds = lookUpCursorIds(opCtx, nss, aggComment);
 
     if (cursorIds.empty()) {
         return Status::OK();
@@ -215,7 +204,9 @@ SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
         .thenRunOn(cleanupExecutor)
         .onCompletion([this, anchor = shared_from_this()](Status finalEventStatus) {
             auto opCtx = cc().makeOperationContext();
-            auto killCursorsStatus = killCursors(opCtx.get(), _monitorNss, _reshardingUUID);
+            auto aggComment = makeAggregateComment(_reshardingUUID);
+            auto killCursorsStatus =
+                killCursors(opCtx.get(), _monitorNss, _reshardingUUID, aggComment);
 
             LOGV2(1006685,
                   "The resharding change streams monitor finished cleaning up",
@@ -321,6 +312,14 @@ std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() co
     BSONObj projectStage = BSON("$project" << BSON("operationType" << 1));
 
     return {std::move(changeStreamStage), std::move(matchStage), std::move(projectStage)};
+}
+
+BSONObj ReshardingChangeStreamsMonitor::makeAggregateComment(const UUID& reshardingUUID) {
+    // The common UUID is included to prevent accidentally killing other cursors whose
+    // originating command happens to include the resharding UUID in its 'comment'.
+    return BSON(kAggregateCommentFieldName
+                << BSON(kCommonUUIDFieldName << commonUUID.toString() << kReshardingUUIDFieldName
+                                             << reshardingUUID.toString()));
 }
 
 AggregateCommandRequest ReshardingChangeStreamsMonitor::makeAggregateCommandRequest() {
