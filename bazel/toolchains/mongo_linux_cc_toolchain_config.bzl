@@ -897,7 +897,7 @@ def _impl(ctx):
         ),
     ]
 
-mongo_cc_toolchain_config = rule(
+mongo_linux_cc_toolchain_config = rule(
     implementation = _impl,
     attrs = {
         "builtin_sysroot": attr.string(),
