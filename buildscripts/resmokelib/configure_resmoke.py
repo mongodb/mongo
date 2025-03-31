@@ -359,9 +359,11 @@ be invoked as either:
     else:
         # Don't run tests with feature flags that are not enabled.
         _config.EXCLUDE_WITH_ANY_TAGS.extend(not_enabled_feature_flags)
-        _config.EXCLUDE_WITH_ANY_TAGS.extend(
-            [f"{feature_flag}_incompatible" for feature_flag in _config.ENABLED_FEATURE_FLAGS]
-        )
+
+    # Don't run tests that are incompatible with enabled feature flags.
+    _config.EXCLUDE_WITH_ANY_TAGS.extend(
+        [f"{feature_flag}_incompatible" for feature_flag in _config.ENABLED_FEATURE_FLAGS]
+    )
 
     _config.DOCKER_COMPOSE_BUILD_IMAGES = config.pop("docker_compose_build_images")
     if _config.DOCKER_COMPOSE_BUILD_IMAGES is not None:
