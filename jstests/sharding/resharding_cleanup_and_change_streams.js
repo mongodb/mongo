@@ -40,6 +40,8 @@ function assertInsertEvent(event, dbName, collName, collUuid, doc) {
     assert.eq(event.ns.coll, collName, event);
     if (collUuid) {
         assert.eq(event.collectionUUID, collUuid, event);
+    } else {
+        assert.eq(event.hasOwnProperty("collectionUUID"), false, event);
     }
     assert.eq(event.fullDocument, doc, event);
 }

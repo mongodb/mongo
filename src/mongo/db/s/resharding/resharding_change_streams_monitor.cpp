@@ -297,6 +297,10 @@ std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() co
         // not need to do this because resharding cloning does not involve running prepared
         // (cross-shard) transactions.
 
+        // TODO (SERVER-86688): Remove this once events for prepared transactions always have the
+        // 'commitTimestamp'.
+        changeStreamSpec.setShowExpandedEvents(true);
+
         BSONArrayBuilder matchAndArrayBuilder;
         matchAndArrayBuilder.append(BSON(DocumentSourceChangeStream::kOperationTypeField
                                          << BSON("$in" << operationTypesArrayBuilder.arr())));
@@ -479,14 +483,15 @@ bool ReshardingChangeStreamsMonitor::EventBatch::empty() const {
 
 int64_t ReshardingChangeStreamsMonitor::EventBatch::getNumEvents() const {
     return _numEvents;
-}
+};
 
 int64_t ReshardingChangeStreamsMonitor::EventBatch::getDocumentsDelta() const {
     return _documentsDelta;
-}
+};
 
 BSONObj ReshardingChangeStreamsMonitor::EventBatch::getResumeToken() const {
     return _resumeToken;
-}
+};
+
 
 }  // namespace mongo

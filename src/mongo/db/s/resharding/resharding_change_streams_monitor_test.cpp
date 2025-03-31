@@ -1139,7 +1139,9 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDon
     ASSERT_FALSE(donorChangeStreamSpec.getShowMigrationEvents());
     ASSERT_TRUE(donorChangeStreamSpec.getShowSystemEvents());
     ASSERT_FALSE(donorChangeStreamSpec.getAllowToRunOnSystemNS());
-    ASSERT_FALSE(donorChangeStreamSpec.getShowExpandedEvents());
+    // TODO (SERVER-86688): Assert that this is false instead this once events for prepared
+    // transactions always have the 'commitTimestamp'.
+    ASSERT_TRUE(donorChangeStreamSpec.getShowExpandedEvents());
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDonorTimeseries) {
@@ -1166,7 +1168,9 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDon
     ASSERT_FALSE(donorChangeStreamSpec.getShowMigrationEvents());
     ASSERT_TRUE(donorChangeStreamSpec.getShowSystemEvents());
     ASSERT_TRUE(donorChangeStreamSpec.getAllowToRunOnSystemNS());
-    ASSERT_FALSE(donorChangeStreamSpec.getShowExpandedEvents());
+    // TODO (SERVER-86688): Assert that this is false instead this once events for prepared
+    // transactions always have the 'commitTimestamp'.
+    ASSERT_TRUE(donorChangeStreamSpec.getShowExpandedEvents());
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForRecipient) {

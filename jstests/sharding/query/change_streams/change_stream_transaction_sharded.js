@@ -44,9 +44,8 @@ const db = mongosConn.getDB(dbName);
 const coll = db.getCollection(collName);
 
 const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-// The 'commitTimestamp' field is exposed by default from v8.2 onwards.
-const alwaysExpectCommitTimestamp =
-    (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.2") >= 0);
+const is81OrHigher =
+    (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0);
 
 let changeListShard1 = [], changeListShard2 = [];
 
@@ -209,7 +208,7 @@ assertWritesVisibleWithCapture(
     ],
     changeListShard1,
     changeListShard2,
-    alwaysExpectCommitTimestamp);
+    is81OrHigher);
 
 // Perform a write outside of the transaction.
 assert.commandWorked(coll.insert({shard: 2, _id: "no-txn-doc-4"}, {writeConcern: {w: "majority"}}));
