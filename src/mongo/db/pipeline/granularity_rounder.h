@@ -37,7 +37,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/intrusive_counter.h"
 

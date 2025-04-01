@@ -44,7 +44,6 @@
 #include "mongo/db/exec/mutable_bson/api.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/exec/mutable_bson/element.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/visibility.h"

@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/redact_processor.h"
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/platform/basic.h"
 

@@ -43,7 +43,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/hedging_mode_gen.h"
 #include "mongo/client/read_preference_gen.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/duration.h"

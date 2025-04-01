@@ -39,7 +39,6 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_all_indices_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_executor.h"

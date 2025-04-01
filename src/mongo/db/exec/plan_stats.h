@@ -36,7 +36,6 @@
 
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/plan_summary_stats.h"

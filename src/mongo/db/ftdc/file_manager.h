@@ -44,7 +44,6 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_writer.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

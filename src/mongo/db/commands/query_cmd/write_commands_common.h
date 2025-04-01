@@ -31,7 +31,6 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/query_cmd/update_metrics.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 

@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/util/options_parser/value.h"
 
 namespace mongo {

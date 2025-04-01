@@ -35,7 +35,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/s/type_shard_identity_gen.h"
 
 namespace mongo {

@@ -595,7 +595,6 @@ mongo_cc_library(
     srcs = [
         "processinfo.cpp",
         "processinfo.h",
-        "//src/mongo/db:jsobj.h",
     ] + select({
         "@platforms//os:{}".format(os): ["processinfo_{}.cpp".format(os)]
         for os in [

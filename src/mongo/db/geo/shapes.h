@@ -46,8 +46,8 @@
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/big_polygon.h"
-#include "mongo/db/jsobj.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846

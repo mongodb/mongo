@@ -35,7 +35,6 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo {

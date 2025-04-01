@@ -42,7 +42,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/ftdc/decompressor.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 

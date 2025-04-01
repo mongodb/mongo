@@ -48,7 +48,6 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"

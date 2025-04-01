@@ -38,7 +38,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

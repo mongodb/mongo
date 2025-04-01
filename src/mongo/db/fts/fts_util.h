@@ -31,7 +31,7 @@
 
 #include <string>
 
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsontypes.h"
 
 namespace mongo {
 

@@ -42,7 +42,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/mutable_bson/api.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/visibility.h"
 #include "mongo/util/assert_util.h"

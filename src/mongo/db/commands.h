@@ -57,7 +57,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

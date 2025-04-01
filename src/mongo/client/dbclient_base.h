@@ -58,7 +58,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/read_concern_gen.h"

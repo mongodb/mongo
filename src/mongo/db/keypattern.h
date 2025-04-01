@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/str.h"
 

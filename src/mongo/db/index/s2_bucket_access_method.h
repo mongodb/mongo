@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {

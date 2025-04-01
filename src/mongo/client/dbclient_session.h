@@ -52,7 +52,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log_severity.h"

@@ -32,8 +32,13 @@
 #include <iostream>
 #include <yaml-cpp/yaml.h>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/util/options_parser/constraints.h"
 
 namespace mongo {

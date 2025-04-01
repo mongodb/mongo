@@ -47,7 +47,6 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"

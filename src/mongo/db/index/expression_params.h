@@ -34,7 +34,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

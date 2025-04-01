@@ -47,7 +47,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"

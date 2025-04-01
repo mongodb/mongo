@@ -41,7 +41,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/transport/transport_layer.h"

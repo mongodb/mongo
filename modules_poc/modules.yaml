@@ -4,7 +4,6 @@ core:
   - src/mongo/platform/
   - src/mongo/stdx/
   - src/mongo/util/
-  - src/mongo/db/jsobj.h
   - src/mongo/db/json.h
 
 core.service:

@@ -34,7 +34,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/cluster_query_result.h"

@@ -42,7 +42,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/constants.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/message.h"
 

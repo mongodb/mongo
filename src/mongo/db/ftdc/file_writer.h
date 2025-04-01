@@ -42,7 +42,6 @@
 #include "mongo/db/ftdc/compressor.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/metadata_compressor.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

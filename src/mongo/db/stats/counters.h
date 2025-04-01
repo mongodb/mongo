@@ -45,7 +45,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"

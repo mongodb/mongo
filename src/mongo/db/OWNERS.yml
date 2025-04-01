@@ -45,9 +45,6 @@ filters:
   - "generic_argument_util.*":
     approvers:
       - 10gen/server-programmability
-  - "jsobj.*":
-    approvers:
-      - 10gen/server-programmability
   - "json.*":
     approvers:
       - 10gen/server-programmability

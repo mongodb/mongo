@@ -39,7 +39,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"

@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo {

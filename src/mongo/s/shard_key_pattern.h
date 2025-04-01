@@ -40,7 +40,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 
 namespace mongo {

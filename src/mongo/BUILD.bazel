@@ -488,7 +488,6 @@ filegroup(
         "//src/mongo/db:feature_flag_server_parameter.h",
         "//src/mongo/db:field_ref.h",
         "//src/mongo/db:index_names.h",
-        "//src/mongo/db:jsobj.h",
         "//src/mongo/db:json.h",
         "//src/mongo/db:keypattern.h",
         "//src/mongo/db:list_collections_gen",
