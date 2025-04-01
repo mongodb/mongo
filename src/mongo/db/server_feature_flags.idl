@@ -159,3 +159,8 @@ feature_flags:
         cpp_varname: gFeatureFlagRawDataCrudOperations
         default: false
         shouldBeFCVGated: false
+    featureFlagIntentRegistration:
+        description: "Enables intent registration in place of RSTL acquisitions"
+        cpp_varname: gFeatureFlagIntentRegistration
+        default: false 
+        shouldBeFCVGated: false
