@@ -55,7 +55,6 @@ selector:
   roots:
     - jstests/core/timeseries/ddl/timeseries_create_collection.js
     - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
-    - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
     - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
     - jstests/core/timeseries/libs/geo.js
     - jstests/core/timeseries/libs/timeseries.js
