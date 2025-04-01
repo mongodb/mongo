@@ -435,6 +435,11 @@ public:
         if (result.isOK()) {
             result.getValue()->setCachedPlanHash(cachedPlanHash);
         }
+        // Check for interrupt after running the sophisticated planners in finishPrepare()
+        if (auto interruptCheck = _cq->getOpCtx()->checkForInterruptNoAssert();
+            !interruptCheck.isOK()) {
+            return interruptCheck;
+        }
         return result;
     }
 
