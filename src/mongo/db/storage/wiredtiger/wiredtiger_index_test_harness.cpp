@@ -30,7 +30,6 @@
 #include <boost/move/utility_core.hpp>
 #include <memory>
 #include <string>
-#include <vector>
 #include <wiredtiger.h>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -41,9 +40,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/index/index_constants.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -82,15 +78,19 @@ public:
     std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface(
         OperationContext* opCtx) final {
         std::string ns = "test.wt";
+        std::string indexName = "_id";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         BSONObj spec =
-            BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName << "v"
+            BSON("key" << BSON("_id" << 1) << "name" << indexName << "v"
                        << static_cast<int>(IndexConfig::kLatestIndexVersion) << "unique" << true);
 
-        auto collection = std::make_unique<CollectionMock>(nss);
-        IndexDescriptor desc("", spec);
-        invariant(desc.isIdIndex());
-        IndexConfig config = desc.toIndexConfig();
+        auto ordering = Ordering::allAscending();
+        IndexConfig config{true /* isIdIndex */,
+                           true /* unique */,
+                           IndexConfig::kLatestIndexVersion,
+                           spec,
+                           indexName,
+                           ordering};
 
         const bool isLogged = false;
         StatusWith<std::string> result =
@@ -119,23 +119,23 @@ public:
                                                                 KeyFormat keyFormat) final {
         std::string ns = "test.wt";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-
-        BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
-                                  << "testIndex"
-                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)
-                                  << "unique" << unique);
+        std::string indexName = "textIndex";
+        BSONObj spec =
+            BSON("key" << BSON("a" << 1) << "name" << indexName << "v"
+                       << static_cast<int>(IndexConfig::kLatestIndexVersion) << "unique" << unique);
 
         if (partial) {
-            auto partialBSON =
-                BSON(IndexDescriptor::kPartialFilterExprFieldName.toString() << BSON("" << ""));
+            auto partialBSON = BSON("partialFilterExpression" << BSON("" << ""));
             spec = spec.addField(partialBSON.firstElement());
         }
 
-        auto collection = std::make_unique<CollectionMock>(nss);
-
-        IndexDescriptor& desc = _descriptors.emplace_back("", spec);
-        IndexConfig config = desc.toIndexConfig();
-
+        auto ordering = Ordering::allAscending();
+        IndexConfig config{false /* isIdIndex */,
+                           unique,
+                           IndexConfig::kLatestIndexVersion,
+                           spec,
+                           indexName,
+                           ordering};
         StatusWith<std::string> result =
             WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
                                                   "",
@@ -177,7 +177,6 @@ public:
 private:
     unittest::TempDir _dbpath;
     std::unique_ptr<ClockSource> _fastClockSource;
-    std::vector<IndexDescriptor> _descriptors;
     WT_CONNECTION* _conn;
     std::unique_ptr<WiredTigerConnection> _connection;
 };

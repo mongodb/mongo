@@ -43,12 +43,10 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -309,19 +307,16 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
         uow.commit();
     }
 
-    std::unique_ptr<Collection> collection;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        WriteUnitOfWork uow(opCtx.get());
-        collection =
-            std::make_unique<CollectionImpl>(opCtx.get(), nss, RecordId(0), mdPtr, std::move(rs));
-        uow.commit();
-    }
-
-    IndexDescriptor desc(
-        "",
-        BSON("v" << static_cast<int>(IndexConfig::kLatestIndexVersion) << "key" << BSON("a" << 1)));
-    IndexConfig config = desc.toIndexConfig();
+    std::string indexName = "name";
+    auto spec = BSON("v" << static_cast<int>(IndexConfig::kLatestIndexVersion) << "key"
+                         << BSON("a" << 1) << "name" << indexName);
+    auto ordering = Ordering::allAscending();
+    IndexConfig config{false /* isIdIndex */,
+                       false /* unique */,
+                       IndexConfig::kLatestIndexVersion,
+                       spec,
+                       indexName,
+                       ordering};
     std::unique_ptr<SortedDataInterface> sorted;
     {
         auto opCtx = _makeOperationContext(engine);
@@ -1441,59 +1436,6 @@ TEST_F(DurableCatalogTest, BackupImplemented) {
     ASSERT(engine);
     ASSERT_OK(engine->beginBackup());
     engine->endBackup();
-}
-
-DEATH_TEST_REGEX_F(DurableCatalogTest,
-                   TerminateOnNonNumericIndexVersion,
-                   "Fatal assertion.*50942") {
-    KVEngine* engine = helper->getEngine();
-    ASSERT(engine);
-
-    std::string ident = "abc";
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("mydb.mycoll");
-
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-
-    auto mdPtr = std::make_shared<BSONCollectionCatalogEntry::MetaData>();
-    mdPtr->nss = nss;
-    mdPtr->options = options;
-
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(
-            NamespaceString::createNamespaceString_forTest("catalog"), "catalog", options));
-        rs = engine->getRecordStore(
-            opCtx, NamespaceString::createNamespaceString_forTest("catalog"), "catalog", options);
-        uow.commit();
-    }
-
-    std::unique_ptr<CollectionImpl> collection;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        collection =
-            std::make_unique<CollectionImpl>(opCtx, nss, RecordId(0), mdPtr, std::move(rs));
-        uow.commit();
-    }
-
-    IndexDescriptor desc("",
-                         BSON("v" << "1"
-                                  << "key" << BSON("a" << 1)));
-    IndexConfig config = desc.toIndexConfig();
-    std::unique_ptr<SortedDataInterface> sorted;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        ASSERT_OK(engine->createSortedDataInterface(
-            *shard_role_details::getRecoveryUnit(opCtx), nss, CollectionOptions(), ident, config));
-        sorted = engine->getSortedDataInterface(opCtx, nss, CollectionOptions(), ident, config);
-        ASSERT(sorted);
-    }
 }
 
 TEST_F(DurableCatalogTest, EntryIncludesTenantIdInMultitenantEnv) {

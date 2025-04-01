@@ -42,7 +42,6 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/catalog:catalog_impl",
         "//src/mongo/db/concurrency:lock_manager",
-        "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/storage:durable_catalog",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_options",

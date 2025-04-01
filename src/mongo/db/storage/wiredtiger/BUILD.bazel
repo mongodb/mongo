@@ -181,14 +181,11 @@ mongo_cc_library(
     srcs = [
         "wiredtiger_index_test_harness.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/catalog:collection_mock.h",
-    ],
+    hdrs = [],
     deps = [
         "storage_wiredtiger_core",
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/storage:sorted_data_interface_test_harness",
     ],
 )
@@ -216,7 +213,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db:snapshot_window_options",
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/storage:checkpointer",
@@ -243,7 +239,6 @@ mongo_cc_unit_test(
         ":storage_wiredtiger_core",
         ":wiredtiger_index_test_harness",
         ":wiredtiger_record_store_test_harness",
-        "//src/mongo/db:multitenancy",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/storage:oplog_truncation",
         "//src/mongo/db/storage:sorted_data_interface_tests",
@@ -260,7 +255,6 @@ mongo_cc_benchmark(
     deps = [
         ":wiredtiger_index_test_harness",
         ":wiredtiger_record_store_test_harness",
-        "//src/mongo/db:multitenancy",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/storage:record_store_bm",
@@ -291,7 +285,6 @@ mongo_cc_benchmark(
     tags = ["storage_bm"],
     deps = [
         ":wiredtiger_record_store_test_harness",
-        "//src/mongo/db:multitenancy",
         "//src/mongo/db:service_context_d",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/auth:authmocks",
