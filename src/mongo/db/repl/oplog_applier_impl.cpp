@@ -555,6 +555,10 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
 
         // Make sure the oplog doesn't go back in time or repeat an entry.
         if (firstOpTimeInBatch <= lastAppliedOpTimeAtStartOfBatch) {
+            LOGV2(10180701,
+                  "Oplog entry that is less than our last applied OpTime",
+                  "entry"_attr = redact(ops.front().toBSONForLogging()));
+
             fassert(34361,
                     Status(ErrorCodes::OplogOutOfOrder,
                            str::stream() << "Attempted to apply an oplog entry ("
