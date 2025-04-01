@@ -86,6 +86,21 @@ public:
      */
     void serialize(BSONObjBuilder* bob) const;
 
+    /**
+     * Returns TRUE if a fetch to IDP SHOULD NOT be performed at this time.
+     * e.g. If a fetch was performed too recently.
+     */
+    bool quiesce() const {
+        return _fetcher->quiesce();
+    }
+
+    /**
+     * Sets a date to be used as the latest time a fetch happened.
+     */
+    void setQuiesce(Date_t quiesce) {
+        _fetcher->setQuiesce(quiesce);
+    }
+
 private:
     bool _haveKeysBeenModified(const KeyMap& newKeyMaterial) const;
 
