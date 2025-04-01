@@ -231,6 +231,10 @@ void DotPrinterImpl::VisitAction(ActionNode* that) {
           << "\", shape=septagon";
       break;
     }
+    case ActionNode::MODIFY_FLAGS: {
+      os_ << "label=\"flags $" << that->flags() << "\", shape=septagon";
+      break;
+    }
   }
   os_ << "];\n";
   PrintAttributes(that);

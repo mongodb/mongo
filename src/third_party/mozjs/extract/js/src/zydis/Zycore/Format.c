@@ -423,7 +423,7 @@ ZyanStatus ZyanStringAppendFormat(ZyanString* string, const char* format, ...)
 
 ZyanStatus ZyanStringAppendDecU(ZyanString* string, ZyanU64 value, ZyanU8 padding_length)
 {
-#if defined(ZYAN_X64) || defined(ZYAN_AARCH64) || defined(ZYAN_PPC64) || defined(ZYAN_RISCV64)
+#if defined(ZYAN_X64) || defined(ZYAN_AARCH64) || defined(ZYAN_PPC64) || defined(ZYAN_RISCV64) || defined(ZYAN_LOONGARCH)
     return ZyanStringAppendDecU64(string, value, padding_length);
 #else
     // Working with 64-bit values is slow on non 64-bit systems
@@ -464,7 +464,7 @@ ZyanStatus ZyanStringAppendDecS(ZyanString* string, ZyanI64 value, ZyanU8 paddin
 ZyanStatus ZyanStringAppendHexU(ZyanString* string, ZyanU64 value, ZyanU8 padding_length,
     ZyanBool uppercase)
 {
-#if defined(ZYAN_X64) || defined(ZYAN_AARCH64) || defined(ZYAN_PPC64) || defined(ZYAN_RISCV64)
+#if defined(ZYAN_X64) || defined(ZYAN_AARCH64) || defined(ZYAN_PPC64) || defined(ZYAN_RISCV64) || defined(ZYAN_LOONGARCH)
     return ZyanStringAppendHexU64(string, value, padding_length, uppercase);
 #else
     // Working with 64-bit values is slow on non 64-bit systems

@@ -20,68 +20,31 @@ class NativeObject;
 class Nursery;
 class PlainObject;
 
+namespace wasm {
+class AnyRef;
+}  // namespace wasm
+
 namespace gc {
 
+class AllocSite;
+class ArenaCellSet;
 class RelocationOverlay;
 class StringRelocationOverlay;
 
 template <typename Key>
 struct DeduplicationStringHasher {
   using Lookup = Key;
-
-  static inline HashNumber hash(const Lookup& lookup) {
-    JS::AutoCheckCannotGC nogc;
-    HashNumber strHash;
-
-    // Include flags in the hash. A string relocation overlay stores either
-    // the nursery root base chars or the dependent string nursery base, but
-    // does not indicate which one. If strings with different string types
-    // were deduplicated, for example, a dependent string gets deduplicated
-    // into an extensible string, the base chain would be broken and the root
-    // base would be unreachable.
-
-    if (lookup->asLinear().hasLatin1Chars()) {
-      strHash = mozilla::HashString(lookup->asLinear().latin1Chars(nogc),
-                                    lookup->length());
-    } else {
-      MOZ_ASSERT(lookup->asLinear().hasTwoByteChars());
-      strHash = mozilla::HashString(lookup->asLinear().twoByteChars(nogc),
-                                    lookup->length());
-    }
-
-    return mozilla::HashGeneric(strHash, lookup->zone(), lookup->flags());
-  }
-
-  static MOZ_ALWAYS_INLINE bool match(const Key& key, const Lookup& lookup) {
-    if (!key->sameLengthAndFlags(*lookup) ||
-        key->asTenured().zone() != lookup->zone() ||
-        key->asTenured().getAllocKind() != lookup->getAllocKind()) {
-      return false;
-    }
-
-    JS::AutoCheckCannotGC nogc;
-
-    if (key->asLinear().hasLatin1Chars()) {
-      MOZ_ASSERT(lookup->asLinear().hasLatin1Chars());
-      return EqualChars(key->asLinear().latin1Chars(nogc),
-                        lookup->asLinear().latin1Chars(nogc), lookup->length());
-    } else {
-      MOZ_ASSERT(key->asLinear().hasTwoByteChars());
-      MOZ_ASSERT(lookup->asLinear().hasTwoByteChars());
-      return EqualChars(key->asLinear().twoByteChars(nogc),
-                        lookup->asLinear().twoByteChars(nogc),
-                        lookup->length());
-    }
-  }
+  static inline HashNumber hash(const Lookup& lookup);
+  static MOZ_ALWAYS_INLINE bool match(const Key& key, const Lookup& lookup);
 };
 
 class TenuringTracer final : public JSTracer {
   Nursery& nursery_;
 
-  // Amount of data moved to the tenured generation during collection.
-  size_t tenuredSize = 0;
-  // Number of cells moved to the tenured generation.
-  size_t tenuredCells = 0;
+  // Size of data promoted during collection.
+  size_t promotedSize = 0;
+  // Number of cells promoted during collection.
+  size_t promotedCells = 0;
 
   // These lists are threaded through the Nursery using the space from
   // already moved things. The lists are used to fix up the moved things and
@@ -98,38 +61,62 @@ class TenuringTracer final : public JSTracer {
   // collection when out of memory to insert new entries.
   mozilla::Maybe<StringDeDupSet> stringDeDupSet;
 
+  bool tenureEverything;
+
+  // A flag set when a GC thing is promoted to the next nursery generation (as
+  // opposed to the tenured heap). This is used to check when we need to add an
+  // edge to the remembered set during nursery collection.
+  bool promotedToNursery = false;
+
 #define DEFINE_ON_EDGE_METHOD(name, type, _1, _2) \
   void on##name##Edge(type** thingp, const char* name) override;
   JS_FOR_EACH_TRACEKIND(DEFINE_ON_EDGE_METHOD)
 #undef DEFINE_ON_EDGE_METHOD
 
  public:
-  TenuringTracer(JSRuntime* rt, Nursery* nursery);
+  TenuringTracer(JSRuntime* rt, Nursery* nursery, bool tenureEverything);
 
   Nursery& nursery() { return nursery_; }
 
-  // Move all objects and everything they can reach to the tenured heap. Called
-  // after all roots have been traced.
+  // Promote all live objects and everything they can reach. Called after all
+  // roots have been traced.
   void collectToObjectFixedPoint();
 
-  // Move all strings and all strings they can reach to the tenured heap, and
-  // additionally do any fixups for when strings are pointing into memory that
-  // was deduplicated. Called after collectToObjectFixedPoint().
+  // Promote all live strings and all strings they can reach, and additionally
+  // do any fixups for when strings are pointing into memory that was
+  // deduplicated. Called after collectToObjectFixedPoint().
   void collectToStringFixedPoint();
 
-  size_t getTenuredSize() const;
-  size_t getTenuredCells() const;
+  size_t getPromotedSize() const;
+  size_t getPromotedCells() const;
 
   void traverse(JS::Value* thingp);
+  void traverse(wasm::AnyRef* thingp);
 
   // The store buffers need to be able to call these directly.
-  void traceObject(JSObject* src);
+  void traceObject(JSObject* obj);
   void traceObjectSlots(NativeObject* nobj, uint32_t start, uint32_t end);
-  void traceSlots(JS::Value* vp, uint32_t nslots);
-  void traceString(JSString* src);
-  void traceBigInt(JS::BigInt* src);
+  void traceObjectElements(JS::Value* vp, uint32_t count);
+  void traceString(JSString* str);
+  void traceBigInt(JS::BigInt* bi);
+
+  // Methods to promote a live cell or get the pointer to its new location if
+  // that has already happened. The store buffers call these.
+  JSObject* promoteOrForward(JSObject* obj);
+  JSString* promoteOrForward(JSString* str);
+  JS::BigInt* promoteOrForward(JS::BigInt* bip);
+
+  // Returns whether any cells in the arena require sweeping.
+  template <typename T>
+  bool traceBufferedCells(Arena* arena, ArenaCellSet* cells);
+
+  class AutoPromotedAnyToNursery;
 
  private:
+  MOZ_ALWAYS_INLINE JSObject* onNonForwardedNurseryObject(JSObject* obj);
+  MOZ_ALWAYS_INLINE JSString* onNonForwardedNurseryString(JSString* str);
+  MOZ_ALWAYS_INLINE JS::BigInt* onNonForwardedNurseryBigInt(JS::BigInt* bi);
+
   // The dependent string chars needs to be relocated if the base which it's
   // using chars from has been deduplicated.
   template <typename CharT>
@@ -143,22 +130,24 @@ class TenuringTracer final : public JSTracer {
   inline void insertIntoStringFixupList(gc::StringRelocationOverlay* entry);
 
   template <typename T>
-  inline T* allocTenured(JS::Zone* zone, gc::AllocKind kind);
-  JSString* allocTenuredString(JSString* src, JS::Zone* zone,
-                               gc::AllocKind dstKind);
+  T* alloc(JS::Zone* zone, gc::AllocKind kind, gc::Cell* src);
+  template <JS::TraceKind traceKind>
+  void* allocCell(JS::Zone* zone, gc::AllocKind allocKind, gc::AllocSite* site,
+                  gc::Cell* src);
+  JSString* allocString(JSString* src, JS::Zone* zone, gc::AllocKind dstKind);
 
-  inline JSObject* movePlainObjectToTenured(PlainObject* src);
-  JSObject* moveToTenuredSlow(JSObject* src);
-  JSString* moveToTenured(JSString* src);
-  JS::BigInt* moveToTenured(JS::BigInt* src);
+  bool shouldTenure(Zone* zone, JS::TraceKind traceKind, Cell* cell);
 
-  size_t moveElementsToTenured(NativeObject* dst, NativeObject* src,
-                               gc::AllocKind dstKind);
-  size_t moveSlotsToTenured(NativeObject* dst, NativeObject* src);
-  size_t moveStringToTenured(JSString* dst, JSString* src,
-                             gc::AllocKind dstKind);
-  size_t moveBigIntToTenured(JS::BigInt* dst, JS::BigInt* src,
-                             gc::AllocKind dstKind);
+  inline JSObject* promotePlainObject(PlainObject* src);
+  JSObject* promoteObjectSlow(JSObject* src);
+  JSString* promoteString(JSString* src);
+  JS::BigInt* promoteBigInt(JS::BigInt* src);
+
+  size_t moveElements(NativeObject* dst, NativeObject* src,
+                      gc::AllocKind dstKind);
+  size_t moveSlots(NativeObject* dst, NativeObject* src);
+  size_t moveString(JSString* dst, JSString* src, gc::AllocKind dstKind);
+  size_t moveBigInt(JS::BigInt* dst, JS::BigInt* src, gc::AllocKind dstKind);
 
   void traceSlots(JS::Value* vp, JS::Value* end);
 };

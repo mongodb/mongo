@@ -44,31 +44,55 @@ bool js::intl::InitializeObject(JSContext* cx, JS::Handle<JSObject*> obj,
   }
 
   MOZ_ASSERT(ignored.isUndefined(),
-             "Unexpected return value from non-legacy Intl object initializer");
+             "Unexpected return value from Intl object initializer");
   return true;
 }
 
-bool js::intl::LegacyInitializeObject(JSContext* cx, JS::Handle<JSObject*> obj,
-                                      JS::Handle<PropertyName*> initializer,
-                                      JS::Handle<JS::Value> thisValue,
-                                      JS::Handle<JS::Value> locales,
-                                      JS::Handle<JS::Value> options,
-                                      DateTimeFormatOptions dtfOptions,
-                                      JS::MutableHandle<JS::Value> result) {
-  FixedInvokeArgs<5> args(cx);
+bool js::intl::InitializeDateTimeFormatObject(
+    JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JS::Value> thisValue,
+    JS::Handle<JS::Value> locales, JS::Handle<JS::Value> options,
+    JS::Handle<JSString*> required, JS::Handle<JSString*> defaults,
+    DateTimeFormatOptions dtfOptions, JS::MutableHandle<JS::Value> result) {
+  Handle<PropertyName*> initializer = cx->names().InitializeDateTimeFormat;
+
+  FixedInvokeArgs<7> args(cx);
 
   args[0].setObject(*obj);
   args[1].set(thisValue);
   args[2].set(locales);
   args[3].set(options);
-  args[4].setBoolean(dtfOptions == DateTimeFormatOptions::EnableMozExtensions);
+  args[4].setString(required);
+  args[5].setString(defaults);
+  args[6].setBoolean(dtfOptions == DateTimeFormatOptions::EnableMozExtensions);
 
   if (!CallSelfHostedFunction(cx, initializer, NullHandleValue, args, result)) {
     return false;
   }
 
   MOZ_ASSERT(result.isObject(),
-             "Legacy Intl object initializer must return an object");
+             "Intl.DateTimeFormat initializer must return an object");
+  return true;
+}
+
+bool js::intl::InitializeNumberFormatObject(
+    JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JS::Value> thisValue,
+    JS::Handle<JS::Value> locales, JS::Handle<JS::Value> options,
+    JS::MutableHandle<JS::Value> result) {
+  Handle<PropertyName*> initializer = cx->names().InitializeNumberFormat;
+
+  FixedInvokeArgs<4> args(cx);
+
+  args[0].setObject(*obj);
+  args[1].set(thisValue);
+  args[2].set(locales);
+  args[3].set(options);
+
+  if (!CallSelfHostedFunction(cx, initializer, NullHandleValue, args, result)) {
+    return false;
+  }
+
+  MOZ_ASSERT(result.isObject(),
+             "Intl.NumberFormat initializer must return an object");
   return true;
 }
 

@@ -63,7 +63,7 @@ class Thread {
             typename DerefO = std::remove_reference_t<NonConstO>,
             typename = std::enable_if_t<std::is_same_v<DerefO, Options>>>
   explicit Thread(O&& options = Options())
-      : id_(ThreadId()), options_(std::forward<O>(options)) {
+      : options_(std::forward<O>(options)) {
     MOZ_ASSERT(isInitialized());
   }
 
@@ -83,15 +83,24 @@ class Thread {
       return false;
     }
 
-    // We hold this lock while create() sets the thread id.
-    LockGuard<Mutex> lock(trampoline->createMutex);
-    return create(Trampoline::Start, trampoline);
+    bool result;
+    {
+      // We hold this lock while create() sets the thread id.
+      LockGuard<Mutex> lock(trampoline->createMutex);
+      result = create(Trampoline::Start, trampoline);
+    }
+    if (!result) {
+      // Trampoline should be deleted outside of the above lock.
+      js_delete(trampoline);
+      return false;
+    }
+    return true;
   }
 
   // The thread must be joined or detached before destruction.
   ~Thread();
 
-  // Move the thread into the detached state without blocking. In the detatched
+  // Move the thread into the detached state without blocking. In the detached
   // state, the thread continues to run until it exits, but cannot be joined.
   // After this method returns, this Thread no longer represents a thread of
   // execution. When the thread exits, its resources will be cleaned up by the

@@ -10,11 +10,12 @@
 #include "mozilla/HashFunctions.h"
 
 #include <algorithm>
-#include <initializer_list>
 #include <stdint.h>
 
 #include "jstypes.h"
 #include "NamespaceImports.h"
+
+#include "jit/ABIFunctionType.h"
 
 #include "js/ScalarType.h"  // js::Scalar::Type
 #include "js/Value.h"
@@ -189,6 +190,11 @@ enum class BailoutKind : uint8_t {
   // was not an object.
   ThrowCheckIsObject,
 
+  // These two are similar to ThrowCheckIsObject. We have to throw an exception
+  // because the result of a Proxy get trap didn't match the requirements.
+  ThrowProxyTrapMustReportSameValue,
+  ThrowProxyTrapMustReportUndefined,
+
   // We have executed code that should be unreachable, and need to assert.
   Unreachable,
 
@@ -237,6 +243,10 @@ inline const char* BailoutKindString(BailoutKind kind) {
       return "OnStackInvalidation";
     case BailoutKind::ThrowCheckIsObject:
       return "ThrowCheckIsObject";
+    case BailoutKind::ThrowProxyTrapMustReportSameValue:
+      return "ThrowProxyTrapMustReportSameValue";
+    case BailoutKind::ThrowProxyTrapMustReportUndefined:
+      return "ThrowProxyTrapMustReportUndefined";
     case BailoutKind::Unreachable:
       return "Unreachable";
 
@@ -511,13 +521,14 @@ enum class MIRType : uint8_t {
   MagicUninitializedLexical,  // JS_UNINITIALIZED_LEXICAL magic value.
   // Types above are specialized.
   Value,
-  None,          // Invalid, used as a placeholder.
-  Slots,         // A slots vector
-  Elements,      // An elements vector
-  Pointer,       // An opaque pointer that receives no special treatment
-  RefOrNull,     // Wasm Ref/AnyRef/NullRef: a raw JSObject* or a raw (void*)0
-  StackResults,  // Wasm multi-value stack result area, which may contain refs
-  Shape,         // A Shape pointer.
+  None,           // Invalid, used as a placeholder.
+  Slots,          // A slots vector
+  Elements,       // An elements vector
+  Pointer,        // An opaque pointer that receives no special treatment
+  WasmAnyRef,     // Wasm Ref/AnyRef/NullRef: a raw JSObject* or a raw (void*)0
+  WasmArrayData,  // A WasmArrayObject data pointer
+  StackResults,   // Wasm multi-value stack result area, which may contain refs
+  Shape,          // A Shape pointer.
   Last = Shape
 };
 
@@ -605,7 +616,7 @@ static inline size_t MIRTypeToSize(MIRType type) {
     case MIRType::Simd128:
       return 16;
     case MIRType::Pointer:
-    case MIRType::RefOrNull:
+    case MIRType::WasmAnyRef:
       return sizeof(uintptr_t);
     default:
       MOZ_CRASH("MIRTypeToSize - unhandled case");
@@ -656,8 +667,10 @@ static inline const char* StringFromMIRType(MIRType type) {
       return "Elements";
     case MIRType::Pointer:
       return "Pointer";
-    case MIRType::RefOrNull:
-      return "RefOrNull";
+    case MIRType::WasmAnyRef:
+      return "WasmAnyRef";
+    case MIRType::WasmArrayData:
+      return "WasmArrayData";
     case MIRType::StackResults:
       return "StackResults";
     case MIRType::Shape:
@@ -721,6 +734,9 @@ static inline MIRType ScalarTypeToMIRType(Scalar::Type type) {
       return MIRType::Int32;
     case Scalar::Int64:
       return MIRType::Int64;
+    case Scalar::Float16:
+      // TODO: See Bug 1835034 for JIT support for Float16Array
+      MOZ_CRASH("NYI");
     case Scalar::Float32:
       return MIRType::Float32;
     case Scalar::Float64:
@@ -752,265 +768,6 @@ static constexpr bool NeedsPostBarrier(MIRType type) {
 #  define CHECK_OSIPOINT_REGISTERS 1
 
 #endif  // DEBUG
-
-enum ABIArgType {
-  // A pointer sized integer
-  ArgType_General = 0x1,
-  // A 32-bit integer
-  ArgType_Int32 = 0x2,
-  // A 64-bit integer
-  ArgType_Int64 = 0x3,
-  // A 32-bit floating point number
-  ArgType_Float32 = 0x4,
-  // A 64-bit floating point number
-  ArgType_Float64 = 0x5,
-
-  RetType_Shift = 0x0,
-  ArgType_Shift = 0x3,
-  ArgType_Mask = 0x7
-};
-
-namespace detail {
-
-static constexpr uint64_t MakeABIFunctionType(
-    ABIArgType ret, std::initializer_list<ABIArgType> args) {
-  uint64_t abiType = (uint64_t)ret << RetType_Shift;
-  int i = 1;
-  for (auto arg : args) {
-    abiType |= ((uint64_t)arg << (ArgType_Shift * i));
-    i++;
-  }
-  return abiType;
-}
-
-}  // namespace detail
-
-enum ABIFunctionType : uint64_t {
-  // The enum must be explicitly typed to avoid UB: some validly constructed
-  // members are larger than any explicitly declared members.
-
-  // VM functions that take 0-9 non-double arguments
-  // and return a non-double value.
-  Args_General0 = ArgType_General << RetType_Shift,
-  Args_General1 = Args_General0 | (ArgType_General << (ArgType_Shift * 1)),
-  Args_General2 = Args_General1 | (ArgType_General << (ArgType_Shift * 2)),
-  Args_General3 = Args_General2 | (ArgType_General << (ArgType_Shift * 3)),
-  Args_General4 = Args_General3 | (ArgType_General << (ArgType_Shift * 4)),
-  Args_General5 = Args_General4 | (ArgType_General << (ArgType_Shift * 5)),
-  Args_General6 = Args_General5 | (ArgType_General << (ArgType_Shift * 6)),
-  Args_General7 = Args_General6 | (ArgType_General << (ArgType_Shift * 7)),
-  Args_General8 = Args_General7 | (ArgType_General << (ArgType_Shift * 8)),
-
-  // int64 f(double)
-  Args_Int64_Double =
-      (ArgType_Int64 << RetType_Shift) | (ArgType_Float64 << ArgType_Shift),
-
-  // double f()
-  Args_Double_None = ArgType_Float64 << RetType_Shift,
-
-  // int f(double)
-  Args_Int_Double = Args_General0 | (ArgType_Float64 << ArgType_Shift),
-
-  // int f(float32)
-  Args_Int_Float32 = Args_General0 | (ArgType_Float32 << ArgType_Shift),
-
-  // float f(float)
-  Args_Float32_Float32 =
-      (ArgType_Float32 << RetType_Shift) | (ArgType_Float32 << ArgType_Shift),
-
-  // float f(int, int)
-  Args_Float32_IntInt = (ArgType_Float32 << RetType_Shift) |
-                        (ArgType_General << (ArgType_Shift * 1)) |
-                        (ArgType_General << (ArgType_Shift * 2)),
-
-  // double f(double)
-  Args_Double_Double = Args_Double_None | (ArgType_Float64 << ArgType_Shift),
-
-  // double f(int)
-  Args_Double_Int = Args_Double_None | (ArgType_General << ArgType_Shift),
-
-  // double f(int, int)
-  Args_Double_IntInt =
-      Args_Double_Int | (ArgType_General << (ArgType_Shift * 2)),
-
-  // double f(double, int)
-  Args_Double_DoubleInt = Args_Double_None |
-                          (ArgType_General << (ArgType_Shift * 1)) |
-                          (ArgType_Float64 << (ArgType_Shift * 2)),
-
-  // double f(double, double)
-  Args_Double_DoubleDouble =
-      Args_Double_Double | (ArgType_Float64 << (ArgType_Shift * 2)),
-
-  // float f(float, float)
-  Args_Float32_Float32Float32 =
-      Args_Float32_Float32 | (ArgType_Float32 << (ArgType_Shift * 2)),
-
-  // double f(int, double)
-  Args_Double_IntDouble = Args_Double_None |
-                          (ArgType_Float64 << (ArgType_Shift * 1)) |
-                          (ArgType_General << (ArgType_Shift * 2)),
-
-  // int f(int, double)
-  Args_Int_IntDouble = Args_General0 |
-                       (ArgType_Float64 << (ArgType_Shift * 1)) |
-                       (ArgType_General << (ArgType_Shift * 2)),
-
-  // int f(double, int)
-  Args_Int_DoubleInt = Args_General0 |
-                       (ArgType_General << (ArgType_Shift * 1)) |
-                       (ArgType_Float64 << (ArgType_Shift * 2)),
-
-  // double f(double, double, double)
-  Args_Double_DoubleDoubleDouble =
-      Args_Double_DoubleDouble | (ArgType_Float64 << (ArgType_Shift * 3)),
-
-  // double f(double, double, double, double)
-  Args_Double_DoubleDoubleDoubleDouble =
-      Args_Double_DoubleDoubleDouble | (ArgType_Float64 << (ArgType_Shift * 4)),
-
-  // int f(double, int, int)
-  Args_Int_DoubleIntInt = Args_General0 |
-                          (ArgType_General << (ArgType_Shift * 1)) |
-                          (ArgType_General << (ArgType_Shift * 2)) |
-                          (ArgType_Float64 << (ArgType_Shift * 3)),
-
-  // int f(int, double, int, int)
-  Args_Int_IntDoubleIntInt = Args_General0 |
-                             (ArgType_General << (ArgType_Shift * 1)) |
-                             (ArgType_General << (ArgType_Shift * 2)) |
-                             (ArgType_Float64 << (ArgType_Shift * 3)) |
-                             (ArgType_General << (ArgType_Shift * 4)),
-
-  Args_Int_GeneralGeneralGeneralInt64 =
-      Args_General0 | (ArgType_General << (ArgType_Shift * 1)) |
-      (ArgType_General << (ArgType_Shift * 2)) |
-      (ArgType_General << (ArgType_Shift * 3)) |
-      (ArgType_Int64 << (ArgType_Shift * 4)),
-
-  Args_Int_GeneralGeneralInt64Int64 = Args_General0 |
-                                      (ArgType_General << (ArgType_Shift * 1)) |
-                                      (ArgType_General << (ArgType_Shift * 2)) |
-                                      (ArgType_Int64 << (ArgType_Shift * 3)) |
-                                      (ArgType_Int64 << (ArgType_Shift * 4)),
-
-  // int32_t f(...) variants
-  Args_Int32_General =
-      detail::MakeABIFunctionType(ArgType_Int32, {ArgType_General}),
-  Args_Int32_GeneralInt32 = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int32}),
-  Args_Int32_GeneralInt32Int32 = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int32, ArgType_Int32}),
-  Args_Int32_GeneralInt32Int32Int32Int32 = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int32, ArgType_Int32,
-                      ArgType_Int32, ArgType_Int32}),
-  Args_Int32_GeneralInt32Int32Int32Int32Int32 = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int32, ArgType_Int32,
-                      ArgType_Int32, ArgType_Int32, ArgType_Int32}),
-  Args_Int32_GeneralInt32Int32Int32Int32General = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int32, ArgType_Int32,
-                      ArgType_Int32, ArgType_Int32, ArgType_General}),
-  Args_Int32_GeneralGeneralInt32General = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_General, ArgType_Int32, ArgType_General}),
-  Args_Int32_GeneralGeneralInt32GeneralInt32Int32Int32 =
-      detail::MakeABIFunctionType(
-          ArgType_Int32,
-          {ArgType_General, ArgType_General, ArgType_Int32, ArgType_General,
-           ArgType_Int32, ArgType_Int32, ArgType_Int32}),
-  Args_Int32_GeneralInt32Int32Int32Int32Int32Int32General =
-      detail::MakeABIFunctionType(
-          ArgType_Int32,
-          {ArgType_General, ArgType_Int32, ArgType_Int32, ArgType_Int32,
-           ArgType_Int32, ArgType_Int32, ArgType_Int32, ArgType_General}),
-  Args_Int32_GeneralInt32Float32Float32Int32Int32Int32General =
-      detail::MakeABIFunctionType(
-          ArgType_Int32,
-          {ArgType_General, ArgType_Int32, ArgType_Float32, ArgType_Float32,
-           ArgType_Int32, ArgType_Int32, ArgType_Int32, ArgType_General}),
-  Args_Int32_GeneralInt32Float32Float32Float32Float32Int32Int32Int32Int32General =
-      detail::MakeABIFunctionType(
-          ArgType_Int32,
-          {ArgType_General, ArgType_Int32, ArgType_Float32, ArgType_Float32,
-           ArgType_Float32, ArgType_Float32, ArgType_Int32, ArgType_Int32,
-           ArgType_Int32, ArgType_Int32, ArgType_General}),
-  Args_Int32_GeneralInt32Float32Float32Int32Float32Float32Int32Float32Int32Int32Int32Int32General =
-      detail::MakeABIFunctionType(
-          ArgType_Int32,
-          {ArgType_General, ArgType_Int32, ArgType_Float32, ArgType_Float32,
-           ArgType_Int32, ArgType_Float32, ArgType_Float32, ArgType_Int32,
-           ArgType_Float32, ArgType_Int32, ArgType_Int32, ArgType_Int32,
-           ArgType_Int32, ArgType_General}),
-  Args_Int32_GeneralInt32Int32Int32General = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int32, ArgType_Int32,
-                      ArgType_Int32, ArgType_General}),
-  Args_Int32_GeneralInt32Int32Int64 = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_Int32, ArgType_Int32, ArgType_Int64}),
-  Args_Int32_GeneralInt32Int32General = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_Int32, ArgType_Int32, ArgType_General}),
-  Args_Int32_GeneralInt32Int64Int64 = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_Int32, ArgType_Int64, ArgType_Int64}),
-  Args_Int32_GeneralInt32GeneralInt32 = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_Int32, ArgType_General, ArgType_Int32}),
-  Args_Int32_GeneralInt32GeneralInt32Int32 = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int32, ArgType_General,
-                      ArgType_Int32, ArgType_Int32}),
-  Args_Int32_GeneralGeneral = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_General}),
-  Args_Int32_GeneralGeneralGeneral = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_General, ArgType_General}),
-  Args_Int32_GeneralGeneralInt32Int32 = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_General, ArgType_Int32, ArgType_Int32}),
-
-  // general f(...) variants
-  Args_General_GeneralInt32 = detail::MakeABIFunctionType(
-      ArgType_General, {ArgType_General, ArgType_Int32}),
-  Args_General_GeneralInt32Int32 = detail::MakeABIFunctionType(
-      ArgType_General, {ArgType_General, ArgType_Int32, ArgType_Int32}),
-  Args_General_GeneralInt32General = detail::MakeABIFunctionType(
-      ArgType_General, {ArgType_General, ArgType_Int32, ArgType_General}),
-  Args_General_GeneralInt32Int32GeneralInt32 = detail::MakeABIFunctionType(
-      ArgType_General, {ArgType_General, ArgType_Int32, ArgType_Int32,
-                        ArgType_General, ArgType_Int32}),
-  Args_Int32_GeneralInt64Int32Int32Int32 = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int64, ArgType_Int32,
-                      ArgType_Int32, ArgType_Int32}),
-  Args_Int32_GeneralInt64Int32 = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int64, ArgType_Int32}),
-  Args_Int32_GeneralInt64Int32Int64 = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_Int64, ArgType_Int32, ArgType_Int64}),
-  Args_Int32_GeneralInt64Int32Int64General = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int64, ArgType_Int32,
-                      ArgType_Int64, ArgType_General}),
-  Args_Int32_GeneralInt64Int64Int64 = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_Int64, ArgType_Int64, ArgType_Int64}),
-  Args_Int32_GeneralInt64Int64General = detail::MakeABIFunctionType(
-      ArgType_Int32,
-      {ArgType_General, ArgType_Int64, ArgType_Int64, ArgType_General}),
-  Args_Int32_GeneralInt64Int64Int64General = detail::MakeABIFunctionType(
-      ArgType_Int32, {ArgType_General, ArgType_Int64, ArgType_Int64,
-                      ArgType_Int64, ArgType_General}),
-
-  // Functions that return Int64 are tricky because SpiderMonkey's ReturnRegI64
-  // does not match the ABI int64 return register on x86.  Wasm only!
-  Args_Int64_General =
-      detail::MakeABIFunctionType(ArgType_Int64, {ArgType_General}),
-  Args_Int64_GeneralInt64 = detail::MakeABIFunctionType(
-      ArgType_Int64, {ArgType_General, ArgType_Int64}),
-
-};
-
-static constexpr ABIFunctionType MakeABIFunctionType(
-    ABIArgType ret, std::initializer_list<ABIArgType> args) {
-  return ABIFunctionType(detail::MakeABIFunctionType(ret, args));
-}
 
 // Rounding modes for round instructions.
 enum class RoundingMode { Down, Up, NearestTiesToEven, TowardsZero };
@@ -1048,6 +805,10 @@ enum class ResumeMode : uint8_t {
   // CloseIter causes an invalidation bailout.
   ResumeAfterCheckIsObject,
 
+  // Similar to ResumeAfterCheckIsObject, but we must check that the result
+  // of a proxy get trap aligns with what the spec requires.
+  ResumeAfterCheckProxyGetResult,
+
   // Innermost frame. Resume at the current bytecode op when bailing out.
   ResumeAt,
 
@@ -1077,6 +838,8 @@ inline const char* ResumeModeToString(ResumeMode mode) {
       return "InlinedAccessor";
     case ResumeMode::ResumeAfterCheckIsObject:
       return "ResumeAfterCheckIsObject";
+    case ResumeMode::ResumeAfterCheckProxyGetResult:
+      return "ResumeAfterCheckProxyGetResult";
   }
   MOZ_CRASH("Invalid mode");
 }
@@ -1085,6 +848,7 @@ inline bool IsResumeAfter(ResumeMode mode) {
   switch (mode) {
     case ResumeMode::ResumeAfter:
     case ResumeMode::ResumeAfterCheckIsObject:
+    case ResumeMode::ResumeAfterCheckProxyGetResult:
       return true;
     default:
       return false;
@@ -1095,6 +859,8 @@ inline bool IsResumeAfter(ResumeMode mode) {
 // that aren't on the expression stack, but are needed during bailouts.
 inline uint32_t NumIntermediateValues(ResumeMode mode) {
   switch (mode) {
+    case ResumeMode::ResumeAfterCheckProxyGetResult:
+      return 2;
     case ResumeMode::ResumeAfterCheckIsObject:
       return 1;
     default:

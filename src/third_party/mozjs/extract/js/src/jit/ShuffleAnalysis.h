@@ -63,6 +63,14 @@ enum class SimdPermuteOp {
 
   // Reverse bytes of 64-bit lanes.
   REVERSE_64x2,
+
+  // Zero extends.
+  ZERO_EXTEND_8x16_TO_16x8,
+  ZERO_EXTEND_8x16_TO_32x4,
+  ZERO_EXTEND_8x16_TO_64x2,
+  ZERO_EXTEND_16x8_TO_32x4,
+  ZERO_EXTEND_16x8_TO_64x2,
+  ZERO_EXTEND_32x4_TO_64x2,
 };
 
 // Shuffle operations.  NOTE: these may still be x86-centric, but the set can

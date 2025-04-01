@@ -23,10 +23,6 @@
 // JSContext represents a thread: there must be exactly one JSContext for each
 // thread running JS/Wasm.
 //
-// Internally, helper threads can also have a JSContext. They do not always have
-// an active context, but one may be requested by AutoSetHelperThreadContext,
-// which activates a pre-allocated JSContext for the duration of its lifetime.
-//
 // Runtime
 // -------
 // JSRuntime is very similar to JSContext: each runtime belongs to one context
@@ -105,6 +101,25 @@ using EnsureCanAddPrivateElementOp = bool (*)(JSContext* cx, HandleValue val);
 
 JS_PUBLIC_API void SetHostEnsureCanAddPrivateElementHook(
     JSContext* cx, EnsureCanAddPrivateElementOp op);
+
+/**
+ * Transition the cx to a mode where failures that would normally cause a false
+ * return value will instead crash with a diagnostic assertion.
+ *
+ * Return value: the former brittle mode setting.
+ */
+JS_PUBLIC_API bool SetBrittleMode(JSContext* cx, bool setting);
+
+class AutoBrittleMode {
+  bool wasBrittle;
+  JSContext* cx;
+
+ public:
+  explicit AutoBrittleMode(JSContext* cx) : cx(cx) {
+    wasBrittle = SetBrittleMode(cx, true);
+  }
+  ~AutoBrittleMode() { MOZ_ALWAYS_TRUE(SetBrittleMode(cx, wasBrittle)); }
+};
 
 } /* namespace JS */
 

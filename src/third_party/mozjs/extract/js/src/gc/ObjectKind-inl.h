@@ -20,8 +20,8 @@ namespace gc {
 
 /* Capacity for slotsToThingKind */
 const size_t SLOTS_TO_THING_KIND_LIMIT = 17;
-
 extern const AllocKind slotsToThingKind[];
+extern const uint32_t slotsToAllocKindBytes[];
 
 /* Get the best kind to use when making an object with the given slot count. */
 static inline AllocKind GetGCObjectKind(size_t numSlots) {
@@ -99,7 +99,7 @@ static constexpr inline size_t GetGCKindSlots(AllocKind thingKind) {
     case AllocKind::OBJECT4_BACKGROUND:
       return 4;
     case AllocKind::FUNCTION_EXTENDED:
-      return 6;
+      return 7;
     case AllocKind::OBJECT8:
     case AllocKind::OBJECT8_BACKGROUND:
       return 8;

@@ -35,13 +35,15 @@ namespace jit {
   _(OptimizeSpreadCall)                        \
   _(InstanceOf)                                \
   _(TypeOf)                                    \
+  _(TypeOfEq)                                  \
   _(ToPropertyKey)                             \
   _(Rest)                                      \
   _(BinaryArith)                               \
   _(Compare)                                   \
   _(GetProp)                                   \
   _(GetPropSuper)                              \
-  _(CloseIter)
+  _(CloseIter)                                 \
+  _(OptimizeGetIterator)
 
 }  // namespace jit
 }  // namespace js

@@ -8,11 +8,10 @@
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
 
-#include "frontend/BytecodeEmitter.h"     // BytecodeEmitter
-#include "frontend/NameOpEmitter.h"       // NameOpEmitter
-#include "frontend/ParserAtom.h"          // TaggedParserAtomIndex
-#include "vm/AsyncFunctionResolveKind.h"  // AsyncFunctionResolveKind
-#include "vm/Opcodes.h"                   // JSOp
+#include "frontend/BytecodeEmitter.h"  // BytecodeEmitter
+#include "frontend/NameOpEmitter.h"    // NameOpEmitter
+#include "frontend/ParserAtom.h"       // TaggedParserAtomIndex
+#include "vm/Opcodes.h"                // JSOp
 
 using namespace js;
 using namespace js::frontend;
@@ -64,10 +63,11 @@ bool AsyncEmitter::prepareForModule() {
   // modules, we need to emit a
   // |.generator| which we can use to pause and resume execution.
   MOZ_ASSERT(state_ == State::Start);
-  MOZ_ASSERT(bce_->lookupName(TaggedParserAtomIndex::WellKnown::dotGenerator())
-                 .hasKnownSlot());
+  MOZ_ASSERT(
+      bce_->lookupName(TaggedParserAtomIndex::WellKnown::dot_generator_())
+          .hasKnownSlot());
 
-  NameOpEmitter noe(bce_, TaggedParserAtomIndex::WellKnown::dotGenerator(),
+  NameOpEmitter noe(bce_, TaggedParserAtomIndex::WellKnown::dot_generator_(),
                     NameOpEmitter::Kind::Initialize);
   if (!noe.prepareForRhs()) {
     //              [stack]
@@ -152,8 +152,7 @@ bool AsyncEmitter::emitFinalYield() {
     return false;
   }
 
-  if (!bce_->emit2(JSOp::AsyncResolve,
-                   uint8_t(AsyncFunctionResolveKind::Fulfill))) {
+  if (!bce_->emit1(JSOp::AsyncResolve)) {
     //              [stack] PROMISE
     return false;
   }
@@ -177,18 +176,17 @@ bool AsyncEmitter::emitFinalYield() {
 }
 
 bool AsyncEmitter::emitRejectCatch() {
-  if (!rejectTryCatch_->emitCatch()) {
-    //              [stack] EXC
+  if (!rejectTryCatch_->emitCatch(TryEmitter::ExceptionStack::Yes)) {
+    //              [stack] EXC STACK
     return false;
   }
 
   if (!bce_->emitGetDotGeneratorInInnermostScope()) {
-    //              [stack] EXC GEN
+    //              [stack] EXC STACK GEN
     return false;
   }
 
-  if (!bce_->emit2(JSOp::AsyncResolve,
-                   uint8_t(AsyncFunctionResolveKind::Reject))) {
+  if (!bce_->emit1(JSOp::AsyncReject)) {
     //              [stack] PROMISE
     return false;
   }

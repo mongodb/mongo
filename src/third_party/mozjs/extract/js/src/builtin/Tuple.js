@@ -25,7 +25,7 @@ function TupleToSorted(comparefn) {
 
   /* Step 3. */
   var items = TupleToArray(T);
-  var sorted = callFunction(ArraySort, items, comparefn);
+  var sorted = callFunction(std_Array_sort, items, comparefn);
   return std_Tuple_unchecked(sorted);
 }
 
@@ -63,7 +63,7 @@ function TupleToSpliced(start, deleteCount /*, ...items */) {
     /* Step 8a. */
     insertCount = ArgumentsLength() - 2;
     /* Step 8b. */
-    let dc = ToInteger(deleteCount);
+    var dc = ToInteger(deleteCount);
     /* Step 8c. */
     actualDeleteCount = std_Math_min(std_Math_max(dc, 0), len - actualStart);
   }
@@ -85,7 +85,7 @@ function TupleToSpliced(start, deleteCount /*, ...items */) {
   /* Step 14. */
   while (k < actualStart) {
     /* Step 14a. */
-    let E = list[k];
+    var E = list[k];
     /* Step 14b. */
     DefineDataProperty(newList, k, E);
     /* Step 14c. */
@@ -97,7 +97,7 @@ function TupleToSpliced(start, deleteCount /*, ...items */) {
   /* Step 16. */
   while (itemK < itemCount) {
     /* Step 16a. */
-    let E = GetArgument(itemK + 2);
+    var E = GetArgument(itemK + 2);
     /* Step 16b. */
     if (IsObject(E)) {
       ThrowTypeError(JSMSG_RECORD_TUPLE_NO_OBJECT);
@@ -114,7 +114,7 @@ function TupleToSpliced(start, deleteCount /*, ...items */) {
   /* Step 18. */
   while (itemK < len) {
     /* Step 18a. */
-    let E = list[itemK];
+    var E = list[itemK];
     /* Step 18b. */
     DefineDataProperty(newList, k, E);
     /* Step 18c. */
@@ -141,7 +141,7 @@ function TupleToReversed() {
   /* Step 4. */
   for (var k = len - 1; k >= 0; k--) {
     /* Step 5a. */
-    let E = T[k];
+    var E = T[k];
     /* Step 5b. */
     DefineDataProperty(newList, len - k - 1, E);
   }
@@ -186,7 +186,7 @@ function TupleConcat() {
   /* Step 5 */
   for (var i = 0; i < ArgumentsLength(); i++) {
     /* Step 5a. */
-    let E = GetArgument(i);
+    var E = GetArgument(i);
     /* Step 5b. */
     var spreadable = IsConcatSpreadable(E);
     /* Step 5c. */
@@ -266,15 +266,15 @@ function TupleIndexOf(valueToFind /* , fromIndex */) {
 // proposal-record-tuple
 // Tuple.prototype.join()
 function TupleJoin(separator) {
-  let T = ThisTupleValue(this);
+  var T = ThisTupleValue(this);
 
   // Step 2
-  let len = TupleLength(T);
+  var len = TupleLength(T);
 
   // Steps 3-4
   var sep = ",";
   if (!IsNullOrUndefined(separator)) {
-    let toString = IsCallable(separator.toString)
+    var toString = IsCallable(separator.toString)
       ? separator.toString
       : std_Object_toString;
     sep = callContentFunction(toString, separator);
@@ -293,11 +293,11 @@ function TupleJoin(separator) {
       R += sep;
     }
     // Step 7b
-    let element = T[k];
+    var element = T[k];
     // Step 7c
     var next = "";
     if (!IsNullOrUndefined(element)) {
-      let toString = IsCallable(element.toString)
+      var toString = IsCallable(element.toString)
         ? element.toString
         : std_Object_toString;
       next = callContentFunction(toString, element);
@@ -651,12 +651,12 @@ function TupleFrom(items /*, mapFn, thisArg */) {
   var k = 0;
 
   /* Step 5 */
-  let usingIterator = GetMethod(items, GetBuiltinSymbol("iterator"));
+  var usingIterator = GetMethod(items, GetBuiltinSymbol("iterator"));
 
   /* Step 6 */
   if (usingIterator !== undefined) {
     /* Step 6a. */
-    let adder = function(value) {
+    var adder = function(value) {
       var mappedValue;
       /* Step 6a.i */
       if (mapping) {
@@ -685,16 +685,16 @@ function TupleFrom(items /*, mapFn, thisArg */) {
   /* Step 7 */
   /* We assume items is an array-like object */
   /* Step 8 */
-  let arrayLike = ToObject(items);
+  var arrayLike = ToObject(items);
   /* Step 9 */
-  let len = ToLength(arrayLike.length);
+  var len = ToLength(arrayLike.length);
   /* Step 10 */
   while (k < len) {
     /* Step 10a not necessary */
     /* Step 10b */
-    let kValue = arrayLike[k];
+    var kValue = arrayLike[k];
     /* Step 10c-d */
-    let mappedValue = mapping
+    var mappedValue = mapping
       ? callContentFunction(mapfn, thisArg, kValue, k)
       : kValue;
     /* Step 10e */

@@ -60,6 +60,10 @@ void MacroAssembler::moveGPRToFloat32(Register src, FloatRegister dest) {
   moveToFloat32(src, dest);
 }
 
+void MacroAssembler::move8ZeroExtend(Register src, Register dest) {
+  as_bstrpick_d(dest, src, 7, 0);
+}
+
 void MacroAssembler::move8SignExtend(Register src, Register dest) {
   as_ext_w_b(dest, src);
 }
@@ -307,6 +311,10 @@ void MacroAssembler::add32(Register src, Register dest) {
 
 void MacroAssembler::add32(Imm32 imm, Register dest) {
   ma_add_w(dest, dest, imm);
+}
+
+void MacroAssembler::add32(Imm32 imm, Register src, Register dest) {
+  ma_add_w(dest, src, imm);
 }
 
 void MacroAssembler::add32(Imm32 imm, const Address& dest) {
@@ -1854,6 +1862,13 @@ void MacroAssembler::branchToComputedAddress(const BaseIndex& addr) {
   branch(scratch2);
 }
 
+void MacroAssembler::cmp32Move32(Condition cond, Register lhs, Imm32 rhs,
+                                 Register src, Register dest) {
+  SecondScratchRegisterScope scratch2(asMasm());
+  cmp32Set(cond, lhs, rhs, scratch2);
+  moveIfNotZero(dest, src, scratch2);
+}
+
 void MacroAssembler::cmp32Move32(Condition cond, Register lhs, Register rhs,
                                  Register src, Register dest) {
   SecondScratchRegisterScope scratch2(asMasm());
@@ -1900,6 +1915,14 @@ void MacroAssembler::cmp32Load32(Condition cond, Register lhs,
 }
 
 void MacroAssembler::cmp32Load32(Condition cond, Register lhs, Register rhs,
+                                 const Address& src, Register dest) {
+  Label skip;
+  branch32(Assembler::InvertCondition(cond), lhs, rhs, &skip);
+  load32(src, dest);
+  bind(&skip);
+}
+
+void MacroAssembler::cmp32Load32(Condition cond, Register lhs, Imm32 rhs,
                                  const Address& src, Register dest) {
   Label skip;
   branch32(Assembler::InvertCondition(cond), lhs, rhs, &skip);
@@ -1972,22 +1995,22 @@ void MacroAssembler::spectreBoundsCheckPtr(Register index,
 // ========================================================================
 // Memory access primitives.
 
-void MacroAssembler::storeUncanonicalizedFloat32(FloatRegister src,
-                                                 const Address& addr) {
-  ma_fst_s(src, addr);
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
+    FloatRegister src, const Address& addr) {
+  return ma_fst_s(src, addr);
 }
-void MacroAssembler::storeUncanonicalizedFloat32(FloatRegister src,
-                                                 const BaseIndex& addr) {
-  ma_fst_s(src, addr);
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
+    FloatRegister src, const BaseIndex& addr) {
+  return ma_fst_s(src, addr);
 }
 
-void MacroAssembler::storeUncanonicalizedDouble(FloatRegister src,
-                                                const Address& addr) {
-  ma_fst_d(src, addr);
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
+    FloatRegister src, const Address& addr) {
+  return ma_fst_d(src, addr);
 }
-void MacroAssembler::storeUncanonicalizedDouble(FloatRegister src,
-                                                const BaseIndex& addr) {
-  ma_fst_d(src, addr);
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
+    FloatRegister src, const BaseIndex& addr) {
+  return ma_fst_d(src, addr);
 }
 
 void MacroAssembler::memoryBarrier(MemoryBarrierBits barrier) {

@@ -36,6 +36,7 @@ typedef uint64_t TimeStampValue;
 #endif
 
 class TimeStamp;
+class TimeStampTests;
 
 /**
  * Platform-specific implementation details of BaseTimeDuration.
@@ -131,6 +132,7 @@ class BaseTimeDuration {
     return FromMilliseconds(aMicroseconds / 1000.0);
   }
 
+  static constexpr BaseTimeDuration Zero() { return BaseTimeDuration(); }
   static constexpr BaseTimeDuration Forever() { return FromTicks(INT64_MAX); }
 
   BaseTimeDuration operator+(const BaseTimeDuration& aOther) const {
@@ -270,7 +272,7 @@ class BaseTimeDuration {
   template <typename>
   friend class BaseTimeDuration;
 
-  static BaseTimeDuration FromTicks(int64_t aTicks) {
+  static constexpr BaseTimeDuration FromTicks(int64_t aTicks) {
     BaseTimeDuration t;
     t.mValue = aTicks;
     return t;
@@ -369,6 +371,20 @@ typedef BaseTimeDuration<TimeDurationValueCalculator> TimeDuration;
  * Note that, since TimeStamp objects are small, prefer to pass them by value
  * unless there is a specific reason not to do so.
  */
+#if defined(XP_WIN)
+// If this static_assert fails then possibly the warning comment below is no
+// longer valid and should be removed.
+static_assert(sizeof(TimeStampValue) > 8);
+#endif
+/*
+ * WARNING: On Windows, each TimeStamp is represented internally by two
+ * different raw values (one from GTC and one from QPC) and which value gets
+ * used for a given operation depends on whether both operands have QPC values
+ * or not. This duality of values can lead to some surprising results when
+ * mixing TimeStamps with and without QPC values, such as comparisons being
+ * non-transitive (ie, a > b > c might not imply a > c). See bug 1829983 for
+ * more details/an example.
+ */
 class TimeStamp {
  public:
   /**
@@ -401,7 +417,7 @@ class TimeStamp {
   /**
    * Return true if this is the "null" moment
    */
-  bool IsNull() const { return mValue == 0; }
+  constexpr bool IsNull() const { return mValue == 0; }
 
   /**
    * Return true if this is not the "null" moment, may be used in tests, e.g.:
@@ -453,17 +469,18 @@ class TimeStamp {
   static MFBT_API void RecordProcessRestart();
 
 #ifdef XP_LINUX
-  uint64_t RawClockMonotonicNanosecondsSinceBoot() {
+  uint64_t RawClockMonotonicNanosecondsSinceBoot() const {
     return static_cast<uint64_t>(mValue);
   }
 #endif
 
-#ifdef XP_MACOSX
-  uint64_t RawMachAbsoluteTimeValue() { return static_cast<uint64_t>(mValue); }
+#ifdef XP_DARWIN
+  // Returns the number of nanoseconds since the mach_absolute_time origin.
+  MFBT_API uint64_t RawMachAbsoluteTimeNanoseconds() const;
 #endif
 
 #ifdef XP_WIN
-  Maybe<uint64_t> RawQueryPerformanceCounterValue() {
+  Maybe<uint64_t> RawQueryPerformanceCounterValue() const {
     // mQPC is stored in `mt` i.e. QueryPerformanceCounter * 1000
     // so divide out the 1000
     return mValue.mHasQPC ? Some(mValue.mQPC / 1000ULL) : Nothing();
@@ -526,22 +543,22 @@ class TimeStamp {
     return *this;
   }
 
-  bool operator<(const TimeStamp& aOther) const {
+  constexpr bool operator<(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     return mValue < aOther.mValue;
   }
-  bool operator<=(const TimeStamp& aOther) const {
+  constexpr bool operator<=(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     return mValue <= aOther.mValue;
   }
-  bool operator>=(const TimeStamp& aOther) const {
+  constexpr bool operator>=(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     return mValue >= aOther.mValue;
   }
-  bool operator>(const TimeStamp& aOther) const {
+  constexpr bool operator>(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     return mValue > aOther.mValue;
@@ -566,9 +583,9 @@ class TimeStamp {
  private:
   friend struct IPC::ParamTraits<mozilla::TimeStamp>;
   friend struct TimeStampInitialization;
+  friend class TimeStampTests;
 
-  MOZ_IMPLICIT
-  TimeStamp(TimeStampValue aValue) : mValue(aValue) {}
+  constexpr MOZ_IMPLICIT TimeStamp(TimeStampValue aValue) : mValue(aValue) {}
 
   static MFBT_API TimeStamp Now(bool aHighResolution);
 

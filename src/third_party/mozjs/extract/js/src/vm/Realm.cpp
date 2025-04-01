@@ -21,7 +21,6 @@
 #include "debugger/Script.h"
 #include "debugger/Source.h"
 #include "gc/GC.h"
-#include "jit/JitRealm.h"
 #include "jit/JitRuntime.h"
 #include "js/CallAndConstruct.h"      // JS::IsCallable
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
@@ -69,6 +68,10 @@ Realm::~Realm() {
   // Write the code coverage information in a file.
   if (lcovRealm_) {
     runtime_->lcovOutput().writeLCovResult(*lcovRealm_);
+  }
+
+  if (allocationMetadataBuilder_) {
+    forgetAllocationMetadataBuilder();
   }
 
   MOZ_ASSERT(runtime_->numRealms > 0);
@@ -120,28 +123,6 @@ bool JSRuntime::createJitRuntime(JSContext* cx) {
     return false;
   }
 
-  return true;
-}
-
-bool Realm::ensureJitRealmExists(JSContext* cx) {
-  using namespace js::jit;
-
-  if (jitRealm_) {
-    return true;
-  }
-
-  if (!zone()->getJitZone(cx)) {
-    return false;
-  }
-
-  UniquePtr<JitRealm> jitRealm = cx->make_unique<JitRealm>();
-  if (!jitRealm) {
-    return false;
-  }
-
-  jitRealm->initialize(zone()->allocNurseryStrings());
-
-  jitRealm_ = std::move(jitRealm);
   return true;
 }
 
@@ -260,10 +241,16 @@ void Realm::traceRoots(JSTracer* trc,
     // The global is never nursery allocated, so we don't need to
     // trace it when doing a minor collection.
     //
-    // If a realm is on-stack, we mark its global so that
-    // JSContext::global() remains valid.
+    // If a realm is on-stack, we mark its global so that JSContext::global()
+    // remains valid.
     if (shouldTraceGlobal() && global_) {
       TraceRoot(trc, global_.unbarrieredAddress(), "on-stack realm global");
+    }
+
+    // If the realm is still being initialized we set a flag so that it doesn't
+    // get deleted, since there may be GC things that contain pointers to it.
+    if (shouldTraceGlobal() && initializingGlobal_) {
+      allocatedDuringIncrementalGC_ = true;
     }
   }
 
@@ -323,21 +310,6 @@ void Realm::traceWeakGlobalEdge(JSTracer* trc) {
   }
 }
 
-void Realm::traceWeakEdgesInJitRealm(JSTracer* trc) {
-  if (jitRealm_) {
-    jitRealm_->traceWeak(trc, this);
-  }
-}
-
-void Realm::traceWeakRegExps(JSTracer* trc) {
-  /*
-   * JIT code increments activeWarmUpCounter for any RegExpShared used by jit
-   * code for the lifetime of the JIT script. Thus, we must perform
-   * sweeping after clearing jit code.
-   */
-  regExps.traceWeak(trc);
-}
-
 void Realm::traceWeakDebugEnvironmentEdges(JSTracer* trc) {
   if (debugEnvs_) {
     debugEnvs_->traceWeak(trc);
@@ -353,6 +325,7 @@ void Realm::purge() {
   dtoaCache.purge();
   newProxyCache.purge();
   newPlainObjectWithPropsCache.purge();
+  plainObjectAssignCache.purge();
   objects_.iteratorCache.clearAndCompact();
   arraySpeciesLookup.purge();
   promiseLookup.purge();
@@ -380,18 +353,31 @@ void Realm::setAllocationMetadataBuilder(
     const js::AllocationMetadataBuilder* builder) {
   // Clear any jitcode in the runtime, which behaves differently depending on
   // whether there is a creation callback.
-  ReleaseAllJITCode(runtime_->gcContext());
+  if (bool(allocationMetadataBuilder_) != bool(builder)) {
+    ReleaseAllJITCode(runtime_->gcContext());
+    if (builder) {
+      zone()->incNumRealmsWithAllocMetadataBuilder();
+    } else {
+      zone()->decNumRealmsWithAllocMetadataBuilder();
+    }
+  }
 
   allocationMetadataBuilder_ = builder;
 }
 
 void Realm::forgetAllocationMetadataBuilder() {
+  if (!allocationMetadataBuilder_) {
+    return;
+  }
+
   // Unlike setAllocationMetadataBuilder, we don't have to discard all JIT
   // code here (code is still valid, just a bit slower because it doesn't do
   // inline GC allocations when a metadata builder is present), but we do want
-  // to cancel off-thread Ion compilations to avoid races when Ion calls
-  // hasAllocationMetadataBuilder off-thread.
-  CancelOffThreadIonCompile(this);
+  // to cancel off-thread Ion compilations to avoid races when Ion accesses
+  // numRealmsWithAllocMetadataBuilder_ off-thread.
+  CancelOffThreadIonCompile(zone());
+
+  zone()->decNumRealmsWithAllocMetadataBuilder();
 
   allocationMetadataBuilder_ = nullptr;
 }
@@ -425,7 +411,8 @@ void Realm::updateDebuggerObservesFlag(unsigned flag) {
   MOZ_ASSERT(isDebuggee());
   MOZ_ASSERT(flag == DebuggerObservesAllExecution ||
              flag == DebuggerObservesCoverage ||
-             flag == DebuggerObservesAsmJS || flag == DebuggerObservesWasm);
+             flag == DebuggerObservesAsmJS || flag == DebuggerObservesWasm ||
+             flag == DebuggerObservesNativeCall);
 
   GlobalObject* global =
       zone()->runtimeFromMainThread()->gc.isForegroundSweeping()
@@ -440,6 +427,8 @@ void Realm::updateDebuggerObservesFlag(unsigned flag) {
     observes = DebugAPI::debuggerObservesAsmJS(global);
   } else if (flag == DebuggerObservesWasm) {
     observes = DebugAPI::debuggerObservesWasm(global);
+  } else if (flag == DebuggerObservesNativeCall) {
+    observes = DebugAPI::debuggerObservesNativeCall(global);
   }
 
   if (observes) {
@@ -513,6 +502,14 @@ void Realm::clearScriptCounts() { zone()->clearScriptCounts(this); }
 
 void Realm::clearScriptLCov() { zone()->clearScriptLCov(this); }
 
+const char* Realm::getLocale() const {
+  if (RefPtr<LocaleString> locale = creationOptions_.locale()) {
+    return locale->chars();
+  }
+
+  return runtime_->getDefaultLocale();
+}
+
 void ObjectRealm::addSizeOfExcludingThis(
     mozilla::MallocSizeOf mallocSizeOf, size_t* innerViewsArg,
     size_t* objectMetadataTablesArg,
@@ -535,8 +532,7 @@ void Realm::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
                                    size_t* innerViewsArg,
                                    size_t* objectMetadataTablesArg,
                                    size_t* savedStacksSet,
-                                   size_t* nonSyntacticLexicalEnvironmentsArg,
-                                   size_t* jitRealm) {
+                                   size_t* nonSyntacticLexicalEnvironmentsArg) {
   *realmObject += mallocSizeOf(this);
   wasm.addSizeOfExcludingThis(mallocSizeOf, realmTables);
 
@@ -545,10 +541,6 @@ void Realm::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
                                   nonSyntacticLexicalEnvironmentsArg);
 
   *savedStacksSet += savedStacks_.sizeOfExcludingThis(mallocSizeOf);
-
-  if (jitRealm_) {
-    *jitRealm += jitRealm_->sizeOfIncludingThis(mallocSizeOf);
-  }
 }
 
 bool Realm::shouldCaptureStackForThrow() {

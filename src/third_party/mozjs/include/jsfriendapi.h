@@ -11,6 +11,7 @@
 
 #include "js/CallArgs.h"
 #include "js/Class.h"
+#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin
 #include "js/GCAPI.h"
 #include "js/HeapAPI.h"
 #include "js/Object.h"           // JS::GetClass
@@ -55,9 +56,9 @@ extern JS_PUBLIC_API bool JS_NondeterministicGetWeakSetKeys(
     JSContext* cx, JS::HandleObject obj, JS::MutableHandleObject ret);
 
 // Raw JSScript* because this needs to be callable from a signal handler.
-extern JS_PUBLIC_API unsigned JS_PCToLineNumber(JSScript* script,
-                                                jsbytecode* pc,
-                                                unsigned* columnp = nullptr);
+extern JS_PUBLIC_API unsigned JS_PCToLineNumber(
+    JSScript* script, jsbytecode* pc,
+    JS::LimitedColumnNumberOneOrigin* columnp = nullptr);
 
 /**
  * Determine whether the given object is backed by a DeadObjectProxy.
@@ -149,9 +150,9 @@ extern JS_PUBLIC_API bool ForceLexicalInitialization(JSContext* cx,
 /**
  * Whether we are poisoning unused/released data for error detection. Governed
  * by the JS_GC_ALLOW_EXTRA_POISONING #ifdef as well as the
- * $JSGC_EXTRA_POISONING environment variable.
+ * javascript.options.extra_gc_poisoning pref.
  */
-extern JS_PUBLIC_API int IsGCPoisoning();
+extern JS_PUBLIC_API bool IsGCPoisoning();
 
 extern JS_PUBLIC_API JSPrincipals* GetRealmPrincipals(JS::Realm* realm);
 
@@ -193,14 +194,11 @@ struct JSFunctionSpecWithHelp {
 };
 
 #define JS_FN_HELP(name, call, nargs, flags, usage, help) \
-  { name, call, nargs, (flags) | JSPROP_ENUMERATE, nullptr, usage, help }
+  {name, call, nargs, (flags) | JSPROP_ENUMERATE, nullptr, usage, help}
 #define JS_INLINABLE_FN_HELP(name, call, nargs, flags, native, usage, help)    \
-  {                                                                            \
-    name, call, nargs, (flags) | JSPROP_ENUMERATE, &js::jit::JitInfo_##native, \
-        usage, help                                                            \
-  }
-#define JS_FS_HELP_END \
-  { nullptr, nullptr, 0, 0, nullptr, nullptr }
+  {name,  call, nargs, (flags) | JSPROP_ENUMERATE, &js::jit::JitInfo_##native, \
+   usage, help}
+#define JS_FS_HELP_END {nullptr, nullptr, 0, 0, nullptr, nullptr}
 
 extern JS_PUBLIC_API bool JS_DefineFunctionsWithHelp(
     JSContext* cx, JS::HandleObject obj, const JSFunctionSpecWithHelp* fs);
@@ -244,6 +242,12 @@ extern JS_PUBLIC_API bool EnqueueJob(JSContext* cx, JS::HandleObject job);
  * builtin being called, or if it wants to resume executing jobs later on.
  */
 extern JS_PUBLIC_API void StopDrainingJobQueue(JSContext* cx);
+
+/**
+ * Instruct the runtime to restart draining the internal job queue after
+ * stopping it with StopDrainingJobQueue.
+ */
+extern JS_PUBLIC_API void RestartDrainingJobQueue(JSContext* cx);
 
 extern JS_PUBLIC_API void RunJobs(JSContext* cx);
 
@@ -387,6 +391,10 @@ JS_PUBLIC_API JSFunction* NewFunctionByIdWithReserved(JSContext* cx,
                                                       JSNative native,
                                                       unsigned nargs,
                                                       unsigned flags, jsid id);
+
+JS_PUBLIC_API JSFunction* NewFunctionByIdWithReservedAndProto(
+    JSContext* cx, JSNative native, JS::Handle<JSObject*> proto, unsigned nargs,
+    unsigned flags, jsid id);
 
 /**
  * Get or set function's reserved slot value.

@@ -5,7 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /*
- * Weak Maps.
+ * Maps and Sets.
  */
 
 #ifndef js_MapAndSet_h

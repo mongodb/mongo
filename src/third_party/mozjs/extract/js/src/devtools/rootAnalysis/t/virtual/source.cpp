@@ -290,3 +290,77 @@ void f() {
     use(c21);
   }
 }
+
+template <typename Function>
+void Call1(Function&& f) {
+  f();
+}
+
+template <typename Function>
+void Call2(Function&& f) {
+  f();
+}
+
+void function_pointers() {
+  Cell cell;
+
+  {
+    auto* f = GC;
+    Cell* c22 = &cell;
+    f();
+    use(c22);
+  }
+
+  {
+    auto* f = GC;
+    auto*& g = f;
+    Cell* c23 = &cell;
+    g();
+    use(c23);
+  }
+
+  {
+    auto* f = GC;
+    Call1([&] {
+      Cell* c24 = &cell;
+      f();
+      use(c24);
+    });
+  }
+}
+
+// Use a separate function to test `mallocSizeOf` annotations. Bug 1872197:
+// functions that are specialized on a lambda function and call that function
+// will have that call get mixed up with other calls of lambdas defined within
+// the same function.
+void annotated_function_pointers() {
+  Cell cell;
+
+  // Variables with the specific name "mallocSizeOf" are
+  // annotated to not GC. (Heh... even though here, they
+  // *do* GC!)
+
+  {
+    auto* mallocSizeOf = GC;
+    Cell* c25 = &cell;
+    mallocSizeOf();
+    use(c25);
+  }
+
+  {
+    auto* f = GC;
+    auto*& mallocSizeOf = f;
+    Cell* c26 = &cell;
+    mallocSizeOf();
+    use(c26);
+  }
+
+  {
+    auto* mallocSizeOf = GC;
+    Call2([&] {
+      Cell* c27 = &cell;
+      mallocSizeOf();
+      use(c27);
+    });
+  }
+}

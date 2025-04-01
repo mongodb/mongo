@@ -115,6 +115,11 @@ static constexpr Register RabaldrScratchI32 = CallTempReg2;
 static constexpr Register RabaldrScratchI32 = CallTempReg2;
 #endif
 
+#ifdef JS_CODEGEN_RISCV64
+#  define RABALDR_SCRATCH_I32
+static constexpr Register RabaldrScratchI32 = CallTempReg2;
+#endif
+
 #ifdef RABALDR_SCRATCH_F32_ALIASES_F64
 #  if !defined(RABALDR_SCRATCH_F32) || !defined(RABALDR_SCRATCH_F64)
 #    error "Bad configuration"
@@ -203,7 +208,7 @@ struct RegPtr : public Register {
 };
 
 struct RegF32 : public FloatRegister {
-  RegF32() : FloatRegister() {}
+  RegF32() {}
   explicit RegF32(FloatRegister reg) : FloatRegister(reg) {
     MOZ_ASSERT(isSingle());
   }
@@ -212,7 +217,7 @@ struct RegF32 : public FloatRegister {
 };
 
 struct RegF64 : public FloatRegister {
-  RegF64() : FloatRegister() {}
+  RegF64() {}
   explicit RegF64(FloatRegister reg) : FloatRegister(reg) {
     MOZ_ASSERT(isDouble());
   }
@@ -222,7 +227,7 @@ struct RegF64 : public FloatRegister {
 
 #ifdef ENABLE_WASM_SIMD
 struct RegV128 : public FloatRegister {
-  RegV128() : FloatRegister() {}
+  RegV128() {}
   explicit RegV128(FloatRegister reg) : FloatRegister(reg) {
     MOZ_ASSERT(isSimd128());
   }
@@ -384,7 +389,7 @@ struct SpecificRegs {
   SpecificRegs() : abiReturnRegI64(ReturnReg64) {}
 };
 #elif defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64) || \
-    defined(JS_CODEGEN_LOONG64)
+    defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_RISCV64)
 struct SpecificRegs {
   // Required by gcc.
   SpecificRegs() {}

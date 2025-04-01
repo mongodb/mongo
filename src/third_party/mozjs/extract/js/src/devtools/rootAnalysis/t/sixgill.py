@@ -35,7 +35,7 @@ class Body(dict):
             src, dst = edge["Index"]
             self["SrcPoint2Edges"][src].append(edge)
         self["Line2Edges"] = defaultdict(list)
-        for (src, edges) in self["SrcPoint2Edges"].items():
+        for src, edges in self["SrcPoint2Edges"].items():
             line = self["Points"][src]
             self["Line2Edges"][line].extend(edges)
 

@@ -180,6 +180,11 @@ static constexpr Register WasmJitEntryReturnScratch{Registers::t1};
 static constexpr Register WasmCallRefCallScratchReg0{ABINonArgReg0};
 static constexpr Register WasmCallRefCallScratchReg1{ABINonArgReg1};
 static constexpr Register WasmCallRefReg{ABINonArgReg3};
+
+static constexpr Register WasmTailCallInstanceScratchReg{ABINonArgReg1};
+static constexpr Register WasmTailCallRAScratchReg{ra};
+static constexpr Register WasmTailCallFPScratchReg{ABINonArgReg3};
+
 }  // namespace jit
 }  // namespace js
 

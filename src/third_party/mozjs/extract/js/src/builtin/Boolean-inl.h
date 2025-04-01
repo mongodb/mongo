@@ -24,6 +24,20 @@ inline bool EmulatesUndefined(JSObject* obj) {
   return actual->getClass()->emulatesUndefined();
 }
 
+inline bool EmulatesUndefinedCheckFuse(JSObject* obj, size_t fuseValue) {
+  // This may be called off the main thread. It's OK not to expose the object
+  // here as it doesn't escape.
+  AutoUnsafeCallWithABI unsafe(UnsafeABIStrictness::AllowPendingExceptions);
+  JSObject* actual = MOZ_LIKELY(!obj->is<WrapperObject>())
+                         ? obj
+                         : UncheckedUnwrapWithoutExpose(obj);
+  bool emulatesUndefined = actual->getClass()->emulatesUndefined();
+  if (emulatesUndefined) {
+    MOZ_RELEASE_ASSERT(fuseValue != 0);
+  }
+  return emulatesUndefined;
+}
+
 } /* namespace js */
 
 #endif /* builtin_Boolean_inl_h */

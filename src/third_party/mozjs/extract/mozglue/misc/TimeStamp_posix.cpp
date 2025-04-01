@@ -58,6 +58,10 @@
 static uint64_t sResolution;
 static uint64_t sResolutionSigDigs;
 
+#ifdef CLOCK_MONOTONIC_COARSE
+static bool sSupportsMonotonicCoarseClock = false;
+#endif
+
 #if !defined(__wasi__)
 static const uint16_t kNsPerUs = 1000;
 #endif
@@ -72,11 +76,19 @@ static uint64_t TimespecToNs(const struct timespec& aTs) {
   return baseNs + uint64_t(aTs.tv_nsec);
 }
 
-static uint64_t ClockTimeNs() {
+static uint64_t ClockTimeNs(const clockid_t aClockId = CLOCK_MONOTONIC) {
   struct timespec ts;
+#ifdef CLOCK_MONOTONIC_COARSE
+  MOZ_RELEASE_ASSERT(
+      aClockId == CLOCK_MONOTONIC ||
+      (sSupportsMonotonicCoarseClock && aClockId == CLOCK_MONOTONIC_COARSE));
+#else
+  MOZ_RELEASE_ASSERT(aClockId == CLOCK_MONOTONIC);
+#endif
   // this can't fail: we know &ts is valid, and TimeStamp::Startup()
-  // checks that CLOCK_MONOTONIC is supported (and aborts if not)
-  clock_gettime(CLOCK_MONOTONIC, &ts);
+  // checks that CLOCK_MONOTONIC / CLOCK_MONOTONIC_COARSE are
+  // supported (and aborts if the former is not).
+  clock_gettime(aClockId, &ts);
 
   // tv_sec is defined to be relative to an arbitrary point in time,
   // but it would be madness for that point in time to be earlier than
@@ -173,6 +185,12 @@ void TimeStamp::Startup() {
     MOZ_CRASH("CLOCK_MONOTONIC is absent!");
   }
 
+#ifdef CLOCK_MONOTONIC_COARSE
+  if (clock_gettime(CLOCK_MONOTONIC_COARSE, &dummy) == 0) {
+    sSupportsMonotonicCoarseClock = true;
+  }
+#endif
+
   sResolution = ClockResolutionNs();
 
   // find the number of significant digits in sResolution, for the
@@ -188,7 +206,12 @@ void TimeStamp::Startup() {
 void TimeStamp::Shutdown() {}
 
 TimeStamp TimeStamp::Now(bool aHighResolution) {
-  return TimeStamp(ClockTimeNs());
+#ifdef CLOCK_MONOTONIC_COARSE
+  if (!aHighResolution && sSupportsMonotonicCoarseClock) {
+    return TimeStamp(ClockTimeNs(CLOCK_MONOTONIC_COARSE));
+  }
+#endif
+  return TimeStamp(ClockTimeNs(CLOCK_MONOTONIC));
 }
 
 #if defined(XP_LINUX) || defined(ANDROID)

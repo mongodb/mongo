@@ -1,0 +1,4 @@
+{
+    "configure-args": "--enable-portable-baseline-interp --enable-portable-baseline-interp-force",
+    "optimize": true
+}

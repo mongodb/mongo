@@ -20,8 +20,8 @@ namespace jit {
 
 InlineScriptTree* InlineScriptTree::New(TempAllocator* allocator,
                                         InlineScriptTree* callerTree,
-                                        jsbytecode* callerPc,
-                                        JSScript* script) {
+                                        jsbytecode* callerPc, JSScript* script,
+                                        bool isMonomorphicallyInlined) {
   MOZ_ASSERT_IF(!callerTree, !callerPc);
   MOZ_ASSERT_IF(callerTree, callerTree->script()->containsPC(callerPc));
 
@@ -32,14 +32,17 @@ InlineScriptTree* InlineScriptTree::New(TempAllocator* allocator,
   }
 
   // Initialize it.
-  return new (treeMem) InlineScriptTree(callerTree, callerPc, script);
+  return new (treeMem)
+      InlineScriptTree(callerTree, callerPc, script, isMonomorphicallyInlined);
 }
 
 InlineScriptTree* InlineScriptTree::addCallee(TempAllocator* allocator,
                                               jsbytecode* callerPc,
-                                              JSScript* calleeScript) {
+                                              JSScript* calleeScript,
+                                              bool isMonomorphicallyInlined) {
   MOZ_ASSERT(script_ && script_->containsPC(callerPc));
-  InlineScriptTree* calleeTree = New(allocator, this, callerPc, calleeScript);
+  InlineScriptTree* calleeTree =
+      New(allocator, this, callerPc, calleeScript, isMonomorphicallyInlined);
   if (!calleeTree) {
     return nullptr;
   }

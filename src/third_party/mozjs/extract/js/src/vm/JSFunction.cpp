@@ -10,6 +10,7 @@
 
 #include "vm/JSFunction-inl.h"
 
+#include "mozilla/ArrayUtils.h"  // mozilla::ArrayLength
 #include "mozilla/CheckedInt.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/Range.h"
@@ -24,9 +25,9 @@
 #include "builtin/BigInt.h"
 #include "builtin/Object.h"
 #include "builtin/Symbol.h"
-#include "frontend/BytecodeCompilation.h"
-#include "frontend/BytecodeCompiler.h"
+#include "frontend/BytecodeCompiler.h"  // frontend::{CompileStandaloneFunction, CompileStandaloneGenerator, CompileStandaloneAsyncFunction, CompileStandaloneAsyncGenerator, DelazifyCanonicalScriptedFunction}
 #include "frontend/FrontendContext.h"  // AutoReportFrontendContext, ManualReportFrontendContext
+#include "frontend/Stencil.h"  // js::DumpFunctionFlagsItems
 #include "jit/InlinableNatives.h"
 #include "jit/Ion.h"
 #include "js/CallNonGenericMethod.h"
@@ -34,6 +35,7 @@
 #include "js/CompileOptions.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/friend/StackLimits.h"    // js::AutoCheckRecursionLimit
+#include "js/Printer.h"               // js::GenericPrinter
 #include "js/PropertySpec.h"
 #include "js/SourceText.h"
 #include "js/StableStringChars.h"
@@ -48,16 +50,16 @@
 #include "vm/GeneratorAndAsyncKind.h"  // js::GeneratorKind, js::FunctionAsyncKind
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
-#include "vm/JSAtom.h"
+#include "vm/JSAtomUtils.h"  // ToAtom
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
+#include "vm/JSONPrinter.h"  // js::JSONPrinter
 #include "vm/JSScript.h"
 #include "vm/NumberObject.h"
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/SelfHosting.h"
 #include "vm/Shape.h"
 #include "vm/StringObject.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 #include "wasm/AsmJS.h"
 #ifdef ENABLE_RECORD_TUPLE
 #  include "vm/RecordType.h"
@@ -462,6 +464,89 @@ static bool fun_mayResolve(const JSAtomState& names, jsid id, JSObject*) {
   return atom == names.prototype || atom == names.length || atom == names.name;
 }
 
+bool JSFunction::getExplicitName(JSContext* cx,
+                                 JS::MutableHandle<JSAtom*> name) {
+  if (isAccessorWithLazyName()) {
+    JSAtom* accessorName = getAccessorNameForLazy(cx);
+    if (!accessorName) {
+      return false;
+    }
+
+    name.set(accessorName);
+    return true;
+  }
+
+  name.set(maybePartialExplicitName());
+  return true;
+}
+
+bool JSFunction::getDisplayAtom(JSContext* cx,
+                                JS::MutableHandle<JSAtom*> name) {
+  if (isAccessorWithLazyName()) {
+    JSAtom* accessorName = getAccessorNameForLazy(cx);
+    if (!accessorName) {
+      return false;
+    }
+
+    name.set(accessorName);
+    return true;
+  }
+
+  name.set(maybePartialDisplayAtom());
+  return true;
+}
+
+static JSAtom* NameToPrefixedFunctionName(JSContext* cx, JSString* nameStr,
+                                          FunctionPrefixKind prefixKind) {
+  MOZ_ASSERT(prefixKind != FunctionPrefixKind::None);
+
+  StringBuffer sb(cx);
+  if (prefixKind == FunctionPrefixKind::Get) {
+    if (!sb.append("get ")) {
+      return nullptr;
+    }
+  } else {
+    if (!sb.append("set ")) {
+      return nullptr;
+    }
+  }
+  if (!sb.append(nameStr)) {
+    return nullptr;
+  }
+  return sb.finishAtom();
+}
+
+static JSAtom* NameToFunctionName(JSContext* cx, HandleValue name,
+                                  FunctionPrefixKind prefixKind) {
+  MOZ_ASSERT(name.isString() || name.isNumeric());
+
+  if (prefixKind == FunctionPrefixKind::None) {
+    return ToAtom<CanGC>(cx, name);
+  }
+
+  JSString* nameStr = ToString(cx, name);
+  if (!nameStr) {
+    return nullptr;
+  }
+
+  return NameToPrefixedFunctionName(cx, nameStr, prefixKind);
+}
+
+JSAtom* JSFunction::getAccessorNameForLazy(JSContext* cx) {
+  MOZ_ASSERT(isAccessorWithLazyName());
+
+  JSAtom* name = NameToPrefixedFunctionName(
+      cx, rawAtom(),
+      isGetter() ? FunctionPrefixKind::Get : FunctionPrefixKind::Set);
+  if (!name) {
+    return nullptr;
+  }
+
+  setAtom(name);
+  setFlags(flags().clearLazyAccessorName());
+  return name;
+}
+
 static bool fun_resolve(JSContext* cx, HandleObject obj, HandleId id,
                         bool* resolvedp) {
   if (!id.isAtom()) {
@@ -518,7 +603,11 @@ static bool fun_resolve(JSContext* cx, HandleObject obj, HandleId id,
         return true;
       }
 
-      v.setString(fun->infallibleGetUnresolvedName(cx));
+      JSAtom* name = fun->getUnresolvedName(cx);
+      if (!name) {
+        return false;
+      }
+      v.setString(name);
     }
 
     if (!NativeDefineDataProperty(cx, fun, id, v,
@@ -690,7 +779,7 @@ static JSObject* CreateFunctionPrototype(JSContext* cx, JSProtoKey key) {
 
   return NewFunctionWithProto(
       cx, FunctionPrototype, 0, FunctionFlags::NATIVE_FUN, nullptr,
-      Handle<PropertyName*>(cx->names().empty), objectProto,
+      Handle<PropertyName*>(cx->names().empty_), objectProto,
       gc::AllocKind::FUNCTION, TenuredObject);
 }
 
@@ -801,17 +890,20 @@ JSString* js::FunctionToString(JSContext* cx, HandleFunction fun,
     // We don't want to fully parse the function's name here because of
     // performance reasons, so only append the name if we're confident it
     // can be matched as the 'PropertyName' grammar production.
-    if (fun->explicitName() &&
+    if (fun->maybePartialExplicitName() &&
         (fun->kind() == FunctionFlags::NormalFunction ||
+         (fun->isBuiltinNative() && (fun->kind() == FunctionFlags::Getter ||
+                                     fun->kind() == FunctionFlags::Setter)) ||
          fun->kind() == FunctionFlags::Wasm ||
          fun->kind() == FunctionFlags::ClassConstructor)) {
       if (!out.append(' ')) {
         return nullptr;
       }
 
-      // Built-in getters or setters are classified as normal
-      // functions, strip any leading "get " or "set " if present.
-      JSAtom* name = fun->explicitName();
+      // Built-in getters or setters are classified as one of
+      // NormalFunction, Getter, or Setter. Strip any leading "get " or "set "
+      // if present.
+      JSAtom* name = fun->maybePartialExplicitName();
       size_t offset = hasGetterOrSetterPrefix(name) ? 4 : 0;
       if (!out.appendSubstring(name, offset, name->length() - offset)) {
         return nullptr;
@@ -840,11 +932,16 @@ JSString* js::FunctionToString(JSContext* cx, HandleFunction fun,
       }
     }
 
-    if (fun->explicitName()) {
+    JS::Rooted<JSAtom*> name(cx);
+    if (!fun->getExplicitName(cx, &name)) {
+      return nullptr;
+    }
+
+    if (name) {
       if (!out.append(' ')) {
         return nullptr;
       }
-      if (!out.append(fun->explicitName())) {
+      if (!out.append(name)) {
         return nullptr;
       }
     }
@@ -870,8 +967,8 @@ JSString* fun_toStringHelper(JSContext* cx, HandleObject obj, bool isToSource) {
     }
 
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_INCOMPATIBLE_PROTO, js_Function_str,
-                              js_toString_str, "object");
+                              JSMSG_INCOMPATIBLE_PROTO, "Function", "toString",
+                              "object");
     return nullptr;
   }
 
@@ -979,7 +1076,7 @@ bool js::fun_apply(JSContext* cx, unsigned argc, Value* vp) {
   // Step 3.
   if (!args[1].isObject()) {
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_BAD_APPLY_ARGS, js_apply_str);
+                              JSMSG_BAD_APPLY_ARGS, "apply");
     return false;
   }
 
@@ -1009,10 +1106,10 @@ bool js::fun_apply(JSContext* cx, unsigned argc, Value* vp) {
 }
 
 static const JSFunctionSpec function_methods[] = {
-    JS_FN(js_toSource_str, fun_toSource, 0, 0),
-    JS_FN(js_toString_str, fun_toString, 0, 0),
-    JS_FN(js_apply_str, fun_apply, 2, 0),
-    JS_FN(js_call_str, fun_call, 1, 0),
+    JS_FN("toSource", fun_toSource, 0, 0),
+    JS_FN("toString", fun_toString, 0, 0),
+    JS_FN("apply", fun_apply, 2, 0),
+    JS_FN("call", fun_call, 1, 0),
     JS_INLINABLE_FN("bind", BoundFunctionObject::functionBind, 1, 0,
                     FunctionBind),
     JS_SYM_FN(hasInstance, fun_symbolHasInstance, 1,
@@ -1037,13 +1134,13 @@ static const ClassSpec JSFunctionClassSpec = {
     function_methods,          function_properties};
 
 const JSClass js::FunctionClass = {
-    js_Function_str,
+    "Function",
     JSCLASS_HAS_CACHED_PROTO(JSProto_Function) |
         JSCLASS_HAS_RESERVED_SLOTS(JSFunction::SlotCount),
     &JSFunctionClassOps, &JSFunctionClassSpec};
 
 const JSClass js::ExtendedFunctionClass = {
-    js_Function_str,
+    "Function",
     JSCLASS_HAS_CACHED_PROTO(JSProto_Function) |
         JSCLASS_HAS_RESERVED_SLOTS(FunctionExtended::SlotCount),
     &JSFunctionClassOps, &JSFunctionClassSpec};
@@ -1194,7 +1291,7 @@ static bool CreateDynamicFunction(JSContext* cx, const CallArgs& args,
 
   RootedScript maybeScript(cx);
   const char* filename;
-  unsigned lineno;
+  uint32_t lineno;
   bool mutedErrors;
   uint32_t pcOffset;
   DescribeScriptedCallerForCompilation(cx, &maybeScript, &filename, &lineno,
@@ -1453,6 +1550,50 @@ bool JSFunction::needsCallObject() const {
   return nonLazyScript()->bodyScope()->hasEnvironment();
 }
 
+#if defined(DEBUG) || defined(JS_JITSPEW)
+void JSFunction::dumpOwnFields(js::JSONPrinter& json) const {
+  if (maybePartialDisplayAtom()) {
+    js::GenericPrinter& out =
+        json.beginStringProperty("maybePartialDisplayAtom");
+    maybePartialDisplayAtom()->dumpPropertyName(out);
+    json.endStringProperty();
+  }
+
+  if (hasBaseScript()) {
+    js::GenericPrinter& out = json.beginStringProperty("baseScript");
+    baseScript()->dumpStringContent(out);
+    json.endStringProperty();
+  }
+
+  json.property("nargs", nargs());
+
+  json.beginInlineListProperty("flags");
+  DumpFunctionFlagsItems(json, flags());
+  json.endInlineList();
+
+  if (isNativeFun()) {
+    json.formatProperty("native", "0x%p", native());
+    if (hasJitInfo()) {
+      json.formatProperty("jitInfo", "0x%p", jitInfo());
+    }
+  }
+}
+
+void JSFunction::dumpOwnStringContent(js::GenericPrinter& out) const {
+  if (maybePartialDisplayAtom() && maybePartialDisplayAtom()->length() > 0) {
+    maybePartialDisplayAtom()->dumpPropertyName(out);
+  } else {
+    out.put("(anonymous)");
+  }
+
+  if (hasBaseScript()) {
+    out.put(" (");
+    baseScript()->dumpStringContent(out);
+    out.put(")");
+  }
+}
+#endif
+
 #ifdef DEBUG
 static JSObject* SkipEnvironmentObjects(JSObject* env) {
   if (!env) {
@@ -1586,6 +1727,10 @@ JSFunction* js::NewFunctionWithProto(
   }
   fun->initAtom(atom);
 
+#ifdef DEBUG
+  fun->assertFunctionKindIntegrity();
+#endif
+
   return fun;
 }
 
@@ -1682,7 +1827,11 @@ static inline JSFunction* NewFunctionClone(JSContext* cx, HandleFunction fun,
   clone->setFlags(flags);
 
   // Note: |clone| and |fun| are same-zone so we don't need to call markAtom.
-  clone->initAtom(fun->displayAtom());
+  clone->initAtom(fun->maybePartialDisplayAtom());
+
+#ifdef DEBUG
+  clone->assertFunctionKindIntegrity();
+#endif
 
   return clone;
 }
@@ -1693,23 +1842,17 @@ JSFunction* js::CloneFunctionReuseScript(JSContext* cx, HandleFunction fun,
   MOZ_ASSERT(cx->realm() == fun->realm());
   MOZ_ASSERT(NewFunctionEnvironmentIsWellFormed(cx, enclosingEnv));
   MOZ_ASSERT(fun->isInterpreted());
+  MOZ_ASSERT(fun->hasBaseScript());
   MOZ_ASSERT(CanReuseScriptForClone(cx->realm(), fun, enclosingEnv));
 
-  RootedFunction clone(cx, NewFunctionClone(cx, fun, proto));
+  JSFunction* clone = NewFunctionClone(cx, fun, proto);
   if (!clone) {
     return nullptr;
   }
 
-  if (fun->hasBaseScript()) {
-    BaseScript* base = fun->baseScript();
-    clone->initScript(base);
-    clone->initEnvironment(enclosingEnv);
-  } else {
-    MOZ_ASSERT(fun->hasSelfHostedLazyScript());
-    SelfHostedLazyScript* lazy = fun->selfHostedLazyScript();
-    clone->initSelfHostedLazyScript(lazy);
-    clone->initEnvironment(enclosingEnv);
-  }
+  BaseScript* base = fun->baseScript();
+  clone->initScript(base);
+  clone->initEnvironment(enclosingEnv);
 
 #ifdef DEBUG
   // Assert extended slots don't need to be copied.
@@ -1755,7 +1898,7 @@ static JSAtom* SymbolToFunctionName(JSContext* cx, JS::Symbol* symbol,
 
   // Step 4.b, no prefix fastpath.
   if (!desc && prefixKind == FunctionPrefixKind::None) {
-    return cx->names().empty;
+    return cx->names().empty_;
   }
 
   // Step 5 (reordered).
@@ -1786,35 +1929,6 @@ static JSAtom* SymbolToFunctionName(JSContext* cx, JS::Symbol* symbol,
         return nullptr;
       }
     }
-  }
-  return sb.finishAtom();
-}
-
-static JSAtom* NameToFunctionName(JSContext* cx, HandleValue name,
-                                  FunctionPrefixKind prefixKind) {
-  MOZ_ASSERT(name.isString() || name.isNumeric());
-
-  if (prefixKind == FunctionPrefixKind::None) {
-    return ToAtom<CanGC>(cx, name);
-  }
-
-  JSString* nameStr = ToString(cx, name);
-  if (!nameStr) {
-    return nullptr;
-  }
-
-  StringBuffer sb(cx);
-  if (prefixKind == FunctionPrefixKind::Get) {
-    if (!sb.append("get ")) {
-      return nullptr;
-    }
-  } else {
-    if (!sb.append("set ")) {
-      return nullptr;
-    }
-  }
-  if (!sb.append(nameStr)) {
-    return nullptr;
   }
   return sb.finishAtom();
 }

@@ -52,7 +52,7 @@
  *   FOR_EACH_TOKEN_KIND(EMIT_TOKEN)
  *   #undef EMIT_TOKEN
  *
- * Note that this list does not contain ERROR and LIMIT.
+ * Note that this list does not contain Limit.
  */
 #define FOR_EACH_TOKEN_KIND_WITH_RANGE(MACRO, RANGE)                   \
   MACRO(Eof, "end of script")                                          \
@@ -143,6 +143,7 @@
   MACRO(Set, "'set'")                                                  \
   MACRO(Static, "'static'")                                            \
   MACRO(Target, "'target'")                                            \
+  IF_EXPLICIT_RESOURCE_MANAGEMENT(MACRO(Using, "'using'"))             \
   MACRO(Yield, "'yield'")                                              \
   RANGE(ContextualKeywordLast, Yield)                                  \
                                                                        \

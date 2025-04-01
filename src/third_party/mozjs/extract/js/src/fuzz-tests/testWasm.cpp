@@ -9,12 +9,14 @@
 
 #include "fuzz-tests/tests.h"
 #include "js/CallAndConstruct.h"
+#include "js/Prefs.h"
 #include "js/PropertyAndElement.h"  // JS_Enumerate, JS_GetProperty, JS_GetPropertyById, JS_HasProperty, JS_SetProperty
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
 #include "vm/TypedArrayObject.h"
 
 #include "wasm/WasmCompile.h"
+#include "wasm/WasmFeatures.h"
 #include "wasm/WasmIonCompile.h"
 #include "wasm/WasmJS.h"
 #include "wasm/WasmTable.h"
@@ -36,9 +38,18 @@ size_t gluesmith(uint8_t* data, size_t size, uint8_t* out, size_t maxsize);
 
 static int testWasmInit(int* argc, char*** argv) {
   bool wasmHasSupport = WASM_HAS_SUPPORT(gCx);
-  if (!wasmHasSupport ||
-      !GlobalObject::getOrCreateConstructor(gCx, JSProto_WebAssembly)) {
-    MOZ_CRASH("Failed to initialize wasm support");
+  if (!wasmHasSupport || !wasm::HasSupport(gCx)) {
+    MOZ_CRASH("Wasm is not supported");
+  }
+
+#define WASM_FEATURE(NAME, LOWER_NAME, COMPILE_PRED, COMPILER_PRED, FLAG_PRED, \
+                     FLAG_FORCE_ON, FLAG_FUZZ_ON, PREF)                        \
+  JS::Prefs::setAtStartup_wasm_##PREF(FLAG_FUZZ_ON);
+  JS_FOR_WASM_FEATURES(WASM_FEATURE)
+#undef WASM_FEATURE
+
+  if (!GlobalObject::getOrCreateConstructor(gCx, JSProto_WebAssembly)) {
+    MOZ_CRASH("Failed to initialize wasm engine");
   }
 
   return 0;

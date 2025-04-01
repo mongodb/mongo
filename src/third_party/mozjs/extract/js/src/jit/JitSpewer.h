@@ -41,6 +41,8 @@ namespace jit {
   _(Range)                                 \
   /* Information during LICM */            \
   _(LICM)                                  \
+  /* Information during Branch Hinting */  \
+  _(BranchHint)                            \
   /* Info about fold linear constants */   \
   _(FLAC)                                  \
   /* Effective address analysis info */    \
@@ -65,10 +67,10 @@ namespace jit {
   _(RedundantShapeGuards)                  \
   /* Info about redundant GC barriers */   \
   _(RedundantGCBarriers)                   \
+  /* Info about loads used as keys */      \
+  _(MarkLoadsUsedAsPropertyKeys)           \
   /* Output a list of MIR expressions */   \
   _(MIRExpressions)                        \
-  /* Spew Tracelogger summary stats */     \
-  _(ScriptStats)                           \
                                            \
   /* BASELINE COMPILER SPEW */             \
                                            \

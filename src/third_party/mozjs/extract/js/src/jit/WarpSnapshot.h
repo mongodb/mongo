@@ -512,7 +512,6 @@ class WarpScriptSnapshot
 
   // Whether this script is for an arrow function.
   bool isArrowFunction_;
-  bool isMonomorphicInlined_;
 
  public:
   WarpScriptSnapshot(JSScript* script, const WarpEnvironment& env,
@@ -525,8 +524,6 @@ class WarpScriptSnapshot
   ModuleObject* moduleObject() const { return moduleObject_; }
 
   bool isArrowFunction() const { return isArrowFunction_; }
-  bool isMonomorphicInlined() const { return isMonomorphicInlined_; }
-  void markIsMonomorphicInlined() { isMonomorphicInlined_ = true; }
 
   void trace(JSTracer* trc);
 

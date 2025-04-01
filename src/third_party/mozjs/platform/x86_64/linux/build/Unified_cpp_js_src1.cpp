@@ -44,12 +44,12 @@
 #error "builtin/Object.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/Profilers.cpp"
+#include "builtin/ParseRecordObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/Profilers.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/ParseRecordObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/Profilers.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/ParseRecordObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

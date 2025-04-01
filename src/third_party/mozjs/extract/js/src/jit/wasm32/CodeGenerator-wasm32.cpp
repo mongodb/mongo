@@ -153,7 +153,6 @@ void CodeGenerator::visitAtomicTypedArrayElementBinopForEffect(
   MOZ_CRASH();
 }
 void CodeGenerator::visitWasmSelect(LWasmSelect* ins) { MOZ_CRASH(); }
-void CodeGenerator::visitWasmHeapBase(LWasmHeapBase* ins) { MOZ_CRASH(); }
 void CodeGenerator::visitWasmLoad(LWasmLoad* lir) { MOZ_CRASH(); }
 void CodeGenerator::visitWasmLoadI64(LWasmLoadI64* lir) { MOZ_CRASH(); }
 void CodeGenerator::visitWasmStore(LWasmStore* lir) { MOZ_CRASH(); }
@@ -176,7 +175,6 @@ void CodeGenerator::visitWasmAtomicBinopHeapForEffect(
 }
 void CodeGenerator::visitWasmStackArg(LWasmStackArg* ins) { MOZ_CRASH(); }
 void CodeGenerator::visitWasmStackArgI64(LWasmStackArgI64* ins) { MOZ_CRASH(); }
-void CodeGenerator::visitMemoryBarrier(LMemoryBarrier* ins) { MOZ_CRASH(); }
 void CodeGenerator::visitSimd128(LSimd128* ins) { MOZ_CRASH(); }
 void CodeGenerator::visitWasmTernarySimd128(LWasmTernarySimd128* ins) {
   MOZ_CRASH();

@@ -127,9 +127,8 @@ static bool ProbeRegion(uintptr_t aRegion, uintptr_t aSize) {
   if (madvise(reinterpret_cast<void*>(aRegion), aSize, MADV_NORMAL)) {
 #  endif
     return true;
-  } else {
-    return false;
   }
+  return false;
 }
 
 static uintptr_t GetDesiredRegionSize() { return sysconf(_SC_PAGESIZE); }

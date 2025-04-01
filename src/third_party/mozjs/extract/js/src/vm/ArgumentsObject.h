@@ -10,6 +10,7 @@
 #include "mozilla/MemoryReporting.h"
 
 #include "gc/Barrier.h"
+#include "gc/GCArray.h"
 #include "util/BitArray.h"
 #include "vm/NativeObject.h"
 
@@ -55,13 +56,7 @@ class RareArgumentsData {
 // property is modified, when the relevant value is flagged to memorialize the
 // modification.
 struct ArgumentsData {
-  /*
-   * numArgs = std::max(numFormalArgs, numActualArgs)
-   * The array 'args' has numArgs elements.
-   */
-  uint32_t numArgs;
-
-  RareArgumentsData* rareData;
+  RareArgumentsData* rareData = nullptr;
 
   /*
    * This array holds either the current argument value or the magic
@@ -71,19 +66,25 @@ struct ArgumentsData {
    * canonical value so any element access to the arguments object should load
    * the value out of the CallObject (which is pointed to by MAYBE_CALL_SLOT).
    */
-  GCPtr<Value> args[1];
+  GCOwnedArray<Value> args;
+
+  /*
+   * numArgs = std::max(numFormalArgs, numActualArgs)
+   * The array 'args' has numArgs elements.
+   */
+  explicit ArgumentsData(uint32_t numArgs);
+
+  uint32_t numArgs() const { return args.size(); }
 
   /* For jit use: */
-  static ptrdiff_t offsetOfArgs() { return offsetof(ArgumentsData, args); }
-
-  /* Iterate args. */
-  GCPtr<Value>* begin() { return args; }
-  const GCPtr<Value>* begin() const { return args; }
-  GCPtr<Value>* end() { return args + numArgs; }
-  const GCPtr<Value>* end() const { return args + numArgs; }
+  static constexpr ptrdiff_t offsetOfArgs() {
+    return offsetof(ArgumentsData, args) +
+           GCOwnedArray<Value>::offsetOfElements();
+  }
 
   static size_t bytesRequired(size_t numArgs) {
-    return offsetof(ArgumentsData, args) + numArgs * sizeof(Value);
+    return offsetof(ArgumentsData, args) +
+           GCOwnedArray<Value>::bytesRequired(numArgs);
   }
 };
 
@@ -274,11 +275,13 @@ class ArgumentsObject : public NativeObject {
     return argc;
   }
 
-  // True iff arguments.length has been assigned or deleted.
-  bool hasOverriddenLength() const {
+  bool hasFlags(uint32_t flags) const {
     const Value& v = getFixedSlot(INITIAL_LENGTH_SLOT);
-    return v.toInt32() & LENGTH_OVERRIDDEN_BIT;
+    return v.toInt32() & flags;
   }
+
+  // True iff arguments.length has been assigned or deleted.
+  bool hasOverriddenLength() const { return hasFlags(LENGTH_OVERRIDDEN_BIT); }
 
   void markLengthOverridden() {
     uint32_t v =
@@ -291,8 +294,7 @@ class ArgumentsObject : public NativeObject {
 
   // True iff arguments[@@iterator] has been assigned or deleted.
   bool hasOverriddenIterator() const {
-    const Value& v = getFixedSlot(INITIAL_LENGTH_SLOT);
-    return v.toInt32() & ITERATOR_OVERRIDDEN_BIT;
+    return hasFlags(ITERATOR_OVERRIDDEN_BIT);
   }
 
   void markIteratorOverridden() {
@@ -310,10 +312,7 @@ class ArgumentsObject : public NativeObject {
   static bool getArgumentsIterator(JSContext* cx, MutableHandleValue val);
 
   // True iff any element has been assigned or deleted.
-  bool hasOverriddenElement() const {
-    const Value& v = getFixedSlot(INITIAL_LENGTH_SLOT);
-    return v.toInt32() & ELEMENT_OVERRIDDEN_BIT;
-  }
+  bool hasOverriddenElement() const { return hasFlags(ELEMENT_OVERRIDDEN_BIT); }
 
   void markElementOverridden() {
     uint32_t v =
@@ -337,7 +336,7 @@ class ArgumentsObject : public NativeObject {
    * ArgumentsData::args.
    */
   bool isElementDeleted(uint32_t i) const {
-    MOZ_ASSERT(i < data()->numArgs);
+    MOZ_ASSERT(i < data()->numArgs());
     if (i >= initialLength()) {
       return false;
     }
@@ -385,17 +384,16 @@ class ArgumentsObject : public NativeObject {
   inline void setElement(uint32_t i, const Value& v);
 
   const Value& arg(unsigned i) const {
-    MOZ_ASSERT(i < data()->numArgs);
+    MOZ_ASSERT(i < data()->numArgs());
     const Value& v = data()->args[i];
     MOZ_ASSERT(!v.isMagic());
     return v;
   }
 
   void setArg(unsigned i, const Value& v) {
-    MOZ_ASSERT(i < data()->numArgs);
-    GCPtr<Value>& lhs = data()->args[i];
-    MOZ_ASSERT(!lhs.isMagic());
-    lhs = v;
+    MOZ_ASSERT(i < data()->numArgs());
+    MOZ_ASSERT(!data()->args[i].isMagic());
+    data()->args.setElement(this, i, v);
   }
 
   /*
@@ -403,16 +401,13 @@ class ArgumentsObject : public NativeObject {
    * CallObject and can't be directly read from |ArgumentsData::args|.
    */
   bool argIsForwarded(unsigned i) const {
-    MOZ_ASSERT(i < data()->numArgs);
+    MOZ_ASSERT(i < data()->numArgs());
     const Value& v = data()->args[i];
     MOZ_ASSERT_IF(IsMagicScopeSlotValue(v), anyArgIsForwarded());
     return IsMagicScopeSlotValue(v);
   }
 
-  bool anyArgIsForwarded() const {
-    const Value& v = getFixedSlot(INITIAL_LENGTH_SLOT);
-    return v.toInt32() & FORWARDED_ARGUMENTS_BIT;
-  }
+  bool anyArgIsForwarded() const { return hasFlags(FORWARDED_ARGUMENTS_BIT); }
 
   void markArgumentForwarded() {
     uint32_t v =
@@ -450,7 +445,7 @@ class ArgumentsObject : public NativeObject {
     return mallocSizeOf(data()) + mallocSizeOf(maybeRareData());
   }
   size_t sizeOfData() const {
-    return ArgumentsData::bytesRequired(data()->numArgs) +
+    return ArgumentsData::bytesRequired(data()->numArgs()) +
            (maybeRareData() ? RareArgumentsData::bytesRequired(initialLength())
                             : 0);
   }
@@ -504,10 +499,7 @@ class MappedArgumentsObject : public ArgumentsObject {
     return getFixedSlot(CALLEE_SLOT).toObject().as<JSFunction>();
   }
 
-  bool hasOverriddenCallee() const {
-    const Value& v = getFixedSlot(INITIAL_LENGTH_SLOT);
-    return v.toInt32() & CALLEE_OVERRIDDEN_BIT;
-  }
+  bool hasOverriddenCallee() const { return hasFlags(CALLEE_OVERRIDDEN_BIT); }
 
   void markCalleeOverridden() {
     uint32_t v =

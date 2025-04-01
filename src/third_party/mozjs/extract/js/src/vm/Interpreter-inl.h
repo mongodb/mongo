@@ -9,12 +9,16 @@
 
 #include "vm/Interpreter.h"
 
+#include "jslibmath.h"
+#include "jsmath.h"
 #include "jsnum.h"
 
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
+#include "util/CheckedArithmetic.h"
 #include "vm/ArgumentsObject.h"
 #include "vm/BigIntType.h"
 #include "vm/BytecodeUtil.h"  // JSDVG_SEARCH_STACK
+#include "vm/JSAtomUtils.h"   // AtomizeString
 #include "vm/Realm.h"
 #include "vm/SharedStencil.h"  // GCThingIndex
 #include "vm/StaticStrings.h"
@@ -24,9 +28,10 @@
 #endif
 
 #include "vm/GlobalObject-inl.h"
-#include "vm/JSAtom-inl.h"
+#include "vm/JSAtomUtils-inl.h"  // PrimitiveValueToId, TypeName
 #include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
+#include "vm/NativeObject-inl.h"
 #include "vm/ObjectOperations-inl.h"
 #include "vm/StringType-inl.h"
 
@@ -141,7 +146,7 @@ inline bool FetchName(JSContext* cx, HandleObject receiver, HandleObject holder,
   }
 
   // We do our own explicit checking for |this|
-  if (name == cx->names().dotThis) {
+  if (name == cx->names().dot_this_) {
     return true;
   }
 
@@ -631,6 +636,360 @@ inline JSFunction* ReportIfNotFunction(
   ReportIsNotFunction(cx, v, -1, construct);
   return nullptr;
 }
+
+static inline JSObject* SuperFunOperation(JSObject* callee) {
+  MOZ_ASSERT(callee->as<JSFunction>().isClassConstructor());
+  MOZ_ASSERT(
+      callee->as<JSFunction>().baseScript()->isDerivedClassConstructor());
+
+  return callee->as<JSFunction>().staticPrototype();
+}
+
+static inline JSObject* HomeObjectSuperBase(JSObject* homeObj) {
+  MOZ_ASSERT(homeObj->is<PlainObject>() || homeObj->is<JSFunction>());
+
+  return homeObj->staticPrototype();
+}
+
+static MOZ_ALWAYS_INLINE bool AddOperation(JSContext* cx,
+                                           MutableHandleValue lhs,
+                                           MutableHandleValue rhs,
+                                           MutableHandleValue res) {
+  if (lhs.isInt32() && rhs.isInt32()) {
+    int32_t l = lhs.toInt32(), r = rhs.toInt32();
+    int32_t t;
+    if (MOZ_LIKELY(SafeAdd(l, r, &t))) {
+      res.setInt32(t);
+      return true;
+    }
+  }
+
+  if (!ToPrimitive(cx, lhs)) {
+    return false;
+  }
+  if (!ToPrimitive(cx, rhs)) {
+    return false;
+  }
+
+  bool lIsString = lhs.isString();
+  bool rIsString = rhs.isString();
+  if (lIsString || rIsString) {
+    JSString* lstr;
+    if (lIsString) {
+      lstr = lhs.toString();
+    } else {
+      lstr = ToString<CanGC>(cx, lhs);
+      if (!lstr) {
+        return false;
+      }
+    }
+
+    JSString* rstr;
+    if (rIsString) {
+      rstr = rhs.toString();
+    } else {
+      // Save/restore lstr in case of GC activity under ToString.
+      lhs.setString(lstr);
+      rstr = ToString<CanGC>(cx, rhs);
+      if (!rstr) {
+        return false;
+      }
+      lstr = lhs.toString();
+    }
+    JSString* str = ConcatStrings<NoGC>(cx, lstr, rstr);
+    if (!str) {
+      RootedString nlstr(cx, lstr), nrstr(cx, rstr);
+      str = ConcatStrings<CanGC>(cx, nlstr, nrstr);
+      if (!str) {
+        return false;
+      }
+    }
+    res.setString(str);
+    return true;
+  }
+
+  if (!ToNumeric(cx, lhs) || !ToNumeric(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::addValue(cx, lhs, rhs, res);
+  }
+
+  res.setNumber(lhs.toNumber() + rhs.toNumber());
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool SubOperation(JSContext* cx,
+                                           MutableHandleValue lhs,
+                                           MutableHandleValue rhs,
+                                           MutableHandleValue res) {
+  if (!ToNumeric(cx, lhs) || !ToNumeric(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::subValue(cx, lhs, rhs, res);
+  }
+
+  res.setNumber(lhs.toNumber() - rhs.toNumber());
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool MulOperation(JSContext* cx,
+                                           MutableHandleValue lhs,
+                                           MutableHandleValue rhs,
+                                           MutableHandleValue res) {
+  if (!ToNumeric(cx, lhs) || !ToNumeric(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::mulValue(cx, lhs, rhs, res);
+  }
+
+  res.setNumber(lhs.toNumber() * rhs.toNumber());
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool DivOperation(JSContext* cx,
+                                           MutableHandleValue lhs,
+                                           MutableHandleValue rhs,
+                                           MutableHandleValue res) {
+  if (!ToNumeric(cx, lhs) || !ToNumeric(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::divValue(cx, lhs, rhs, res);
+  }
+
+  res.setNumber(NumberDiv(lhs.toNumber(), rhs.toNumber()));
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool ModOperation(JSContext* cx,
+                                           MutableHandleValue lhs,
+                                           MutableHandleValue rhs,
+                                           MutableHandleValue res) {
+  int32_t l, r;
+  if (lhs.isInt32() && rhs.isInt32() && (l = lhs.toInt32()) >= 0 &&
+      (r = rhs.toInt32()) > 0) {
+    int32_t mod = l % r;
+    res.setInt32(mod);
+    return true;
+  }
+
+  if (!ToNumeric(cx, lhs) || !ToNumeric(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::modValue(cx, lhs, rhs, res);
+  }
+
+  res.setNumber(NumberMod(lhs.toNumber(), rhs.toNumber()));
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool PowOperation(JSContext* cx,
+                                           MutableHandleValue lhs,
+                                           MutableHandleValue rhs,
+                                           MutableHandleValue res) {
+  if (!ToNumeric(cx, lhs) || !ToNumeric(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::powValue(cx, lhs, rhs, res);
+  }
+
+  res.setNumber(ecmaPow(lhs.toNumber(), rhs.toNumber()));
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool BitNotOperation(JSContext* cx,
+                                              MutableHandleValue in,
+                                              MutableHandleValue out) {
+  if (!ToInt32OrBigInt(cx, in)) {
+    return false;
+  }
+
+  if (in.isBigInt()) {
+    return BigInt::bitNotValue(cx, in, out);
+  }
+
+  out.setInt32(~in.toInt32());
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool BitXorOperation(JSContext* cx,
+                                              MutableHandleValue lhs,
+                                              MutableHandleValue rhs,
+                                              MutableHandleValue out) {
+  if (!ToInt32OrBigInt(cx, lhs) || !ToInt32OrBigInt(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::bitXorValue(cx, lhs, rhs, out);
+  }
+
+  out.setInt32(lhs.toInt32() ^ rhs.toInt32());
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool BitOrOperation(JSContext* cx,
+                                             MutableHandleValue lhs,
+                                             MutableHandleValue rhs,
+                                             MutableHandleValue out) {
+  if (!ToInt32OrBigInt(cx, lhs) || !ToInt32OrBigInt(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::bitOrValue(cx, lhs, rhs, out);
+  }
+
+  out.setInt32(lhs.toInt32() | rhs.toInt32());
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool BitAndOperation(JSContext* cx,
+                                              MutableHandleValue lhs,
+                                              MutableHandleValue rhs,
+                                              MutableHandleValue out) {
+  if (!ToInt32OrBigInt(cx, lhs) || !ToInt32OrBigInt(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::bitAndValue(cx, lhs, rhs, out);
+  }
+
+  out.setInt32(lhs.toInt32() & rhs.toInt32());
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool BitLshOperation(JSContext* cx,
+                                              MutableHandleValue lhs,
+                                              MutableHandleValue rhs,
+                                              MutableHandleValue out) {
+  if (!ToInt32OrBigInt(cx, lhs) || !ToInt32OrBigInt(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::lshValue(cx, lhs, rhs, out);
+  }
+
+  // Signed left-shift is undefined on overflow, so |lhs << (rhs & 31)| won't
+  // work.  Instead, convert to unsigned space (where overflow is treated
+  // modularly), perform the operation there, then convert back.
+  uint32_t left = static_cast<uint32_t>(lhs.toInt32());
+  uint8_t right = rhs.toInt32() & 31;
+  out.setInt32(mozilla::WrapToSigned(left << right));
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool BitRshOperation(JSContext* cx,
+                                              MutableHandleValue lhs,
+                                              MutableHandleValue rhs,
+                                              MutableHandleValue out) {
+  if (!ToInt32OrBigInt(cx, lhs) || !ToInt32OrBigInt(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    return BigInt::rshValue(cx, lhs, rhs, out);
+  }
+
+  out.setInt32(lhs.toInt32() >> (rhs.toInt32() & 31));
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool UrshOperation(JSContext* cx,
+                                            MutableHandleValue lhs,
+                                            MutableHandleValue rhs,
+                                            MutableHandleValue out) {
+  if (!ToNumeric(cx, lhs) || !ToNumeric(cx, rhs)) {
+    return false;
+  }
+
+  if (lhs.isBigInt() || rhs.isBigInt()) {
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_BIGINT_TO_NUMBER);
+    return false;
+  }
+
+  uint32_t left;
+  int32_t right;
+  if (!ToUint32(cx, lhs, &left) || !ToInt32(cx, rhs, &right)) {
+    return false;
+  }
+  left >>= right & 31;
+  out.setNumber(uint32_t(left));
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE void InitElemArrayOperation(JSContext* cx,
+                                                     jsbytecode* pc,
+                                                     Handle<ArrayObject*> arr,
+                                                     HandleValue val) {
+  MOZ_ASSERT(JSOp(*pc) == JSOp::InitElemArray);
+
+  // The dense elements must have been initialized up to this index. The JIT
+  // implementation also depends on this.
+  uint32_t index = GET_UINT32(pc);
+  MOZ_ASSERT(index < arr->getDenseCapacity());
+  MOZ_ASSERT(index == arr->getDenseInitializedLength());
+
+  // Bump the initialized length even for hole values to ensure the
+  // index == initLength invariant holds for later InitElemArray ops.
+  arr->setDenseInitializedLength(index + 1);
+
+  if (val.isMagic(JS_ELEMENTS_HOLE)) {
+    arr->initDenseElementHole(index);
+  } else {
+    arr->initDenseElement(index, val);
+  }
+}
+
+/*
+ * As an optimization, the interpreter creates a handful of reserved Rooted<T>
+ * variables at the beginning, thus inserting them into the Rooted list once
+ * upon entry. ReservedRooted "borrows" a reserved Rooted variable and uses it
+ * within a local scope, resetting the value to nullptr (or the appropriate
+ * equivalent for T) at scope end. This avoids inserting/removing the Rooted
+ * from the rooter list, while preventing stale values from being kept alive
+ * unnecessarily.
+ */
+
+template <typename T>
+class ReservedRooted : public RootedOperations<T, ReservedRooted<T>> {
+  Rooted<T>* savedRoot;
+
+ public:
+  ReservedRooted(Rooted<T>* root, const T& ptr) : savedRoot(root) {
+    *root = ptr;
+  }
+
+  explicit ReservedRooted(Rooted<T>* root) : savedRoot(root) {
+    *root = JS::SafelyInitialized<T>::create();
+  }
+
+  ~ReservedRooted() { *savedRoot = JS::SafelyInitialized<T>::create(); }
+
+  void set(const T& p) const { *savedRoot = p; }
+  operator Handle<T>() { return *savedRoot; }
+  operator Rooted<T>&() { return *savedRoot; }
+  MutableHandle<T> operator&() { return &*savedRoot; }
+
+  DECLARE_NONPOINTER_ACCESSOR_METHODS(savedRoot->get())
+  DECLARE_NONPOINTER_MUTABLE_ACCESSOR_METHODS(savedRoot->get())
+  DECLARE_POINTER_CONSTREF_OPS(T)
+  DECLARE_POINTER_ASSIGN_OPS(ReservedRooted, T)
+};
 
 } /* namespace js */
 

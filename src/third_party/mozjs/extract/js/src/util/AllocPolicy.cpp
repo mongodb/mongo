@@ -23,12 +23,6 @@ void* TempAllocPolicy::onOutOfMemory(arena_id_t arenaId,
   return result;
 }
 
-#ifdef DEBUG
-void TempAllocPolicy::assertNotJSContextOnHelperThread() const {
-  MOZ_ASSERT(!(hasJSContext() && cx() && cx()->isHelperThreadContext()));
-}
-#endif /* DEBUG */
-
 void TempAllocPolicy::reportAllocOverflow() const {
   if (hasJSContext()) {
     ReportAllocationOverflow(cx());

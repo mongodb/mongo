@@ -26,6 +26,13 @@ struct DefaultMapEntryGCPolicy {
     return GCPolicy<Key>::traceWeak(trc, key) &&
            GCPolicy<Value>::traceWeak(trc, value);
   }
+  static bool needsSweep(JSTracer* trc, const Key* key, const Value* value) {
+    // This is like a const version of the |traceWeak| method. It has the sense
+    // of the return value reversed and does not mutate keys/values. Used during
+    // incremental sweeping by the WeakCache specializations for maps and sets.
+    return GCPolicy<Key>::needsSweep(trc, key) ||
+           GCPolicy<Value>::needsSweep(trc, value);
+  }
 };
 
 // A GCHashMap is a GC-aware HashMap, meaning that it has additional trace
@@ -63,7 +70,8 @@ class GCHashMap : public js::HashMap<Key, Value, HashPolicy, AllocPolicy> {
  public:
   using EntryGCPolicy = MapEntryGCPolicy;
 
-  explicit GCHashMap(AllocPolicy a = AllocPolicy()) : Base(std::move(a)) {}
+  explicit GCHashMap() : Base(AllocPolicy()) {}
+  explicit GCHashMap(AllocPolicy a) : Base(std::move(a)) {}
   explicit GCHashMap(size_t length) : Base(length) {}
   GCHashMap(AllocPolicy a, size_t length) : Base(std::move(a), length) {}
 
@@ -87,6 +95,16 @@ class GCHashMap : public js::HashMap<Key, Value, HashPolicy, AllocPolicy> {
         e.removeFront();
       }
     }
+  }
+
+  bool needsSweep(JSTracer* trc) const {
+    for (auto r = this->all(); !r.empty(); r.popFront()) {
+      if (MapEntryGCPolicy::needsSweep(trc, &r.front().key(),
+                                       &r.front().value())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // GCHashMap is movable
@@ -267,6 +285,15 @@ class GCHashSet : public js::HashSet<T, HashPolicy, AllocPolicy> {
     }
   }
 
+  bool needsSweep(JSTracer* trc) const {
+    for (auto r = this->all(); !r.empty(); r.popFront()) {
+      if (GCPolicy<T>::needsSweep(trc, &r.front())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // GCHashSet is movable
   GCHashSet(GCHashSet&& rhs) : Base(std::move(rhs)) {}
   void operator=(GCHashSet&& rhs) {
@@ -394,7 +421,7 @@ class WeakCache<
 
   bool empty() override { return map.empty(); }
 
-  size_t traceWeak(JSTracer* trc, js::gc::StoreBuffer* sbToLock) override {
+  size_t traceWeak(JSTracer* trc, NeedsLock needsLock) override {
     size_t steps = map.count();
 
     // Create an Enum and sweep the table entries.
@@ -405,8 +432,8 @@ class WeakCache<
     // Potentially take a lock while the Enum's destructor is called as this can
     // rehash/resize the table and access the store buffer.
     mozilla::Maybe<js::gc::AutoLockStoreBuffer> lock;
-    if (sbToLock) {
-      lock.emplace(sbToLock);
+    if (needsLock) {
+      lock.emplace(trc->runtime());
     }
     e.reset();
 
@@ -424,15 +451,9 @@ class WeakCache<
  private:
   using Entry = typename Map::Entry;
 
-  static bool entryNeedsSweep(JSTracer* barrierTracer, const Entry& prior) {
-    Key key(prior.key());
-    Value value(prior.value());
-    bool needsSweep = !MapEntryGCPolicy::traceWeak(barrierTracer, &key, &value);
-    MOZ_ASSERT_IF(!needsSweep,
-                  prior.key() == key);  // We shouldn't update here.
-    MOZ_ASSERT_IF(!needsSweep,
-                  prior.value() == value);  // We shouldn't update here.
-    return needsSweep;
+  static bool entryNeedsSweep(JSTracer* barrierTracer, const Entry& entry) {
+    return MapEntryGCPolicy::needsSweep(barrierTracer, &entry.key(),
+                                        &entry.value());
   }
 
  public:
@@ -594,7 +615,7 @@ class WeakCache<GCHashSet<T, HashPolicy, AllocPolicy>> final
   explicit WeakCache(JSRuntime* rt, Args&&... args)
       : WeakCacheBase(rt), set(std::forward<Args>(args)...) {}
 
-  size_t traceWeak(JSTracer* trc, js::gc::StoreBuffer* sbToLock) override {
+  size_t traceWeak(JSTracer* trc, NeedsLock needsLock) override {
     size_t steps = set.count();
 
     // Create an Enum and sweep the table entries. It's not necessary to take
@@ -607,8 +628,8 @@ class WeakCache<GCHashSet<T, HashPolicy, AllocPolicy>> final
     // can access the store buffer, we need to take a lock for this if we're
     // called off main thread.
     mozilla::Maybe<js::gc::AutoLockStoreBuffer> lock;
-    if (sbToLock) {
-      lock.emplace(sbToLock);
+    if (needsLock) {
+      lock.emplace(trc->runtime());
     }
     e.reset();
 

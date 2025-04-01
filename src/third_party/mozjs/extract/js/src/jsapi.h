@@ -46,7 +46,6 @@
 #include "js/MapAndSet.h"
 #include "js/MemoryCallbacks.h"
 #include "js/MemoryFunctions.h"
-#include "js/OffThreadScriptCompilation.h"
 #include "js/Principals.h"
 #include "js/PropertyAndElement.h"  // JS_Enumerate
 #include "js/PropertyDescriptor.h"
@@ -72,16 +71,6 @@
 #include "js/WeakMap.h"
 #include "js/WrapperCallbacks.h"
 #include "js/Zone.h"
-
-/************************************************************************/
-
-namespace JS {
-/**
- * Tell JS engine whether to use fdlibm for Math.sin, Math.cos, and Math.tan.
- * Using fdlibm ensures that we don't expose a math fingerprint.
- */
-extern JS_PUBLIC_API void SetUseFdlibmForSinCosTan(bool value);
-}  // namespace JS
 
 /************************************************************************/
 
@@ -314,7 +303,7 @@ extern JS_PUBLIC_API bool ToPrimitive(JSContext* cx, JS::HandleObject obj,
  * This can be useful in implementing a @@toPrimitive method.
  */
 extern JS_PUBLIC_API bool GetFirstArgumentAsTypeHint(JSContext* cx,
-                                                     CallArgs args,
+                                                     const CallArgs& args,
                                                      JSType* result);
 
 } /* namespace JS */
@@ -595,20 +584,50 @@ extern JS_PUBLIC_API JSObject* JS_GetFunctionObject(JSFunction* fun);
 
 /**
  * Return the function's identifier as a JSString, or null if fun is unnamed.
+ *
  * The returned string lives as long as fun, so you don't need to root a saved
  * reference to it if fun is well-connected or rooted, and provided you bound
  * the use of the saved reference by fun's lifetime.
+ *
+ * This function returns false if any error happens while generating the
+ * function name string for a function with lazy name.
  */
-extern JS_PUBLIC_API JSString* JS_GetFunctionId(JSFunction* fun);
+extern JS_PUBLIC_API bool JS_GetFunctionId(JSContext* cx,
+                                           JS::Handle<JSFunction*> fun,
+                                           JS::MutableHandle<JSString*> name);
 
 /**
- * Return a function's display name. This is the defined name if one was given
- * where the function was defined, or it could be an inferred name by the JS
- * engine in the case that the function was defined to be anonymous. This can
- * still return nullptr if a useful display name could not be inferred. The
- * same restrictions on rooting as those in JS_GetFunctionId apply.
+ * Almost same as JS_GetFunctionId.
+ *
+ * If the function has lazy name, this returns partial name, such as the
+ * function name without "get " or "set " prefix.
  */
-extern JS_PUBLIC_API JSString* JS_GetFunctionDisplayId(JSFunction* fun);
+extern JS_PUBLIC_API JSString* JS_GetMaybePartialFunctionId(JSFunction* fun);
+
+/**
+ * Return a function's display name as `name` out-parameter.
+ *
+ * This is the defined name if one was given where the function was defined, or
+ * it could be an inferred name by the JS engine in the case that the function
+ * was defined to be anonymous.
+ *
+ * This can still return nullptr as `name` out-parameter if a useful display
+ * name could not be inferred.
+ *
+ * This function returns false if any error happens while generating the
+ * function name string for a function with lazy name.
+ */
+extern JS_PUBLIC_API bool JS_GetFunctionDisplayId(
+    JSContext* cx, JS::Handle<JSFunction*> fun,
+    JS::MutableHandle<JSString*> name);
+
+/**
+ * Almost same as JS_GetFunctionDisplayId.
+ *
+ * If the function has lazy name, this returns partial name, such as the
+ * function name without "get " or "set " prefix.
+ */
+extern JS_PUBLIC_API JSString* JS_GetMaybePartialFunctionDisplayId(JSFunction*);
 
 /*
  * Return the arity of fun, which includes default parameters and rest
@@ -825,6 +844,8 @@ extern JS_PUBLIC_API void JS_SetOffthreadIonCompilationEnabled(JSContext* cx,
   Register(INLINING_BYTECODE_MAX_LENGTH, "inlining.bytecode-max-length") \
   Register(BASELINE_INTERPRETER_ENABLE, "blinterp.enable") \
   Register(BASELINE_ENABLE, "baseline.enable") \
+  Register(PORTABLE_BASELINE_ENABLE, "pbl.enable") \
+  Register(PORTABLE_BASELINE_WARMUP_THRESHOLD, "pbl.warmup.threshold") \
   Register(OFFTHREAD_COMPILATION_ENABLE, "offthread-compilation.enable")  \
   Register(FULL_DEBUG_CHECKS, "jit.full-debug-checks") \
   Register(JUMP_THRESHOLD, "jump-threshold") \
@@ -836,12 +857,12 @@ extern JS_PUBLIC_API void JS_SetOffthreadIonCompilationEnabled(JSContext* cx,
   Register(SPECTRE_STRING_MITIGATIONS, "spectre.string-mitigations") \
   Register(SPECTRE_VALUE_MASKING, "spectre.value-masking") \
   Register(SPECTRE_JIT_TO_CXX_CALLS, "spectre.jit-to-cxx-calls") \
-  Register(WATCHTOWER_MEGAMORPHIC, "watchtower.megamorphic") \
+  Register(WRITE_PROTECT_CODE, "write-protect-code") \
   Register(WASM_FOLD_OFFSETS, "wasm.fold-offsets") \
   Register(WASM_DELAY_TIER2, "wasm.delay-tier2") \
   Register(WASM_JIT_BASELINE, "wasm.baseline") \
-  Register(WASM_JIT_OPTIMIZING, "wasm.optimizing")
-// clang-format on
+  Register(WASM_JIT_OPTIMIZING, "wasm.optimizing") \
+  Register(REGEXP_DUPLICATE_NAMED_GROUPS, "regexp.duplicate-named-groups")  // clang-format on
 
 typedef enum JSJitCompilerOption {
 #define JIT_COMPILER_DECLARE(key, str) JSJITCOMPILER_##key,
@@ -932,8 +953,8 @@ class MOZ_RAII JS_PUBLIC_API AutoFilename {
  * record, this will also return false.
  */
 extern JS_PUBLIC_API bool DescribeScriptedCaller(
-    JSContext* cx, AutoFilename* filename = nullptr, unsigned* lineno = nullptr,
-    unsigned* column = nullptr);
+    JSContext* cx, AutoFilename* filename = nullptr, uint32_t* lineno = nullptr,
+    JS::ColumnNumberOneOrigin* column = nullptr);
 
 extern JS_PUBLIC_API JSObject* GetScriptedCallerGlobal(JSContext* cx);
 

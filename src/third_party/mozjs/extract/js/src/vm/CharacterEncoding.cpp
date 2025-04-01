@@ -18,6 +18,10 @@
 
 #ifndef XP_LINUX
 // We still support libstd++ versions without codecvt support on Linux.
+//
+// When the minimum supported libstd++ version is bumped to 3.4.21, we can
+// enable the codecvt code path for Linux, too. This should happen in 2024 when
+// support for CentOS 7 is removed.
 #  include <codecvt>
 #endif
 #include <cwchar>
@@ -51,7 +55,7 @@ using namespace js;
 using namespace js::unicode;
 
 Latin1CharsZ JS::LossyTwoByteCharsToNewLatin1CharsZ(
-    JSContext* cx, const mozilla::Range<const char16_t> tbchars) {
+    JSContext* cx, const mozilla::Range<const char16_t>& tbchars) {
   MOZ_ASSERT(cx);
   size_t len = tbchars.length();
   unsigned char* latin1 = cx->pod_malloc<unsigned char>(len + 1);
@@ -139,7 +143,7 @@ void ConvertToUTF8<const Latin1Char>(mozilla::Span<const Latin1Char> src,
 
 template <typename CharT, typename Allocator>
 UTF8CharsZ JS::CharsToNewUTF8CharsZ(Allocator* alloc,
-                                    const mozilla::Range<CharT> chars) {
+                                    const mozilla::Range<CharT>& chars) {
   /* Get required buffer size. */
   const CharT* str = chars.begin().get();
   size_t len = ::GetDeflatedUTF8StringLength(str, chars.length());
@@ -158,28 +162,28 @@ UTF8CharsZ JS::CharsToNewUTF8CharsZ(Allocator* alloc,
 }
 
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
-    JSContext* cx, const mozilla::Range<Latin1Char> chars);
+    JSContext* cx, const mozilla::Range<Latin1Char>& chars);
 
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
-    JSContext* cx, const mozilla::Range<char16_t> chars);
+    JSContext* cx, const mozilla::Range<char16_t>& chars);
 
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
-    JSContext* cx, const mozilla::Range<const Latin1Char> chars);
+    JSContext* cx, const mozilla::Range<const Latin1Char>& chars);
 
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
-    JSContext* cx, const mozilla::Range<const char16_t> chars);
+    JSContext* cx, const mozilla::Range<const char16_t>& chars);
 
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
-    FrontendAllocator* cx, const mozilla::Range<Latin1Char> chars);
+    FrontendAllocator* cx, const mozilla::Range<Latin1Char>& chars);
 
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
-    FrontendAllocator* cx, const mozilla::Range<char16_t> chars);
+    FrontendAllocator* cx, const mozilla::Range<char16_t>& chars);
 
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
-    FrontendAllocator* cx, const mozilla::Range<const Latin1Char> chars);
+    FrontendAllocator* cx, const mozilla::Range<const Latin1Char>& chars);
 
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
-    FrontendAllocator* cx, const mozilla::Range<const char16_t> chars);
+    FrontendAllocator* cx, const mozilla::Range<const char16_t>& chars);
 
 static constexpr uint32_t INVALID_UTF8 = std::numeric_limits<char32_t>::max();
 
@@ -255,12 +259,23 @@ enum class OnUTF8Error {
   Crash,
 };
 
+inline bool IsInvalidSecondByte(uint32_t first, uint8_t second) {
+  // Perform an extra check aginst the second byte.
+  // From Unicode Standard v6.2, Table 3-7 Well-Formed UTF-8 Byte Sequences.
+  //
+  // The consumer should perform a followup check for second & 0xC0 == 0x80.
+  return (first == 0xE0 && (second & 0xE0) != 0xA0) ||  // E0 A0~BF
+         (first == 0xED && (second & 0xE0) != 0x80) ||  // ED 80~9F
+         (first == 0xF0 && (second & 0xF0) == 0x80) ||  // F0 90~BF
+         (first == 0xF4 && (second & 0xF0) != 0x80);    // F4 80~8F
+}
+
 // Scan UTF-8 input and (internally, at least) convert it to a series of UTF-16
 // code units. But you can also do odd things like pass an empty lambda for
 // `dst`, in which case the output is discarded entirely--the only effect of
 // calling the template that way is error-checking.
 template <OnUTF8Error ErrorAction, typename OutputFn>
-static bool InflateUTF8ToUTF16(JSContext* cx, const UTF8Chars src,
+static bool InflateUTF8ToUTF16(JSContext* cx, const UTF8Chars& src,
                                OutputFn dst) {
   size_t srclen = src.length();
   for (uint32_t i = 0; i < srclen; i++) {
@@ -271,12 +286,6 @@ static bool InflateUTF8ToUTF16(JSContext* cx, const UTF8Chars src,
         break;
       }
     } else {
-      // Non-ASCII code unit.  Determine its length in bytes (n).
-      uint32_t n = 1;
-      while (v & (0x80 >> n)) {
-        n++;
-      }
-
 #define INVALID(report, arg, n2)                                    \
   do {                                                              \
     if (ErrorAction == OnUTF8Error::Throw) {                        \
@@ -300,6 +309,14 @@ static bool InflateUTF8ToUTF16(JSContext* cx, const UTF8Chars src,
     }                                                               \
   } while (0)
 
+      // Non-ASCII code unit. Determine its length in bytes (n).
+      //
+      // Avoid undefined behavior from passing in 0
+      // (https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html#index-_005f_005fbuiltin_005fclz)
+      // by turning on the low bit so that 0xff will set n=31-24=7, which will
+      // be detected as an invalid character.
+      uint32_t n = mozilla::CountLeadingZeroes32(~int8_t(src[i]) | 0x1) - 24;
+
       // Check the leading byte.
       if (n < 2 || n > 4) {
         INVALID(ReportInvalidCharacter, i, 1);
@@ -307,16 +324,34 @@ static bool InflateUTF8ToUTF16(JSContext* cx, const UTF8Chars src,
 
       // Check that |src| is large enough to hold an n-byte code unit.
       if (i + n > srclen) {
-        INVALID(ReportBufferTooSmall, /* dummy = */ 0, 1);
+        // Check the second and continuation bytes, to replace maximal subparts
+        // of an ill-formed subsequence with single U+FFFD.
+        if (i + 2 > srclen) {
+          INVALID(ReportBufferTooSmall, /* dummy = */ 0, 1);
+        }
+
+        if (IsInvalidSecondByte(v, (uint8_t)src[i + 1])) {
+          INVALID(ReportInvalidCharacter, i, 1);
+        }
+
+        if ((src[i + 1] & 0xC0) != 0x80) {
+          INVALID(ReportInvalidCharacter, i, 1);
+        }
+
+        if (n == 3) {
+          INVALID(ReportInvalidCharacter, i, 2);
+        } else {
+          if (i + 3 > srclen) {
+            INVALID(ReportBufferTooSmall, /* dummy = */ 0, 2);
+          }
+          if ((src[i + 2] & 0xC0) != 0x80) {
+            INVALID(ReportInvalidCharacter, i, 2);
+          }
+          INVALID(ReportInvalidCharacter, i, 3);
+        }
       }
 
-      // Check the second byte.  From Unicode Standard v6.2, Table 3-7
-      // Well-Formed UTF-8 Byte Sequences.
-      if ((v == 0xE0 && ((uint8_t)src[i + 1] & 0xE0) != 0xA0) ||  // E0 A0~BF
-          (v == 0xED && ((uint8_t)src[i + 1] & 0xE0) != 0x80) ||  // ED 80~9F
-          (v == 0xF0 && ((uint8_t)src[i + 1] & 0xF0) == 0x80) ||  // F0 90~BF
-          (v == 0xF4 && ((uint8_t)src[i + 1] & 0xF0) != 0x80))    // F4 80~8F
-      {
+      if (IsInvalidSecondByte(v, (uint8_t)src[i + 1])) {
         INVALID(ReportInvalidCharacter, i, 1);
       }
 
@@ -359,7 +394,7 @@ static bool InflateUTF8ToUTF16(JSContext* cx, const UTF8Chars src,
 }
 
 template <OnUTF8Error ErrorAction, typename CharT>
-static void CopyAndInflateUTF8IntoBuffer(JSContext* cx, const UTF8Chars src,
+static void CopyAndInflateUTF8IntoBuffer(JSContext* cx, const UTF8Chars& src,
                                          CharT* dst, size_t outlen,
                                          bool allASCII) {
   if (allASCII) {
@@ -380,7 +415,7 @@ static void CopyAndInflateUTF8IntoBuffer(JSContext* cx, const UTF8Chars src,
 }
 
 template <OnUTF8Error ErrorAction, typename CharsT>
-static CharsT InflateUTF8StringHelper(JSContext* cx, const UTF8Chars src,
+static CharsT InflateUTF8StringHelper(JSContext* cx, const UTF8Chars& src,
                                       size_t* outlen, arena_id_t destArenaId) {
   using CharT = typename CharsT::CharT;
   static_assert(
@@ -420,7 +455,7 @@ static CharsT InflateUTF8StringHelper(JSContext* cx, const UTF8Chars src,
 }
 
 TwoByteCharsZ JS::UTF8CharsToNewTwoByteCharsZ(JSContext* cx,
-                                              const UTF8Chars utf8,
+                                              const UTF8Chars& utf8,
                                               size_t* outlen,
                                               arena_id_t destArenaId) {
   return InflateUTF8StringHelper<OnUTF8Error::Throw, TwoByteCharsZ>(
@@ -437,7 +472,7 @@ TwoByteCharsZ JS::UTF8CharsToNewTwoByteCharsZ(JSContext* cx,
 }
 
 TwoByteCharsZ JS::LossyUTF8CharsToNewTwoByteCharsZ(JSContext* cx,
-                                                   const JS::UTF8Chars utf8,
+                                                   const JS::UTF8Chars& utf8,
                                                    size_t* outlen,
                                                    arena_id_t destArenaId) {
   return InflateUTF8StringHelper<OnUTF8Error::InsertReplacementCharacter,
@@ -467,8 +502,8 @@ static void UpdateSmallestEncodingForChar(char16_t c,
   }
 }
 
-JS::SmallestEncoding JS::FindSmallestEncoding(UTF8Chars utf8) {
-  Span<unsigned char> unsignedSpan = utf8;
+JS::SmallestEncoding JS::FindSmallestEncoding(const UTF8Chars& utf8) {
+  Span<const unsigned char> unsignedSpan = utf8;
   auto charSpan = AsChars(unsignedSpan);
   size_t upTo = AsciiValidUpTo(charSpan);
   if (upTo == charSpan.Length()) {
@@ -480,7 +515,8 @@ JS::SmallestEncoding JS::FindSmallestEncoding(UTF8Chars utf8) {
   return SmallestEncoding::UTF16;
 }
 
-Latin1CharsZ JS::UTF8CharsToNewLatin1CharsZ(JSContext* cx, const UTF8Chars utf8,
+Latin1CharsZ JS::UTF8CharsToNewLatin1CharsZ(JSContext* cx,
+                                            const UTF8Chars& utf8,
                                             size_t* outlen,
                                             arena_id_t destArenaId) {
   return InflateUTF8StringHelper<OnUTF8Error::Throw, Latin1CharsZ>(
@@ -488,7 +524,7 @@ Latin1CharsZ JS::UTF8CharsToNewLatin1CharsZ(JSContext* cx, const UTF8Chars utf8,
 }
 
 Latin1CharsZ JS::LossyUTF8CharsToNewLatin1CharsZ(JSContext* cx,
-                                                 const UTF8Chars utf8,
+                                                 const UTF8Chars& utf8,
                                                  size_t* outlen,
                                                  arena_id_t destArenaId) {
   return InflateUTF8StringHelper<OnUTF8Error::InsertQuestionMark, Latin1CharsZ>(
@@ -502,7 +538,7 @@ Latin1CharsZ JS::LossyUTF8CharsToNewLatin1CharsZ(JSContext* cx,
  * consumption.
  */
 
-bool GetUTF8AtomizationData(JSContext* cx, const JS::UTF8Chars utf8,
+bool GetUTF8AtomizationData(JSContext* cx, const JS::UTF8Chars& utf8,
                             size_t* outlen, JS::SmallestEncoding* encoding,
                             HashNumber* hashNum) {
   *outlen = 0;
@@ -524,7 +560,7 @@ bool GetUTF8AtomizationData(JSContext* cx, const JS::UTF8Chars utf8,
 }
 
 template <typename CharT>
-bool UTF8EqualsChars(const JS::UTF8Chars utfChars, const CharT* chars) {
+bool UTF8EqualsChars(const JS::UTF8Chars& utfChars, const CharT* chars) {
   size_t ind = 0;
   bool isEqual = true;
 
@@ -555,22 +591,22 @@ bool UTF8EqualsChars(const JS::UTF8Chars utfChars, const CharT* chars) {
   return isEqual;
 }
 
-template bool UTF8EqualsChars(const JS::UTF8Chars, const char16_t*);
-template bool UTF8EqualsChars(const JS::UTF8Chars, const JS::Latin1Char*);
+template bool UTF8EqualsChars(const JS::UTF8Chars&, const char16_t*);
+template bool UTF8EqualsChars(const JS::UTF8Chars&, const JS::Latin1Char*);
 
 template <typename CharT>
-void InflateUTF8CharsToBuffer(const JS::UTF8Chars src, CharT* dst,
+void InflateUTF8CharsToBuffer(const JS::UTF8Chars& src, CharT* dst,
                               size_t dstLen, JS::SmallestEncoding encoding) {
   CopyAndInflateUTF8IntoBuffer<OnUTF8Error::Crash>(
       /* cx = */ nullptr, src, dst, dstLen,
       encoding == JS::SmallestEncoding::ASCII);
 }
 
-template void InflateUTF8CharsToBuffer(const UTF8Chars src, char16_t* dst,
+template void InflateUTF8CharsToBuffer(const UTF8Chars& src, char16_t* dst,
                                        size_t dstLen,
                                        JS::SmallestEncoding encoding);
-template void InflateUTF8CharsToBuffer(const UTF8Chars src, JS::Latin1Char* dst,
-                                       size_t dstLen,
+template void InflateUTF8CharsToBuffer(const UTF8Chars& src,
+                                       JS::Latin1Char* dst, size_t dstLen,
                                        JS::SmallestEncoding encoding);
 
 #ifdef DEBUG
@@ -581,6 +617,10 @@ void JS::ConstUTF8CharsZ::validate(size_t aLength) {
     return LoopDisposition::Continue;
   };
   InflateUTF8ToUTF16<OnUTF8Error::Crash>(/* cx = */ nullptr, chars, nop);
+}
+void JS::ConstUTF8CharsZ::validateWithoutLength() {
+  MOZ_ASSERT(data_);
+  validate(strlen(data_));
 }
 #endif
 
@@ -654,6 +694,7 @@ JS_PUBLIC_API JS::UniqueChars JS::EncodeWideToUtf8(JSContext* cx,
 
   // STL returns |codecvt_base::partial| for empty strings.
   if (len == 0) {
+    utf8[0] = '\0';  // Explicit null-termination required.
     return utf8;
   }
 
@@ -683,6 +724,10 @@ JS_PUBLIC_API JS::UniqueChars JS::EncodeWideToUtf8(JSContext* cx,
 
   return utf8;
 #else
+  // Alternative code path for Linux, because we still support libstd++ versions
+  // without codecvt support. See also the top comment where <codecvt> is
+  // included.
+
   static_assert(sizeof(wchar_t) == 4,
                 "Assume wchar_t is UTF-32 on Linux systems");
 
@@ -768,6 +813,7 @@ JS_PUBLIC_API JS::UniqueWideChars JS::EncodeUtf8ToWide(JSContext* cx,
 
   // STL returns |codecvt_base::partial| for empty strings.
   if (len == 0) {
+    wideChars[0] = '\0';  // Explicit null-termination required.
     return wideChars;
   }
 
@@ -787,6 +833,10 @@ JS_PUBLIC_API JS::UniqueWideChars JS::EncodeUtf8ToWide(JSContext* cx,
 
   return wideChars;
 #else
+  // Alternative code path for Linux, because we still support libstd++ versions
+  // without codecvt support. See also the top comment where <codecvt> is
+  // included.
+
   static_assert(sizeof(wchar_t) == 4,
                 "Assume wchar_t is UTF-32 on Linux systems");
 

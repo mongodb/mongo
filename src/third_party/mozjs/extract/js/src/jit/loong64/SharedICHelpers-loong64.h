@@ -63,8 +63,6 @@ inline void EmitBaselineLeaveStubFrame(MacroAssembler& masm) {
     SecondScratchRegisterScope scratch2(masm);
     masm.Pop(scratch2);
   }
-
-  masm.checkStackAlignment();
 }
 
 template <typename AddrType>

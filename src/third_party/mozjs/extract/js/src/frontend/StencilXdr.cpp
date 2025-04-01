@@ -9,6 +9,7 @@
 #include "mozilla/ArrayUtils.h"             // mozilla::ArrayEqual
 #include "mozilla/OperatorNewExtensions.h"  // mozilla::KnownNotNull
 #include "mozilla/ScopeExit.h"              // mozilla::MakeScopeExit
+#include "mozilla/Try.h"                    // MOZ_TRY
 
 #include <stddef.h>     // size_t
 #include <stdint.h>     // uint8_t, uint16_t, uint32_t
@@ -576,7 +577,7 @@ template <XDRMode mode>
 /* static */ XDRResult StencilXDR::codeModuleRequest(
     XDRState<mode>* xdr, StencilModuleRequest& stencil) {
   MOZ_TRY(xdr->codeUint32(stencil.specifier.rawDataRef()));
-  MOZ_TRY(XDRVectorContent(xdr, stencil.assertions));
+  MOZ_TRY(XDRVectorContent(xdr, stencil.attributes));
 
   return Ok();
 }
@@ -601,7 +602,7 @@ template <XDRMode mode>
   MOZ_TRY(xdr->codeUint32(stencil.importName.rawDataRef()));
   MOZ_TRY(xdr->codeUint32(stencil.exportName.rawDataRef()));
   MOZ_TRY(xdr->codeUint32(&stencil.lineno));
-  MOZ_TRY(xdr->codeUint32(&stencil.column));
+  MOZ_TRY(xdr->codeUint32(stencil.column.addressOfValueForTranscode()));
 
   return Ok();
 }
@@ -779,9 +780,6 @@ template <XDRMode mode>
   MOZ_TRY(xdr->codeUint8(&canLazilyParse));
   if (mode == XDR_DECODE) {
     stencil.canLazilyParse = canLazilyParse;
-    // NOTE: stencil.canLazilyParse can be different than
-    //       CanLazilyParse(static_cast<XDRStencilDecoder*>(xdr)->options()).
-    //       See bug 1726498 for removing the redundancy.
   }
 
   MOZ_TRY(xdr->codeUint32(&stencil.functionKey));
@@ -1219,7 +1217,7 @@ XDRResult StencilXDR::codeSourceData(XDRState<mode>* const xdr,
 template <XDRMode mode>
 /* static */
 XDRResult StencilXDR::codeSource(XDRState<mode>* xdr,
-                                 const JS::DecodeOptions* maybeOptions,
+                                 const JS::ReadOnlyDecodeOptions* maybeOptions,
                                  RefPtr<ScriptSource>& source) {
   FrontendContext* fc = xdr->fc();
 
@@ -1307,15 +1305,15 @@ XDRResult StencilXDR::codeSource(XDRState<mode>* xdr,
   }
 
   MOZ_TRY(xdr->codeUint32(&source->startLine_));
-  MOZ_TRY(xdr->codeUint32(&source->startColumn_));
+  MOZ_TRY(xdr->codeUint32(source->startColumn_.addressOfValueForTranscode()));
 
   // The introduction info doesn't persist across encode/decode.
   if (mode == XDR_DECODE) {
     source->introductionType_ = maybeOptions->introductionType;
     source->setIntroductionOffset(maybeOptions->introductionOffset);
-    if (maybeOptions->introducerFilename) {
-      if (!source->setIntroducerFilename(fc,
-                                         maybeOptions->introducerFilename)) {
+    if (maybeOptions->introducerFilename()) {
+      if (!source->setIntroducerFilename(
+              fc, maybeOptions->introducerFilename().c_str())) {
         return xdr->fail(JS::TranscodeResult::Throw);
       }
     }
@@ -1329,12 +1327,12 @@ XDRResult StencilXDR::codeSource(XDRState<mode>* xdr,
 template /* static */
     XDRResult
     StencilXDR::codeSource(XDRState<XDR_ENCODE>* xdr,
-                           const JS::DecodeOptions* maybeOptions,
+                           const JS::ReadOnlyDecodeOptions* maybeOptions,
                            RefPtr<ScriptSource>& holder);
 template /* static */
     XDRResult
     StencilXDR::codeSource(XDRState<XDR_DECODE>* xdr,
-                           const JS::DecodeOptions* maybeOptions,
+                           const JS::ReadOnlyDecodeOptions* maybeOptions,
                            RefPtr<ScriptSource>& holder);
 
 JS_PUBLIC_API bool JS::GetScriptTranscodingBuildId(
@@ -1462,6 +1460,8 @@ void StencilIncrementalEncoderPtr::reset() {
 bool StencilIncrementalEncoderPtr::setInitial(
     JSContext* cx,
     UniquePtr<frontend::ExtensibleCompilationStencil>&& initial) {
+  MOZ_ASSERT(!merger_);
+
   AutoReportFrontendContext fc(cx);
   merger_ = fc.getAllocator()->new_<frontend::CompilationStencilMerger>();
   if (!merger_) {
@@ -1480,7 +1480,8 @@ bool StencilIncrementalEncoderPtr::addDelazification(
 }
 
 XDRResult XDRStencilDecoder::codeStencil(
-    const JS::DecodeOptions& options, frontend::CompilationStencil& stencil) {
+    const JS::ReadOnlyDecodeOptions& options,
+    frontend::CompilationStencil& stencil) {
 #ifdef DEBUG
   auto sanityCheck = mozilla::MakeScopeExit(
       [&] { MOZ_ASSERT(validateResultCode(fc(), resultCode())); });

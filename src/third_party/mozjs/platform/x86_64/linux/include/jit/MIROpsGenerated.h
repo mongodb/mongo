@@ -23,6 +23,7 @@ _(Goto)\
 _(Test)\
 _(Return)\
 _(Throw)\
+_(ThrowWithStack)\
 _(NewArray)\
 _(NewArrayDynamicLength)\
 _(NewTypedArray)\
@@ -75,6 +76,9 @@ _(InArgumentsObjectArg)\
 _(ArgumentsObjectLength)\
 _(ArrayFromArgumentsObject)\
 _(GuardArgumentsObjectFlags)\
+_(LoadScriptedProxyHandler)\
+_(CheckScriptedProxyGetResult)\
+_(IdToStringOrSymbol)\
 _(ReturnFromCtor)\
 _(ToDouble)\
 _(ToFloat32)\
@@ -85,8 +89,11 @@ _(ExtendInt32ToInt64)\
 _(WasmBuiltinTruncateToInt64)\
 _(WasmTruncateToInt64)\
 _(WasmTruncateToInt32)\
-_(WasmBoxValue)\
+_(WasmAnyRefFromJSValue)\
 _(WasmAnyRefFromJSObject)\
+_(WasmAnyRefFromJSString)\
+_(WasmNewI31Ref)\
+_(WasmI31RefGet)\
 _(Int32ToIntPtr)\
 _(NonNegativeIntPtrToInt32)\
 _(IntPtrToDouble)\
@@ -158,16 +165,29 @@ _(Int32ToStringWithBase)\
 _(NumberParseInt)\
 _(DoubleParseInt)\
 _(Concat)\
+_(LinearizeString)\
 _(LinearizeForCharAccess)\
+_(LinearizeForCodePointAccess)\
+_(ToRelativeStringIndex)\
 _(CharCodeAt)\
-_(CharCodeAtMaybeOutOfBounds)\
-_(CharAtMaybeOutOfBounds)\
+_(CharCodeAtOrNegative)\
+_(CodePointAt)\
+_(CodePointAtOrNegative)\
+_(NegativeToNaN)\
+_(NegativeToUndefined)\
 _(FromCharCode)\
+_(FromCharCodeEmptyIfNegative)\
+_(FromCharCodeUndefinedIfNegative)\
 _(FromCodePoint)\
+_(StringIncludes)\
 _(StringIndexOf)\
+_(StringLastIndexOf)\
 _(StringStartsWith)\
 _(StringEndsWith)\
 _(StringConvertCase)\
+_(CharCodeConvertCase)\
+_(StringTrimStartIndex)\
+_(StringTrimEndIndex)\
 _(StringSplit)\
 _(BoxNonStrictThis)\
 _(ImplicitThis)\
@@ -192,8 +212,10 @@ _(GlobalDeclInstantiation)\
 _(RegExp)\
 _(RegExpMatcher)\
 _(RegExpSearcher)\
+_(RegExpSearcherLastLimit)\
 _(RegExpExecMatch)\
 _(RegExpExecTest)\
+_(RegExpHasCaptureGroups)\
 _(RegExpPrototypeOptimizable)\
 _(RegExpInstanceOptimizable)\
 _(GetFirstDollarIndex)\
@@ -217,8 +239,14 @@ _(ArrayBufferByteLength)\
 _(ArrayBufferViewLength)\
 _(ArrayBufferViewByteOffset)\
 _(ArrayBufferViewElements)\
+_(ResizableTypedArrayByteOffsetMaybeOutOfBounds)\
+_(ResizableTypedArrayLength)\
+_(ResizableDataViewByteLength)\
+_(GrowableSharedArrayBufferByteLength)\
 _(TypedArrayElementSize)\
 _(GuardHasAttachedArrayBuffer)\
+_(GuardResizableArrayBufferViewInBounds)\
+_(GuardResizableArrayBufferViewInBoundsOrDetached)\
 _(GuardNumberToIntPtrIndex)\
 _(KeepAliveObject)\
 _(DebugEnterGCUnsafeRegion)\
@@ -241,6 +269,8 @@ _(FrameArgumentsSlice)\
 _(InlineArgumentsSlice)\
 _(NormalizeSliceTerm)\
 _(ArrayJoin)\
+_(ObjectKeys)\
+_(ObjectKeysLength)\
 _(LoadUnboxedScalar)\
 _(LoadDataViewElement)\
 _(LoadTypedArrayElementHole)\
@@ -259,6 +289,7 @@ _(GetPropSuperCache)\
 _(BindNameCache)\
 _(CallBindVar)\
 _(GuardShape)\
+_(GuardFuse)\
 _(GuardMultipleShapes)\
 _(GuardProto)\
 _(GuardNullProto)\
@@ -277,8 +308,12 @@ _(MegamorphicLoadSlot)\
 _(MegamorphicLoadSlotByValue)\
 _(MegamorphicStoreSlot)\
 _(MegamorphicHasProp)\
+_(SmallObjectVariableKeyHasProp)\
 _(GuardIsNotArrayBufferMaybeShared)\
 _(GuardIsTypedArray)\
+_(GuardIsFixedLengthTypedArray)\
+_(GuardIsResizableTypedArray)\
+_(GuardHasProxyHandler)\
 _(NurseryObject)\
 _(GuardValue)\
 _(GuardNullOrUndefined)\
@@ -337,6 +372,7 @@ _(IteratorMore)\
 _(IsNoIter)\
 _(IteratorEnd)\
 _(CloseIterCache)\
+_(OptimizeGetIteratorCache)\
 _(InCache)\
 _(InArray)\
 _(GuardElementNotHole)\
@@ -363,6 +399,7 @@ _(IsObject)\
 _(IsNullOrUndefined)\
 _(HasClass)\
 _(GuardToClass)\
+_(GuardToEitherClass)\
 _(GuardToFunction)\
 _(IsArray)\
 _(IsTypedArray)\
@@ -370,6 +407,7 @@ _(ObjectClassToString)\
 _(CheckReturn)\
 _(CheckThis)\
 _(AsyncResolve)\
+_(AsyncReject)\
 _(GeneratorReturn)\
 _(AsyncAwait)\
 _(CheckThisReinit)\
@@ -435,12 +473,14 @@ _(MapObjectGetBigInt)\
 _(MapObjectGetValue)\
 _(MapObjectGetValueVMCall)\
 _(MapObjectSize)\
+_(PostIntPtrConversion)\
 _(WasmNeg)\
 _(WasmBinaryBitwise)\
 _(WasmLoadInstance)\
 _(WasmStoreInstance)\
-_(WasmHeapBase)\
+_(WasmHeapReg)\
 _(WasmBoundsCheck)\
+_(WasmBoundsCheckRange32)\
 _(WasmExtendU32Index)\
 _(WasmWrapU32Index)\
 _(WasmAddOffset)\
@@ -462,7 +502,8 @@ _(WasmStoreStackResult)\
 _(WasmDerivedPointer)\
 _(WasmDerivedIndexPointer)\
 _(WasmStoreRef)\
-_(WasmPostWriteBarrier)\
+_(WasmPostWriteBarrierImmediate)\
+_(WasmPostWriteBarrierIndex)\
 _(WasmParameter)\
 _(WasmReturn)\
 _(WasmReturnVoid)\
@@ -475,9 +516,13 @@ _(WasmStackResult)\
 _(WasmCallCatchable)\
 _(WasmCallUncatchable)\
 _(WasmCallLandingPrePad)\
+_(WasmReturnCall)\
 _(WasmSelect)\
 _(WasmReinterpret)\
 _(Rotate)\
+_(WasmStackSwitchToMain)\
+_(WasmStackSwitchToSuspendable)\
+_(WasmStackContinueOnSuspendable)\
 _(WasmBinarySimd128)\
 _(WasmBinarySimd128WithConstant)\
 _(WasmShiftSimd128)\
@@ -493,10 +538,15 @@ _(UnreachableResult)\
 _(IonToWasmCall)\
 _(WasmLoadField)\
 _(WasmLoadFieldKA)\
+_(WasmLoadElementKA)\
 _(WasmStoreFieldKA)\
 _(WasmStoreFieldRefKA)\
-_(WasmGcObjectIsSubtypeOfConcrete)\
-_(WasmGcObjectIsSubtypeOfAbstract)
+_(WasmStoreElementKA)\
+_(WasmStoreElementRefKA)\
+_(WasmRefIsSubtypeOfConcrete)\
+_(WasmRefIsSubtypeOfAbstract)\
+_(WasmNewStructObject)\
+_(WasmNewArrayObject)
 
 #define MIR_OPCODE_CLASS_GENERATED \
 class MStart : public MNullaryInstruction {\
@@ -551,12 +601,23 @@ class MIsConstructing : public MNullaryInstruction {\
 };\
 \
 class MThrow : public MUnaryInstruction, public BoxPolicy<0>::Data {\
-  explicit MThrow(MDefinition* ins) : MUnaryInstruction(classOpcode, ins) {\
+  explicit MThrow(MDefinition* value) : MUnaryInstruction(classOpcode, value) {\
   }\
  public:\
   INSTRUCTION_HEADER(Throw)\
   TRIVIAL_NEW_WRAPPERS\
-  NAMED_OPERANDS((0, ins))\
+  NAMED_OPERANDS((0, value))\
+  AliasSet getAliasSet() const override;\
+  bool possiblyCalls() const override { return true; }\
+};\
+\
+class MThrowWithStack : public MBinaryInstruction, public MixPolicy<BoxPolicy<0>, BoxPolicy<1>>::Data {\
+  explicit MThrowWithStack(MDefinition* value, MDefinition* stack) : MBinaryInstruction(classOpcode, value, stack) {\
+  }\
+ public:\
+  INSTRUCTION_HEADER(ThrowWithStack)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, value), (1, stack))\
   AliasSet getAliasSet() const override;\
   bool possiblyCalls() const override { return true; }\
 };\
@@ -852,6 +913,43 @@ class MGuardArgumentsObjectFlags : public MUnaryInstruction, public ObjectPolicy
   bool congruentTo(const MDefinition* ins) const override;\
 };\
 \
+class MLoadScriptedProxyHandler : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MLoadScriptedProxyHandler(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setGuard();\
+    setResultType(MIRType::Object);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(LoadScriptedProxyHandler)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MCheckScriptedProxyGetResult : public MTernaryInstruction, public MixPolicy<BoxPolicy<0>, BoxPolicy<1>, BoxPolicy<2>>::Data {\
+  explicit MCheckScriptedProxyGetResult(MDefinition* target, MDefinition* id, MDefinition* value) : MTernaryInstruction(classOpcode, target, id, value) {\
+    setGuard();\
+  }\
+ public:\
+  INSTRUCTION_HEADER(CheckScriptedProxyGetResult)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, target), (1, id), (2, value))\
+  AliasSet getAliasSet() const override;\
+};\
+\
+class MIdToStringOrSymbol : public MUnaryInstruction, public BoxPolicy<0>::Data {\
+  explicit MIdToStringOrSymbol(MDefinition* idVal) : MUnaryInstruction(classOpcode, idVal) {\
+    setResultType(MIRType::Value);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(IdToStringOrSymbol)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, idVal))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  MDefinition* foldsTo(TempAllocator& alloc) override;\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
 class MReturnFromCtor : public MBinaryInstruction, public MixPolicy<BoxPolicy<0>, ObjectPolicy<1>>::Data {\
   explicit MReturnFromCtor(MDefinition* value, MDefinition* object) : MBinaryInstruction(classOpcode, value, object) {\
     setResultType(MIRType::Object);\
@@ -879,12 +977,12 @@ class MWasmUnsignedToDouble : public MUnaryInstruction, public NoTypePolicy::Dat
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
-class MWasmBoxValue : public MUnaryInstruction, public BoxPolicy<0>::Data {\
-  explicit MWasmBoxValue(MDefinition* def) : MUnaryInstruction(classOpcode, def) {\
-    setResultType(MIRType::RefOrNull);\
+class MWasmAnyRefFromJSValue : public MUnaryInstruction, public BoxPolicy<0>::Data {\
+  explicit MWasmAnyRefFromJSValue(MDefinition* def) : MUnaryInstruction(classOpcode, def) {\
+    setResultType(MIRType::WasmAnyRef);\
   }\
  public:\
-  INSTRUCTION_HEADER(WasmBoxValue)\
+  INSTRUCTION_HEADER(WasmAnyRefFromJSValue)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, def))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
@@ -893,12 +991,51 @@ class MWasmBoxValue : public MUnaryInstruction, public BoxPolicy<0>::Data {\
 \
 class MWasmAnyRefFromJSObject : public MUnaryInstruction, public NoTypePolicy::Data {\
   explicit MWasmAnyRefFromJSObject(MDefinition* def) : MUnaryInstruction(classOpcode, def) {\
-    setResultType(MIRType::RefOrNull);\
+    setResultType(MIRType::WasmAnyRef);\
   }\
  public:\
   INSTRUCTION_HEADER(WasmAnyRefFromJSObject)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, def))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MWasmAnyRefFromJSString : public MUnaryInstruction, public NoTypePolicy::Data {\
+  explicit MWasmAnyRefFromJSString(MDefinition* def) : MUnaryInstruction(classOpcode, def) {\
+    setResultType(MIRType::WasmAnyRef);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(WasmAnyRefFromJSString)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, def))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MWasmNewI31Ref : public MUnaryInstruction, public NoTypePolicy::Data {\
+  explicit MWasmNewI31Ref(MDefinition* input) : MUnaryInstruction(classOpcode, input) {\
+    setMovable();\
+    setResultType(MIRType::WasmAnyRef);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(WasmNewI31Ref)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, input))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MWasmI31RefGet : public MUnaryInstruction, public NoTypePolicy::Data {\
+  wasm::FieldWideningOp wideningOp_;\
+  explicit MWasmI31RefGet(MDefinition* input, wasm::FieldWideningOp wideningOp) : MUnaryInstruction(classOpcode, input), wideningOp_(wideningOp) {\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  wasm::FieldWideningOp wideningOp() const { return wideningOp_; }\
+  INSTRUCTION_HEADER(WasmI31RefGet)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, input))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
@@ -990,16 +1127,18 @@ class MRandom : public MNullaryInstruction {\
 };\
 \
 class MInt32ToStringWithBase : public MBinaryInstruction, public MixPolicy<UnboxedInt32Policy<0>, UnboxedInt32Policy<1>>::Data {\
-  explicit MInt32ToStringWithBase(MDefinition* input, MDefinition* base) : MBinaryInstruction(classOpcode, input, base) {\
+  bool lowerCase_;\
+  explicit MInt32ToStringWithBase(MDefinition* input, MDefinition* base, bool lowerCase) : MBinaryInstruction(classOpcode, input, base), lowerCase_(lowerCase) {\
     setMovable();\
     setResultType(MIRType::String);\
   }\
  public:\
+  bool lowerCase() const { return lowerCase_; }\
   INSTRUCTION_HEADER(Int32ToStringWithBase)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, input), (1, base))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
-  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  bool congruentTo(const MDefinition* ins) const override;\
 };\
 \
 class MNumberParseInt : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
@@ -1029,6 +1168,19 @@ class MDoubleParseInt : public MUnaryInstruction, public DoublePolicy<0>::Data {
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
+class MLinearizeString : public MUnaryInstruction, public StringPolicy<0>::Data {\
+  explicit MLinearizeString(MDefinition* string) : MUnaryInstruction(classOpcode, string) {\
+    setMovable();\
+    setResultType(MIRType::String);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(LinearizeString)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, string))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
 class MLinearizeForCharAccess : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
   explicit MLinearizeForCharAccess(MDefinition* string, MDefinition* index) : MBinaryInstruction(classOpcode, string, index) {\
     setMovable();\
@@ -1039,6 +1191,33 @@ class MLinearizeForCharAccess : public MBinaryInstruction, public MixPolicy<Stri
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, string), (1, index))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MLinearizeForCodePointAccess : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
+  explicit MLinearizeForCodePointAccess(MDefinition* string, MDefinition* index) : MBinaryInstruction(classOpcode, string, index) {\
+    setMovable();\
+    setResultType(MIRType::String);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(LinearizeForCodePointAccess)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, string), (1, index))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MToRelativeStringIndex : public MBinaryInstruction, public MixPolicy<UnboxedInt32Policy<0>, UnboxedInt32Policy<1>>::Data {\
+  explicit MToRelativeStringIndex(MDefinition* index, MDefinition* length) : MBinaryInstruction(classOpcode, index, length) {\
+    setMovable();\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(ToRelativeStringIndex)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, index), (1, length))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  MDefinition* foldsTo(TempAllocator& alloc) override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
@@ -1061,28 +1240,70 @@ class MCharCodeAt : public MBinaryInstruction, public MixPolicy<StringPolicy<0>,
   ALLOW_CLONE(MCharCodeAt)\
 };\
 \
-class MCharCodeAtMaybeOutOfBounds : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
-  explicit MCharCodeAtMaybeOutOfBounds(MDefinition* string, MDefinition* index) : MBinaryInstruction(classOpcode, string, index) {\
+class MCharCodeAtOrNegative : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
+  explicit MCharCodeAtOrNegative(MDefinition* string, MDefinition* index) : MBinaryInstruction(classOpcode, string, index) {\
     setMovable();\
-    setResultType(MIRType::Value);\
+    setResultType(MIRType::Int32);\
   }\
  public:\
-  INSTRUCTION_HEADER(CharCodeAtMaybeOutOfBounds)\
+  INSTRUCTION_HEADER(CharCodeAtOrNegative)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, string), (1, index))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
-class MCharAtMaybeOutOfBounds : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
-  explicit MCharAtMaybeOutOfBounds(MDefinition* string, MDefinition* index) : MBinaryInstruction(classOpcode, string, index) {\
+class MCodePointAt : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
+  explicit MCodePointAt(MDefinition* string, MDefinition* index) : MBinaryInstruction(classOpcode, string, index) {\
     setMovable();\
-    setResultType(MIRType::String);\
+    setResultType(MIRType::Int32);\
   }\
  public:\
-  INSTRUCTION_HEADER(CharAtMaybeOutOfBounds)\
+  INSTRUCTION_HEADER(CodePointAt)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, string), (1, index))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  MDefinition* foldsTo(TempAllocator& alloc) override;\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  void computeRange(TempAllocator& alloc) override;\
+  ALLOW_CLONE(MCodePointAt)\
+};\
+\
+class MCodePointAtOrNegative : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
+  explicit MCodePointAtOrNegative(MDefinition* string, MDefinition* index) : MBinaryInstruction(classOpcode, string, index) {\
+    setMovable();\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(CodePointAtOrNegative)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, string), (1, index))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MNegativeToNaN : public MUnaryInstruction, public UnboxedInt32Policy<0>::Data {\
+  explicit MNegativeToNaN(MDefinition* input) : MUnaryInstruction(classOpcode, input) {\
+    setMovable();\
+    setResultType(MIRType::Value);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(NegativeToNaN)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, input))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MNegativeToUndefined : public MUnaryInstruction, public UnboxedInt32Policy<0>::Data {\
+  explicit MNegativeToUndefined(MDefinition* input) : MUnaryInstruction(classOpcode, input) {\
+    setMovable();\
+    setResultType(MIRType::Value);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(NegativeToUndefined)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, input))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
@@ -1104,6 +1325,36 @@ class MFromCharCode : public MUnaryInstruction, public UnboxedInt32Policy<0>::Da
   ALLOW_CLONE(MFromCharCode)\
 };\
 \
+class MFromCharCodeEmptyIfNegative : public MUnaryInstruction, public UnboxedInt32Policy<0>::Data {\
+  explicit MFromCharCodeEmptyIfNegative(MDefinition* code) : MUnaryInstruction(classOpcode, code) {\
+    setMovable();\
+    setResultType(MIRType::String);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(FromCharCodeEmptyIfNegative)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, code))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  [[nodiscard]] bool writeRecoverData(\
+    CompactBufferWriter& writer) const override;\
+  bool canRecoverOnBailout() const override { return true; }\
+  ALLOW_CLONE(MFromCharCodeEmptyIfNegative)\
+};\
+\
+class MFromCharCodeUndefinedIfNegative : public MUnaryInstruction, public UnboxedInt32Policy<0>::Data {\
+  explicit MFromCharCodeUndefinedIfNegative(MDefinition* code) : MUnaryInstruction(classOpcode, code) {\
+    setMovable();\
+    setResultType(MIRType::Value);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(FromCharCodeUndefinedIfNegative)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, code))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
 class MFromCodePoint : public MUnaryInstruction, public UnboxedInt32Policy<0>::Data {\
   explicit MFromCodePoint(MDefinition* codePoint) : MUnaryInstruction(classOpcode, codePoint) {\
     setGuard();\
@@ -1119,6 +1370,20 @@ class MFromCodePoint : public MUnaryInstruction, public UnboxedInt32Policy<0>::D
   ALLOW_CLONE(MFromCodePoint)\
 };\
 \
+class MStringIncludes : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, StringPolicy<1>>::Data {\
+  explicit MStringIncludes(MDefinition* string, MDefinition* searchString) : MBinaryInstruction(classOpcode, string, searchString) {\
+    setMovable();\
+    setResultType(MIRType::Boolean);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(StringIncludes)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, string), (1, searchString))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  bool possiblyCalls() const override { return true; }\
+};\
+\
 class MStringIndexOf : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, StringPolicy<1>>::Data {\
   explicit MStringIndexOf(MDefinition* string, MDefinition* searchString) : MBinaryInstruction(classOpcode, string, searchString) {\
     setMovable();\
@@ -1126,6 +1391,20 @@ class MStringIndexOf : public MBinaryInstruction, public MixPolicy<StringPolicy<
   }\
  public:\
   INSTRUCTION_HEADER(StringIndexOf)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, string), (1, searchString))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  bool possiblyCalls() const override { return true; }\
+};\
+\
+class MStringLastIndexOf : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, StringPolicy<1>>::Data {\
+  explicit MStringLastIndexOf(MDefinition* string, MDefinition* searchString) : MBinaryInstruction(classOpcode, string, searchString) {\
+    setMovable();\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(StringLastIndexOf)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, string), (1, searchString))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
@@ -1159,6 +1438,32 @@ class MStringEndsWith : public MBinaryInstruction, public MixPolicy<StringPolicy
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
   bool possiblyCalls() const override { return true; }\
+};\
+\
+class MStringTrimStartIndex : public MUnaryInstruction, public StringPolicy<0>::Data {\
+  explicit MStringTrimStartIndex(MDefinition* string) : MUnaryInstruction(classOpcode, string) {\
+    setMovable();\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(StringTrimStartIndex)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, string))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MStringTrimEndIndex : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, UnboxedInt32Policy<1>>::Data {\
+  explicit MStringTrimEndIndex(MDefinition* string, MDefinition* start) : MBinaryInstruction(classOpcode, string, start) {\
+    setMovable();\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(StringTrimEndIndex)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, string), (1, start))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
 class MStringSplit : public MBinaryInstruction, public MixPolicy<StringPolicy<0>, StringPolicy<1>>::Data {\
@@ -1237,7 +1542,7 @@ class MInterruptCheck : public MNullaryInstruction {\
 class MWasmTrapIfNull : public MUnaryInstruction, public NoTypePolicy::Data {\
   wasm::Trap trap_;\
   wasm::BytecodeOffset bytecodeOffset_;\
-  explicit MWasmTrapIfNull(MDefinition* value, wasm::Trap trap, wasm::BytecodeOffset bytecodeOffset) : MUnaryInstruction(classOpcode, value), trap_(trap), bytecodeOffset_(bytecodeOffset) {\
+  explicit MWasmTrapIfNull(MDefinition* ref, wasm::Trap trap, wasm::BytecodeOffset bytecodeOffset) : MUnaryInstruction(classOpcode, ref), trap_(trap), bytecodeOffset_(bytecodeOffset) {\
     setGuard();\
     setResultType(MIRType::None);\
   }\
@@ -1246,7 +1551,7 @@ class MWasmTrapIfNull : public MUnaryInstruction, public NoTypePolicy::Data {\
   wasm::BytecodeOffset bytecodeOffset() const { return bytecodeOffset_; }\
   INSTRUCTION_HEADER(WasmTrapIfNull)\
   TRIVIAL_NEW_WRAPPERS\
-  NAMED_OPERANDS((0, value))\
+  NAMED_OPERANDS((0, ref))\
 };\
 \
 class MThrowRuntimeLexicalError : public MNullaryInstruction {\
@@ -1295,9 +1600,6 @@ class MRegExpMatcher : public MTernaryInstruction, public MixPolicy<ObjectPolicy
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, regexp), (1, string), (2, lastIndex))\
   bool possiblyCalls() const override { return true; }\
-  [[nodiscard]] bool writeRecoverData(\
-    CompactBufferWriter& writer) const override;\
-  bool canRecoverOnBailout() const override { return true; }\
 };\
 \
 class MRegExpSearcher : public MTernaryInstruction, public MixPolicy<ObjectPolicy<0>, StringPolicy<1>, UnboxedInt32Policy<2>>::Data {\
@@ -1309,9 +1611,15 @@ class MRegExpSearcher : public MTernaryInstruction, public MixPolicy<ObjectPolic
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, regexp), (1, string), (2, lastIndex))\
   bool possiblyCalls() const override { return true; }\
-  [[nodiscard]] bool writeRecoverData(\
-    CompactBufferWriter& writer) const override;\
-  bool canRecoverOnBailout() const override { return true; }\
+};\
+\
+class MRegExpSearcherLastLimit : public MNullaryInstruction {\
+  explicit MRegExpSearcherLastLimit() : MNullaryInstruction(classOpcode) {\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(RegExpSearcherLastLimit)\
+  TRIVIAL_NEW_WRAPPERS\
 };\
 \
 class MRegExpExecMatch : public MBinaryInstruction, public MixPolicy<ObjectPolicy<0>, StringPolicy<1>>::Data {\
@@ -1333,6 +1641,17 @@ class MRegExpExecTest : public MBinaryInstruction, public MixPolicy<ObjectPolicy
   INSTRUCTION_HEADER(RegExpExecTest)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, regexp), (1, string))\
+  bool possiblyCalls() const override { return true; }\
+};\
+\
+class MRegExpHasCaptureGroups : public MBinaryInstruction, public MixPolicy<ObjectPolicy<0>, StringPolicy<1>>::Data {\
+  explicit MRegExpHasCaptureGroups(MDefinition* regexp, MDefinition* input) : MBinaryInstruction(classOpcode, regexp, input) {\
+    setResultType(MIRType::Boolean);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(RegExpHasCaptureGroups)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, regexp), (1, input))\
   bool possiblyCalls() const override { return true; }\
 };\
 \
@@ -1367,6 +1686,7 @@ class MSubstr : public MTernaryInstruction, public MixPolicy<StringPolicy<0>, Un
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, string), (1, begin), (2, length))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  MDefinition* foldsTo(TempAllocator& alloc) override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
   [[nodiscard]] bool writeRecoverData(\
     CompactBufferWriter& writer) const override;\
@@ -1472,6 +1792,7 @@ class MArrayLength : public MUnaryInstruction, public NoTypePolicy::Data {\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, elements))\
   AliasSet getAliasSet() const override;\
+  MDefinition* foldsTo(TempAllocator& alloc) override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
   void computeRange(TempAllocator& alloc) override;\
   ALLOW_CLONE(MArrayLength)\
@@ -1485,9 +1806,6 @@ class MSetArrayLength : public MBinaryInstruction, public NoTypePolicy::Data {\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, elements), (1, index))\
   AliasSet getAliasSet() const override;\
-  [[nodiscard]] bool writeRecoverData(\
-    CompactBufferWriter& writer) const override;\
-  bool canRecoverOnBailout() const override;\
 };\
 \
 class MFunctionLength : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
@@ -1571,6 +1889,64 @@ class MArrayBufferViewElements : public MUnaryInstruction, public ObjectPolicy<0
   ALLOW_CLONE(MArrayBufferViewElements)\
 };\
 \
+class MResizableTypedArrayByteOffsetMaybeOutOfBounds : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MResizableTypedArrayByteOffsetMaybeOutOfBounds(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setMovable();\
+    setResultType(MIRType::IntPtr);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(ResizableTypedArrayByteOffsetMaybeOutOfBounds)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override;\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  void computeRange(TempAllocator& alloc) override;\
+};\
+\
+class MResizableTypedArrayLength : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  MemoryBarrierRequirement requiresMemoryBarrier_;\
+  explicit MResizableTypedArrayLength(MDefinition* object, MemoryBarrierRequirement requiresMemoryBarrier) : MUnaryInstruction(classOpcode, object), requiresMemoryBarrier_(requiresMemoryBarrier) {\
+    setGuard();\
+    setResultType(MIRType::IntPtr);\
+  }\
+ public:\
+  MemoryBarrierRequirement requiresMemoryBarrier() const { return requiresMemoryBarrier_; }\
+  INSTRUCTION_HEADER(ResizableTypedArrayLength)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override;\
+  bool congruentTo(const MDefinition* ins) const override;\
+  void computeRange(TempAllocator& alloc) override;\
+};\
+\
+class MResizableDataViewByteLength : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  MemoryBarrierRequirement requiresMemoryBarrier_;\
+  explicit MResizableDataViewByteLength(MDefinition* object, MemoryBarrierRequirement requiresMemoryBarrier) : MUnaryInstruction(classOpcode, object), requiresMemoryBarrier_(requiresMemoryBarrier) {\
+    setGuard();\
+    setResultType(MIRType::IntPtr);\
+  }\
+ public:\
+  MemoryBarrierRequirement requiresMemoryBarrier() const { return requiresMemoryBarrier_; }\
+  INSTRUCTION_HEADER(ResizableDataViewByteLength)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override;\
+  bool congruentTo(const MDefinition* ins) const override;\
+  void computeRange(TempAllocator& alloc) override;\
+};\
+\
+class MGrowableSharedArrayBufferByteLength : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MGrowableSharedArrayBufferByteLength(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setGuard();\
+    setResultType(MIRType::IntPtr);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(GrowableSharedArrayBufferByteLength)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override;\
+};\
+\
 class MTypedArrayElementSize : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
   explicit MTypedArrayElementSize(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
     setMovable();\
@@ -1593,6 +1969,34 @@ class MGuardHasAttachedArrayBuffer : public MUnaryInstruction, public ObjectPoli
   }\
  public:\
   INSTRUCTION_HEADER(GuardHasAttachedArrayBuffer)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override;\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MGuardResizableArrayBufferViewInBounds : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MGuardResizableArrayBufferViewInBounds(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setGuard();\
+    setMovable();\
+    setResultType(MIRType::Object);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(GuardResizableArrayBufferViewInBounds)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override;\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MGuardResizableArrayBufferViewInBoundsOrDetached : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MGuardResizableArrayBufferViewInBoundsOrDetached(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setGuard();\
+    setMovable();\
+    setResultType(MIRType::Object);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(GuardResizableArrayBufferViewInBoundsOrDetached)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
   AliasSet getAliasSet() const override;\
@@ -1717,6 +2121,32 @@ class MArrayJoin : public MBinaryInstruction, public MixPolicy<ObjectPolicy<0>, 
   bool possiblyCalls() const override { return true; }\
 };\
 \
+class MObjectKeys : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MObjectKeys(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setResultType(MIRType::Object);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(ObjectKeys)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  [[nodiscard]] bool writeRecoverData(\
+    CompactBufferWriter& writer) const override;\
+  bool canRecoverOnBailout() const override;\
+};\
+\
+class MObjectKeysLength : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MObjectKeysLength(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(ObjectKeysLength)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override;\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  ALLOW_CLONE(MObjectKeysLength)\
+};\
+\
 class MHomeObjectSuperBase : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
   explicit MHomeObjectSuperBase(MDefinition* homeObject) : MUnaryInstruction(classOpcode, homeObject) {\
     setMovable();\
@@ -1767,6 +2197,21 @@ class MGuardShape : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
   NAMED_OPERANDS((0, object))\
   AliasSet getAliasSet() const override;\
   AliasType mightAlias(const MDefinition* store) const override;\
+  bool congruentTo(const MDefinition* ins) const override;\
+};\
+\
+class MGuardFuse : public MNullaryInstruction {\
+  RealmFuses::FuseIndex fuseIndex_;\
+  explicit MGuardFuse(RealmFuses::FuseIndex fuseIndex) : MNullaryInstruction(classOpcode), fuseIndex_(fuseIndex) {\
+    setGuard();\
+    setMovable();\
+    setResultType(MIRType::None);\
+  }\
+ public:\
+  RealmFuses::FuseIndex fuseIndex() const { return fuseIndex_; }\
+  INSTRUCTION_HEADER(GuardFuse)\
+  TRIVIAL_NEW_WRAPPERS\
+  AliasSet getAliasSet() const override;\
   bool congruentTo(const MDefinition* ins) const override;\
 };\
 \
@@ -1994,6 +2439,20 @@ class MMegamorphicHasProp : public MBinaryInstruction, public MixPolicy<ObjectPo
   bool possiblyCalls() const override { return true; }\
 };\
 \
+class MSmallObjectVariableKeyHasProp : public MUnaryInstruction, public StringPolicy<0>::Data {\
+  CompilerGCPointer<Shape*> shape_;\
+  explicit MSmallObjectVariableKeyHasProp(MDefinition* idStr, Shape* shape) : MUnaryInstruction(classOpcode, idStr), shape_(shape) {\
+    setResultType(MIRType::Boolean);\
+  }\
+ public:\
+  Shape* shape() const { return shape_; }\
+  INSTRUCTION_HEADER(SmallObjectVariableKeyHasProp)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, idStr))\
+  AliasSet getAliasSet() const override;\
+  bool congruentTo(const MDefinition* ins) const override;\
+};\
+\
 class MGuardIsNotArrayBufferMaybeShared : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
   explicit MGuardIsNotArrayBufferMaybeShared(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
     setGuard();\
@@ -2017,6 +2476,50 @@ class MGuardIsTypedArray : public MUnaryInstruction, public ObjectPolicy<0>::Dat
   }\
  public:\
   INSTRUCTION_HEADER(GuardIsTypedArray)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MGuardIsFixedLengthTypedArray : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MGuardIsFixedLengthTypedArray(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setGuard();\
+    setMovable();\
+    setResultType(MIRType::Object);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(GuardIsFixedLengthTypedArray)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MGuardIsResizableTypedArray : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  explicit MGuardIsResizableTypedArray(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+    setGuard();\
+    setMovable();\
+    setResultType(MIRType::Object);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(GuardIsResizableTypedArray)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, object))\
+  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
+class MGuardHasProxyHandler : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
+  const void* handler_;\
+  explicit MGuardHasProxyHandler(MDefinition* object, const void* handler) : MUnaryInstruction(classOpcode, object), handler_(handler) {\
+    setGuard();\
+    setMovable();\
+    setResultType(MIRType::Object);\
+  }\
+ public:\
+  const void* handler() const { return handler_; }\
+  INSTRUCTION_HEADER(GuardHasProxyHandler)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
@@ -2502,6 +3005,16 @@ class MCloseIterCache : public MUnaryInstruction, public ObjectPolicy<0>::Data {
   bool possiblyCalls() const override { return true; }\
 };\
 \
+class MOptimizeGetIteratorCache : public MUnaryInstruction, public BoxPolicy<0>::Data {\
+  explicit MOptimizeGetIteratorCache(MDefinition* value) : MUnaryInstruction(classOpcode, value) {\
+    setResultType(MIRType::Boolean);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(OptimizeGetIteratorCache)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, value))\
+};\
+\
 class MNewPrivateName : public MNullaryInstruction {\
   CompilerGCPointer<JSAtom*> name_;\
   explicit MNewPrivateName(JSAtom* name) : MNullaryInstruction(classOpcode), name_(name) {\
@@ -2662,7 +3175,7 @@ class MIsObject : public MUnaryInstruction, public BoxPolicy<0>::Data {\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
-class MIsNullOrUndefined : public MUnaryInstruction, public BoxPolicy<0>::Data {\
+class MIsNullOrUndefined : public MUnaryInstruction, public NoTypePolicy::Data {\
   explicit MIsNullOrUndefined(MDefinition* value) : MUnaryInstruction(classOpcode, value) {\
     setMovable();\
     setResultType(MIRType::Boolean);\
@@ -2674,6 +3187,7 @@ class MIsNullOrUndefined : public MUnaryInstruction, public BoxPolicy<0>::Data {
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
   MDefinition* foldsTo(TempAllocator& alloc) override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  bool canConsumeFloat32(MUse* use) const override { return true; }\
 };\
 \
 class MObjectClassToString : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
@@ -2718,15 +3232,23 @@ class MCheckThis : public MUnaryInstruction, public BoxPolicy<0>::Data {\
 };\
 \
 class MAsyncResolve : public MBinaryInstruction, public MixPolicy<ObjectPolicy<0>, BoxPolicy<1>>::Data {\
-  AsyncFunctionResolveKind resolveKind_;\
-  explicit MAsyncResolve(MDefinition* generator, MDefinition* valueOrReason, AsyncFunctionResolveKind resolveKind) : MBinaryInstruction(classOpcode, generator, valueOrReason), resolveKind_(resolveKind) {\
+  explicit MAsyncResolve(MDefinition* generator, MDefinition* value) : MBinaryInstruction(classOpcode, generator, value) {\
     setResultType(MIRType::Object);\
   }\
  public:\
-  AsyncFunctionResolveKind resolveKind() const { return resolveKind_; }\
   INSTRUCTION_HEADER(AsyncResolve)\
   TRIVIAL_NEW_WRAPPERS\
-  NAMED_OPERANDS((0, generator), (1, valueOrReason))\
+  NAMED_OPERANDS((0, generator), (1, value))\
+};\
+\
+class MAsyncReject : public MTernaryInstruction, public MixPolicy<ObjectPolicy<0>, BoxPolicy<1>, BoxPolicy<2>>::Data {\
+  explicit MAsyncReject(MDefinition* generator, MDefinition* reason, MDefinition* stack) : MTernaryInstruction(classOpcode, generator, reason, stack) {\
+    setResultType(MIRType::Object);\
+  }\
+ public:\
+  INSTRUCTION_HEADER(AsyncReject)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, generator), (1, reason), (2, stack))\
 };\
 \
 class MGeneratorReturn : public MUnaryInstruction, public BoxPolicy<0>::Data {\
@@ -2795,7 +3317,7 @@ class MCheckIsObj : public MUnaryInstruction, public BoxPolicy<0>::Data {\
   INSTRUCTION_HEADER(CheckIsObj)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, value))\
-  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  AliasSet getAliasSet() const override;\
   MDefinition* foldsTo(TempAllocator& alloc) override;\
 };\
 \
@@ -2944,16 +3466,18 @@ class MLoadValueTag : public MUnaryInstruction, public BoxPolicy<0>::Data {\
 };\
 \
 class MLoadWrapperTarget : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
-  explicit MLoadWrapperTarget(MDefinition* object) : MUnaryInstruction(classOpcode, object) {\
+  bool fallible_;\
+  explicit MLoadWrapperTarget(MDefinition* object, bool fallible) : MUnaryInstruction(classOpcode, object), fallible_(fallible) {\
     setMovable();\
     setResultType(MIRType::Object);\
   }\
  public:\
+  bool fallible() const { return fallible_; }\
   INSTRUCTION_HEADER(LoadWrapperTarget)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
   AliasSet getAliasSet() const override;\
-  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  bool congruentTo(const MDefinition* ins) const override;\
 };\
 \
 class MGuardHasGetterSetter : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
@@ -3461,6 +3985,19 @@ class MMapObjectSize : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
+class MWasmBoundsCheckRange32 : public MTernaryInstruction, public NoTypePolicy::Data {\
+  wasm::BytecodeOffset bytecodeOffset_;\
+  explicit MWasmBoundsCheckRange32(MDefinition* index, MDefinition* length, MDefinition* limit, wasm::BytecodeOffset bytecodeOffset) : MTernaryInstruction(classOpcode, index, length, limit), bytecodeOffset_(bytecodeOffset) {\
+    setResultType(MIRType::Int32);\
+  }\
+ public:\
+  wasm::BytecodeOffset bytecodeOffset() const { return bytecodeOffset_; }\
+  INSTRUCTION_HEADER(WasmBoundsCheckRange32)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, index), (1, length), (2, limit))\
+  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+};\
+\
 class MWasmExtendU32Index : public MUnaryInstruction, public NoTypePolicy::Data {\
   explicit MWasmExtendU32Index(MDefinition* input) : MUnaryInstruction(classOpcode, input) {\
     setMovable();\
@@ -3498,6 +4035,33 @@ class MWasmFence : public MNullaryInstruction {\
   TRIVIAL_NEW_WRAPPERS\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
   ALLOW_CLONE(MWasmFence)\
+};\
+\
+class MWasmStackSwitchToMain : public MTernaryInstruction, public NoTypePolicy::Data {\
+  explicit MWasmStackSwitchToMain(MDefinition* suspender, MDefinition* fn, MDefinition* data) : MTernaryInstruction(classOpcode, suspender, fn, data) {\
+  }\
+ public:\
+  INSTRUCTION_HEADER(WasmStackSwitchToMain)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, suspender), (1, fn), (2, data))\
+};\
+\
+class MWasmStackSwitchToSuspendable : public MTernaryInstruction, public NoTypePolicy::Data {\
+  explicit MWasmStackSwitchToSuspendable(MDefinition* suspender, MDefinition* fn, MDefinition* data) : MTernaryInstruction(classOpcode, suspender, fn, data) {\
+  }\
+ public:\
+  INSTRUCTION_HEADER(WasmStackSwitchToSuspendable)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, suspender), (1, fn), (2, data))\
+};\
+\
+class MWasmStackContinueOnSuspendable : public MUnaryInstruction, public NoTypePolicy::Data {\
+  explicit MWasmStackContinueOnSuspendable(MDefinition* suspender) : MUnaryInstruction(classOpcode, suspender) {\
+  }\
+ public:\
+  INSTRUCTION_HEADER(WasmStackContinueOnSuspendable)\
+  TRIVIAL_NEW_WRAPPERS\
+  NAMED_OPERANDS((0, suspender))\
 };\
 \
 class MWasmShiftSimd128 : public MBinaryInstruction, public NoTypePolicy::Data {\
@@ -3550,11 +4114,12 @@ class MWasmUnarySimd128 : public MUnaryInstruction, public NoTypePolicy::Data {\
 
 
 #define NON_GC_POINTER_TYPE_ASSERTIONS_GENERATED \
-static_assert(!std::is_base_of_v<gc::Cell, AsyncFunctionResolveKind>, "Ensure that AsyncFunctionResolveKind is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, BuiltinObjectKind>, "Ensure that BuiltinObjectKind is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, FunctionFlags>, "Ensure that FunctionFlags is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, FunctionFlags::FunctionKind>, "Ensure that FunctionFlags::FunctionKind is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
+static_assert(!std::is_base_of_v<gc::Cell, MemoryBarrierRequirement>, "Ensure that MemoryBarrierRequirement is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, PropertyKey>, "Ensure that PropertyKey is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
+static_assert(!std::is_base_of_v<gc::Cell, RealmFuses::FuseIndex>, "Ensure that RealmFuses::FuseIndex is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, SimdShuffle>, "Ensure that SimdShuffle is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, bool>, "Ensure that bool is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, const void>, "Ensure that const void is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
@@ -3567,6 +4132,7 @@ static_assert(!std::is_base_of_v<gc::Cell, uint32_t>, "Ensure that uint32_t is a
 static_assert(!std::is_base_of_v<gc::Cell, uint8_t>, "Ensure that uint8_t is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, unsigned>, "Ensure that unsigned is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, wasm::BytecodeOffset>, "Ensure that wasm::BytecodeOffset is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
+static_assert(!std::is_base_of_v<gc::Cell, wasm::FieldWideningOp>, "Ensure that wasm::FieldWideningOp is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, wasm::SimdOp>, "Ensure that wasm::SimdOp is added to the gc_pointer_types list in GenerateMIRFiles.py.");\
 static_assert(!std::is_base_of_v<gc::Cell, wasm::Trap>, "Ensure that wasm::Trap is added to the gc_pointer_types list in GenerateMIRFiles.py.");
 

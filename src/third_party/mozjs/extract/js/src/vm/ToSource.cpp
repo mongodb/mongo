@@ -15,7 +15,7 @@
 #include "builtin/Array.h"          // ArrayToSource
 #include "builtin/Boolean.h"        // BooleanToString
 #include "builtin/Object.h"         // ObjectToSource
-#include "gc/Allocator.h"           // CanGC
+#include "gc/GCEnum.h"              // CanGC
 #include "js/Class.h"               // ESClass
 #include "js/friend/StackLimits.h"  // js::AutoCheckRecursionLimit
 #include "js/Object.h"              // JS::GetBuiltinClass
@@ -128,7 +128,7 @@ JSString* js::ValueToSource(JSContext* cx, HandleValue v) {
 
   switch (v.type()) {
     case JS::ValueType::Undefined:
-      return cx->names().void0;
+      return cx->names().void_0_;
 
     case JS::ValueType::String:
       return StringToSource(cx, v.toString());
@@ -212,8 +212,8 @@ JSString* js::ValueToSource(JSContext* cx, HandleValue v) {
         case ESClass::RegExp: {
           FixedInvokeArgs<0> args(cx);
           RootedValue rval(cx);
-          if (!CallSelfHostedFunction(cx, cx->names().RegExpToString, v, args,
-                                      &rval)) {
+          if (!CallSelfHostedFunction(cx, cx->names().dollar_RegExpToString_, v,
+                                      args, &rval)) {
             return nullptr;
           }
           return ToString<CanGC>(cx, rval);

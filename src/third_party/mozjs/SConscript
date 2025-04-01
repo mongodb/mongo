@@ -134,6 +134,7 @@ sources = [
     "extract/mfbt/lz4/xxhash.c",
     "extract/mozglue/misc/AutoProfilerLabel.cpp",
     "extract/mozglue/misc/AwakeTimeStamp.cpp",
+    "extract/mozglue/misc/Debug.cpp",
     "extract/mozglue/misc/MmapFaultHandler.cpp",
     "extract/mozglue/misc/Printf.cpp",
     "extract/mozglue/misc/SIMD.cpp",

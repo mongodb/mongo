@@ -27,6 +27,7 @@
 #include "jit/JitCode.h"
 #include "jit/JitHints.h"
 #include "jit/shared/Assembler-shared.h"
+#include "jit/TrampolineNatives.h"
 #include "js/AllocPolicy.h"
 #include "js/ProfilingFrameIterator.h"
 #include "js/TypeDecls.h"
@@ -42,16 +43,15 @@ namespace js {
 
 class AutoLockHelperThreadState;
 class GCMarker;
+enum class ArraySortKind;
 
 namespace jit {
 
 class FrameSizeClass;
-class JitRealm;
 class Label;
 class MacroAssembler;
 struct VMFunctionData;
 
-enum class TailCallVMFunctionId;
 enum class VMFunctionId;
 
 enum class BaselineICFallbackKind : uint8_t {
@@ -77,15 +77,15 @@ enum class BailoutReturnKind {
 class BaselineICFallbackCode {
   JitCode* code_ = nullptr;
   using OffsetArray =
-      mozilla::EnumeratedArray<BaselineICFallbackKind,
-                               BaselineICFallbackKind::Count, uint32_t>;
+      mozilla::EnumeratedArray<BaselineICFallbackKind, uint32_t,
+                               size_t(BaselineICFallbackKind::Count)>;
   OffsetArray offsets_ = {};
 
   // Keep track of offset into various baseline stubs' code at return
   // point from called script.
   using BailoutReturnArray =
-      mozilla::EnumeratedArray<BailoutReturnKind, BailoutReturnKind::Count,
-                               uint32_t>;
+      mozilla::EnumeratedArray<BailoutReturnKind, uint32_t,
+                               size_t(BailoutReturnKind::Count)>;
   BailoutReturnArray bailoutReturnOffsets_ = {};
 
  public:
@@ -112,21 +112,27 @@ enum class ArgumentsRectifierKind { Normal, TrialInlining };
 
 enum class DebugTrapHandlerKind { Interpreter, Compiler, Count };
 
+enum class IonGenericCallKind { Call, Construct, Count };
+
 using EnterJitCode = void (*)(void*, unsigned int, Value*, InterpreterFrame*,
                               CalleeToken, JSObject*, size_t, Value*);
 
 class JitcodeGlobalTable;
+class PerfSpewerRangeRecorder;
 
 class JitRuntime {
  private:
-  friend class JitRealm;
-
   MainThreadData<uint64_t> nextCompilationId_{0};
 
   // Buffer for OSR from baseline to Ion. To avoid holding on to this for too
   // long it's also freed in EnterBaseline and EnterJit (after returning from
   // JIT code).
   MainThreadData<js::UniquePtr<uint8_t>> ionOsrTempData_{nullptr};
+  MainThreadData<uint32_t> ionOsrTempDataSize_{0};
+
+  // List of Ion compile tasks that should be freed. Used to batch multiple
+  // tasks into a single IonFreeTask.
+  MainThreadData<IonFreeCompileTasks> ionFreeTaskBatch_;
 
   // Shared exception-handler tail.
   WriteOnceData<uint32_t> exceptionTailOffset_{0};
@@ -155,6 +161,7 @@ class JitRuntime {
   WriteOnceData<uint32_t> stringPreBarrierOffset_{0};
   WriteOnceData<uint32_t> objectPreBarrierOffset_{0};
   WriteOnceData<uint32_t> shapePreBarrierOffset_{0};
+  WriteOnceData<uint32_t> wasmAnyRefPreBarrierOffset_{0};
 
   // Thunk to call malloc/free.
   WriteOnceData<uint32_t> freeStubOffset_{0};
@@ -169,9 +176,14 @@ class JitRuntime {
   // Note: this stub treats -0 as +0 and may clobber R1.scratchReg().
   WriteOnceData<uint32_t> doubleToInt32ValueStubOffset_{0};
 
+  // Thunk to do a generic call from Ion.
+  mozilla::EnumeratedArray<IonGenericCallKind, WriteOnceData<uint32_t>,
+                           size_t(IonGenericCallKind::Count)>
+      ionGenericCallStubOffset_;
+
   // Thunk used by the debugger for breakpoint and step mode.
-  mozilla::EnumeratedArray<DebugTrapHandlerKind, DebugTrapHandlerKind::Count,
-                           WriteOnceData<JitCode*>>
+  mozilla::EnumeratedArray<DebugTrapHandlerKind, WriteOnceData<JitCode*>,
+                           size_t(DebugTrapHandlerKind::Count)>
       debugTrapHandlers_;
 
   // BaselineInterpreter state.
@@ -187,10 +199,6 @@ class JitRuntime {
   // Maps VMFunctionId to the offset of the wrapper code in trampolineCode_.
   using VMWrapperOffsets = Vector<uint32_t, 0, SystemAllocPolicy>;
   VMWrapperOffsets functionWrapperOffsets_;
-
-  // Maps TailCallVMFunctionId to the offset of the wrapper code in
-  // trampolineCode_.
-  VMWrapperOffsets tailCallFunctionWrapperOffsets_;
 
   MainThreadData<BaselineICFallbackCode> baselineICFallbackCode_;
 
@@ -228,6 +236,13 @@ class JitRuntime {
   MainThreadData<IonCompileTaskList> ionLazyLinkList_;
   MainThreadData<size_t> ionLazyLinkListSize_{0};
 
+  // Pointer to trampoline code for each TrampolineNative. The JSFunction has
+  // a JitEntry pointer that points to an item in this array.
+  using TrampolineNativeJitEntryArray =
+      mozilla::EnumeratedArray<TrampolineNative, void*,
+                               size_t(TrampolineNative::Count)>;
+  TrampolineNativeJitEntryArray trampolineNativeJitEntries_{};
+
 #ifdef DEBUG
   // Flag that can be set from JIT code to indicate it's invalid to call
   // arbitrary JS code in a particular region. This is checked in RunScript.
@@ -253,16 +268,28 @@ class JitRuntime {
   uint32_t generatePreBarrier(JSContext* cx, MacroAssembler& masm,
                               MIRType type);
   void generateFreeStub(MacroAssembler& masm);
+  void generateIonGenericCallStub(MacroAssembler& masm,
+                                  IonGenericCallKind kind);
+
+  // Helper functions for generateIonGenericCallStub
+  void generateIonGenericCallBoundFunction(MacroAssembler& masm, Label* entry,
+                                           Label* vmCall);
+  void generateIonGenericCallNativeFunction(MacroAssembler& masm,
+                                            bool isConstructing);
+  void generateIonGenericCallFunCall(MacroAssembler& masm, Label* entry,
+                                     Label* vmCall);
+  void generateIonGenericCallArgumentsShift(MacroAssembler& masm, Register argc,
+                                            Register curr, Register end,
+                                            Register scratch, Label* done);
+
   JitCode* generateDebugTrapHandler(JSContext* cx, DebugTrapHandlerKind kind);
 
-  bool generateVMWrapper(JSContext* cx, MacroAssembler& masm,
+  bool generateVMWrapper(JSContext* cx, MacroAssembler& masm, VMFunctionId id,
                          const VMFunctionData& f, DynFn nativeFun,
                          uint32_t* wrapperOffset);
 
-  template <typename IdT>
   bool generateVMWrappers(JSContext* cx, MacroAssembler& masm,
-                          VMWrapperOffsets& offsets);
-  bool generateVMWrappers(JSContext* cx, MacroAssembler& masm);
+                          PerfSpewerRangeRecorder& rangeRecorder);
 
   uint32_t startTrampolineCode(MacroAssembler& masm);
 
@@ -274,6 +301,20 @@ class JitRuntime {
 
   void generateBaselineInterpreterEntryTrampoline(MacroAssembler& masm);
   void generateInterpreterEntryTrampoline(MacroAssembler& masm);
+
+  using TrampolineNativeJitEntryOffsets =
+      mozilla::EnumeratedArray<TrampolineNative, uint32_t,
+                               size_t(TrampolineNative::Count)>;
+  void generateTrampolineNatives(MacroAssembler& masm,
+                                 TrampolineNativeJitEntryOffsets& offsets,
+                                 PerfSpewerRangeRecorder& rangeRecorder);
+  uint32_t generateArraySortTrampoline(MacroAssembler& masm,
+                                       ArraySortKind kind);
+
+  void bindLabelToOffset(Label* label, uint32_t offset) {
+    MOZ_ASSERT(!trampolineCode_);
+    label->bind(offset);
+  }
 
  public:
   JitCode* generateEntryTrampolineForScript(JSContext* cx, JSScript* script);
@@ -294,6 +335,11 @@ class JitRuntime {
     return IonCompilationId(nextCompilationId_++);
   }
 
+  [[nodiscard]] bool addIonCompileToFreeTaskBatch(IonCompileTask* task) {
+    return ionFreeTaskBatch_.ref().append(task);
+  }
+  void maybeStartIonFreeTask(bool force);
+
 #ifdef DEBUG
   bool disallowArbitraryCode() const { return disallowArbitraryCode_; }
   void clearDisallowArbitraryCode() { disallowArbitraryCode_ = false; }
@@ -308,10 +354,6 @@ class JitRuntime {
   TrampolinePtr getVMWrapper(VMFunctionId funId) const {
     MOZ_ASSERT(trampolineCode_);
     return trampolineCode(functionWrapperOffsets_[size_t(funId)]);
-  }
-  TrampolinePtr getVMWrapper(TailCallVMFunctionId funId) const {
-    MOZ_ASSERT(trampolineCode_);
-    return trampolineCode(tailCallFunctionWrapperOffsets_[size_t(funId)]);
   }
 
   JitCode* debugTrapHandler(JSContext* cx, DebugTrapHandlerKind kind);
@@ -370,6 +412,8 @@ class JitRuntime {
         return trampolineCode(objectPreBarrierOffset_);
       case MIRType::Shape:
         return trampolineCode(shapePreBarrierOffset_);
+      case MIRType::WasmAnyRef:
+        return trampolineCode(wasmAnyRefPreBarrierOffset_);
       default:
         MOZ_CRASH();
     }
@@ -386,6 +430,24 @@ class JitRuntime {
 
   TrampolinePtr getDoubleToInt32ValueStub() const {
     return trampolineCode(doubleToInt32ValueStubOffset_);
+  }
+
+  TrampolinePtr getIonGenericCallStub(IonGenericCallKind kind) const {
+    return trampolineCode(ionGenericCallStubOffset_[kind]);
+  }
+
+  void** trampolineNativeJitEntry(TrampolineNative native) {
+    void** jitEntry = &trampolineNativeJitEntries_[native];
+    MOZ_ASSERT(*jitEntry >= trampolineCode_->raw());
+    MOZ_ASSERT(*jitEntry <
+               trampolineCode_->raw() + trampolineCode_->instructionsSize());
+    return jitEntry;
+  }
+  TrampolineNative trampolineNativeForJitEntry(void** entry) {
+    MOZ_RELEASE_ASSERT(entry >= trampolineNativeJitEntries_.begin());
+    size_t index = entry - trampolineNativeJitEntries_.begin();
+    MOZ_RELEASE_ASSERT(index < size_t(TrampolineNative::Count));
+    return TrampolineNative(index);
   }
 
   bool hasJitcodeGlobalTable() const { return jitcodeGlobalTable_ != nullptr; }

@@ -23,10 +23,10 @@
 
 #include "NamespaceImports.h"
 
-#include "gc/Allocator.h"
 #include "gc/Pretenuring.h"
 #include "js/Utility.h"
 #include "wasm/WasmInstance.h"
+#include "wasm/WasmMemory.h"
 #include "wasm/WasmTypeDecls.h"
 
 namespace js {
@@ -52,7 +52,8 @@ struct TypeDefInstanceData {
         superTypeVector(nullptr),
         shape(nullptr),
         clasp(nullptr),
-        allocKind(gc::AllocKind::LIMIT) {}
+        allocKind(gc::AllocKind::LIMIT),
+        unused(0) {}
 
   // The canonicalized pointer to this type definition. This is kept alive by
   // the type context associated with the instance.
@@ -63,13 +64,44 @@ struct TypeDefInstanceData {
   //
   const wasm::SuperTypeVector* superTypeVector;
 
-  // The remaining fields are only meaningful for, and used by, structs and
+  // The next four fields are only meaningful for, and used by, structs and
   // arrays.
   GCPtr<Shape*> shape;
   const JSClass* clasp;
   // The allocation site for GC types. This is used for pre-tenuring.
-  gc::AllocSite allocSite;
+  alignas(8) gc::AllocSite allocSite;
+  // Only valid for structs.
   gc::AllocKind allocKind;
+
+  // This union is only meaningful for structs and arrays, and should
+  // otherwise be set to zero:
+  //
+  // * if `typeDef` refers to a struct type, then it caches the value of
+  //   `typeDef->structType().size_` (a size in bytes)
+  //
+  // * if `typeDef` refers to an array type, then it caches the value of
+  //   `typeDef->arrayType().elementType_.size()` (also a size in bytes)
+  //
+  // This is so that allocators of structs and arrays don't need to chase from
+  // this TypeDefInstanceData through `typeDef` to find the value.
+  union {
+    uint32_t structTypeSize;
+    uint32_t arrayElemSize;
+    uint32_t unused;
+  };
+
+  static constexpr size_t offsetOfShape() {
+    return offsetof(TypeDefInstanceData, shape);
+  }
+  static constexpr size_t offsetOfSuperTypeVector() {
+    return offsetof(TypeDefInstanceData, superTypeVector);
+  }
+  static constexpr size_t offsetOfAllocSite() {
+    return offsetof(TypeDefInstanceData, allocSite);
+  }
+  static constexpr size_t offsetOfArrayElemSize() {
+    return offsetof(TypeDefInstanceData, arrayElemSize);
+  }
 };
 
 // FuncImportInstanceData describes the region of wasm global memory allocated
@@ -93,6 +125,24 @@ struct FuncImportInstanceData {
   // values for lazy table initialization.
   GCPtr<JSObject*> callable;
   static_assert(sizeof(GCPtr<JSObject*>) == sizeof(void*), "for JIT access");
+};
+
+struct MemoryInstanceData {
+  // Pointer the memory object.
+  GCPtr<WasmMemoryObject*> memory;
+
+  // Pointer to the base of the memory.
+  uint8_t* base;
+
+  // Bounds check limit in bytes (or zero if there is no memory).  This is
+  // 64-bits on 64-bit systems so as to allow for heap lengths up to and beyond
+  // 4GB, and 32-bits on 32-bit systems, where heaps are limited to 2GB.
+  //
+  // See "Linear memory addresses and bounds checking" in WasmMemory.cpp.
+  uintptr_t boundsCheckLimit;
+
+  // Whether this memory is shared or not.
+  bool isShared;
 };
 
 // TableInstanceData describes the region of wasm global memory allocated in the

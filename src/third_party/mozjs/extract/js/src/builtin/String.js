@@ -131,11 +131,11 @@ function String_pad(maxLength, fillString, padEnd) {
   }
 
   // Step 2.
-  let str = ToString(this);
+  var str = ToString(this);
 
   // Steps 3-4.
-  let intMaxLength = ToLength(maxLength);
-  let strLen = str.length;
+  var intMaxLength = ToLength(maxLength);
+  var strLen = str.length;
 
   // Step 5.
   if (intMaxLength <= strLen) {
@@ -144,7 +144,7 @@ function String_pad(maxLength, fillString, padEnd) {
 
   // Steps 6-7.
   assert(fillString !== undefined, "never called when fillString is undefined");
-  let filler = ToString(fillString);
+  var filler = ToString(fillString);
 
   // Step 8.
   if (filler === "") {
@@ -158,12 +158,12 @@ function String_pad(maxLength, fillString, padEnd) {
   }
 
   // Step 9.
-  let fillLen = intMaxLength - strLen;
+  var fillLen = intMaxLength - strLen;
 
   // Step 10.
   // Perform an int32 division to ensure String_repeat is not called with a
   // double to avoid repeated bailouts in ToInteger.
-  let truncatedStringFiller = callFunction(
+  var truncatedStringFiller = callFunction(
     String_repeat,
     filler,
     (fillLen / filler.length) | 0
@@ -208,7 +208,11 @@ function Substring(str, from, length) {
     "coercing |length| into int32 should not change the value"
   );
 
-  return SubstringKernel(str, from | 0, length | 0);
+  return SubstringKernel(
+    str,
+    std_Math_max(from, 0) | 0,
+    std_Math_max(length, 0) | 0
+  );
 }
 
 // ES 2016 draft Mar 25, 2016 21.1.3.14.
@@ -717,44 +721,6 @@ function String_slice(start, end) {
 SetIsInlinableLargeFunction(String_slice);
 
 // ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
-// 21.1.3.3 String.prototype.codePointAt ( pos )
-function String_codePointAt(pos) {
-  // Step 1.
-  if (IsNullOrUndefined(this)) {
-    ThrowIncompatibleMethod("codePointAt", this);
-  }
-
-  // Step 2.
-  var S = ToString(this);
-
-  // Step 3.
-  var position = ToInteger(pos);
-
-  // Step 4.
-  var size = S.length;
-
-  // Step 5.
-  if (position < 0 || position >= size) {
-    return undefined;
-  }
-
-  // Steps 6-7.
-  var first = callFunction(std_String_charCodeAt, S, position);
-  if (first < 0xd800 || first > 0xdbff || position + 1 === size) {
-    return first;
-  }
-
-  // Steps 8-9.
-  var second = callFunction(std_String_charCodeAt, S, position + 1);
-  if (second < 0xdc00 || second > 0xdfff) {
-    return first;
-  }
-
-  // Step 10.
-  return (first - 0xd800) * 0x400 + (second - 0xdc00) + 0x10000;
-}
-
-// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
 // 21.1.3.16 String.prototype.repeat ( count )
 function String_repeat(count) {
   // Step 1.
@@ -853,23 +819,16 @@ function StringIteratorNext() {
     return result;
   }
 
-  var charCount = 1;
-  var first = callFunction(std_String_charCodeAt, S, index);
-  if (first >= 0xd800 && first <= 0xdbff && index + 1 < size) {
-    var second = callFunction(std_String_charCodeAt, S, index + 1);
-    if (second >= 0xdc00 && second <= 0xdfff) {
-      first = (first - 0xd800) * 0x400 + (second - 0xdc00) + 0x10000;
-      charCount = 2;
-    }
-  }
+  var codePoint = callFunction(std_String_codePointAt, S, index);
+  var charCount = 1 + (codePoint > 0xffff);
 
   UnsafeSetReservedSlot(obj, ITERATOR_SLOT_NEXT_INDEX, index + charCount);
 
-  // Communicate |first|'s possible range to the compiler.
-  result.value = callFunction(std_String_fromCodePoint, null, first & 0x1fffff);
+  result.value = callFunction(std_String_fromCodePoint, null, codePoint);
 
   return result;
 }
+SetIsInlinableLargeFunction(StringIteratorNext);
 
 #if JS_HAS_INTL_API
 var collatorCache = new_Record();
@@ -1053,40 +1012,6 @@ function String_static_raw(callSite /*, ...substitutions*/) {
 
   // Step 9.d.i.
   return resultString;
-}
-
-// https://github.com/tc39/proposal-relative-indexing-method
-// String.prototype.at ( index )
-function String_at(index) {
-  // Step 1.
-  if (IsNullOrUndefined(this)) {
-    ThrowIncompatibleMethod("at", this);
-  }
-
-  // Step 2.
-  var string = ToString(this);
-
-  // Step 3.
-  var len = string.length;
-
-  // Step 4.
-  var relativeIndex = ToInteger(index);
-
-  // Steps 5-6.
-  var k;
-  if (relativeIndex >= 0) {
-    k = relativeIndex;
-  } else {
-    k = len + relativeIndex;
-  }
-
-  // Step 7.
-  if (k < 0 || k >= len) {
-    return undefined;
-  }
-
-  // Step 8.
-  return string[k];
 }
 
 // ES6 draft 2014-04-27 B.2.3.3

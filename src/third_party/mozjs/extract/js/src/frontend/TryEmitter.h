@@ -130,8 +130,8 @@ class MOZ_STACK_CLASS TryEmitter {
   //     catch-block
   //
   // Additionally, a finally block may be emitted for non-syntactic
-  // try-catch-finally, even if the kind is TryCatch, because GOSUBs are not
-  // emitted.
+  // try-catch-finally, even if the kind is TryCatch, because JSOp::Goto is
+  // not emitted.
   mozilla::Maybe<TryFinallyControl> controlInfo_;
 
   // The stack depth before emitting JSOp::Try.
@@ -203,7 +203,20 @@ class MOZ_STACK_CLASS TryEmitter {
   TryEmitter(BytecodeEmitter* bce, Kind kind, ControlKind controlKind);
 
   [[nodiscard]] bool emitTry();
-  [[nodiscard]] bool emitCatch();
+
+  enum class ExceptionStack : bool {
+    /**
+     * Push only the pending exception value.
+     */
+    No,
+
+    /**
+     * Push the pending exception value and its stack.
+     */
+    Yes,
+  };
+
+  [[nodiscard]] bool emitCatch(ExceptionStack stack = ExceptionStack::No);
 
   // If `finallyPos` is specified, it's an offset of the finally block's
   // "{" character in the source code text, to improve line:column number in

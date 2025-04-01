@@ -14,8 +14,8 @@
 
 #include "jstypes.h"
 
-#include "gc/Allocator.h"
 #include "gc/Cell.h"
+#include "gc/GCEnum.h"
 #include "gc/StoreBuffer.h"
 #include "js/Result.h"
 #include "js/RootingAPI.h"
@@ -25,12 +25,20 @@
 namespace js {
 
 namespace gc {
+class CellAllocator;
 class TenuringTracer;
 }  // namespace gc
 
 namespace jit {
 class MacroAssembler;
 }  // namespace jit
+
+}  // namespace js
+
+namespace js {
+
+class JS_PUBLIC_API GenericPrinter;
+class JSONPrinter;
 
 }  // namespace js
 
@@ -101,6 +109,8 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   bool isZero() const { return digitLength() == 0; }
   bool isNegative() const { return headerFlagsField() & SignBit; }
 
+  int32_t sign() const { return isZero() ? 0 : isNegative() ? -1 : 1; }
+
   void initializeDigitsToZero();
 
   void traceChildren(JSTracer* trc);
@@ -147,23 +157,27 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   static BigInt* bitOr(JSContext* cx, Handle<BigInt*> x, Handle<BigInt*> y);
   static BigInt* bitNot(JSContext* cx, Handle<BigInt*> x);
 
+  static bool divmod(JSContext* cx, Handle<BigInt*> x, Handle<BigInt*> y,
+                     MutableHandle<BigInt*> quotient,
+                     MutableHandle<BigInt*> remainder);
+
   static int64_t toInt64(const BigInt* x);
   static uint64_t toUint64(const BigInt* x);
 
   // Return true if the BigInt is without loss of precision representable as an
   // int64 and store the int64 value in the output. Otherwise return false and
   // leave the value of the output parameter unspecified.
-  static bool isInt64(BigInt* x, int64_t* result);
+  static bool isInt64(const BigInt* x, int64_t* result);
 
   // Return true if the BigInt is without loss of precision representable as an
   // uint64 and store the uint64 value in the output. Otherwise return false and
   // leave the value of the output parameter unspecified.
-  static bool isUint64(BigInt* x, uint64_t* result);
+  static bool isUint64(const BigInt* x, uint64_t* result);
 
   // Return true if the BigInt is without loss of precision representable as a
   // JS Number (double) and store the double value in the output. Otherwise
   // return false and leave the value of the output parameter unspecified.
-  static bool isNumber(BigInt* x, double* result);
+  static bool isNumber(const BigInt* x, double* result);
 
   static BigInt* asIntN(JSContext* cx, Handle<BigInt*> x, uint64_t bits);
   static BigInt* asUintN(JSContext* cx, Handle<BigInt*> x, uint64_t bits);
@@ -203,7 +217,7 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   static bool bitNotValue(JSContext* cx, Handle<Value> operand,
                           MutableHandle<Value> res);
 
-  static double numberValue(BigInt* x);
+  static double numberValue(const BigInt* x);
 
   template <js::AllowGC allowGC>
   static JSLinearString* toString(JSContext* cx, Handle<BigInt*> x,
@@ -223,19 +237,19 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   template <typename CharT>
   static bool literalIsZero(const mozilla::Range<const CharT> chars);
 
-  static int8_t compare(BigInt* lhs, BigInt* rhs);
-  static bool equal(BigInt* lhs, BigInt* rhs);
-  static bool equal(BigInt* lhs, double rhs);
+  static int8_t compare(const BigInt* lhs, const BigInt* rhs);
+  static bool equal(const BigInt* lhs, const BigInt* rhs);
+  static bool equal(const BigInt* lhs, double rhs);
   static JS::Result<bool> equal(JSContext* cx, Handle<BigInt*> lhs,
                                 HandleString rhs);
   static JS::Result<bool> looselyEqual(JSContext* cx, Handle<BigInt*> lhs,
                                        HandleValue rhs);
 
-  static bool lessThan(BigInt* x, BigInt* y);
+  static bool lessThan(const BigInt* x, const BigInt* y);
   // These methods return Nothing when the non-BigInt operand is NaN
   // or a string that can't be interpreted as a BigInt.
-  static mozilla::Maybe<bool> lessThan(BigInt* lhs, double rhs);
-  static mozilla::Maybe<bool> lessThan(double lhs, BigInt* rhs);
+  static mozilla::Maybe<bool> lessThan(const BigInt* lhs, double rhs);
+  static mozilla::Maybe<bool> lessThan(double lhs, const BigInt* rhs);
   static bool lessThan(JSContext* cx, Handle<BigInt*> lhs, HandleString rhs,
                        mozilla::Maybe<bool>& res);
   static bool lessThan(JSContext* cx, HandleString lhs, Handle<BigInt*> rhs,
@@ -246,6 +260,11 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
 #if defined(DEBUG) || defined(JS_JITSPEW)
   void dump() const;  // Debugger-friendly stderr dump.
   void dump(js::GenericPrinter& out) const;
+  void dump(js::JSONPrinter& json) const;
+
+  void dumpFields(js::JSONPrinter& json) const;
+  void dumpStringContent(js::GenericPrinter& out) const;
+  void dumpLiteral(js::GenericPrinter& out) const;
 #endif
 
  public:
@@ -286,9 +305,9 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
       JSContext* cx, Handle<BigInt*> x, Digit divisor,
       const mozilla::Maybe<MutableHandle<BigInt*>>& quotient, Digit* remainder,
       bool quotientNegative);
-  static void internalMultiplyAdd(BigInt* source, Digit factor, Digit summand,
-                                  unsigned, BigInt* result);
-  static void multiplyAccumulate(BigInt* multiplicand, Digit multiplier,
+  static void internalMultiplyAdd(const BigInt* source, Digit factor,
+                                  Digit summand, unsigned, BigInt* result);
+  static void multiplyAccumulate(const BigInt* multiplicand, Digit multiplier,
                                  BigInt* accumulator,
                                  unsigned accumulatorIndex);
   static bool absoluteDivWithBigIntDivisor(
@@ -310,8 +329,8 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
                                               uint64_t bits,
                                               bool resultNegative);
 
-  Digit absoluteInplaceAdd(BigInt* summand, unsigned startIndex);
-  Digit absoluteInplaceSub(BigInt* subtrahend, unsigned startIndex);
+  Digit absoluteInplaceAdd(const BigInt* summand, unsigned startIndex);
+  Digit absoluteInplaceSub(const BigInt* subtrahend, unsigned startIndex);
   void inplaceRightShiftLowZeroBits(unsigned shift);
   void inplaceMultiplyAdd(Digit multiplier, Digit part);
 
@@ -384,10 +403,12 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   static BigInt* absoluteSub(JSContext* cx, Handle<BigInt*> x,
                              Handle<BigInt*> y, bool resultNegative);
 
+ public:
   // If `|x| < |y|` return -1; if `|x| == |y|` return 0; otherwise return 1.
-  static int8_t absoluteCompare(BigInt* lhs, BigInt* rhs);
+  static int8_t absoluteCompare(const BigInt* lhs, const BigInt* rhs);
 
-  static int8_t compare(BigInt* lhs, double rhs);
+ private:
+  static int8_t compare(const BigInt* lhs, double rhs);
 
   template <js::AllowGC allowGC>
   static JSLinearString* toStringBasePowerOfTwo(JSContext* cx, Handle<BigInt*>,
@@ -398,7 +419,7 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   static JSLinearString* toStringGeneric(JSContext* cx, Handle<BigInt*>,
                                          unsigned radix);
 
-  friend struct ::JSStructuredCloneReader; // So it can call the following:
+  friend struct ::JSStructuredCloneReader;  // So it can call the following:
   static BigInt* destructivelyTrimHighZeroDigits(JSContext* cx, BigInt* x);
 
   bool absFitsInUint64() const { return digitLength() <= 64 / DigitBits; }

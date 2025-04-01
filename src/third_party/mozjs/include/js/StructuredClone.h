@@ -313,7 +313,8 @@ typedef void (*StructuredCloneErrorOp)(JSContext* cx, uint32_t errorid,
  * will only contain a backreference to the already-read object.
  */
 typedef bool (*ReadTransferStructuredCloneOp)(
-    JSContext* cx, JSStructuredCloneReader* r, uint32_t tag, void* content,
+    JSContext* cx, JSStructuredCloneReader* r,
+    const JS::CloneDataPolicy& aCloneDataPolicy, uint32_t tag, void* content,
     uint64_t extraData, void* closure, JS::MutableHandleObject returnObject);
 
 /**
@@ -744,6 +745,7 @@ class JS_PUBLIC_API JSAutoStructuredCloneBuffer {
 #define JS_SCERR_WASM_NO_TRANSFER 6
 #define JS_SCERR_NOT_CLONABLE 7
 #define JS_SCERR_NOT_CLONABLE_WITH_COOP_COEP 8
+#define JS_SCERR_TRANSFERABLE_TWICE 9
 
 JS_PUBLIC_API bool JS_ReadUint32Pair(JSStructuredCloneReader* r, uint32_t* p1,
                                      uint32_t* p2);

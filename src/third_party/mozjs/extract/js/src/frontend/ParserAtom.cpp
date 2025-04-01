@@ -12,10 +12,10 @@
 
 #include "jsnum.h"  // CharsToNumber
 
-#include "frontend/BytecodeCompiler.h"  // IsIdentifier
 #include "frontend/CompilationStencil.h"
 #include "js/GCAPI.h"           // JS::AutoSuppressGCAnalysis
 #include "js/Printer.h"         // Sprinter, QuoteString
+#include "util/Identifier.h"    // IsIdentifier
 #include "util/StringBuffer.h"  // StringBuffer
 #include "util/Text.h"          // AsciiDigitToNumber
 #include "util/Unicode.h"
@@ -32,7 +32,7 @@ namespace js {
 namespace frontend {
 
 JSAtom* GetWellKnownAtom(JSContext* cx, WellKnownAtomId atomId) {
-#define ASSERT_OFFSET_(_, NAME, _2)              \
+#define ASSERT_OFFSET_(NAME, _)                  \
   static_assert(offsetof(JSAtomState, NAME) ==   \
                 int32_t(WellKnownAtomId::NAME) * \
                     sizeof(js::ImmutableTenuredPtr<PropertyName*>));
@@ -733,11 +733,11 @@ bool ParserAtomsTable::isExtendedUnclonedSelfHostedFunctionName(
 
   if (index.isWellKnownAtomId()) {
     switch (index.toWellKnownAtomId()) {
-      case WellKnownAtomId::ArrayBufferSpecies:
-      case WellKnownAtomId::ArraySpecies:
-      case WellKnownAtomId::ArrayValues:
-      case WellKnownAtomId::RegExpFlagsGetter:
-      case WellKnownAtomId::RegExpToString: {
+      case WellKnownAtomId::dollar_ArrayBufferSpecies_:
+      case WellKnownAtomId::dollar_ArraySpecies_:
+      case WellKnownAtomId::dollar_ArrayValues_:
+      case WellKnownAtomId::dollar_RegExpFlagsGetter_:
+      case WellKnownAtomId::dollar_RegExpToString_: {
 #ifdef DEBUG
         const auto& info = GetWellKnownAtomInfo(index.toWellKnownAtomId());
         MOZ_ASSERT(info.content[0] ==
@@ -1004,9 +1004,7 @@ UniqueChars ToPrintableStringImpl(mozilla::Range<CharT> str,
   if (!sprinter.init()) {
     return nullptr;
   }
-  if (!QuoteString<QuoteTarget::String>(&sprinter, str, quote)) {
-    return nullptr;
-  }
+  QuoteString<QuoteTarget::String>(&sprinter, str, quote);
   return sprinter.release();
 }
 
@@ -1279,7 +1277,7 @@ bool WellKnownParserAtoms::init() {
 
   // Add well-known strings to the HashMap. The HashMap is used for dynamic
   // lookups later and does not change once this init method is complete.
-#define COMMON_NAME_INIT_(_, NAME, _2)                         \
+#define COMMON_NAME_INIT_(NAME, _)                             \
   if (!initSingle(GetWellKnownAtomInfo(WellKnownAtomId::NAME), \
                   TaggedParserAtomIndex::WellKnown::NAME())) { \
     return false;                                              \

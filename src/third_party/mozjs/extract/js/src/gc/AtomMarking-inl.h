@@ -33,7 +33,6 @@ MOZ_ALWAYS_INLINE bool AtomMarkingRuntime::inlinedMarkAtomInternal(
   static_assert(std::is_same_v<T, JSAtom> || std::is_same_v<T, JS::Symbol>,
                 "Should only be called with JSAtom* or JS::Symbol* argument");
 
-  MOZ_ASSERT(cx->isMainThreadContext());
   MOZ_ASSERT(cx->zone());
   MOZ_ASSERT(!cx->zone()->isAtomsZone());
 

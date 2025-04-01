@@ -88,7 +88,7 @@ static bool MatchJSScript(JSScript* script, const char* pattern) {
 
   char signature[2048] = {0};
   SprintfLiteral(signature, "%s:%u:%u", script->filename(), script->lineno(),
-                 script->column());
+                 script->column().oneOriginValue());
 
   // Trivial containment match.
   char* result = strstr(signature, pattern);
@@ -131,7 +131,7 @@ void StructuredSpewer::startObject(JSContext* cx, const JSScript* script,
     json.beginObjectProperty("location");
     json.property("filename", script->filename());
     json.property("line", script->lineno());
-    json.property("column", script->column());
+    json.property("column", script->column().oneOriginValue());
     json.endObject();
   }
 }
@@ -158,7 +158,7 @@ void StructuredSpewer::spew(JSContext* cx, SpewChannel channel, const char* fmt,
 
   json.beginObject();
   json.property("channel", getName(channel));
-  json.formatProperty("message", fmt, ap);
+  json.formatPropertyVA("message", fmt, ap);
   json.endObject();
 
   va_end(ap);
@@ -183,54 +183,46 @@ void StructuredSpewer::parseSpewFlags(const char* flags) {
   }
 
   if (ContainsFlag(flags, "help")) {
+    // clang-format off
     printf(
-        "\n"
-        "usage: SPEW=option,option,... where options can be:\n"
-        "\n"
-        "  help                     Dump this help message\n"
-        "  channel                  Enable the selected channel from below, "
-        "if\n"
-        "                           more than one channel is specified, then "
-        "the\n"
-        "                           channel will be set whichever specified "
-        "filter\n"
-        "                           comes first in STRUCTURED_CHANNEL_LIST."
-        "  AtStartup                Enable spewing at browser startup instead\n"
-        "                           of when gecko profiling starts."
-        "\n"
-        " Channels: \n"
-        "\n"
-        // List Channels
-        "  BaselineICStats          Dump the IC Entry counters during Ion "
-        "analysis\n"
-        "  ScriptStats              Dump statistics collected by tracelogger "
-        "that\n"
-        "                           is aggregated by script. Requires\n"
-        "                           JS_TRACE_LOGGING=1\n"
-        "  CacheIRHealthReport      Dump the CacheIR information and "
-        "associated "
-        "rating\n"
-        // End Channel list
-        "\n\n"
-        "By default output goes to a file called spew_output.$PID.$THREAD\n"
-        "\n"
-        "Further control of the spewer can be accomplished with the below\n"
-        "environment variables:\n"
-        "\n"
-        "   SPEW_FILE: Selects the file to write to. An absolute path.\n"
-        "\n"
-        "   SPEW_FILTER: A string which is matched against 'signature'\n"
-        "        constructed from a JSScript, currently connsisting of \n"
-        "        filename:line:col.\n"
-        "\n"
-        "        A JSScript matches the filter string is found in the\n"
-        "        signature\n"
-        "\n"
-        "   SPEW_UPLOAD: If this variable is set as well as MOZ_UPLOAD_DIR,\n"
-        "        output goes to $MOZ_UPLOAD_DIR/spew_output* to ease usage\n"
-        "        with Treeherder.\n"
+      "\n"
+      "usage: SPEW=option,option,... where options can be:\n"
+      "\n"
+      "  help                     Dump this help message\n"
+      "  channel                  Enable the selected channel from below, if\n"
+      "                           more than one channel is specified, then the\n"
+      "                           channel will be set whichever specified filter\n"
+      "                           comes first in STRUCTURED_CHANNEL_LIST.\n"
+      "  AtStartup                Enable spewing at browser startup instead\n"
+      "                           of when gecko profiling starts."
+      "\n"
+      " Channels: \n"
+      "\n"
+      // List Channels
+      "  BaselineICStats          Dump the IC Entry counters during Ion analysis\n"
+      "  CacheIRHealthReport      Dump the CacheIR information and associated rating\n"
+      // End Channel list
+      "\n\n"
+      "By default output goes to a file called spew_output.$PID.$THREAD\n"
+      "\n"
+      "Further control of the spewer can be accomplished with the below\n"
+      "environment variables:\n"
+      "\n"
+      "   SPEW_FILE: Selects the file to write to. An absolute path.\n"
+      "\n"
+      "   SPEW_FILTER: A string which is matched against 'signature'\n"
+      "        constructed from a JSScript, currently connsisting of \n"
+      "        filename:line:col.\n"
+      "\n"
+      "        A JSScript matches the filter string is found in the\n"
+      "        signature\n"
+      "\n"
+      "   SPEW_UPLOAD: If this variable is set as well as MOZ_UPLOAD_DIR,\n"
+      "        output goes to $MOZ_UPLOAD_DIR/spew_output* to ease usage\n"
+      "        with Treeherder.\n"
 
     );
+    // clang-format on
     exit(0);
   }
 }

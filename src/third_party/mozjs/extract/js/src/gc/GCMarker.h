@@ -24,7 +24,12 @@ class GCMarker;
 class SliceBudget;
 class WeakMapBase;
 
+#ifdef DEBUG
+// Force stack resizing to ensure OOM test coverage in debug builds.
+static const size_t MARK_STACK_BASE_CAPACITY = 4;
+#else
 static const size_t MARK_STACK_BASE_CAPACITY = 4096;
+#endif
 
 enum class SlotsOrElementsKind {
   Unused = 0,  // Must match SlotsOrElementsRangeTag
@@ -61,10 +66,10 @@ struct EphemeronEdgeTableHashPolicy {
 // at the time the edge is traced through. The other source's color will be
 // given by the current mark color of the GCMarker.
 struct EphemeronEdge {
-  CellColor color;
+  MarkColor color;
   Cell* target;
 
-  EphemeronEdge(CellColor color_, Cell* cell) : color(color_), target(cell) {}
+  EphemeronEdge(MarkColor color_, Cell* cell) : color(color_), target(cell) {}
 };
 
 using EphemeronEdgeVector = Vector<EphemeronEdge, 2, js::SystemAllocPolicy>;
@@ -153,11 +158,10 @@ class MarkStack {
   MarkStack();
   ~MarkStack();
 
-  explicit MarkStack(const MarkStack& other);
-  MarkStack& operator=(const MarkStack& other);
+  MarkStack(const MarkStack& other) = delete;
+  MarkStack& operator=(const MarkStack& other) = delete;
 
-  MarkStack(MarkStack&& other);
-  MarkStack& operator=(MarkStack&& other);
+  void swap(MarkStack& other);
 
   // The unit for MarkStack::capacity() is mark stack words.
   size_t capacity() { return stack().length(); }
@@ -173,17 +177,13 @@ class MarkStack {
 
   template <typename T>
   [[nodiscard]] bool push(T* ptr);
-
-  [[nodiscard]] bool push(JSObject* obj, SlotsOrElementsKind kind,
-                          size_t start);
+  void infalliblePush(JSObject* obj, SlotsOrElementsKind kind, size_t start);
   [[nodiscard]] bool push(const TaggedPtr& ptr);
-  [[nodiscard]] bool push(const SlotsOrElementsRange& array);
   void infalliblePush(const TaggedPtr& ptr);
-  void infalliblePush(const SlotsOrElementsRange& array);
 
   // GCMarker::eagerlyMarkChildren uses unused marking stack as temporary
   // storage to hold rope pointers.
-  [[nodiscard]] bool pushTempRope(JSRope* ptr);
+  [[nodiscard]] bool pushTempRope(JSRope* rope);
 
   bool isEmpty() const { return position() == 0; }
   bool hasEntries() const { return !isEmpty(); }
@@ -267,6 +267,8 @@ class MOZ_STACK_CLASS MarkStackIter {
 // Bitmask of options to parameterize MarkingTracerT.
 namespace MarkingOptions {
 enum : uint32_t {
+  None = 0,
+
   // Set the compartment's hasMarkedCells flag for roots.
   MarkRootCompartments = 1,
 
@@ -279,6 +281,8 @@ enum : uint32_t {
 };
 }  // namespace MarkingOptions
 
+// A default set of marking options that works during normal marking and weak
+// marking modes. Used for barriers and testing code.
 constexpr uint32_t NormalMarkingOptions = MarkingOptions::MarkImplicitEdges;
 
 template <uint32_t markingOptions>
@@ -295,8 +299,9 @@ class MarkingTracerT
   GCMarker* getMarker();
 };
 
-using MarkingTracer = MarkingTracerT<NormalMarkingOptions>;
+using MarkingTracer = MarkingTracerT<MarkingOptions::None>;
 using RootMarkingTracer = MarkingTracerT<MarkingOptions::MarkRootCompartments>;
+using WeakMarkingTracer = MarkingTracerT<MarkingOptions::MarkImplicitEdges>;
 using ParallelMarkingTracer = MarkingTracerT<MarkingOptions::ParallelMarking>;
 
 enum ShouldReportMarkTime : bool {
@@ -359,6 +364,7 @@ class GCMarker {
   bool hasEntries(gc::MarkColor color) const;
 
   bool canDonateWork() const;
+  bool shouldDonateWork() const;
 
   void start();
   void stop();
@@ -381,12 +387,6 @@ class GCMarker {
   // structures.
   void abortLinearWeakMarking();
 
-  // 'delegate' is no longer the delegate of 'key'.
-  void severWeakDelegate(JSObject* key, JSObject* delegate);
-
-  // 'delegate' is now the delegate of 'key'. Update weakmap marking state.
-  void restoreWeakDelegate(JSObject* key, JSObject* delegate);
-
 #ifdef DEBUG
   // We can't check atom marking if the helper thread lock is already held by
   // the current thread. This allows us to disable the check.
@@ -403,6 +403,10 @@ class GCMarker {
   bool markOneColor(SliceBudget& budget);
 
   static void moveWork(GCMarker* dst, GCMarker* src);
+
+  [[nodiscard]] bool initStack();
+  void resetStackCapacity();
+  void freeStack();
 
   size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
@@ -421,7 +425,7 @@ class GCMarker {
   void markAndTraverse(T* thing);
 
   template <typename T>
-  void markImplicitEdges(T* oldThing);
+  void markImplicitEdges(T* markedThing);
 
  private:
   /*
@@ -460,9 +464,12 @@ class GCMarker {
   }
 
   template <uint32_t markingOptions, typename S, typename T>
-  void markAndTraverseEdge(S source, T* target);
+  void markAndTraverseEdge(S* source, T* target);
   template <uint32_t markingOptions, typename S, typename T>
-  void markAndTraverseEdge(S source, const T& target);
+  void markAndTraverseEdge(S* source, const T& target);
+
+  template <uint32_t markingOptions>
+  bool markAndTraversePrivateGCThing(JSObject* source, gc::TenuredCell* target);
 
   template <typename S, typename T>
   void checkTraversedEdge(S source, T* target);
@@ -513,18 +520,11 @@ class GCMarker {
   inline void pushValueRange(JSObject* obj, SlotsOrElementsKind kind,
                              size_t start, size_t end);
 
-  // Push an object onto the stack for later tracing and assert that it has
-  // already been marked.
-  inline void repush(JSObject* obj);
-
-  template <typename T>
-  void markImplicitEdgesHelper(T oldThing);
-
   // Mark through edges whose target color depends on the colors of two source
   // entities (eg a WeakMap and one of its keys), and push the target onto the
   // mark stack.
   void markEphemeronEdges(gc::EphemeronEdgeVector& edges,
-                          gc::CellColor srcColor);
+                          gc::MarkColor srcColor);
   friend class JS::Zone;
 
 #ifdef DEBUG
@@ -543,7 +543,7 @@ class GCMarker {
    * state.
    */
   mozilla::Variant<gc::MarkingTracer, gc::RootMarkingTracer,
-                   gc::ParallelMarkingTracer>
+                   gc::WeakMarkingTracer, gc::ParallelMarkingTracer>
       tracer_;
 
   JSRuntime* const runtime_;
@@ -627,7 +627,7 @@ class MOZ_RAII AutoSetMarkColor {
   }
 
   AutoSetMarkColor(GCMarker& marker, CellColor newColor)
-      : AutoSetMarkColor(marker, newColor.asMarkColor()) {}
+      : AutoSetMarkColor(marker, AsMarkColor(newColor)) {}
 
   ~AutoSetMarkColor() { marker_.setMarkColor(initialColor_); }
 };

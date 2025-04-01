@@ -412,16 +412,32 @@ class DebuggerWeakMap : private WeakMap<HeapPtr<Referent*>, HeapPtr<Wrapper*>> {
 class LeaveDebuggeeNoExecute;
 
 class MOZ_RAII EvalOptions {
+ public:
+  enum class EnvKind {
+    Frame,
+    FrameWithExtraBindings,
+    Global,
+    GlobalWithExtraOuterBindings,
+    GlobalWithExtraInnerBindings,
+  };
+
+ private:
   JS::UniqueChars filename_;
   unsigned lineno_ = 1;
   bool hideFromDebugger_ = false;
+  EnvKind kind_;
 
  public:
-  EvalOptions() = default;
+  explicit EvalOptions(EnvKind kind) : kind_(kind){};
   ~EvalOptions() = default;
   const char* filename() const { return filename_.get(); }
   unsigned lineno() const { return lineno_; }
   bool hideFromDebugger() const { return hideFromDebugger_; }
+  EnvKind kind() const { return kind_; }
+  void setUseInnerBindings() {
+    MOZ_ASSERT(kind_ == EvalOptions::EnvKind::GlobalWithExtraOuterBindings);
+    kind_ = EvalOptions::EnvKind::GlobalWithExtraInnerBindings;
+  }
   [[nodiscard]] bool setFilename(JSContext* cx, const char* filename);
   void setLineno(unsigned lineno) { lineno_ = lineno; }
   void setHideFromDebugger(bool hide) { hideFromDebugger_ = hide; }
@@ -623,8 +639,22 @@ class Debugger : private mozilla::LinkedListElement<Debugger> {
   bool allowUnobservedAsmJS;
   bool allowUnobservedWasm;
 
+  // When this flag is true, this debugger should be the only one to have its
+  // hooks called when it evaluates via Frame.evalWithBindings,
+  // Object.executeInGlobalWithBindings or Object.call.
+  bool exclusiveDebuggerOnEval;
+
+  // When this flag is true, the onNativeCall hook is called with additional
+  // arguments which are the native function call arguments and well as a
+  // reference to the object on which the function call (if any).
+  bool inspectNativeCallArguments;
+
   // Whether to enable code coverage on the Debuggee.
   bool collectCoverageInfo;
+
+  // Whether to ask avoid side-effects in the native code.
+  // See JS::dbg::ShouldAvoidSideEffects.
+  bool shouldAvoidSideEffects;
 
   template <typename T>
   struct DebuggerLinkAccess {
@@ -975,6 +1005,8 @@ class Debugger : private mozilla::LinkedListElement<Debugger> {
   // Whether the Debugger instance needs to observe native call invocations.
   IsObserving observesNativeCalls() const;
 
+  bool isExclusiveDebuggerOnEval() const;
+
  private:
   [[nodiscard]] static bool ensureExecutionObservabilityOfFrame(
       JSContext* cx, AbstractFramePtr frame);
@@ -989,6 +1021,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger> {
                                                        IsObserving observing);
   void updateObservesAsmJSOnDebuggees(IsObserving observing);
   void updateObservesWasmOnDebuggees(IsObserving observing);
+  void updateObservesNativeCallOnDebuggees(IsObserving observing);
 
   JSObject* getHook(Hook hook) const;
   bool hasAnyLiveHooks() const;

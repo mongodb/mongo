@@ -1,6 +1,6 @@
-diff --git a/mfbt/double-conversion/double-conversion/double-to-string.h b/mfbt/double-conversion/double-conversion/double-to-string.h
---- a/mfbt/double-conversion/double-conversion/double-to-string.h
-+++ b/mfbt/double-conversion/double-conversion/double-to-string.h
+diff --git a/double-conversion/double-to-string.h b/double-conversion/double-to-string.h
+--- a/double-conversion/double-to-string.h
++++ b/double-conversion/double-to-string.h
 @@ -23,16 +23,17 @@
  // DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
@@ -145,9 +145,9 @@ diff --git a/mfbt/double-conversion/double-conversion/double-to-string.h b/mfbt/
    const int flags_;
    const char* const infinity_symbol_;
    const char* const nan_symbol_;
-diff --git a/mfbt/double-conversion/double-conversion/string-to-double.h b/mfbt/double-conversion/double-conversion/string-to-double.h
---- a/mfbt/double-conversion/double-conversion/string-to-double.h
-+++ b/mfbt/double-conversion/double-conversion/string-to-double.h
+diff --git a/double-conversion/string-to-double.h b/double-conversion/string-to-double.h
+--- a/double-conversion/string-to-double.h
++++ b/double-conversion/string-to-double.h
 @@ -23,16 +23,17 @@
  // DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT

@@ -346,14 +346,16 @@ static_assert(!std::is_polymorphic_v<Frame>, "Frame doesn't need a vtable.");
 static_assert(sizeof(Frame) == 2 * sizeof(void*),
               "Frame is a two pointer structure");
 
-// Note that sizeof(FrameWithInstances) does not account for ShadowStackSpace.
-// Use FrameWithInstances::sizeOf() if you are not incorporating
-// ShadowStackSpace through other means (eg the ABIArgIter).
-
-class FrameWithInstances : public Frame {
+class FrameWithShadowStackSpace : public Frame {
+ protected:
   // `ShadowStackSpace` bytes will be allocated here on Win64, at higher
   // addresses than Frame and at lower addresses than the instance fields.
+  uint8_t shadowStackSpace_[js::jit::ShadowStackSpace];
+};
 
+class FrameWithInstances
+    : public std::conditional_t<js::jit::ShadowStackSpace >= 1,
+                                FrameWithShadowStackSpace, Frame> {
   // The instance area MUST be two pointers exactly.
   Instance* calleeInstance_;
   Instance* callerInstance_;
@@ -362,17 +364,17 @@ class FrameWithInstances : public Frame {
   Instance* calleeInstance() { return calleeInstance_; }
   Instance* callerInstance() { return callerInstance_; }
 
-  constexpr static uint32_t sizeOf() {
-    return sizeof(wasm::FrameWithInstances) + js::jit::ShadowStackSpace;
+  constexpr static uint32_t sizeOfInstanceFields() {
+    return sizeof(wasm::FrameWithInstances) - sizeof(wasm::Frame) -
+           js::jit::ShadowStackSpace;
   }
 
-  constexpr static uint32_t sizeOfInstanceFields() {
+  constexpr static uint32_t sizeOfInstanceFieldsAndShadowStack() {
     return sizeof(wasm::FrameWithInstances) - sizeof(wasm::Frame);
   }
 
   constexpr static uint32_t calleeInstanceOffset() {
-    return offsetof(FrameWithInstances, calleeInstance_) +
-           js::jit::ShadowStackSpace;
+    return offsetof(FrameWithInstances, calleeInstance_);
   }
 
   constexpr static uint32_t calleeInstanceOffsetWithoutFrame() {
@@ -380,8 +382,7 @@ class FrameWithInstances : public Frame {
   }
 
   constexpr static uint32_t callerInstanceOffset() {
-    return offsetof(FrameWithInstances, callerInstance_) +
-           js::jit::ShadowStackSpace;
+    return offsetof(FrameWithInstances, callerInstance_);
   }
 
   constexpr static uint32_t callerInstanceOffsetWithoutFrame() {

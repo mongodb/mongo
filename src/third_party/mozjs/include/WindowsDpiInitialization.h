@@ -16,7 +16,6 @@ enum class WindowsDpiInitializationResult : uint32_t {
   SetProcessDpiAwarenessContextFailed,
   FindSetProcessDpiAwarenessFailed,
   SetProcessDpiAwarenessFailed,
-  SetProcessDPIAwareFailed,
 };
 
 // Get a string representation of any WindowsDpiInitializationResult value
@@ -34,8 +33,6 @@ inline const char* WindowsDpiInitializationResultString(
       return "Failed to find SetProcessDpiAwareness";
     case WindowsDpiInitializationResult::SetProcessDpiAwarenessFailed:
       return "SetProcessDpiAwareness failed";
-    case WindowsDpiInitializationResult::SetProcessDPIAwareFailed:
-      return "SetProcessDPIAware failed";
     default:
       return "Unknown result";
   }

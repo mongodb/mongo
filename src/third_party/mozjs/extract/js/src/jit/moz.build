@@ -26,6 +26,7 @@ UNIFIED_SOURCES += [
     "BaselineIC.cpp",
     "BaselineJIT.cpp",
     "BitSet.cpp",
+    "BranchHinting.cpp",
     "BytecodeAnalysis.cpp",
     "CacheIR.cpp",
     "CacheIRCompiler.cpp",
@@ -52,6 +53,7 @@ UNIFIED_SOURCES += [
     "JitcodeMap.cpp",
     "JitContext.cpp",
     "JitFrames.cpp",
+    "JitHints.cpp",
     "JitOptions.cpp",
     "JitScript.cpp",
     "JitSpewer.cpp",
@@ -86,6 +88,7 @@ UNIFIED_SOURCES += [
     "Sink.cpp",
     "Snapshots.cpp",
     "Trampoline.cpp",
+    "TrampolineNatives.cpp",
     "TrialInlining.cpp",
     "TypePolicy.cpp",
     "ValueNumbering.cpp",
@@ -258,6 +261,13 @@ elif CONFIG["JS_CODEGEN_WASM32"]:
         "wasm32/MacroAssembler-wasm32.cpp",
         "wasm32/Trampoline-wasm32.cpp",
     ]
+
+# Generate jit/ABIFunctionTypeGenerated.h from jit/ABIFunctionType.yaml
+GeneratedFile(
+    "ABIFunctionTypeGenerated.h",
+    script="GenerateABIFunctionType.py",
+    inputs=["ABIFunctionType.yaml"],
+)
 
 # Generate jit/MIROpsGenerated.h from jit/MIROps.yaml
 GeneratedFile(

@@ -28,8 +28,29 @@ GetObjectFlagsForNewProperty(const JSClass* clasp, ObjectFlags flags, jsid id,
   }
 
   if ((!propFlags.isDataProperty() || !propFlags.writable()) &&
-      clasp == &PlainObject::class_ && !id.isAtom(cx->names().proto)) {
+      clasp == &PlainObject::class_ && !id.isAtom(cx->names().proto_)) {
     flags.setFlag(ObjectFlag::HasNonWritableOrAccessorPropExclProto);
+  }
+
+  // https://tc39.es/ecma262/multipage/ordinary-and-exotic-objects-behaviours.html#sec-proxy-object-internal-methods-and-internal-slots-get-p-receiver
+  // Proxy.[[Get]] or [[Set]] Step 9
+  if (!propFlags.configurable()) {
+    MOZ_ASSERT(clasp->isNativeObject());
+    // NOTE: there is a hole which this flag does not cover, which is if the
+    // class has a resolve hook which could lazily define a non-configurable
+    // non-writable property. We can just look this up directly though in the
+    // JIT.
+    if (propFlags.isDataProperty() && !propFlags.writable()) {
+      flags.setFlag(ObjectFlag::NeedsProxyGetSetResultValidation);
+    } else if (propFlags.isAccessorProperty()) {
+      // This will cover us for both get trap validation and set trap
+      // validation. We could be more aggressive, because what we really
+      // care about is if there is a getter but not a setter and vice
+      // versa, but the first pass at doing that resulted in test
+      // failures. We'll need to work on that as a follow-up if it is
+      // important.
+      flags.setFlag(ObjectFlag::NeedsProxyGetSetResultValidation);
+    }
   }
 
   if (propFlags.enumerable()) {
@@ -52,6 +73,9 @@ inline ObjectFlags CopyPropMapObjectFlags(ObjectFlags dest,
   }
   if (source.hasFlag(ObjectFlag::HasNonWritableOrAccessorPropExclProto)) {
     dest.setFlag(ObjectFlag::HasNonWritableOrAccessorPropExclProto);
+  }
+  if (source.hasFlag(ObjectFlag::NeedsProxyGetSetResultValidation)) {
+    dest.setFlag(ObjectFlag::NeedsProxyGetSetResultValidation);
   }
   return dest;
 }

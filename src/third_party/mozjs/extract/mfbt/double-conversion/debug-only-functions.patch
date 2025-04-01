@@ -1,6 +1,6 @@
-diff --git a/mfbt/double-conversion/double-conversion/strtod.cc b/mfbt/double-conversion/double-conversion/strtod.cc
---- a/mfbt/double-conversion/double-conversion/strtod.cc
-+++ b/mfbt/double-conversion/double-conversion/strtod.cc
+diff --git a/double-conversion/strtod.cc b/double-conversion/strtod.cc
+--- a/double-conversion/strtod.cc
++++ b/double-conversion/strtod.cc
 @@ -436,16 +436,17 @@ static bool ComputeGuess(Vector<const ch
      return true;
    }

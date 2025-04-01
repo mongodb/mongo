@@ -14,6 +14,7 @@
 #  include "builtin/intl/NumberFormat.h"
 #  include "builtin/intl/PluralRules.h"
 #  include "builtin/intl/RelativeTimeFormat.h"
+#  include "builtin/intl/Segmenter.h"
 #endif
 #include "builtin/MapObject.h"
 #include "js/experimental/JitInfo.h"
@@ -52,6 +53,12 @@ const JSClass* js::jit::InlinableNativeGuardToClass(InlinableNative native) {
       return &PluralRulesObject::class_;
     case InlinableNative::IntlGuardToRelativeTimeFormat:
       return &RelativeTimeFormatObject::class_;
+    case InlinableNative::IntlGuardToSegmenter:
+      return &SegmenterObject::class_;
+    case InlinableNative::IntlGuardToSegments:
+      return &SegmentsObject::class_;
+    case InlinableNative::IntlGuardToSegmentIterator:
+      return &SegmentIteratorObject::class_;
 #else
     case InlinableNative::IntlGuardToCollator:
     case InlinableNative::IntlGuardToDateTimeFormat:
@@ -60,6 +67,9 @@ const JSClass* js::jit::InlinableNativeGuardToClass(InlinableNative native) {
     case InlinableNative::IntlGuardToNumberFormat:
     case InlinableNative::IntlGuardToPluralRules:
     case InlinableNative::IntlGuardToRelativeTimeFormat:
+    case InlinableNative::IntlGuardToSegmenter:
+    case InlinableNative::IntlGuardToSegments:
+    case InlinableNative::IntlGuardToSegmentIterator:
       MOZ_CRASH("Intl API disabled");
 #endif
 
@@ -86,9 +96,9 @@ const JSClass* js::jit::InlinableNativeGuardToClass(InlinableNative native) {
     case InlinableNative::IntrinsicGuardToSetObject:
       return &SetObject::class_;
     case InlinableNative::IntrinsicGuardToArrayBuffer:
-      return &ArrayBufferObject::class_;
+      return &FixedLengthArrayBufferObject::class_;
     case InlinableNative::IntrinsicGuardToSharedArrayBuffer:
-      return &SharedArrayBufferObject::class_;
+      return &FixedLengthSharedArrayBufferObject::class_;
 
     default:
       MOZ_CRASH("Not a GuardTo instruction");
@@ -158,10 +168,15 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::IntlGuardToNumberFormat:
     case InlinableNative::IntlGuardToPluralRules:
     case InlinableNative::IntlGuardToRelativeTimeFormat:
+    case InlinableNative::IntlGuardToSegmenter:
+    case InlinableNative::IntlGuardToSegments:
+    case InlinableNative::IntlGuardToSegmentIterator:
     case InlinableNative::IsRegExpObject:
     case InlinableNative::IsPossiblyWrappedRegExpObject:
     case InlinableNative::RegExpMatcher:
     case InlinableNative::RegExpSearcher:
+    case InlinableNative::RegExpSearcherLastLimit:
+    case InlinableNative::RegExpHasCaptureGroups:
     case InlinableNative::RegExpPrototypeOptimizable:
     case InlinableNative::RegExpInstanceOptimizable:
     case InlinableNative::GetFirstDollarIndex:
@@ -212,6 +227,7 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::IntrinsicRegExpExec:
     case InlinableNative::IntrinsicRegExpExecForTest:
     case InlinableNative::IntrinsicTypedArrayLength:
+    case InlinableNative::IntrinsicTypedArrayLengthZeroOnOutOfBounds:
     case InlinableNative::IntrinsicTypedArrayByteOffset:
     case InlinableNative::IntrinsicTypedArrayElementSize:
     case InlinableNative::IntrinsicArrayIteratorPrototypeOptimizable:
@@ -269,22 +285,31 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::NumberToString:
     case InlinableNative::ReflectGetPrototypeOf:
     case InlinableNative::SetHas:
+    case InlinableNative::SetSize:
     case InlinableNative::String:
     case InlinableNative::StringToString:
     case InlinableNative::StringValueOf:
     case InlinableNative::StringCharCodeAt:
+    case InlinableNative::StringCodePointAt:
     case InlinableNative::StringFromCharCode:
     case InlinableNative::StringFromCodePoint:
     case InlinableNative::StringCharAt:
+    case InlinableNative::StringAt:
+    case InlinableNative::StringIncludes:
     case InlinableNative::StringIndexOf:
+    case InlinableNative::StringLastIndexOf:
     case InlinableNative::StringStartsWith:
     case InlinableNative::StringEndsWith:
     case InlinableNative::StringToLowerCase:
     case InlinableNative::StringToUpperCase:
+    case InlinableNative::StringTrim:
+    case InlinableNative::StringTrimStart:
+    case InlinableNative::StringTrimEnd:
     case InlinableNative::Object:
     case InlinableNative::ObjectCreate:
     case InlinableNative::ObjectIs:
     case InlinableNative::ObjectIsPrototypeOf:
+    case InlinableNative::ObjectKeys:
     case InlinableNative::ObjectToString:
     case InlinableNative::TypedArrayConstructor:
 #ifdef FUZZING_JS_FUZZILLI

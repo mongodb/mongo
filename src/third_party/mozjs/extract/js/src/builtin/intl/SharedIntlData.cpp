@@ -32,7 +32,7 @@
 #include "js/Utility.h"
 #include "js/Vector.h"
 #include "vm/ArrayObject.h"
-#include "vm/JSAtom.h"
+#include "vm/JSAtomUtils.h"  // Atomize
 #include "vm/JSContext.h"
 #include "vm/StringType.h"
 
@@ -534,6 +534,7 @@ bool js::intl::SharedIntlData::isSupportedLocale(JSContext* cx,
     case SupportedLocaleKind::NumberFormat:
     case SupportedLocaleKind::PluralRules:
     case SupportedLocaleKind::RelativeTimeFormat:
+    case SupportedLocaleKind::Segmenter:
       *supported = supportedLocales.has(lookup);
       return true;
   }
@@ -557,6 +558,7 @@ js::ArrayObject* js::intl::SharedIntlData::availableLocalesOf(
     case SupportedLocaleKind::NumberFormat:
     case SupportedLocaleKind::PluralRules:
     case SupportedLocaleKind::RelativeTimeFormat:
+    case SupportedLocaleKind::Segmenter:
       localeSet = &supportedLocales;
       break;
     default:
@@ -674,6 +676,95 @@ bool js::intl::SharedIntlData::isUpperCaseFirst(JSContext* cx,
   return true;
 }
 
+#if DEBUG || MOZ_SYSTEM_ICU
+bool js::intl::SharedIntlData::ensureIgnorePunctuationLocales(JSContext* cx) {
+  if (ignorePunctuationInitialized) {
+    return true;
+  }
+
+  // If ensureIgnorePunctuationLocales() was called previously, but didn't
+  // complete due to OOM, clear all data and start from scratch.
+  ignorePunctuationLocales.clearAndCompact();
+
+  Rooted<JSAtom*> locale(cx);
+  for (const char* rawLocale : mozilla::intl::Collator::GetAvailableLocales()) {
+    auto collator = mozilla::intl::Collator::TryCreate(rawLocale);
+    if (collator.isErr()) {
+      ReportInternalError(cx, collator.unwrapErr());
+      return false;
+    }
+
+    auto ignorePunctuation = collator.unwrap()->GetIgnorePunctuation();
+    if (ignorePunctuation.isErr()) {
+      ReportInternalError(cx, ignorePunctuation.unwrapErr());
+      return false;
+    }
+
+    if (!ignorePunctuation.unwrap()) {
+      continue;
+    }
+
+    locale = Atomize(cx, rawLocale, strlen(rawLocale));
+    if (!locale) {
+      return false;
+    }
+
+    LocaleHasher::Lookup lookup(locale);
+    LocaleSet::AddPtr p = ignorePunctuationLocales.lookupForAdd(lookup);
+
+    // ICU shouldn't report any duplicate locales, but if it does, just
+    // ignore the duplicated locale.
+    if (!p && !ignorePunctuationLocales.add(p, locale)) {
+      ReportOutOfMemory(cx);
+      return false;
+    }
+  }
+
+  MOZ_ASSERT(
+      !ignorePunctuationInitialized,
+      "ensureIgnorePunctuationLocales is neither reentrant nor thread-safe");
+  ignorePunctuationInitialized = true;
+
+  return true;
+}
+#endif  // DEBUG || MOZ_SYSTEM_ICU
+
+bool js::intl::SharedIntlData::isIgnorePunctuation(JSContext* cx,
+                                                   HandleString locale,
+                                                   bool* ignorePunctuation) {
+#if DEBUG || MOZ_SYSTEM_ICU
+  if (!ensureIgnorePunctuationLocales(cx)) {
+    return false;
+  }
+#endif
+
+  Rooted<JSLinearString*> localeLinear(cx, locale->ensureLinear(cx));
+  if (!localeLinear) {
+    return false;
+  }
+
+#if !MOZ_SYSTEM_ICU
+  // "th" (Thai) is the only supported locale which ignores punctuation by
+  // default.
+  bool isDefaultIgnorePunctuationLocale =
+      js::StringEqualsLiteral(localeLinear, "th");
+#endif
+
+#if DEBUG || MOZ_SYSTEM_ICU
+  LocaleHasher::Lookup lookup(localeLinear);
+  *ignorePunctuation = ignorePunctuationLocales.has(lookup);
+#else
+  *ignorePunctuation = isDefaultIgnorePunctuationLocale;
+#endif
+
+#if !MOZ_SYSTEM_ICU
+  MOZ_ASSERT(*ignorePunctuation == isDefaultIgnorePunctuationLocale,
+             "ignore punctuation locales don't match hard-coded list");
+#endif
+
+  return true;
+}
+
 void js::intl::DateTimePatternGeneratorDeleter::operator()(
     mozilla::intl::DateTimePatternGenerator* ptr) {
   delete ptr;
@@ -722,6 +813,7 @@ void js::intl::SharedIntlData::destroyInstance() {
   collatorSupportedLocales.clearAndCompact();
 #if DEBUG || MOZ_SYSTEM_ICU
   upperCaseFirstLocales.clearAndCompact();
+  ignorePunctuationLocales.clearAndCompact();
 #endif
 }
 
@@ -735,6 +827,7 @@ void js::intl::SharedIntlData::trace(JSTracer* trc) {
     collatorSupportedLocales.trace(trc);
 #if DEBUG || MOZ_SYSTEM_ICU
     upperCaseFirstLocales.trace(trc);
+    ignorePunctuationLocales.trace(trc);
 #endif
   }
 }
@@ -749,6 +842,7 @@ size_t js::intl::SharedIntlData::sizeOfExcludingThis(
          collatorSupportedLocales.shallowSizeOfExcludingThis(mallocSizeOf) +
 #if DEBUG || MOZ_SYSTEM_ICU
          upperCaseFirstLocales.shallowSizeOfExcludingThis(mallocSizeOf) +
+         ignorePunctuationLocales.shallowSizeOfExcludingThis(mallocSizeOf) +
 #endif
          mallocSizeOf(dateTimePatternGeneratorLocale.get());
 }

@@ -41,6 +41,11 @@ extern JS_PUBLIC_API JSObject* NewDateObject(JSContext* cx, int year, int mon,
                                              int mday, int hour, int min,
                                              int sec);
 
+/*
+ * Returns the current time in milliseconds since the epoch.
+ */
+JS::ClippedTime DateNow(JSContext* cx);
+
 /* Date methods exposed so they can be installed in the self-hosting global. */
 bool date_now(JSContext* cx, unsigned argc, JS::Value* vp);
 

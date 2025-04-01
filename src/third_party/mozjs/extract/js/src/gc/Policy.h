@@ -12,6 +12,7 @@
 #include <type_traits>
 
 #include "gc/Barrier.h"
+#include "gc/Marking.h"
 #include "gc/Tracer.h"
 #include "js/GCPolicyAPI.h"
 
@@ -55,6 +56,12 @@ struct GCPolicy<js::HeapPtr<T>> {
   static bool traceWeak(JSTracer* trc, js::HeapPtr<T>* thingp) {
     return js::TraceWeakEdge(trc, thingp, "HeapPtr");
   }
+  static bool needsSweep(JSTracer* trc, const js::HeapPtr<T>* thingp) {
+    js::HeapPtr<T> thing(*thingp);
+    auto r = js::TraceWeakEdge(trc, &thing, "HeapPtr");
+    MOZ_ASSERT(!r.wasMoved());
+    return r.isDead();
+  }
 };
 
 template <typename T>
@@ -73,6 +80,12 @@ struct GCPolicy<js::WeakHeapPtr<T>> {
   }
   static bool traceWeak(JSTracer* trc, js::WeakHeapPtr<T>* thingp) {
     return js::TraceWeakEdge(trc, thingp, "traceWeak");
+  }
+  static bool needsSweep(JSTracer* trc, const js::WeakHeapPtr<T>* thingp) {
+    js::WeakHeapPtr<T> thing(*thingp);
+    auto r = js::TraceWeakEdge(trc, &thing, "WeakHeapPtr");
+    MOZ_ASSERT(!r.wasMoved());
+    return r.isDead();
   }
 };
 

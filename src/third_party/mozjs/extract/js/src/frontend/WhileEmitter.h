@@ -35,6 +35,9 @@ struct BytecodeEmitter;
 //     wh.emitEnd();
 //
 class MOZ_STACK_CLASS WhileEmitter {
+#ifdef ENABLE_DECORATORS
+ protected:
+#endif
   BytecodeEmitter* bce_;
 
   mozilla::Maybe<LoopControl> loopInfo_;
@@ -83,6 +86,16 @@ class MOZ_STACK_CLASS WhileEmitter {
   [[nodiscard]] bool emitBody();
   [[nodiscard]] bool emitEnd();
 };
+
+#ifdef ENABLE_DECORATORS
+// This version is for emitting the condition in synthesized code that
+// does not have a corresponding location in the source code.
+class MOZ_STACK_CLASS InternalWhileEmitter : public WhileEmitter {
+ public:
+  explicit InternalWhileEmitter(BytecodeEmitter* bce) : WhileEmitter(bce) {}
+  [[nodiscard]] bool emitCond();
+};
+#endif
 
 } /* namespace frontend */
 } /* namespace js */

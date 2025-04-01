@@ -49,7 +49,7 @@ ABIArg ABIArgGenerator::softNext(MIRType type) {
   switch (type) {
     case MIRType::Int32:
     case MIRType::Pointer:
-    case MIRType::RefOrNull:
+    case MIRType::WasmAnyRef:
     case MIRType::StackResults:
       if (intRegIndex_ == NumIntArgRegs) {
         current_ = ABIArg(stackOffset_);
@@ -111,7 +111,7 @@ ABIArg ABIArgGenerator::hardNext(MIRType type) {
   switch (type) {
     case MIRType::Int32:
     case MIRType::Pointer:
-    case MIRType::RefOrNull:
+    case MIRType::WasmAnyRef:
     case MIRType::StackResults:
       if (intRegIndex_ == NumIntArgRegs) {
         current_ = ABIArg(stackOffset_);
@@ -2674,6 +2674,17 @@ uint32_t Assembler::GetPoolMaxOffset() {
 
 SecondScratchRegisterScope::SecondScratchRegisterScope(MacroAssembler& masm)
     : AutoRegisterScope(masm, masm.getSecondScratchReg()) {}
+
+AutoNonDefaultSecondScratchRegister::AutoNonDefaultSecondScratchRegister(
+    MacroAssembler& masm, Register reg)
+    : masm_(masm) {
+  prevSecondScratch_ = masm.getSecondScratchReg();
+  masm.setSecondScratchReg(reg);
+}
+
+AutoNonDefaultSecondScratchRegister::~AutoNonDefaultSecondScratchRegister() {
+  masm_.setSecondScratchReg(prevSecondScratch_);
+}
 
 #ifdef JS_DISASM_ARM
 

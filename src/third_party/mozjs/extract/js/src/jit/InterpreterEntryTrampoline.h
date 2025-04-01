@@ -58,7 +58,7 @@ class EntryTrampoline {
   }
 
 #ifdef JSGC_HASH_TABLE_CHECKS
-  void checkTrampolineAfterMovingGC();
+  void checkTrampolineAfterMovingGC() const;
 #endif
 };
 

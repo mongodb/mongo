@@ -19,9 +19,14 @@
 #ifndef wasm_realm_h
 #define wasm_realm_h
 
+#include "js/TracingAPI.h"
+
 #include "wasm/WasmTypeDecls.h"
 
 namespace js {
+
+class WasmTagObject;
+
 namespace wasm {
 
 // wasm::Realm lives in JS::Realm and contains the wasm-related per-realm state.
@@ -72,6 +77,12 @@ extern void InterruptRunningCode(JSContext* cx);
 // interrupt request for all wasm Instances to avoid spurious trapping.
 
 void ResetInterruptState(JSContext* cx);
+
+#ifdef ENABLE_WASM_JSPI
+void UpdateInstanceStackLimitsForSuspendableStack(JSContext* cx,
+                                                  JS::NativeStackLimit limit);
+void ResetInstanceStackLimits(JSContext* cx);
+#endif
 
 }  // namespace wasm
 }  // namespace js

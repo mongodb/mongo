@@ -21,6 +21,7 @@
 #include "vm/GeneratorObject.h"
 #include "vm/Interpreter.h"
 #include "vm/Opcodes.h"
+#include "vm/TypeofEqOperand.h"  // TypeofEqOperand
 
 #include "gc/ObjectKind-inl.h"
 #include "vm/BytecodeIterator-inl.h"
@@ -630,7 +631,8 @@ bool WarpBuilder::buildBody() {
       //
       // This loop never actually loops.
       if (loc.isBackedge() && !loopStack_.empty()) {
-        BytecodeLocation loopHead(script_, loopStack_.back().header()->pc());
+        BytecodeLocation loopHead(script_,
+                                  loopStack_.back().header()->entryPC());
         if (loc.isBackedgeForLoophead(loopHead)) {
           decLoopDepth();
           loopStack_.popBack();
@@ -651,6 +653,10 @@ bool WarpBuilder::buildBody() {
       return false;
     }
 #endif
+    bool wantPreciseLineNumbers = js::jit::PerfEnabled();
+    if (wantPreciseLineNumbers && !hasTerminatedBlock()) {
+      current->updateTrackedSite(newBytecodeSite(loc));
+    }
 
     JSOp op = loc.getOp();
 
@@ -681,6 +687,8 @@ WARP_UNSUPPORTED_OPCODE_LIST(DEF_OP)
 bool WarpBuilder::build_Nop(BytecodeLocation) { return true; }
 
 bool WarpBuilder::build_NopDestructuring(BytecodeLocation) { return true; }
+
+bool WarpBuilder::build_NopIsAssignOp(BytecodeLocation) { return true; }
 
 bool WarpBuilder::build_TryDestructuring(BytecodeLocation) {
   // Set the hasTryBlock flag to turn off optimizations that eliminate dead
@@ -966,6 +974,9 @@ bool WarpBuilder::build_GetActualArg(BytecodeLocation) {
   MInstruction* arg;
   if (inlineCallInfo()) {
     arg = MGetInlinedArgument::New(alloc(), index, *inlineCallInfo());
+    if (!arg) {
+      return false;
+    }
   } else {
     arg = MGetFrameArgument::New(alloc(), index);
   }
@@ -1554,6 +1565,30 @@ bool WarpBuilder::build_TypeofExpr(BytecodeLocation loc) {
   return build_Typeof(loc);
 }
 
+bool WarpBuilder::build_TypeofEq(BytecodeLocation loc) {
+  auto operand = loc.getTypeofEqOperand();
+  JSType type = operand.type();
+  JSOp compareOp = operand.compareOp();
+  MDefinition* input = current->pop();
+
+  if (const auto* typesSnapshot = getOpSnapshot<WarpPolymorphicTypes>(loc)) {
+    auto* typeOf = MTypeOf::New(alloc(), input);
+    typeOf->setObservedTypes(typesSnapshot->list());
+    current->add(typeOf);
+
+    auto* typeInt = MConstant::New(alloc(), Int32Value(type));
+    current->add(typeInt);
+
+    auto* ins = MCompare::New(alloc(), typeOf, typeInt, compareOp,
+                              MCompare::Compare_Int32);
+    current->add(ins);
+    current->push(ins);
+    return true;
+  }
+
+  return buildIC(loc, CacheKind::TypeOfEq, {input});
+}
+
 bool WarpBuilder::build_Arguments(BytecodeLocation loc) {
   auto* snapshot = getOpSnapshot<WarpArguments>(loc);
   MOZ_ASSERT(info().needsArgsObj());
@@ -1692,6 +1727,7 @@ bool WarpBuilder::build_EndIter(BytecodeLocation loc) {
 
 bool WarpBuilder::build_CloseIter(BytecodeLocation loc) {
   MDefinition* iter = current->pop();
+  iter = unboxObjectInfallible(iter, IsMovable::Yes);
   return buildIC(loc, CacheKind::CloseIter, {iter});
 }
 
@@ -1702,6 +1738,11 @@ bool WarpBuilder::build_IsNoIter(BytecodeLocation) {
   current->add(ins);
   current->push(ins);
   return true;
+}
+
+bool WarpBuilder::build_OptimizeGetIterator(BytecodeLocation loc) {
+  MDefinition* value = current->pop();
+  return buildIC(loc, CacheKind::OptimizeGetIterator, {value});
 }
 
 bool WarpBuilder::transpileCall(BytecodeLocation loc,
@@ -1841,6 +1882,7 @@ bool WarpBuilder::build_GetName(BytecodeLocation loc) {
   MOZ_ASSERT(usesEnvironmentChain());
 
   MDefinition* env = current->environmentChain();
+  env = unboxObjectInfallible(env, IsMovable::Yes);
   return buildIC(loc, CacheKind::GetName, {env});
 }
 
@@ -1855,6 +1897,7 @@ bool WarpBuilder::build_BindName(BytecodeLocation loc) {
   MOZ_ASSERT(usesEnvironmentChain());
 
   MDefinition* env = current->environmentChain();
+  env = unboxObjectInfallible(env, IsMovable::Yes);
   return buildIC(loc, CacheKind::BindName, {env});
 }
 
@@ -2273,14 +2316,23 @@ bool WarpBuilder::build_FinalYieldRval(BytecodeLocation loc) {
 
 bool WarpBuilder::build_AsyncResolve(BytecodeLocation loc) {
   MDefinition* generator = current->pop();
-  MDefinition* valueOrReason = current->pop();
-  auto resolveKind = loc.getAsyncFunctionResolveKind();
+  MDefinition* value = current->pop();
 
-  MAsyncResolve* resolve =
-      MAsyncResolve::New(alloc(), generator, valueOrReason, resolveKind);
+  auto* resolve = MAsyncResolve::New(alloc(), generator, value);
   current->add(resolve);
   current->push(resolve);
   return resumeAfter(resolve, loc);
+}
+
+bool WarpBuilder::build_AsyncReject(BytecodeLocation loc) {
+  MDefinition* generator = current->pop();
+  MDefinition* stack = current->pop();
+  MDefinition* reason = current->pop();
+
+  auto* reject = MAsyncReject::New(alloc(), generator, reason, stack);
+  current->add(reject);
+  current->push(reject);
+  return resumeAfter(reject, loc);
 }
 
 bool WarpBuilder::build_ResumeKind(BytecodeLocation loc) {
@@ -2726,7 +2778,7 @@ bool WarpBuilder::build_CheckIsObj(BytecodeLocation loc) {
   MCheckIsObj* ins = MCheckIsObj::New(alloc(), val, uint8_t(kind));
   current->add(ins);
   current->push(ins);
-  return true;
+  return resumeAfter(ins, loc);
 }
 
 bool WarpBuilder::build_CheckObjCoercible(BytecodeLocation loc) {
@@ -2898,6 +2950,12 @@ bool WarpBuilder::build_SpreadCall(BytecodeLocation loc) {
   CallInfo callInfo(alloc(), constructing, loc.resultIsPopped());
   callInfo.initForSpreadCall(current);
 
+  // The argument must be an array object. Add an infallible MUnbox if needed,
+  // but ensure it's not loop hoisted before the branch in the bytecode guarding
+  // that it's not undefined.
+  MOZ_ASSERT(callInfo.argc() == 1);
+  callInfo.setArg(0, unboxObjectInfallible(callInfo.getArg(0), IsMovable::No));
+
   if (auto* cacheIRSnapshot = getOpSnapshot<WarpCacheIR>(loc)) {
     return transpileCall(loc, cacheIRSnapshot, &callInfo);
   }
@@ -2917,6 +2975,10 @@ bool WarpBuilder::build_SpreadNew(BytecodeLocation loc) {
   bool constructing = true;
   CallInfo callInfo(alloc(), constructing, loc.resultIsPopped());
   callInfo.initForSpreadCall(current);
+
+  // See build_SpreadCall.
+  MOZ_ASSERT(callInfo.argc() == 1);
+  callInfo.setArg(0, unboxObjectInfallible(callInfo.getArg(0), IsMovable::No));
 
   if (auto* cacheIRSnapshot = getOpSnapshot<WarpCacheIR>(loc)) {
     return transpileCall(loc, cacheIRSnapshot, &callInfo);
@@ -3111,10 +3173,30 @@ bool WarpBuilder::build_Exception(BytecodeLocation) {
   MOZ_CRASH("Unreachable because we skip catch-blocks");
 }
 
+bool WarpBuilder::build_ExceptionAndStack(BytecodeLocation) {
+  MOZ_CRASH("Unreachable because we skip catch-blocks");
+}
+
 bool WarpBuilder::build_Throw(BytecodeLocation loc) {
   MDefinition* def = current->pop();
 
   MThrow* ins = MThrow::New(alloc(), def);
+  current->add(ins);
+  if (!resumeAfter(ins, loc)) {
+    return false;
+  }
+
+  // Terminate the block.
+  current->end(MUnreachable::New(alloc()));
+  setTerminatedBlock();
+  return true;
+}
+
+bool WarpBuilder::build_ThrowWithStack(BytecodeLocation loc) {
+  MDefinition* stack = current->pop();
+  MDefinition* value = current->pop();
+
+  auto* ins = MThrowWithStack::New(alloc(), value, stack);
   current->add(ins);
   if (!resumeAfter(ins, loc)) {
     return false;
@@ -3345,6 +3427,23 @@ bool WarpBuilder::buildIC(BytecodeLocation loc, CacheKind kind,
       current->push(ins);
       return true;
     }
+    case CacheKind::TypeOfEq: {
+      MOZ_ASSERT(numInputs == 1);
+      auto operand = loc.getTypeofEqOperand();
+      JSType type = operand.type();
+      JSOp compareOp = operand.compareOp();
+      auto* typeOf = MTypeOf::New(alloc(), getInput(0));
+      current->add(typeOf);
+
+      auto* typeInt = MConstant::New(alloc(), Int32Value(type));
+      current->add(typeInt);
+
+      auto* ins = MCompare::New(alloc(), typeOf, typeInt, compareOp,
+                                MCompare::Compare_Int32);
+      current->add(ins);
+      current->push(ins);
+      return true;
+    }
     case CacheKind::NewObject: {
       auto* templateConst = constant(NullValue());
       MNewObject* ins = MNewObject::NewVM(
@@ -3368,6 +3467,13 @@ bool WarpBuilder::buildIC(BytecodeLocation loc, CacheKind kind,
       CompletionKind kind = loc.getCompletionKind();
       auto* ins = MCloseIterCache::New(alloc(), getInput(0), uint8_t(kind));
       current->add(ins);
+      return resumeAfter(ins, loc);
+    }
+    case CacheKind::OptimizeGetIterator: {
+      MOZ_ASSERT(numInputs == 1);
+      auto* ins = MOptimizeGetIteratorCache::New(alloc(), getInput(0));
+      current->add(ins);
+      current->push(ins);
       return resumeAfter(ins, loc);
     }
     case CacheKind::GetIntrinsic:
@@ -3417,6 +3523,8 @@ bool WarpBuilder::buildBailoutForColdIC(BytecodeLocation loc, CacheKind kind) {
     case CacheKind::HasOwn:
     case CacheKind::CheckPrivateField:
     case CacheKind::InstanceOf:
+    case CacheKind::OptimizeGetIterator:
+    case CacheKind::TypeOfEq:
       resultType = MIRType::Boolean;
       break;
     case CacheKind::SetProp:

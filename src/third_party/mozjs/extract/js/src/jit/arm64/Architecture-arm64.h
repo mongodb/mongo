@@ -542,7 +542,7 @@ static const uint32_t SpillSlotSize =
     std::max(sizeof(Registers::RegisterContent),
              sizeof(FloatRegisters::RegisterContent));
 
-static const uint32_t ShadowStackSpace = 0;
+static constexpr uint32_t ShadowStackSpace = 0;
 
 // When our only strategy for far jumps is to encode the offset directly, and
 // not insert any jump islands during assembly for even further jumps, then the

@@ -24,12 +24,13 @@
 
 #include "jit/InlinableNatives.h"
 #include "js/Class.h"
+#include "js/Prefs.h"
 #include "js/PropertySpec.h"
 #include "util/DifferentialTesting.h"
+#include "vm/Float16.h"
 #include "vm/JSContext.h"
 #include "vm/Realm.h"
 #include "vm/Time.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/JSObject-inl.h"
 
@@ -48,17 +49,13 @@ using mozilla::NumberEqualsInt64;
 using mozilla::PositiveInfinity;
 using mozilla::WrappingMultiply;
 
-static mozilla::Atomic<bool, mozilla::Relaxed> sUseFdlibmForSinCosTan;
-
-JS_PUBLIC_API void JS::SetUseFdlibmForSinCosTan(bool value) {
-  sUseFdlibmForSinCosTan = value;
+bool js::math_use_fdlibm_for_sin_cos_tan() {
+  return JS::Prefs::use_fdlibm_for_sin_cos_tan();
 }
 
-bool js::math_use_fdlibm_for_sin_cos_tan() { return sUseFdlibmForSinCosTan; }
-
 static inline bool UseFdlibmForSinCosTan(const CallArgs& args) {
-  return sUseFdlibmForSinCosTan ||
-         args.callee().nonCCWRealm()->behaviors().shouldResistFingerprinting();
+  return math_use_fdlibm_for_sin_cos_tan() ||
+         args.callee().nonCCWRealm()->creationOptions().alwaysUseFdlibm();
 }
 
 template <UnaryMathFunctionType F>
@@ -104,7 +101,7 @@ bool js::math_abs(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_acos_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::acos(x);
+  return fdlibm_acos(x);
 }
 
 static bool math_acos(JSContext* cx, unsigned argc, Value* vp) {
@@ -114,7 +111,7 @@ static bool math_acos(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_asin_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::asin(x);
+  return fdlibm_asin(x);
 }
 
 static bool math_asin(JSContext* cx, unsigned argc, Value* vp) {
@@ -124,7 +121,7 @@ static bool math_asin(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_atan_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::atan(x);
+  return fdlibm_atan(x);
 }
 
 static bool math_atan(JSContext* cx, unsigned argc, Value* vp) {
@@ -134,7 +131,7 @@ static bool math_atan(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::ecmaAtan2(double y, double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::atan2(y, x);
+  return fdlibm_atan2(y, x);
 }
 
 static bool math_atan2(JSContext* cx, unsigned argc, Value* vp) {
@@ -157,7 +154,7 @@ static bool math_atan2(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_ceil_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::ceil(x);
+  return fdlibm_ceil(x);
 }
 
 static bool math_ceil(JSContext* cx, unsigned argc, Value* vp) {
@@ -201,11 +198,11 @@ static bool math_clz32(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_cos_fdlibm_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::cos(x);
+  return fdlibm_cos(x);
 }
 
 double js::math_cos_native_impl(double x) {
-  MOZ_ASSERT(!sUseFdlibmForSinCosTan);
+  MOZ_ASSERT(!math_use_fdlibm_for_sin_cos_tan());
   AutoUnsafeCallWithABI unsafe;
   return std::cos(x);
 }
@@ -220,7 +217,7 @@ static bool math_cos(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_exp_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::exp(x);
+  return fdlibm_exp(x);
 }
 
 static bool math_exp(JSContext* cx, unsigned argc, Value* vp) {
@@ -230,7 +227,7 @@ static bool math_exp(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_floor_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::floor(x);
+  return fdlibm_floor(x);
 }
 
 bool js::math_floor(JSContext* cx, unsigned argc, Value* vp) {
@@ -303,9 +300,37 @@ static bool math_fround(JSContext* cx, unsigned argc, Value* vp) {
   return RoundFloat32(cx, args[0], args.rval());
 }
 
+#ifdef NIGHTLY_BUILD
+static bool math_f16round(JSContext* cx, unsigned argc, Value* vp) {
+  // http://tc39.es/proposal-float16array/#sec-function-properties-of-the-math-object
+  CallArgs args = CallArgsFromVp(argc, vp);
+
+  if (args.length() == 0) {
+    args.rval().setNaN();
+    return true;
+  }
+
+  // 1. Let n be ? ToNumber(x).
+  double d;
+  if (!ToNumber(cx, args[0], &d)) {
+    return false;
+  }
+  // 2. If n is NaN, return NaN.
+  // 3. If n is one of +0𝔽, -0𝔽, +∞𝔽, or -∞𝔽, return n.
+  // 4. Let n16 be the result of converting n to IEEE 754-2019 binary16 format
+  // using roundTiesToEven mode.
+  js::float16 f16 = js::float16(d);
+  // 5. Let n64 be the result of converting n16 to IEEE 754-2019 binary64
+  // format.
+  // 6. Return the ECMAScript Number value corresponding to n64.
+  args.rval().setDouble(f16.toDouble());
+  return true;
+}
+#endif
+
 double js::math_log_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::log(x);
+  return fdlibm_log(x);
 }
 
 static bool math_log(JSContext* cx, unsigned argc, Value* vp) {
@@ -555,7 +580,7 @@ double js::math_round_impl(double x) {
   }
 
   double add = (x >= 0) ? GetBiggestNumberLessThan(0.5) : 0.5;
-  return std::copysign(fdlibm::floor(x + add), x);
+  return std::copysign(fdlibm_floor(x + add), x);
 }
 
 float js::math_roundf_impl(float x) {
@@ -573,7 +598,7 @@ float js::math_roundf_impl(float x) {
   }
 
   float add = (x >= 0) ? GetBiggestNumberLessThan(0.5f) : 0.5f;
-  return std::copysign(fdlibm::floorf(x + add), x);
+  return std::copysign(fdlibm_floorf(x + add), x);
 }
 
 /* ES5 15.8.2.15. */
@@ -596,11 +621,11 @@ static bool math_round(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_sin_fdlibm_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::sin(x);
+  return fdlibm_sin(x);
 }
 
 double js::math_sin_native_impl(double x) {
-  MOZ_ASSERT(!sUseFdlibmForSinCosTan);
+  MOZ_ASSERT(!math_use_fdlibm_for_sin_cos_tan());
   AutoUnsafeCallWithABI unsafe;
   return std::sin(x);
 }
@@ -625,11 +650,11 @@ static bool math_sqrt(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_tan_fdlibm_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::tan(x);
+  return fdlibm_tan(x);
 }
 
 double js::math_tan_native_impl(double x) {
-  MOZ_ASSERT(!sUseFdlibmForSinCosTan);
+  MOZ_ASSERT(!math_use_fdlibm_for_sin_cos_tan());
   AutoUnsafeCallWithABI unsafe;
   return std::tan(x);
 }
@@ -644,7 +669,7 @@ static bool math_tan(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_log10_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::log10(x);
+  return fdlibm_log10(x);
 }
 
 static bool math_log10(JSContext* cx, unsigned argc, Value* vp) {
@@ -654,7 +679,7 @@ static bool math_log10(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_log2_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::log2(x);
+  return fdlibm_log2(x);
 }
 
 static bool math_log2(JSContext* cx, unsigned argc, Value* vp) {
@@ -664,7 +689,7 @@ static bool math_log2(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_log1p_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::log1p(x);
+  return fdlibm_log1p(x);
 }
 
 static bool math_log1p(JSContext* cx, unsigned argc, Value* vp) {
@@ -674,7 +699,7 @@ static bool math_log1p(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_expm1_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::expm1(x);
+  return fdlibm_expm1(x);
 }
 
 static bool math_expm1(JSContext* cx, unsigned argc, Value* vp) {
@@ -684,7 +709,7 @@ static bool math_expm1(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_cosh_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::cosh(x);
+  return fdlibm_cosh(x);
 }
 
 static bool math_cosh(JSContext* cx, unsigned argc, Value* vp) {
@@ -694,7 +719,7 @@ static bool math_cosh(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_sinh_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::sinh(x);
+  return fdlibm_sinh(x);
 }
 
 static bool math_sinh(JSContext* cx, unsigned argc, Value* vp) {
@@ -704,7 +729,7 @@ static bool math_sinh(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_tanh_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::tanh(x);
+  return fdlibm_tanh(x);
 }
 
 static bool math_tanh(JSContext* cx, unsigned argc, Value* vp) {
@@ -714,7 +739,7 @@ static bool math_tanh(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_acosh_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::acosh(x);
+  return fdlibm_acosh(x);
 }
 
 static bool math_acosh(JSContext* cx, unsigned argc, Value* vp) {
@@ -724,7 +749,7 @@ static bool math_acosh(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_asinh_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::asinh(x);
+  return fdlibm_asinh(x);
 }
 
 static bool math_asinh(JSContext* cx, unsigned argc, Value* vp) {
@@ -734,7 +759,7 @@ static bool math_asinh(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_atanh_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::atanh(x);
+  return fdlibm_atanh(x);
 }
 
 static bool math_atanh(JSContext* cx, unsigned argc, Value* vp) {
@@ -744,7 +769,7 @@ static bool math_atanh(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::ecmaHypot(double x, double y) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::hypot(x, y);
+  return fdlibm_hypot(x, y);
 }
 
 static inline void hypot_step(double& scale, double& sumsq, double x) {
@@ -838,12 +863,12 @@ bool js::math_hypot_handle(JSContext* cx, HandleValueArray args,
 
 double js::math_trunc_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::trunc(x);
+  return fdlibm_trunc(x);
 }
 
 float js::math_truncf_impl(float x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::truncf(x);
+  return fdlibm_truncf(x);
 }
 
 bool js::math_trunc(JSContext* cx, unsigned argc, Value* vp) {
@@ -890,7 +915,7 @@ static bool math_sign(JSContext* cx, unsigned argc, Value* vp) {
 
 double js::math_cbrt_impl(double x) {
   AutoUnsafeCallWithABI unsafe;
-  return fdlibm::cbrt(x);
+  return fdlibm_cbrt(x);
 }
 
 static bool math_cbrt(JSContext* cx, unsigned argc, Value* vp) {
@@ -1021,7 +1046,7 @@ const char* js::GetUnaryMathFunctionName(UnaryMathFunction fun) {
 }
 
 static const JSFunctionSpec math_static_methods[] = {
-    JS_FN(js_toSource_str, math_toSource, 0, 0),
+    JS_FN("toSource", math_toSource, 0, 0),
     JS_INLINABLE_FN("abs", math_abs, 1, 0, MathAbs),
     JS_INLINABLE_FN("acos", math_acos, 1, 0, MathACos),
     JS_INLINABLE_FN("asin", math_asin, 1, 0, MathASin),
@@ -1034,6 +1059,10 @@ static const JSFunctionSpec math_static_methods[] = {
     JS_INLINABLE_FN("floor", math_floor, 1, 0, MathFloor),
     JS_INLINABLE_FN("imul", math_imul, 2, 0, MathImul),
     JS_INLINABLE_FN("fround", math_fround, 1, 0, MathFRound),
+#ifdef NIGHTLY_BUILD
+    // TODO: See Bug 1835034 for JIT support
+    JS_FN("f16round", math_f16round, 1, 0),
+#endif
     JS_INLINABLE_FN("log", math_log, 1, 0, MathLog),
     JS_INLINABLE_FN("max", math_max, 2, 0, MathMax),
     JS_INLINABLE_FN("min", math_min, 2, 0, MathMin),
@@ -1056,8 +1085,7 @@ static const JSFunctionSpec math_static_methods[] = {
     JS_INLINABLE_FN("hypot", math_hypot, 2, 0, MathHypot),
     JS_INLINABLE_FN("trunc", math_trunc, 1, 0, MathTrunc),
     JS_INLINABLE_FN("sign", math_sign, 1, 0, MathSign),
-    JS_INLINABLE_FN("cbrt", math_cbrt, 1, 0, MathCbrt),
-    JS_FS_END};
+    JS_INLINABLE_FN("cbrt", math_cbrt, 1, 0, MathCbrt), JS_FS_END};
 
 static const JSPropertySpec math_static_properties[] = {
     JS_DOUBLE_PS("E", M_E, JSPROP_READONLY | JSPROP_PERMANENT),
@@ -1085,6 +1113,5 @@ static const ClassSpec MathClassSpec = {CreateMathObject,
                                         nullptr,
                                         nullptr};
 
-const JSClass js::MathClass = {js_Math_str,
-                               JSCLASS_HAS_CACHED_PROTO(JSProto_Math),
+const JSClass js::MathClass = {"Math", JSCLASS_HAS_CACHED_PROTO(JSProto_Math),
                                JS_NULL_CLASS_OPS, &MathClassSpec};

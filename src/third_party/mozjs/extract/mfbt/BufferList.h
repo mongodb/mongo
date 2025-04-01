@@ -367,17 +367,24 @@ class BufferList : private AllocPolicy {
   }
 
   // This takes ownership of the data
-  void* WriteBytesZeroCopy(char* aData, size_t aSize, size_t aCapacity) {
-    MOZ_ASSERT(aCapacity != 0);
-    MOZ_ASSERT(aSize <= aCapacity);
+  [[nodiscard]] bool WriteBytesZeroCopy(char* aData, size_t aSize,
+                                        size_t aCapacity) {
     MOZ_ASSERT(mOwning);
+    MOZ_ASSERT(aSize <= aCapacity);
+
+    // Don't create zero-length segments; that can cause problems for
+    // consumers of the data (bug 1595453).
+    if (aSize == 0) {
+      this->free_(aData, aCapacity);
+      return true;
+    }
 
     if (!mSegments.append(Segment(aData, aSize, aCapacity))) {
       this->free_(aData, aCapacity);
-      return nullptr;
+      return false;
     }
     mSize += aSize;
-    return aData;
+    return true;
   }
 
   // Truncate this BufferList at the given iterator location, discarding all

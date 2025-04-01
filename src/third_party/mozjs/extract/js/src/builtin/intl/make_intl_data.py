@@ -99,7 +99,7 @@ def writeMappingsVar(println, mapping, name, description, source, url):
     println("")
     writeMappingHeader(println, description, source, url)
     println("var {0} = {{".format(name))
-    for (key, value) in sorted(mapping.items(), key=itemgetter(0)):
+    for key, value in sorted(mapping.items(), key=itemgetter(0)):
         println('    "{0}": "{1}",'.format(key, value))
     println("};")
 
@@ -173,7 +173,7 @@ def writeMappingsBinarySearchBody(
     # for the binary search, which only performs a single |memcmp| for multiple
     # of two subtag lengths.
     mappings_keys = mappings.keys() if type(mappings) == dict else mappings
-    for (length, subtags) in groupby(sorted(mappings_keys, key=len), len):
+    for length, subtags in groupby(sorted(mappings_keys, key=len), len):
         # Omit the length check if the current length is the maximum length.
         if length != tag_maxlength:
             println(
@@ -318,7 +318,7 @@ void mozilla::intl::Locale::PerformComplexLanguageMappings() {
 
     # Merge duplicate language entries.
     language_aliases = {}
-    for (deprecated_language, (language, script, region)) in sorted(
+    for deprecated_language, (language, script, region) in sorted(
         complex_language_mappings.items(), key=itemgetter(0)
     ):
         key = (language, script, region)
@@ -328,7 +328,7 @@ void mozilla::intl::Locale::PerformComplexLanguageMappings() {
             language_aliases[key].append(deprecated_language)
 
     first_language = True
-    for (deprecated_language, (language, script, region)) in sorted(
+    for deprecated_language, (language, script, region) in sorted(
         complex_language_mappings.items(), key=itemgetter(0)
     ):
         key = (language, script, region)
@@ -422,7 +422,7 @@ void mozilla::intl::Locale::PerformComplexRegionMappings() {
 
     # Merge duplicate region entries.
     region_aliases = {}
-    for (deprecated_region, (default, non_default_replacements)) in sorted(
+    for deprecated_region, (default, non_default_replacements) in sorted(
         complex_region_mappings.items(), key=itemgetter(0)
     ):
         key = hash_key(default, non_default_replacements)
@@ -432,7 +432,7 @@ void mozilla::intl::Locale::PerformComplexRegionMappings() {
             region_aliases[key].append(deprecated_region)
 
     first_region = True
-    for (deprecated_region, (default, non_default_replacements)) in sorted(
+    for deprecated_region, (default, non_default_replacements) in sorted(
         complex_region_mappings.items(), key=itemgetter(0)
     ):
         key = hash_key(default, non_default_replacements)
@@ -587,7 +587,7 @@ bool mozilla::intl::Locale::PerformVariantMappings() {
         )
     )
 
-    for (deprecated_variant, (type, replacement)) in sorted(
+    for deprecated_variant, (type, replacement) in sorted(
         with_alias, key=itemgetter(0)
     ):
         println(
@@ -730,7 +730,7 @@ bool mozilla::intl::Locale::UpdateLegacyMappings() {
 
     # Group the mappings by language.
     legacy_mappings_by_language = {}
-    for (type, replacement) in legacy_mappings.items():
+    for type, replacement in legacy_mappings.items():
         (language, _, _, _) = type
         legacy_mappings_by_language.setdefault(language, {})[type] = replacement
 
@@ -820,7 +820,7 @@ bool mozilla::intl::Locale::UpdateLegacyMappings() {
     def hash_key(mappings):
         return str(sorted(mappings.items(), key=itemgetter(0)))
 
-    for (lang, mappings) in sorted(
+    for lang, mappings in sorted(
         legacy_mappings_by_language.items(), key=itemgetter(0)
     ):
         key = hash_key(mappings)
@@ -848,10 +848,9 @@ bool mozilla::intl::Locale::UpdateLegacyMappings() {
             return len(k.split("-"))
 
         # Alias rules are applied by largest union size first.
-        for (size, mappings_by_size) in groupby(
+        for size, mappings_by_size in groupby(
             sorted(mappings.items(), key=variant_size, reverse=True), key=variant_size
         ):
-
             # Convert grouper object to dict.
             mappings_by_size = dict(mappings_by_size)
 
@@ -859,7 +858,7 @@ bool mozilla::intl::Locale::UpdateLegacyMappings() {
             chain_if = size == 1
 
             # Alias rules are applied in alphabetical order
-            for (variants, r_language) in sorted(
+            for variants, r_language in sorted(
                 mappings_by_size.items(), key=itemgetter(0)
             ):
                 sorted_variants = sorted(variants.split("-"))
@@ -868,7 +867,7 @@ bool mozilla::intl::Locale::UpdateLegacyMappings() {
                 maybe_else = "else " if chain_if and not is_first else ""
                 is_first = False
 
-                for (i, variant) in enumerate(sorted_variants):
+                for i, variant in enumerate(sorted_variants):
                     println(
                         f"""
     {"  " * i}{maybe_else}if (auto* {variant} = findVariant("{variant}")) {{
@@ -1106,11 +1105,11 @@ def readSupplementalData(core_file):
         # Compute the transitive closure.
         # Any case which currently doesn't occur in the CLDR sources isn't supported
         # and will lead to throwing an error.
-        for (type, replacement) in rules.items():
+        for type, replacement in rules.items():
             (language, script, region, variants) = type
             (r_language, r_script, r_region, r_variants) = replacement
 
-            for (i_type, i_replacement) in rules.items():
+            for i_type, i_replacement in rules.items():
                 (i_language, i_script, i_region, i_variants) = i_type
                 (i_r_language, i_r_script, i_r_region, i_r_variants) = i_replacement
 
@@ -1257,7 +1256,7 @@ def readSupplementalData(core_file):
     variant_mappings = {}
 
     # Preprocess all rules so we can perform a single lookup per subtag at runtime.
-    for (type, replacement) in rules.items():
+    for type, replacement in rules.items():
         (language, script, region, variants) = type
         (r_language, r_script, r_region, r_variants) = replacement
 
@@ -1399,7 +1398,7 @@ def readSupplementalData(core_file):
 
     complex_region_mappings_final = {}
 
-    for (deprecated_region, replacements) in complex_region_mappings.items():
+    for deprecated_region, replacements in complex_region_mappings.items():
         # Find all likely subtag entries which don't already contain a region
         # subtag and whose target region is in the list of replacement regions.
         region_likely_subtags = [
@@ -2214,7 +2213,7 @@ def listIANAFiles(tzdataDir):
 
 def readIANAFiles(tzdataDir, files):
     """Read all IANA time zone files from the given iterable."""
-    nameSyntax = "[\w/+\-]+"
+    nameSyntax = r"[\w/+\-]+"
     pZone = re.compile(r"Zone\s+(?P<name>%s)\s+.*" % nameSyntax)
     pLink = re.compile(
         r"Link\s+(?P<target>%s)\s+(?P<name>%s)(?:\s+#.*)?" % (nameSyntax, nameSyntax)
@@ -2311,7 +2310,7 @@ def readICUResourceFile(filename):
         maybeMultiComments = r"(?:/\*[^*]*\*/)*"
         maybeSingleComment = r"(?://.*)?"
         lineStart = "^%s" % maybeMultiComments
-        lineEnd = "%s\s*%s$" % (maybeMultiComments, maybeSingleComment)
+        lineEnd = r"%s\s*%s$" % (maybeMultiComments, maybeSingleComment)
         return re.compile(r"\s*".join(chain([lineStart], args, [lineEnd])))
 
     tableName = r'(?P<quote>"?)(?P<name>.+?)(?P=quote)'
@@ -2507,7 +2506,7 @@ def readICULegacyZones(icuDir):
 
     # A handful of non-IANA zones/links are not in icuzones and must be added
     # manually so that we won't invoke ICU with them.
-    for (zone, target) in otherICULegacyLinks().items():
+    for zone, target in otherICULegacyLinks().items():
         if zone in links:
             if links[zone] != target:
                 raise KeyError(
@@ -2555,7 +2554,7 @@ def icuTzDataVersion(icuTzDir):
     zoneinfo = os.path.join(icuTzDir, "zoneinfo64.txt")
     if not os.path.isfile(zoneinfo):
         raise RuntimeError("file not found: %s" % zoneinfo)
-    version = searchInFile("^//\s+tz version:\s+([0-9]{4}[a-z])$", zoneinfo)
+    version = searchInFile(r"^//\s+tz version:\s+([0-9]{4}[a-z])$", zoneinfo)
     if version is None:
         raise RuntimeError(
             "%s does not contain a valid tzdata version string" % zoneinfo
@@ -2712,7 +2711,7 @@ def processTimeZones(
         println("// Format:")
         println('// "ZoneName" // ICU-Name [time zone file]')
         println("const char* const ianaZonesTreatedAsLinksByICU[] = {")
-        for (zone, icuZone) in incorrectZones:
+        for zone, icuZone in incorrectZones:
             println('    "%s", // %s [%s]' % (zone, icuZone, zone.filename))
         println("};")
         println("")
@@ -2726,7 +2725,7 @@ def processTimeZones(
         println("};")
         println("")
         println("const LinkAndTarget ianaLinksCanonicalizedDifferentlyByICU[] = {")
-        for (zone, target, icuTarget) in incorrectLinks:
+        for zone, target, icuTarget in incorrectLinks:
             println(
                 '    { "%s", "%s" }, // %s [%s]'
                 % (zone, target, icuTarget, zone.filename)
@@ -2796,7 +2795,7 @@ const tzMapper = [
 
         println(description)
         println("const links = {")
-        for (zone, target) in sorted(links, key=itemgetter(0)):
+        for zone, target in sorted(links, key=itemgetter(0)):
             println('    "%s": "%s",' % (zone, target))
         println("};")
 
@@ -3150,10 +3149,10 @@ def writeCurrencyFile(published, currencies, out):
  */"""
         )
         println("var currencyDigits = {")
-        for (currency, entries) in groupby(
+        for currency, entries in groupby(
             sorted(currencies, key=itemgetter(0)), itemgetter(0)
         ):
-            for (_, minorUnits, currencyName, countryName) in entries:
+            for _, minorUnits, currencyName, countryName in entries:
                 println("  // {} ({})".format(currencyName, countryName))
             println("  {}: {},".format(currency, minorUnits))
         println("};")
@@ -3319,7 +3318,7 @@ const char* mozilla::intl::Locale::Replace{0}ExtensionType(
 
     # Merge duplicate keys.
     key_aliases = {}
-    for (key, replacements) in sorted(mapping.items(), key=itemgetter(0)):
+    for key, replacements in sorted(mapping.items(), key=itemgetter(0)):
         hash_key = to_hash_key(replacements)
         if hash_key not in key_aliases:
             key_aliases[hash_key] = []
@@ -3327,7 +3326,7 @@ const char* mozilla::intl::Locale::Replace{0}ExtensionType(
             key_aliases[hash_key].append(key)
 
     first_key = True
-    for (key, replacements) in sorted(mapping.items(), key=itemgetter(0)):
+    for key, replacements in sorted(mapping.items(), key=itemgetter(0)):
         hash_key = to_hash_key(replacements)
         if key in key_aliases[hash_key]:
             continue
@@ -3368,7 +3367,7 @@ const char* mozilla::intl::Locale::Replace{0}ExtensionType(
                 )
             )
         else:
-            for (type, replacement) in replacements:
+            for type, replacement in replacements:
                 println(
                     """
     if (Is{}Type(type, "{}")) {{
@@ -3712,7 +3711,7 @@ const allUnits = {};
 """.format(
             all_units_array
         )
-        + """
+        + r"""
 // Test only sanctioned unit identifiers are allowed.
 
 for (const typeAndUnit of allUnits) {

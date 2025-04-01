@@ -57,6 +57,9 @@ class HandleValueArray {
   MOZ_IMPLICIT HandleValueArray(const RootedVector<Value>& values)
       : length_(values.length()), elements_(values.begin()) {}
 
+  MOZ_IMPLICIT HandleValueArray(const PersistentRootedVector<Value>& values)
+      : length_(values.length()), elements_(values.begin()) {}
+
   template <size_t N>
   MOZ_IMPLICIT HandleValueArray(const RootedValueArray<N>& values)
       : length_(N), elements_(values.begin()) {}

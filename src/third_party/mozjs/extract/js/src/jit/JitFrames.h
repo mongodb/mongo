@@ -28,6 +28,7 @@ class Instance;
 namespace jit {
 
 enum class FrameType;
+enum class VMFunctionId;
 class IonScript;
 class JitActivation;
 class JitFrameLayout;
@@ -133,11 +134,10 @@ struct ResumeFromException {
   // Also used by Wasm to send the exception object to the throw stub.
   JS::Value exception;
 
-  BaselineBailoutInfo* bailoutInfo;
+  // Exception stack to push when resuming into a |finally| block.
+  JS::Value exceptionStack;
 
-#if defined(JS_CODEGEN_ARM64)
-  uint64_t padding_;
-#endif
+  BaselineBailoutInfo* bailoutInfo;
 
   static size_t offsetOfFramePointer() {
     return offsetof(ResumeFromException, framePointer);
@@ -155,6 +155,9 @@ struct ResumeFromException {
   static size_t offsetOfException() {
     return offsetof(ResumeFromException, exception);
   }
+  static size_t offsetOfExceptionStack() {
+    return offsetof(ResumeFromException, exceptionStack);
+  }
   static size_t offsetOfBailoutInfo() {
     return offsetof(ResumeFromException, bailoutInfo);
   }
@@ -171,7 +174,12 @@ void EnsureUnwoundJitExitFrame(JitActivation* act, JitFrameLayout* frame);
 
 void TraceJitActivations(JSContext* cx, JSTracer* trc);
 
+// Trace weak pointers in baseline stubs in activations for zones that are
+// currently being swept.
+void TraceWeakJitActivationsInSweepingZones(JSContext* cx, JSTracer* trc);
+
 void UpdateJitActivationsForMinorGC(JSRuntime* rt);
+void UpdateJitActivationsForCompactingGC(JSRuntime* rt);
 
 static inline uint32_t MakeFrameDescriptor(FrameType type) {
   return uint32_t(type);
@@ -291,6 +299,17 @@ class RectifierFrameLayout : public JitFrameLayout {
   static inline size_t Size() { return sizeof(RectifierFrameLayout); }
 };
 
+class TrampolineNativeFrameLayout : public JitFrameLayout {
+ public:
+  static inline size_t Size() { return sizeof(TrampolineNativeFrameLayout); }
+
+  template <typename T>
+  T* getFrameData() {
+    uint8_t* raw = reinterpret_cast<uint8_t*>(this) - sizeof(T);
+    return reinterpret_cast<T*>(raw);
+  }
+};
+
 class WasmToJSJitFrameLayout : public JitFrameLayout {
  public:
   static inline size_t Size() { return sizeof(WasmToJSJitFrameLayout); }
@@ -302,8 +321,16 @@ class IonICCallFrameLayout : public CommonFrameLayout {
   JitCode* stubCode_;
 
  public:
+  static constexpr size_t LocallyTracedValueOffset = sizeof(void*);
+
   JitCode** stubCode() { return &stubCode_; }
   static size_t Size() { return sizeof(IonICCallFrameLayout); }
+
+  inline Value* locallyTracedValuePtr(size_t index) {
+    uint8_t* fp = reinterpret_cast<uint8_t*>(this);
+    return reinterpret_cast<Value*>(fp - LocallyTracedValueOffset -
+                                    index * sizeof(Value));
+  }
 };
 
 enum class ExitFrameType : uint8_t {
@@ -316,18 +343,26 @@ enum class ExitFrameType : uint8_t {
   IonOOLProxy = 0x6,
   WasmGenericJitEntry = 0x7,
   DirectWasmJitCall = 0x8,
-  UnwoundJit = 0xFB,
-  InterpreterStub = 0xFC,
-  VMFunction = 0xFD,
-  LazyLink = 0xFE,
-  Bare = 0xFF,
+  UnwoundJit = 0x9,
+  InterpreterStub = 0xA,
+  LazyLink = 0xB,
+  Bare = 0xC,
+
+  // This must be the last value in this enum. See ExitFooterFrame::data_.
+  VMFunction = 0xD
 };
 
 // GC related data used to keep alive data surrounding the Exit frame.
 class ExitFooterFrame {
-  // Stores the ExitFrameType or, for ExitFrameType::VMFunction, the
-  // VMFunctionData*.
+  // Stores either the ExitFrameType or, for a VMFunction call,
+  // `ExitFrameType::VMFunction + VMFunctionId`.
   uintptr_t data_;
+
+#ifdef DEBUG
+  void assertValidVMFunctionId() const;
+#else
+  void assertValidVMFunctionId() const {}
+#endif
 
  public:
   static constexpr size_t Size() { return sizeof(ExitFooterFrame); }
@@ -335,17 +370,15 @@ class ExitFooterFrame {
     data_ = uintptr_t(ExitFrameType::UnwoundJit);
   }
   ExitFrameType type() const {
-    static_assert(sizeof(ExitFrameType) == sizeof(uint8_t),
-                  "Code assumes ExitFrameType fits in a byte");
-    if (data_ > UINT8_MAX) {
+    if (data_ >= uintptr_t(ExitFrameType::VMFunction)) {
       return ExitFrameType::VMFunction;
     }
-    MOZ_ASSERT(ExitFrameType(data_) != ExitFrameType::VMFunction);
     return ExitFrameType(data_);
   }
-  inline const VMFunctionData* function() const {
+  VMFunctionId functionId() const {
     MOZ_ASSERT(type() == ExitFrameType::VMFunction);
-    return reinterpret_cast<const VMFunctionData*>(data_);
+    assertValidVMFunctionId();
+    return static_cast<VMFunctionId>(data_ - size_t(ExitFrameType::VMFunction));
   }
 
 #ifdef JS_CODEGEN_MIPS32
@@ -702,12 +735,24 @@ class BaselineStubFrameLayout : public CommonFrameLayout {
  public:
   static constexpr size_t ICStubOffset = sizeof(void*);
   static constexpr int ICStubOffsetFromFP = -int(ICStubOffset);
+  static constexpr size_t LocallyTracedValueOffset = 2 * sizeof(void*);
 
   static inline size_t Size() { return sizeof(BaselineStubFrameLayout); }
 
-  inline ICStub* maybeStubPtr() {
+  ICStub* maybeStubPtr() {
     uint8_t* fp = reinterpret_cast<uint8_t*>(this);
     return *reinterpret_cast<ICStub**>(fp - ICStubOffset);
+  }
+  void setStubPtr(ICStub* stub) {
+    MOZ_ASSERT(stub);
+    uint8_t* fp = reinterpret_cast<uint8_t*>(this);
+    *reinterpret_cast<ICStub**>(fp - ICStubOffset) = stub;
+  }
+
+  inline Value* locallyTracedValuePtr(size_t index) {
+    uint8_t* fp = reinterpret_cast<uint8_t*>(this);
+    return reinterpret_cast<Value*>(fp - LocallyTracedValueOffset -
+                                    index * sizeof(Value));
   }
 };
 
@@ -736,8 +781,6 @@ class InvalidationBailoutStack {
 
   void checkInvariants() const;
 };
-
-void GetPcScript(JSContext* cx, JSScript** scriptRes, jsbytecode** pcRes);
 
 // Baseline requires one slot for this/argument type checks.
 static const uint32_t MinJITStackSize = 1;

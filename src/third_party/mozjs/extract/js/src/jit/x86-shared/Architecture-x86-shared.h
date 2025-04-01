@@ -31,9 +31,9 @@ static const int32_t NUNBOX32_PAYLOAD_OFFSET = 0;
 #endif
 
 #if defined(JS_CODEGEN_X64) && defined(_WIN64)
-static const uint32_t ShadowStackSpace = 32;
+static constexpr uint32_t ShadowStackSpace = 32;
 #else
-static const uint32_t ShadowStackSpace = 0;
+static constexpr uint32_t ShadowStackSpace = 0;
 #endif
 
 static const uint32_t JumpImmediateRange = INT32_MAX;

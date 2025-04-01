@@ -254,14 +254,19 @@ var AllocationLoadManager = class {
 var gLoadMgr = undefined;
 
 function format_with_units(n, label, shortlabel, kbase) {
+  function format(n, prefix, unit) {
+    let s = Number.isInteger(n) ? n.toString() : n.toFixed(2);
+    return `${s}${prefix}${unit}`;
+  }
+
   if (n < kbase * 4) {
     return `${n} ${label}`;
   } else if (n < kbase ** 2 * 4) {
-    return `${(n / kbase).toFixed(2)}K${shortlabel}`;
+    return format(n / kbase, 'K', shortlabel);
   } else if (n < kbase ** 3 * 4) {
-    return `${(n / kbase ** 2).toFixed(2)}M${shortlabel}`;
+    return format(n / kbase ** 2, 'M', shortlabel);
   }
-  return `${(n / kbase ** 3).toFixed(2)}G${shortlabel}`;
+  return format(n / kbase ** 3, 'G', shortlabel);
 }
 
 function format_bytes(bytes) {

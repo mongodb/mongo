@@ -386,12 +386,18 @@ static bool NukedAllRealms(JS::Compartment* comp) {
 }
 
 /*
- * NukeChromeCrossCompartmentWrappersForGlobal reaches into chrome and cuts
- * all of the cross-compartment wrappers that point to an object in the |target|
- * realm. The snag here is that we need to avoid cutting wrappers that point to
- * the window object on page navigation (inner window destruction) and only do
- * that on tab close (outer window destruction).  Thus the option of how to
- * handle the global object.
+ * NukeCrossCompartmentWrappers invalidates all cross-compartment wrappers
+ * that point to objects in the |target| realm.
+ *
+ * There is some complexity in targeting to preserve semantics which requires
+ * the filtering and behavioural options:
+ *
+ * - |sourceFilter| limits the compartments searched for source pointers
+ * - |nukeReferencesToWindow| will, if set to DontNukeWindowReferences skip
+ *   wrappers whose target is the window proxy of the target realm.
+ * - |nukeReferencesFromTarget| will, when set to NukeAllReferences, disallow
+ *   the creation of new wrappers to the target realm. This option can also
+ *   allow more wrappers to be cleaned up transitively.
  */
 JS_PUBLIC_API bool js::NukeCrossCompartmentWrappers(
     JSContext* cx, const CompartmentFilter& sourceFilter, JS::Realm* target,
@@ -569,9 +575,6 @@ void js::RemapDeadWrapper(JSContext* cx, HandleObject wobj,
   // Before swapping, this wrapper came out of rewrap(), which enforces the
   // invariant that the wrapper in the map points directly to the key.
   MOZ_ASSERT(Wrapper::wrappedObject(wobj) == newTarget);
-
-  // Update the incremental weakmap marking state.
-  wobj->zone()->afterAddDelegate(wobj);
 
   // Update the entry in the compartment's wrapper map to point to the old
   // wrapper, which has now been updated (via reuse or swap).

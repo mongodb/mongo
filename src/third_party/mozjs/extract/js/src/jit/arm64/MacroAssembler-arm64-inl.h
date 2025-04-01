@@ -30,6 +30,10 @@ void MacroAssembler::moveGPRToFloat32(Register src, FloatRegister dest) {
   Fmov(ARMFPRegister(dest, 32), ARMRegister(src, 32));
 }
 
+void MacroAssembler::move8ZeroExtend(Register src, Register dest) {
+  Uxtb(ARMRegister(dest, 32), ARMRegister(src, 32));
+}
+
 void MacroAssembler::move8SignExtend(Register src, Register dest) {
   Sxtb(ARMRegister(dest, 32), ARMRegister(src, 32));
 }
@@ -252,6 +256,10 @@ void MacroAssembler::add32(Register src, Register dest) {
 
 void MacroAssembler::add32(Imm32 imm, Register dest) {
   Add(ARMRegister(dest, 32), ARMRegister(dest, 32), Operand(imm.value));
+}
+
+void MacroAssembler::add32(Imm32 imm, Register src, Register dest) {
+  Add(ARMRegister(dest, 32), ARMRegister(src, 32), Operand(imm.value));
 }
 
 void MacroAssembler::add32(Imm32 imm, const Address& dest) {
@@ -1389,9 +1397,8 @@ void MacroAssembler::branchTruncateDoubleMaybeModUint32(FloatRegister src,
                                                         Register dest,
                                                         Label* fail) {
   // ARMv8.3 chips support the FJCVTZS instruction, which handles exactly this
-  // logic. But the simulator does not implement it, and when the simulator runs
-  // on ARM64 hardware we want to override vixl's detection of it.
-#if defined(JS_SIMULATOR_ARM64) && (defined(__aarch64__) || defined(_M_ARM64))
+  // logic. But the simulator does not implement it.
+#if defined(JS_SIMULATOR_ARM64)
   const bool fjscvt = false;
 #else
   const bool fjscvt = CPUHas(vixl::CPUFeatures::kFP, vixl::CPUFeatures::kJSCVT);
@@ -2026,6 +2033,13 @@ void MacroAssembler::branchToComputedAddress(const BaseIndex& addr) {
   Br(scratch64);
 }
 
+void MacroAssembler::cmp32Move32(Condition cond, Register lhs, Imm32 rhs,
+                                 Register src, Register dest) {
+  cmp32(lhs, rhs);
+  Csel(ARMRegister(dest, 32), ARMRegister(src, 32), ARMRegister(dest, 32),
+       cond);
+}
+
 void MacroAssembler::cmp32Move32(Condition cond, Register lhs, Register rhs,
                                  Register src, Register dest) {
   cmp32(lhs, rhs);
@@ -2061,6 +2075,25 @@ void MacroAssembler::cmp32Load32(Condition cond, Register lhs,
 void MacroAssembler::cmp32Load32(Condition cond, Register lhs, Register rhs,
                                  const Address& src, Register dest) {
   MOZ_CRASH("NYI");
+}
+
+void MacroAssembler::cmp32Load32(Condition cond, Register lhs, Imm32 rhs,
+                                 const Address& src, Register dest) {
+  // ARM64 does not support conditional loads, so we use a branch with a CSel
+  // (to prevent Spectre attacks).
+  vixl::UseScratchRegisterScope temps(this);
+  const ARMRegister scratch32 = temps.AcquireW();
+
+  // Can't use branch32() here, because it may select Cbz/Cbnz which don't
+  // affect condition flags.
+  Label done;
+  cmp32(lhs, rhs);
+  B(&done, Assembler::InvertCondition(cond));
+
+  load32(src, scratch32.asUnsized());
+  Csel(ARMRegister(dest, 32), scratch32, ARMRegister(dest, 32), cond);
+
+  bind(&done);
 }
 
 void MacroAssembler::cmp32MovePtr(Condition cond, Register lhs, Imm32 rhs,
@@ -2185,22 +2218,22 @@ void MacroAssembler::spectreBoundsCheckPtr(Register index,
 
 // ========================================================================
 // Memory access primitives.
-void MacroAssembler::storeUncanonicalizedDouble(FloatRegister src,
-                                                const Address& dest) {
-  Str(ARMFPRegister(src, 64), toMemOperand(dest));
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
+    FloatRegister src, const Address& dest) {
+  return Str(ARMFPRegister(src, 64), toMemOperand(dest));
 }
-void MacroAssembler::storeUncanonicalizedDouble(FloatRegister src,
-                                                const BaseIndex& dest) {
-  doBaseIndex(ARMFPRegister(src, 64), dest, vixl::STR_d);
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
+    FloatRegister src, const BaseIndex& dest) {
+  return doBaseIndex(ARMFPRegister(src, 64), dest, vixl::STR_d);
 }
 
-void MacroAssembler::storeUncanonicalizedFloat32(FloatRegister src,
-                                                 const Address& addr) {
-  Str(ARMFPRegister(src, 32), toMemOperand(addr));
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
+    FloatRegister src, const Address& addr) {
+  return Str(ARMFPRegister(src, 32), toMemOperand(addr));
 }
-void MacroAssembler::storeUncanonicalizedFloat32(FloatRegister src,
-                                                 const BaseIndex& addr) {
-  doBaseIndex(ARMFPRegister(src, 32), addr, vixl::STR_s);
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
+    FloatRegister src, const BaseIndex& addr) {
+  return doBaseIndex(ARMFPRegister(src, 32), addr, vixl::STR_s);
 }
 
 void MacroAssembler::memoryBarrier(MemoryBarrierBits barrier) {
@@ -2623,6 +2656,42 @@ void MacroAssembler::concatAndRightShiftSimd128(FloatRegister lhs,
                                                 uint32_t shift) {
   MOZ_ASSERT(shift < 16);
   Ext(Simd16B(dest), Simd16B(rhs), Simd16B(lhs), shift);
+}
+
+// Zero extend int values.
+
+void MacroAssembler::zeroExtend8x16To16x8(FloatRegister src,
+                                          FloatRegister dest) {
+  Ushll(Simd8H(dest), Simd8B(src), 0);
+}
+
+void MacroAssembler::zeroExtend8x16To32x4(FloatRegister src,
+                                          FloatRegister dest) {
+  Ushll(Simd8H(dest), Simd8B(src), 0);
+  Ushll(Simd4S(dest), Simd4H(dest), 0);
+}
+
+void MacroAssembler::zeroExtend8x16To64x2(FloatRegister src,
+                                          FloatRegister dest) {
+  Ushll(Simd8H(dest), Simd8B(src), 0);
+  Ushll(Simd4S(dest), Simd4H(dest), 0);
+  Ushll(Simd2D(dest), Simd2S(dest), 0);
+}
+
+void MacroAssembler::zeroExtend16x8To32x4(FloatRegister src,
+                                          FloatRegister dest) {
+  Ushll(Simd4S(dest), Simd4H(src), 0);
+}
+
+void MacroAssembler::zeroExtend16x8To64x2(FloatRegister src,
+                                          FloatRegister dest) {
+  Ushll(Simd4S(dest), Simd4H(src), 0);
+  Ushll(Simd2D(dest), Simd2S(dest), 0);
+}
+
+void MacroAssembler::zeroExtend32x4To64x2(FloatRegister src,
+                                          FloatRegister dest) {
+  Ushll(Simd2D(dest), Simd2S(src), 0);
 }
 
 // Reverse bytes in lanes.
@@ -3342,26 +3411,26 @@ void MacroAssembler::compareFloat64x2(Assembler::Condition cond,
 
 // Load
 
-void MacroAssembler::loadUnalignedSimd128(const Address& src,
-                                          FloatRegister dest) {
-  Ldr(ARMFPRegister(dest, 128), toMemOperand(src));
+FaultingCodeOffset MacroAssembler::loadUnalignedSimd128(const Address& src,
+                                                        FloatRegister dest) {
+  return Ldr(ARMFPRegister(dest, 128), toMemOperand(src));
 }
 
-void MacroAssembler::loadUnalignedSimd128(const BaseIndex& address,
-                                          FloatRegister dest) {
-  doBaseIndex(ARMFPRegister(dest, 128), address, vixl::LDR_q);
+FaultingCodeOffset MacroAssembler::loadUnalignedSimd128(
+    const BaseIndex& address, FloatRegister dest) {
+  return doBaseIndex(ARMFPRegister(dest, 128), address, vixl::LDR_q);
 }
 
 // Store
 
-void MacroAssembler::storeUnalignedSimd128(FloatRegister src,
-                                           const Address& dest) {
-  Str(ARMFPRegister(src, 128), toMemOperand(dest));
+FaultingCodeOffset MacroAssembler::storeUnalignedSimd128(FloatRegister src,
+                                                         const Address& dest) {
+  return Str(ARMFPRegister(src, 128), toMemOperand(dest));
 }
 
-void MacroAssembler::storeUnalignedSimd128(FloatRegister src,
-                                           const BaseIndex& dest) {
-  doBaseIndex(ARMFPRegister(src, 128), dest, vixl::STR_q);
+FaultingCodeOffset MacroAssembler::storeUnalignedSimd128(
+    FloatRegister src, const BaseIndex& dest) {
+  return doBaseIndex(ARMFPRegister(src, 128), dest, vixl::STR_q);
 }
 
 // Floating point negation

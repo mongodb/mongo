@@ -227,13 +227,13 @@ Handle<ByteArray> Isolate::NewByteArray(int length, AllocationType alloc) {
 
   js::AutoEnterOOMUnsafeRegion oomUnsafe;
 
-  size_t alloc_size = sizeof(uint32_t) + length;
+  size_t alloc_size = sizeof(ByteArrayData) + length;
   ByteArrayData* data =
       static_cast<ByteArrayData*>(allocatePseudoHandle(alloc_size));
   if (!data) {
     oomUnsafe.crash("Irregexp NewByteArray");
   }
-  data->length = length;
+  new (data) ByteArrayData(length);
 
   return Handle<ByteArray>(JS::PrivateValue(data), this);
 }
@@ -261,7 +261,7 @@ Handle<FixedIntegerArray<T>> Isolate::NewFixedIntegerArray(uint32_t length) {
   if (!data) {
     oomUnsafe.crash("Irregexp NewFixedIntegerArray");
   }
-  data->length = rawLength;
+  new (data) ByteArrayData(rawLength);
 
   return Handle<FixedIntegerArray<T>>(JS::PrivateValue(data), this);
 }

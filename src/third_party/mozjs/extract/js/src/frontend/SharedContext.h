@@ -20,6 +20,7 @@
 #include "frontend/ParserAtom.h"          // TaggedParserAtomIndex
 #include "frontend/ScopeIndex.h"          // ScopeIndex
 #include "frontend/ScriptIndex.h"         // ScriptIndex
+#include "js/ColumnNumber.h"              // JS::LimitedColumnNumberOneOrigin
 #include "vm/FunctionFlags.h"             // js::FunctionFlags
 #include "vm/GeneratorAndAsyncKind.h"  // js::GeneratorKind, js::FunctionAsyncKind
 #include "vm/Scope.h"
@@ -179,6 +180,10 @@ class SharedContext {
   // FunctionBox::copyUpdated* methods.
   bool isScriptExtraFieldCopiedToStencil : 1;
 
+  // Indicates this shared context is eligible to use JSOp::ArgumentsLength
+  // when emitting the ArgumentsLength parse node.
+  bool eligibleForArgumentsLength : 1;
+
   // End of fields.
 
   enum class Kind : uint8_t { FunctionBox, Global, Eval, Module };
@@ -271,6 +276,11 @@ class SharedContext {
     localStrict = strict;
     return retVal;
   }
+
+  bool isEligibleForArgumentsLength() {
+    return eligibleForArgumentsLength && !bindingsAccessedDynamically();
+  }
+  void setIneligibleForArgumentsLength() { eligibleForArgumentsLength = false; }
 
   void copyScriptExtraFields(ScriptStencilExtra& scriptExtra);
 };
@@ -626,7 +636,8 @@ class FunctionBox : public SuspendableContext {
   // for validated asm.js.
   bool useAsmOrInsideUseAsm() const { return useAsm; }
 
-  void setStart(uint32_t offset, uint32_t line, uint32_t column) {
+  void setStart(uint32_t offset, uint32_t line,
+                JS::LimitedColumnNumberOneOrigin column) {
     MOZ_ASSERT(!isScriptExtraFieldCopiedToStencil);
     extent_.sourceStart = offset;
     extent_.lineno = line;

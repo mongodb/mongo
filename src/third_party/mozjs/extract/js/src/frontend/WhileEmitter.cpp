@@ -83,3 +83,20 @@ bool WhileEmitter::emitEnd() {
 #endif
   return true;
 }
+
+#ifdef ENABLE_DECORATORS
+bool InternalWhileEmitter::emitCond() {
+  MOZ_ASSERT(state_ == State::Start);
+
+  loopInfo_.emplace(bce_, StatementKind::WhileLoop);
+
+  if (!loopInfo_->emitLoopHead(bce_, mozilla::Nothing())) {
+    return false;
+  }
+
+#  ifdef DEBUG
+  state_ = State::Cond;
+#  endif
+  return true;
+}
+#endif

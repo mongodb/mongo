@@ -51,8 +51,9 @@ void js::GCParallelTask::startWithLockHeld(AutoLockHelperThreadState& lock) {
     maybeQueueTime_ = TimeStamp::Now();
   }
 
-  setDispatched(lock);
-  HelperThreadState().submitTask(this, lock);
+  dispatchedToThreadPool = false;
+
+  gc->dispatchOrQueueParallelTask(this, lock);
 }
 
 void js::GCParallelTask::start() {
@@ -101,11 +102,21 @@ void js::GCParallelTask::joinWithLockHeld(AutoLockHelperThreadState& lock,
     return;
   }
 
-  if (isDispatched(lock) && deadline.isNothing()) {
+  if (lock.hasQueuedTasks()) {
+    // Unlock to allow task dispatch without lock held, otherwise we could wait
+    // forever.
+    AutoUnlockHelperThreadState unlock(lock);
+  }
+
+  if (isNotYetRunning(lock) && !dispatchedToThreadPool &&
+      deadline.isNothing()) {
     // If the task was dispatched but has not yet started then cancel the task
     // and run it from the main thread. This stops us from blocking here when
     // the helper threads are busy with other tasks.
-    cancelDispatchedTask(lock);
+    MOZ_ASSERT(isInList());
+    MOZ_ASSERT_IF(isDispatched(lock), gc->dispatchedParallelTasks != 0);
+
+    remove();
     runFromMainThread(lock);
   } else {
     // Otherwise wait for the task to complete.
@@ -145,24 +156,23 @@ void js::GCParallelTask::joinNonIdleTask(Maybe<TimeStamp> deadline,
   }
 }
 
-void js::GCParallelTask::cancelDispatchedTask(AutoLockHelperThreadState& lock) {
-  MOZ_ASSERT(isDispatched(lock));
-  MOZ_ASSERT(isInList());
-  remove();
-  setIdle(lock);
-}
-
-void js::GCParallelTask::runFromMainThread(AutoLockHelperThreadState& lock) {
-  assertIdle();
-  MOZ_ASSERT(js::CurrentThreadCanAccessRuntime(gc->rt));
-  state_ = State::Running;
-  runTask(gc->rt->gcContext(), lock);
-  state_ = State::Idle;
-}
-
 void js::GCParallelTask::runFromMainThread() {
   AutoLockHelperThreadState lock;
   runFromMainThread(lock);
+}
+
+void js::GCParallelTask::runFromMainThread(AutoLockHelperThreadState& lock) {
+  MOZ_ASSERT(isNotYetRunning(lock));
+  MOZ_ASSERT(js::CurrentThreadCanAccessRuntime(gc->rt));
+
+  if (lock.hasQueuedTasks()) {
+    // Unlock to allow task dispatch without lock held, otherwise we can wait
+    // forever.
+    AutoUnlockHelperThreadState unlock(lock);
+  }
+
+  runTask(gc->rt->gcContext(), lock);
+  setIdle(lock);
 }
 
 class MOZ_RAII AutoGCContext {
@@ -186,18 +196,17 @@ class MOZ_RAII AutoGCContext {
 };
 
 void js::GCParallelTask::runHelperThreadTask(AutoLockHelperThreadState& lock) {
-  setRunning(lock);
-
   AutoGCContext gcContext(gc->rt);
-
   runTask(gcContext.get(), lock);
-
-  setFinished(lock);
+  MOZ_ASSERT(isFinished(lock));
 }
 
 void GCParallelTask::runTask(JS::GCContext* gcx,
                              AutoLockHelperThreadState& lock) {
   // Run the task from either the main thread or a helper thread.
+
+  bool wasDispatched = isDispatched(lock);
+  setRunning(lock);
 
   AutoSetThreadGCUse setUse(gcx, use);
 
@@ -213,6 +222,44 @@ void GCParallelTask::runTask(JS::GCContext* gcx,
     TimeDuration delay = timeStart - maybeQueueTime_;
     gc->rt->metrics().GC_TASK_START_DELAY_US(delay);
   }
+
+  setFinished(lock);
+  gc->onParallelTaskEnd(wasDispatched, lock);
+}
+
+void GCParallelTask::onThreadPoolDispatch() {
+  MOZ_ASSERT(!dispatchedToThreadPool);
+  dispatchedToThreadPool = true;
+}
+
+void GCRuntime::dispatchOrQueueParallelTask(
+    GCParallelTask* task, const AutoLockHelperThreadState& lock) {
+  task->setQueued(lock);
+  queuedParallelTasks.ref().insertBack(task, lock);
+  maybeDispatchParallelTasks(lock);
+}
+
+void GCRuntime::maybeDispatchParallelTasks(
+    const AutoLockHelperThreadState& lock) {
+  MOZ_ASSERT(maxParallelThreads != 0);
+  MOZ_ASSERT(dispatchedParallelTasks <= maxParallelThreads);
+
+  while (dispatchedParallelTasks < maxParallelThreads &&
+         !queuedParallelTasks.ref().isEmpty(lock)) {
+    GCParallelTask* task = queuedParallelTasks.ref().popFirst(lock);
+    task->setDispatched(lock);
+    HelperThreadState().submitTask(task, lock);
+    dispatchedParallelTasks++;
+  }
+}
+
+void GCRuntime::onParallelTaskEnd(bool wasDispatched,
+                                  const AutoLockHelperThreadState& lock) {
+  if (wasDispatched) {
+    MOZ_ASSERT(dispatchedParallelTasks != 0);
+    dispatchedParallelTasks--;
+  }
+  maybeDispatchParallelTasks(lock);
 }
 
 bool js::GCParallelTask::isIdle() const {

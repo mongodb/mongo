@@ -156,6 +156,52 @@ ZydisRegister ZydisRegisterGetLargestEnclosing(ZydisMachineMode mode, ZydisRegis
         return ZYDIS_REGISTER_NONE;
     }
 
+    if (mode > ZYDIS_MACHINE_MODE_MAX_VALUE)
+    {
+        return ZYDIS_REGISTER_NONE;
+    }
+
+    const ZydisRegisterClass reg_class = REG_LOOKUP[reg].class;
+
+    if ((reg_class == ZYDIS_REGCLASS_INVALID) ||
+        ((reg_class == ZYDIS_REGCLASS_GPR64) && (mode != ZYDIS_MACHINE_MODE_LONG_64)))
+    {
+        return ZYDIS_REGISTER_NONE;
+    }
+
+    static const ZydisRegister STATIC_MAPPING[ZYDIS_REGCLASS_MAX_VALUE + 1][3] =
+    {
+                                 /* 16              */ /* 32               */ /* 64                  */
+        [ZYDIS_REGCLASS_FLAGS] = { ZYDIS_REGISTER_FLAGS, ZYDIS_REGISTER_EFLAGS, ZYDIS_REGISTER_RFLAGS },
+        [ZYDIS_REGCLASS_IP   ] = { ZYDIS_REGISTER_IP   , ZYDIS_REGISTER_EIP   , ZYDIS_REGISTER_RIP    },
+    };
+    ZYAN_ASSERT(reg_class < ZYAN_ARRAY_LENGTH(STATIC_MAPPING));
+
+    ZyanU8 mode_bits;
+    switch (mode)
+    {
+    case ZYDIS_MACHINE_MODE_LONG_64:
+        mode_bits = 2;
+        break;
+    case ZYDIS_MACHINE_MODE_LONG_COMPAT_32:
+    case ZYDIS_MACHINE_MODE_LEGACY_32:
+        mode_bits = 1;
+        break;
+    case ZYDIS_MACHINE_MODE_LONG_COMPAT_16:
+    case ZYDIS_MACHINE_MODE_LEGACY_16:
+    case ZYDIS_MACHINE_MODE_REAL_16:
+        mode_bits = 0;
+        break;
+    default:
+        ZYAN_UNREACHABLE;
+    }
+
+    const ZydisRegister static_reg = STATIC_MAPPING[reg_class][mode_bits];
+    if (static_reg != ZYDIS_REGISTER_NONE)
+    {
+        return static_reg;
+    }
+
     static const ZyanU8 GPR8_MAPPING[20] =
     {
         /* AL   */  0,
@@ -177,15 +223,8 @@ ZydisRegister ZydisRegisterGetLargestEnclosing(ZydisMachineMode mode, ZydisRegis
         /* R12B */ 12,
         /* R13B */ 13,
         /* R14B */ 14,
-        /* R15B */ 15,
+        /* R15B */ 15
     };
-
-    const ZydisRegisterClass reg_class = REG_LOOKUP[reg].class;
-    if ((reg_class == ZYDIS_REGCLASS_INVALID) ||
-        ((reg_class == ZYDIS_REGCLASS_GPR64) && (mode != ZYDIS_MACHINE_MODE_LONG_64)))
-    {
-        return ZYDIS_REGISTER_NONE;
-    }
 
     ZyanU8 reg_id = REG_LOOKUP[reg].id;
     switch (reg_class)
@@ -196,19 +235,16 @@ ZydisRegister ZydisRegisterGetLargestEnclosing(ZydisMachineMode mode, ZydisRegis
     case ZYDIS_REGCLASS_GPR16:
     case ZYDIS_REGCLASS_GPR32:
     case ZYDIS_REGCLASS_GPR64:
-        switch (mode)
+        switch (mode_bits)
         {
-        case ZYDIS_MACHINE_MODE_LONG_64:
+        case 2:
             return REG_CLASS_LOOKUP[ZYDIS_REGCLASS_GPR64].lo + reg_id;
-        case ZYDIS_MACHINE_MODE_LONG_COMPAT_32:
-        case ZYDIS_MACHINE_MODE_LEGACY_32:
+        case 1:
             return REG_CLASS_LOOKUP[ZYDIS_REGCLASS_GPR32].lo + reg_id;
-        case ZYDIS_MACHINE_MODE_LONG_COMPAT_16:
-        case ZYDIS_MACHINE_MODE_LEGACY_16:
-        case ZYDIS_MACHINE_MODE_REAL_16:
+        case 0:
             return REG_CLASS_LOOKUP[ZYDIS_REGCLASS_GPR16].lo + reg_id;
         default:
-            return ZYDIS_REGISTER_NONE;
+            ZYAN_UNREACHABLE;
         }
     case ZYDIS_REGCLASS_XMM:
     case ZYDIS_REGCLASS_YMM:

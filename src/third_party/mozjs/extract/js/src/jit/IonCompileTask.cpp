@@ -151,7 +151,7 @@ void jit::AttachFinishedCompilations(JSContext* cx) {
   MOZ_ASSERT(!rt->jitRuntime()->numFinishedOffThreadTasks());
 }
 
-void jit::FreeIonCompileTask(IonCompileTask* task) {
+static void FreeIonCompileTask(IonCompileTask* task) {
   // The task is allocated into its LifoAlloc, so destroying that will
   // destroy the task and all other data accumulated during compilation,
   // except any final codegen (which includes an assembler and needs to be
@@ -160,18 +160,27 @@ void jit::FreeIonCompileTask(IonCompileTask* task) {
   js_delete(task->alloc().lifoAlloc());
 }
 
+void jit::FreeIonCompileTasks(const IonFreeCompileTasks& tasks) {
+  MOZ_ASSERT(!tasks.empty());
+  for (auto* task : tasks) {
+    FreeIonCompileTask(task);
+  }
+}
+
 void IonFreeTask::runHelperThreadTask(AutoLockHelperThreadState& locked) {
   {
     AutoUnlockHelperThreadState unlock(locked);
-    jit::FreeIonCompileTask(task_);
+    jit::FreeIonCompileTasks(compileTasks());
   }
 
   js_delete(this);
 }
 
-void jit::FinishOffThreadTask(JSRuntime* runtime, IonCompileTask* task,
-                              const AutoLockHelperThreadState& locked) {
+void jit::FinishOffThreadTask(JSRuntime* runtime,
+                              AutoStartIonFreeTask& freeTask,
+                              IonCompileTask* task) {
   MOZ_ASSERT(runtime);
+  MOZ_ASSERT(CurrentThreadCanAccessRuntime(runtime));
 
   JSScript* script = task->script();
 
@@ -196,8 +205,9 @@ void jit::FinishOffThreadTask(JSRuntime* runtime, IonCompileTask* task,
     }
   }
 
-  // Free Ion LifoAlloc off-thread. Free on the main thread if this OOMs.
-  if (!StartOffThreadIonFree(task, locked)) {
+  // Try to free the Ion LifoAlloc off-thread. Free on the main thread if this
+  // OOMs.
+  if (!freeTask.addIonCompileToFreeTaskBatch(task)) {
     FreeIonCompileTask(task);
   }
 }

@@ -9,6 +9,7 @@
 #ifndef mozilla_Maybe_h
 #define mozilla_Maybe_h
 
+#include <functional>
 #include <new>  // for placement new
 #include <ostream>
 #include <type_traits>
@@ -120,22 +121,22 @@ class Maybe_CopyMove_Enabler;
   }                                                                         \
                                                                             \
   Maybe_CopyMove_Enabler& operator=(const Maybe_CopyMove_Enabler& aOther) { \
-    return downcast(*this).template operator=<T>(downcast(aOther));         \
+    return downcast(*this).template operator= <T>(downcast(aOther));        \
   }
 
-#define MOZ_MAYBE_MOVE_OPS()                                            \
-  constexpr Maybe_CopyMove_Enabler(Maybe_CopyMove_Enabler&& aOther) {   \
-    if (downcast(aOther).isSome()) {                                    \
-      downcast(*this).emplace(std::move(*downcast(aOther)));            \
-      downcast(aOther).reset();                                         \
-    }                                                                   \
-  }                                                                     \
-                                                                        \
-  constexpr Maybe_CopyMove_Enabler& operator=(                          \
-      Maybe_CopyMove_Enabler&& aOther) {                                \
-    downcast(*this).template operator=<T>(std::move(downcast(aOther))); \
-                                                                        \
-    return *this;                                                       \
+#define MOZ_MAYBE_MOVE_OPS()                                             \
+  constexpr Maybe_CopyMove_Enabler(Maybe_CopyMove_Enabler&& aOther) {    \
+    if (downcast(aOther).isSome()) {                                     \
+      downcast(*this).emplace(std::move(*downcast(aOther)));             \
+      downcast(aOther).reset();                                          \
+    }                                                                    \
+  }                                                                      \
+                                                                         \
+  constexpr Maybe_CopyMove_Enabler& operator=(                           \
+      Maybe_CopyMove_Enabler&& aOther) {                                 \
+    downcast(*this).template operator= <T>(std::move(downcast(aOther))); \
+                                                                         \
+    return *this;                                                        \
   }
 
 #define MOZ_MAYBE_DOWNCAST()                                          \
@@ -202,6 +203,8 @@ class Maybe_CopyMove_Enabler<T, false, false, true> {
  public:
   Maybe_CopyMove_Enabler() = default;
 
+  Maybe_CopyMove_Enabler(const Maybe_CopyMove_Enabler&) = delete;
+  Maybe_CopyMove_Enabler& operator=(const Maybe_CopyMove_Enabler&) = delete;
   MOZ_MAYBE_MOVE_OPS()
 
  private:
@@ -214,6 +217,8 @@ class Maybe_CopyMove_Enabler<T, false, true, false> {
   Maybe_CopyMove_Enabler() = default;
 
   MOZ_MAYBE_COPY_OPS()
+  Maybe_CopyMove_Enabler(Maybe_CopyMove_Enabler&&) = delete;
+  Maybe_CopyMove_Enabler& operator=(Maybe_CopyMove_Enabler&&) = delete;
 
  private:
   MOZ_MAYBE_DOWNCAST()
@@ -291,6 +296,15 @@ struct MaybeStorage<T, true> : MaybeStorageBase<T> {
       : MaybeStorageBase<T>{std::in_place, std::forward<Args>(aArgs)...},
         mIsSome{true} {}
 };
+
+template <typename T>
+struct IsMaybeImpl : std::false_type {};
+
+template <typename T>
+struct IsMaybeImpl<Maybe<T>> : std::true_type {};
+
+template <typename T>
+using IsMaybe = IsMaybeImpl<std::decay_t<T>>;
 
 }  // namespace detail
 
@@ -386,28 +400,35 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
    * a const U&.
    */
   template <typename U,
-            typename = std::enable_if_t<std::is_constructible_v<T, const U&>>>
+            std::enable_if_t<std::is_constructible_v<T, const U&>, bool> = true>
   MOZ_IMPLICIT Maybe(const Maybe<U>& aOther) {
     if (aOther.isSome()) {
       emplace(*aOther);
     }
   }
 
+  template <typename U, std::enable_if_t<!std::is_constructible_v<T, const U&>,
+                                         bool> = true>
+  explicit Maybe(const Maybe<U>& aOther) = delete;
+
   /**
    * Maybe<T> can be move-constructed from a Maybe<U> if T is constructible from
    * a U&&.
    */
   template <typename U,
-            typename = std::enable_if_t<std::is_constructible_v<T, U&&>>>
+            std::enable_if_t<std::is_constructible_v<T, U&&>, bool> = true>
   MOZ_IMPLICIT Maybe(Maybe<U>&& aOther) {
     if (aOther.isSome()) {
       emplace(std::move(*aOther));
       aOther.reset();
     }
   }
+  template <typename U,
+            std::enable_if_t<!std::is_constructible_v<T, U&&>, bool> = true>
+  explicit Maybe(Maybe<U>&& aOther) = delete;
 
   template <typename U,
-            typename = std::enable_if_t<std::is_constructible_v<T, const U&>>>
+            std::enable_if_t<std::is_constructible_v<T, const U&>, bool> = true>
   Maybe& operator=(const Maybe<U>& aOther) {
     if (aOther.isSome()) {
       if (mIsSome) {
@@ -421,8 +442,12 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
     return *this;
   }
 
+  template <typename U, std::enable_if_t<!std::is_constructible_v<T, const U&>,
+                                         bool> = true>
+  Maybe& operator=(const Maybe<U>& aOther) = delete;
+
   template <typename U,
-            typename = std::enable_if_t<std::is_constructible_v<T, U&&>>>
+            std::enable_if_t<std::is_constructible_v<T, U&&>, bool> = true>
   Maybe& operator=(Maybe<U>&& aOther) {
     if (aOther.isSome()) {
       if (mIsSome) {
@@ -437,6 +462,10 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
 
     return *this;
   }
+
+  template <typename U,
+            std::enable_if_t<!std::is_constructible_v<T, U&&>, bool> = true>
+  Maybe& operator=(Maybe<U>&& aOther) = delete;
 
   constexpr Maybe& operator=(Nothing) {
     reset();
@@ -459,7 +488,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
    * without calling the destructor. The internal storage is also reset to
    * avoid multiple calls. Unsafe unless |isSome()|.
    */
-  T extract() {
+  constexpr T extract() {
     MOZ_RELEASE_ASSERT(isSome());
     T v = std::move(mStorage.val);
     reset();
@@ -601,7 +630,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
   /* If |isSome()|, runs the provided function or functor on the contents of
    * this Maybe. */
   template <typename Func>
-  constexpr Maybe& apply(Func&& aFunc) {
+  constexpr Maybe& apply(Func&& aFunc) & {
     if (isSome()) {
       std::forward<Func>(aFunc)(ref());
     }
@@ -609,9 +638,25 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
   }
 
   template <typename Func>
-  constexpr const Maybe& apply(Func&& aFunc) const {
+  constexpr const Maybe& apply(Func&& aFunc) const& {
     if (isSome()) {
       std::forward<Func>(aFunc)(ref());
+    }
+    return *this;
+  }
+
+  template <typename Func>
+  constexpr Maybe& apply(Func&& aFunc) && {
+    if (isSome()) {
+      std::forward<Func>(aFunc)(extract());
+    }
+    return *this;
+  }
+
+  template <typename Func>
+  constexpr Maybe& apply(Func&& aFunc) const&& {
+    if (isSome()) {
+      std::forward<Func>(aFunc)(extract());
     }
     return *this;
   }
@@ -622,7 +667,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
    * value type as what the provided function would have returned.
    */
   template <typename Func>
-  constexpr auto map(Func&& aFunc) {
+  constexpr auto map(Func&& aFunc) & {
     if (isSome()) {
       return Some(std::forward<Func>(aFunc)(ref()));
     }
@@ -630,11 +675,130 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
   }
 
   template <typename Func>
-  constexpr auto map(Func&& aFunc) const {
+  constexpr auto map(Func&& aFunc) const& {
     if (isSome()) {
       return Some(std::forward<Func>(aFunc)(ref()));
     }
     return Maybe<decltype(std::forward<Func>(aFunc)(ref()))>{};
+  }
+
+  template <typename Func>
+  constexpr auto map(Func&& aFunc) && {
+    if (isSome()) {
+      return Some(std::forward<Func>(aFunc)(extract()));
+    }
+    return Maybe<decltype(std::forward<Func>(aFunc)(extract()))>{};
+  }
+
+  template <typename Func>
+  constexpr auto map(Func&& aFunc) const&& {
+    if (isSome()) {
+      return Some(std::forward<Func>(aFunc)(extract()));
+    }
+    return Maybe<decltype(std::forward<Func>(aFunc)(extract()))>{};
+  }
+
+  /*
+   * If |isSome()|, runs the provided function or functor on the contents of
+   * this Maybe and returns the result. Note that the provided function or
+   * functor must return a Maybe<U> of any type U.
+   * If |isNothing()|, returns an empty Maybe value with the same type as what
+   * the provided function would have returned.
+   */
+  template <typename Func>
+  constexpr auto andThen(Func&& aFunc) & {
+    static_assert(std::is_invocable_v<Func, T&>);
+    using U = std::invoke_result_t<Func, T&>;
+    static_assert(detail::IsMaybe<U>::value);
+    if (isSome()) {
+      return std::invoke(std::forward<Func>(aFunc), ref());
+    }
+    return std::remove_cv_t<std::remove_reference_t<U>>{};
+  }
+
+  template <typename Func>
+  constexpr auto andThen(Func&& aFunc) const& {
+    static_assert(std::is_invocable_v<Func, const T&>);
+    using U = std::invoke_result_t<Func, const T&>;
+    static_assert(detail::IsMaybe<U>::value);
+    if (isSome()) {
+      return std::invoke(std::forward<Func>(aFunc), ref());
+    }
+    return std::remove_cv_t<std::remove_reference_t<U>>{};
+  }
+
+  template <typename Func>
+  constexpr auto andThen(Func&& aFunc) && {
+    static_assert(std::is_invocable_v<Func, T&&>);
+    using U = std::invoke_result_t<Func, T&&>;
+    static_assert(detail::IsMaybe<U>::value);
+    if (isSome()) {
+      return std::invoke(std::forward<Func>(aFunc), extract());
+    }
+    return std::remove_cv_t<std::remove_reference_t<U>>{};
+  }
+
+  template <typename Func>
+  constexpr auto andThen(Func&& aFunc) const&& {
+    static_assert(std::is_invocable_v<Func, const T&&>);
+    using U = std::invoke_result_t<Func, const T&&>;
+    static_assert(detail::IsMaybe<U>::value);
+    if (isSome()) {
+      return std::invoke(std::forward<Func>(aFunc), extract());
+    }
+    return std::remove_cv_t<std::remove_reference_t<U>>{};
+  }
+
+  /*
+   * If |isNothing()|, runs the provided function or functor and returns its
+   * result. If |isSome()|, returns the contained value wrapped in a Maybe.
+   */
+  template <typename Func>
+  constexpr Maybe orElse(Func&& aFunc) & {
+    static_assert(std::is_invocable_v<Func>);
+    using U = std::invoke_result_t<Func>;
+    static_assert(
+        std::is_same_v<Maybe, std::remove_cv_t<std::remove_reference_t<U>>>);
+    if (isSome()) {
+      return *this;
+    }
+    return std::invoke(std::forward<Func>(aFunc));
+  }
+
+  template <typename Func>
+  constexpr Maybe orElse(Func&& aFunc) const& {
+    static_assert(std::is_invocable_v<Func>);
+    using U = std::invoke_result_t<Func>;
+    static_assert(
+        std::is_same_v<Maybe, std::remove_cv_t<std::remove_reference_t<U>>>);
+    if (isSome()) {
+      return *this;
+    }
+    return std::invoke(std::forward<Func>(aFunc));
+  }
+
+  template <typename Func>
+  constexpr Maybe orElse(Func&& aFunc) && {
+    static_assert(std::is_invocable_v<Func>);
+    using U = std::invoke_result_t<Func>;
+    static_assert(
+        std::is_same_v<Maybe, std::remove_cv_t<std::remove_reference_t<U>>>);
+    if (isSome()) {
+      return std::move(*this);
+    }
+    return std::invoke(std::forward<Func>(aFunc));
+  }
+
+  template <typename Func>
+  constexpr Maybe orElse(Func&& aFunc) const&& {
+    static_assert(std::is_invocable_v<Func>);
+    using U = std::invoke_result_t<Func>;
+    static_assert(
+        std::is_same_v<Maybe, std::remove_cv_t<std::remove_reference_t<U>>>);
+    if (isSome()) {
+      return std::move(*this);
+    }
+    return std::invoke(std::forward<Func>(aFunc));
   }
 
   /* If |isSome()|, empties this Maybe and destroys its contents. */
@@ -709,28 +873,11 @@ class Maybe<T&> {
   void reset() { mValue = nullptr; }
 
   template <typename Func>
-  Maybe& apply(Func&& aFunc) {
-    if (isSome()) {
-      std::forward<Func>(aFunc)(ref());
-    }
-    return *this;
-  }
-
-  template <typename Func>
   const Maybe& apply(Func&& aFunc) const {
     if (isSome()) {
       std::forward<Func>(aFunc)(ref());
     }
     return *this;
-  }
-
-  template <typename Func>
-  auto map(Func&& aFunc) {
-    Maybe<decltype(std::forward<Func>(aFunc)(ref()))> val;
-    if (isSome()) {
-      val.emplace(std::forward<Func>(aFunc)(ref()));
-    }
-    return val;
   }
 
   template <typename Func>
@@ -740,6 +887,29 @@ class Maybe<T&> {
       val.emplace(std::forward<Func>(aFunc)(ref()));
     }
     return val;
+  }
+
+  template <typename Func>
+  constexpr auto andThen(Func&& aFunc) const {
+    static_assert(std::is_invocable_v<Func, T&>);
+    using U = std::invoke_result_t<Func, T&>;
+    static_assert(detail::IsMaybe<U>::value);
+    if (isSome()) {
+      return std::invoke(std::forward<Func>(aFunc), ref());
+    }
+    return std::remove_cv_t<std::remove_reference_t<U>>{};
+  }
+
+  template <typename Func>
+  constexpr Maybe orElse(Func&& aFunc) const {
+    static_assert(std::is_invocable_v<Func>);
+    using U = std::invoke_result_t<Func>;
+    static_assert(
+        std::is_same_v<Maybe, std::remove_cv_t<std::remove_reference_t<U>>>);
+    if (isSome()) {
+      return *this;
+    }
+    return std::invoke(std::forward<Func>(aFunc));
   }
 
   bool refEquals(const Maybe<T&>& aOther) const {

@@ -10,6 +10,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/Maybe.h"
+#include "mozilla/ScopeExit.h"
 #include "mozilla/SIMD.h"
 #include "mozilla/TextUtils.h"
 
@@ -21,9 +22,10 @@
 #include "jsnum.h"
 #include "jstypes.h"
 
+#include "builtin/SelfHostingDefines.h"
 #include "ds/Sort.h"
-#include "gc/Allocator.h"
 #include "jit/InlinableNatives.h"
+#include "jit/TrampolineNatives.h"
 #include "js/Class.h"
 #include "js/Conversions.h"
 #include "js/experimental/JitInfo.h"  // JSJitGetterOp, JSJitInfo
@@ -42,19 +44,20 @@
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/SelfHosting.h"
 #include "vm/Shape.h"
+#include "vm/StringType.h"
 #include "vm/ToSource.h"  // js::ValueToSource
 #include "vm/TypedArrayObject.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 #include "vm/WrapperObject.h"
 #ifdef ENABLE_RECORD_TUPLE
 #  include "vm/TupleType.h"
 #endif
 
+#include "builtin/Sorting-inl.h"
 #include "vm/ArgumentsObject-inl.h"
 #include "vm/ArrayObject-inl.h"
 #include "vm/GeckoProfiler-inl.h"
 #include "vm/IsGivenTypeObject-inl.h"
-#include "vm/JSAtom-inl.h"
+#include "vm/JSAtomUtils-inl.h"  // PrimitiveValueToId, IndexToId
 #include "vm/NativeObject-inl.h"
 
 using namespace js;
@@ -71,7 +74,7 @@ using JS::AutoCheckCannotGC;
 using JS::IsArrayAnswer;
 using JS::ToUint32;
 
-static inline bool ObjectMayHaveExtraIndexedOwnProperties(JSObject* obj) {
+bool js::ObjectMayHaveExtraIndexedOwnProperties(JSObject* obj) {
   if (!obj->is<NativeObject>()) {
     return true;
   }
@@ -113,7 +116,7 @@ bool js::PrototypeMayHaveIndexedProperties(NativeObject* obj) {
  * elements. This includes other indexed properties in its shape hierarchy, and
  * indexed properties or elements along its prototype chain.
  */
-static bool ObjectMayHaveExtraIndexedProperties(JSObject* obj) {
+bool js::ObjectMayHaveExtraIndexedProperties(JSObject* obj) {
   MOZ_ASSERT_IF(obj->hasDynamicPrototype(), !obj->is<NativeObject>());
 
   if (ObjectMayHaveExtraIndexedOwnProperties(obj)) {
@@ -437,8 +440,8 @@ bool js::GetElements(JSContext* cx, HandleObject aobj, uint32_t length,
 
   if (aobj->is<TypedArrayObject>()) {
     Handle<TypedArrayObject*> typedArray = aobj.as<TypedArrayObject>();
-    if (typedArray->length() == length) {
-      return TypedArrayObject::getElements(cx, typedArray, vp);
+    if (typedArray->length().valueOr(0) == length) {
+      return TypedArrayObject::getElements(cx, typedArray, length, vp);
     }
   }
 
@@ -956,7 +959,7 @@ static SharedShape* AddLengthProperty(JSContext* cx,
                                       map, mapLength, objectFlags);
 }
 
-static bool IsArrayConstructor(const JSObject* obj) {
+bool js::IsArrayConstructor(const JSObject* obj) {
   // Note: this also returns true for cross-realm Array constructors in the
   // same compartment.
   return IsNativeFunction(obj, ArrayConstructor);
@@ -981,6 +984,11 @@ bool js::IsCrossRealmArrayConstructor(JSContext* cx, JSObject* obj,
   return true;
 }
 
+// Returns true iff we know for -sure- that it is definitely safe to use the
+// realm's array constructor.
+//
+// This function is conservative as it may return false for cases which
+// ultimately do use the array constructor.
 static MOZ_ALWAYS_INLINE bool IsArraySpecies(JSContext* cx,
                                              HandleObject origArray) {
   if (MOZ_UNLIKELY(origArray->is<ProxyObject>())) {
@@ -1032,7 +1040,7 @@ static MOZ_ALWAYS_INLINE bool IsArraySpecies(JSContext* cx,
     return false;
   }
 
-  return IsSelfHostedFunctionWithName(getter, cx->names().ArraySpecies);
+  return IsSelfHostedFunctionWithName(getter, cx->names().dollar_ArraySpecies_);
 }
 
 static bool ArraySpeciesCreate(JSContext* cx, HandleObject origArray,
@@ -1265,7 +1273,7 @@ bool js::array_join(JSContext* cx, unsigned argc, Value* vp) {
   }
 
   if (detector.foundCycle()) {
-    args.rval().setString(cx->names().empty);
+    args.rval().setString(cx->names().empty_);
     return true;
   }
 
@@ -1287,7 +1295,7 @@ bool js::array_join(JSContext* cx, unsigned argc, Value* vp) {
       return false;
     }
   } else {
-    sepstr = cx->names().comma;
+    sepstr = cx->names().comma_;
   }
 
   // Steps 5-8 (When the length is zero, directly return the empty string).
@@ -1392,7 +1400,7 @@ static bool array_toLocaleString(JSContext* cx, unsigned argc, Value* vp) {
 
   // Avoid calling into self-hosted code if the array is empty.
   if (obj->is<ArrayObject>() && obj->as<ArrayObject>().length() == 0) {
-    args.rval().setString(cx->names().empty);
+    args.rval().setString(cx->names().empty_);
     return true;
   }
 
@@ -1402,7 +1410,7 @@ static bool array_toLocaleString(JSContext* cx, unsigned argc, Value* vp) {
   }
 
   if (detector.foundCycle()) {
-    args.rval().setString(cx->names().empty);
+    args.rval().setString(cx->names().empty_);
     return true;
   }
 
@@ -2027,57 +2035,10 @@ static bool FillWithUndefined(JSContext* cx, HandleObject obj, uint32_t start,
   return true;
 }
 
-static bool ArrayNativeSortImpl(JSContext* cx, Handle<JSObject*> obj,
-                                Handle<Value> fval, ComparatorMatchResult comp);
-
-bool js::intrinsic_ArrayNativeSort(JSContext* cx, unsigned argc, Value* vp) {
-  // This function is called from the self-hosted Array.prototype.sort
-  // implementation. It returns |true| if the array was sorted, otherwise it
-  // returns |false| to notify the self-hosted code to perform the sorting.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  MOZ_ASSERT(args.length() == 1);
-
-  HandleValue fval = args[0];
-  MOZ_ASSERT(fval.isUndefined() || IsCallable(fval));
-
-  ComparatorMatchResult comp;
-  if (fval.isObject()) {
-    comp = MatchNumericComparator(cx, &fval.toObject());
-    if (comp == Match_Failure) {
-      return false;
-    }
-
-    if (comp == Match_None) {
-      // Non-optimized user supplied comparators perform much better when
-      // called from within a self-hosted sorting function.
-      args.rval().setBoolean(false);
-      return true;
-    }
-  } else {
-    comp = Match_None;
-  }
-
-  Rooted<JSObject*> obj(cx, &args.thisv().toObject());
-
-  if (!ArrayNativeSortImpl(cx, obj, fval, comp)) {
-    return false;
-  }
-
-  args.rval().setBoolean(true);
-  return true;
-}
-
-static bool ArrayNativeSortImpl(JSContext* cx, Handle<JSObject*> obj,
-                                Handle<Value> fval,
-                                ComparatorMatchResult comp) {
-  uint64_t length;
-  if (!GetLengthPropertyInlined(cx, obj, &length)) {
-    return false;
-  }
-  if (length < 2) {
-    /* [] and [a] remain unchanged when sorted. */
-    return true;
-  }
+static bool ArraySortWithoutComparator(JSContext* cx, Handle<JSObject*> obj,
+                                       uint64_t length,
+                                       ComparatorMatchResult comp) {
+  MOZ_ASSERT(length > 1);
 
   if (length > UINT32_MAX) {
     ReportAllocationOverflow(cx);
@@ -2224,6 +2185,263 @@ static bool ArrayNativeSortImpl(JSContext* cx, Handle<JSObject*> obj,
     }
   }
   return true;
+}
+
+// This function handles sorting without a comparator function (or with a
+// trivial comparator function that we can pattern match) by calling
+// ArraySortWithoutComparator.
+//
+// If there's a non-trivial comparator function, it initializes the
+// ArraySortData struct for ArraySortData::sortArrayWithComparator. This
+// function must be called next to perform the sorting.
+//
+// This is separate from ArraySortData::sortArrayWithComparator because it lets
+// the compiler generate better code for ArraySortData::sortArrayWithComparator.
+//
+// https://tc39.es/ecma262/#sec-array.prototype.sort
+// 23.1.3.30 Array.prototype.sort ( comparefn )
+static MOZ_ALWAYS_INLINE bool ArraySortPrologue(JSContext* cx,
+                                                Handle<Value> thisv,
+                                                Handle<Value> comparefn,
+                                                ArraySortData* d, bool* done) {
+  // Step 1.
+  if (MOZ_UNLIKELY(!comparefn.isUndefined() && !IsCallable(comparefn))) {
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BAD_SORT_ARG);
+    return false;
+  }
+
+  // Step 2.
+  Rooted<JSObject*> obj(cx, ToObject(cx, thisv));
+  if (!obj) {
+    return false;
+  }
+
+  // Step 3.
+  uint64_t length;
+  if (MOZ_UNLIKELY(!GetLengthPropertyInlined(cx, obj, &length))) {
+    return false;
+  }
+
+  // Arrays with less than two elements remain unchanged when sorted.
+  if (length <= 1) {
+    d->setReturnValue(obj);
+    *done = true;
+    return true;
+  }
+
+  // Use a fast path if there's no comparator or if the comparator is a function
+  // that we can pattern match.
+  do {
+    ComparatorMatchResult comp = Match_None;
+    if (comparefn.isObject()) {
+      comp = MatchNumericComparator(cx, &comparefn.toObject());
+      if (comp == Match_Failure) {
+        return false;
+      }
+      if (comp == Match_None) {
+        // Pattern matching failed.
+        break;
+      }
+    }
+    if (!ArraySortWithoutComparator(cx, obj, length, comp)) {
+      return false;
+    }
+    d->setReturnValue(obj);
+    *done = true;
+    return true;
+  } while (false);
+
+  // Ensure length * 2 (used below) doesn't overflow UINT32_MAX.
+  if (MOZ_UNLIKELY(length > UINT32_MAX / 2)) {
+    ReportAllocationOverflow(cx);
+    return false;
+  }
+  uint32_t len = uint32_t(length);
+
+  // Merge sort requires extra scratch space.
+  bool needsScratchSpace = len > ArraySortData::InsertionSortMaxLength;
+
+  Rooted<ArraySortData::ValueVector> vec(cx);
+  if (MOZ_UNLIKELY(!vec.reserve(needsScratchSpace ? (2 * len) : len))) {
+    ReportOutOfMemory(cx);
+    return false;
+  }
+
+  // Append elements to the vector. Skip holes.
+  if (IsPackedArray(obj)) {
+    Handle<ArrayObject*> array = obj.as<ArrayObject>();
+    const Value* elements = array->getDenseElements();
+    vec.infallibleAppend(elements, len);
+  } else {
+    RootedValue v(cx);
+    for (uint32_t i = 0; i < len; i++) {
+      if (!CheckForInterrupt(cx)) {
+        return false;
+      }
+
+      bool hole;
+      if (!HasAndGetElement(cx, obj, i, &hole, &v)) {
+        return false;
+      }
+      if (hole) {
+        continue;
+      }
+      vec.infallibleAppend(v);
+    }
+    // If there are only holes, the object is already sorted.
+    if (vec.empty()) {
+      d->setReturnValue(obj);
+      *done = true;
+      return true;
+    }
+  }
+
+  uint32_t denseLen = vec.length();
+  if (needsScratchSpace) {
+    MOZ_ALWAYS_TRUE(vec.resize(denseLen * 2));
+  }
+  d->init(obj, &comparefn.toObject(), std::move(vec.get()), len, denseLen);
+
+  // Continue in ArraySortData::sortArrayWithComparator.
+  MOZ_ASSERT(!*done);
+  return true;
+}
+
+ArraySortResult js::CallComparatorSlow(ArraySortData* d, const Value& x,
+                                       const Value& y) {
+  JSContext* cx = d->cx();
+  FixedInvokeArgs<2> callArgs(cx);
+  callArgs[0].set(x);
+  callArgs[1].set(y);
+  Rooted<Value> comparefn(cx, ObjectValue(*d->comparator()));
+  Rooted<Value> rval(cx);
+  if (!js::Call(cx, comparefn, UndefinedHandleValue, callArgs, &rval)) {
+    return ArraySortResult::Failure;
+  }
+  d->setComparatorReturnValue(rval);
+  return ArraySortResult::Done;
+}
+
+// static
+ArraySortResult ArraySortData::sortArrayWithComparator(ArraySortData* d) {
+  ArraySortResult result = sortWithComparatorShared<ArraySortKind::Array>(d);
+  if (result != ArraySortResult::Done) {
+    return result;
+  }
+
+  // Copy elements to the array.
+  JSContext* cx = d->cx();
+  Rooted<JSObject*> obj(cx, d->obj_);
+  if (!SetArrayElements(cx, obj, 0, d->denseLen, d->list)) {
+    return ArraySortResult::Failure;
+  }
+
+  // Re-create any holes that sorted to the end of the array.
+  for (uint32_t i = d->denseLen; i < d->length; i++) {
+    if (!CheckForInterrupt(cx) || !DeletePropertyOrThrow(cx, obj, i)) {
+      return ArraySortResult::Failure;
+    }
+  }
+
+  d->freeMallocData();
+  d->setReturnValue(obj);
+  return ArraySortResult::Done;
+}
+
+// https://tc39.es/ecma262/#sec-array.prototype.sort
+// 23.1.3.30 Array.prototype.sort ( comparefn )
+bool js::array_sort(JSContext* cx, unsigned argc, Value* vp) {
+  AutoJSMethodProfilerEntry pseudoFrame(cx, "Array.prototype", "sort");
+  CallArgs args = CallArgsFromVp(argc, vp);
+
+  // If we have a comparator argument, use the JIT trampoline implementation
+  // instead. This avoids a performance cliff (especially with large arrays)
+  // because C++ => JIT calls are much slower than Trampoline => JIT calls.
+  if (args.hasDefined(0) && jit::IsBaselineInterpreterEnabled()) {
+    return CallTrampolineNativeJitCode(cx, jit::TrampolineNative::ArraySort,
+                                       args);
+  }
+
+  Rooted<ArraySortData> data(cx, cx);
+
+  // On all return paths other than ArraySortData::sortArrayWithComparator
+  // returning Done, we call freeMallocData to not fail debug assertions. This
+  // matches the JIT trampoline where we can't rely on C++ destructors.
+  auto freeData =
+      mozilla::MakeScopeExit([&]() { data.get().freeMallocData(); });
+
+  bool done = false;
+  if (!ArraySortPrologue(cx, args.thisv(), args.get(0), data.address(),
+                         &done)) {
+    return false;
+  }
+  if (done) {
+    args.rval().set(data.get().returnValue());
+    return true;
+  }
+
+  FixedInvokeArgs<2> callArgs(cx);
+  Rooted<Value> rval(cx);
+
+  while (true) {
+    ArraySortResult res =
+        ArraySortData::sortArrayWithComparator(data.address());
+    switch (res) {
+      case ArraySortResult::Failure:
+        return false;
+
+      case ArraySortResult::Done:
+        freeData.release();
+        args.rval().set(data.get().returnValue());
+        return true;
+
+      case ArraySortResult::CallJS:
+      case ArraySortResult::CallJSSameRealmNoRectifier:
+        MOZ_ASSERT(data.get().comparatorThisValue().isUndefined());
+        MOZ_ASSERT(&args[0].toObject() == data.get().comparator());
+        callArgs[0].set(data.get().comparatorArg(0));
+        callArgs[1].set(data.get().comparatorArg(1));
+        if (!js::Call(cx, args[0], UndefinedHandleValue, callArgs, &rval)) {
+          return false;
+        }
+        data.get().setComparatorReturnValue(rval);
+        break;
+    }
+  }
+}
+
+ArraySortResult js::ArraySortFromJit(JSContext* cx,
+                                     jit::TrampolineNativeFrameLayout* frame) {
+  // Initialize the ArraySortData class stored in the trampoline frame.
+  void* dataUninit = frame->getFrameData<ArraySortData>();
+  auto* data = new (dataUninit) ArraySortData(cx);
+
+  Rooted<Value> thisv(cx, frame->thisv());
+  Rooted<Value> comparefn(cx);
+  if (frame->numActualArgs() > 0) {
+    comparefn = frame->actualArgs()[0];
+  }
+
+  bool done = false;
+  if (!ArraySortPrologue(cx, thisv, comparefn, data, &done)) {
+    return ArraySortResult::Failure;
+  }
+  if (done) {
+    data->freeMallocData();
+    return ArraySortResult::Done;
+  }
+
+  return ArraySortData::sortArrayWithComparator(data);
+}
+
+void ArraySortData::trace(JSTracer* trc) {
+  TraceNullableRoot(trc, &comparator_, "comparator_");
+  TraceRoot(trc, &thisv, "thisv");
+  TraceRoot(trc, &callArgs[0], "callArgs0");
+  TraceRoot(trc, &callArgs[1], "callArgs1");
+  vec.trace(trc);
+  TraceRoot(trc, &item, "item");
+  TraceNullableRoot(trc, &obj_, "obj");
 }
 
 bool js::NewbornArrayPush(JSContext* cx, HandleObject obj, const Value& v) {
@@ -3595,7 +3813,7 @@ static bool GetIndexedPropertiesInRange(JSContext* cx, HandleObject obj,
 
     // Append typed array elements.
     if (nativeObj->is<TypedArrayObject>()) {
-      size_t len = nativeObj->as<TypedArrayObject>().length();
+      size_t len = nativeObj->as<TypedArrayObject>().length().valueOr(0);
       for (uint32_t i = begin; i < len && i < end; i++) {
         if (!indexes.append(i)) {
           return false;
@@ -4030,6 +4248,11 @@ static bool array_of(JSContext* cx, unsigned argc, Value* vp) {
     // isArrayConstructor will usually be true in practice. This is the most
     // common path.
     return ArrayFromCallArgs(cx, args);
+  }
+
+  if (!ReportUsageCounter(cx, nullptr, SUBCLASSING_ARRAY,
+                          SUBCLASSING_TYPE_II)) {
+    return false;
   }
 
   // Step 4.
@@ -4840,14 +5063,14 @@ static bool array_concat(JSContext* cx, unsigned argc, Value* vp) {
 }
 
 static const JSFunctionSpec array_methods[] = {
-    JS_FN(js_toSource_str, array_toSource, 0, 0),
-    JS_SELF_HOSTED_FN(js_toString_str, "ArrayToString", 0, 0),
-    JS_FN(js_toLocaleString_str, array_toLocaleString, 0, 0),
+    JS_FN("toSource", array_toSource, 0, 0),
+    JS_SELF_HOSTED_FN("toString", "ArrayToString", 0, 0),
+    JS_FN("toLocaleString", array_toLocaleString, 0, 0),
 
     /* Perl-ish methods. */
     JS_INLINABLE_FN("join", array_join, 1, 0, ArrayJoin),
     JS_FN("reverse", array_reverse, 0, 0),
-    JS_SELF_HOSTED_FN("sort", "ArraySort", 1, 0),
+    JS_TRAMPOLINE_FN("sort", array_sort, 1, 0, ArraySort),
     JS_INLINABLE_FN("push", array_push, 1, 0, ArrayPush),
     JS_INLINABLE_FN("pop", array_pop, 0, 0, ArrayPop),
     JS_INLINABLE_FN("shift", array_shift, 0, 0, ArrayShift),
@@ -4863,10 +5086,6 @@ static const JSFunctionSpec array_methods[] = {
     JS_SELF_HOSTED_FN("forEach", "ArrayForEach", 1, 0),
     JS_SELF_HOSTED_FN("map", "ArrayMap", 1, 0),
     JS_SELF_HOSTED_FN("filter", "ArrayFilter", 1, 0),
-#ifdef NIGHTLY_BUILD
-    JS_SELF_HOSTED_FN("group", "ArrayGroup", 1, 0),
-    JS_SELF_HOSTED_FN("groupToMap", "ArrayGroupToMap", 1, 0),
-#endif
     JS_SELF_HOSTED_FN("reduce", "ArrayReduce", 1, 0),
     JS_SELF_HOSTED_FN("reduceRight", "ArrayReduceRight", 1, 0),
     JS_SELF_HOSTED_FN("some", "ArraySome", 1, 0),
@@ -5149,35 +5368,21 @@ static bool array_proto_finish(JSContext* cx, JS::HandleObject ctor,
       !DefineDataProperty(cx, unscopables, cx->names().flatMap, value) ||
       !DefineDataProperty(cx, unscopables, cx->names().includes, value) ||
       !DefineDataProperty(cx, unscopables, cx->names().keys, value) ||
+      !DefineDataProperty(cx, unscopables, cx->names().toReversed, value) ||
+      !DefineDataProperty(cx, unscopables, cx->names().toSorted, value) ||
+      !DefineDataProperty(cx, unscopables, cx->names().toSpliced, value) ||
       !DefineDataProperty(cx, unscopables, cx->names().values, value)) {
     return false;
   }
 
-#ifdef NIGHTLY_BUILD
-  if (cx->realm()->creationOptions().getArrayGroupingEnabled()) {
-    if (!DefineDataProperty(cx, unscopables, cx->names().group, value) ||
-        !DefineDataProperty(cx, unscopables, cx->names().groupToMap, value)) {
-      return false;
-    }
-  }
-#endif
-
-  // FIXME: Once bug 1826643 is fixed, the names should be moved into the first
-  // "or" clause in this method so that they will be alphabetized.
-  if (cx->realm()->creationOptions().getChangeArrayByCopyEnabled()) {
-    /* The reason that "with" is not included in the unscopableList is
-     * because it is already a reserved word.
-     */
-    if (!DefineDataProperty(cx, unscopables, cx->names().toReversed, value) ||
-        !DefineDataProperty(cx, unscopables, cx->names().toSorted, value) ||
-        !DefineDataProperty(cx, unscopables, cx->names().toSpliced, value)) {
-      return false;
-    }
-  }
-
   RootedId id(cx, PropertyKey::Symbol(cx->wellKnownSymbols().unscopables));
   value.setObject(*unscopables);
-  return DefineDataProperty(cx, proto, id, value, JSPROP_READONLY);
+  if (!DefineDataProperty(cx, proto, id, value, JSPROP_READONLY)) {
+    return false;
+  }
+
+  // Mark Array prototype as having fuse property (@iterator for example).
+  return JSObject::setHasFuseProperty(cx, proto);
 }
 
 static const JSClassOps ArrayObjectClassOps = {
@@ -5254,6 +5459,19 @@ ArrayObject* js::NewDenseCopiedArray(
   return arr;
 }
 
+// values must point at already-rooted Value objects
+ArrayObject* js::NewDenseCopiedArray(
+    JSContext* cx, uint32_t length, JSLinearString** values,
+    NewObjectKind newKind /* = GenericObject */) {
+  ArrayObject* arr = NewArray<UINT32_MAX>(cx, length, newKind);
+  if (!arr) {
+    return nullptr;
+  }
+
+  arr->initDenseElements(values, length);
+  return arr;
+}
+
 ArrayObject* js::NewDenseCopiedArrayWithProto(JSContext* cx, uint32_t length,
                                               const Value* values,
                                               HandleObject proto) {
@@ -5267,14 +5485,12 @@ ArrayObject* js::NewDenseCopiedArrayWithProto(JSContext* cx, uint32_t length,
   return arr;
 }
 
-ArrayObject* js::NewDenseFullyAllocatedArrayWithTemplate(
-    JSContext* cx, uint32_t length, ArrayObject* templateObject) {
+ArrayObject* js::NewDenseFullyAllocatedArrayWithShape(
+    JSContext* cx, uint32_t length, Handle<SharedShape*> shape) {
   AutoSetNewObjectMetadata metadata(cx);
   gc::AllocKind allocKind = GuessArrayGCKind(length);
   MOZ_ASSERT(CanChangeToBackgroundAllocKind(allocKind, &ArrayObject::class_));
   allocKind = ForegroundToBackgroundAllocKind(allocKind);
-
-  Rooted<SharedShape*> shape(cx, templateObject->sharedShape());
 
   gc::Heap heap = GetInitialHeap(GenericObject, &ArrayObject::class_);
   ArrayObject* arr = ArrayObject::create(cx, allocKind, heap, shape, length,
@@ -5355,7 +5571,7 @@ void js::ArraySpeciesLookup::initialize(JSContext* cx) {
   // optimizable, set to disabled now, and clear it later when we succeed.
   state_ = State::Disabled;
 
-  // Look up Array.prototype[@@iterator] and ensure it's a data property.
+  // Look up Array.prototype.constructor and ensure it's a data property.
   Maybe<PropertyInfo> ctorProp =
       arrayProto->lookup(cx, NameToId(cx->names().constructor));
   if (ctorProp.isNothing() || !ctorProp->isDataProperty()) {
@@ -5387,7 +5603,8 @@ void js::ArraySpeciesLookup::initialize(JSContext* cx) {
     return;
   }
   JSFunction* speciesFun = &speciesGetter->as<JSFunction>();
-  if (!IsSelfHostedFunctionWithName(speciesFun, cx->names().ArraySpecies)) {
+  if (!IsSelfHostedFunctionWithName(speciesFun,
+                                    cx->names().dollar_ArraySpecies_)) {
     return;
   }
 

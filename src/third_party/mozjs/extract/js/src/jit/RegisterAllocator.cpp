@@ -348,10 +348,13 @@ void AllocationIntegrityState::checkSafepointAllocation(LInstruction* ins,
       MOZ_ASSERT(safepoint->hasGcPointer(alloc));
       break;
     case LDefinition::STACKRESULTS:
-      MOZ_ASSERT(safepoint->hasAllGcPointersFromStackArea(alloc));
+      MOZ_ASSERT(safepoint->hasAllWasmAnyRefsFromStackArea(alloc));
       break;
     case LDefinition::SLOTS:
       MOZ_ASSERT(safepoint->hasSlotsOrElementsPointer(alloc));
+      break;
+    case LDefinition::WASM_ANYREF:
+      MOZ_ASSERT(safepoint->hasWasmAnyRef(alloc));
       break;
 #  ifdef JS_NUNBOX32
     // Do not assert that safepoint information for nunbox types is complete,

@@ -124,10 +124,30 @@ function translateCallees(edge)
         return []; // Intentional crash
 
     assert(callee.Kind == "Drf");
-    const called = callee.Exp[0];
+    let called = callee.Exp[0];
+    let indirection = 1;
+    if (called.Kind == "Drf") {
+        // This is probably a reference to a function pointer (`func*&`). It
+        // would be possible to determine that for certain by looking up the
+        // variable's type, which is doable but unnecessary. Indirect calls
+        // are assumed to call anything (any function in the codebase) unless they
+        // are annotated otherwise, and the `funkyName` annotation applies to
+        // `(**funkyName)(args)` as well as `(*funkyName)(args)`, it's ok.
+        called = called.Exp[0];
+        indirection += 1;
+    }
+
     if (called.Kind == "Var") {
-        // indirect call through a variable.
-        return [{'kind': "indirect", 'variable': callee.Exp[0].Variable.Name[0]}];
+        // indirect call through a variable. Note that the `indirection` field is
+        // currently unused by the later analysis. It is the number of dereferences
+        // applied to the variable before invoking the resulting function.
+        //
+        // The variable name passed through is the simplified one, since that is
+        // what annotations.js uses and we don't want the annotation to be missed
+        // if eg there is another variable of the same name in a sibling scope such
+        // that the fully decorated name no longer matches.
+        const [decorated, bare] = called.Variable.Name;
+        return [{'kind': "indirect", 'variable': bare, indirection}];
     }
 
     if (called.Kind != "Fld") {
@@ -142,7 +162,7 @@ function translateCallees(edge)
     // static type of whatever you're calling the method on. Both refer to the
     // same call; they're just different ways of describing it.
     const callees = [];
-    const field = callee.Exp[0].Field;
+    const field = called.Field;
     const staticCSU = getFieldCallInstanceCSU(edge, field);
     callees.push({'kind': "field", 'csu': field.FieldCSU.Type.Name, staticCSU,
                   'field': field.Name[0], 'fieldKey': fieldKey(staticCSU, field),

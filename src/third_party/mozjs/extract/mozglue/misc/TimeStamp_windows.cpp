@@ -254,12 +254,6 @@ static void InitResolution() {
 // ----------------------------------------------------------------------------
 // TimeStampValue implementation
 // ----------------------------------------------------------------------------
-MFBT_API
-TimeStampValue::TimeStampValue(ULONGLONG aGTC, ULONGLONG aQPC, bool aHasQPC)
-    : mGTC(aGTC), mQPC(aQPC), mHasQPC(aHasQPC) {
-  mIsNull = aGTC == 0 && aQPC == 0;
-}
-
 MFBT_API TimeStampValue& TimeStampValue::operator+=(const int64_t aOther) {
   mGTC += aOther;
   mQPC += aOther;
@@ -356,6 +350,62 @@ TimeStampValue::operator-(const TimeStampValue& aOther) const {
 
   return CheckQPC(aOther);
 }
+
+class TimeStampValueTests {
+  // Check that nullity is set/not set correctly.
+  static_assert(TimeStampValue{0}.IsNull());
+  static_assert(!TimeStampValue{1}.IsNull());
+
+  // Check that we ignore GTC when both TimeStampValues have QPC. (In each of
+  // these tests, looking at GTC would give a different result.)
+  static_assert(TimeStampValue{1, 2, true} < TimeStampValue{1, 3, true});
+  static_assert(!(TimeStampValue{1, 2, true} == TimeStampValue{1, 3, true}));
+
+  static_assert(TimeStampValue{2, 2, true} < TimeStampValue{1, 3, true});
+  static_assert(TimeStampValue{2, 2, true} <= TimeStampValue{1, 3, true});
+  static_assert(!(TimeStampValue{2, 2, true} > TimeStampValue{1, 3, true}));
+
+  static_assert(TimeStampValue{1, 3, true} > TimeStampValue{1, 2, true});
+  static_assert(!(TimeStampValue{1, 3, true} == TimeStampValue{1, 2, true}));
+
+  static_assert(TimeStampValue{1, 3, true} > TimeStampValue{2, 2, true});
+  static_assert(TimeStampValue{1, 3, true} >= TimeStampValue{2, 2, true});
+  static_assert(!(TimeStampValue{1, 3, true} < TimeStampValue{2, 2, true}));
+
+  static_assert(TimeStampValue{1, 3, true} == TimeStampValue{2, 3, true});
+  static_assert(!(TimeStampValue{1, 3, true} < TimeStampValue{2, 3, true}));
+
+  static_assert(TimeStampValue{1, 2, true} != TimeStampValue{1, 3, true});
+  static_assert(!(TimeStampValue{1, 2, true} == TimeStampValue{1, 3, true}));
+
+  // Check that, if either TimeStampValue doesn't have QPC, we only look at the
+  // GTC values. These are the same cases as above, except that we accept the
+  // opposite results because we turn off QPC on one or both of the
+  // TimeStampValue's.
+  static_assert(TimeStampValue{1, 2, false} == TimeStampValue{1, 3, true});
+  static_assert(TimeStampValue{1, 2, true} == TimeStampValue{1, 3, false});
+  static_assert(TimeStampValue{1, 2, false} == TimeStampValue{1, 3, false});
+
+  static_assert(TimeStampValue{2, 2, false} > TimeStampValue{1, 3, true});
+  static_assert(TimeStampValue{2, 2, true} > TimeStampValue{1, 3, false});
+  static_assert(TimeStampValue{2, 2, false} > TimeStampValue{1, 3, false});
+
+  static_assert(TimeStampValue{1, 3, false} == TimeStampValue{1, 2, true});
+  static_assert(TimeStampValue{1, 3, true} == TimeStampValue{1, 2, false});
+  static_assert(TimeStampValue{1, 3, false} == TimeStampValue{1, 2, false});
+
+  static_assert(TimeStampValue{1, 3, false} < TimeStampValue{2, 2, true});
+  static_assert(TimeStampValue{1, 3, true} < TimeStampValue{2, 2, false});
+  static_assert(TimeStampValue{1, 3, false} < TimeStampValue{2, 2, false});
+
+  static_assert(TimeStampValue{1, 3, false} < TimeStampValue{2, 3, true});
+  static_assert(TimeStampValue{1, 3, true} < TimeStampValue{2, 3, false});
+  static_assert(TimeStampValue{1, 3, false} < TimeStampValue{2, 3, false});
+
+  static_assert(TimeStampValue{1, 2, false} == TimeStampValue{1, 3, true});
+  static_assert(TimeStampValue{1, 2, true} == TimeStampValue{1, 3, false});
+  static_assert(TimeStampValue{1, 2, false} == TimeStampValue{1, 3, false});
+};
 
 // ----------------------------------------------------------------------------
 // TimeDuration and TimeStamp implementation

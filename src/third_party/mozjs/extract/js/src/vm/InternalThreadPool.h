@@ -19,16 +19,19 @@
 #include "threading/ProtectedData.h"
 
 namespace JS {
-enum class DispatchReason;
+class HelperThreadTask;
 };
 
 namespace js {
 
 class AutoLockHelperThreadState;
 class HelperThread;
+using JS::HelperThreadTask;
 
 using HelperThreadVector =
     Vector<UniquePtr<HelperThread>, 0, SystemAllocPolicy>;
+
+using HelperTaskVector = Vector<HelperThreadTask*, 0, SystemAllocPolicy>;
 
 class InternalThreadPool {
  public:
@@ -45,28 +48,26 @@ class InternalThreadPool {
                              const AutoLockHelperThreadState& lock) const;
 
  private:
-  static void DispatchTask(JS::DispatchReason reason);
+  static void DispatchTask(HelperThreadTask* task);
 
-  void dispatchTask(JS::DispatchReason reason);
+  void dispatchOrQueueTask(HelperThreadTask* task);
+  void maybeDispatchQueuedTask();
   void shutDown(AutoLockHelperThreadState& lock);
 
   HelperThreadVector& threads(const AutoLockHelperThreadState& lock);
   const HelperThreadVector& threads(
       const AutoLockHelperThreadState& lock) const;
 
-  void notifyAll(const AutoLockHelperThreadState& lock);
-  void wait(AutoLockHelperThreadState& lock);
+  void setThreadFree(uint32_t threadId);
+  void clearThreadFree(uint32_t threadId);
+
   friend class HelperThread;
 
   static InternalThreadPool* Instance;
 
   HelperThreadLockData<HelperThreadVector> threads_;
-
-  js::ConditionVariable wakeup;
-
-  HelperThreadLockData<size_t> queuedTasks;
-
   HelperThreadLockData<bool> terminating;
+  HelperThreadLockData<uint32_t> freeThreadSet;
 };
 
 }  // namespace js

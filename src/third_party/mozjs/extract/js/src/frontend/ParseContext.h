@@ -16,7 +16,6 @@
 #include "frontend/SharedContext.h"
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
 #include "vm/GeneratorAndAsyncKind.h"  // js::GeneratorKind, js::FunctionAsyncKind
-#include "vm/WellKnownAtom.h"          // js_*_str
 
 namespace js {
 
@@ -112,12 +111,81 @@ class ParseContext : public Nestable<ParseContext> {
     // Monotonically increasing id.
     uint32_t id_;
 
-    // Scope size info, relevant for scopes in generators and async functions
-    // only. During parsing, this is the estimated number of slots needed for
-    // nested scopes inside this one. When the parser leaves a scope, this is
-    // set to UINT32_MAX if there are too many bindings overrall to store them
-    // in stack frames, and 0 otherwise.
-    uint32_t sizeBits_ = 0;
+    // Flag for determining if we can apply an optimization to store bindings in
+    // stack slots, which is applied in generator or async functions, or in
+    // async modules.
+    //
+    // This limit is a performance heuristic. Stack slots reduce allocations,
+    // and `Local` opcodes are a bit faster than `AliasedVar` ones; but at each
+    // `yield` or `await` the stack slots must be memcpy'd into a
+    // GeneratorObject. At some point the memcpy is too much. The limit is
+    // plenty for typical human-authored code.
+    enum class GeneratorOrAsyncScopeFlag : uint32_t {
+      // Scope is small enough that bindings can be stored in stack slots.
+      Optimizable = 0,
+
+      // Scope is too big and all bindings should be closed over.
+      TooManyBindings = UINT32_MAX,
+    };
+
+    // Scope size info, relevant for scopes in generators, async functions, and
+    // async modules only.
+    static constexpr uint32_t InnerScopeSlotCountInitialValue = 0;
+    union {
+      // The estimated number of slots needed for nested scopes inside this one.
+      // Calculated while parsing the scope and inner scopes.
+      // Valid only if isOptimizableFlagCalculated_ is false.
+      uint32_t innerScopeSlotCount_ = InnerScopeSlotCountInitialValue;
+
+      // Set when leaving the scope.
+      // Valid only if isOptimizableFlagCalculated_ is true.
+      GeneratorOrAsyncScopeFlag optimizableFlag_;
+    } generatorOrAsyncScopeInfo_;
+
+#ifdef DEBUG
+    bool isGeneratorOrAsyncScopeInfoUsed_ = false;
+    bool isOptimizableFlagCalculated_ = false;
+#endif
+
+    uint32_t innerScopeSlotCount() {
+      MOZ_ASSERT(!isOptimizableFlagCalculated_);
+#ifdef DEBUG
+      isGeneratorOrAsyncScopeInfoUsed_ = true;
+#endif
+      return generatorOrAsyncScopeInfo_.innerScopeSlotCount_;
+    }
+    void setInnerScopeSlotCount(uint32_t slotCount) {
+      MOZ_ASSERT(!isOptimizableFlagCalculated_);
+      generatorOrAsyncScopeInfo_.innerScopeSlotCount_ = slotCount;
+#ifdef DEBUG
+      isGeneratorOrAsyncScopeInfoUsed_ = true;
+#endif
+    }
+    void propagateInnerScopeSlotCount(uint32_t slotCount) {
+      if (slotCount > innerScopeSlotCount()) {
+        setInnerScopeSlotCount(slotCount);
+      }
+    }
+
+    void setGeneratorOrAsyncScopeIsOptimizable() {
+      MOZ_ASSERT(!isOptimizableFlagCalculated_);
+#ifdef DEBUG
+      isGeneratorOrAsyncScopeInfoUsed_ = true;
+      isOptimizableFlagCalculated_ = true;
+#endif
+      generatorOrAsyncScopeInfo_.optimizableFlag_ =
+          GeneratorOrAsyncScopeFlag::Optimizable;
+    }
+
+    void setGeneratorOrAsyncScopeHasTooManyBindings() {
+      MOZ_ASSERT(!isOptimizableFlagCalculated_);
+#ifdef DEBUG
+      isGeneratorOrAsyncScopeInfoUsed_ = true;
+      isOptimizableFlagCalculated_ = true;
+#endif
+      generatorOrAsyncScopeInfo_.optimizableFlag_ =
+          GeneratorOrAsyncScopeFlag::TooManyBindings;
+    }
 
     bool maybeReportOOM(ParseContext* pc, bool result) {
       if (!result) {
@@ -142,7 +210,7 @@ class ParseContext : public Nestable<ParseContext> {
 
     [[nodiscard]] bool init(ParseContext* pc) {
       if (id_ == UINT32_MAX) {
-        pc->errorReporter_.errorNoOffset(JSMSG_NEED_DIET, js_script_str);
+        pc->errorReporter_.errorNoOffset(JSMSG_NEED_DIET, "script");
         return false;
       }
 
@@ -201,35 +269,42 @@ class ParseContext : public Nestable<ParseContext> {
     // `yield` or `await` the stack slots must be memcpy'd into a
     // GeneratorObject. At some point the memcpy is too much. The limit is
     // plenty for typical human-authored code.
+    //
+    // NOTE: This just limits the number of fixed slots, not the entire stack
+    //       slots.  `yield` and `await` can happen with more slots if there
+    //       are many stack values, and the number of values copied to the
+    //       generator's stack storage array can be more than the limit.
     static constexpr uint32_t FixedSlotLimit = 256;
 
     // This is called as we leave a function, var, or lexical scope in a
     // generator or async function. `ownSlotCount` is the number of `bindings_`
     // that are not closed over.
     void setOwnStackSlotCount(uint32_t ownSlotCount) {
-      // Determine if this scope is too big to optimize bindings into stack
-      // slots. The meaning of sizeBits_ changes from "maximum nested slot
-      // count" to "UINT32_MAX if too big".
-      uint32_t slotCount = ownSlotCount + sizeBits_;
+      uint32_t slotCount = ownSlotCount + innerScopeSlotCount();
       if (slotCount > FixedSlotLimit) {
-        slotCount = sizeBits_;
-        sizeBits_ = UINT32_MAX;
+        slotCount = innerScopeSlotCount();
+        setGeneratorOrAsyncScopeHasTooManyBindings();
       } else {
-        sizeBits_ = 0;
+        setGeneratorOrAsyncScopeIsOptimizable();
       }
 
       // Propagate total size to enclosing scope.
       if (Scope* parent = enclosing()) {
-        if (slotCount > parent->sizeBits_) {
-          parent->sizeBits_ = slotCount;
-        }
+        parent->propagateInnerScopeSlotCount(slotCount);
       }
     }
 
     bool tooBigToOptimize() const {
-      MOZ_ASSERT(sizeBits_ == 0 || sizeBits_ == UINT32_MAX,
-                 "call this only after the parser leaves the scope");
-      return sizeBits_ != 0;
+      // NOTE: This is called also for scopes in non-generator/non-async.
+      //       generatorOrAsyncScopeInfo_ is used only from generator or async,
+      //       and if it's not used, it holds the initial value, which is the
+      //       same value as GeneratorOrAsyncScopeFlag::Optimizable.
+      static_assert(InnerScopeSlotCountInitialValue ==
+                    uint32_t(GeneratorOrAsyncScopeFlag::Optimizable));
+      MOZ_ASSERT(!isGeneratorOrAsyncScopeInfoUsed_ ||
+                 isOptimizableFlagCalculated_);
+      return generatorOrAsyncScopeInfo_.optimizableFlag_ !=
+             GeneratorOrAsyncScopeFlag::Optimizable;
     }
 
     // An iterator for the set of names a scope binds: the set of all
@@ -522,6 +597,10 @@ class ParseContext : public Nestable<ParseContext> {
     return (scriptId() == 0);
   }
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  bool isUsingSyntaxAllowed() { return !atGlobalLevel() || atModuleTopLevel(); }
+#endif
+
   void setSuperScopeNeedsHomeObject() {
     MOZ_ASSERT(sc_->allowSuperProperty());
     superScopeNeedsHomeObject_ = true;
@@ -586,8 +665,12 @@ class ParseContext : public Nestable<ParseContext> {
 
   bool hasUsedName(const UsedNameTracker& usedNames,
                    TaggedParserAtomIndex name);
+  bool hasClosedOverName(const UsedNameTracker& usedNames,
+                         TaggedParserAtomIndex name);
   bool hasUsedFunctionSpecialName(const UsedNameTracker& usedNames,
                                   TaggedParserAtomIndex name);
+  bool hasClosedOverFunctionSpecialName(const UsedNameTracker& usedNames,
+                                        TaggedParserAtomIndex name);
 
   bool declareFunctionThis(const UsedNameTracker& usedNames,
                            bool canSkipLazyClosedOverBindings);
@@ -597,6 +680,13 @@ class ParseContext : public Nestable<ParseContext> {
                         bool canSkipLazyClosedOverBindings);
   bool declareDotGeneratorName();
   bool declareTopLevelDotGeneratorName();
+
+  // Used to determine if we have non-length uses of the arguments binding.
+  // This works by incrementing this counter each time we encounter the
+  // arguments name, and decrementing each time it is combined into
+  // arguments.length; as a result, if this is non-zero at the end of parsing,
+  // we have identified a non-length use of the arguments binding.
+  size_t numberOfArgumentsNames = 0;
 
  private:
   [[nodiscard]] bool isVarRedeclaredInInnermostScope(

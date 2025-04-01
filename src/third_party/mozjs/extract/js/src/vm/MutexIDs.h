@@ -66,7 +66,8 @@
   _(ThreadId, 600)                    \
   _(WasmCodeSegmentMap, 600)          \
   _(VTuneLock, 600)                   \
-  _(ShellTelemetry, 600)
+  _(ShellTelemetry, 600)              \
+  _(ShellUseCounters, 600)
 
 namespace js {
 namespace mutexid {

@@ -140,16 +140,12 @@ struct JS_PUBLIC_API FirstSubsumedFrame {
   // unnecessarily.
   FirstSubsumedFrame(const FirstSubsumedFrame&) = delete;
   FirstSubsumedFrame& operator=(const FirstSubsumedFrame&) = delete;
+  FirstSubsumedFrame& operator=(FirstSubsumedFrame&&) = delete;
 
   FirstSubsumedFrame(FirstSubsumedFrame&& rhs)
       : principals(rhs.principals), ignoreSelfHosted(rhs.ignoreSelfHosted) {
     MOZ_ASSERT(this != &rhs, "self move disallowed");
     rhs.principals = nullptr;
-  }
-
-  FirstSubsumedFrame& operator=(FirstSubsumedFrame&& rhs) {
-    new (this) FirstSubsumedFrame(std::move(rhs));
-    return *this;
   }
 
   ~FirstSubsumedFrame() {

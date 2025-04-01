@@ -1,5 +1,5 @@
 {
-    "configure-args": "--enable-warnings-as-errors --enable-rust-simd",
+    "configure-args": "--enable-warnings-as-errors --enable-rust-simd --disable-unified-build",
     "debug": true,
     "env": {
         "JS_SMOOSH_DISABLE_OPCODE_CHECK": "1"
