@@ -129,6 +129,10 @@ public:
         return _validateMode == ValidateMode::kForegroundFullEnforceFastCount;
     }
 
+    RepairMode getRepairMode() const {
+        return _repairMode;
+    }
+
     bool fixErrors() const {
         return _repairMode == RepairMode::kFixErrors;
     }

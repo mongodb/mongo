@@ -47,6 +47,10 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+namespace CollectionValidation {
+// forwards declaring RepairMode to avoid adding validate_option to core headers
+enum class RepairMode;
+}  // namespace CollectionValidation
 
 class ValidateResultsIf {
 public:
@@ -272,6 +276,12 @@ public:
         return _indexResultsMap[indexName];
     }
 
+    std::string getRepairMode() const {
+        return _repairMode;
+    }
+
+    void setRepairMode(CollectionValidation::RepairMode mode);
+
     // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
     // validate results.
     void appendToResultObj(
@@ -290,6 +300,7 @@ private:
     std::vector<RecordId> _corruptRecords;
 
     bool _repaired = false;
+    std::string _repairMode;
     bool _hasStructuralDamage = false;
     boost::optional<Timestamp> _readTimestamp = boost::none;
 

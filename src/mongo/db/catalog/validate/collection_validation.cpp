@@ -519,6 +519,8 @@ Status validate(OperationContext* opCtx,
             oldDataCorruptionMode);
     });
 
+    results->setRepairMode(validateState.getRepairMode());
+
     if (validateState.fixErrors()) {
         // Note: cannot set PrepareConflictBehavior here, since the validate command with repair
         // needs kIngnoreConflictsAllowWrites, but validate repair at startup cannot set that here
