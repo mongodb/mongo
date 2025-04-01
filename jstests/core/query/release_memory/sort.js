@@ -12,6 +12,7 @@
  */
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {getEngine} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode
@@ -56,60 +57,78 @@ const classicGroupIncreasedSpillingInitialValue =
 setServerParameter(classicGroupIncreasedSpillingKnob, false);
 
 // TODO SERVER-102896 add bounded sort test
-// TODO SERVER-99158, SERVER-99179 Add find test
 
-const pipeline = [
-    {$_internalInhibitOptimization: {}},
-    {$sort: {index: 1, padding: 1}},  // Secondary sort on padding prevents projection pushdown
-    {$project: {padding: 0}},
+const pipelines = [
+    [
+        {$sort: {index: 1, padding: 1}},  // Will be pushed down to find.
+        {$project: {padding: 0}},         // Secondary sort on padding prevents projection pushdown.
+    ],
+    [
+        {
+            $_internalInhibitOptimization: {}
+        },  // Prevents $sort pushdown to find, allowing to test DocumentSourceSort.
+        {$sort: {index: 1, padding: 1}},
+        {$project: {padding: 0}},  // Secondary sort on padding prevents projection pushdown.
+    ],
 ];
 
-let previousSpillCount = getSortSpillCounter();
-assertCursorSortedByIndex(coll.aggregate(pipeline));
-assert.eq(previousSpillCount, getSortSpillCounter());
+for (let pipeline of pipelines) {
+    const explain = coll.explain().aggregate(pipeline);
+    jsTestLog("Testing pipeline: " + tojson(pipeline));
 
-{
-    const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
-    const cursorId = cursor.getId();
+    // TODO SERVER-99158 Remove when forceSpill is supported in SBE
+    if (getEngine(explain) === "sbe") {
+        jsTestLog("forceSpill is not supported in SBE sort");
+        continue;
+    }
+
+    let previousSpillCount = getSortSpillCounter();
+    assertCursorSortedByIndex(coll.aggregate(pipeline));
     assert.eq(previousSpillCount, getSortSpillCounter());
 
-    const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
-    assert.commandWorked(releaseMemoryRes);
-    assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
-    assert.lt(previousSpillCount, getSortSpillCounter());
-    previousSpillCount = getSortSpillCounter();
+    {
+        const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
+        assert.eq(previousSpillCount, getSortSpillCounter());
 
-    assertCursorSortedByIndex(cursor);
-}
+        const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
+        assert.commandWorked(releaseMemoryRes);
+        assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+        assert.lt(previousSpillCount, getSortSpillCounter());
+        previousSpillCount = getSortSpillCounter();
 
-{
-    const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}, allowDiskUse: false});
-    const cursorId = cursor.getId();
+        assertCursorSortedByIndex(cursor);
+    }
 
-    const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
-    assert.commandWorked(releaseMemoryRes);
-    assertReleaseMemoryFailedWithCode(
-        releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    {
+        const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}, allowDiskUse: false});
+        const cursorId = cursor.getId();
 
-    assertCursorSortedByIndex(cursor);
-}
+        const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
+        assert.commandWorked(releaseMemoryRes);
+        assertReleaseMemoryFailedWithCode(
+            releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
-{
-    const originalKnobValue = getServerParameter(sortMemoryLimitKnob);
-    setServerParameter(sortMemoryLimitKnob, 5 * 1024 * 1024);
+        assertCursorSortedByIndex(cursor);
+    }
 
-    const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
-    const cursorId = cursor.getId();
-    assert.lt(previousSpillCount, getSortSpillCounter());
-    previousSpillCount = getSortSpillCounter();
+    {
+        const originalKnobValue = getServerParameter(sortMemoryLimitKnob);
+        setServerParameter(sortMemoryLimitKnob, 5 * 1024 * 1024);
 
-    const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
-    assert.commandWorked(releaseMemoryRes);
-    assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
-    assert.eq(previousSpillCount, getSortSpillCounter());
+        const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
+        assert.lt(previousSpillCount, getSortSpillCounter());
+        previousSpillCount = getSortSpillCounter();
 
-    assertCursorSortedByIndex(cursor);
-    setServerParameter(sortMemoryLimitKnob, originalKnobValue);
+        const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
+        assert.commandWorked(releaseMemoryRes);
+        assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+        assert.eq(previousSpillCount, getSortSpillCounter());
+
+        assertCursorSortedByIndex(cursor);
+        setServerParameter(sortMemoryLimitKnob, originalKnobValue);
+    }
 }
 
 setServerParameter(classicGroupIncreasedSpillingKnob, classicGroupIncreasedSpillingInitialValue);

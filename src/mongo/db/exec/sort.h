@@ -142,6 +142,10 @@ public:
         return &_sortExecutor.stats();
     }
 
+    void doForceSpill() final {
+        _sortExecutor.forceSpill();
+    }
+
 private:
     SortExecutor<SortableWorkingSetMember> _sortExecutor;
 };
@@ -181,6 +185,10 @@ public:
 
     const SpecificStats* getSpecificStats() const final {
         return &_sortExecutor.stats();
+    }
+
+    void doForceSpill() final {
+        _sortExecutor.forceSpill();
     }
 
 private:
