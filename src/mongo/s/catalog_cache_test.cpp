@@ -58,7 +58,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version_factory.h"
@@ -166,16 +165,9 @@ protected:
         auto coll = makeCollectionType(version);
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(makeChunks(version.placementVersion()));
-        auto future = launchAsync([&] {
-            onCommand([&](const executor::RemoteCommandRequest& request) {
-                return makeCollectionAndIndexesAggregationResponse(coll, std::vector<BSONObj>());
-            });
-        });
-
         const auto swCri =
             _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swCri.getStatus());
-        future.default_timed_get();
         return coll;
     }
 
@@ -204,20 +196,7 @@ protected:
                             Date_t::now(),
                             kUUID,
                             kShardKeyPattern.getKeyPattern()};
-        if (collPlacementVersion.indexVersion()) {
-            coll.setIndexVersion(CollectionIndexes(kUUID, *collPlacementVersion.indexVersion()));
-        }
         return coll;
-    }
-
-    BSONObj makeCollectionAndIndexesAggregationResponse(const CollectionType& coll,
-                                                        const std::vector<BSONObj>& indexes) {
-        BSONObj obj = coll.toBSON();
-        BSONObjBuilder indexField;
-        indexField.append("indexes", indexes);
-        BSONObj newObj = obj.addField(indexField.obj().firstElement());
-        return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {newObj})
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
     const NamespaceString kNss =
@@ -228,8 +207,6 @@ protected:
     const int kDummyPort{12345};
     const HostAndPort kConfigHostAndPort{"DummyConfig", kDummyPort};
     const std::vector<ShardId> kShards{{"0"}, {"1"}};
-    RAIIServerParameterControllerForTest featureFlagController{
-        "featureFlagGlobalIndexesShardingCatalog", true};
 
     std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
     std::unique_ptr<CatalogCache> _catalogCache;
@@ -484,16 +461,10 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(chunks);
-        auto future = launchAsync([&] {
-            onCommand([&](const executor::RemoteCommandRequest& request) {
-                return makeCollectionAndIndexesAggregationResponse(coll, std::vector<BSONObj>());
-            });
-        });
 
         const auto swCri =
             _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swCri.getStatus());
-        future.default_timed_get();
 
         const auto& chunkManager = swCri.getValue().getChunkManager();
         ASSERT(chunkManager.getTimeseriesFields().has_value());
@@ -515,17 +486,11 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(std::vector{lastChunk});
-        auto future = launchAsync([&] {
-            onCommand([&](const executor::RemoteCommandRequest& request) {
-                return makeCollectionAndIndexesAggregationResponse(coll, std::vector<BSONObj>());
-            });
-        });
 
         _catalogCache->onStaleCollectionVersion(coll.getNss(), boost::none /* wantedVersion */);
         const auto swCri =
             _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swCri.getStatus());
-        future.default_timed_get();
 
         const auto& chunkManager = swCri.getValue().getChunkManager();
         ASSERT(chunkManager.getTimeseriesFields().has_value());
@@ -553,58 +518,6 @@ TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
     ASSERT_EQUALS(swCri.getStatus(), ErrorCodes::InvalidOptions);
 }
 
-
-TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterIndexVersion) {
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion = ShardVersionFactory::make(
-        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
-    const auto wantedCollVersion = ShardVersionFactory::make(
-        ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(1, 0)));
-
-    loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
-    CollectionType coll = loadCollection(cachedCollVersion);
-    _catalogCache->onStaleCollectionVersion(kNss, wantedCollVersion);
-
-    auto future = launchAsync([&] {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            coll.setIndexVersion({coll.getUuid(), Timestamp(1, 0)});
-            return makeCollectionAndIndexesAggregationResponse(
-                coll,
-                {IndexCatalogType("x_1", BSON("x" << 1), BSONObj(), Timestamp(1, 0), coll.getUuid())
-                     .toBSON()});
-        });
-    });
-
-    const auto routingInfo = _catalogCache->getCollectionRoutingInfo(operationContext(), kNss);
-    future.default_timed_get();
-}
-
-TEST_F(CatalogCacheTest, OnStaleShardVersionIndexVersionBumpNotNone) {
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion = ShardVersionFactory::make(
-        ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(1, 0)));
-    const auto wantedCollVersion = ShardVersionFactory::make(
-        ChunkVersion(gen, {1, 0}), CollectionIndexes(kUUID, Timestamp(2, 0)));
-
-    loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
-    CollectionType coll = loadCollection(cachedCollVersion);
-    _catalogCache->onStaleCollectionVersion(kNss, wantedCollVersion);
-
-    auto future = launchAsync([&] {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            coll.setIndexVersion({coll.getUuid(), Timestamp(2, 0)});
-            return makeCollectionAndIndexesAggregationResponse(
-                coll,
-                {IndexCatalogType("x_1", BSON("x" << 1), BSONObj(), Timestamp(2, 0), coll.getUuid())
-                     .toBSON()});
-        });
-    });
-
-    const auto routingInfo = _catalogCache->getCollectionRoutingInfo(operationContext(), kNss);
-    future.default_timed_get();
-}
 
 TEST_F(CatalogCacheTest, PeekCollectionCacheVersion) {
     // Nothing cached, then peek returns boost::none. Does not attempt to refresh.

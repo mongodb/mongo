@@ -110,7 +110,6 @@ CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoUntracked(
     ChunkManager cm(OptionalRoutingTableHistory(), boost::none);
     return CollectionRoutingInfo(
         std::move(cm),
-        boost::none /*shardingIndexesCatalog*/,
         DatabaseTypeValueHandle(DatabaseType{nss.dbName(), dbPrimaryShard, dbVersion}));
 }
 
@@ -199,7 +198,6 @@ CollectionRoutingInfo CatalogCacheMock::_makeCollectionRoutingInfoTracked(
                     boost::none /*clusterTime*/);
     return CollectionRoutingInfo(
         std::move(cm),
-        boost::none /*shardingIndexesCatalog*/,
         DatabaseTypeValueHandle(DatabaseType{nss.dbName(), dbPrimaryShard, dbVersion}));
 }
 

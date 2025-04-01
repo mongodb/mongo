@@ -84,7 +84,6 @@ protected:
             nss,
             CollectionRoutingInfo(
                 std::move(cm),
-                boost::none,
                 DatabaseTypeValueHandle(DatabaseType{nss.dbName(), kMyShardName, _dbVersion})));
     }
 
@@ -144,7 +143,6 @@ protected:
             nss,
             CollectionRoutingInfo(
                 std::move(cm),
-                boost::none,
                 DatabaseTypeValueHandle(DatabaseType{nss.dbName(), shardName, _dbVersion})));
     }
 

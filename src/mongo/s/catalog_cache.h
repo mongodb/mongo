@@ -47,7 +47,6 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/database_version.h"
@@ -70,12 +69,8 @@ using CachedDatabaseInfo = DatabaseTypeValueHandle;
 
 class CollectionRoutingInfo {
 public:
-    CollectionRoutingInfo(ChunkManager&& chunkManager,
-                          boost::optional<ShardingIndexesCatalogCache>&& shardingIndexesCatalog,
-                          CachedDatabaseInfo&& dbInfo)
-        : _dbInfo(std::move(dbInfo)),
-          _cm(std::move(chunkManager)),
-          _sii(std::move(shardingIndexesCatalog)) {}
+    CollectionRoutingInfo(ChunkManager&& chunkManager, CachedDatabaseInfo&& dbInfo)
+        : _dbInfo(std::move(dbInfo)), _cm(std::move(chunkManager)) {}
 
     /**
      * Returns true if the collection is tracked in the global catalog.
@@ -227,14 +222,12 @@ public:
                                                        const DatabaseName& dbName);
 
     /**
-     * Blocking method to get both the placement information and the index information for a
-     * collection.
+     * Blocking method to get collection placement information.
      *
-     * If the collection is sharded, returns placement info initialized with a ChunkManager and a
-     * list of global indexes that may be empty if no global indexes exist. If the collection is not
-     * sharded, returns placement info initialized with the primary shard for the specified database
-     * and an empty list representing no global indexes. If an error occurs while loading the
-     * metadata, returns a failed status.
+     * If the collection is sharded, returns placement info initialized with a ChunkManager.
+     * If the collection is not sharded, returns placement info initialized with the primary shard
+     * for the specified database. If an error occurs while loading the metadata, returns a failed
+     * status.
      *
      * If the given atClusterTime is so far in the past that it is not possible to construct
      * placement info, returns a StaleClusterTime error.
@@ -260,12 +253,6 @@ public:
      * Blocking method to retrieve refreshed collection placement information (ChunkManager).
      */
     virtual StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
-     * Blocking method to get the refreshed index information for a given collection.
-     */
-    StatusWith<boost::optional<ShardingIndexesCatalogCache>> getCollectionIndexInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
@@ -332,8 +319,6 @@ public:
      * even if they do not require causal consistency.
      */
     void invalidateCollectionEntry_LINEARIZABLE(const NamespaceString& nss);
-
-    void invalidateIndexEntry_LINEARIZABLE(const NamespaceString& nss);
 
     /**
      * Peeks at the collection routing cache and returns the currently cached collection version.
@@ -403,18 +388,6 @@ private:
         void _updateRefreshesStats(bool isIncremental, bool add);
     };
 
-    class IndexCache : public ShardingIndexesCatalogRTCBase {
-    public:
-        IndexCache(ServiceContext* service, ThreadPoolInterface& threadPool);
-
-    private:
-        LookupResult _lookupIndexes(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const ValueHandle& indexes,
-                                    const ComparableIndexVersion& previousIndexVersion);
-        stdx::mutex _mutex;
-    };
-
     // Callers of this internal function that are passing allowLocks must handle allowLocks failures
     // by checking for ErrorCodes::ShardCannotRefreshDueToLocksHeld and addint the full namespace to
     // the exception.
@@ -437,20 +410,7 @@ private:
                                                            boost::optional<Timestamp> atClusterTime,
                                                            bool allowLocks = false);
 
-    boost::optional<ShardingIndexesCatalogCache> _getCollectionIndexInfo(OperationContext* opCtx,
-                                                                         const NamespaceString& nss,
-                                                                         bool allowLocks = false);
-
     void _triggerPlacementVersionRefresh(const NamespaceString& nss);
-
-    void _triggerIndexVersionRefresh(const NamespaceString& nss);
-
-    StatusWith<CollectionRoutingInfo> _retryUntilConsistentRoutingInfo(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        ChunkManager&& cm,
-        boost::optional<ShardingIndexesCatalogCache>&& sii,
-        CachedDatabaseInfo&& dbInfo);
 
     // (Optional) the kind of catalog cache instantiated. Used for logging and reporting purposes.
     std::string _kind;
@@ -464,8 +424,6 @@ private:
     DatabaseCache _databaseCache;
 
     CollectionCache _collectionCache;
-
-    IndexCache _indexCache;
 
     /**
      * Encapsulates runtime statistics across all databases and collections in this catalog cache

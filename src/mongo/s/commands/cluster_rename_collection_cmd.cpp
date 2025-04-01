@@ -185,7 +185,6 @@ public:
             catalogCache->onStaleCollectionVersion(toNss, renameCollResp.getCollectionVersion());
 
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(fromNss);
-            catalogCache->invalidateIndexEntry_LINEARIZABLE(fromNss);
         }
 
         NamespaceString ns() const override {

@@ -113,14 +113,3 @@ server_parameters:
     validator:
       gt: 0
     redact: false
-
-  catalogCacheIndexMaxEntries:
-    description: >-
-        Maximum number of entries allowed in the catalog cache for indexes.
-    set_at: [ startup ]
-    cpp_vartype: int
-    cpp_varname: "gCatalogCacheIndexMaxEntries"
-    default: 10000
-    validator:
-      gt: 0
-    redact: false

@@ -73,9 +73,8 @@ protected:
 
     /**
      * Returns a chunk manager for the specified namespace with chunks at the specified split
-     * points as well as a global index cache with the specified global indexes. Each individual
-     * chunk is placed on a separate shard with shard id being a single number ranging from "0" to
-     * the number of chunks.
+     * points. Each individual chunk is placed on a separate shard with shard id being a single
+     * number ranging from "0" to the number of chunks.
      */
     CollectionRoutingInfo makeCollectionRoutingInfo(
         const NamespaceString& nss,
@@ -83,7 +82,6 @@ protected:
         std::unique_ptr<CollatorInterface> defaultCollator,
         bool unique,
         const std::vector<BSONObj>& splitPoints,
-        const std::vector<BSONObj>& globalIndexes,
         boost::optional<ReshardingFields> reshardingFields = boost::none,
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields = boost::none,
         boost::optional<bool> unsplittable = boost::none);
@@ -180,14 +178,6 @@ protected:
                                               UUID uuid,
                                               const ShardKeyPattern& shardKeyPattern,
                                               const std::vector<ChunkType>& chunks);
-    void expectCollectionAndIndexesAggregation(NamespaceString nss,
-                                               OID epoch,
-                                               Timestamp timestamp,
-                                               UUID uuid,
-                                               const ShardKeyPattern& shardKeyPattern,
-                                               boost::optional<Timestamp> indexVersion,
-                                               const std::vector<BSONObj>& indexes);
-
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };
 

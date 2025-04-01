@@ -5307,7 +5307,6 @@ public:
             NamespaceString::createNamespaceString_forTest(kDBName, "outColl"),
             CollectionRoutingInfo{
                 ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
-                boost::none,
                 DatabaseTypeValueHandle(
                     DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                                  kMyShardName,
@@ -5353,7 +5352,6 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
         NamespaceString::createNamespaceString_forTest(kDBName, "outColl"),
         CollectionRoutingInfo{
             ChunkManager{RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}}, timestamp},
-            boost::none,
             DatabaseTypeValueHandle(
                 DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                              kMyShardName,
@@ -5409,7 +5407,6 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
         fromCollNs,
         CollectionRoutingInfo{
             ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
-            boost::none,
             DatabaseTypeValueHandle(
                 DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                              kMyShardName,
@@ -5447,7 +5444,6 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
         fromCollNs,
         CollectionRoutingInfo{
             ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
-            boost::none,
             DatabaseTypeValueHandle(
                 DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                              kMyShardName,

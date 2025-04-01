@@ -74,16 +74,6 @@
 
 namespace mongo {
 
-BSONObj makeCollectionAndIndexesAggregationResponse(const CollectionType& coll,
-                                                    const std::vector<BSONObj>& indexes) {
-    BSONObj obj = coll.toBSON();
-    BSONObjBuilder indexField;
-    indexField.append("indexes", indexes);
-    BSONObj newObj = obj.addField(indexField.obj().firstElement());
-    return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {newObj})
-        .toBSON(CursorResponse::ResponseType::InitialResponse);
-}
-
 void CoreCatalogCacheTestFixture::setUp() {
     ShardingTestFixture::setUp();
     configTargeter()->setFindHostReturnValue(kConfigHostAndPort);
@@ -162,7 +152,6 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
     const std::vector<BSONObj>& splitPoints,
-    const std::vector<BSONObj>& globalIndexes,
     boost::optional<ReshardingFields> reshardingFields,
     boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
     boost::optional<bool> unsplittable) {
@@ -171,8 +160,6 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
     DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
 
     const auto uuid = UUID::gen();
-    boost::optional<Timestamp> indexVersion =
-        globalIndexes.empty() ? boost::none : boost::make_optional(Timestamp(11, 12));
     const BSONObj collectionBSON = [&]() {
         CollectionType coll(nss,
                             version.epoch(),
@@ -192,10 +179,6 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
 
         if (timeseriesFields) {
             coll.setTimeseriesFields(std::move(timeseriesFields));
-        }
-
-        if (indexVersion) {
-            coll.setIndexVersion({uuid, *indexVersion});
         }
 
         coll.setUnsplittable(unsplittable);
@@ -238,15 +221,6 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
                        [](const auto& chunk) { return BSON("chunks" << chunk); });
         return aggResult;
     }());
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
-            return makeCollectionAndIndexesAggregationResponse(CollectionType(collectionBSON),
-                                                               globalIndexes);
-        });
-    }
-
     return *future.default_timed_get();
 }
 
@@ -257,7 +231,6 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUnshardedCollectionRoutin
                                      nullptr /* defaultCollator */,
                                      false /* unique */,
                                      {} /* splitPoints */,
-                                     {} /* globalIndexes */,
                                      boost::none /* reshardingFields */,
                                      boost::none /* timeseriesFields */,
                                      true /* unsplittable */);
@@ -313,28 +286,6 @@ void CoreCatalogCacheTestFixture::expectCollectionAndChunksAggregation(
     }());
 }
 
-void CoreCatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
-    NamespaceString nss,
-    OID epoch,
-    Timestamp timestamp,
-    UUID uuid,
-    const ShardKeyPattern& shardKeyPattern,
-    boost::optional<Timestamp> indexVersion,
-    const std::vector<BSONObj>& indexes) {
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
-            CollectionType collType(
-                nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
-            if (indexVersion) {
-                collType.setIndexVersion({uuid, *indexVersion});
-            }
-            return makeCollectionAndIndexesAggregationResponse(collType, indexes);
-        });
-    }
-}
-
 ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(
     NamespaceString nss) {
 
@@ -384,14 +335,6 @@ ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoSha
         const auto chunk2Obj = BSON("chunks" << chunk2.toConfigBSON());
         return std::vector<BSONObj>{collType.toBSON(), chunk1Obj, chunk2Obj};
     }());
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
-            return makeCollectionAndIndexesAggregationResponse(collType, {});
-        });
-    }
-
     return future.default_timed_get()->getChunkManager();
 }
 

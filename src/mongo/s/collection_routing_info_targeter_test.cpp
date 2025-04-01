@@ -253,7 +253,6 @@ void CollectionRoutingInfoTargeterTest::
         kNss,
         CollectionRoutingInfo{
             std::move(cm),
-            boost::optional<ShardingIndexesCatalogCache>(boost::none),
             DatabaseTypeValueHandle(DatabaseType{kNss.dbName(),
                                                  ShardId("dummyShardPrimary"),
                                                  DatabaseVersion(UUID::gen(), Timestamp(1, 0))})});

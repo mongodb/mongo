@@ -438,10 +438,8 @@ void removeCollAndChunksMetadataFromConfig(
     const auto& nss = coll.getNss();
     const auto& uuid = coll.getUuid();
 
-    ON_BLOCK_EXIT([&] {
-        Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
-        Grid::get(opCtx)->catalogCache()->invalidateIndexEntry_LINEARIZABLE(nss);
-    });
+    ON_BLOCK_EXIT(
+        [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
 
     /*
     Data from config.collection are deleted using a transaction to guarantee an atomic update on

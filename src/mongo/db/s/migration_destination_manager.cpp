@@ -354,20 +354,7 @@ void replaceShardingIndexCatalogInShardIfNeeded(OperationContext* opCtx,
         return;
     }
 
-    auto optSii = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionIndexInfoWithRefresh(opCtx, nss));
-
-    if (optSii) {
-        std::vector<IndexCatalogType> indexes;
-        optSii->forEachIndex([&](const auto& index) {
-            indexes.push_back(index);
-            return true;
-        });
-        replaceCollectionShardingIndexCatalog(
-            opCtx, nss, uuid, optSii->getCollectionIndexes().indexVersion(), indexes);
-    } else {
-        clearCollectionShardingIndexCatalog(opCtx, nss, uuid);
-    }
+    clearCollectionShardingIndexCatalog(opCtx, nss, uuid);
 }
 
 // Throws if this configShard is currently draining.

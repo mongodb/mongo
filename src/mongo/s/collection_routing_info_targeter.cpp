@@ -190,15 +190,7 @@ bool isMetadataDifferent(const CollectionRoutingInfo& criA, const CollectionRout
         return true;
 
     if (criA.hasRoutingTable()) {
-        if (criA.getChunkManager().getVersion() != criB.getChunkManager().getVersion())
-            return true;
-
-        if (criA.getIndexesInfo().is_initialized() != criB.getIndexesInfo().is_initialized())
-            return true;
-
-        return criA.getIndexesInfo().is_initialized() &&
-            criA.getIndexesInfo()->getCollectionIndexes() !=
-            criB.getIndexesInfo()->getCollectionIndexes();
+        return criA.getChunkManager().getVersion() != criB.getChunkManager().getVersion();
     }
 
     return criA.getDbVersion() != criB.getDbVersion();
@@ -281,11 +273,9 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         }
     };
 
-    auto [cm, sii, dbInfo] = [&]() {
+    auto [cm, dbInfo] = [&]() {
         auto cri = createDatabaseAndGetRoutingInfo(_nss);
-        return std::make_tuple(std::move(cri.getChunkManager()),
-                               std::move(cri.getIndexesInfo()),
-                               std::move(cri.getDatabaseInfo()));
+        return std::make_tuple(std::move(cri.getChunkManager()), std::move(cri.getDatabaseInfo()));
     }();
 
     // For a tracked time-series collection, only the underlying buckets collection is stored on the
@@ -307,7 +297,6 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         if (bucketsCri.hasRoutingTable()) {
             _nss = bucketsNs;
             cm = std::move(bucketsCri.getChunkManager());
-            sii = std::move(bucketsCri.getIndexesInfo());
             if (!isRawDataOperation(opCtx)) {
                 _isRequestOnTimeseriesViewNamespace = true;
             }
@@ -318,7 +307,6 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         _nss = _nss.getTimeseriesViewNamespace();
         auto newCri = createDatabaseAndGetRoutingInfo(_nss);
         cm = std::move(newCri.getChunkManager());
-        sii = std::move(newCri.getIndexesInfo());
         _isRequestOnTimeseriesViewNamespace = false;
     }
 
@@ -328,7 +316,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
                 "Collection epoch has changed",
                 cm.getVersion().epoch() == *_targetEpoch);
     }
-    return CollectionRoutingInfo(std::move(cm), std::move(sii), std::move(dbInfo));
+    return CollectionRoutingInfo(std::move(cm), std::move(dbInfo));
 }
 
 const NamespaceString& CollectionRoutingInfoTargeter::getNS() const {

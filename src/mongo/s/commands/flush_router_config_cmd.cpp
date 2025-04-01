@@ -123,8 +123,6 @@ public:
             } else {
                 LOGV2(22763, "Routing metadata flushed for collection", logAttrs(nss));
                 catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-                LOGV2(7343300, "Index information flushed for collection", logAttrs(nss));
-                catalogCache->invalidateIndexEntry_LINEARIZABLE(nss);
             }
         }
 
@@ -147,10 +145,6 @@ public:
                 } else {
                     LOGV2(8778003, "CSRS routing info cache flushed for collection", logAttrs(nss));
                     routingInfoCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-                    LOGV2(8778004,
-                          "Index information within CSRS routing info cache flushed for collection",
-                          logAttrs(nss));
-                    routingInfoCache->invalidateIndexEntry_LINEARIZABLE(nss);
                 }
             }
         }

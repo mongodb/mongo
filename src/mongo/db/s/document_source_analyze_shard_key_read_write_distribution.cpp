@@ -231,7 +231,6 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
         nss,
         CollectionRoutingInfo{
             std::move(cm),
-            boost::optional<ShardingIndexesCatalogCache>(boost::none),
             DatabaseTypeValueHandle(DatabaseType{
                 nss.dbName(), ShardId("0"), DatabaseVersion(UUID::gen(), validAfter)})});
 }

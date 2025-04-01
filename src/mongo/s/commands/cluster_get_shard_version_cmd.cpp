@@ -128,7 +128,6 @@ public:
             // Return the collection's information.
             const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
             const auto& cm = cri.getChunkManager();
-            const auto& sii = cri.getIndexesInfo();
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Collection " << nss.toStringForErrorMsg()
                                   << " does not have a routing table.",
@@ -139,10 +138,6 @@ public:
             result.append("versionTimestamp", cm.getVersion().getTimestamp());
             // Added to the result bson if the max bson size is exceeded
             BSONObjBuilder exceededSizeElt(BSON("exceededSize" << true));
-
-            if (sii) {
-                result.append("indexVersion", sii->getCollectionIndexes().indexVersion());
-            }
 
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONArrayBuilder chunksArrBuilder;
@@ -169,24 +164,6 @@ public:
 
                 if (!exceedsSizeLimit) {
                     result.append("chunks", chunksArrBuilder.arr());
-
-                    if (sii) {
-                        BSONArrayBuilder indexesArrBuilder;
-                        sii->forEachIndex([&](const auto& index) {
-                            BSONObjBuilder indexB(index.toBSON());
-                            if (result.len() + exceededSizeElt.len() + indexesArrBuilder.len() +
-                                    indexB.len() >
-                                BSONObjMaxUserSize) {
-                                exceedsSizeLimit = true;
-                            } else {
-                                indexesArrBuilder.append(indexB.done());
-                            }
-
-                            return !exceedsSizeLimit;
-                        });
-
-                        result.append("indexes", indexesArrBuilder.arr());
-                    }
                 }
 
                 if (exceedsSizeLimit) {

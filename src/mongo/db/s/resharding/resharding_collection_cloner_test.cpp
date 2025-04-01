@@ -189,7 +189,6 @@ protected:
         getCatalogCacheMock()->setCollectionReturnValue(
             _tempNss,
             CollectionRoutingInfo(createChunkManager(newShardKeyPattern, configCacheChunksData),
-                                  boost::none /* indexVersion */,
                                   DatabaseTypeValueHandle(DatabaseType{_tempNss.dbName(),
                                                                        getSourceId().getShardId(),
                                                                        _sourceDbVersion})));

@@ -139,9 +139,6 @@ protected:
                                             const ShardKeyPattern& shardKeyPattern) {
         return {kNss, epoch, timestamp, Date_t::now(), UUID::gen(), shardKeyPattern.toBSON()};
     }
-
-    RAIIServerParameterControllerForTest featureFlagController{
-        "featureFlagGlobalIndexesShardingCatalog", true};
 };
 
 TEST_F(CatalogCacheRefreshTest, FullLoad) {
@@ -180,9 +177,6 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
 
     expectCollectionAndChunksAggregationWithReshardingFields(
         epoch, timestamp, shardKeyPattern, reshardingUUID, {chunk1, chunk2, chunk3, chunk4});
-
-    expectCollectionAndIndexesAggregation(
-        kNss, epoch, timestamp, reshardingUUID, shardKeyPattern, boost::none, {});
 
     auto cri = *future.default_timed_get();
     ASSERT(cri.isSharded());
@@ -425,14 +419,8 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithLowestVersion) {
     expectCollectionAndChunksAggregation(
         kNss, epoch, timestamp, uuid, shardKeyPattern, incompleteChunks);
 
-    try {
-        auto cri = *future.default_timed_get();
-        FAIL(
-            str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << cri.getChunkManager().toString());
-    } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::ChunkMetadataInconsistency, ex.code());
-    }
+    ASSERT_THROWS_CODE(
+        future.default_timed_get(), DBException, ErrorCodes::ChunkMetadataInconsistency);
 }
 
 TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithHighestVersion) {
@@ -639,14 +627,6 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
         return std::vector<BSONObj>{collBSON, chunk1BSON, chunk2BSON};
     });
 
-    expectCollectionAndIndexesAggregation(kNss,
-                                          newVersion.epoch(),
-                                          newVersion.getTimestamp(),
-                                          initialCm.getUUID(),
-                                          shardKeyPattern,
-                                          boost::none,
-                                          {});
-
     auto cri = *future.default_timed_get();
     const auto& cm = cri.getChunkManager();
     ASSERT(cm.isSharded());
@@ -711,14 +691,6 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
         return std::vector<BSONObj>{collBSON, chunk1BSON, chunk2BSON};
     });
 
-    expectCollectionAndIndexesAggregation(kNss,
-                                          version.epoch(),
-                                          version.getTimestamp(),
-                                          initialCm.getUUID(),
-                                          shardKeyPattern,
-                                          boost::none,
-                                          {});
-
     auto cri = *future.default_timed_get();
     const auto& cm = cri.getChunkManager();
     ASSERT(cm.isSharded());
@@ -761,14 +733,6 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
     expectCollectionAndChunksAggregationWithReshardingFields(
         version.epoch(), version.getTimestamp(), shardKeyPattern, reshardingUUID, {chunk1, chunk2});
 
-    expectCollectionAndIndexesAggregation(kNss,
-                                          version.epoch(),
-                                          version.getTimestamp(),
-                                          reshardingUUID,
-                                          shardKeyPattern,
-                                          boost::none,
-                                          {});
-
     auto cri = *future.default_timed_get();
     const auto& cm = cri.getChunkManager();
     ASSERT(cm.isSharded());
@@ -787,7 +751,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
     reshardingFields.setReshardingUUID(reshardingUUID);
 
     auto initialRoutingInfo(
-        makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, {}, reshardingFields));
+        makeCollectionRoutingInfo(kNss, shardKeyPattern, nullptr, true, {}, reshardingFields));
     const auto& initialCm = initialRoutingInfo.getChunkManager();
     ASSERT_EQ(1, initialCm.numChunks());
     ASSERT_EQ(reshardingUUID, initialCm.getReshardingFields()->getReshardingUUID());
@@ -810,14 +774,6 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
 
     expectCollectionAndChunksAggregation(
         kNss, version.epoch(), version.getTimestamp(), UUID::gen(), shardKeyPattern, {chunk1});
-
-    expectCollectionAndIndexesAggregation(kNss,
-                                          version.epoch(),
-                                          version.getTimestamp(),
-                                          initialCm.getUUID(),
-                                          shardKeyPattern,
-                                          boost::none,
-                                          {});
 
     auto cri = *future.default_timed_get();
     const auto& cm = cri.getChunkManager();

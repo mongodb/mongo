@@ -159,7 +159,6 @@ protected:
             nss,
             CollectionRoutingInfo{
                 std::move(cm),
-                boost::optional<ShardingIndexesCatalogCache>(boost::none),
                 DatabaseTypeValueHandle(DatabaseType{nss.dbName(),
                                                      ShardId("dummyPrimaryShard"),
                                                      DatabaseVersion(UUID::gen(), timestamp)})});

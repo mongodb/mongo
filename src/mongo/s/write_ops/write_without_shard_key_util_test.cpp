@@ -115,7 +115,6 @@ private:
                                          nullptr,
                                          false,
                                          {BSON("meta.a" << 50 << "meta.b" << 50)},
-                                         {},
                                          boost::none,
                                          std::move(timeseriesFields))
             .getChunkManager();

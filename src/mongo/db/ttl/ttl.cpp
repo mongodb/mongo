@@ -442,15 +442,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
     try {
         uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
 
-        auto catalogCache =
-            Grid::get(opCtx)->isInitialized() ? Grid::get(opCtx)->catalogCache() : nullptr;
-        auto sii = catalogCache
-            ? uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, *nss)).getIndexesInfo()
-            : boost::none;
-        // Attach IGNORED placement version to skip orphans (the range deleter will clear them up)
-        const auto shardVersion = ShardVersionFactory::make(
-            ChunkVersion::IGNORED(),
-            sii ? boost::make_optional(sii->getCollectionIndexes()) : boost::none);
+        const auto shardVersion = ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none);
         auto scopedRole = ScopedSetShardRole(opCtx, *nss, shardVersion, boost::none);
         const auto coll =
             acquireCollection(opCtx,
