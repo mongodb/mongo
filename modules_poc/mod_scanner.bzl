@@ -84,7 +84,7 @@ def _rule_sources(ctx):
     srcs = []
     if hasattr(ctx.rule.attr, "srcs"):
         for src in ctx.rule.attr.srcs:
-            srcs += [src for src in src.files.to_list() if src.is_source and check_valid_file_type(src)]
+            srcs += [src for src in src.files.to_list() if check_valid_file_type(src)]
 
     # Filter sources down to only those that are Mongo-specific.
     # Although we also apply a filter mechanism in the clang-tidy config itself, this filter mechanism
