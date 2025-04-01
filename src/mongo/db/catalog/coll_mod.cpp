@@ -803,6 +803,8 @@ Status _collModInternal(OperationContext* opCtx,
                         CollectionAcquisition* acquisition,
                         BSONObjBuilder* result,
                         boost::optional<repl::OplogApplication::Mode> mode) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
     // Get key pattern from the config server if we may need it for parsing checks if on the primary
     // before taking any locks. The ddl lock will prevent the key pattern from changing.
     boost::optional<ShardKeyPattern> shardKeyPattern;
@@ -1028,29 +1030,41 @@ Status _collModInternal(OperationContext* opCtx,
             if (changed) {
                 writableColl->setTimeseriesOptions(opCtx, newOptions);
                 if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                        VersionContext::getDecoration(opCtx), fcvSnapshot)) {
                     writableColl->setTimeseriesBucketingParametersChanged(opCtx, true);
                 };
             }
         }
 
+        const auto version = fcvSnapshot.getVersion();
         // We involve an empty collMod command during a setFCV downgrade to clean timeseries
         // bucketing parameters in the catalog. So if the FCV is in downgrading or downgraded stage,
         // remove time-series bucketing parameters flag, as nodes older than 7.1 cannot understand
         // this flag.
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
         // TODO SERVER-80003 remove special version handling when LTS becomes 8.0.
-        if (const auto version =
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-            cmrNew.numModifications == 0 && coll->timeseriesBucketingParametersHaveChanged() &&
+        if (cmrNew.numModifications == 0 && coll->timeseriesBucketingParametersHaveChanged() &&
             version == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS) {
             writableColl->setTimeseriesBucketingParametersChanged(opCtx, boost::none);
         }
 
-        // Fix any invalid index options for indexes belonging to this collection.
+        // Fix any invalid index options for indexes belonging to this collection, only for empty
+        // collMod requests which are called during setFCV upgrade.
+        const auto removeDeprecatedFields = [&]() {
+            if (cmrNew.numModifications > 0) {
+                return false;
+            }
+
+            if (!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(version)) {
+                return false;
+            }
+
+            const auto transitionInfo = getTransitionFCVInfo(version);
+            return transitionInfo.from < transitionInfo.to;
+        }();
+
         std::vector<std::string> indexesWithInvalidOptions =
-            writableColl->repairInvalidIndexOptions(opCtx);
+            writableColl->repairInvalidIndexOptions(opCtx, removeDeprecatedFields);
         for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
             const IndexDescriptor* desc =
                 writableColl->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);

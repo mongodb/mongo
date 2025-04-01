@@ -368,7 +368,8 @@ public:
         unimplementedTasserted();
     }
 
-    std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx) final {
+    std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx,
+                                                       bool removeDeprecatedFields) final {
         unimplementedTasserted();
         return {};
     }

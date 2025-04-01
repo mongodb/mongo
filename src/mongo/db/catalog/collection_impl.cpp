@@ -1616,21 +1616,28 @@ void CollectionImpl::updatePrepareUniqueSetting(OperationContext* opCtx,
     });
 }
 
-std::vector<std::string> CollectionImpl::repairInvalidIndexOptions(OperationContext* opCtx) {
+std::vector<std::string> CollectionImpl::repairInvalidIndexOptions(OperationContext* opCtx,
+                                                                   bool removeDeprecatedFields) {
     std::vector<std::string> indexesWithInvalidOptions;
+    const auto& allowedFieldNames = removeDeprecatedFields
+        ? index_key_validate::kNonDeprecatedAllowedFieldNames
+        : index_key_validate::kAllowedFieldNames;
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         for (auto& index : md.indexes) {
             if (index.isPresent()) {
                 BSONObj oldSpec = index.spec;
 
-                Status status = index_key_validate::validateIndexSpec(opCtx, oldSpec).getStatus();
+                Status status =
+                    index_key_validate::validateIndexSpec(opCtx, oldSpec, allowedFieldNames)
+                        .getStatus();
                 if (status.isOK()) {
                     continue;
                 }
 
                 indexesWithInvalidOptions.push_back(std::string(index.nameStringData()));
-                index.spec = index_key_validate::repairIndexSpec(md.nss, oldSpec);
+                index.spec =
+                    index_key_validate::repairIndexSpec(md.nss, oldSpec, allowedFieldNames);
             }
         }
     });

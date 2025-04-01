@@ -422,3 +422,42 @@ export let insertInvalidUTF8 = function(coll, uri, conn, numDocs) {
     };
     rewriteTable(uri, conn, makeInvalidUTF8);
 };
+
+/**
+ * Loads the contents of the _mdb_catalog.wt file, and invokes the 'modifyCatalogEntry' callback for
+ * each entry, which should modify the passed entry (in-place). The modified contents are then
+ * written back to the _mdb_catalog.wt file.
+ */
+export let rewriteCatalogTable = function(conn, modifyCatalogEntry) {
+    const uri = "_mdb_catalog";
+    const fullURI = "table:" + uri;
+
+    const separator = _isWindows() ? '\\' : '/';
+    const tempDumpFile = conn.dbpath + separator + "temp_dump";
+    const newTableFile = conn.dbpath + separator + "new_table_file" + count++;
+    runWiredTigerTool("-h",
+                      conn.dbpath,
+                      "-r",
+                      "-C",
+                      "log=(compressor=snappy,path=journal)",
+                      "dump",
+                      "-x",
+                      "-f",
+                      tempDumpFile,
+                      fullURI);
+
+    let lines = cat(tempDumpFile).split("\n");
+
+    // Each record takes two lines with a key and a value. We will only modify the values.
+    for (let i = wtHeaderLines; i < lines.length; i += 2) {
+        let entry = hexToBSON(lines[i]);
+        modifyCatalogEntry(entry);
+        lines[i] = dumpBSONAsHex(entry);
+    }
+
+    writeFile(newTableFile, lines.join("\n"));
+
+    runWiredTigerTool("-h", conn.dbpath, "alter", fullURI, "write_timestamp_usage=never");
+    runWiredTigerTool("-h", conn.dbpath, "load", "-f", newTableFile, "-r", uri);
+    runWiredTigerTool("-h", conn.dbpath, "alter", fullURI, "write_timestamp_usage=none");
+};

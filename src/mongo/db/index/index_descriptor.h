@@ -94,6 +94,7 @@ public:
     static constexpr StringData kIndexVersionFieldName = "v"_sd;
     static constexpr StringData kKeyPatternFieldName = "key"_sd;
     static constexpr StringData kLanguageOverrideFieldName = "language_override"_sd;
+    // TODO(SERVER-100328): remove after 9.0 is branched.
     static constexpr StringData kNamespaceFieldName = "ns"_sd;  // Removed in 4.4
     static constexpr StringData kPartialFilterExprFieldName = "partialFilterExpression"_sd;
     static constexpr StringData kWildcardProjectionFieldName = "wildcardProjection"_sd;

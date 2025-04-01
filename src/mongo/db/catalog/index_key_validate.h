@@ -67,41 +67,22 @@ constexpr auto kExpireAfterSecondsForInactiveTTLIndex =
  * Describe which field names are considered valid options when creating an index. If the set
  * associated with the field name is empty, the option is always valid, otherwise it will be allowed
  * only when creating the set of index types listed in the set.
+ *
+ * Although the variable is not defined as const, it in practice is one. It may be modified only by
+ * a GlobalInitializerRegisterer.
  */
-static std::map<StringData, std::set<IndexType>> allowedFieldNames = {
-    {IndexDescriptor::k2dIndexBitsFieldName, {IndexType::INDEX_2D}},
-    {IndexDescriptor::k2dIndexMaxFieldName, {IndexType::INDEX_2D}},
-    {IndexDescriptor::k2dIndexMinFieldName, {IndexType::INDEX_2D}},
-    {IndexDescriptor::k2dsphereCoarsestIndexedLevel, {IndexType::INDEX_2DSPHERE}},
-    {IndexDescriptor::k2dsphereFinestIndexedLevel, {IndexType::INDEX_2DSPHERE}},
-    {IndexDescriptor::k2dsphereVersionFieldName,
-     {IndexType::INDEX_2DSPHERE, IndexType::INDEX_2DSPHERE_BUCKET}},
-    {IndexDescriptor::kBackgroundFieldName, {}},
-    {IndexDescriptor::kCollationFieldName, {}},
-    {IndexDescriptor::kDefaultLanguageFieldName, {}},
-    {IndexDescriptor::kDropDuplicatesFieldName, {}},
-    {IndexDescriptor::kExpireAfterSecondsFieldName, {}},
-    {IndexDescriptor::kHiddenFieldName, {}},
-    {IndexDescriptor::kIndexNameFieldName, {}},
-    {IndexDescriptor::kIndexVersionFieldName, {}},
-    {IndexDescriptor::kKeyPatternFieldName, {}},
-    {IndexDescriptor::kLanguageOverrideFieldName, {}},
-    {IndexDescriptor::kNamespaceFieldName, {}},
-    {IndexDescriptor::kPartialFilterExprFieldName, {}},
-    {IndexDescriptor::kWildcardProjectionFieldName, {IndexType::INDEX_WILDCARD}},
-    {IndexDescriptor::kSparseFieldName, {}},
-    {IndexDescriptor::kStorageEngineFieldName, {}},
-    {IndexDescriptor::kTextVersionFieldName, {IndexType::INDEX_TEXT}},
-    {IndexDescriptor::kUniqueFieldName, {}},
-    {IndexDescriptor::kWeightsFieldName, {IndexType::INDEX_TEXT}},
-    {IndexDescriptor::kOriginalSpecFieldName, {}},
-    {IndexDescriptor::kPrepareUniqueFieldName, {}},
-    // Index creation under legacy writeMode can result in an index spec with an _id field.
-    {"_id", {}},
-    // TODO SERVER-76108: Field names are not validated to match index type. This was used for the
-    // removed 'geoHaystack' index type, but users could have set it for other index types as well.
-    // We need to keep allowing it until FCV upgrade is implemented to clean this up.
-    {"bucketSize"_sd, {}}};
+extern std::map<StringData, std::set<IndexType>> kAllowedFieldNames;
+
+const std::set<StringData> kDeprecatedFieldNames = {
+    "_id"_sd, "bucketSize"_sd, IndexDescriptor::kNamespaceFieldName};
+
+/**
+ * Like 'allowedFieldNames', but removes deprecated fields specified in kDeprecatedFieldNames.
+ *
+ * Although the variable is not defined as const, it in practice is one. It may be modified only by
+ * a GlobalInitializerRegisterer.
+ */
+extern std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames;
 
 /**
  * Checks if the key is valid for building an index according to the validation rules for the given
@@ -114,7 +95,11 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
  * has any missing attributes filled in. If the index specification is malformed, then an error
  * status is returned.
  */
-StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec);
+StatusWith<BSONObj> validateIndexSpec(
+    OperationContext* opCtx,
+    const BSONObj& indexSpec,
+    const std::map<StringData, std::set<IndexType>>& allowedFieldNames =
+        index_key_validate::kAllowedFieldNames);
 
 /**
  * Returns a new index spec with any unknown field names removed from 'indexSpec'.
@@ -128,7 +113,7 @@ BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec)
 BSONObj repairIndexSpec(const NamespaceString& ns,
                         const BSONObj& indexSpec,
                         const std::map<StringData, std::set<IndexType>>& allowedFieldNames =
-                            index_key_validate::allowedFieldNames);
+                            index_key_validate::kAllowedFieldNames);
 
 /**
  * Performs additional validation for _id index specifications. This should be called after
@@ -140,7 +125,9 @@ Status validateIdIndexSpec(const BSONObj& indexSpec);
  * Confirms that 'indexSpec' contains only valid field names. Returns an error if an unexpected
  * field name is found.
  */
-Status validateIndexSpecFieldNames(const BSONObj& indexSpec);
+Status validateIndexSpecFieldNames(const BSONObj& indexSpec,
+                                   const std::map<StringData, std::set<IndexType>>&
+                                       allowedFieldNames = index_key_validate::kAllowedFieldNames);
 
 /**
  * Validates the 'collation' field in the index specification 'indexSpec' and fills in the full

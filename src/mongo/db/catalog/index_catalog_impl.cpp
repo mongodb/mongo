@@ -1651,9 +1651,6 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     const std::string indexName = oldDesc->indexName();
     invariant(collection->isIndexReady(indexName));
 
-    // The _id index should not be modified by a collMod.
-    tassert(9037800, "Should not be refreshing the _id index", !oldDesc->isIdIndex());
-
     // Delete the IndexCatalogEntry that owns this descriptor. After deletion, 'oldDesc' is invalid
     // and should not be dereferenced. Also, invalidate the index from the
     // CollectionIndexUsageTrackerDecoration (shared state among Collection instances).

@@ -88,6 +88,45 @@ std::function<void(std::map<StringData, std::set<IndexType>>&)> filterAllowedInd
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
+std::map<StringData, std::set<IndexType>> kAllowedFieldNames = {
+    {IndexDescriptor::k2dIndexBitsFieldName, {IndexType::INDEX_2D}},
+    {IndexDescriptor::k2dIndexMaxFieldName, {IndexType::INDEX_2D}},
+    {IndexDescriptor::k2dIndexMinFieldName, {IndexType::INDEX_2D}},
+    {IndexDescriptor::k2dsphereCoarsestIndexedLevel, {IndexType::INDEX_2DSPHERE}},
+    {IndexDescriptor::k2dsphereFinestIndexedLevel, {IndexType::INDEX_2DSPHERE}},
+    {IndexDescriptor::k2dsphereVersionFieldName,
+     {IndexType::INDEX_2DSPHERE, IndexType::INDEX_2DSPHERE_BUCKET}},
+    {IndexDescriptor::kBackgroundFieldName, {}},
+    {IndexDescriptor::kCollationFieldName, {}},
+    {IndexDescriptor::kDefaultLanguageFieldName, {}},
+    {IndexDescriptor::kDropDuplicatesFieldName, {}},
+    {IndexDescriptor::kExpireAfterSecondsFieldName, {}},
+    {IndexDescriptor::kHiddenFieldName, {}},
+    {IndexDescriptor::kIndexNameFieldName, {}},
+    {IndexDescriptor::kIndexVersionFieldName, {}},
+    {IndexDescriptor::kKeyPatternFieldName, {}},
+    {IndexDescriptor::kLanguageOverrideFieldName, {}},
+    // TODO(SERVER-100328): remove after 9.0 is branched.
+    {IndexDescriptor::kNamespaceFieldName, {}},
+    {IndexDescriptor::kPartialFilterExprFieldName, {}},
+    {IndexDescriptor::kWildcardProjectionFieldName, {IndexType::INDEX_WILDCARD}},
+    {IndexDescriptor::kSparseFieldName, {}},
+    {IndexDescriptor::kStorageEngineFieldName, {}},
+    {IndexDescriptor::kTextVersionFieldName, {IndexType::INDEX_TEXT}},
+    {IndexDescriptor::kUniqueFieldName, {}},
+    {IndexDescriptor::kWeightsFieldName, {IndexType::INDEX_TEXT}},
+    {IndexDescriptor::kOriginalSpecFieldName, {}},
+    {IndexDescriptor::kPrepareUniqueFieldName, {}},
+    // Index creation under legacy writeMode can result in an index spec with an _id field.
+    {"_id", {}},
+    // TODO SERVER-76108: Field names are not validated to match index type. This was used for the
+    // removed 'geoHaystack' index type, but users could have set it for other index types as well.
+    // We need to keep allowing it until FCV upgrade is implemented to clean this up.
+    {"bucketSize"_sd, {}}};
+
+// Initialised by a GlobalInitializerRegisterer.
+std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames = {};
+
 namespace {
 // When the skipIndexCreateFieldNameValidation failpoint is enabled, validation for index field
 // names will be disabled. This will allow for creation of indexes with invalid field names in their
@@ -103,6 +142,7 @@ static const std::set<StringData> allowedIdIndexFieldNames = {
     IndexDescriptor::kIndexNameFieldName,
     IndexDescriptor::kIndexVersionFieldName,
     IndexDescriptor::kKeyPatternFieldName,
+    // TODO(SERVER-100328): remove after 9.0 is branched.
     IndexDescriptor::kNamespaceFieldName,
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
@@ -285,7 +325,7 @@ BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec)
     auto appendIndexSpecFn = [](const BSONElement& indexSpecElem, BSONObjBuilder* builder) {
         builder->append(indexSpecElem);
     };
-    return buildRepairedIndexSpec(ns, indexSpec, allowedFieldNames, appendIndexSpecFn);
+    return buildRepairedIndexSpec(ns, indexSpec, kAllowedFieldNames, appendIndexSpecFn);
 }
 
 BSONObj repairIndexSpec(const NamespaceString& ns,
@@ -344,7 +384,10 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
     return buildRepairedIndexSpec(ns, indexSpec, allowedFieldNames, fixIndexSpecFn);
 }
 
-StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec) {
+StatusWith<BSONObj> validateIndexSpec(
+    OperationContext* opCtx,
+    const BSONObj& indexSpec,
+    const std::map<StringData, std::set<IndexType>>& allowedFieldNames) {
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
     bool hasNamespaceField = false;
@@ -359,7 +402,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     auto clusteredField = indexSpec[IndexDescriptor::kClusteredFieldName];
     bool apiStrict = opCtx && APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
-    auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec);
+    auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec, allowedFieldNames);
     if (!fieldNamesValidStatus.isOK()) {
         return fieldNamesValidStatus;
     }
@@ -438,6 +481,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
             }
 
         } else if (IndexDescriptor::kNamespaceFieldName == indexSpecElemFieldName) {
+            // TODO(SERVER-100328): remove after 9.0 is branched.
             hasNamespaceField = true;
         } else if (IndexDescriptor::kIndexVersionFieldName == indexSpecElemFieldName) {
             if (!indexSpecElem.isNumber()) {
@@ -686,6 +730,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     // Ignore any 'ns' field in the index spec because this field is dropped post-4.0. Don't remove
     // the field during repair, as repair may run on old data files (version 3.6 and 4.0) that
     // require the field to be present.
+    // TODO(SERVER-100328): remove after 9.0 is branched.
     if (hasNamespaceField && !storageGlobalParams.repair) {
         modifiedSpec = modifiedSpec.removeField(IndexDescriptor::kNamespaceFieldName);
     }
@@ -794,7 +839,8 @@ Status validateClusteredSpecFieldNames(const BSONObj& indexSpec) {
  * value, is the the sub-module's responsibility to ensure that the content is valid and that only
  * expected fields are present at creation time
  */
-Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
+Status validateIndexSpecFieldNames(
+    const BSONObj& indexSpec, const std::map<StringData, std::set<IndexType>>& allowedFieldNames) {
     if (MONGO_unlikely(skipIndexCreateFieldNameValidation.shouldFail())) {
         return Status::OK();
     }
@@ -1082,8 +1128,20 @@ BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& index
 GlobalInitializerRegisterer filterAllowedIndexFieldNamesInitializer(
     "FilterAllowedIndexFieldNames", [](InitializerContext*) {
         if (filterAllowedIndexFieldNames)
-            filterAllowedIndexFieldNames(allowedFieldNames);
+            filterAllowedIndexFieldNames(kAllowedFieldNames);
     });
+
+GlobalInitializerRegisterer nonDeprecatedAllowedFieldNamesInitializer(
+    "NonDeprecatedAllowedIndexFieldNames",
+    [](InitializerContext*) {
+        kNonDeprecatedAllowedFieldNames = kAllowedFieldNames;
+
+        for (const auto& name : kDeprecatedFieldNames) {
+            kNonDeprecatedAllowedFieldNames.erase(name);
+        }
+    },
+    nullptr,
+    {"FilterAllowedIndexFieldNames"});
 
 }  // namespace index_key_validate
 }  // namespace mongo

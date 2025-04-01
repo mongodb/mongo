@@ -93,7 +93,8 @@ std::map<StringData, BSONElement> populateOptionsMapForEqualityCheck(const BSONO
 
     // These index options are not considered for equality.
     static const StringDataSet kIndexOptionsNotConsideredForEqualityCheck{
-        IndexDescriptor::kKeyPatternFieldName,          // checked specially
+        IndexDescriptor::kKeyPatternFieldName,  // checked specially
+        // TODO(SERVER-100328): remove after 9.0 is branched.
         IndexDescriptor::kNamespaceFieldName,           // removed in 4.4
         IndexDescriptor::kIndexNameFieldName,           // checked separately
         IndexDescriptor::kIndexVersionFieldName,        // not considered for equivalence
@@ -137,6 +138,7 @@ constexpr StringData IndexDescriptor::kIndexNameFieldName;
 constexpr StringData IndexDescriptor::kIndexVersionFieldName;
 constexpr StringData IndexDescriptor::kKeyPatternFieldName;
 constexpr StringData IndexDescriptor::kLanguageOverrideFieldName;
+// TODO(SERVER-100328): remove after 9.0 is branched.
 constexpr StringData IndexDescriptor::kNamespaceFieldName;
 constexpr StringData IndexDescriptor::kPartialFilterExprFieldName;
 constexpr StringData IndexDescriptor::kWildcardProjectionFieldName;

@@ -782,6 +782,8 @@ private:
             _setShardedClusterCardinalityParameter(opCtx, requestedVersion);
             _initializePlacementHistory(opCtx, requestedVersion);
         }
+
+        _cleanUpDeprecatedCatalogMetadata(opCtx);
     }
 
     // TODO (SERVER-83704): Remove this function once 8.0 becomes last LTS.
@@ -793,6 +795,36 @@ private:
         if (feature_flags::gPlacementHistoryPostFCV3.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
             ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
+        }
+    }
+
+    // TODO(SERVER-100328): remove after 9.0 is branched.
+    // WARNING: do not rely on this method to clean up metadata that can be created concurrently. It
+    // is fine to rely on this only when missing concurrently created collections is fine, when
+    // newly created collections no longer use the metadata format we wish to remove.
+    void _cleanUpDeprecatedCatalogMetadata(OperationContext* opCtx) {
+        // We bypass the UserWritesBlock mode here in order to not see errors arising from the
+        // block. The user already has permission to run FCV at this point and the writes performed
+        // here aren't modifying any user data with the exception of fixing up the collection
+        // metadata.
+        auto originalValue = WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled();
+        ON_BLOCK_EXIT([&] { WriteBlockBypass::get(opCtx).set(originalValue); });
+        WriteBlockBypass::get(opCtx).set(true);
+
+        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            catalog::forEachCollectionFromDb(
+                opCtx, dbName, MODE_X, [&](const Collection* collection) {
+                    // To remove deprecated catalog metadata, issue a collmod with no other options
+                    // set.
+                    BSONObjBuilder responseBuilder;
+                    uassertStatusOK(processCollModCommand(opCtx,
+                                                          collection->ns(),
+                                                          CollMod{collection->ns()},
+                                                          nullptr,
+                                                          &responseBuilder));
+                    return true;
+                });
         }
     }
 

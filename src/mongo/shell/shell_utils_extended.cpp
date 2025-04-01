@@ -540,7 +540,25 @@ BSONObj decompressBSONColumn(const BSONObj& a, void* data) {
  * Dumps BSON data as a Hex-formatted string
  */
 BSONObj dumpBSONAsHex(const BSONObj& a, void* data) {
-    return BSON("" << bson_bin_util::toHex(a));
+    uassert(9174601,
+            "dumpBSONAsHex() takes one argument: a BSON obj",
+            a.nFields() == 1 && a.firstElementType() == Object);
+    auto obj = a.firstElement().Obj();
+
+    return BSON("" << hexblob::encodeLower(obj.objdata(), obj.objsize()));
+}
+
+/**
+ * Convert a hex string encoded BSON into its BSONObj form.
+ */
+BSONObj hexToBSON(const BSONObj& a, void*) {
+    uassert(9174600,
+            "hexToBSON takes one argument: a hex string",
+            a.nFields() == 1 && a.firstElementType() == String);
+
+    BufBuilder bb;
+    hexblob::decode(a.firstElement().String(), &bb);
+    return BSON("" << BSONObj(bb.release()));
 }
 
 BSONObj generateStorageBSON(const BSONObj& args, void* data) {
@@ -881,6 +899,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("getFileMode", getFileMode);
     scope.injectNative("decompressBSONColumn", decompressBSONColumn);
     scope.injectNative("dumpBSONAsHex", dumpBSONAsHex);
+    scope.injectNative("hexToBSON", hexToBSON);
     scope.injectNative("_copyFileRange", copyFileRange);
     scope.injectNative("_readDumpFile", readDumpFile);
     scope.injectNative("_numObjsInDumpFile", numObjsInDumpFile);

@@ -369,7 +369,8 @@ public:
                                     StringData idxName,
                                     bool prepareUnique) final;
 
-    std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx) final;
+    std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx,
+                                                       bool removeDeprecatedFields) final;
 
     void setIsTemp(OperationContext* opCtx, bool isTemp) final;
 

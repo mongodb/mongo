@@ -534,9 +534,12 @@ public:
 
     /**
      * Repairs invalid index options on all indexes in this collection. Returns a list of
-     * index names that were repaired.
+     * index names that were repaired. Specifying 'removeDeprecatedFields' as true, causes
+     * deprecated fields, which much be otherwise supported for backwards compatibility, to be
+     * removed when performing the repair.
      */
-    virtual std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx) = 0;
+    virtual std::vector<std::string> repairInvalidIndexOptions(
+        OperationContext* opCtx, bool removeDeprecatedFields = false) = 0;
 
     /**
      * Updates the 'temp' setting for this collection.

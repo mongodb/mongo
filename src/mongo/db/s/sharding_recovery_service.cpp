@@ -285,6 +285,12 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
             return;
         }
 
+        // TODO(SERVER-100328): remove after 9.0 is branched.
+        // If the storage snapshot is reused between the 'find' above and the 'insert' below, the
+        // operation may unnecessarily fail if a collMod is run on the
+        // kCollectionCriticalSectionsNamespace during FCV upgrade.
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
         // The collection critical section is not taken, try to acquire it.
 
         // The following code will try to add a doc to config.criticalCollectionSections:
@@ -399,6 +405,12 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                         "writeConcern"_attr = writeConcern);
             return;
         }
+
+        // TODO(SERVER-100328): remove after 9.0 is branched.
+        // If the storage snapshot is reused between the 'find' above and the 'update' below, the
+        // operation may unnecessarily fail when a collMod is run on the
+        // kCollectionCriticalSectionsNamespace during FCV upgrade.
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
         // The CS is in the catch-up phase, try to advance it to the commit phase.
 
@@ -533,6 +545,12 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         // try to release it.
 
         beforeReleasingAction(opCtx, nss);
+
+        // TODO(SERVER-100328): remove after 9.0 is branched.
+        // If the storage snapshot is reused between the 'find' above and the 'delete' below, the
+        // operation may unnecessarily fail if a collMod is run on the
+        // kCollectionCriticalSectionsNamespace during FCV upgrade.
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
         // The following code will try to remove a doc from config.criticalCollectionSections:
         // - If everything goes well, the shard server op observer will release the in-memory CS

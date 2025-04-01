@@ -392,7 +392,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::vector<std::string> repairInvalidIndexOptions(OperationContext*) override {
+    std::vector<std::string> repairInvalidIndexOptions(OperationContext*,
+                                                       bool removeDeprecatedFields) override {
         MONGO_UNREACHABLE;
     }
 

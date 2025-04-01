@@ -941,7 +941,12 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
-    abortOngoingMigrationIfNeeded(opCtx, nss);
+    // A collMod with no arguments is used to repair or cleanup metadata during FCV upgrade or
+    // downgrade. This is not an index modification operation, and does not need to abort ongoing
+    // migrations.
+    if (collModCmd.nFields() > 1) {
+        abortOngoingMigrationIfNeeded(opCtx, nss);
+    }
 };
 
 void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
