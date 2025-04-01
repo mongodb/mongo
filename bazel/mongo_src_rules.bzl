@@ -2,6 +2,14 @@
 BUILD files in the "src/" subtree.
 """
 
+load("//bazel/toolchains:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
+load(
+    "//bazel/toolchains:mongo_errors.bzl",
+    "LIBCXX_ERROR_MESSAGE",
+    "REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE",
+    "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
+    "THREAD_SANITIZER_ERROR_MESSAGE",
+)
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
 load("@com_github_grpc_grpc//bazel:protobuf.bzl", "well_known_proto_libs")
@@ -330,108 +338,6 @@ WINDOWS_LINKFLAGS = (
     MSVC_OPT_LINKFLAGS
 )
 
-WINDOWS_DEFINES = select({
-    "@platforms//os:windows": [
-        # This tells the Windows compiler not to link against the .lib files and
-        # to use boost as a bunch of header-only libraries
-        "BOOST_ALL_NO_LIB",
-        "_UNICODE",
-        "UNICODE",
-
-        # Temporary fixes to allow compilation with VS2017
-        "_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING",
-        "_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING",
-        "_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING",
-
-        # TODO(SERVER-60151): Until we are fully in C++20 mode, it is easier to
-        # simply suppress C++20 deprecations. After we have switched over we
-        # should address any actual deprecated usages and then remove this flag.
-        "_SILENCE_ALL_CXX20_DEPRECATION_WARNINGS",
-        "_CONSOLE",
-        "_CRT_SECURE_NO_WARNINGS",
-        "_ENABLE_EXTENDED_ALIGNED_STORAGE",
-        "_SCL_SECURE_NO_WARNINGS",
-    ],
-    "//conditions:default": [],
-})
-
-LINUX_DEFINES = select({
-    "@platforms//os:linux": [
-        # On linux, C code compiled with gcc/clang -std=c11 causes
-        # __STRICT_ANSI__ to be set, and that drops out all of the feature test
-        # definitions, resulting in confusing errors when we run C language
-        # configure checks and expect to be able to find newer POSIX things.
-        # Explicitly enabling _XOPEN_SOURCE fixes that, and should be mostly
-        # harmless as on Linux, these macros are cumulative. The C++ compiler
-        # already sets _XOPEN_SOURCE, and, notably, setting it again does not
-        # disable any other feature test macros, so this is safe to do. Other
-        # platforms like macOS and BSD have crazy rules, so don't try this
-        # there.
-        #
-        # Furthermore, as both C++ compilers appear to define _GNU_SOURCE
-        # unconditionally (because libstdc++ requires it), it seems prudent to
-        # explicitly add that too, so that C language checks see a consistent
-        # set of definitions.
-        "_XOPEN_SOURCE=700",
-        "_GNU_SOURCE",
-    ],
-    "//conditions:default": [],
-})
-
-MACOS_DEFINES = select({
-    "@platforms//os:macos": [
-        # TODO SERVER-54659 - ASIO depends on std::result_of which was removed
-        # in C++ 20. xcode15 does not have backwards compatibility
-        "ASIO_HAS_STD_INVOKE_RESULT",
-        # This is needed to compile boost on the newer xcodes
-        "BOOST_NO_CXX98_FUNCTION_BASE",
-    ],
-    "//conditions:default": [],
-})
-
-ABSEIL_DEFINES = [
-    "ABSL_FORCE_ALIGNED_ACCESS",
-]
-
-BOOST_DEFINES = [
-    "BOOST_ENABLE_ASSERT_DEBUG_HANDLER",
-    # TODO: Ideally, we could not set this define in C++20 builds, but at least
-    # our current Xcode 12 doesn't offer std::atomic_ref, so we cannot.
-    "BOOST_FILESYSTEM_NO_CXX20_ATOMIC_REF",
-    "BOOST_LOG_NO_SHORTHAND_NAMES",
-    "BOOST_LOG_USE_NATIVE_SYSLOG",
-    "BOOST_LOG_WITHOUT_THREAD_ATTR",
-    "BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS",
-    "BOOST_SYSTEM_NO_DEPRECATED",
-    "BOOST_THREAD_USES_DATETIME",
-    "BOOST_THREAD_VERSION=5",
-] + select({
-    "//bazel/config:linkdynamic_not_shared_archive": ["BOOST_LOG_DYN_LINK"],
-    "//conditions:default": [],
-}) + select({
-    "@platforms//os:windows": ["BOOST_ALL_NO_LIB"],
-    "//conditions:default": [],
-})
-
-ENTERPRISE_DEFINES = select({
-    "//bazel/config:build_enterprise_enabled": ["MONGO_ENTERPRISE_VERSION=1"],
-    "//conditions:default": [],
-}) + select({
-    "//bazel/config:enterprise_feature_audit_enabled": ["MONGO_ENTERPRISE_AUDIT=1"],
-    "//conditions:default": [],
-}) + select({
-    "//bazel/config:enterprise_feature_encryptdb_enabled": ["MONGO_ENTERPRISE_ENCRYPTDB=1"],
-    "//conditions:default": [],
-})
-
-# Fortify only possibly makes sense on POSIX systems, and we know that clang is
-# not a valid combination:
-# http://lists.llvm.org/pipermail/cfe-dev/2015-November/045852.html
-GCC_OPT_DEFINES = select({
-    "//bazel/config:gcc_opt": ["_FORTIFY_SOURCE=2"],
-    "//conditions:default": [],
-})
-
 LINUX_OPT_COPTS = select({
     # This is opt=debug, not to be confused with (opt=on && dbg=on)
     "//bazel/config:gcc_or_clang_opt_debug": [
@@ -704,43 +610,12 @@ EXTRA_GLOBAL_LIBS_LINKFLAGS = select({
     "//conditions:default": [],
 })
 
-# TODO(SERVER-85340): Fix this error message when libc++ is readded to the
-#                     toolchain.
-LIBCXX_ERROR_MESSAGE = """
-Error:
-    libc++ is not currently supported in the mongo toolchain. Follow this ticket
-    to see when support is being added SERVER-85340 We currently only support
-    passing the libcxx config on macos for compatibility reasons.
-
-    libc++ requires these configuration: --compiler_type=clang
-"""
-
 LIBCXX_COPTS = select({
     "//bazel/config:use_libcxx_required_settings": ["-stdlib=libc++"],
     "//bazel/config:use_libcxx_disabled": [],
 }, no_match_error = LIBCXX_ERROR_MESSAGE)
 
 LIBCXX_LINKFLAGS = LIBCXX_COPTS
-
-# TODO(SERVER-54659): ASIO depends on std::result_of which was removed in C++ 20
-LIBCXX_DEFINES = select({
-    "//bazel/config:use_libcxx_required_settings": ["ASIO_HAS_STD_INVOKE_RESULT"],
-    "//bazel/config:use_libcxx_disabled": [],
-}, no_match_error = LIBCXX_ERROR_MESSAGE)
-
-DEBUG_DEFINES = select({
-    "//bazel/config:dbg_enabled": [],
-    "//conditions:default": ["NDEBUG"],
-})
-
-PCRE2_DEFINES = ["PCRE2_STATIC"]
-
-SAFEINT_DEFINES = ["SAFEINT_USE_INTRINSICS=0"]
-
-REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE = """
-Error:
-  libunwind=on is only supported on linux"
-"""
 
 # These will throw an error if the following condition is not met:
 # (libunwind == on && os == linux) || libunwind == off || libunwind == auto
@@ -780,12 +655,6 @@ ANY_SANITIZER_GCC_LINKFLAGS = select({
     "//conditions:default": [],
 })
 
-SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE = """
-Error:
-  fuzzer, address, and memory sanitizers require these configurations:
-      --allocator=system
-"""
-
 ADDRESS_SANITIZER_COPTS = select({
     "//bazel/config:asan_disabled": [],
     "//bazel/config:sanitize_address_required_settings": [
@@ -797,15 +666,6 @@ ADDRESS_SANITIZER_COPTS = select({
 ADDRESS_SANITIZER_LINKFLAGS = select({
     "//bazel/config:asan_disabled": [],
     "//bazel/config:sanitize_address_required_settings": ["-fsanitize=address"],
-}, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
-
-# Unfortunately, abseil requires that we make these macros (this, and THREAD_
-# and UNDEFINED_BEHAVIOR_ below) set, because apparently it is too hard to query
-# the running compiler. We do this unconditionally because abseil is basically
-# pervasive via the 'base' library.
-ADDRESS_SANITIZER_DEFINES = select({
-    "//bazel/config:sanitize_address_required_settings": ["ADDRESS_SANITIZER"],
-    "//bazel/config:asan_disabled": [],
 }, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
 
 # Makes it easier to debug memory failures at the cost of some perf:
@@ -860,6 +720,7 @@ FUZZER_SANITIZER_LINKFLAGS = select({
     "//bazel/config:fsan_disabled": [],
 }, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE + "fuzzer")
 
+# TODO - Patrice: Move error message to defs.
 # Combines following two conditions -
 # 1.
 # TODO: SERVER-48622
@@ -874,15 +735,6 @@ FUZZER_SANITIZER_LINKFLAGS = select({
 # We add supressions based on the library file in etc/tsan.suppressions so the
 # link-model needs to be dynamic.
 
-THREAD_SANITIZER_ERROR_MESSAGE = """
-Error:
-  Build failed due to either -
-    - Cannot use libunwind with TSAN, please add
-        --use_libunwind=False to your compile flags or
-    - TSAN is only supported with dynamic link models, please add
-        --linkstatic=False to your compile flags.
-"""
-
 THREAD_SANITIZER_COPTS = select({
     "//bazel/config:sanitize_thread_required_settings": [
         "-fsanitize=thread",
@@ -895,16 +747,6 @@ THREAD_SANITIZER_LINKFLAGS = select({
     "//bazel/config:sanitize_thread_required_settings": ["-fsanitize=thread"],
     "//bazel/config:tsan_disabled": [],
 }, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
-
-THREAD_SANITIZER_DEFINES = select({
-    "//bazel/config:sanitize_thread_required_settings": ["THREAD_SANITIZER"],
-    "//bazel/config:tsan_disabled": [],
-}, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
-
-UNDEFINED_SANITIZER_DEFINES = select({
-    "//bazel/config:ubsan_enabled": ["UNDEFINED_BEHAVIOR_SANITIZER"],
-    "//bazel/config:ubsan_disabled": [],
-})
 
 # By default, undefined behavior sanitizer doesn't stop on the first error. Make
 # it so. Newer versions of clang have renamed the flag. However, this flag
@@ -1147,24 +989,6 @@ TCMALLOC_DEPS = select({
         "//src/third_party/gperftools:tcmalloc_minimal",
     ],
 }, no_match_error = TCMALLOC_ERROR_MESSAGE)
-
-TCMALLOC_DEFINES = select({
-    "//bazel/config:tcmalloc_google_enabled": ["ABSL_ALLOCATOR_NOTHROW"],
-    "//conditions:default": [],
-})
-
-#TODO SERVER-84714 add message about using the toolchain version of C++ libs
-GLIBCXX_DEBUG_ERROR_MESSAGE = """
-Error:
-    glibcxx_debug requires these configurations:
-        --dbg=True
-        --use_libcxx=False
-"""
-
-GLIBCXX_DEBUG_DEFINES = select({
-    ("//bazel/config:use_glibcxx_debug_required_settings"): ["_GLIBCXX_DEBUG"],
-    ("//bazel/config:use_glibcxx_debug_disabled"): [],
-}, no_match_error = GLIBCXX_DEBUG_ERROR_MESSAGE)
 
 DETECT_ODR_VIOLATIONS_ERROR_MESSAGE = """
 Error:
@@ -1436,25 +1260,6 @@ MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/valgrind:headers",
     "//src/third_party/abseil-cpp:absl_local_repo_deps",
 ]
-
-MONGO_GLOBAL_DEFINES = (
-    DEBUG_DEFINES +
-    LIBCXX_DEFINES +
-    ADDRESS_SANITIZER_DEFINES +
-    THREAD_SANITIZER_DEFINES +
-    UNDEFINED_SANITIZER_DEFINES +
-    GLIBCXX_DEBUG_DEFINES +
-    WINDOWS_DEFINES +
-    MACOS_DEFINES +
-    TCMALLOC_DEFINES +
-    LINUX_DEFINES +
-    GCC_OPT_DEFINES +
-    BOOST_DEFINES +
-    ABSEIL_DEFINES +
-    PCRE2_DEFINES +
-    SAFEINT_DEFINES +
-    ENTERPRISE_DEFINES
-)
 
 MONGO_GLOBAL_COPTS = (
     MONGO_GLOBAL_INCLUDE_DIRECTORIES +
