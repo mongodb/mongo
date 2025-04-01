@@ -130,7 +130,8 @@ Future<DbResponse> ServiceEntryPointRSEndpoint::_replicaSetEndpointHandleRequest
 }
 Future<DbResponse> ServiceEntryPointRSEndpoint::handleRequest(OperationContext* opCtx,
                                                               const Message& m) noexcept {
-    if (replica_set_endpoint::isReplicaSetEndpointClient(opCtx->getClient())) {
+    if (replica_set_endpoint::isReplicaSetEndpointClient(VersionContext::getDecoration(opCtx),
+                                                         opCtx->getClient())) {
         return _replicaSetEndpointHandleRequest(opCtx, m);
     }
     return _shardSep->handleRequest(opCtx, m);

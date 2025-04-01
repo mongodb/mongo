@@ -280,6 +280,7 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx) c
 
 void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
     if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // When the feature flag for authoritative database metadata is enabled, this should act as
         // a noop. Clearing and setting the database metadata is only managed by the recover from
@@ -302,6 +303,7 @@ void DatabaseShardingState::setAuthoritativeDbInfo(OperationContext* opCtx,
     tassert(10003603,
             "Expected to find the authoritative database metadata feature flag enabled",
             feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
@@ -332,6 +334,7 @@ void DatabaseShardingState::clearDbInfo_DEPRECATED(OperationContext* opCtx,
         "which is managed by the DDL commit to the shard catalog. This method is being called in a "
         "non-authoritative way, which is not correct in the current implementation.",
         !feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
@@ -349,6 +352,7 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx) {
     tassert(10003601,
             "Expected to find the authoritative database metadata feature flag enabled",
             feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     LOGV2(10003602, "Clearing this node's cached database info", logAttrs(_dbName));

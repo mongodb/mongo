@@ -78,8 +78,8 @@ void ReplicaSetEndpointShardingState::setIsReplicaSetMember(bool value) {
     _isReplicaSetMember = value;
 }
 
-bool ReplicaSetEndpointShardingState::supportsReplicaSetEndpoint() {
-    if (!isFeatureFlagEnabled()) {
+bool ReplicaSetEndpointShardingState::supportsReplicaSetEndpoint(const VersionContext& vCtx) {
+    if (!isFeatureFlagEnabled(vCtx)) {
         return false;
     }
     if (gMultitenancySupport) {

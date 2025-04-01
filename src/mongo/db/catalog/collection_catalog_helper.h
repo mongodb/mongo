@@ -70,7 +70,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
                              CollectionCatalog::CollectionInfoFn callback,
                              CollectionCatalog::CollectionInfoFn predicate = nullptr);
 
-boost::optional<bool> getConfigDebugDump(const NamespaceString& nss);
+boost::optional<bool> getConfigDebugDump(const VersionContext& vCtx, const NamespaceString& nss);
 
 /**
  * Indicates whether the data drop (the data table) should occur immediately or be two-phased, which

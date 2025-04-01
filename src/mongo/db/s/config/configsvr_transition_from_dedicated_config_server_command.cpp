@@ -106,6 +106,7 @@ public:
                                                           opCtx->getWriteConcern());
 
             if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 _runNewPath(opCtx);
             } else {

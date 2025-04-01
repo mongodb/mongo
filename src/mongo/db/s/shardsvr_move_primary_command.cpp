@@ -99,9 +99,13 @@ public:
             const auto coordinatorFuture = [&] {
                 FixedFCVRegion fcvRegion(opCtx);
 
+                // The Operation FCV is currently propagated only for DDL operations,
+                // which cannot be nested. Therefore, the VersionContext shouldn't have
+                // been initialized yet.
+                invariant(!VersionContext::getDecoration(opCtx).isInitialized());
                 const auto authoritativeMetadataAccessLevel =
                     sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-                        fcvRegion->acquireFCVSnapshot());
+                        VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot());
 
                 auto shardRegistry = Grid::get(opCtx)->shardRegistry();
                 // Ensure that the shard information is up-to-date as possible to catch the case

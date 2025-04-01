@@ -120,12 +120,12 @@ ScopedSetRouterService::~ScopedSetRouterService() {
     _opCtx->setRoutedByReplicaSetEndpoint(false);
 }
 
-bool isReplicaSetEndpointClient(Client* client) {
+bool isReplicaSetEndpointClient(const VersionContext& vCtx, Client* client) {
     if (client->isRouterClient()) {
         return false;
     }
     return replica_set_endpoint::ReplicaSetEndpointShardingState::get(client->getServiceContext())
-        ->supportsReplicaSetEndpoint();
+        ->supportsReplicaSetEndpoint(vCtx);
 }
 
 bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
@@ -133,7 +133,7 @@ bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
     invariant(!opCtx->getClient()->isRouterClient());
 
     if (!replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)
-             ->supportsReplicaSetEndpoint()) {
+             ->supportsReplicaSetEndpoint(VersionContext::getDecoration(opCtx))) {
         return false;
     }
 

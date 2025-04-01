@@ -126,7 +126,7 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint) {
     shardingState->setIsReplicaSetMember(true);
 
     ASSERT(shardingState->isConfigShardForTest());
-    ASSERT(shardingState->supportsReplicaSetEndpoint());
+    ASSERT(shardingState->supportsReplicaSetEndpoint(kNoVersionContext));
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_NotConfigShard) {
@@ -139,7 +139,7 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_NotConfig
     shardingState->setIsReplicaSetMember(true);
 
     ASSERT_FALSE(shardingState->isConfigShardForTest());
-    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint(kNoVersionContext));
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_NotReplicaSetMember) {
@@ -152,7 +152,7 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_NotReplic
     shardingState->setIsConfigShard(true);
 
     ASSERT_TRUE(shardingState->isConfigShardForTest());
-    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint(kNoVersionContext));
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_HasTwoOrMoreShards) {
@@ -166,7 +166,7 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_HasTwoOrM
     shardingState->setIsReplicaSetMember(true);
 
     ASSERT_TRUE(shardingState->isConfigShardForTest());
-    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint(kNoVersionContext));
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_FeatureFlagDisabled) {
@@ -182,7 +182,7 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_FeatureFl
     shardingState->setIsReplicaSetMember(true);
 
     ASSERT_TRUE(shardingState->isConfigShardForTest());
-    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint(kNoVersionContext));
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_Multitenant) {
@@ -197,7 +197,7 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_Multitena
     shardingState->setIsReplicaSetMember(true);
 
     ASSERT_TRUE(shardingState->isConfigShardForTest());
-    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint(kNoVersionContext));
 }
 
 }  // namespace

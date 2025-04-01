@@ -107,6 +107,7 @@ public:
             audit::logAddShard(Client::getCurrent(), name ? name.value() : "", target.toString());
 
             if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 return _runNewPath(opCtx, target, name);
             }

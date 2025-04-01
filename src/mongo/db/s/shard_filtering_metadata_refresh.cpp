@@ -458,6 +458,7 @@ Status FilteringMetadataCache::onDbVersionMismatch(
     boost::optional<DatabaseVersion> clientDbVersion) noexcept {
     try {
         if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             tassert(10003600, "Expected to be called with a clientDbVersion", clientDbVersion);
             _onDbVersionMismatchAuthoritative(opCtx, dbName, *clientDbVersion);

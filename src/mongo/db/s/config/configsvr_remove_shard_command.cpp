@@ -149,7 +149,8 @@ public:
                 // connections again after a second shard has been added. Unsharded collections are
                 // allowed to be tracked and moved as soon as a second shard is added to the
                 // cluster, and these collections will not handle direct connections properly.
-                if (replica_set_endpoint::isFeatureFlagEnabled()) {
+                if (replica_set_endpoint::isFeatureFlagEnabled(
+                        VersionContext::getDecoration(opCtx))) {
                     uassertStatusOK(ShardingCatalogManager::get(opCtx)
                                         ->updateClusterCardinalityParameterIfNeeded(opCtx));
                 }

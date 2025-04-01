@@ -904,11 +904,11 @@ void commitDropDatabaseMetadataToShardCatalog(
 }
 
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
-    const ServerGlobalParams::FCVSnapshot& snapshot) {
+    const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot) {
     const bool isAuthoritativeDDLEnabled =
-        feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(snapshot);
+        feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(vCtx, snapshot);
     const bool isAuthoritativeCRUDEnabled =
-        feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(snapshot);
+        feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(vCtx, snapshot);
 
     tassert(10162502,
             "shardAuthoritativeDbMetadataCRUD should not be enabled if "

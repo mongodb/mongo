@@ -149,6 +149,7 @@ public:
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
             if (!feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(ErrorCodes::OperationNotSupportedInTransaction,
                         "Cannot create new collections inside distributed transactions",

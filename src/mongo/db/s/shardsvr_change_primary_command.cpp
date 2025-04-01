@@ -101,15 +101,20 @@ public:
             const auto coordinatorFuture = [&] {
                 FixedFCVRegion fcvRegion(opCtx);
 
+                // The Operation FCV is currently propagated only for DDL operations,
+                // which cannot be nested. Therefore, the VersionContext shouldn't have
+                // been initialized yet.
+                invariant(!VersionContext::getDecoration(opCtx).isInitialized());
                 const auto authoritativeMetadataAccessLevel =
                     sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-                        fcvRegion->acquireFCVSnapshot());
+                        VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot());
 
                 // TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
                 uassert(
                     ErrorCodes::IllegalOperation,
                     "Cannot run changePrimary with featureFlagBalanceUnshardedCollections disabled",
                     feature_flags::gBalanceUnshardedCollections.isEnabled(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
                 auto shardRegistry = Grid::get(opCtx)->shardRegistry();

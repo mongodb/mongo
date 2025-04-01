@@ -68,7 +68,7 @@ public:
      * Returns true if this mongod supports replica set endpoint, meaning it is part of
      * a single-shard cluster consisting of config shard with router role.
      */
-    bool supportsReplicaSetEndpoint();
+    bool supportsReplicaSetEndpoint(const VersionContext& vCtx);
 
 private:
     mutable std::shared_mutex _mutex;  // NOLINT

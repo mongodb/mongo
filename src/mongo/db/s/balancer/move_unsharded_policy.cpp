@@ -333,13 +333,15 @@ boost::optional<MigrateInfo> selectUnsplittableCollectionToMove(
     auto collectionAndChunks = [&]() -> boost::optional<std::pair<NamespaceString, ChunkType>> {
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
 
-        if (!feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(fcvSnapshot) &&
+        if (!feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot) &&
             !feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabled(fcvSnapshot)) {
             return boost::none;
         }
 
         for (const auto& shardId : availableDonors) {
-            if (!feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(fcvSnapshot)) {
+            if (!feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
+                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
                 auto randomUntrackedColl = getRandomUntrackedCollectionOnShard(opCtx, shardId);
                 if (randomUntrackedColl) {
                     return randomUntrackedColl;

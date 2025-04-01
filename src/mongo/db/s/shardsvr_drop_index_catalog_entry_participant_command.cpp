@@ -98,6 +98,7 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     fmt::format("{} command not enabled", definition()->getName()),
                     feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 

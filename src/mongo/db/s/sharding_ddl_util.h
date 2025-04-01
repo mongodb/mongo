@@ -339,11 +339,11 @@ void commitDropDatabaseMetadataToShardCatalog(
     const CancellationToken& token);
 
 /**
- * Based on a FCV snapshot, get the where the DDL needs to act accordingly to the database
+ * Based on the FCV, get the where the DDL needs to act accordingly to the database
  * authoritativeness.
  */
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
-    const ServerGlobalParams::FCVSnapshot& snapshot);
+    const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

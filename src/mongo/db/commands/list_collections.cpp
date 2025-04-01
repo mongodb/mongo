@@ -278,7 +278,8 @@ BSONObj buildCollectionBson(OperationContext* opCtx, const Collection* collectio
     if (options.uuid) {
         infoBuilder.appendElements(options.uuid->toBSON());
     }
-    if (const auto configDebugDump = catalog::getConfigDebugDump(nss);
+    if (const auto configDebugDump =
+            catalog::getConfigDebugDump(VersionContext::getDecoration(opCtx), nss);
         configDebugDump.has_value()) {
         infoBuilder.append("configDebugDump", *configDebugDump);
     }

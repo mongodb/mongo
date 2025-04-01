@@ -169,6 +169,7 @@ public:
                     !opCtx->readOnly());
 
             if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 // When the feature flag for authoritative database metadata is enabled, this should
                 // act as a noop. Refreshing the database metadata is no longer supported.

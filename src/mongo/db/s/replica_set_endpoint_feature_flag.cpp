@@ -35,10 +35,10 @@
 namespace mongo {
 namespace replica_set_endpoint {
 
-bool isFeatureFlagEnabled() {
+bool isFeatureFlagEnabled(const VersionContext& vCtx) {
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabled(fcvSnapshot);
+    return feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabledUseLastLTSFCVWhenUninitialized(
+        vCtx, fcvSnapshot);
 }
 
 bool isFeatureFlagEnabledIgnoreFCV() {

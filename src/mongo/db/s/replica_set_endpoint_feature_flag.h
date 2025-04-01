@@ -29,13 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/version_context.h"
 namespace mongo {
 namespace replica_set_endpoint {
 
 /**
  * Returns true if the feature flag is enabled, not ignoring the feature compatibility version.
  */
-bool isFeatureFlagEnabled();
+bool isFeatureFlagEnabled(const VersionContext& vCtx);
 
 /**
  * Returns true if the feature flag is enabled, ignoring the feature compatibility version.

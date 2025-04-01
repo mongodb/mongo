@@ -243,6 +243,7 @@ public:
 
                     bool isTrackUnshardedUponCreationEnabled =
                         feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
+                            VersionContext::getDecoration(opCtx),
                             (*optFixedFcvRegion)->acquireFCVSnapshot());
 
                     bool mustTrackOnMoveCollection =
@@ -372,7 +373,7 @@ public:
             // collection locally.
             auto clusterRole = ShardingState::get(opCtx)->pollClusterRole();
             if (feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
-                    fixedFcvRegion->acquireFCVSnapshot())) {
+                    VersionContext::getDecoration(opCtx), fixedFcvRegion->acquireFCVSnapshot())) {
 
                 uassert(ErrorCodes::CommandNotSupported,
                         "Sessions collection can only be sharded on the config server",

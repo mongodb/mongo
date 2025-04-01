@@ -175,7 +175,8 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
 /**
  * Create a BSONObjBuilder with all fields common to collections, views and timeseries.
  */
-BSONObjBuilder createCommonNsFields(StringData shardName,
+BSONObjBuilder createCommonNsFields(const VersionContext& vCtx,
+                                    StringData shardName,
                                     const NamespaceString& ns,
                                     const BSONObj& extraElements,
                                     StringData type = "collection") {
@@ -187,7 +188,8 @@ BSONObjBuilder createCommonNsFields(StringData shardName,
     if (!shardName.empty()) {
         builder.append("shard", shardName);
     }
-    if (const auto configDebugDump = catalog::getConfigDebugDump(ns); configDebugDump.has_value()) {
+    if (const auto configDebugDump = catalog::getConfigDebugDump(vCtx, ns);
+        configDebugDump.has_value()) {
         builder.append("configDebugDump", *configDebugDump);
     }
     builder.appendElements(extraElements);
@@ -233,7 +235,9 @@ void listDurableCatalog(OperationContext* opCtx,
             }
             return "collection"_sd;
         }();
-        docs->push_back(createCommonNsFields(shardName, ns, obj, type).obj());
+        docs->push_back(
+            createCommonNsFields(VersionContext::getDecoration(opCtx), shardName, ns, obj, type)
+                .obj());
     }
 }
 
@@ -389,6 +393,7 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
                     NamespaceStringUtil::deserialize(ns.dbName(), obj.getStringField("viewOn")));
 
                 auto builder = createCommonNsFields(
+                    VersionContext::getDecoration(opCtx),
                     getShardName(opCtx),
                     ns,
                     obj,
@@ -423,7 +428,8 @@ boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
     const auto& collPtr = acquisition.getCollectionPtr();
     auto obj = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, collPtr->getCatalogId());
 
-    return createCommonNsFields(getShardName(opCtx), ns, obj).obj();
+    return createCommonNsFields(VersionContext::getDecoration(opCtx), getShardName(opCtx), ns, obj)
+        .obj();
 }
 
 void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,

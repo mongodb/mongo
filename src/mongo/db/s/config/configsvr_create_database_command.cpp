@@ -131,10 +131,16 @@ public:
                 boost::optional<FixedFCVRegion> fixedFcvRegion{opCtx};
 
                 const auto fcvSnapshot = (*fixedFcvRegion)->acquireFCVSnapshot();
+                // The Operation FCV is currently propagated only for DDL operations,
+                // which cannot be nested. Therefore, the VersionContext shouldn't have
+                // been initialized yet.
+                invariant(!VersionContext::getDecoration(opCtx).isInitialized());
                 const auto createDatabaseDDLCoordinatorFeatureFlagEnabled =
-                    feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(fcvSnapshot);
+                    feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
+                        VersionContext::getDecoration(opCtx), fcvSnapshot);
                 const auto authoritativeMetadataAccessLevel =
-                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(fcvSnapshot);
+                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                        VersionContext::getDecoration(opCtx), fcvSnapshot);
 
                 if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
                     // (Ignore FCV check): The use isEnabledAndIgnoreFCVUnsafe is intentional, we

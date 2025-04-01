@@ -179,6 +179,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
 
     const bool allowCollectionCreatinInPreparedTransactions =
         feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : txnOps) {

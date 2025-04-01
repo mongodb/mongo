@@ -192,6 +192,7 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     fmt::format("{} command not enabled", definition()->getName()),
                     feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassert(ErrorCodes::IllegalOperation,
                     fmt::format("{} can only be run on config servers", definition()->getName()),

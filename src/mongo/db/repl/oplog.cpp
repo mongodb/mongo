@@ -841,6 +841,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           boost::optional<Lock::CollectionLock> collLock;
           if (mongo::feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
+                  VersionContext::getDecoration(opCtx),
                   serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
               opCtx->inMultiDocumentTransaction()) {
               // During initial sync we could have the following three scenarios:
@@ -2146,6 +2147,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
 
         if (mongo::feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
+                VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
             shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
             // Do not assign timestamps to non-replicated commands that have a wrapping

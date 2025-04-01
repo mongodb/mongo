@@ -402,7 +402,11 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
     FixedFCVRegion fixedFcvRegion(opCtx);
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     ForwardableOperationMetadata forwardableOpMetadata(opCtx);
-    if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(fcv)) {
+    // We currently only propagate the Operation FCV for DDL operations.
+    // Moreover, DDL operations cannot be nested. Therefore, the VersionContext
+    // shouldn't have been initialized yet.
+    invariant(!VersionContext::getDecoration(opCtx).isInitialized());
+    if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored, fcv)) {
         forwardableOpMetadata.setVersionContext(VersionContext{fcv});
     }
     coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);

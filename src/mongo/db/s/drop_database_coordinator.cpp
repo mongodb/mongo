@@ -211,6 +211,7 @@ void removeDatabaseMetadataFromConfigAndUpdatePlacementHistory(
 
                 const bool createDatabaseDDLCoordinatorFeatureFlagEnabled =
                     feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
                 if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {

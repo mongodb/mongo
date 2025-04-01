@@ -138,7 +138,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
     }
 }
 
-boost::optional<bool> getConfigDebugDump(const NamespaceString& nss) {
+boost::optional<bool> getConfigDebugDump(const VersionContext& vCtx, const NamespaceString& nss) {
     static const std::array kConfigDumpCollections = {
         "chunks"_sd,
         "collections"_sd,
@@ -154,7 +154,7 @@ boost::optional<bool> getConfigDebugDump(const NamespaceString& nss) {
     }
 
     if (MONGO_unlikely(!mongo::feature_flags::gConfigDebugDumpSupported.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {
         return boost::none;
     }
 

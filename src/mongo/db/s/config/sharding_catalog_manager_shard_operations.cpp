@@ -493,7 +493,7 @@ Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterRemoveShar
     // again after a second shard has been added. Unsharded collections are allowed to be tracked
     // and moved as soon as a second shard is added to the cluster, and these collections will not
     // handle direct connections properly.
-    if (!replica_set_endpoint::isFeatureFlagEnabled()) {
+    if (!replica_set_endpoint::isFeatureFlagEnabled(VersionContext::getDecoration(opCtx))) {
         return Status::OK();
     }
 
@@ -695,7 +695,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         const auto fcvSnapshot = (*fcvRegion).acquireFCVSnapshot();
 
         std::vector<CollectionType> collList;
-        if (feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(fcvSnapshot)) {
+        if (feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
             // TODO SERVER-80532: the sharding catalog might lose some collections.
             auto listStatus = _getCollListFromShard(opCtx, dbNamesStatus.getValue(), targeter);
             if (!listStatus.isOK()) {
@@ -716,7 +717,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                   currentFCV == multiversion::GenericFCV::kLastLTS);
 
         if (isConfigShard &&
-            !feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(fcvSnapshot)) {
+            !feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
             auto res = _dropSessionsCollection(opCtx, targeter);
             if (!res.isOK()) {
                 return res.withContext(
@@ -1085,7 +1087,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             // drop the collection when they shouldn't, but the create coordinator will re-create it
             // on the next periodic refresh.
             if (!feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
-                    fcvRegion->acquireFCVSnapshot())) {
+                    VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot())) {
                 DBDirectClient client(opCtx);
                 BSONObj result;
                 if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,

@@ -147,6 +147,7 @@ public:
                 }
 
                 if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                        VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                     !nss.isConfigDB()) {
                     const auto dbInGlobalCatalog =

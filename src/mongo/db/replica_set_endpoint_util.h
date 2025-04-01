@@ -89,7 +89,7 @@ private:
  * Returns true if this is a client on the shard port of a shardsvr mongod that supports
  * replica set endpoint.
  */
-bool isReplicaSetEndpointClient(Client* client);
+bool isReplicaSetEndpointClient(const VersionContext& vCtx, Client* client);
 
 /**
  * Returns true if a request on the shard port of a shardsvr mongod should go through the router

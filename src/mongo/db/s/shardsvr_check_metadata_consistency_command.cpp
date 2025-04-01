@@ -321,6 +321,7 @@ public:
                     tassert(9980500, "StaleDbVersion must have extraInfo", extraInfo);
 
                     if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                            VersionContext::getDecoration(opCtx),
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                         // If versionWanted exists:
                         //    - This means that the wanted version is higher than the one initially

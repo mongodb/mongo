@@ -57,8 +57,12 @@ RemoveShardProgress runCoordinatorRemoveShard(OperationContext* opCtx,
             coordinatorDoc.setShardId(shardId);
             coordinatorDoc.setReplicaSetName(replicaSetName);
             coordinatorDoc.setIsTransitionToDedicated(shardId == ShardId::kConfigServerId);
+            // The Operation FCV is currently propagated only for DDL operations,
+            // which cannot be nested. Therefore, the VersionContext shouldn't have
+            // been initialized yet.
+            invariant(!VersionContext::getDecoration(opCtx).isInitialized());
             coordinatorDoc.setShouldUpdateClusterCardinality(
-                replica_set_endpoint::isFeatureFlagEnabled());
+                replica_set_endpoint::isFeatureFlagEnabled(VersionContext::getDecoration(opCtx)));
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
                 {{NamespaceString::kConfigsvrShardsNamespace,
                   DDLCoordinatorTypeEnum::kRemoveShardCommit}});
@@ -112,8 +116,12 @@ RemoveShardProgress removeShard(OperationContext* opCtx,
             // TODO (SERVER-101452) Remove once addShard takes the FCV lock before the DDL lock.
             DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
             boost::optional<FixedFCVRegion> fixedFCV{boost::in_place_init, opCtx};
+            // The Operation FCV is currently propagated only for DDL operations,
+            // which cannot be nested. Therefore, the VersionContext shouldn't have
+            // been initialized yet.
+            invariant(!VersionContext::getDecoration(opCtx).isInitialized());
             if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
-                    (*fixedFCV)->acquireFCVSnapshot())) {
+                    VersionContext::getDecoration(opCtx), (*fixedFCV)->acquireFCVSnapshot())) {
                 return runCoordinatorRemoveShard(opCtx, fixedFCV, shardId, replicaSetName);
             } else {
                 DDLLockManager::ScopedCollectionDDLLock ddlLock(

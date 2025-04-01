@@ -3503,10 +3503,11 @@ TEST(GetConfigDebugDumpTest, NonConfigDatabase) {
     // Run against a non-config database. It should always return boost::none.
 
     const auto resultNonConfig = catalog::getConfigDebugDump(
-        NamespaceString::createNamespaceString_forTest("nonConfig", "dummy"));
+        kNoVersionContext, NamespaceString::createNamespaceString_forTest("nonConfig", "dummy"));
     ASSERT_FALSE(resultNonConfig);
 
     const auto resultNonConfigDatabases = catalog::getConfigDebugDump(
+        kNoVersionContext,
         NamespaceString::createNamespaceString_forTest("nonConfig", "databases"));
     ASSERT_FALSE(resultNonConfigDatabases);
 };
@@ -3516,12 +3517,12 @@ TEST(GetConfigDebugDumpTest, ConfigDatabase) {
     // false depending on the collection.
 
     const auto resultNotListed = catalog::getConfigDebugDump(
-        NamespaceString::createNamespaceString_forTest("config", "dummy"));
+        kNoVersionContext, NamespaceString::createNamespaceString_forTest("config", "dummy"));
     ASSERT_TRUE(resultNotListed);
     ASSERT_FALSE(*resultNotListed);
 
     const auto resultListed = catalog::getConfigDebugDump(
-        NamespaceString::createNamespaceString_forTest("config", "databases"));
+        kNoVersionContext, NamespaceString::createNamespaceString_forTest("config", "databases"));
     ASSERT_TRUE(resultListed);
     ASSERT_TRUE(*resultListed);
 };
@@ -3534,19 +3535,20 @@ TEST(GetConfigDebugDumpTest, FeatureFlagDisabled) {
                                                           false);
 
     const auto resultNonConfig = catalog::getConfigDebugDump(
-        NamespaceString::createNamespaceString_forTest("nonConfig", "dummy"));
+        kNoVersionContext, NamespaceString::createNamespaceString_forTest("nonConfig", "dummy"));
     ASSERT_FALSE(resultNonConfig);
 
     const auto resultNonConfigDatabases = catalog::getConfigDebugDump(
+        kNoVersionContext,
         NamespaceString::createNamespaceString_forTest("nonConfig", "databases"));
     ASSERT_FALSE(resultNonConfigDatabases);
 
     const auto resultNotListed = catalog::getConfigDebugDump(
-        NamespaceString::createNamespaceString_forTest("config", "dummy"));
+        kNoVersionContext, NamespaceString::createNamespaceString_forTest("config", "dummy"));
     ASSERT_FALSE(resultNotListed);
 
     const auto resultListed = catalog::getConfigDebugDump(
-        NamespaceString::createNamespaceString_forTest("config", "databases"));
+        kNoVersionContext, NamespaceString::createNamespaceString_forTest("config", "databases"));
     ASSERT_FALSE(resultListed);
 };
 
