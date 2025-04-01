@@ -315,14 +315,6 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                                 ClientOperationKillableByStepdown{false});
             return iterate(client.get(), factory);
         })
-        .then([executor, cancelToken](bool moreToCome) {
-            // Wait a little before re-running the aggregation pipeline on the donor's oplog. The
-            // 1-second value was chosen to match the default awaitData timeout that would have been
-            // used if the aggregation cursor was TailableModeEnum::kTailableAndAwaitData.
-            return executor->sleepFor(Seconds{1}, cancelToken).then([moreToCome] {
-                return moreToCome;
-            });
-        })
         .then([this, executor, cancelToken, factory](bool moreToCome) mutable {
             if (!moreToCome) {
                 LOGV2_INFO(6077401,
@@ -338,7 +330,16 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                     Status{ErrorCodes::CallbackCanceled,
                            "Resharding oplog fetcher canceled due to abort or stepdown"});
             }
-            return _reschedule(std::move(executor), cancelToken, factory);
+
+            // Wait a little before re-running the aggregation pipeline on the donor's oplog. The
+            // 1-second value was chosen to match the default awaitData timeout that would have been
+            // used if the aggregation cursor was TailableModeEnum::kTailableAndAwaitData.
+            return executor
+                ->sleepFor(Milliseconds{resharding::gReshardingOplogFetcherSleepMillis.load()},
+                           cancelToken)
+                .then([this, executor, cancelToken, factory] {
+                    return _reschedule(std::move(executor), cancelToken, factory);
+                });
         });
 }
 

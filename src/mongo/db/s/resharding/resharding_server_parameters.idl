@@ -132,6 +132,20 @@ server_parameters:
                 expr: 16 * 1024 * 1024
         redact: false
 
+    reshardingOplogFetcherSleepMillis:
+        description: >-
+            The amount of time that the ReshardingOplogFetcher should wait for before running the
+            next aggregate command after it has exhausted the oplog entries returned by the previous
+            one.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingOplogFetcherSleepMillis
+        default:
+            expr: 1 * 1000
+        validator:
+            gte: 0
+        redact: false
+
     reshardingOplogBatchTaskCount:
         description: >-
             The number of subtasks to divide a single oplog batch into so that it may be applied
