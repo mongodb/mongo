@@ -149,7 +149,9 @@ public:
 
         spill();
 
-        switchToDisk();
+        if (_recordStore) {
+            switchToDisk();
+        }
 
         doSaveState(true);
     }
@@ -185,6 +187,10 @@ private:
 
     // The stage has spilled to disk. Results will be returned from there.
     void switchToDisk() {
+        tassert(10300300,
+                "_recordStore should have been initialised before switching to reading from disk",
+                _recordStore);
+
         // Establish a cursor, positioned at the beginning of the record store.
         _rsCursor = _recordStore->getCursor(_opCtx);
 
