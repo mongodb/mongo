@@ -13,6 +13,7 @@
 #include "builtin/RecordObject.h"
 #include "builtin/TupleObject.h"
 #include "js/Value.h"
+#include "vm/BigIntType.h"
 #include "vm/Compartment.h"
 #include "vm/GlobalObject.h"
 #include "vm/JSObject.h"

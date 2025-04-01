@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "vm/Stack.cpp"
+#include "vm/Shape.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Stack.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Shape.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Stack.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Shape.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/StaticStrings.cpp"
+#include "vm/ShapeZone.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/StaticStrings.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ShapeZone.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/StaticStrings.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ShapeZone.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/StencilCache.cpp"
+#include "vm/SharedArrayObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/StencilCache.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SharedArrayObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/StencilCache.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SharedArrayObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/StencilObject.cpp"
+#include "vm/SharedImmutableStringsCache.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/StencilObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SharedImmutableStringsCache.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/StencilObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SharedImmutableStringsCache.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/StringType.cpp"
+#include "vm/SharedScriptDataTableHolder.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/StringType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SharedScriptDataTableHolder.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/StringType.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SharedScriptDataTableHolder.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/StructuredClone.cpp"
+#include "vm/SourceHook.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/StructuredClone.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SourceHook.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/StructuredClone.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SourceHook.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

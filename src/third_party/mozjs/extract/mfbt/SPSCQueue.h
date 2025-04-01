@@ -255,26 +255,39 @@ class SPSCRingBufferBase {
    * @return The maximum Capacity of this ring buffer.
    */
   int Capacity() const { return StorageCapacity() - 1; }
-  /**
-   * Reset the consumer and producer thread identifier, in case the threads are
-   * being changed. This has to be externally synchronized. This is no-op when
-   * asserts are disabled.
-   */
-  void ResetThreadIds() {
-    ResetProducerThreadId();
-    ResetConsumerThreadId();
-  }
 
+  /**
+   * Reset the consumer thread id to the current thread. The caller must
+   * guarantee that the last call to Dequeue() on the previous consumer thread
+   * has completed, and subsequent calls to Dequeue() will only happen on the
+   * current thread.
+   */
   void ResetConsumerThreadId() {
 #ifdef DEBUG
-    mConsumerId = std::thread::id();
+    mConsumerId = std::this_thread::get_id();
 #endif
+
+    // When changing consumer from thread A to B, the last Dequeue on A (synced
+    // by mReadIndex.store with memory_order_release) must be picked up by B
+    // through an acquire operation.
+    std::ignore = mReadIndex.load(std::memory_order_acquire);
   }
 
+  /**
+   * Reset the producer thread id to the current thread. The caller must
+   * guarantee that the last call to Enqueue() on the previous consumer thread
+   * has completed, and subsequent calls to Dequeue() will only happen on the
+   * current thread.
+   */
   void ResetProducerThreadId() {
 #ifdef DEBUG
-    mProducerId = std::thread::id();
+    mProducerId = std::this_thread::get_id();
 #endif
+
+    // When changing producer from thread A to B, the last Enqueue on A (synced
+    // by mWriteIndex.store with memory_order_release) must be picked up by B
+    // through an acquire operation.
+    std::ignore = mWriteIndex.load(std::memory_order_acquire);
   }
 
  private:
@@ -364,7 +377,7 @@ class SPSCRingBufferBase {
    * called by the right thread.
    *
    * The role of the thread are assigned the first time they call Enqueue or
-   * Dequeue, and cannot change, except when ResetThreadIds is called..
+   * Dequeue, and cannot change, except by a ResetThreadId method.
    *
    * @param id the id of the thread that has called the calling method first.
    */

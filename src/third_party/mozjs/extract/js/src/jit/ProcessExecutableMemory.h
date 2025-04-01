@@ -18,9 +18,9 @@ namespace jit {
 static const size_t MaxCodeBytesPerProcess = 140 * 1024 * 1024;
 #else
 // This is the largest number which satisfies various alignment static
-// asserts that is <= INT32_MAX. The INT32_MAX limit is required for making a
-// single call to RtlInstallFunctionTableCallback(). (This limit could be
-// relaxed in the future by making multiple calls.)
+// asserts that is <= INT32_MAX. If we ever want to increase this, we need to
+// ensure RtlAddGrowableFunctionTable does the right thing because
+// RUNTIME_FUNCTION::EndAddress is a (32-bit) DWORD.
 static const size_t MaxCodeBytesPerProcess = 2044 * 1024 * 1024;
 #endif
 
@@ -63,7 +63,6 @@ static const size_t MaxCodeBytesPerBuffer = MaxCodeBytesPerProcess;
 static const size_t ExecutableCodePageSize = 64 * 1024;
 
 enum class ProtectionSetting {
-  Protected,  // Not readable, writable, or executable.
   Writable,
   Executable,
 };
@@ -102,6 +101,36 @@ extern size_t LikelyAvailableExecutableMemory();
 
 // Returns whether |p| is stored in the executable code buffer.
 extern bool AddressIsInExecutableMemory(const void* p);
+
+// RWX page permissions are not supported on Apple Silicon. We have to use this
+// RAII class to temporarily mark JIT memory as writable for the current thread
+// with pthread_jit_write_protect_np. This class is a no-op on other platforms
+// (except for some debug assertions).
+class MOZ_RAII AutoMarkJitCodeWritableForThread {
+#ifdef DEBUG
+  void checkConstructor();
+  void checkDestructor();
+#else
+  void checkConstructor() {}
+  void checkDestructor() {}
+#endif
+
+#ifdef JS_USE_APPLE_FAST_WX
+  void markExecutable(bool executable);
+#else
+  void markExecutable(bool executable) {}
+#endif
+
+ public:
+  AutoMarkJitCodeWritableForThread() {
+    markExecutable(false);
+    checkConstructor();
+  }
+  ~AutoMarkJitCodeWritableForThread() {
+    markExecutable(true);
+    checkDestructor();
+  }
+};
 
 }  // namespace jit
 }  // namespace js

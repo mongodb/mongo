@@ -78,6 +78,13 @@
 #  define MOZ_HAVE_NO_STACK_PROTECTOR __attribute__((no_stack_protector))
 #endif
 
+/* if defined(__clang__) && __has_attribute (attr) may not be portable */
+#if defined(__clang__)
+#  define MOZ_HAS_CLANG_ATTRIBUTE(attr) __has_attribute(attr)
+#else
+#  define MOZ_HAS_CLANG_ATTRIBUTE(attr) 0
+#endif
+
 /*
  * When built with clang analyzer (a.k.a scan-build), define MOZ_HAVE_NORETURN
  * to mark some false positives
@@ -87,6 +94,40 @@
 #    define MOZ_HAVE_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
 #  endif
 #endif
+
+#if defined(__GNUC__) || MOZ_HAS_CLANG_ATTRIBUTE(no_profile_instrument_function)
+#  define MOZ_NOPROFILE __attribute__((no_profile_instrument_function))
+#else
+#  define MOZ_NOPROFILE
+#endif
+
+#if defined(__GNUC__) || (MOZ_HAS_CLANG_ATTRIBUTE(no_instrument_function))
+#  define MOZ_NOINSTRUMENT __attribute__((no_instrument_function))
+#else
+#  define MOZ_NOINSTRUMENT
+#endif
+
+/*
+ * MOZ_NAKED tells the compiler that the function only contains assembly and
+ * that it should not try to inject code that may mess with the assembly in it.
+ *
+ * See https://github.com/llvm/llvm-project/issues/74573 for the interaction
+ * between naked and no_profile_instrument_function.
+ */
+#define MOZ_NAKED __attribute__((naked)) MOZ_NOPROFILE MOZ_NOINSTRUMENT
+
+/**
+ * Per clang's documentation:
+ *
+ * If a statement is marked nomerge and contains call expressions, those call
+ * expressions inside the statement will not be merged during optimization. This
+ * attribute can be used to prevent the optimizer from obscuring the source
+ * location of certain calls.
+ *
+ * This is useful to have clearer information on assertion failures.
+ */
+// MONGODB MODIFICATION: v4 of the mongo toolchain does not support the nomerge clang attribute
+#  define MOZ_NOMERGE
 
 /*
  * MOZ_NEVER_INLINE is a macro which expands to tell the compiler that the
@@ -407,6 +448,23 @@
 #  define MOZ_NO_STACK_PROTECTOR /* no support */
 #endif
 
+/**
+ * MOZ_LIFETIME_BOUND indicates that objects that are referred to by that
+ * parameter may also be referred to by the return value of the annotated
+ * function (or, for a parameter of a constructor, by the value of the
+ * constructed object).
+ * See: https://clang.llvm.org/docs/AttributeReference.html#lifetimebound
+ */
+#if defined(__clang__) && defined(__has_cpp_attribute)
+#  if __has_cpp_attribute(clang::lifetimebound)
+#    define MOZ_LIFETIME_BOUND [[clang::lifetimebound]]
+#  else
+#    define MOZ_LIFETIME_BOUND /* nothing */
+#  endif
+#else
+#  define MOZ_LIFETIME_BOUND /* nothing */
+#endif
+
 #ifdef __cplusplus
 
 /**
@@ -573,8 +631,8 @@
  *   need not be provided in such cases.
  * MOZ_TEMPORARY_CLASS: Applies to all classes. Any class with this annotation
  *   is expected to only live in a temporary. If another class inherits from
- *   this class, then it is considered to be a non-temporary class as well,
- *   although this attribute need not be provided in such cases.
+ *   this class, then it is considered to be a temporary class as well, although
+ *   this attribute need not be provided in such cases.
  * MOZ_RAII: Applies to all classes. Any class with this annotation is assumed
  *   to be a RAII guard, which is expected to live on the stack in an automatic
  *   allocation. It is prohibited from being allocated in a temporary, static
@@ -706,9 +764,6 @@
  * MOZ_MAY_CALL_AFTER_MUST_RETURN: Applies to function or method declarations.
  *   Calls to these methods may be made in functions after calls a
  *   MOZ_MUST_RETURN_FROM_CALLER_IF_THIS_IS_ARG method.
- * MOZ_LIFETIME_BOUND: Applies to method declarations.
- *   The result of calling these functions on temporaries may not be returned as
- *   a reference or bound to a reference variable.
  * MOZ_UNANNOTATED/MOZ_ANNOTATED: Applies to Mutexes/Monitors and variations on
  *   them. MOZ_UNANNOTATED indicates that the Mutex/Monitor/etc hasn't been
  *   examined and annotated using macros from mfbt/ThreadSafety --
@@ -799,7 +854,6 @@
       __attribute__((annotate("moz_must_return_from_caller_if_this_is_arg")))
 #    define MOZ_MAY_CALL_AFTER_MUST_RETURN \
       __attribute__((annotate("moz_may_call_after_must_return")))
-#    define MOZ_LIFETIME_BOUND __attribute__((annotate("moz_lifetime_bound")))
 #    define MOZ_KNOWN_LIVE __attribute__((annotate("moz_known_live")))
 #    ifndef XGILL_PLUGIN
 #      define MOZ_UNANNOTATED __attribute__((annotate("moz_unannotated")))
@@ -859,7 +913,6 @@
 #    define MOZ_REQUIRED_BASE_METHOD                        /* nothing */
 #    define MOZ_MUST_RETURN_FROM_CALLER_IF_THIS_IS_ARG      /* nothing */
 #    define MOZ_MAY_CALL_AFTER_MUST_RETURN                  /* nothing */
-#    define MOZ_LIFETIME_BOUND                              /* nothing */
 #    define MOZ_KNOWN_LIVE                                  /* nothing */
 #    define MOZ_UNANNOTATED                                 /* nothing */
 #    define MOZ_ANNOTATED                                   /* nothing */
@@ -978,6 +1031,14 @@
 #  define MOZ_EMPTY_BASES __declspec(empty_bases)
 #else
 #  define MOZ_EMPTY_BASES
+#endif
+
+// XXX: GCC somehow does not allow attributes before lambda return types, while
+// clang requires so. See also bug 1627007.
+#ifdef __clang__
+#  define MOZ_CAN_RUN_SCRIPT_BOUNDARY_LAMBDA MOZ_CAN_RUN_SCRIPT_BOUNDARY
+#else
+#  define MOZ_CAN_RUN_SCRIPT_BOUNDARY_LAMBDA
 #endif
 
 #endif /* mozilla_Attributes_h */

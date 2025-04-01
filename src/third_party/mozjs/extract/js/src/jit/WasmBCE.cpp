@@ -45,9 +45,9 @@ bool jit::EliminateBoundsChecks(MIRGenerator* mir, MIRGraph& graph) {
           MWasmBoundsCheck* bc = def->toWasmBoundsCheck();
           MDefinition* addr = bc->index();
 
-          // We only support bounds check elimination on wasm memory, not
-          // tables. See bug 1625891.
-          if (!bc->isMemory()) {
+          // We only support bounds check elimination on wasm memory 0, not
+          // other memories or tables. See bug 1625891.
+          if (!bc->isMemory0()) {
             continue;
           }
 
@@ -60,10 +60,10 @@ bool jit::EliminateBoundsChecks(MIRGenerator* mir, MIRGraph& graph) {
           if (addr->isConstant() &&
               ((addr->toConstant()->type() == MIRType::Int32 &&
                 uint64_t(addr->toConstant()->toInt32()) <
-                    mir->minWasmHeapLength()) ||
+                    mir->minWasmMemory0Length()) ||
                (addr->toConstant()->type() == MIRType::Int64 &&
                 uint64_t(addr->toConstant()->toInt64()) <
-                    mir->minWasmHeapLength()))) {
+                    mir->minWasmMemory0Length()))) {
             bc->setRedundant();
             if (JitOptions.spectreIndexMasking) {
               bc->replaceAllUsesWith(addr);

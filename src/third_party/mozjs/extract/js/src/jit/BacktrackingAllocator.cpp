@@ -1888,7 +1888,13 @@ bool BacktrackingAllocator::tryMergeBundles(LiveBundle* bundle0,
   // arguments through a lazy arguments object or rest parameter.
   if (IsArgumentSlotDefinition(reg0.def()) ||
       IsArgumentSlotDefinition(reg1.def())) {
-    if (graph.mir().entryBlock()->info().mayReadFrameArgsDirectly()) {
+#ifdef JS_PUNBOX64
+    bool canSpillToArgSlots =
+        !graph.mir().entryBlock()->info().mayReadFrameArgsDirectly();
+#else
+    bool canSpillToArgSlots = false;
+#endif
+    if (!canSpillToArgSlots) {
       if (*reg0.def()->output() != *reg1.def()->output()) {
         return true;
       }
@@ -3193,7 +3199,8 @@ bool BacktrackingAllocator::tryAllocateRegister(PhysicalRegister& r,
     // All ranges in the bundle must be compatible with the physical register.
     MOZ_ASSERT(range->vreg().isCompatible(r.reg));
 
-    for (size_t a = 0; a < r.reg.numAliased(); a++) {
+    const size_t numAliased = r.reg.numAliased();
+    for (size_t a = 0; a < numAliased; a++) {
       PhysicalRegister& rAlias = registers[r.reg.aliased(a).code()];
       LiveRangePlus existingPlus;
       if (!rAlias.allocations.contains(rangePlus, &existingPlus)) {
@@ -3218,6 +3225,7 @@ bool BacktrackingAllocator::tryAllocateRegister(PhysicalRegister& r,
         *pfixed = true;
         return true;
       }
+      MOZ_ASSERT(r.reg.numAliased() == numAliased);
     }
   }
 
@@ -4130,7 +4138,8 @@ static inline bool IsSlotsOrElements(VirtualRegister& reg) {
 
 // Helper for ::populateSafepoints
 static inline bool IsTraceable(VirtualRegister& reg) {
-  if (reg.type() == LDefinition::OBJECT) {
+  if (reg.type() == LDefinition::OBJECT ||
+      reg.type() == LDefinition::WASM_ANYREF) {
     return true;
   }
 #ifdef JS_PUNBOX64
@@ -4142,7 +4151,7 @@ static inline bool IsTraceable(VirtualRegister& reg) {
     MOZ_ASSERT(reg.def());
     const LStackArea* alloc = reg.def()->output()->toStackArea();
     for (auto iter = alloc->results(); iter; iter.next()) {
-      if (iter.isGcPointer()) {
+      if (iter.isWasmAnyRef()) {
         return true;
       }
     }
@@ -4215,11 +4224,16 @@ bool BacktrackingAllocator::populateSafepoints() {
               return false;
             }
             break;
+          case LDefinition::WASM_ANYREF:
+            if (!safepoint->addWasmAnyRef(a)) {
+              return false;
+            }
+            break;
           case LDefinition::STACKRESULTS: {
             MOZ_ASSERT(a.isStackArea());
             for (auto iter = a.toStackArea()->results(); iter; iter.next()) {
-              if (iter.isGcPointer()) {
-                if (!safepoint->addGcPointer(iter.alloc())) {
+              if (iter.isWasmAnyRef()) {
+                if (!safepoint->addWasmAnyRef(iter.alloc())) {
                   return false;
                 }
               }

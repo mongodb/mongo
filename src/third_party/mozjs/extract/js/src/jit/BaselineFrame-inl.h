@@ -10,6 +10,7 @@
 #include "jit/BaselineFrame.h"
 
 #include "jit/TrialInlining.h"
+#include "jit/VMFunctions.h"
 #include "vm/JSContext.h"
 #include "vm/Realm.h"
 
@@ -76,7 +77,9 @@ inline bool BaselineFrame::pushClassBodyEnvironment(
   return true;
 }
 
-inline bool BaselineFrame::freshenLexicalEnvironment(JSContext* cx) {
+template <bool IsDebuggee>
+inline bool BaselineFrame::freshenLexicalEnvironment(JSContext* cx,
+                                                     const jsbytecode* pc) {
   Rooted<BlockLexicalEnvironmentObject*> current(
       cx, &envChain_->as<BlockLexicalEnvironmentObject>());
   BlockLexicalEnvironmentObject* clone =
@@ -85,17 +88,33 @@ inline bool BaselineFrame::freshenLexicalEnvironment(JSContext* cx) {
     return false;
   }
 
+  if constexpr (IsDebuggee) {
+    MOZ_ASSERT(pc);
+    Rooted<BlockLexicalEnvironmentObject*> cloneRoot(cx, clone);
+    MOZ_ALWAYS_TRUE(DebugLeaveLexicalEnv(cx, this, pc));
+    clone = cloneRoot;
+  }
+
   replaceInnermostEnvironment(*clone);
   return true;
 }
 
-inline bool BaselineFrame::recreateLexicalEnvironment(JSContext* cx) {
+template <bool IsDebuggee>
+inline bool BaselineFrame::recreateLexicalEnvironment(JSContext* cx,
+                                                      const jsbytecode* pc) {
   Rooted<BlockLexicalEnvironmentObject*> current(
       cx, &envChain_->as<BlockLexicalEnvironmentObject>());
   BlockLexicalEnvironmentObject* clone =
       BlockLexicalEnvironmentObject::recreate(cx, current);
   if (!clone) {
     return false;
+  }
+
+  if constexpr (IsDebuggee) {
+    MOZ_ASSERT(pc);
+    Rooted<BlockLexicalEnvironmentObject*> cloneRoot(cx, clone);
+    MOZ_ALWAYS_TRUE(DebugLeaveLexicalEnv(cx, this, pc));
+    clone = cloneRoot;
   }
 
   replaceInnermostEnvironment(*clone);

@@ -40,17 +40,6 @@ class AbstractGeneratorObject : public NativeObject {
     RESERVED_SLOTS
   };
 
-  // Maximum number of fixed stack slots in a generator or async function
-  // script. If a script would have more, we instead store some variables in
-  // heap EnvironmentObjects.
-  //
-  // This limit is a performance heuristic. Stack slots reduce allocations,
-  // and `Local` opcodes are a bit faster than `AliasedVar` ones; but at each
-  // `yield` or `await` the stack slots must be memcpy'd into a
-  // GeneratorObject. At some point the memcpy is too much. The limit is
-  // plenty for typical human-authored code.
-  static constexpr uint32_t FixedSlotLimit = 256;
-
  private:
   static JSObject* createModuleGenerator(JSContext* cx, AbstractFramePtr frame);
 
@@ -68,7 +57,7 @@ class AbstractGeneratorObject : public NativeObject {
   static bool suspend(JSContext* cx, HandleObject obj, AbstractFramePtr frame,
                       const jsbytecode* pc, unsigned nvalues);
 
-  static void finalSuspend(HandleObject obj);
+  static void finalSuspend(JSContext* cx, HandleObject obj);
 
   JSFunction& callee() const {
     return getFixedSlot(CALLEE_SLOT).toObject().as<JSFunction>();
@@ -160,13 +149,7 @@ class AbstractGeneratorObject : public NativeObject {
     return getFixedSlot(RESUME_INDEX_SLOT).toInt32();
   }
   bool isClosed() const { return getFixedSlot(CALLEE_SLOT).isNull(); }
-  void setClosed() {
-    setFixedSlot(CALLEE_SLOT, NullValue());
-    setFixedSlot(ENV_CHAIN_SLOT, NullValue());
-    setFixedSlot(ARGS_OBJ_SLOT, NullValue());
-    setFixedSlot(STACK_STORAGE_SLOT, NullValue());
-    setFixedSlot(RESUME_INDEX_SLOT, NullValue());
-  }
+  void setClosed(JSContext* cx);
 
   bool isAfterYield();
   bool isAfterAwait();

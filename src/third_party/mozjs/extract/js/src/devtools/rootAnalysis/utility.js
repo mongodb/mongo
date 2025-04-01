@@ -330,7 +330,7 @@ function cLibrary()
         throw new Error("Unable to open libc");
     }
 
-    if (getBuildConfiguration()["moz-memory"]) {
+    if (getBuildConfiguration("moz-memory")) {
         throw new Error("cannot use libc functions with --enable-jemalloc, since they will be routed " +
                         "through jemalloc, but calling libc.free() directly will bypass it and the " +
                         "malloc/free will be mismatched");

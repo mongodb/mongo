@@ -196,7 +196,7 @@ class InstructionDataMap {
   FixedList<LNode*> insData_;
 
  public:
-  InstructionDataMap() : insData_() {}
+  InstructionDataMap() {}
 
   [[nodiscard]] bool init(MIRGenerator* gen, uint32_t numInstructions) {
     if (!insData_.init(gen->alloc(), numInstructions)) {

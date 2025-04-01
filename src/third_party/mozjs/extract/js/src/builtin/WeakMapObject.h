@@ -17,8 +17,8 @@ class WeakCollectionObject : public NativeObject {
  public:
   enum { DataSlot, SlotCount };
 
-  ObjectValueWeakMap* getMap() {
-    return maybePtrFromReservedSlot<ObjectValueWeakMap>(DataSlot);
+  ValueValueWeakMap* getMap() {
+    return maybePtrFromReservedSlot<ValueValueWeakMap>(DataSlot);
   }
 
   size_t sizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf);

@@ -41,7 +41,7 @@ static_assert(HandlerFunctionSlot_Extra < FunctionExtended::NUM_EXTENDED_SLOTS,
                                             JS::Handle<JSObject*> target) {
   cx->check(target);
 
-  JS::Handle<PropertyName*> funName = cx->names().empty;
+  JS::Handle<PropertyName*> funName = cx->names().empty_;
   JS::Rooted<JSFunction*> handlerFun(
       cx, NewNativeFunction(cx, handler, 0, funName,
                             gc::AllocKind::FUNCTION_EXTENDED, GenericObject));

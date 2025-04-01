@@ -77,7 +77,6 @@ struct ThemeColors {
 
 enum class PreXULSkeletonUIError : uint32_t {
   None,
-  Ineligible,
   Disabled,
   EnabledKeyDoesNotExist,
   OOM,
@@ -107,8 +106,6 @@ inline const wchar_t* GetPreXULSkeletonUIErrorString(
   switch (error) {
     case PreXULSkeletonUIError::None:
       return L"None";
-    case PreXULSkeletonUIError::Ineligible:
-      return L"Ineligible";
     case PreXULSkeletonUIError::Disabled:
       return L"Disabled";
     case PreXULSkeletonUIError::OOM:

@@ -227,10 +227,10 @@ void js::gc::GetTraceThingInfo(char* buf, size_t bufsize, void* thing,
         JSObject* obj = (JSObject*)thing;
         if (obj->is<JSFunction>()) {
           JSFunction* fun = &obj->as<JSFunction>();
-          if (fun->displayAtom()) {
+          if (fun->maybePartialDisplayAtom()) {
             *buf++ = ' ';
             bufsize--;
-            PutEscapedString(buf, bufsize, fun->displayAtom(), 0);
+            PutEscapedString(buf, bufsize, fun->maybePartialDisplayAtom(), 0);
           }
         } else {
           snprintf(buf, bufsize, " <unknown object>");

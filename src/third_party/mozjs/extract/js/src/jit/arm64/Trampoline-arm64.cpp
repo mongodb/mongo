@@ -226,14 +226,14 @@ void JitRuntime::generateEnterJIT(JSContext* cx, MacroAssembler& masm) {
     masm.push(reg_code);
 
     // Initialize the frame, including filling in the slots.
-    using Fn = bool (*)(BaselineFrame * frame, InterpreterFrame * interpFrame,
+    using Fn = bool (*)(BaselineFrame* frame, InterpreterFrame* interpFrame,
                         uint32_t numStackValues);
     masm.setupUnalignedABICall(r19);
     masm.passABIArg(framePtrScratch);  // BaselineFrame.
     masm.passABIArg(reg_osrFrame);     // InterpreterFrame.
     masm.passABIArg(reg_osrNStack);
     masm.callWithABI<Fn, jit::InitBaselineFrameForOsr>(
-        MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
+        ABIType::General, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
     masm.pop(scratch);
     MOZ_ASSERT(scratch != ReturnReg);
@@ -389,14 +389,13 @@ void JitRuntime::generateInvalidator(MacroAssembler& masm, Label* bailoutTail) {
   masm.Sub(x1, masm.GetStackPointer64(), Operand(sizeof(void*)));
   masm.moveToStackPtr(r1);
 
-  using Fn =
-      bool (*)(InvalidationBailoutStack * sp, BaselineBailoutInfo * *info);
+  using Fn = bool (*)(InvalidationBailoutStack* sp, BaselineBailoutInfo** info);
   masm.setupUnalignedABICall(r10);
   masm.passABIArg(r0);
   masm.passABIArg(r1);
 
   masm.callWithABI<Fn, InvalidationBailout>(
-      MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckOther);
+      ABIType::General, CheckUnsafeCallWithABI::DontCheckOther);
 
   masm.pop(r2);  // Get the bailoutInfo outparam.
 
@@ -551,11 +550,11 @@ static void GenerateBailoutThunk(MacroAssembler& masm, Label* bailoutTail) {
   masm.reserveStack(sizeof(void*));
   masm.moveStackPtrTo(r1);
 
-  using Fn = bool (*)(BailoutStack * sp, BaselineBailoutInfo * *info);
+  using Fn = bool (*)(BailoutStack* sp, BaselineBailoutInfo** info);
   masm.setupUnalignedABICall(r2);
   masm.passABIArg(r0);
   masm.passABIArg(r1);
-  masm.callWithABI<Fn, Bailout>(MoveOp::GENERAL,
+  masm.callWithABI<Fn, Bailout>(ABIType::General,
                                 CheckUnsafeCallWithABI::DontCheckOther);
 
   // Get the bailoutInfo outparam.
@@ -578,8 +577,8 @@ void JitRuntime::generateBailoutHandler(MacroAssembler& masm,
 }
 
 bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
-                                   const VMFunctionData& f, DynFn nativeFun,
-                                   uint32_t* wrapperOffset) {
+                                   VMFunctionId id, const VMFunctionData& f,
+                                   DynFn nativeFun, uint32_t* wrapperOffset) {
   AutoCreatedBy acb(masm, "JitRuntime::generateVMWrapper");
 
   *wrapperOffset = startTrampolineCode(masm);
@@ -592,97 +591,123 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
       (Register::Codes::VolatileMask & ~Register::Codes::WrapperMask) == 0,
       "Wrapper register set must be a superset of the Volatile register set.");
 
-  // Unlike on other platforms, it is the responsibility of the VM *callee* to
+  // The first argument is the JSContext.
+  Register reg_cx = IntArgReg0;
+  regs.take(reg_cx);
+  Register temp = regs.getAny();
+
+  // On entry, the stack is:
+  //   ... frame ...
+  //  [args]
+  //  descriptor
+  //
+  // Before we pass arguments (potentially pushing some of them on the stack),
+  // we want:
+  //  ... frame ...
+  //  [args]
+  //  descriptor           \
+  //  return address       | <- exit frame
+  //  saved frame pointer  /
+  //  VM id                  <- exit frame footer
+  //  [space for out-param, if necessary]]
+  //  [alignment padding, if necessary]
+  //
+  // To minimize PSP overhead, we compute the final stack size and update the
+  // stack pointer all in one go. Then we use the PSP to "push" the required
+  // values into the pre-allocated stack space.
+  size_t stackAdjustment = 0;
+
+  // The descriptor was already pushed.
+  stackAdjustment += ExitFrameLayout::SizeWithFooter() - sizeof(uintptr_t);
+  stackAdjustment += f.sizeOfOutParamStackSlot();
+
+  masm.SetStackPointer64(sp);
+
+  // First, update the actual stack pointer to its final aligned value.
+  masm.Sub(ARMRegister(temp, 64), masm.GetStackPointer64(),
+           Operand(stackAdjustment));
+  masm.And(sp, ARMRegister(temp, 64), ~(uint64_t(JitStackAlignment) - 1));
+
+  // On link-register platforms, it is the responsibility of the VM *callee* to
   // push the return address, while the caller must ensure that the address
   // is stored in lr on entry. This allows the VM wrapper to work with both
   // direct calls and tail calls.
-  masm.push(lr);
+  masm.str(ARMRegister(lr, 64),
+           MemOperand(PseudoStackPointer64, -8, vixl::PreIndex));
 
-  // First argument is the JSContext.
-  Register reg_cx = IntArgReg0;
-  regs.take(reg_cx);
+  // Push the frame pointer using the PSP.
+  masm.str(ARMRegister(FramePointer, 64),
+           MemOperand(PseudoStackPointer64, -8, vixl::PreIndex));
 
-  // Stack is:
-  //    ... frame ...
-  //  +12 [args]
-  //  +8  descriptor
-  //  +0  returnAddress (pushed by this function, caller sets as lr)
-  //
-  // Push the frame pointer to finish the exit frame, then link it up.
-  masm.Push(FramePointer);
-  masm.moveStackPtrTo(FramePointer);
+  // Because we've been moving the PSP as we fill in the frame, we can set the
+  // frame pointer for this frame directly from the PSP.
+  masm.movePtr(PseudoStackPointer, FramePointer);
+
   masm.loadJSContext(reg_cx);
-  masm.enterExitFrame(reg_cx, regs.getAny(), &f);
 
-  // Save the current stack pointer as the base for copying arguments.
-  Register argsBase = InvalidReg;
-  if (f.explicitArgs) {
-    // argsBase can't be an argument register. Bad things would happen if
-    // the MoveResolver didn't throw an assertion failure first.
-    argsBase = r8;
-    regs.take(argsBase);
-    masm.Add(ARMRegister(argsBase, 64), masm.GetStackPointer64(),
-             Operand(ExitFrameLayout::SizeWithFooter()));
+  // Finish the exit frame. See MacroAssembler::enterExitFrame.
+
+  // linkExitFrame
+  masm.loadPtr(Address(reg_cx, JSContext::offsetOfActivation()), temp);
+  masm.storePtr(FramePointer,
+                Address(temp, JitActivation::offsetOfPackedExitFP()));
+
+  // Push `ExitFrameType::VMFunction + VMFunctionId`
+  uint32_t type = uint32_t(ExitFrameType::VMFunction) + uint32_t(id);
+  masm.move32(Imm32(type), temp);
+  masm.str(ARMRegister(temp, 64),
+           MemOperand(PseudoStackPointer64, -8, vixl::PreIndex));
+
+  // If the out parameter is a handle, initialize it to empty.
+  // See MacroAssembler::reserveVMFunctionOutParamSpace and PushEmptyRooted.
+  if (f.outParam == Type_Handle) {
+    switch (f.outParamRootType) {
+      case VMFunctionData::RootNone:
+        MOZ_CRASH("Handle must have root type");
+      case VMFunctionData::RootObject:
+      case VMFunctionData::RootString:
+      case VMFunctionData::RootCell:
+      case VMFunctionData::RootBigInt:
+        masm.str(xzr, MemOperand(PseudoStackPointer64, -8, vixl::PreIndex));
+        break;
+      case VMFunctionData::RootValue:
+        masm.movePtr(ImmWord(UndefinedValue().asRawBits()), temp);
+        masm.str(ARMRegister(temp, 64),
+                 MemOperand(PseudoStackPointer64, -8, vixl::PreIndex));
+        break;
+      case VMFunctionData::RootId:
+        masm.movePtr(ImmWord(JS::PropertyKey::Void().asRawBits()), temp);
+        masm.str(ARMRegister(temp, 64),
+                 MemOperand(PseudoStackPointer64, -8, vixl::PreIndex));
+    }
   }
 
-  // Reserve space for any outparameter.
-  Register outReg = InvalidReg;
-  switch (f.outParam) {
-    case Type_Value:
-      outReg = regs.takeAny();
-      masm.reserveStack(sizeof(Value));
-      masm.moveStackPtrTo(outReg);
-      break;
+  // Now that we've filled in the stack frame, synchronize the PSP with the
+  // real stack pointer and return to PSP-mode while we pass arguments.
+  masm.moveStackPtrTo(PseudoStackPointer);
+  masm.SetStackPointer64(PseudoStackPointer64);
 
-    case Type_Handle:
-      outReg = regs.takeAny();
-      masm.PushEmptyRooted(f.outParamRootType);
-      masm.moveStackPtrTo(outReg);
-      break;
-
-    case Type_Int32:
-    case Type_Bool:
-      outReg = regs.takeAny();
-      masm.reserveStack(sizeof(int64_t));
-      masm.moveStackPtrTo(outReg);
-      break;
-
-    case Type_Double:
-      outReg = regs.takeAny();
-      masm.reserveStack(sizeof(double));
-      masm.moveStackPtrTo(outReg);
-      break;
-
-    case Type_Pointer:
-      outReg = regs.takeAny();
-      masm.reserveStack(sizeof(uintptr_t));
-      masm.moveStackPtrTo(outReg);
-      break;
-
-    default:
-      MOZ_ASSERT(f.outParam == Type_Void);
-      break;
-  }
-
-  masm.setupUnalignedABICall(regs.getAny());
+  MOZ_ASSERT(masm.framePushed() == 0);
+  masm.setupAlignedABICall();
   masm.passABIArg(reg_cx);
 
-  size_t argDisp = 0;
+  size_t argDisp = ExitFrameLayout::Size();
 
   // Copy arguments.
   for (uint32_t explicitArg = 0; explicitArg < f.explicitArgs; explicitArg++) {
     switch (f.argProperties(explicitArg)) {
       case VMFunctionData::WordByValue:
-        masm.passABIArg(MoveOperand(argsBase, argDisp),
-                        (f.argPassedInFloatReg(explicitArg) ? MoveOp::DOUBLE
-                                                            : MoveOp::GENERAL));
+        masm.passABIArg(
+            MoveOperand(FramePointer, argDisp),
+            (f.argPassedInFloatReg(explicitArg) ? ABIType::Float64
+                                                : ABIType::General));
         argDisp += sizeof(void*);
         break;
 
       case VMFunctionData::WordByRef:
-        masm.passABIArg(
-            MoveOperand(argsBase, argDisp, MoveOperand::Kind::EffectiveAddress),
-            MoveOp::GENERAL);
+        masm.passABIArg(MoveOperand(FramePointer, argDisp,
+                                    MoveOperand::Kind::EffectiveAddress),
+                        ABIType::General);
         argDisp += sizeof(void*);
         break;
 
@@ -696,15 +721,16 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
   // It is not a C++-abi outparam, which would get passed in the
   // outparam register, but a real parameter to the function, which
   // was stack-allocated above.
-  if (outReg != InvalidReg) {
-    masm.passABIArg(outReg);
+  const int32_t outParamOffset =
+      -int32_t(ExitFooterFrame::Size()) - f.sizeOfOutParamStackSlot();
+  if (f.outParam != Type_Void) {
+    masm.passABIArg(MoveOperand(FramePointer, outParamOffset,
+                                MoveOperand::Kind::EffectiveAddress),
+                    ABIType::General);
   }
 
-  masm.callWithABI(nativeFun, MoveOp::GENERAL,
+  masm.callWithABI(nativeFun, ABIType::General,
                    CheckUnsafeCallWithABI::DontCheckHasExitFrame);
-
-  // SP is used to transfer stack across call boundaries.
-  masm.initPseudoStackPtr();
 
   // Test for failure.
   switch (f.failType()) {
@@ -720,46 +746,8 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
       MOZ_CRASH("unknown failure kind");
   }
 
-  // Load the outparam and free any allocated stack.
-  switch (f.outParam) {
-    case Type_Value:
-      masm.Ldr(ARMRegister(JSReturnReg, 64),
-               MemOperand(masm.GetStackPointer64()));
-      masm.freeStack(sizeof(Value));
-      break;
-
-    case Type_Handle:
-      masm.popRooted(f.outParamRootType, ReturnReg, JSReturnOperand);
-      break;
-
-    case Type_Int32:
-      masm.Ldr(ARMRegister(ReturnReg, 32),
-               MemOperand(masm.GetStackPointer64()));
-      masm.freeStack(sizeof(int64_t));
-      break;
-
-    case Type_Bool:
-      masm.Ldrb(ARMRegister(ReturnReg, 32),
-                MemOperand(masm.GetStackPointer64()));
-      masm.freeStack(sizeof(int64_t));
-      break;
-
-    case Type_Double:
-      masm.Ldr(ARMFPRegister(ReturnDoubleReg, 64),
-               MemOperand(masm.GetStackPointer64()));
-      masm.freeStack(sizeof(double));
-      break;
-
-    case Type_Pointer:
-      masm.Ldr(ARMRegister(ReturnReg, 64),
-               MemOperand(masm.GetStackPointer64()));
-      masm.freeStack(sizeof(uintptr_t));
-      break;
-
-    default:
-      MOZ_ASSERT(f.outParam == Type_Void);
-      break;
-  }
+  // Load the outparam.
+  masm.loadVMFunctionOutParam(f, Address(FramePointer, outParamOffset));
 
   // Until C++ code is instrumented against Spectre, prevent speculative
   // execution from returning any private data.
@@ -767,8 +755,10 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
     masm.speculationBarrier();
   }
 
-  // Pop ExitFooterFrame and the frame pointer.
-  masm.leaveExitFrame(0);
+  // Pop frame and restore frame pointer. We call Mov here directly instead
+  // of `moveToStackPtr` to avoid a syncStackPtr. The stack pointer will be
+  // synchronized as part of retn, after adjusting the PSP.
+  masm.Mov(masm.GetStackPointer64(), ARMRegister(FramePointer, 64));
   masm.pop(FramePointer);
 
   // Return. Subtract sizeof(void*) for the frame pointer.

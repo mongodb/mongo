@@ -8,7 +8,7 @@ EXPORTS += [
     'fdlibm.h',
 ]
 
-FINAL_LIBRARY = 'js'
+Library('fdlibm')
 
 if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     CXXFLAGS += [
@@ -44,8 +44,10 @@ SOURCES += [
     'e_exp.cpp',
     'e_expf.cpp',
     'e_hypot.cpp',
+    'e_hypotf.cpp',
     'e_log.cpp',
     'e_log10.cpp',
+    'e_log10f.cpp',
     'e_log2.cpp',
     'e_logf.cpp',
     'e_pow.cpp',

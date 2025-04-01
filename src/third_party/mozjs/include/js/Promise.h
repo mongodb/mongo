@@ -80,6 +80,12 @@ class JS_PUBLIC_API JobQueue {
    */
   virtual bool empty() const = 0;
 
+  /**
+   * Returns true if the job queue stops draining, which results in `empty()`
+   * being false after `runJobs()`.
+   */
+  virtual bool isDrainingStopped() const = 0;
+
  protected:
   friend class AutoDebuggerJobQueueInterruption;
 

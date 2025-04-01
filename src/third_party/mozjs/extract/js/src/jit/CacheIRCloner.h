@@ -60,12 +60,14 @@ class MOZ_RAII CacheIRCloner {
   int64_t readStubInt64(uint32_t offset);
 
   Shape* getShapeField(uint32_t stubOffset);
-  GetterSetter* getGetterSetterField(uint32_t stubOffset);
+  Shape* getWeakShapeField(uint32_t stubOffset);
+  GetterSetter* getWeakGetterSetterField(uint32_t stubOffset);
   JSObject* getObjectField(uint32_t stubOffset);
+  JSObject* getWeakObjectField(uint32_t stubOffset);
   JSString* getStringField(uint32_t stubOffset);
   JSAtom* getAtomField(uint32_t stubOffset);
   JS::Symbol* getSymbolField(uint32_t stubOffset);
-  BaseScript* getBaseScriptField(uint32_t stubOffset);
+  BaseScript* getWeakBaseScriptField(uint32_t stubOffset);
   JitCode* getJitCodeField(uint32_t stubOffset);
   uint32_t getRawInt32Field(uint32_t stubOffset);
   const void* getRawPointerField(uint32_t stubOffset);

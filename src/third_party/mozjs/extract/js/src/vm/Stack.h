@@ -97,11 +97,11 @@ class AbstractFramePtr {
   uintptr_t ptr_;
 
   enum {
-    Tag_InterpreterFrame = 0x1,
-    Tag_BaselineFrame = 0x2,
-    Tag_RematerializedFrame = 0x3,
-    Tag_WasmDebugFrame = 0x4,
-    TagMask = 0x7
+    Tag_InterpreterFrame = 0x0,
+    Tag_BaselineFrame = 0x1,
+    Tag_RematerializedFrame = 0x2,
+    Tag_WasmDebugFrame = 0x3,
+    TagMask = 0x3
   };
 
  public:
@@ -253,7 +253,7 @@ class AbstractFramePtr {
 
 class NullFramePtr : public AbstractFramePtr {
  public:
-  NullFramePtr() : AbstractFramePtr() {}
+  NullFramePtr() = default;
 };
 
 enum MaybeConstruct { NO_CONSTRUCT = false, CONSTRUCT = true };
@@ -538,8 +538,8 @@ class InterpreterFrame {
    */
 
   bool pushLexicalEnvironment(JSContext* cx, Handle<LexicalScope*> scope);
-  bool freshenLexicalEnvironment(JSContext* cx);
-  bool recreateLexicalEnvironment(JSContext* cx);
+  bool freshenLexicalEnvironment(JSContext* cx, jsbytecode* pc);
+  bool recreateLexicalEnvironment(JSContext* cx, jsbytecode* pc);
 
   bool pushClassBodyEnvironment(JSContext* cx, Handle<ClassBodyScope*> scope);
 
@@ -976,6 +976,24 @@ inline bool FillArgumentsFromArraylike(JSContext* cx, Args& args,
 
   return true;
 }
+
+#ifdef ENABLE_PORTABLE_BASELINE_INTERP
+struct PortableBaselineStack {
+  static const size_t DEFAULT_SIZE = 512 * 1024;
+
+  void* base;
+  void* top;
+
+  bool valid() { return base != nullptr; }
+
+  PortableBaselineStack() {
+    base = js_calloc(DEFAULT_SIZE);
+    top = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(base) +
+                                  DEFAULT_SIZE);
+  }
+  ~PortableBaselineStack() { js_free(base); }
+};
+#endif  // ENABLE_PORTABLE_BASELINE_INTERP
 
 }  // namespace js
 

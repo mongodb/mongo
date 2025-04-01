@@ -1,0 +1,50 @@
+schema: 1
+
+bugzilla:
+  product: Core
+  component: "JavaScript Engine"
+
+origin:
+  name: zydis
+  description: x64/x86 disassembler
+
+  url: https://github.com/zyantific/zydis
+
+  release: 569320ad3c4856da13b9dbf1f0d9e20bda63870e (2024-02-04T21:11:43Z).
+  revision: 569320ad3c4856da13b9dbf1f0d9e20bda63870e
+
+  license: MIT
+
+vendoring:
+  url: https://github.com/zyantific/zydis
+  source-hosting: github
+  tracking: commit
+
+  exclude:
+    - "*"
+    - assets
+    - cmake
+    - tests
+    - tools
+    - examples
+    - dependecies
+    - resources
+    - man
+    - msvc
+
+  keep:
+    - LICENSE
+
+  update-actions:
+    - action: move-dir
+      from: '{vendor_dir}/src'
+      to: '{vendor_dir}'
+    - action: move-dir
+      from: '{vendor_dir}/include/Zydis'
+      to: '{vendor_dir}'
+    - action: move-file
+      from: '{vendor_dir}/String.c'
+      to: '{vendor_dir}/ZydisString.c'
+    - action: run-script
+      script: "{vendor_dir}/../patch-include-headers.sh"
+      cwd: "{vendor_dir}"

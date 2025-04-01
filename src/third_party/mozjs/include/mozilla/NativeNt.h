@@ -93,6 +93,11 @@ VOID NTAPI RtlAcquireSRWLockShared(PSRWLOCK aLock);
 VOID NTAPI RtlReleaseSRWLockExclusive(PSRWLOCK aLock);
 VOID NTAPI RtlReleaseSRWLockShared(PSRWLOCK aLock);
 
+NTSTATUS NTAPI RtlSleepConditionVariableSRW(
+    PCONDITION_VARIABLE aConditionVariable, PSRWLOCK aSRWLock,
+    PLARGE_INTEGER aTimeOut, ULONG aFlags);
+VOID NTAPI RtlWakeAllConditionVariable(PCONDITION_VARIABLE aConditionVariable);
+
 ULONG NTAPI RtlNtStatusToDosError(NTSTATUS aStatus);
 VOID NTAPI RtlSetLastWin32Error(DWORD aError);
 DWORD NTAPI RtlGetLastWin32Error();
@@ -1242,59 +1247,6 @@ class MOZ_RAII PEExportSection {
     return rvaToFunction;
   }
 
-  BOOL ReplaceExportNameTableEntry(const char* aFunctionNameASCII,
-                                   const char* aReplFunctionNameASCII) const {
-    if (!*this || !aFunctionNameASCII || !aReplFunctionNameASCII) {
-      return FALSE;
-    }
-
-    struct NameTableComparator {
-      NameTableComparator(const PEExportSection<MMPolicy>& aExportSection,
-                          const char* aTarget)
-          : mExportSection(aExportSection),
-            mTargetName(aTarget),
-            mTargetNamelength(StrlenASCII(aTarget)) {}
-
-      int operator()(DWORD aRVAToString) const {
-        mozilla::interceptor::TargetObjectArray<MMPolicy, char> itemString(
-            mExportSection.mMMPolicy, mExportSection.mImageBase + aRVAToString,
-            mTargetNamelength + 1);
-        return StrcmpASCII(mTargetName, itemString[0]);
-      }
-
-      const PEExportSection<MMPolicy>& mExportSection;
-      const char* mTargetName;
-      size_t mTargetNamelength;
-    };
-
-    const NameTableComparator comp(*this, aFunctionNameASCII);
-
-    size_t match;
-    if (!mExportNameTable.BinarySearchIf(comp, &match)) {
-      return FALSE;
-    }
-
-    const DWORD* rvaToString = mExportNameTable[match];
-    if (!rvaToString) {
-      return FALSE;
-    }
-
-    auto replNameLen = StrlenASCII(aReplFunctionNameASCII);
-    char* namePtr = reinterpret_cast<char*>(mImageBase + *rvaToString);
-    if (StrlenASCII(namePtr) < replNameLen) {
-      return FALSE;
-    }
-
-    auto replNameLenIncNull = replNameLen + 1;
-    AutoVirtualProtect prot(namePtr, replNameLenIncNull, PAGE_READWRITE);
-    if (!prot) {
-      return FALSE;
-    }
-
-    memcpy(namePtr, aReplFunctionNameASCII, replNameLenIncNull);
-    return TRUE;
-  }
-
   /**
    * This functions behaves the same as the native ::GetProcAddress except
    * the following cases:
@@ -1335,6 +1287,14 @@ inline DWORD RtlGetCurrentThreadId() {
   CLIENT_ID* cid = reinterpret_cast<CLIENT_ID*>(&teb->Reserved1[8]);
   return static_cast<DWORD>(reinterpret_cast<uintptr_t>(cid->UniqueThread) &
                             0xFFFFFFFFUL);
+}
+
+inline PVOID RtlGetThreadStackBase() {
+  return reinterpret_cast<_NT_TIB*>(::NtCurrentTeb())->StackBase;
+}
+
+inline PVOID RtlGetThreadStackLimit() {
+  return reinterpret_cast<_NT_TIB*>(::NtCurrentTeb())->StackLimit;
 }
 
 const HANDLE kCurrentProcess = reinterpret_cast<HANDLE>(-1);
@@ -1775,6 +1735,22 @@ class AutoMappedView final {
     return p;
   }
 };
+
+#if defined(_M_X64)
+// CheckStack ensures that stack memory pages are committed up to a given size
+// in bytes from the current stack pointer. It updates the thread stack limit,
+// which points to the lowest committed stack address.
+MOZ_NEVER_INLINE MOZ_NAKED inline void CheckStack(uint32_t size) {
+  asm volatile(
+      "mov %ecx, %eax;"
+#  if defined(__MINGW32__)
+      "jmp ___chkstk_ms;"
+#  else
+      "jmp __chkstk;"
+#  endif  // __MINGW32__
+  );
+}
+#endif  // _M_X64
 
 }  // namespace nt
 }  // namespace mozilla

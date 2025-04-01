@@ -1,4 +1,13 @@
 #define MOZ_UNIFIED_BUILD
+#include "jit/JSJitFrameIter.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "jit/JSJitFrameIter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "jit/JSJitFrameIter.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "jit/JSONSpewer.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "jit/JSONSpewer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -35,21 +44,12 @@
 #error "jit/JitFrames.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/JitOptions.cpp"
+#include "jit/JitHints.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JitOptions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jit/JitHints.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/JitOptions.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "jit/JitScript.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JitScript.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "jit/JitScript.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jit/JitHints.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

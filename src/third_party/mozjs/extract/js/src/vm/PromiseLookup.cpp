@@ -12,7 +12,7 @@
 
 #include "builtin/Promise.h"  // js::Promise_then, js::Promise_static_resolve, js::Promise_static_species
 #include "js/HeapAPI.h"  // js::gc::IsInsideNursery
-#include "js/Id.h"       // SYMBOL_TO_JSID
+#include "js/Id.h"       // JS::PropertyKey
 #include "js/Value.h"    // JS::Value, JS::ObjectValue
 #include "util/Poison.h"  // js::AlwaysPoison, JS_RESET_VALUE_PATTERN, MemCheckKind
 #include "vm/GlobalObject.h"  // js::GlobalObject

@@ -221,6 +221,10 @@ typedef struct ZydisEncoderRelInfo_
      * True if instruction accepts branch hint prefixes.
      */
     ZyanBool accepts_branch_hints;
+    /**
+     * True if instruction accepts bound (`BND`) prefix.
+     */
+    ZyanBool accepts_bound;
 } ZydisEncoderRelInfo;
 
 /**

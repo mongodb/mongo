@@ -53,9 +53,14 @@ frontend::TaggedParserAtomIndex NumberToParserAtom(
 template <AllowGC allowGC>
 extern JSLinearString* Int32ToString(JSContext* cx, int32_t i);
 
+template <AllowGC allowGC>
+extern JSLinearString* Int32ToStringWithHeap(JSContext* cx, int32_t i,
+                                             gc::Heap heap);
+
 extern JSLinearString* Int32ToStringPure(JSContext* cx, int32_t i);
 
-extern JSString* Int32ToStringWithBase(JSContext* cx, int32_t i, int32_t base);
+extern JSString* Int32ToStringWithBase(JSContext* cx, int32_t i, int32_t base,
+                                       bool lowerCase);
 
 extern JSAtom* Int32ToAtom(JSContext* cx, int32_t si);
 

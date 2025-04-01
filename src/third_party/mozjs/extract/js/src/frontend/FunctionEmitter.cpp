@@ -524,9 +524,9 @@ bool FunctionScriptEmitter::emitExtraBodyVarScope() {
 
     // The '.this', '.newTarget', and '.generator' function special binding
     // should never appear in the extra var scope. 'arguments', however, may.
-    MOZ_ASSERT(name != TaggedParserAtomIndex::WellKnown::dotThis() &&
-               name != TaggedParserAtomIndex::WellKnown::dotNewTarget() &&
-               name != TaggedParserAtomIndex::WellKnown::dotGenerator());
+    MOZ_ASSERT(name != TaggedParserAtomIndex::WellKnown::dot_this_() &&
+               name != TaggedParserAtomIndex::WellKnown::dot_newTarget_() &&
+               name != TaggedParserAtomIndex::WellKnown::dot_generator_());
 
     NameOpEmitter noe(bce_, name, NameOpEmitter::Kind::Initialize);
     if (!noe.prepareForRhs()) {
@@ -624,8 +624,7 @@ bool FunctionScriptEmitter::emitEndBody() {
         return false;
       }
 
-      if (!bce_->emit2(JSOp::AsyncResolve,
-                       uint8_t(AsyncFunctionResolveKind::Fulfill))) {
+      if (!bce_->emit1(JSOp::AsyncResolve)) {
         //          [stack] PROMISE
         return false;
       }

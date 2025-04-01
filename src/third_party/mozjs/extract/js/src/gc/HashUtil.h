@@ -20,8 +20,8 @@ namespace js {
  */
 template <class T>
 struct DependentAddPtr {
-  typedef typename T::AddPtr AddPtr;
-  typedef typename T::Entry Entry;
+  using AddPtr = typename T::AddPtr;
+  using Entry = typename T::Entry;
 
   template <class Lookup>
   DependentAddPtr(const JSContext* cx, T& table, const Lookup& lookup)

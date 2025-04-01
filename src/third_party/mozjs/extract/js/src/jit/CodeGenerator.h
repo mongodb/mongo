@@ -8,6 +8,7 @@
 #define jit_CodeGenerator_h
 
 #include "jit/PerfSpewer.h"
+#include "js/Prefs.h"
 #include "js/ScalarType.h"  // js::Scalar::Type
 
 #if defined(JS_CODEGEN_X86)
@@ -80,7 +81,11 @@ class OutOfLineAbortingWasmTrap;
 class OutOfLineGuardNumberToIntPtrIndex;
 class OutOfLineBoxNonStrictThis;
 class OutOfLineArrayPush;
-class OutOfLineWasmCallPostWriteBarrier;
+class OutOfLineAtomizeSlot;
+class OutOfLineWasmCallPostWriteBarrierImmediate;
+class OutOfLineWasmCallPostWriteBarrierIndex;
+class OutOfLineWasmNewStruct;
+class OutOfLineWasmNewArray;
 
 class CodeGenerator final : public CodeGeneratorSpecific {
   [[nodiscard]] bool generateBody();
@@ -104,6 +109,11 @@ class CodeGenerator final : public CodeGeneratorSpecific {
                                   const StoreOutputTo& out);
 
   template <typename LCallIns>
+  void emitCallNative(LCallIns* call, JSNative native, Register argContextReg,
+                      Register argUintNReg, Register argVpReg, Register tempReg,
+                      uint32_t unusedStack);
+
+  template <typename LCallIns>
   void emitCallNative(LCallIns* call, JSNative native);
 
  public:
@@ -122,7 +132,6 @@ class CodeGenerator final : public CodeGeneratorSpecific {
 
   void emitOOLTestObject(Register objreg, Label* ifTruthy, Label* ifFalsy,
                          Register scratch);
-  void emitIntToString(Register input, Register output, Label* ool);
 
   void emitTypeOfCheck(JSValueType type, Register tag, Register output,
                        Label* done, Label* oolObject);
@@ -183,8 +192,27 @@ class CodeGenerator final : public CodeGeneratorSpecific {
 
   void visitOutOfLineArrayPush(OutOfLineArrayPush* ool);
 
-  void visitOutOfLineWasmCallPostWriteBarrier(
-      OutOfLineWasmCallPostWriteBarrier* ool);
+  void visitOutOfLineAtomizeSlot(OutOfLineAtomizeSlot* ool);
+
+  void visitOutOfLineWasmCallPostWriteBarrierImmediate(
+      OutOfLineWasmCallPostWriteBarrierImmediate* ool);
+  void visitOutOfLineWasmCallPostWriteBarrierIndex(
+      OutOfLineWasmCallPostWriteBarrierIndex* ool);
+
+  void callWasmStructAllocFun(LInstruction* lir, wasm::SymbolicAddress fun,
+                              Register typeDefData, Register output);
+  void visitOutOfLineWasmNewStruct(OutOfLineWasmNewStruct* ool);
+
+  void callWasmArrayAllocFun(LInstruction* lir, wasm::SymbolicAddress fun,
+                             Register numElements, Register typeDefData,
+                             Register output,
+                             wasm::BytecodeOffset bytecodeOffset);
+  void visitOutOfLineWasmNewArray(OutOfLineWasmNewArray* ool);
+
+#ifdef ENABLE_WASM_JSPI
+  void callWasmUpdateSuspenderState(wasm::UpdateSuspenderStateAction kind,
+                                    Register suspender);
+#endif
 
  private:
   void emitPostWriteBarrier(const LAllocation* obj);
@@ -221,15 +249,41 @@ class CodeGenerator final : public CodeGeneratorSpecific {
                          uint32_t extraFormals);
   void emitPushArrayAsArguments(Register tmpArgc, Register srcBaseAndArgc,
                                 Register scratch, size_t argvSrcOffset);
-  void emitPushArguments(LApplyArgsGeneric* apply, Register scratch);
-  void emitPushArguments(LApplyArgsObj* apply, Register scratch);
-  void emitPushArguments(LApplyArrayGeneric* apply, Register scratch);
-  void emitPushArguments(LConstructArgsGeneric* construct, Register scratch);
-  void emitPushArguments(LConstructArrayGeneric* construct, Register scratch);
+  void emitPushArguments(LApplyArgsGeneric* apply);
+  void emitPushArguments(LApplyArgsObj* apply);
+  void emitPushArguments(LApplyArrayGeneric* apply);
+  void emitPushArguments(LConstructArgsGeneric* construct);
+  void emitPushArguments(LConstructArrayGeneric* construct);
+
+  template <typename T>
+  void emitApplyNative(T* apply);
+  template <typename T>
+  void emitAlignStackForApplyNative(T* apply, Register argc);
+  template <typename T>
+  void emitPushNativeArguments(T* apply);
+  template <typename T>
+  void emitPushArrayAsNativeArguments(T* apply);
+  void emitPushArguments(LApplyArgsNative* apply);
+  void emitPushArguments(LApplyArgsObjNative* apply);
+  void emitPushArguments(LApplyArrayNative* apply);
+  void emitPushArguments(LConstructArgsNative* construct);
+  void emitPushArguments(LConstructArrayNative* construct);
+
+  template <typename T>
+  void emitApplyArgsGuard(T* apply);
+
+  template <typename T>
+  void emitApplyArgsObjGuard(T* apply);
+
+  template <typename T>
+  void emitApplyArrayGuard(T* apply);
 
   template <class GetInlinedArgument>
   void emitGetInlinedArgument(GetInlinedArgument* lir, Register index,
                               ValueOperand output);
+
+  void emitMaybeAtomizeSlot(LInstruction* ins, Register stringReg,
+                            Address slotAddr, TypedOrValueRegister dest);
 
   using RegisterOrInt32 = mozilla::Variant<Register, int32_t>;
 
@@ -299,6 +353,15 @@ class CodeGenerator final : public CodeGeneratorSpecific {
   IonScriptCounts* maybeCreateScriptCounts();
 
   void emitWasmCompareAndSelect(LWasmCompareAndSelect* ins);
+
+  template <typename InstructionWithMaybeTrapSite, class AddressOrBaseIndex>
+  void emitWasmValueLoad(InstructionWithMaybeTrapSite* ins, MIRType type,
+                         MWideningOp wideningOp, AddressOrBaseIndex addr,
+                         AnyRegister dst);
+  template <typename InstructionWithMaybeTrapSite, class AddressOrBaseIndex>
+  void emitWasmValueStore(InstructionWithMaybeTrapSite* ins, MIRType type,
+                          MNarrowingOp narrowingOp, AnyRegister src,
+                          AddressOrBaseIndex addr);
 
   void testValueTruthyForType(JSValueType type, ScratchTagScope& tag,
                               const ValueOperand& value, Register tempToUnbox,
@@ -386,8 +449,8 @@ class CodeGenerator final : public CodeGeneratorSpecific {
 
   IonPerfSpewer perfSpewer_;
 
-  // Bit mask of JitRealm stubs that are to be read-barriered.
-  uint32_t realmStubsToReadBarrier_;
+  // Bit mask of JitZone stubs that are to be read-barriered.
+  uint32_t zoneStubsToReadBarrier_;
 
 #ifdef FUZZING_JS_FUZZILLI
   void emitFuzzilliHashDouble(FloatRegister floatDouble, Register scratch,
@@ -399,6 +462,51 @@ class CodeGenerator final : public CodeGeneratorSpecific {
 #define LIR_OP(op) void visit##op(L##op* ins);
   LIR_OPCODE_LIST(LIR_OP)
 #undef LIR_OP
+
+  // In debug mode, we need to validate that we've not made a mistake with the
+  // fuse.
+  void assertObjectDoesNotEmulateUndefined(Register input, Register temp,
+                                           const MInstruction* mir);
+
+  // Enumerates the fuses that a code generation can depend on. These will
+  // be mapped to an actual fuse by validateAndRegisterFuseDependencies.
+  enum class FuseDependencyKind {
+    HasSeenObjectEmulateUndefinedFuse,
+    OptimizeGetIteratorFuse,
+  };
+
+  // The set of fuses this code generation depends on.
+  mozilla::EnumSet<FuseDependencyKind> fuseDependencies;
+
+  // Register a dependency on the HasSeenObjectEmulateUndefined fuse.
+  void addHasSeenObjectEmulateUndefinedFuseDependency() {
+    fuseDependencies += FuseDependencyKind::HasSeenObjectEmulateUndefinedFuse;
+  }
+
+  void addOptimizeGetIteratorFuseDependency() {
+    fuseDependencies += FuseDependencyKind::OptimizeGetIteratorFuse;
+  }
+
+  // Called during linking on main-thread: Ensures that the fuses are still
+  // intact, and registers a script dependency on a specific fuse before
+  // finishing compilation.
+  void validateAndRegisterFuseDependencies(JSContext* cx, HandleScript script,
+                                           bool* isValid);
+
+  // Return true if the fuse is intact, andd if the fuse is intact note the
+  // dependency
+  bool hasSeenObjectEmulateUndefinedFuseIntactAndDependencyNoted() {
+    if (!JS::Prefs::use_emulates_undefined_fuse()) {
+      // if we're not active, simply pretend the fuse is popped.
+      return false;
+    }
+
+    bool intact = gen->outerInfo().hasSeenObjectEmulateUndefinedFuseIntact();
+    if (intact) {
+      addHasSeenObjectEmulateUndefinedFuseDependency();
+    }
+    return intact;
+  }
 };
 
 class OutOfLineResumableWasmTrap : public OutOfLineCodeBase<CodeGenerator> {

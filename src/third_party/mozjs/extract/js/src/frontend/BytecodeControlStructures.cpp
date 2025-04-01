@@ -242,10 +242,10 @@ bool NonLocalExitControl::emitNonLocalJump(NestableControl* target,
     return true;
   };
 
-  // If we are closing multiple for-of loops, the resulting FOR_OF_ITERCLOSE
-  // trynotes must be appropriately nested. Each FOR_OF_ITERCLOSE starts when
-  // we close the corresponding for-of iterator, and continues until the
-  // actual jump.
+  // If we are closing multiple for-of loops, the resulting
+  // TryNoteKind::ForOfIterClose trynotes must be appropriately nested. Each
+  // TryNoteKind::ForOfIterClose starts when we close the corresponding for-of
+  // iterator, and continues until the actual jump.
   Vector<BytecodeOffset, 4> forOfIterCloseScopeStarts(bce_->fc);
 
   // If we have to execute a finally block, then we will jump there now and
@@ -269,14 +269,14 @@ bool NonLocalExitControl::emitNonLocalJump(NestableControl* target,
         TryFinallyControl& finallyControl = control->as<TryFinallyControl>();
         if (finallyControl.emittingSubroutine()) {
           /*
-           * There's a [resume-index-or-exception, throwing] pair on
-           * the stack that we need to pop. If the script is not a
+           * There's a [resume-index-or-exception, exception-stack, throwing]
+           * triple on the stack that we need to pop. If the script is not a
            * noScriptRval script, we also need to pop the cached rval.
            */
           if (bce_->sc->noScriptRval()) {
-            npops += 2;
-          } else {
             npops += 3;
+          } else {
+            npops += 4;
           }
         } else {
           jumpingToFinally = true;
@@ -380,7 +380,7 @@ bool NonLocalExitControl::emitNonLocalJump(NestableControl* target,
     }
   }
 
-  // Close FOR_OF_ITERCLOSE trynotes.
+  // Close TryNoteKind::ForOfIterClose trynotes.
   BytecodeOffset end = bce_->bytecodeSection().offset();
   for (BytecodeOffset start : forOfIterCloseScopeStarts) {
     if (!bce_->addTryNote(TryNoteKind::ForOfIterClose, 0, start, end)) {

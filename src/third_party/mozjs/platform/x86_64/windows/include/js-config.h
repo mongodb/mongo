@@ -41,6 +41,9 @@
 /* Define to 1 if SpiderMonkey should include support for the Intl API. */
 /* #undef JS_HAS_INTL_API */
 
+/* Define to 1 if SpiderMonkey should include support for the Temporal API. */
+/* #undef JS_HAS_TEMPORAL_API */
+
 /* Define to 1 if SpiderMonkey should include a breakpoint function for
  * artificial OOMs. */
 /* #undef JS_OOM_BREAKPOINT */
@@ -48,9 +51,6 @@
 /* Define to 1 if SpiderMonkey should support the ability to perform
    entirely too much GC.  */
 /* #undef JS_GC_ZEAL */
-
-/* Define to 1 if SpiderMonkey should use small chunks. */
-/* #undef JS_GC_SMALL_CHUNK_SIZE */
 
 /* Define to 1 to perform extra assertions and heap poisoning. */
 /* #undef JS_CRASH_DIAGNOSTICS */
@@ -67,11 +67,11 @@
 /* Experimental WASM features */
 /* #undef ENABLE_WASM_EXCEPTIONS */
 /* #undef ENABLE_WASM_FUNCTION_REFERENCES */
-/* #undef ENABLE_WASM_GC */
+#define ENABLE_WASM_GC 1
 /* #undef ENABLE_WASM_SIMD */
 
 /* MOZILLA JSAPI version number components */
-#define MOZJS_MAJOR_VERSION 115
-#define MOZJS_MINOR_VERSION 21
+#define MOZJS_MAJOR_VERSION 128
+#define MOZJS_MINOR_VERSION 9
 
 #endif /* js_config_h */

@@ -22,15 +22,22 @@
 
 #include <algorithm>
 
+#include "js/Equality.h"
+#include "js/ForOfIterator.h"
+#include "js/PropertyAndElement.h"
+
 #ifndef __wasi__
 #  include "jit/ProcessExecutableMemory.h"
 #endif
 
 #include "jit/FlushICache.h"
+#include "jit/JitOptions.h"
 #include "util/Text.h"
 #include "vm/HelperThreads.h"
+#include "vm/JSAtomState.h"
 #include "vm/Realm.h"
 #include "wasm/WasmBaselineCompile.h"
+#include "wasm/WasmFeatures.h"
 #include "wasm/WasmGenerator.h"
 #include "wasm/WasmIonCompile.h"
 #include "wasm/WasmOpIter.h"
@@ -85,19 +92,94 @@ uint32_t wasm::ObservedCPUFeatures() {
 #endif
 }
 
+bool FeatureOptions::init(JSContext* cx, HandleValue val) {
+  if (val.isNullOrUndefined()) {
+    return true;
+  }
+
+#ifdef ENABLE_WASM_JS_STRING_BUILTINS
+  if (JSStringBuiltinsAvailable(cx)) {
+    if (!val.isObject()) {
+      JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
+                               JSMSG_WASM_BAD_COMPILE_OPTIONS);
+      return false;
+    }
+    RootedObject obj(cx, &val.toObject());
+
+    // Get the `builtins` iterable
+    RootedValue builtins(cx);
+    if (!JS_GetProperty(cx, obj, "builtins", &builtins)) {
+      return false;
+    }
+
+    JS::ForOfIterator iterator(cx);
+
+    if (!iterator.init(builtins, JS::ForOfIterator::ThrowOnNonIterable)) {
+      return false;
+    }
+
+    RootedValue jsStringModule(cx, StringValue(cx->names().jsStringModule));
+    RootedValue nextBuiltin(cx);
+    while (true) {
+      bool done;
+      if (!iterator.next(&nextBuiltin, &done)) {
+        return false;
+      }
+      if (done) {
+        break;
+      }
+
+      bool jsStringBuiltins;
+      if (!JS::LooselyEqual(cx, nextBuiltin, jsStringModule,
+                            &jsStringBuiltins)) {
+        return false;
+      }
+
+      if (!jsStringBuiltins) {
+        JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
+                                 JSMSG_WASM_UNKNOWN_BUILTIN);
+        return false;
+      }
+
+      if (this->jsStringBuiltins && jsStringBuiltins) {
+        JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
+                                 JSMSG_WASM_DUPLICATE_BUILTIN);
+        return false;
+      }
+      this->jsStringBuiltins = jsStringBuiltins;
+    }
+  }
+#endif
+
+  return true;
+}
+
 FeatureArgs FeatureArgs::build(JSContext* cx, const FeatureOptions& options) {
   FeatureArgs features;
 
 #define WASM_FEATURE(NAME, LOWER_NAME, ...) \
   features.LOWER_NAME = wasm::NAME##Available(cx);
-  JS_FOR_WASM_FEATURES(WASM_FEATURE, WASM_FEATURE, WASM_FEATURE);
+  JS_FOR_WASM_FEATURES(WASM_FEATURE);
 #undef WASM_FEATURE
 
   features.sharedMemory =
       wasm::ThreadsAvailable(cx) ? Shareable::True : Shareable::False;
 
   features.simd = jit::JitSupportsWasmSimd();
-  features.intrinsics = options.intrinsics;
+  features.isBuiltinModule = options.isBuiltinModule;
+  if (features.jsStringBuiltins) {
+    features.builtinModules.jsString = options.jsStringBuiltins;
+  }
+#ifdef ENABLE_WASM_GC
+  if (options.requireGC) {
+    features.gc = true;
+  }
+#endif
+#ifdef ENABLE_WASM_TAIL_CALLS
+  if (options.requireTailCalls) {
+    features.tailCalls = true;
+  }
+#endif
 
   return features;
 }
@@ -151,6 +233,13 @@ SharedCompileArgs CompileArgs::build(JSContext* cx,
   target->features = FeatureArgs::build(cx, options);
 
   return target;
+}
+
+void wasm::SetUseCountersForFeatureUsage(JSContext* cx, JSObject* object,
+                                         FeatureUsage usage) {
+  if (usage & FeatureUsage::LegacyExceptions) {
+    cx->runtime()->setUseCounter(object, JSUseCounter::WASM_LEGACY_EXCEPTIONS);
+  }
 }
 
 SharedCompileArgs CompileArgs::buildForAsmJS(ScriptedCaller&& scriptedCaller) {
@@ -647,8 +736,8 @@ void CompilerEnvironment::computeParameters(Decoder& d) {
   state_ = Computed;
 }
 
-template <class DecoderT>
-static bool DecodeFunctionBody(DecoderT& d, ModuleGenerator& mg,
+template <class DecoderT, class ModuleGeneratorT>
+static bool DecodeFunctionBody(DecoderT& d, ModuleGeneratorT& mg,
                                uint32_t funcIndex) {
   uint32_t bodySize;
   if (!d.readVarU32(&bodySize)) {
@@ -672,9 +761,9 @@ static bool DecodeFunctionBody(DecoderT& d, ModuleGenerator& mg,
                            bodyBegin + bodySize);
 }
 
-template <class DecoderT>
+template <class DecoderT, class ModuleGeneratorT>
 static bool DecodeCodeSection(const ModuleEnvironment& env, DecoderT& d,
-                              ModuleGenerator& mg) {
+                              ModuleGeneratorT& mg) {
   if (!env.codeSection) {
     if (env.numFuncDefs() != 0) {
       return d.fail("expected code section");
@@ -916,4 +1005,47 @@ SharedModule wasm::CompileStreaming(
   }
 
   return mg.finishModule(*bytecode, streamEnd.tier2Listener);
+}
+
+class DumpIonModuleGenerator {
+ private:
+  ModuleEnvironment& moduleEnv_;
+  uint32_t targetFuncIndex_;
+  IonDumpContents contents_;
+  GenericPrinter& out_;
+  UniqueChars* error_;
+
+ public:
+  DumpIonModuleGenerator(ModuleEnvironment& moduleEnv, uint32_t targetFuncIndex,
+                         IonDumpContents contents, GenericPrinter& out,
+                         UniqueChars* error)
+      : moduleEnv_(moduleEnv),
+        targetFuncIndex_(targetFuncIndex),
+        contents_(contents),
+        out_(out),
+        error_(error) {}
+
+  bool finishFuncDefs() { return true; }
+  bool compileFuncDef(uint32_t funcIndex, uint32_t lineOrBytecode,
+                      const uint8_t* begin, const uint8_t* end) {
+    if (funcIndex != targetFuncIndex_) {
+      return true;
+    }
+
+    FuncCompileInput input(funcIndex, lineOrBytecode, begin, end,
+                           Uint32Vector());
+    return IonDumpFunction(moduleEnv_, input, contents_, out_, error_);
+  }
+};
+
+bool wasm::DumpIonFunctionInModule(const ShareableBytes& bytecode,
+                                   uint32_t targetFuncIndex,
+                                   IonDumpContents contents,
+                                   GenericPrinter& out, UniqueChars* error) {
+  UniqueCharsVector warnings;
+  Decoder d(bytecode.bytes, 0, error, &warnings);
+  ModuleEnvironment moduleEnv(FeatureArgs::allEnabled());
+  DumpIonModuleGenerator mg(moduleEnv, targetFuncIndex, contents, out, error);
+  return moduleEnv.init() && DecodeModuleEnvironment(d, &moduleEnv) &&
+         DecodeCodeSection(moduleEnv, d, mg);
 }

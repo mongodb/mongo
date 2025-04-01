@@ -21,10 +21,6 @@ class AutoLockGC;
 class AutoLockGCBgAlloc;
 class Nursery;
 
-// To prevent false sharing, some data structures are aligned to a typical cache
-// line size.
-static constexpr size_t TypicalCacheLineSize = 64;
-
 namespace gc {
 
 class Arena;
@@ -37,13 +33,6 @@ class TenuredCell;
 
 // Cells are aligned to CellAlignShift, so the largest tagged null pointer is:
 const uintptr_t LargestTaggedNullCellPointer = (1 << CellAlignShift) - 1;
-
-/*
- * The minimum cell size ends up as twice the cell alignment because the mark
- * bitmap contains one bit per CellBytesPerMarkBit bytes (which is equal to
- * CellAlignBytes) and we need two mark bits per cell.
- */
-const size_t MinCellSize = CellBytesPerMarkBit * MarkBitsPerCell;
 
 static_assert(ArenaSize % CellAlignBytes == 0,
               "Arena size must be a multiple of cell alignment");
@@ -771,7 +760,8 @@ struct alignas(gc::CellAlignBytes) NurseryCellHeader {
     return uintptr_t(site) | uintptr_t(kind);
   }
 
-  inline NurseryCellHeader(AllocSite* site, JS::TraceKind kind);
+  inline NurseryCellHeader(AllocSite* site, JS::TraceKind kind)
+      : allocSiteAndTraceKind(MakeValue(site, kind)) {}
 
   AllocSite* allocSite() const {
     return reinterpret_cast<AllocSite*>(allocSiteAndTraceKind & ~TraceKindMask);
@@ -807,10 +797,15 @@ enum class MarkInfo : int {
   GRAY = 1,
   UNMARKED = -1,
   NURSERY = -2,
+  UNKNOWN = -3,
 };
 
-// Get the mark color for a cell, in a way easily usable from a debugger.
-MOZ_NEVER_INLINE MarkInfo GetMarkInfo(js::gc::Cell* cell);
+// For calling from gdb only: given a pointer that is either in the nursery
+// (possibly pointing to a buffer, not necessarily a Cell) or a tenured Cell,
+// return its mark color or NURSERY or UNKNOWN. UNKONWN is only for non-Cell
+// pointers, and means it is not in the nursery (so could be malloced or stack
+// or whatever.)
+MOZ_NEVER_INLINE MarkInfo GetMarkInfo(void* vp);
 
 // Sample usage from gdb:
 //

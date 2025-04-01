@@ -19,19 +19,19 @@
 #include "frontend/ModuleSharedContext.h"
 #include "frontend/ParseNode.h"
 #include "frontend/Parser.h"
+#include "js/ColumnNumber.h"          // JS::LimitedColumnNumberOneOrigin
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/friend/StackLimits.h"    // js::AutoCheckRecursionLimit
 #include "js/PropertyAndElement.h"    // JS_DefineFunction
 #include "js/StableStringChars.h"
 #include "vm/FunctionFlags.h"  // js::FunctionFlags
 #include "vm/Interpreter.h"
-#include "vm/JSAtom.h"
+#include "vm/JSAtomUtils.h"  // Atomize, AtomizeUTF8Chars
 #include "vm/JSObject.h"
 #include "vm/ModuleBuilder.h"  // js::ModuleBuilder
 #include "vm/PlainObject.h"    // js::PlainObject
 #include "vm/RegExpObject.h"
 
-#include "vm/JSAtom-inl.h"
 #include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/ObjectOperations-inl.h"
@@ -136,6 +136,10 @@ enum VarDeclKind {
   VARDECL_VAR = 0,
   VARDECL_CONST,
   VARDECL_LET,
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  VARDECL_USING,
+  VARDECL_AWAIT_USING,
+#endif
   VARDECL_LIMIT
 };
 
@@ -505,10 +509,10 @@ class NodeBuilder {
   [[nodiscard]] bool debuggerStatement(TokenPos* pos, MutableHandleValue dst);
 
   [[nodiscard]] bool moduleRequest(HandleValue moduleSpec,
-                                   NodeVector& assertions, TokenPos* pos,
+                                   NodeVector& attributes, TokenPos* pos,
                                    MutableHandleValue dst);
 
-  [[nodiscard]] bool importAssertion(HandleValue key, HandleValue value,
+  [[nodiscard]] bool importAttribute(HandleValue key, HandleValue value,
                                      TokenPos* pos, MutableHandleValue dst);
 
   [[nodiscard]] bool importDeclaration(NodeVector& elts, HandleValue moduleSpec,
@@ -540,12 +544,21 @@ class NodeBuilder {
 
   [[nodiscard]] bool classDefinition(bool expr, HandleValue name,
                                      HandleValue heritage, HandleValue block,
+#ifdef ENABLE_DECORATORS
+                                     HandleValue decorators,
+#endif
                                      TokenPos* pos, MutableHandleValue dst);
   [[nodiscard]] bool classMembers(NodeVector& members, MutableHandleValue dst);
   [[nodiscard]] bool classMethod(HandleValue name, HandleValue body,
+#ifdef ENABLE_DECORATORS
+                                 HandleValue decorators,
+#endif
                                  PropKind kind, bool isStatic, TokenPos* pos,
                                  MutableHandleValue dst);
   [[nodiscard]] bool classField(HandleValue name, HandleValue initializer,
+#ifdef ENABLE_DECORATORS
+                                HandleValue decorators,
+#endif
                                 TokenPos* pos, MutableHandleValue dst);
   [[nodiscard]] bool staticClassBlock(HandleValue body, TokenPos* pos,
                                       MutableHandleValue dst);
@@ -726,8 +739,8 @@ bool NodeBuilder::newNodeLoc(TokenPos* pos, MutableHandleValue dst) {
 
   dst.setObject(*loc);
 
-  uint32_t startLineNum, startColumnIndex;
-  uint32_t endLineNum, endColumnIndex;
+  uint32_t startLineNum, endLineNum;
+  JS::LimitedColumnNumberOneOrigin startColumnIndex, endColumnIndex;
   parser->tokenStream.computeLineAndColumn(pos->begin, &startLineNum,
                                            &startColumnIndex);
   parser->tokenStream.computeLineAndColumn(pos->end, &endLineNum,
@@ -744,7 +757,7 @@ bool NodeBuilder::newNodeLoc(TokenPos* pos, MutableHandleValue dst) {
   if (!defineProperty(to, "line", val)) {
     return false;
   }
-  val.setNumber(startColumnIndex);
+  val.setNumber(startColumnIndex.oneOriginValue());
   if (!defineProperty(to, "column", val)) {
     return false;
   }
@@ -760,7 +773,7 @@ bool NodeBuilder::newNodeLoc(TokenPos* pos, MutableHandleValue dst) {
   if (!defineProperty(to, "line", val)) {
     return false;
   }
-  val.setNumber(endColumnIndex);
+  val.setNumber(endColumnIndex.oneOriginValue());
   if (!defineProperty(to, "column", val)) {
     return false;
   }
@@ -1151,20 +1164,20 @@ bool NodeBuilder::yieldExpression(HandleValue arg, YieldKind kind,
                  dst);
 }
 
-bool NodeBuilder::moduleRequest(HandleValue moduleSpec, NodeVector& assertions,
+bool NodeBuilder::moduleRequest(HandleValue moduleSpec, NodeVector& attributes,
                                 TokenPos* pos, MutableHandleValue dst) {
   RootedValue array(cx);
-  if (!newArray(assertions, &array)) {
+  if (!newArray(attributes, &array)) {
     return false;
   }
 
-  return newNode(AST_MODULE_REQUEST, pos, "source", moduleSpec, "assertions",
+  return newNode(AST_MODULE_REQUEST, pos, "source", moduleSpec, "attributes",
                  array, dst);
 }
 
-bool NodeBuilder::importAssertion(HandleValue key, HandleValue value,
+bool NodeBuilder::importAttribute(HandleValue key, HandleValue value,
                                   TokenPos* pos, MutableHandleValue dst) {
-  return newNode(AST_IMPORT_ASSERTION, pos, "key", key, "value", value, dst);
+  return newNode(AST_IMPORT_ATTRIBUTE, pos, "key", key, "value", value, dst);
 }
 
 bool NodeBuilder::importDeclaration(NodeVector& elts, HandleValue moduleRequest,
@@ -1226,10 +1239,26 @@ bool NodeBuilder::variableDeclaration(NodeVector& elts, VarDeclKind kind,
   MOZ_ASSERT(kind > VARDECL_ERR && kind < VARDECL_LIMIT);
 
   RootedValue array(cx), kindName(cx);
-  if (!newArray(elts, &array) || !atomValue(kind == VARDECL_CONST ? "const"
-                                            : kind == VARDECL_LET ? "let"
-                                                                  : "var",
-                                            &kindName)) {
+  const char* s;
+  switch (kind) {
+    case VARDECL_CONST:
+      s = "const";
+      break;
+    case VARDECL_LET:
+      s = "let";
+      break;
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    case VARDECL_USING:
+      s = "using";
+      break;
+    case VARDECL_AWAIT_USING:
+      s = "await using";
+      break;
+#endif
+    default:
+      s = "var";
+  }
+  if (!newArray(elts, &array) || !atomValue(s, &kindName)) {
     return false;
   }
 
@@ -1313,8 +1342,11 @@ bool NodeBuilder::function(ASTType type, TokenPos* pos, HandleValue id,
                  "async", isAsyncVal, "expression", isExpressionVal, dst);
 }
 
-bool NodeBuilder::classMethod(HandleValue name, HandleValue body, PropKind kind,
-                              bool isStatic, TokenPos* pos,
+bool NodeBuilder::classMethod(HandleValue name, HandleValue body,
+#ifdef ENABLE_DECORATORS
+                              HandleValue decorators,
+#endif
+                              PropKind kind, bool isStatic, TokenPos* pos,
                               MutableHandleValue dst) {
   RootedValue kindName(cx);
   if (!atomValue(kind == PROP_INIT     ? "method"
@@ -1326,12 +1358,23 @@ bool NodeBuilder::classMethod(HandleValue name, HandleValue body, PropKind kind,
 
   RootedValue isStaticVal(cx, BooleanValue(isStatic));
   return newNode(AST_CLASS_METHOD, pos, "name", name, "body", body, "kind",
-                 kindName, "static", isStaticVal, dst);
+                 kindName, "static", isStaticVal,
+#ifdef ENABLE_DECORATORS
+                 "decorators", decorators,
+#endif
+                 dst);
 }
 
 bool NodeBuilder::classField(HandleValue name, HandleValue initializer,
+#ifdef ENABLE_DECORATORS
+                             HandleValue decorators,
+#endif
                              TokenPos* pos, MutableHandleValue dst) {
-  return newNode(AST_CLASS_FIELD, pos, "name", name, "init", initializer, dst);
+  return newNode(AST_CLASS_FIELD, pos, "name", name, "init", initializer,
+#ifdef ENABLE_DECORATORS
+                 "decorators", decorators,
+#endif
+                 dst);
 }
 
 bool NodeBuilder::staticClassBlock(HandleValue body, TokenPos* pos,
@@ -1345,9 +1388,15 @@ bool NodeBuilder::classMembers(NodeVector& members, MutableHandleValue dst) {
 
 bool NodeBuilder::classDefinition(bool expr, HandleValue name,
                                   HandleValue heritage, HandleValue block,
+#ifdef ENABLE_DECORATORS
+                                  HandleValue decorators,
+#endif
                                   TokenPos* pos, MutableHandleValue dst) {
   ASTType type = expr ? AST_CLASS_EXPR : AST_CLASS_STMT;
   return newNode(type, pos, "id", name, "superClass", heritage, "body", block,
+#ifdef ENABLE_DECORATORS
+                 "decorators", decorators,
+#endif
                  dst);
 }
 
@@ -1386,7 +1435,7 @@ class ASTSerializer {
   DebugOnly<uint32_t> lineno;
 
   Value unrootedAtomContents(JSAtom* atom) {
-    return StringValue(atom ? atom : cx->names().empty);
+    return StringValue(atom ? atom : cx->names().empty_);
   }
 
   BinaryOperator binop(ParseNodeKind kind);
@@ -1413,7 +1462,7 @@ class ASTSerializer {
   bool exportSpecifier(BinaryNode* exportSpec, MutableHandleValue dst);
   bool exportNamespaceSpecifier(UnaryNode* exportSpec, MutableHandleValue dst);
   bool classDefinition(ClassNode* pn, bool expr, MutableHandleValue dst);
-  bool importAssertions(ListNode* assertionList, NodeVector& assertions);
+  bool importAttributes(ListNode* attributeList, NodeVector& attributes);
 
   bool optStatement(ParseNode* pn, MutableHandleValue dst) {
     if (!pn) {
@@ -1700,6 +1749,10 @@ bool ASTSerializer::declaration(ParseNode* pn, MutableHandleValue dst) {
   MOZ_ASSERT(pn->isKind(ParseNodeKind::Function) ||
              pn->isKind(ParseNodeKind::VarStmt) ||
              pn->isKind(ParseNodeKind::LetDecl) ||
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+             pn->isKind(ParseNodeKind::UsingDecl) ||
+             pn->isKind(ParseNodeKind::AwaitUsingDecl) ||
+#endif
              pn->isKind(ParseNodeKind::ConstDecl));
 
   switch (pn->getKind()) {
@@ -1711,6 +1764,10 @@ bool ASTSerializer::declaration(ParseNode* pn, MutableHandleValue dst) {
 
     default:
       MOZ_ASSERT(pn->isKind(ParseNodeKind::LetDecl) ||
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+                 pn->isKind(ParseNodeKind::UsingDecl) ||
+                 pn->isKind(ParseNodeKind::AwaitUsingDecl) ||
+#endif
                  pn->isKind(ParseNodeKind::ConstDecl));
       return variableDeclaration(&pn->as<ListNode>(), true, dst);
   }
@@ -1719,6 +1776,10 @@ bool ASTSerializer::declaration(ParseNode* pn, MutableHandleValue dst) {
 bool ASTSerializer::variableDeclaration(ListNode* declList, bool lexical,
                                         MutableHandleValue dst) {
   MOZ_ASSERT_IF(lexical, declList->isKind(ParseNodeKind::LetDecl) ||
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+                             declList->isKind(ParseNodeKind::UsingDecl) ||
+                             declList->isKind(ParseNodeKind::AwaitUsingDecl) ||
+#endif
                              declList->isKind(ParseNodeKind::ConstDecl));
   MOZ_ASSERT_IF(!lexical, declList->isKind(ParseNodeKind::VarStmt));
 
@@ -1726,8 +1787,19 @@ bool ASTSerializer::variableDeclaration(ListNode* declList, bool lexical,
   // Treat both the toplevel const binding (secretly var-like) and the lexical
   // const the same way
   if (lexical) {
-    kind =
-        declList->isKind(ParseNodeKind::LetDecl) ? VARDECL_LET : VARDECL_CONST;
+    if (declList->isKind(ParseNodeKind::LetDecl)) {
+      kind = VARDECL_LET;
+    }
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    else if (declList->isKind(ParseNodeKind::UsingDecl)) {
+      kind = VARDECL_USING;
+    } else if (declList->isKind(ParseNodeKind::AwaitUsingDecl)) {
+      kind = VARDECL_AWAIT_USING;
+    }
+#endif
+    else {
+      kind = VARDECL_CONST;
+    }
   } else {
     kind =
         declList->isKind(ParseNodeKind::VarStmt) ? VARDECL_VAR : VARDECL_CONST;
@@ -1784,8 +1856,8 @@ bool ASTSerializer::importDeclaration(BinaryNode* importNode,
   ParseNode* moduleSpecNode = moduleRequest->left();
   MOZ_ASSERT(moduleSpecNode->isKind(ParseNodeKind::StringExpr));
 
-  auto* assertionList = &moduleRequest->right()->as<ListNode>();
-  MOZ_ASSERT(assertionList->isKind(ParseNodeKind::ImportAssertionList));
+  auto* attributeList = &moduleRequest->right()->as<ListNode>();
+  MOZ_ASSERT(attributeList->isKind(ParseNodeKind::ImportAttributeList));
 
   NodeVector elts(cx);
   if (!elts.reserve(specList->count())) {
@@ -1813,13 +1885,13 @@ bool ASTSerializer::importDeclaration(BinaryNode* importNode,
     return false;
   }
 
-  NodeVector assertions(cx);
-  if (!importAssertions(assertionList, assertions)) {
+  NodeVector attributes(cx);
+  if (!importAttributes(attributeList, attributes)) {
     return false;
   }
 
   RootedValue moduleRequestValue(cx);
-  if (!builder.moduleRequest(moduleSpec, assertions, &importNode->pn_pos,
+  if (!builder.moduleRequest(moduleSpec, attributes, &importNode->pn_pos,
                              &moduleRequestValue)) {
     return false;
   }
@@ -1934,16 +2006,16 @@ bool ASTSerializer::exportDeclaration(ParseNode* exportNode,
       return false;
     }
 
-    auto* assertionList =
+    auto* attributeList =
         &moduleRequest->as<BinaryNode>().right()->as<ListNode>();
-    MOZ_ASSERT(assertionList->isKind(ParseNodeKind::ImportAssertionList));
+    MOZ_ASSERT(attributeList->isKind(ParseNodeKind::ImportAttributeList));
 
-    NodeVector assertions(cx);
-    if (!importAssertions(assertionList, assertions)) {
+    NodeVector attributes(cx);
+    if (!importAttributes(attributeList, attributes)) {
       return false;
     }
 
-    if (!builder.moduleRequest(moduleSpec, assertions, &exportNode->pn_pos,
+    if (!builder.moduleRequest(moduleSpec, attributes, &exportNode->pn_pos,
                                &moduleRequestValue)) {
       return false;
     }
@@ -1982,14 +2054,14 @@ bool ASTSerializer::exportNamespaceSpecifier(UnaryNode* exportSpec,
          builder.exportNamespaceSpecifier(exportName, &exportSpec->pn_pos, dst);
 }
 
-bool ASTSerializer::importAssertions(ListNode* assertionList,
-                                     NodeVector& assertions) {
-  for (ParseNode* assertionItem : assertionList->contents()) {
-    BinaryNode* assertionNode = &assertionItem->as<BinaryNode>();
-    MOZ_ASSERT(assertionNode->isKind(ParseNodeKind::ImportAssertion));
+bool ASTSerializer::importAttributes(ListNode* attributeList,
+                                     NodeVector& attributes) {
+  for (ParseNode* attributeItem : attributeList->contents()) {
+    BinaryNode* attributeNode = &attributeItem->as<BinaryNode>();
+    MOZ_ASSERT(attributeNode->isKind(ParseNodeKind::ImportAttribute));
 
-    NameNode* keyNameNode = &assertionNode->left()->as<NameNode>();
-    NameNode* valueNameNode = &assertionNode->right()->as<NameNode>();
+    NameNode* keyNameNode = &attributeNode->left()->as<NameNode>();
+    NameNode* valueNameNode = &attributeNode->right()->as<NameNode>();
 
     RootedValue key(cx);
     if (!identifierOrLiteral(keyNameNode, &key)) {
@@ -2001,13 +2073,13 @@ bool ASTSerializer::importAssertions(ListNode* assertionList,
       return false;
     }
 
-    RootedValue assertion(cx);
-    if (!builder.importAssertion(key, value, &assertionNode->pn_pos,
-                                 &assertion)) {
+    RootedValue attribute(cx);
+    if (!builder.importAttribute(key, value, &attributeNode->pn_pos,
+                                 &attribute)) {
       return false;
     }
 
-    if (!assertions.append(assertion)) {
+    if (!attributes.append(attribute)) {
       return false;
     }
   }
@@ -2114,7 +2186,11 @@ bool ASTSerializer::forInit(ParseNode* pn, MutableHandleValue dst) {
   }
 
   bool lexical = pn->isKind(ParseNodeKind::LetDecl) ||
-                 pn->isKind(ParseNodeKind::ConstDecl);
+                 pn->isKind(ParseNodeKind::ConstDecl)
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+                 || pn->isKind(ParseNodeKind::UsingDecl)
+#endif
+      ;
   return (lexical || pn->isKind(ParseNodeKind::VarStmt))
              ? variableDeclaration(&pn->as<ListNode>(), lexical, dst)
              : expression(pn, dst);
@@ -2141,6 +2217,22 @@ bool ASTSerializer::classDefinition(ClassNode* pn, bool expr,
   RootedValue className(cx, MagicValue(JS_SERIALIZE_NO_NODE));
   RootedValue heritage(cx);
   RootedValue classBody(cx);
+#ifdef ENABLE_DECORATORS
+  NodeVector classDecorators(cx);
+  RootedValue classDecoratorsArray(cx);
+  TokenPos decoratorPos;
+  bool decoratorsParsed = true;
+  if (pn->decorators()) {
+    decoratorPos.begin = pn->decorators()->head()->pn_pos.begin;
+    decoratorPos.end = pn->decorators()->last()->pn_pos.end;
+    decoratorsParsed =
+        expressions(pn->decorators(), classDecorators) &&
+        builder.sequenceExpression(classDecorators, &decoratorPos,
+                                   &classDecoratorsArray);
+  } else {
+    classDecoratorsArray.setMagic(JS_SERIALIZE_NO_NODE);
+  }
+#endif
 
   if (ClassNames* names = pn->names()) {
     if (!identifier(names->innerBinding(), &className)) {
@@ -2150,7 +2242,13 @@ bool ASTSerializer::classDefinition(ClassNode* pn, bool expr,
 
   return optExpression(pn->heritage(), &heritage) &&
          statement(pn->memberList(), &classBody) &&
+#ifdef ENABLE_DECORATORS
+         decoratorsParsed &&
+#endif
          builder.classDefinition(expr, className, heritage, classBody,
+#ifdef ENABLE_DECORATORS
+                                 classDecoratorsArray,
+#endif
                                  &pn->pn_pos, dst);
 }
 
@@ -2167,6 +2265,10 @@ bool ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst) {
 
     case ParseNodeKind::LetDecl:
     case ParseNodeKind::ConstDecl:
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    case ParseNodeKind::UsingDecl:
+    case ParseNodeKind::AwaitUsingDecl:
+#endif
       return declaration(pn, dst);
 
     case ParseNodeKind::ImportDecl:
@@ -2288,6 +2390,10 @@ bool ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst) {
           }
         } else if (!initNode->isKind(ParseNodeKind::VarStmt) &&
                    !initNode->isKind(ParseNodeKind::LetDecl) &&
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+                   !initNode->isKind(ParseNodeKind::UsingDecl) &&
+                   !initNode->isKind(ParseNodeKind::AwaitUsingDecl) &&
+#endif
                    !initNode->isKind(ParseNodeKind::ConstDecl)) {
           if (!pattern(initNode, &var)) {
             return false;
@@ -2296,6 +2402,10 @@ bool ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst) {
           if (!variableDeclaration(
                   &initNode->as<ListNode>(),
                   initNode->isKind(ParseNodeKind::LetDecl) ||
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+                      initNode->isKind(ParseNodeKind::UsingDecl) ||
+                      initNode->isKind(ParseNodeKind::AwaitUsingDecl) ||
+#endif
                       initNode->isKind(ParseNodeKind::ConstDecl),
                   &var)) {
             return false;
@@ -2444,13 +2554,35 @@ bool ASTSerializer::classMethod(ClassMethod* classMethod,
     default:
       LOCAL_NOT_REACHED("unexpected object-literal property");
   }
+#ifdef ENABLE_DECORATORS
+  NodeVector methodDecorators(cx);
+  RootedValue methodDecoratorsArray(cx);
+  TokenPos decoratorPos;
+  bool decoratorsParsed = true;
+  if (classMethod->decorators()) {
+    decoratorPos.begin = classMethod->decorators()->head()->pn_pos.begin;
+    decoratorPos.end = classMethod->decorators()->last()->pn_pos.end;
+    decoratorsParsed =
+        expressions(classMethod->decorators(), methodDecorators) &&
+        builder.sequenceExpression(methodDecorators, &decoratorPos,
+                                   &methodDecoratorsArray);
+  } else {
+    methodDecoratorsArray.setMagic(JS_SERIALIZE_NO_NODE);
+  }
+#endif
 
   RootedValue key(cx), val(cx);
   bool isStatic = classMethod->isStatic();
   return propertyName(&classMethod->name(), &key) &&
          expression(&classMethod->method(), &val) &&
-         builder.classMethod(key, val, kind, isStatic, &classMethod->pn_pos,
-                             dst);
+#ifdef ENABLE_DECORATORS
+         decoratorsParsed &&
+#endif
+         builder.classMethod(key, val,
+#ifdef ENABLE_DECORATORS
+                             methodDecoratorsArray,
+#endif
+                             kind, isStatic, &classMethod->pn_pos, dst);
 }
 
 bool ASTSerializer::classField(ClassField* classField, MutableHandleValue dst) {
@@ -2466,6 +2598,22 @@ bool ASTSerializer::classField(ClassField* classField, MutableHandleValue dst) {
                          .kid()
                          ->as<BinaryNode>()
                          .right();
+#ifdef ENABLE_DECORATORS
+  NodeVector fieldDecorators(cx);
+  RootedValue fieldDecoratorsArray(cx);
+  TokenPos decoratorPos;
+  bool decoratorsParsed = true;
+  if (classField->decorators()) {
+    decoratorPos.begin = classField->decorators()->head()->pn_pos.begin;
+    decoratorPos.end = classField->decorators()->last()->pn_pos.end;
+    decoratorsParsed =
+        expressions(classField->decorators(), fieldDecorators) &&
+        builder.sequenceExpression(fieldDecorators, &decoratorPos,
+                                   &fieldDecoratorsArray);
+  } else {
+    fieldDecoratorsArray.setMagic(JS_SERIALIZE_NO_NODE);
+  }
+#endif
   // RawUndefinedExpr is the node we use for "there is no initializer". If one
   // writes, literally, `x = undefined;`, it will not be a RawUndefinedExpr
   // node, but rather a variable reference.
@@ -2478,7 +2626,14 @@ bool ASTSerializer::classField(ClassField* classField, MutableHandleValue dst) {
     val.setNull();
   }
   return propertyName(&classField->name(), &key) &&
-         builder.classField(key, val, &classField->pn_pos, dst);
+#ifdef ENABLE_DECORATORS
+         decoratorsParsed &&
+#endif
+         builder.classField(key, val,
+#ifdef ENABLE_DECORATORS
+                            fieldDecoratorsArray,
+#endif
+                            &classField->pn_pos, dst);
 }
 
 bool ASTSerializer::staticClassBlock(StaticClassBlock* staticClassBlock,
@@ -2789,7 +2944,8 @@ bool ASTSerializer::expression(ParseNode* pn, MutableHandleValue dst) {
     }
 
     case ParseNodeKind::DotExpr:
-    case ParseNodeKind::OptionalDotExpr: {
+    case ParseNodeKind::OptionalDotExpr:
+    case ParseNodeKind::ArgumentsLength: {
       PropertyAccessBase* prop = &pn->as<PropertyAccessBase>();
       MOZ_ASSERT(prop->pn_pos.encloses(prop->expression().pn_pos));
 
@@ -3368,7 +3524,7 @@ bool ASTSerializer::objectPattern(ListNode* obj, MutableHandleValue dst) {
     RootedValue key(cx);
     ParseNode* target;
     if (propdef->isKind(ParseNodeKind::MutateProto)) {
-      RootedValue pname(cx, StringValue(cx->names().proto));
+      RootedValue pname(cx, StringValue(cx->names().proto_));
       if (!builder.literal(pname, &propdef->pn_pos, &key)) {
         return false;
       }
@@ -3756,7 +3912,7 @@ static bool reflect_parse(JSContext* cx, uint32_t argc, Value* vp) {
 
   ParseNode* pn;
   if (target == ParseGoal::Script) {
-    pn = parser.parse();
+    pn = parser.parse().unwrapOr(nullptr);
     if (!pn) {
       return false;
     }
@@ -3764,10 +3920,12 @@ static bool reflect_parse(JSContext* cx, uint32_t argc, Value* vp) {
     ModuleBuilder builder(&fc, &parser);
 
     uint32_t len = chars.length();
-    SourceExtent extent =
-        SourceExtent::makeGlobalExtent(len, options.lineno, options.column);
+    SourceExtent extent = SourceExtent::makeGlobalExtent(
+        len, options.lineno,
+        JS::LimitedColumnNumberOneOrigin::fromUnlimited(
+            JS::ColumnNumberOneOrigin(options.column)));
     ModuleSharedContext modulesc(&fc, options, builder, extent);
-    pn = parser.moduleBody(&modulesc);
+    pn = parser.moduleBody(&modulesc).unwrapOr(nullptr);
     if (!pn) {
       return false;
     }

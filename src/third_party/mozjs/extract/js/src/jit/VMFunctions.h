@@ -19,6 +19,7 @@
 #include "gc/AllocKind.h"
 #include "js/ScalarType.h"
 #include "js/TypeDecls.h"
+#include "vm/TypeofEqOperand.h"
 
 class JSJitInfo;
 class JSLinearString;
@@ -45,7 +46,13 @@ namespace gc {
 
 struct Cell;
 
-}
+}  // namespace gc
+
+namespace wasm {
+
+class AnyRef;
+
+}  // namespace wasm
 
 namespace jit {
 
@@ -62,8 +69,6 @@ enum DataType : uint8_t {
   Type_Value,
   Type_Handle
 };
-
-enum MaybeTailCall : bool { TailCall, NonTailCall };
 
 // [SMDOC] JIT-to-C++ Function Calls. (callVM)
 //
@@ -139,7 +144,7 @@ enum MaybeTailCall : bool { TailCall, NonTailCall };
 
 // Data for a VM function. All VMFunctionDatas are stored in a constexpr array.
 struct VMFunctionData {
-#if defined(DEBUG) || defined(JS_JITSPEW)
+#if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_ION_PERF)
   // Informative name of the wrapped function. The name should not be present
   // in release builds in order to save memory.
   const char* name_;
@@ -204,11 +209,6 @@ struct VMFunctionData {
   // wrapper.
   uint8_t extraValuesToPop;
 
-  // On some architectures, called functions need to explicitly push their
-  // return address, for a tail call, there is nothing to push, so tail-callness
-  // needs to be known at compile time.
-  MaybeTailCall expectTailCall;
-
   uint32_t argc() const {
     // JSContext * + args + (OutParam? *)
     return 1 + explicitArgc() + ((outParam == Type_Void) ? 0 : 1);
@@ -234,7 +234,7 @@ struct VMFunctionData {
     return ((argumentPassedInFloatRegs >> explicitArg) & 1) == 1;
   }
 
-#if defined(DEBUG) || defined(JS_JITSPEW)
+#if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_ION_PERF)
   const char* name() const { return name_; }
 #endif
 
@@ -301,15 +301,16 @@ struct VMFunctionData {
     return count;
   }
 
+  size_t sizeOfOutParamStackSlot() const;
+
   constexpr VMFunctionData(const char* name, uint32_t explicitArgs,
                            uint32_t argumentProperties,
                            uint32_t argumentPassedInFloatRegs,
                            uint64_t argRootTypes, DataType outParam,
                            RootType outParamRootType, DataType returnType,
-                           uint8_t extraValuesToPop = 0,
-                           MaybeTailCall expectTailCall = NonTailCall)
+                           uint8_t extraValuesToPop = 0)
       :
-#if defined(DEBUG) || defined(JS_JITSPEW)
+#if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_ION_PERF)
         name_(name),
 #endif
         argumentRootTypes(argRootTypes),
@@ -319,8 +320,7 @@ struct VMFunctionData {
         outParamRootType(outParamRootType),
         outParam(outParam),
         returnType(returnType),
-        extraValuesToPop(extraValuesToPop),
-        expectTailCall(expectTailCall) {
+        extraValuesToPop(extraValuesToPop) {
     // Check for valid failure/return type.
     MOZ_ASSERT_IF(outParam != Type_Void,
                   returnType == Type_Void || returnType == Type_Bool);
@@ -376,19 +376,21 @@ template <ComparisonKind Kind>
 bool StringsCompare(JSContext* cx, HandleString lhs, HandleString rhs,
                     bool* res);
 
-[[nodiscard]] bool ArrayPushDensePure(JSContext* cx, ArrayObject* arr,
-                                      Value* v);
 JSString* ArrayJoin(JSContext* cx, HandleObject array, HandleString sep);
 [[nodiscard]] bool SetArrayLength(JSContext* cx, HandleObject obj,
                                   HandleValue value, bool strict);
 
 [[nodiscard]] bool CharCodeAt(JSContext* cx, HandleString str, int32_t index,
                               uint32_t* code);
-JSLinearString* StringFromCharCode(JSContext* cx, int32_t code);
+[[nodiscard]] bool CodePointAt(JSContext* cx, HandleString str, int32_t index,
+                               uint32_t* code);
 JSLinearString* StringFromCharCodeNoGC(JSContext* cx, int32_t code);
-JSString* StringFromCodePoint(JSContext* cx, int32_t codePoint);
 JSLinearString* LinearizeForCharAccessPure(JSString* str);
 JSLinearString* LinearizeForCharAccess(JSContext* cx, JSString* str);
+int32_t StringTrimStartIndex(const JSString* str);
+int32_t StringTrimEndIndex(const JSString* str, int32_t start);
+JSString* CharCodeToLowerCase(JSContext* cx, int32_t code);
+JSString* CharCodeToUpperCase(JSContext* cx, int32_t code);
 
 [[nodiscard]] bool SetProperty(JSContext* cx, HandleObject obj,
                                Handle<PropertyName*> name, HandleValue value,
@@ -413,9 +415,6 @@ bool OperatorIn(JSContext* cx, HandleValue key, HandleObject obj, bool* out);
 void PostWriteBarrier(JSRuntime* rt, js::gc::Cell* cell);
 void PostGlobalWriteBarrier(JSRuntime* rt, GlobalObject* obj);
 
-enum class IndexInBounds { Yes, Maybe };
-
-template <IndexInBounds InBounds>
 void PostWriteElementBarrier(JSRuntime* rt, JSObject* obj, int32_t index);
 
 // If |str| represents an int32, assign it to |result| and return true.
@@ -464,8 +463,8 @@ JSObject* CreateGenerator(JSContext* cx, HandleFunction, HandleScript,
 
 ArrayObject* NewArrayObjectEnsureDenseInitLength(JSContext* cx, int32_t count);
 
-JSObject* InitRestParameter(JSContext* cx, uint32_t length, Value* rest,
-                            HandleObject res);
+ArrayObject* InitRestParameter(JSContext* cx, uint32_t length, Value* rest,
+                               Handle<ArrayObject*> arrRes);
 
 [[nodiscard]] bool HandleDebugTrap(JSContext* cx, BaselineFrame* frame,
                                    const uint8_t* retAddr);
@@ -484,13 +483,13 @@ JSObject* InitRestParameter(JSContext* cx, uint32_t length, Value* rest,
                                                BaselineFrame* frame,
                                                const jsbytecode* pc);
 [[nodiscard]] bool FreshenLexicalEnv(JSContext* cx, BaselineFrame* frame);
-[[nodiscard]] bool DebugLeaveThenFreshenLexicalEnv(JSContext* cx,
-                                                   BaselineFrame* frame,
-                                                   const jsbytecode* pc);
+[[nodiscard]] bool DebuggeeFreshenLexicalEnv(JSContext* cx,
+                                             BaselineFrame* frame,
+                                             const jsbytecode* pc);
 [[nodiscard]] bool RecreateLexicalEnv(JSContext* cx, BaselineFrame* frame);
-[[nodiscard]] bool DebugLeaveThenRecreateLexicalEnv(JSContext* cx,
-                                                    BaselineFrame* frame,
-                                                    const jsbytecode* pc);
+[[nodiscard]] bool DebuggeeRecreateLexicalEnv(JSContext* cx,
+                                              BaselineFrame* frame,
+                                              const jsbytecode* pc);
 [[nodiscard]] bool DebugLeaveLexicalEnv(JSContext* cx, BaselineFrame* frame,
                                         const jsbytecode* pc);
 
@@ -514,9 +513,12 @@ void JitValuePreWriteBarrier(JSRuntime* rt, Value* vp);
 void JitStringPreWriteBarrier(JSRuntime* rt, JSString** stringp);
 void JitObjectPreWriteBarrier(JSRuntime* rt, JSObject** objp);
 void JitShapePreWriteBarrier(JSRuntime* rt, Shape** shapep);
+void JitWasmAnyRefPreWriteBarrier(JSRuntime* rt, wasm::AnyRef* refp);
 
 bool ObjectIsCallable(JSObject* obj);
 bool ObjectIsConstructor(JSObject* obj);
+JSObject* ObjectKeys(JSContext* cx, HandleObject obj);
+bool ObjectKeysLength(JSContext* cx, HandleObject obj, int32_t* length);
 
 [[nodiscard]] bool ThrowRuntimeLexicalError(JSContext* cx,
                                             unsigned errorNumber);
@@ -544,6 +546,9 @@ bool CallDOMSetter(JSContext* cx, const JSJitInfo* jitInfo, HandleObject obj,
 
 void HandleCodeCoverageAtPC(BaselineFrame* frame, jsbytecode* pc);
 void HandleCodeCoverageAtPrologue(BaselineFrame* frame);
+
+bool CheckProxyGetByValueResult(JSContext* cx, HandleObject obj, HandleValue id,
+                                HandleValue value, MutableHandleValue result);
 
 bool GetNativeDataPropertyPure(JSContext* cx, JSObject* obj, PropertyKey id,
                                MegamorphicCacheEntry* entry, Value* vp);
@@ -577,6 +582,8 @@ bool SetPropertyMegamorphic(JSContext* cx, HandleObject obj, HandleId id,
 
 JSString* TypeOfNameObject(JSObject* obj, JSRuntime* rt);
 
+bool TypeOfEqObject(JSObject* obj, TypeofEqOperand operand);
+
 bool GetPrototypeOf(JSContext* cx, HandleObject target,
                     MutableHandleValue rval);
 
@@ -591,8 +598,6 @@ void* AllocateBigIntNoGC(JSContext* cx, bool requestMinorGC);
 void AllocateAndInitTypedArrayBuffer(JSContext* cx, TypedArrayObject* obj,
                                      int32_t count);
 
-void* CreateMatchResultFallbackFunc(JSContext* cx, gc::AllocKind kind,
-                                    size_t nDynamicSlots);
 #ifdef JS_GC_PROBES
 void TraceCreateObject(JSObject* obj);
 #endif
@@ -719,11 +724,11 @@ void AssumeUnreachable(const char* output);
 void Printf0(const char* output);
 void Printf1(const char* output, uintptr_t value);
 
-enum class TailCallVMFunctionId;
 enum class VMFunctionId;
 
 extern const VMFunctionData& GetVMFunction(VMFunctionId id);
-extern const VMFunctionData& GetVMFunction(TailCallVMFunctionId id);
+
+extern size_t NumVMFunctions();
 
 }  // namespace jit
 }  // namespace js

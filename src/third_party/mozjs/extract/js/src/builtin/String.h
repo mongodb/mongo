@@ -20,17 +20,11 @@ class GlobalObject;
 /* Initialize the String class, returning its prototype object. */
 extern JSObject* InitStringClass(JSContext* cx, Handle<GlobalObject*> global);
 
+// String methods exposed so they can be installed in the self-hosting global.
+
 extern bool str_fromCharCode(JSContext* cx, unsigned argc, Value* vp);
 
-extern bool str_fromCharCode_one_arg(JSContext* cx, HandleValue code,
-                                     MutableHandleValue rval);
-
 extern bool str_fromCodePoint(JSContext* cx, unsigned argc, Value* vp);
-
-extern bool str_fromCodePoint_one_arg(JSContext* cx, HandleValue code,
-                                      MutableHandleValue rval);
-
-// String methods exposed so they can be installed in the self-hosting global.
 
 extern bool str_includes(JSContext* cx, unsigned argc, Value* vp);
 
@@ -40,10 +34,9 @@ extern bool str_startsWith(JSContext* cx, unsigned argc, Value* vp);
 
 extern bool str_toString(JSContext* cx, unsigned argc, Value* vp);
 
-extern bool str_charCodeAt_impl(JSContext* cx, HandleString string,
-                                HandleValue index, MutableHandleValue res);
-
 extern bool str_charCodeAt(JSContext* cx, unsigned argc, Value* vp);
+
+extern bool str_codePointAt(JSContext* cx, unsigned argc, Value* vp);
 
 extern bool str_endsWith(JSContext* cx, unsigned argc, Value* vp);
 
@@ -82,8 +75,14 @@ JSString* str_replaceAll_string_raw(JSContext* cx, HandleString string,
                                     HandleString pattern,
                                     HandleString replacement);
 
+extern bool StringIncludes(JSContext* cx, HandleString string,
+                           HandleString searchString, bool* result);
+
 extern bool StringIndexOf(JSContext* cx, HandleString string,
                           HandleString searchString, int32_t* result);
+
+extern bool StringLastIndexOf(JSContext* cx, HandleString string,
+                              HandleString searchString, int32_t* result);
 
 extern bool StringStartsWith(JSContext* cx, HandleString string,
                              HandleString searchString, bool* result);
@@ -95,11 +94,21 @@ extern JSString* StringToLowerCase(JSContext* cx, HandleString string);
 
 extern JSString* StringToUpperCase(JSContext* cx, HandleString string);
 
+extern JSString* StringTrim(JSContext* cx, HandleString string);
+
+extern JSString* StringTrimStart(JSContext* cx, HandleString string);
+
+extern JSString* StringTrimEnd(JSContext* cx, HandleString string);
+
 extern bool StringConstructor(JSContext* cx, unsigned argc, Value* vp);
 
 extern bool FlatStringMatch(JSContext* cx, unsigned argc, Value* vp);
 
 extern bool FlatStringSearch(JSContext* cx, unsigned argc, Value* vp);
+
+extern JSLinearString* StringFromCharCode(JSContext* cx, int32_t charCode);
+
+extern JSLinearString* StringFromCodePoint(JSContext* cx, char32_t codePoint);
 
 } /* namespace js */
 

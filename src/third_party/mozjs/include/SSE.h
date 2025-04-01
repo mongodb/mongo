@@ -138,6 +138,10 @@
 // It's ok to use AVX instructions based on the -march option.
 #    define MOZILLA_PRESUME_AVX2 1
 #  endif
+#  ifdef __AVXVNNI__
+// It's ok to use AVX instructions based on the -march option.
+#    define MOZILLA_PRESUME_AVXVNNI 1
+#  endif
 #  ifdef __AES__
 // It's ok to use AES instructions based on the -march option.
 #    define MOZILLA_PRESUME_AES 1
@@ -199,6 +203,9 @@ extern bool MFBT_DATA avx_enabled;
 #  endif
 #  if !defined(MOZILLA_PRESUME_AVX2)
 extern bool MFBT_DATA avx2_enabled;
+#  endif
+#  if !defined(MOZILLA_PRESUME_AVXVNNI)
+extern bool MFBT_DATA avxvnni_enabled;
 #  endif
 #  if !defined(MOZILLA_PRESUME_AES)
 extern bool MFBT_DATA aes_enabled;
@@ -324,6 +331,16 @@ inline bool supports_avx2() { return true; }
 inline bool supports_avx2() { return sse_private::avx2_enabled; }
 #else
 inline bool supports_avx2() { return false; }
+#endif
+
+#if defined(MOZILLA_PRESUME_AVXVNNI)
+#  define MOZILLA_MAY_SUPPORT_AVXVNNI 1
+inline bool supports_avxvnni() { return true; }
+#elif defined(MOZILLA_SSE_HAVE_CPUID_DETECTION)
+#  define MOZILLA_MAY_SUPPORT_AVXVNNI 1
+inline bool supports_avxvnni() { return sse_private::avxvnni_enabled; }
+#else
+inline bool supports_avxvnni() { return false; }
 #endif
 
 #if defined(MOZILLA_PRESUME_AES)

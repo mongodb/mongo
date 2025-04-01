@@ -188,12 +188,30 @@ sixgill_bin = '{bindir}'
                 data.unmangledToMangled[unmangled] = mangled
                 return
 
-            limit = 0
-            m = re.match(r"^\w (?:/(\d+))? ", line)
-            if m:
-                limit = int(m[1])
-
+            # Sample lines:
+            #   D 10 20
+            #   D /3 10 20
+            #   D 3:3 10 20
+            # All of these mean that there is a direct call from function #10
+            # to function #20. The latter two mean that the call is made in a
+            # context where the 0x1 and 0x2 properties (3 == 0x1 | 0x2) are in
+            # effect. The `/n` syntax was the original, which was then expanded
+            # to `m:n` to allow multiple calls to be combined together when not
+            # all calls have the same properties in effect. The `/n` syntax is
+            # deprecated.
+            #
+            # The properties usually refer to "limits", eg "GC is suppressed
+            # in the scope surrounding this call". For testing purposes, the
+            # difference between `m` and `n` in `m:n` is currently ignored.
             tokens = line.split(" ")
+            limit = 0
+            if tokens[1].startswith("/"):
+                attr_str = tokens.pop(1)
+                limit = int(attr_str[1:])
+            elif ":" in tokens[1]:
+                attr_str = tokens.pop(1)
+                limit = int(attr_str[0 : attr_str.index(":")])
+
             if tokens[0] in ("D", "R"):
                 _, caller, callee = tokens
                 add_call(lookup(caller), lookup(callee), limit)

@@ -37,6 +37,7 @@
 #include "wasm/WasmGC.h"
 #include "wasm/WasmIonCompile.h"
 #include "wasm/WasmStubs.h"
+#include "wasm/WasmSummarizeInsn.h"
 
 using namespace js;
 using namespace js::jit;
@@ -56,6 +57,7 @@ bool CompiledCode::swap(MacroAssembler& masm) {
   trapSites.swap(masm.trapSites());
   symbolicAccesses.swap(masm.symbolicAccesses());
   tryNotes.swap(masm.tryNotes());
+  codeRangeUnwindInfos.swap(masm.codeRangeUnwindInfos());
   codeLabels.swap(masm.codeLabels());
   return true;
 }
@@ -279,6 +281,14 @@ bool ModuleGenerator::init(Metadata* maybeAsmJSMetadata) {
     return false;
   }
 
+  // Allocate space for every memory
+  if (!allocateInstanceDataBytesN(
+          sizeof(MemoryInstanceData), alignof(MemoryInstanceData),
+          moduleEnv_->memories.length(), &moduleEnv_->memoriesOffsetStart)) {
+    return false;
+  }
+  metadata_->memoriesOffsetStart = moduleEnv_->memoriesOffsetStart;
+
   // Allocate space for every table
   if (!allocateInstanceDataBytesN(
           sizeof(TableInstanceData), alignof(TableInstanceData),
@@ -430,7 +440,7 @@ static bool InRange(uint32_t caller, uint32_t callee) {
 using OffsetMap =
     HashMap<uint32_t, uint32_t, DefaultHasher<uint32_t>, SystemAllocPolicy>;
 using TrapMaybeOffsetArray =
-    EnumeratedArray<Trap, Trap::Limit, Maybe<uint32_t>>;
+    EnumeratedArray<Trap, Maybe<uint32_t>, size_t(Trap::Limit)>;
 
 bool ModuleGenerator::linkCallSites() {
   AutoCreatedBy acb(masm_, "linkCallSites");
@@ -456,15 +466,28 @@ bool ModuleGenerator::linkCallSites() {
       case CallSiteDesc::Breakpoint:
       case CallSiteDesc::EnterFrame:
       case CallSiteDesc::LeaveFrame:
+      case CallSiteDesc::CollapseFrame:
       case CallSiteDesc::FuncRef:
       case CallSiteDesc::FuncRefFast:
+      case CallSiteDesc::ReturnStub:
+      case CallSiteDesc::StackSwitch:
         break;
+      case CallSiteDesc::ReturnFunc:
       case CallSiteDesc::Func: {
+        auto patch = [this, callSite](uint32_t callerOffset,
+                                      uint32_t calleeOffset) {
+          if (callSite.kind() == CallSiteDesc::ReturnFunc) {
+            masm_.patchFarJump(CodeOffset(callerOffset), calleeOffset);
+          } else {
+            MOZ_ASSERT(callSite.kind() == CallSiteDesc::Func);
+            masm_.patchCall(callerOffset, calleeOffset);
+          }
+        };
         if (funcIsCompiled(target.funcIndex())) {
           uint32_t calleeOffset =
               funcCodeRange(target.funcIndex()).funcUncheckedCallEntry();
           if (InRange(callerOffset, calleeOffset)) {
-            masm_.patchCall(callerOffset, calleeOffset);
+            patch(callerOffset, calleeOffset);
             break;
           }
         }
@@ -491,7 +514,7 @@ bool ModuleGenerator::linkCallSites() {
           }
         }
 
-        masm_.patchCall(callerOffset, p->value());
+        patch(callerOffset, p->value());
         break;
       }
     }
@@ -596,6 +619,9 @@ bool ModuleGenerator::linkCompiledCode(CompiledCode& code) {
   AutoCreatedBy acb(masm_, "ModuleGenerator::linkCompiledCode");
   JitContext jcx;
 
+  // Combine observed features from the compiled code into the metadata
+  metadata_->featureUsage |= code.featureUsage;
+
   // Before merging in new code, if calls in a prior code range might go out of
   // range, insert far jumps to extend the range.
 
@@ -675,6 +701,14 @@ bool ModuleGenerator::linkCompiledCode(CompiledCode& code) {
       maplet.map->destroy();
       return false;
     }
+  }
+
+  auto unwindInfoOp = [=](uint32_t, CodeRangeUnwindInfo* i) {
+    i->offsetBy(offsetInModule);
+  };
+  if (!AppendForEach(&metadataTier_->codeRangeUnwindInfos,
+                     code.codeRangeUnwindInfos, unwindInfoOp)) {
+    return false;
   }
 
   auto tryNoteFilter = [](const TryNote* tn) {
@@ -956,6 +990,12 @@ bool ModuleGenerator::finishMetadataTier() {
     }
   }
 
+  last = 0;
+  for (const CodeRangeUnwindInfo& info : metadataTier_->codeRangeUnwindInfos) {
+    MOZ_ASSERT(info.offset() >= last);
+    last = info.offset();
+  }
+
   // Try notes should be sorted so that the end of ranges are in rising order
   // so that the innermost catch handler is chosen.
   last = 0;
@@ -1030,12 +1070,50 @@ UniqueCodeTier ModuleGenerator::finishCodeTier() {
 
   metadataTier_->stackMaps.offsetBy(uintptr_t(segment->base()));
 
-#ifdef DEBUG
+#if defined(DEBUG)
   // Check that each stackmap is associated with a plausible instruction.
   for (size_t i = 0; i < metadataTier_->stackMaps.length(); i++) {
-    MOZ_ASSERT(IsValidStackMapKey(compilerEnv_->debugEnabled(),
-                                  metadataTier_->stackMaps.get(i).nextInsnAddr),
-               "wasm stackmap does not reference a valid insn");
+    MOZ_ASSERT(
+        IsPlausibleStackMapKey(metadataTier_->stackMaps.get(i).nextInsnAddr),
+        "wasm stackmap does not reference a valid insn");
+  }
+#endif
+
+#if defined(DEBUG) && (defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_X86) ||   \
+                       defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_ARM) || \
+                       defined(JS_CODEGEN_LOONG64))
+  // Check that each trapsite is associated with a plausible instruction.  The
+  // required instruction kind depends on the trapsite kind.
+  //
+  // NOTE: currently only enabled on x86_{32,64} and arm{32,64}.  Ideally it
+  // should be extended to riscv, loongson, mips.
+  //
+  for (Trap trap : MakeEnumeratedRange(Trap::Limit)) {
+    const TrapSiteVector& trapSites = metadataTier_->trapSites[trap];
+    for (const TrapSite& trapSite : trapSites) {
+      const uint8_t* insnAddr =
+          ((const uint8_t*)(segment->base())) + uintptr_t(trapSite.pcOffset);
+      // `expected` describes the kind of instruction we expect to see at
+      // `insnAddr`.  Find out what is actually there and check it matches.
+      const TrapMachineInsn expected = trapSite.insn;
+      mozilla::Maybe<TrapMachineInsn> actual =
+          SummarizeTrapInstruction(insnAddr);
+      bool valid = actual.isSome() && actual.value() == expected;
+      // This is useful for diagnosing validation failures.
+      // if (!valid) {
+      //   fprintf(stderr,
+      //           "FAIL: reason=%-22s  expected=%-12s  "
+      //           "pcOffset=%-5u  addr= %p\n",
+      //           NameOfTrap(trap), NameOfTrapMachineInsn(expected),
+      //           trapSite.pcOffset, insnAddr);
+      //   if (actual.isSome()) {
+      //     fprintf(stderr, "FAIL: identified as %s\n",
+      //             actual.isSome() ? NameOfTrapMachineInsn(actual.value())
+      //                             : "(insn not identified)");
+      //   }
+      // }
+      MOZ_ASSERT(valid, "wasm trapsite does not reference a valid insn");
+    }
   }
 #endif
 
@@ -1049,15 +1127,16 @@ SharedMetadata ModuleGenerator::finishMetadata(const Bytes& bytecode) {
 
   // Copy over data from the ModuleEnvironment.
 
-  metadata_->memory = moduleEnv_->memory;
   metadata_->startFuncIndex = moduleEnv_->startFuncIndex;
+  metadata_->builtinModules = moduleEnv_->features.builtinModules;
+  metadata_->memories = std::move(moduleEnv_->memories);
   metadata_->tables = std::move(moduleEnv_->tables);
   metadata_->globals = std::move(moduleEnv_->globals);
   metadata_->tags = std::move(moduleEnv_->tags);
   metadata_->nameCustomSectionIndex = moduleEnv_->nameCustomSectionIndex;
   metadata_->moduleName = moduleEnv_->moduleName;
   metadata_->funcNames = std::move(moduleEnv_->funcNames);
-  metadata_->omitsBoundsChecks = moduleEnv_->hugeMemoryEnabled();
+  metadata_->parsedBranchHints = moduleEnv_->parsedBranchHints;
 
   // Copy over additional debug information.
 

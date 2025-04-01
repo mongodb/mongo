@@ -98,6 +98,8 @@ void AssertExtendedGraphCoherency(MIRGraph& graph,
 
 [[nodiscard]] bool AddKeepAliveInstructions(MIRGraph& graph);
 
+[[nodiscard]] bool MarkLoadsUsedAsPropertyKeys(MIRGraph& graph);
+
 // Simple linear sum of the form 'n' or 'x + n'.
 struct SimpleLinearSum {
   MDefinition* term;

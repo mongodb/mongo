@@ -22,6 +22,10 @@ void MacroAssembler::moveGPRToFloat32(Register src, FloatRegister dest) {
   moveToFloat32(src, dest);
 }
 
+void MacroAssembler::move8ZeroExtend(Register src, Register dest) {
+  as_andi(dest, src, 0xff);
+}
+
 void MacroAssembler::move8SignExtend(Register src, Register dest) {
   ma_seb(dest, src);
 }
@@ -106,6 +110,10 @@ void MacroAssembler::add32(Register src, Register dest) {
 
 void MacroAssembler::add32(Imm32 imm, Register dest) {
   ma_addu(dest, dest, imm);
+}
+
+void MacroAssembler::add32(Imm32 imm, Register src, Register dest) {
+  ma_addu(dest, src, imm);
 }
 
 void MacroAssembler::add32(Imm32 imm, const Address& dest) {
@@ -1132,6 +1140,20 @@ void MacroAssembler::branchToComputedAddress(const BaseIndex& addr) {
   branch(ScratchRegister);
 }
 
+void MacroAssembler::cmp32Move32(Condition cond, Register lhs, Imm32 rhs,
+                                 Register src, Register dest) {
+  Register scratch = ScratchRegister;
+  MOZ_ASSERT(src != scratch && dest != scratch);
+  cmp32Set(cond, lhs, rhs, scratch);
+#ifdef MIPSR6
+  as_selnez(src, src, scratch);
+  as_seleqz(dest, dest, scratch);
+  as_or(dest, dest, src);
+#else
+  as_movn(dest, src, scratch);
+#endif
+}
+
 void MacroAssembler::cmp32Move32(Condition cond, Register lhs, Register rhs,
                                  Register src, Register dest) {
   Register scratch = ScratchRegister;
@@ -1179,6 +1201,14 @@ void MacroAssembler::cmp32Load32(Condition cond, Register lhs,
 }
 
 void MacroAssembler::cmp32Load32(Condition cond, Register lhs, Register rhs,
+                                 const Address& src, Register dest) {
+  Label skip;
+  branch32(Assembler::InvertCondition(cond), lhs, rhs, &skip);
+  load32(src, dest);
+  bind(&skip);
+}
+
+void MacroAssembler::cmp32Load32(Condition cond, Register lhs, Imm32 rhs,
                                  const Address& src, Register dest) {
   Label skip;
   branch32(Assembler::InvertCondition(cond), lhs, rhs, &skip);
@@ -1251,21 +1281,26 @@ void MacroAssembler::spectreZeroRegister(Condition cond, Register scratch,
 // ========================================================================
 // Memory access primitives.
 
-void MacroAssembler::storeUncanonicalizedDouble(FloatRegister src,
-                                                const Address& addr) {
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
+    FloatRegister src, const Address& addr) {
+  // FIXME -- see https://bugzilla.mozilla.org/show_bug.cgi?id=1855960
+  return FaultingCodeOffset();
   ma_sd(src, addr);
 }
-void MacroAssembler::storeUncanonicalizedDouble(FloatRegister src,
-                                                const BaseIndex& addr) {
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
+    FloatRegister src, const BaseIndex& addr) {
+  return FaultingCodeOffset();  // FIXME
   ma_sd(src, addr);
 }
 
-void MacroAssembler::storeUncanonicalizedFloat32(FloatRegister src,
-                                                 const Address& addr) {
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
+    FloatRegister src, const Address& addr) {
+  return FaultingCodeOffset();  // FIXME
   ma_ss(src, addr);
 }
-void MacroAssembler::storeUncanonicalizedFloat32(FloatRegister src,
-                                                 const BaseIndex& addr) {
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
+    FloatRegister src, const BaseIndex& addr) {
+  return FaultingCodeOffset();  // FIXME
   ma_ss(src, addr);
 }
 

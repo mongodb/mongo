@@ -1,4 +1,22 @@
 #define MOZ_UNIFIED_BUILD
+#include "builtin/String.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "builtin/String.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "builtin/String.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "builtin/Symbol.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "builtin/Symbol.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "builtin/Symbol.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "builtin/TestingFunctions.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "builtin/TestingFunctions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -33,23 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "builtin/WeakRefObject.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "builtin/WeakSetObject.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/WeakSetObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "builtin/WeakSetObject.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "builtin/WrappedFunctionObject.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/WrappedFunctionObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "builtin/WrappedFunctionObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

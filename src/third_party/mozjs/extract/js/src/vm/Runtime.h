@@ -18,6 +18,7 @@
 #include "mozilla/XorShift128PlusRNG.h"
 
 #include <algorithm>
+#include <utility>
 
 #ifdef JS_HAS_INTL_API
 #  include "builtin/intl/SharedIntlData.h"
@@ -49,6 +50,7 @@
 #include "vm/Caches.h"  // js::RuntimeCaches
 #include "vm/CodeCoverage.h"
 #include "vm/GeckoProfiler.h"
+#include "vm/InvalidatingFuse.h"
 #include "vm/JSScript.h"
 #include "vm/OffThreadPromiseRuntimeState.h"  // js::OffThreadPromiseRuntimeState
 #include "vm/SharedScriptDataTableHolder.h"   // js::SharedScriptDataTableHolder
@@ -260,20 +262,20 @@ class Metrics {
   // values so take care not to redefine the value of enum values. In the
   // future, these should become Glean Labeled Counter metrics.
   struct Enumeration {
-    using SourceType = int;
+    using SourceType = unsigned int;
     static uint32_t convert(SourceType sample) {
-      MOZ_ASSERT(sample >= 0 && sample <= 100);
+      MOZ_ASSERT(sample <= 100);
       return static_cast<uint32_t>(sample);
     }
   };
 
-  // Record a percentage distribution which is an integer in the range 0 to 100.
-  // In the future, this will be a Glean Custom Distribution unless they add a
-  // better match.
+  // Record a percentage distribution in the range 0 to 100. This takes a double
+  // and converts it to an integer. In the future, this will be a Glean Custom
+  // Distribution unless they add a better match.
   struct Percentage {
-    using SourceType = int;
+    using SourceType = double;
     static uint32_t convert(SourceType sample) {
-      MOZ_ASSERT(sample >= 0 && sample <= 100);
+      MOZ_ASSERT(sample >= 0.0 && sample <= 100.0);
       return static_cast<uint32_t>(sample);
     }
   };
@@ -294,6 +296,17 @@ class Metrics {
 #undef DECLARE_METRIC_HELPER
 };
 
+class HasSeenObjectEmulateUndefinedFuse : public js::InvalidatingRuntimeFuse {
+  virtual const char* name() override {
+    return "HasSeenObjectEmulateUndefinedFuse";
+  }
+  virtual bool checkInvariant(JSContext* cx) override {
+    // Without traversing the GC heap I don't think it's possible to assert
+    // this invariant directly.
+    return true;
+  }
+};
+
 }  // namespace js
 
 struct JSRuntime {
@@ -306,8 +319,18 @@ struct JSRuntime {
   /* Space for interpreter frames. */
   js::MainThreadData<js::InterpreterStack> interpreterStack_;
 
+#ifdef ENABLE_PORTABLE_BASELINE_INTERP
+  /* Space for portable baseline interpreter frames. */
+  js::MainThreadData<js::PortableBaselineStack> portableBaselineStack_;
+#endif
+
  public:
   js::InterpreterStack& interpreterStack() { return interpreterStack_.ref(); }
+#ifdef ENABLE_PORTABLE_BASELINE_INTERP
+  js::PortableBaselineStack& portableBaselineStack() {
+    return portableBaselineStack_.ref();
+  }
+#endif
 
   /*
    * If non-null, another runtime guaranteed to outlive this one and whose
@@ -503,9 +526,9 @@ struct JSRuntime {
   js::GeckoProfilerRuntime& geckoProfiler() { return geckoProfiler_.ref(); }
 
   // Heap GC roots for PersistentRooted pointers.
-  js::MainThreadData<
-      mozilla::EnumeratedArray<JS::RootKind, JS::RootKind::Limit,
-                               mozilla::LinkedList<js::PersistentRootedBase>>>
+  js::MainThreadData<mozilla::EnumeratedArray<
+      JS::RootKind, mozilla::LinkedList<js::PersistentRootedBase>,
+      size_t(JS::RootKind::Limit)>>
       heapRoots;
 
   void tracePersistentRoots(JSTracer* trc);
@@ -656,8 +679,19 @@ struct JSRuntime {
   /* Code coverage output. */
   js::UnprotectedData<js::coverage::LCovRuntime> lcovOutput_;
 
+  /* Functions to call, together with data, when the runtime is being torn down.
+   */
+  js::MainThreadData<mozilla::Vector<std::pair<void (*)(void*), void*>, 4>>
+      cleanupClosures;
+
  public:
   js::coverage::LCovRuntime& lcovOutput() { return lcovOutput_.ref(); }
+
+  /* Register a cleanup function to be called during runtime shutdown. Do not
+   * depend on the ordering of cleanup calls. */
+  bool atExit(void (*function)(void*), void* data) {
+    return cleanupClosures.ref().append(std::pair(function, data));
+  }
 
  private:
   js::UnprotectedData<js::jit::JitRuntime*> jitRuntime_;
@@ -984,7 +1018,7 @@ struct JSRuntime {
   // but Ion needs to be able to access addresses inside here, which should be
   // safe, as the actual cache lookups will be performed on the main thread
   // through jitted code.
-  js::MainThreadOrParseOrIonCompileData<js::RuntimeCaches> caches_;
+  js::MainThreadOrIonCompileData<js::RuntimeCaches> caches_;
 
  public:
   js::RuntimeCaches& caches() { return caches_.ref(); }
@@ -1014,11 +1048,6 @@ struct JSRuntime {
   // HostImportModuleDynamically. This is also used to enable/disable dynamic
   // module import and can accessed by off-thread parsing.
   mozilla::Atomic<JS::ModuleDynamicImportHook> moduleDynamicImportHook;
-
-  // The supported module import assertions.
-  // https://tc39.es/proposal-import-assertions/#sec-hostgetsupportedimportassertions
-  js::MainThreadOrParseData<JS::ImportAssertionVector>
-      supportedImportAssertions;
 
   // Hooks called when script private references are created and destroyed.
   js::MainThreadData<JS::ScriptPrivateReferenceHook> scriptPrivateAddRefHook;
@@ -1071,6 +1100,9 @@ struct JSRuntime {
 
   js::MainThreadData<JS::GlobalCreationCallback>
       shadowRealmGlobalCreationCallback;
+
+  js::MainThreadData<js::HasSeenObjectEmulateUndefinedFuse>
+      hasSeenObjectEmulateUndefinedFuse;
 };
 
 namespace js {

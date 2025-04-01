@@ -279,28 +279,33 @@ void ExecutableAllocator::poisonCode(JSRuntime* rt,
   }
 #endif
 
-  for (size_t i = 0; i < ranges.length(); i++) {
-    ExecutablePool* pool = ranges[i].pool;
-    if (pool->m_refCount == 1) {
-      // This is the last reference so the release() call below will
-      // unmap the memory. Don't bother poisoning it.
-      continue;
+  {
+    AutoMarkJitCodeWritableForThread writable;
+
+    for (size_t i = 0; i < ranges.length(); i++) {
+      ExecutablePool* pool = ranges[i].pool;
+      if (pool->m_refCount == 1) {
+        // This is the last reference so the release() call below will
+        // unmap the memory. Don't bother poisoning it.
+        continue;
+      }
+
+      MOZ_ASSERT(pool->m_refCount > 1);
+
+      // Use the pool's mark bit to indicate we made the pool writable.
+      // This avoids reprotecting a pool multiple times.
+      if (!pool->isMarked()) {
+        reprotectPool(rt, pool, ProtectionSetting::Writable,
+                      MustFlushICache::No);
+        pool->mark();
+      }
+
+      // Note: we use memset instead of js::Poison because we want to poison
+      // JIT code in release builds too. Furthermore, we don't want the
+      // invalid-ObjectValue poisoning js::Poison does in debug builds.
+      memset(ranges[i].start, JS_SWEPT_CODE_PATTERN, ranges[i].size);
+      MOZ_MAKE_MEM_NOACCESS(ranges[i].start, ranges[i].size);
     }
-
-    MOZ_ASSERT(pool->m_refCount > 1);
-
-    // Use the pool's mark bit to indicate we made the pool writable.
-    // This avoids reprotecting a pool multiple times.
-    if (!pool->isMarked()) {
-      reprotectPool(rt, pool, ProtectionSetting::Writable, MustFlushICache::No);
-      pool->mark();
-    }
-
-    // Note: we use memset instead of js::Poison because we want to poison
-    // JIT code in release builds too. Furthermore, we don't want the
-    // invalid-ObjectValue poisoning js::Poison does in debug builds.
-    memset(ranges[i].start, JS_SWEPT_CODE_PATTERN, ranges[i].size);
-    MOZ_MAKE_MEM_NOACCESS(ranges[i].start, ranges[i].size);
   }
 
   // Make the pools executable again and drop references. We don't flush the

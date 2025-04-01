@@ -371,11 +371,6 @@ static bool OptimizableConstantAccess(MDefinition* base,
   return true;
 }
 
-void LIRGenerator::visitWasmHeapBase(MWasmHeapBase* ins) {
-  auto* lir = new (alloc()) LWasmHeapBase(useRegisterAtStart(ins->instance()));
-  define(lir, ins);
-}
-
 void LIRGenerator::visitWasmLoad(MWasmLoad* ins) {
   MDefinition* base = ins->base();
   MOZ_ASSERT(base->type() == MIRType::Int32);
@@ -480,6 +475,7 @@ void LIRGenerator::visitWasmStore(MWasmStore* ins) {
     case Scalar::Uint8Clamped:
     case Scalar::BigInt64:
     case Scalar::BigUint64:
+    case Scalar::Float16:
     case Scalar::MaxTypedArrayViewType:
       MOZ_CRASH("unexpected array type");
   }
@@ -640,8 +636,8 @@ void LIRGenerator::visitWasmAtomicBinopHeap(MWasmAtomicBinopHeap* ins) {
   //  - better 8-bit register allocation and instruction selection, Bug
   //  #1077036.
 
-  bool bitOp = !(ins->operation() == AtomicFetchAddOp ||
-                 ins->operation() == AtomicFetchSubOp);
+  bool bitOp =
+      !(ins->operation() == AtomicOp::Add || ins->operation() == AtomicOp::Sub);
   LDefinition tempDef = LDefinition::BogusTemp();
   LAllocation value;
 

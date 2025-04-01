@@ -471,14 +471,11 @@ void MemOperand::AddOffset(int64_t offset) {
   offset_ += offset;
 }
 
+static CPUFeatures InitCachedCPUFeatures() {
+  CPUFeatures cpu_features = CPUFeatures::AArch64LegacyBaseline();
 
-// Assembler
-Assembler::Assembler(PositionIndependentCodeOption pic)
-    : pic_(pic),
-      cpu_features_(CPUFeatures::AArch64LegacyBaseline())
-{
   // Mozilla change: always use maximally-present features.
-  cpu_features_.Combine(CPUFeatures::InferFromOS());
+  cpu_features.Combine(CPUFeatures::InferFromOS());
 
   // Mozilla change: Compile time hard-coded value from js-config.mozbuild.
 #ifndef MOZ_AARCH64_JSCVT
@@ -486,8 +483,19 @@ Assembler::Assembler(PositionIndependentCodeOption pic)
 #elif MOZ_AARCH64_JSCVT >= 1
   // Note, vixl backend implements the JSCVT flag as a boolean despite having 3
   // extra bits reserved for forward compatibility in the ARMv8 documentation.
-  cpu_features_.Combine(CPUFeatures::kJSCVT);
+  cpu_features.Combine(CPUFeatures::kJSCVT);
 #endif
+
+  return cpu_features;
+}
+
+// Assembler
+Assembler::Assembler(PositionIndependentCodeOption pic)
+    : pic_(pic)
+{
+  // Mozilla change: query cpu features once and cache result.
+  static CPUFeatures cached_cpu_features = InitCachedCPUFeatures();
+  cpu_features_ = cached_cpu_features;
 }
 
 

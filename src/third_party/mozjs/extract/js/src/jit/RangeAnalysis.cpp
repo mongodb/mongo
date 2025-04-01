@@ -21,7 +21,9 @@
 #include "js/Conversions.h"
 #include "js/ScalarType.h"  // js::Scalar::Type
 #include "util/CheckedArithmetic.h"
+#include "util/Unicode.h"
 #include "vm/ArgumentsObject.h"
+#include "vm/Float16.h"
 #include "vm/TypedArrayObject.h"
 #include "vm/Uint8Clamped.h"
 
@@ -1319,7 +1321,11 @@ void MConstant::computeRange(TempAllocator& alloc) {
 
 void MCharCodeAt::computeRange(TempAllocator& alloc) {
   // ECMA 262 says that the integer will be non-negative and at most 65535.
-  setRange(Range::NewInt32Range(alloc, 0, 65535));
+  setRange(Range::NewInt32Range(alloc, 0, unicode::UTF16Max));
+}
+
+void MCodePointAt::computeRange(TempAllocator& alloc) {
+  setRange(Range::NewInt32Range(alloc, 0, unicode::NonBMPMax));
 }
 
 void MClampToUint8::computeRange(TempAllocator& alloc) {
@@ -1753,6 +1759,7 @@ static Range* GetArrayBufferViewRange(TempAllocator& alloc, Scalar::Type type) {
     case Scalar::BigUint64:
     case Scalar::Int64:
     case Scalar::Simd128:
+    case Scalar::Float16:
     case Scalar::Float32:
     case Scalar::Float64:
     case Scalar::MaxTypedArrayViewType:
@@ -1786,13 +1793,32 @@ void MInitializedLength::computeRange(TempAllocator& alloc) {
 }
 
 void MArrayBufferViewLength::computeRange(TempAllocator& alloc) {
-  if constexpr (ArrayBufferObject::MaxByteLength <= INT32_MAX) {
+  if constexpr (ArrayBufferObject::ByteLengthLimit <= INT32_MAX) {
     setRange(Range::NewUInt32Range(alloc, 0, INT32_MAX));
   }
 }
 
 void MArrayBufferViewByteOffset::computeRange(TempAllocator& alloc) {
-  if constexpr (ArrayBufferObject::MaxByteLength <= INT32_MAX) {
+  if constexpr (ArrayBufferObject::ByteLengthLimit <= INT32_MAX) {
+    setRange(Range::NewUInt32Range(alloc, 0, INT32_MAX));
+  }
+}
+
+void MResizableTypedArrayByteOffsetMaybeOutOfBounds::computeRange(
+    TempAllocator& alloc) {
+  if constexpr (ArrayBufferObject::ByteLengthLimit <= INT32_MAX) {
+    setRange(Range::NewUInt32Range(alloc, 0, INT32_MAX));
+  }
+}
+
+void MResizableTypedArrayLength::computeRange(TempAllocator& alloc) {
+  if constexpr (ArrayBufferObject::ByteLengthLimit <= INT32_MAX) {
+    setRange(Range::NewUInt32Range(alloc, 0, INT32_MAX));
+  }
+}
+
+void MResizableDataViewByteLength::computeRange(TempAllocator& alloc) {
+  if constexpr (ArrayBufferObject::ByteLengthLimit <= INT32_MAX) {
     setRange(Range::NewUInt32Range(alloc, 0, INT32_MAX));
   }
 }
@@ -1959,8 +1985,12 @@ bool RangeAnalysis::analyzeLoop(MBasicBlock* header) {
       return false;
     }
     iterationBound->boundSum.dump(sp);
+    JS::UniqueChars str = sp.release();
+    if (!str) {
+      return false;
+    }
     JitSpew(JitSpew_Range, "computed symbolic bound on backedges: %s",
-            sp.string());
+            str.get());
   }
 #endif
 

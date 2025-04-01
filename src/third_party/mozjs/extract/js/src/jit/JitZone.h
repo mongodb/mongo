@@ -8,7 +8,9 @@
 #define jit_JitZone_h
 
 #include "mozilla/Assertions.h"
+#include "mozilla/EnumeratedArray.h"
 #include "mozilla/HashFunctions.h"
+#include "mozilla/LinkedList.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
 
@@ -17,9 +19,11 @@
 #include <utility>
 
 #include "gc/Barrier.h"
+#include "gc/Marking.h"
 #include "jit/ExecutableAllocator.h"
 #include "jit/ICStubSpace.h"
 #include "jit/Invalidation.h"
+#include "jit/JitScript.h"
 #include "js/AllocPolicy.h"
 #include "js/GCHashTable.h"
 #include "js/HashTable.h"
@@ -39,6 +43,7 @@ namespace jit {
 enum class CacheKind : uint8_t;
 class CacheIRStubInfo;
 class JitCode;
+class JitScript;
 
 enum class ICStubEngine : uint8_t {
   // Baseline IC, see BaselineIC.h.
@@ -81,9 +86,11 @@ struct BaselineCacheIRStubCodeMapGCPolicy {
   }
 };
 
+enum JitScriptFilter : bool { SkipDyingScripts, IncludeDyingScripts };
+
 class JitZone {
-  // Allocated space for optimized baseline stubs.
-  OptimizedICStubSpace optimizedStubSpace_;
+  // Allocated space for CacheIR stubs.
+  ICStubSpace stubSpace_;
 
   // Set of CacheIRStubInfo instances used by Ion stubs in this Zone.
   using IonCacheIRStubInfoSet =
@@ -105,6 +112,8 @@ class JitZone {
                 StableCellHasher<WeakHeapPtr<BaseScript*>>, SystemAllocPolicy>;
   InlinedScriptMap inlinedCompilations_;
 
+  mozilla::LinkedList<JitScript> jitScripts_;
+
   // The following two fields are a pair of associated scripts. If they are
   // non-null, the child has been inlined into the parent, and we have bailed
   // out due to a MonomorphicInlinedStubFolding bailout. If it wasn't
@@ -113,19 +122,63 @@ class JitZone {
   WeakHeapPtr<JSScript*> lastStubFoldingBailoutChild_;
   WeakHeapPtr<JSScript*> lastStubFoldingBailoutParent_;
 
+  // The JitZone stores stubs to concatenate strings inline and perform RegExp
+  // calls inline. These bake in zone specific pointers and can't be stored in
+  // JitRuntime. They also are dependent on the value of 'initialStringHeap' and
+  // must be flushed when its value changes.
+  //
+  // These are weak pointers, but they can by accessed during off-thread Ion
+  // compilation and therefore can't use the usual read barrier. Instead, we
+  // record which stubs have been read and perform the appropriate barriers in
+  // CodeGenerator::link().
+
+  enum StubIndex : uint32_t {
+    StringConcat = 0,
+    RegExpMatcher,
+    RegExpSearcher,
+    RegExpExecMatch,
+    RegExpExecTest,
+    Count
+  };
+
+  mozilla::EnumeratedArray<StubIndex, WeakHeapPtr<JitCode*>,
+                           size_t(StubIndex::Count)>
+      stubs_;
+
   mozilla::Maybe<IonCompilationId> currentCompilationId_;
   bool keepJitScripts_ = false;
 
- public:
-  ~JitZone() { MOZ_ASSERT(!keepJitScripts_); }
+  gc::Heap initialStringHeap = gc::Heap::Tenured;
 
-  void traceWeak(JSTracer* trc);
+  JitCode* generateStringConcatStub(JSContext* cx);
+  JitCode* generateRegExpMatcherStub(JSContext* cx);
+  JitCode* generateRegExpSearcherStub(JSContext* cx);
+  JitCode* generateRegExpExecMatchStub(JSContext* cx);
+  JitCode* generateRegExpExecTestStub(JSContext* cx);
+
+  JitCode* getStubNoBarrier(StubIndex stub,
+                            uint32_t* requiredBarriersOut) const {
+    MOZ_ASSERT(CurrentThreadIsIonCompiling());
+    *requiredBarriersOut |= 1 << uint32_t(stub);
+    return stubs_[stub].unbarrieredGet();
+  }
+
+ public:
+  explicit JitZone(bool zoneHasNurseryStrings) {
+    setStringsCanBeInNursery(zoneHasNurseryStrings);
+  }
+  ~JitZone() {
+    MOZ_ASSERT(jitScripts_.isEmpty());
+    MOZ_ASSERT(!keepJitScripts_);
+  }
+
+  void traceWeak(JSTracer* trc, Zone* zone);
 
   void addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
                               JS::CodeSizes* code, size_t* jitZone,
-                              size_t* baselineStubsOptimized) const;
+                              size_t* cacheIRStubs) const;
 
-  OptimizedICStubSpace* optimizedStubSpace() { return &optimizedStubSpace_; }
+  ICStubSpace* stubSpace() { return &stubSpace_; }
 
   JitCode* getBaselineCacheIRStubCode(const CacheIRStubKey::Lookup& key,
                                       CacheIRStubInfo** stubInfo) {
@@ -191,6 +244,42 @@ class JitZone {
     lastStubFoldingBailoutParent_ = nullptr;
   }
 
+  void registerJitScript(JitScript* script) { jitScripts_.insertBack(script); }
+
+  // Iterate over all JitScripts in this zone calling |f| on each, allowing |f|
+  // to remove the script. The template parameter |filter| controls whether to
+  // include dying JitScripts during GC sweeping. Be careful when using this not
+  // to let GC things reachable from the JitScript escape - they may be gray.
+  template <JitScriptFilter filter = SkipDyingScripts, typename F>
+  void forEachJitScript(F&& f) {
+    JitScript* script = jitScripts_.getFirst();
+    while (script) {
+      JitScript* next = script->getNext();
+      if (filter == IncludeDyingScripts ||
+          !gc::IsAboutToBeFinalizedUnbarriered(script->owningScript())) {
+        f(script);
+      }
+      script = next;
+    }
+  }
+
+  // Like forEachJitScript above, but abort if |f| returns false.
+  template <JitScriptFilter filter = SkipDyingScripts, typename F>
+  bool forEachJitScriptFallible(F&& f) {
+    JitScript* script = jitScripts_.getFirst();
+    while (script) {
+      JitScript* next = script->getNext();
+      if (filter == IncludeDyingScripts ||
+          !gc::IsAboutToBeFinalizedUnbarriered(script->owningScript())) {
+        if (!f(script)) {
+          return false;
+        }
+      }
+      script = next;
+    }
+    return true;
+  }
+
   bool keepJitScripts() const { return keepJitScripts_; }
   void setKeepJitScripts(bool keep) { keepJitScripts_ = keep; }
 
@@ -199,6 +288,110 @@ class JitZone {
   }
   mozilla::Maybe<IonCompilationId>& currentCompilationIdRef() {
     return currentCompilationId_;
+  }
+
+  // Initialize code stubs only used by Ion, not Baseline.
+  [[nodiscard]] bool ensureIonStubsExist(JSContext* cx) {
+    if (stubs_[StringConcat]) {
+      return true;
+    }
+    stubs_[StringConcat] = generateStringConcatStub(cx);
+    return stubs_[StringConcat];
+  }
+
+  void traceWeak(JSTracer* trc, JS::Realm* realm);
+
+  void discardStubs() {
+    for (WeakHeapPtr<JitCode*>& stubRef : stubs_) {
+      stubRef = nullptr;
+    }
+  }
+
+  bool hasStubs() const {
+    for (const WeakHeapPtr<JitCode*>& stubRef : stubs_) {
+      if (stubRef) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void setStringsCanBeInNursery(bool allow) {
+    MOZ_ASSERT(!hasStubs());
+    initialStringHeap = allow ? gc::Heap::Default : gc::Heap::Tenured;
+  }
+
+  JitCode* stringConcatStubNoBarrier(uint32_t* requiredBarriersOut) const {
+    return getStubNoBarrier(StringConcat, requiredBarriersOut);
+  }
+
+  JitCode* regExpMatcherStubNoBarrier(uint32_t* requiredBarriersOut) const {
+    return getStubNoBarrier(RegExpMatcher, requiredBarriersOut);
+  }
+
+  [[nodiscard]] JitCode* ensureRegExpMatcherStubExists(JSContext* cx) {
+    if (JitCode* code = stubs_[RegExpMatcher]) {
+      return code;
+    }
+    stubs_[RegExpMatcher] = generateRegExpMatcherStub(cx);
+    return stubs_[RegExpMatcher];
+  }
+
+  JitCode* regExpSearcherStubNoBarrier(uint32_t* requiredBarriersOut) const {
+    return getStubNoBarrier(RegExpSearcher, requiredBarriersOut);
+  }
+
+  [[nodiscard]] JitCode* ensureRegExpSearcherStubExists(JSContext* cx) {
+    if (JitCode* code = stubs_[RegExpSearcher]) {
+      return code;
+    }
+    stubs_[RegExpSearcher] = generateRegExpSearcherStub(cx);
+    return stubs_[RegExpSearcher];
+  }
+
+  JitCode* regExpExecMatchStubNoBarrier(uint32_t* requiredBarriersOut) const {
+    return getStubNoBarrier(RegExpExecMatch, requiredBarriersOut);
+  }
+
+  [[nodiscard]] JitCode* ensureRegExpExecMatchStubExists(JSContext* cx) {
+    if (JitCode* code = stubs_[RegExpExecMatch]) {
+      return code;
+    }
+    stubs_[RegExpExecMatch] = generateRegExpExecMatchStub(cx);
+    return stubs_[RegExpExecMatch];
+  }
+
+  JitCode* regExpExecTestStubNoBarrier(uint32_t* requiredBarriersOut) const {
+    return getStubNoBarrier(RegExpExecTest, requiredBarriersOut);
+  }
+
+  [[nodiscard]] JitCode* ensureRegExpExecTestStubExists(JSContext* cx) {
+    if (JitCode* code = stubs_[RegExpExecTest]) {
+      return code;
+    }
+    stubs_[RegExpExecTest] = generateRegExpExecTestStub(cx);
+    return stubs_[RegExpExecTest];
+  }
+
+  // Perform the necessary read barriers on stubs described by the bitmasks
+  // passed in. This function can only be called from the main thread.
+  //
+  // The stub pointers must still be valid by the time these methods are
+  // called. This is arranged by cancelling off-thread Ion compilation at the
+  // start of GC and at the start of sweeping.
+  void performStubReadBarriers(uint32_t stubsToBarrier) const;
+
+  static constexpr size_t offsetOfRegExpMatcherStub() {
+    return offsetof(JitZone, stubs_) + RegExpMatcher * sizeof(uintptr_t);
+  }
+  static constexpr size_t offsetOfRegExpSearcherStub() {
+    return offsetof(JitZone, stubs_) + RegExpSearcher * sizeof(uintptr_t);
+  }
+  static constexpr size_t offsetOfRegExpExecMatchStub() {
+    return offsetof(JitZone, stubs_) + RegExpExecMatch * sizeof(uintptr_t);
+  }
+  static constexpr size_t offsetOfRegExpExecTestStub() {
+    return offsetof(JitZone, stubs_) + RegExpExecTest * sizeof(uintptr_t);
   }
 };
 

@@ -6,15 +6,32 @@
 
 #include "frontend/FrontendContext.h"
 
+#ifdef _WIN32
+#  include <windows.h>
+#  include <process.h>  // GetCurrentThreadId
+#else
+#  include <pthread.h>  // pthread_self
+#endif
+
 #include "gc/GC.h"
-#include "js/AllocPolicy.h"         // js::ReportOutOfMemory
-#include "js/friend/StackLimits.h"  // js::ReportOverRecursed
+#include "js/AllocPolicy.h"  // js::ReportOutOfMemory
+#include "js/friend/StackLimits.h"  // js::ReportOverRecursed, js::MinimumStackLimitMargin
 #include "js/Modules.h"
 #include "util/DifferentialTesting.h"
 #include "util/NativeStack.h"  // GetNativeStackBase
 #include "vm/JSContext.h"
 
 using namespace js;
+
+void FrontendErrors::clearErrors() {
+  error.reset();
+  warnings.clear();
+  overRecursed = false;
+  outOfMemory = false;
+  allocationOverflow = false;
+}
+
+void FrontendErrors::clearWarnings() { warnings.clear(); }
 
 void FrontendAllocator::reportAllocationOverflow() {
   fc_->onAllocationOverflow();
@@ -33,16 +50,6 @@ FrontendContext::~FrontendContext() {
   }
 }
 
-bool FrontendContext::setSupportedImportAssertions(
-    const JS::ImportAssertionVector& supportedImportAssertions) {
-  MOZ_ASSERT(supportedImportAssertions_.empty());
-  if (!supportedImportAssertions_.appendAll(supportedImportAssertions)) {
-    ReportOutOfMemory();
-    return false;
-  }
-  return true;
-}
-
 void FrontendContext::setStackQuota(JS::NativeStackSize stackSize) {
 #ifdef __wasi__
   stackLimit_ = JS::WASINativeStackLimit;
@@ -53,6 +60,10 @@ void FrontendContext::setStackQuota(JS::NativeStackSize stackSize) {
     stackLimit_ = JS::GetNativeStackLimit(GetNativeStackBase(), stackSize - 1);
   }
 #endif  // !__wasi__
+
+#ifdef DEBUG
+  setNativeStackLimitThread();
+#endif
 }
 
 bool FrontendContext::allocateOwnedPool() {
@@ -67,14 +78,18 @@ bool FrontendContext::allocateOwnedPool() {
 }
 
 bool FrontendContext::hadErrors() const {
-  if (maybeCx_) {
-    if (maybeCx_->isExceptionPending()) {
-      return true;
-    }
-  }
+  // All errors must be reported to FrontendContext.
+  MOZ_ASSERT_IF(maybeCx_, !maybeCx_->isExceptionPending());
 
   return errors_.hadErrors();
 }
+
+void FrontendContext::clearErrors() {
+  MOZ_ASSERT(!maybeCx_);
+  return errors_.clearErrors();
+}
+
+void FrontendContext::clearWarnings() { return errors_.clearWarnings(); }
 
 void* FrontendContext::onOutOfMemory(AllocFunction allocFunc, arena_id_t arena,
                                      size_t nbytes, void* reallocPtr) {
@@ -91,11 +106,7 @@ void FrontendContext::onOutOfMemory() { addPendingOutOfMemory(); }
 void FrontendContext::onOverRecursed() { errors_.overRecursed = true; }
 
 void FrontendContext::recoverFromOutOfMemory() {
-  // TODO: Remove this branch once error report directly against JSContext is
-  //       removed from the frontend code.
-  if (maybeCx_) {
-    maybeCx_->recoverFromOutOfMemory();
-  }
+  MOZ_ASSERT_IF(maybeCx_, !maybeCx_->isThrowingOutOfMemory());
 
   errors_.outOfMemory = false;
 }
@@ -151,6 +162,10 @@ void FrontendContext::setCurrentJSContext(JSContext* cx) {
   nameCollectionPool_ = &cx->frontendCollectionPool();
   scriptDataTableHolder_ = &cx->runtime()->scriptDataTableHolder();
   stackLimit_ = cx->stackLimitForCurrentPrincipal();
+
+#ifdef DEBUG
+  setNativeStackLimitThread();
+#endif
 }
 
 bool FrontendContext::convertToRuntimeError(
@@ -179,14 +194,33 @@ bool FrontendContext::convertToRuntimeError(
   if (hadAllocationOverflow()) {
     js::ReportAllocationOverflow(cx);
   }
+
+  MOZ_ASSERT(!extraBindingsAreNotUsed(),
+             "extraBindingsAreNotUsed shouldn't escape from FrontendContext");
   return true;
 }
 
-void FrontendContext::linkWithJSContext(JSContext* cx) {
-  if (cx) {
-    cx->setFrontendErrors(&errors_);
-  }
+#ifdef DEBUG
+static size_t GetTid() {
+#  if defined(_WIN32)
+  return size_t(GetCurrentThreadId());
+#  else
+  return size_t(pthread_self());
+#  endif
 }
+
+void FrontendContext::setNativeStackLimitThread() {
+  stackLimitThreadId_.emplace(GetTid());
+}
+
+void FrontendContext::assertNativeStackLimitThread() {
+  if (!stackLimitThreadId_.isSome()) {
+    return;
+  }
+
+  MOZ_ASSERT(*stackLimitThreadId_ == GetTid());
+}
+#endif
 
 #ifdef __wasi__
 void FrontendContext::incWasiRecursionDepth() {
@@ -235,3 +269,37 @@ FrontendContext* js::NewFrontendContext() {
 }
 
 void js::DestroyFrontendContext(FrontendContext* fc) { js_delete_poison(fc); }
+
+#ifdef DEBUG
+void FrontendContext::checkAndUpdateFrontendContextRecursionLimit(void* sp) {
+  // For the js::MinimumStackLimitMargin to be effective, it should be larger
+  // than the largest stack space which might be consumed by successive calls
+  // to AutoCheckRecursionLimit::check.
+  //
+  // This function asserts that this property holds by recalling the stack
+  // pointer of the previous call and comparing the consumed stack size with
+  // the minimum margin.
+  //
+  // If this property does not hold, either the stack limit should be increased
+  // or more calls to check for recursion should be added.
+  if (previousStackPointer_ != nullptr) {
+#  if JS_STACK_GROWTH_DIRECTION > 0
+    if (sp > previousStackPointer_) {
+      size_t diff = uintptr_t(sp) - uintptr_t(previousStackPointer_);
+      MOZ_ASSERT(diff < js::MinimumStackLimitMargin);
+    }
+#  else
+    if (sp < previousStackPointer_) {
+      size_t diff = uintptr_t(previousStackPointer_) - uintptr_t(sp);
+      MOZ_ASSERT(diff < js::MinimumStackLimitMargin);
+    }
+#  endif
+  }
+  previousStackPointer_ = sp;
+}
+
+void js::CheckAndUpdateFrontendContextRecursionLimit(FrontendContext* fc,
+                                                     void* sp) {
+  fc->checkAndUpdateFrontendContextRecursionLimit(sp);
+}
+#endif

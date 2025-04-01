@@ -20,7 +20,6 @@ namespace js {
 class Monitor {
  protected:
   friend class AutoLockMonitor;
-  friend class AutoUnlockMonitor;
 
   Mutex lock_ MOZ_UNANNOTATED;
   ConditionVariable condVar_;
@@ -51,20 +50,6 @@ class AutoLockMonitor : public LockGuard<Mutex> {
   void notifyAll(ConditionVariable& condVar) { condVar.notify_all(); }
 
   void notifyAll() { notifyAll(monitor.condVar_); }
-};
-
-class AutoUnlockMonitor {
- private:
-  Monitor& monitor;
-
- public:
-  explicit AutoUnlockMonitor(Monitor& monitor) : monitor(monitor) {
-    monitor.lock_.unlock();
-  }
-
-  ~AutoUnlockMonitor() { monitor.lock_.lock(); }
-
-  bool isFor(Monitor& other) const { return &monitor.lock_ == &other.lock_; }
 };
 
 }  // namespace js

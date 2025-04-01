@@ -162,6 +162,10 @@ typedef enum ZydisElementType_
      */
     ZYDIS_ELEMENT_TYPE_FLOAT80,
     /**
+     * 16-bit brain floating point value.
+     */
+    ZYDIS_ELEMENT_TYPE_BFLOAT16,
+    /**
      * Binary coded decimal value.
      */
     ZYDIS_ELEMENT_TYPE_LONGBCD,

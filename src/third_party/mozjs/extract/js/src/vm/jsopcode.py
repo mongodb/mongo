@@ -16,7 +16,7 @@ def codify(text):
     return text
 
 
-space_star_space_pat = re.compile("^\s*\* ?", re.M)
+space_star_space_pat = re.compile(r"^\s*\* ?", re.M)
 
 
 def get_comment_body(comment):
@@ -59,7 +59,7 @@ def parse_index(comment):
     index = []
     current_types = None
     category_name = ""
-    category_pat = re.compile("\[([^\]]+)\]")
+    category_pat = re.compile(r"\[([^\]]+)\]")
     for line in get_comment_body(comment):
         m = category_pat.search(line)
         if m:
@@ -130,16 +130,16 @@ class OpcodeInfo:
         #   /*
         #    * comment
         #    */
-        #   MACRO(JSOP_SUB, ...)
-        #   MACRO(JSOP_MUL, ...)
-        #   MACRO(JSOP_DIV, ...)
+        #   MACRO(Sub, ...)
+        #   MACRO(Mul, ...)
+        #   MACRO(Div, ...)
         self.group = []
 
         self.sort_key = ""
 
 
 def find_by_name(list, name):
-    for (n, body) in list:
+    for n, body in list:
         if n == name:
             return body
 
@@ -166,7 +166,7 @@ def add_to_index(index, opcode):
     opcodes.append(opcode)
 
 
-tag_pat = re.compile("^\s*[A-Za-z]+:\s*|\s*$")
+tag_pat = re.compile(r"^\s*[A-Za-z]+:\s*|\s*$")
 
 
 def get_tag_value(line):
@@ -301,7 +301,7 @@ def get_opcodes(dir):
             if opcode.op_snake != expected_snake:
                 raise ValueError(
                     "Unexpected snake-case name for {}: expected {!r}, got {!r}".format(
-                        opcode.op_camel, expected_snake, opcode.op_snake
+                        opcode.op, expected_snake, opcode.op_snake
                     )
                 )
 

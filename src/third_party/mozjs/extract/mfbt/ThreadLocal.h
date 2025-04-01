@@ -240,7 +240,7 @@ inline void ThreadLocal<T, Storage>::set(const T aValue) {
 #  define MOZ_THREAD_LOCAL(TYPE)                 \
     thread_local ::mozilla::detail::ThreadLocal< \
         TYPE, ::mozilla::detail::ThreadLocalNativeStorage>
-#elif defined(HAVE_THREAD_TLS_KEYWORD)
+#elif defined(HAVE_THREAD_TLS_KEYWORD) && !defined(MOZ_LINKER)
 #  define MOZ_THREAD_LOCAL(TYPE)             \
     __thread ::mozilla::detail::ThreadLocal< \
         TYPE, ::mozilla::detail::ThreadLocalNativeStorage>

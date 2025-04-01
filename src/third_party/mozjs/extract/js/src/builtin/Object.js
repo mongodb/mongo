@@ -347,9 +347,9 @@ function ObjectFromEntries(iter) {
   // CreateDataPropertyOnObject, so it looks more like the polyfill
   // <https://github.com/tc39/proposal-object-from-entries/blob/master/polyfill.js>
   // than the spec algorithm.
-  const obj = {};
+  var obj = {};
 
-  for (const pair of allowContentIter(iter)) {
+  for (var pair of allowContentIter(iter)) {
     if (!IsObject(pair)) {
       ThrowTypeError(JSMSG_INVALID_MAP_ITERABLE, "Object.fromEntries");
     }
@@ -366,4 +366,71 @@ function ObjectHasOwn(O, P) {
   var obj = ToObject(O);
   // Step 2-3.
   return hasOwn(P, obj);
+}
+
+// Array Grouping proposal
+//
+// Object.groupBy ( items, callbackfn )
+//
+// https://tc39.es/proposal-array-grouping/#sec-object.groupby
+function ObjectGroupBy(items, callbackfn) {
+  // Step 1. (Call to GroupBy is inlined.)
+
+  // GroupBy, step 1.
+  if (IsNullOrUndefined(items)) {
+    ThrowTypeError(
+      JSMSG_UNEXPECTED_TYPE,
+      DecompileArg(0, items),
+      items === null ? "null" : "undefined"
+    );
+  }
+
+  // GroupBy, step 2.
+  if (!IsCallable(callbackfn)) {
+    ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
+  }
+
+  // Step 2.
+  var obj = std_Object_create(null);
+
+  // GroupBy, step 3. (Not applicable in our implementation.)
+
+  // GroupBy, step 4.
+  var k = 0;
+
+  // GroupBy, steps 4 and 6.
+  for (var value of allowContentIter(items)) {
+    // GroupBy, step 6.a. (Not applicable)
+    assert(k < 2 ** 53 - 1, "out-of-memory happens before k exceeds 2^53 - 1");
+
+    // GroupBy, steps 6.b-d. (Implicit through for-of loop.)
+
+    // GroupBy, step 6.e.
+    var key = callContentFunction(callbackfn, undefined, value, k);
+
+    // GroupBy, step 6.f. (Implicit through for-of loop.)
+
+    // GroupBy, step 6.g.i.
+    key = TO_PROPERTY_KEY(key);
+
+    // GroupBy, step 6.g.ii. (Implicit through for-of loop.)
+
+    // GroupBy, step 6.h. (Not applicable)
+
+    // GroupBy, step 6.i. (Inlined call to AddValueToKeyedGroup.)
+    var elements = obj[key];
+    if (elements === undefined) {
+      DefineDataProperty(obj, key, [value]);
+    } else {
+      DefineDataProperty(elements, elements.length, value);
+    }
+
+    // GroupBy, step 6.j.
+    k += 1;
+  }
+
+  // Step 3. (Result object already populated in the previous loop.)
+
+  // Step 4.
+  return obj;
 }

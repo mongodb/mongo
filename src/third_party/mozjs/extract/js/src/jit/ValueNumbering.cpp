@@ -755,9 +755,17 @@ bool ValueNumberer::visitDefinition(MDefinition* def) {
 
     // If |sim| doesn't belong to a block, insert it next to |def|.
     if (isNewInstruction) {
-      // A new |sim| node mustn't be effectful when |def| wasn't effectful.
-      MOZ_ASSERT((def->isEffectful() && sim->isEffectful()) ||
-                 !sim->isEffectful());
+#ifdef DEBUG
+      if (sim->isObjectKeysLength() && def->isArrayLength()) {
+        // /!\ Exception: MArrayLength::foldsTo replaces a sequence of
+        // instructions containing an effectful instruction by an effectful
+        // instruction.
+      } else {
+        // Otherwise, a new |sim| node mustn't be effectful when |def| wasn't
+        // effectful.
+        MOZ_ASSERT_IF(sim->isEffectful(), def->isEffectful());
+      }
+#endif
 
       // If both instructions are effectful, |sim| must have stolen the resume
       // point of |def| when it's a new instruction.

@@ -27,7 +27,8 @@ CFLAGS="$CFLAGS -D__STDC_FORMAT_MACROS" \
     --enable-optimize \
     --disable-js-shell \
     --disable-tests \
-    --disable-new-pass-manager
+    --disable-new-pass-manager \
+    --disable-wasm-moz-intgemm
 
 # we have to run make to generate a byte code version of the self hosted js and
 # a switch table
@@ -48,9 +49,6 @@ mkdir -p include/gc
 cp extract/js/src/_build/js/src/gc/StatsPhasesGenerated.h include/gc
 mkdir -p extract/js/src/gc
 cp extract/js/src/_build/js/src/gc/StatsPhasesGenerated.inc extract/js/src/gc
-
-mkdir -p extract/js/src/wasm
-cp extract/js/src/_build/js/src/wasm/WasmIntrinsicGenerated.h extract/js/src/wasm
 
 # mfbt doesn't change by arch or platform, so keep the same unified cpp
 mkdir -p extract/js/src/mfbt
@@ -114,9 +112,12 @@ done
 
 # this is all of the EXPORTS.js files from the moz.build
 mkdir -p include/js
-for i in 'AllocationLogging.h' 'AllocationRecording.h' 'AllocPolicy.h' 'Array.h' 'ArrayBuffer.h' 'ArrayBufferMaybeShared.h' 'BigInt.h' 'BuildId.h' 'CallAndConstruct.h' 'CallArgs.h' 'CallNonGenericMethod.h' 'CharacterEncoding.h' 'Class.h' 'ComparisonOperators.h' 'CompilationAndEvaluation.h' 'CompileOptions.h' 'Context.h' 'ContextOptions.h' 'Conversions.h' 'Date.h' 'Debug.h' 'Equality.h' 'ErrorInterceptor.h' 'ErrorReport.h' 'Exception.h' 'ForOfIterator.h' 'GCAnnotations.h' 'GCAPI.h' 'GCHashTable.h' 'GCPolicyAPI.h' 'GCTypeMacros.h' 'GCVariant.h' 'GCVector.h' 'GlobalObject.h' 'HashTable.h' 'HeapAPI.h' 'HelperThreadAPI.h' 'Id.h' 'Initialization.h' 'Interrupt.h' 'JitCodeAPI.h' 'JSON.h' 'LocaleSensitive.h' 'MapAndSet.h' 'MemoryCallbacks.h' 'MemoryFunctions.h' 'MemoryMetrics.h' 'Modules.h' 'Object.h' 'OffThreadScriptCompilation.h' 'Principals.h' 'Printer.h' 'Printf.h' 'ProfilingCategory.h' 'ProfilingFrameIterator.h' 'ProfilingStack.h' 'Promise.h' 'PropertyAndElement.h' 'PropertyDescriptor.h' 'PropertySpec.h' 'ProtoKey.h' 'Proxy.h' 'Realm.h' 'RealmIterators.h' 'RealmOptions.h' 'RefCounted.h' 'RegExp.h' 'RegExpFlags.h' 'Result.h' 'RootingAPI.h' 'SavedFrameAPI.h' 'ScalarType.h' 'ScriptPrivate.h' 'ShadowRealmCallbacks.h' 'SharedArrayBuffer.h' 'SliceBudget.h' 'SourceText.h' 'StableStringChars.h' 'Stack.h' 'StreamConsumer.h' 'String.h' 'StructuredClone.h' 'SweepingAPI.h' 'Symbol.h' 'TelemetryTimers.h' 'TraceKind.h' 'TracingAPI.h' 'Transcoding.h' 'TypeDecls.h' 'UbiNode.h' 'UbiNodeBreadthFirst.h' 'UbiNodeCensus.h' 'UbiNodeDominatorTree.h' 'UbiNodePostOrder.h' 'UbiNodeShortestPaths.h' 'UbiNodeUtils.h' 'UniquePtr.h' 'Utility.h' 'Value.h' 'ValueArray.h' 'Vector.h' 'WaitCallbacks.h' 'Warnings.h' 'WasmFeatures.h' 'WasmModule.h' 'WeakMap.h' 'WeakMapPtr.h' 'Wrapper.h' 'WrapperCallbacks.h' 'Zone.h' ; do
+for i in 'AllocationLogging.h' 'AllocationRecording.h' 'AllocPolicy.h' 'Array.h' 'ArrayBuffer.h' 'ArrayBufferMaybeShared.h' 'BigInt.h' 'BuildId.h' 'CallAndConstruct.h' 'CallArgs.h' 'CallNonGenericMethod.h' 'CharacterEncoding.h' 'Class.h' 'ColumnNumber.h' 'ComparisonOperators.h' 'CompilationAndEvaluation.h' 'CompileOptions.h' 'Context.h' 'ContextOptions.h' 'Conversions.h' 'Date.h' 'Debug.h' 'Equality.h' 'ErrorInterceptor.h' 'ErrorReport.h' 'Exception.h' 'ForOfIterator.h' 'GCAnnotations.h' 'GCAPI.h' 'GCHashTable.h' 'GCPolicyAPI.h' 'GCTypeMacros.h' 'GCVariant.h' 'GCVector.h' 'GlobalObject.h' 'HashTable.h' 'HeapAPI.h' 'HelperThreadAPI.h' 'Id.h' 'Initialization.h' 'Interrupt.h' 'Iterator.h' 'JitCodeAPI.h' 'JSON.h' 'LocaleSensitive.h' 'MapAndSet.h' 'MemoryCallbacks.h' 'MemoryFunctions.h' 'MemoryMetrics.h' 'Modules.h' 'Object.h' 'Prefs.h' 'Principals.h' 'Printer.h' 'Printf.h' 'ProfilingCategory.h' 'ProfilingFrameIterator.h' 'ProfilingStack.h' 'Promise.h' 'PropertyAndElement.h' 'PropertyDescriptor.h' 'PropertySpec.h' 'ProtoKey.h' 'Proxy.h' 'Realm.h' 'RealmIterators.h' 'RealmOptions.h' 'RefCounted.h' 'RegExp.h' 'RegExpFlags.h' 'Result.h' 'RootingAPI.h' 'SavedFrameAPI.h' 'ScalarType.h' 'ScriptPrivate.h' 'ShadowRealmCallbacks.h' 'SharedArrayBuffer.h' 'SliceBudget.h' 'SourceText.h' 'StableStringChars.h' 'Stack.h' 'StreamConsumer.h' 'String.h' 'StructuredClone.h' 'SweepingAPI.h' 'Symbol.h' 'TelemetryTimers.h' 'TraceKind.h' 'TracingAPI.h' 'Transcoding.h' 'TypeDecls.h' 'UbiNode.h' 'UbiNodeBreadthFirst.h' 'UbiNodeCensus.h' 'UbiNodeDominatorTree.h' 'UbiNodePostOrder.h' 'UbiNodeShortestPaths.h' 'UbiNodeUtils.h' 'UniquePtr.h' 'Utility.h' 'Value.h' 'ValueArray.h' 'Vector.h' 'WaitCallbacks.h' 'Warnings.h' 'WasmFeatures.h' 'WasmModule.h' 'WeakMap.h' 'WeakMapPtr.h' 'Wrapper.h' 'WrapperCallbacks.h' 'Zone.h' ; do
     cp extract/js/public/$i include/js/
 done
+
+# This file is generated from StaticPrefList.yaml during the make step.
+cp extract/js/src/_build/js/public/PrefsGenerated.h include/js/
 
 for i in 'ProfilingCategoryList.h' ; do
     cp extract/js/src/_build/mozglue/baseprofiler/public/$i include/js/
@@ -142,7 +143,7 @@ done
 
 # this is all of the EXPORTS.mozilla files from the moz.build's (i.e mfbt)
 mkdir -p include/mozilla
-for i in 'Algorithm.h' 'Alignment.h' 'AllocPolicy.h' 'AlreadyAddRefed.h' 'Array.h' 'ArrayUtils.h' 'Assertions.h' 'AtomicBitfields.h' 'Atomics.h' 'Attributes.h' 'BinarySearch.h' 'BitSet.h' 'BloomFilter.h' 'Buffer.h' 'BufferList.h' 'Casting.h' 'ChaosMode.h' 'Char16.h' 'CheckedInt.h' 'CompactPair.h' 'Compiler.h' 'Compression.h' 'DbgMacro.h' 'DebugOnly.h' 'DefineEnum.h' 'DoublyLinkedList.h' 'EndianUtils.h' 'EnumeratedArray.h' 'EnumeratedRange.h' 'EnumSet.h' 'EnumTypeTraits.h' 'fallible.h' 'FastBernoulliTrial.h' 'FloatingPoint.h' 'FStream.h' 'FunctionRef.h' 'FunctionTypeTraits.h' 'Fuzzing.h' 'HashFunctions.h' 'HashTable.h' 'HelperMacros.h' 'InitializedOnce.h' 'IntegerRange.h' 'IntegerTypeTraits.h' 'JSONWriter.h' 'JsRust.h' 'Latin1.h' 'Likely.h' 'LinkedList.h' 'MacroArgs.h' 'MacroForEach.h' 'MathAlgorithms.h' 'Maybe.h' 'MaybeOneOf.h' 'MaybeStorageBase.h' 'MemoryChecking.h' 'MemoryReporting.h' 'MoveOnlyFunction.h' 'MruCache.h' 'NonDereferenceable.h' 'NotNull.h' 'Opaque.h' 'OperatorNewExtensions.h' 'PairHash.h' 'Path.h' 'PodOperations.h' 'Poison.h' 'RandomNum.h' 'Range.h' 'RangedArray.h' 'RangedPtr.h' 'ReentrancyGuard.h' 'RefCounted.h' 'RefCountType.h' 'RefPtr.h' 'Result.h' 'ResultExtensions.h' 'ResultVariant.h' 'ReverseIterator.h' 'RollingMean.h' 'Saturate.h' 'Scoped.h' 'ScopeExit.h' 'SegmentedVector.h' 'SHA1.h' 'SharedLibrary.h' 'SmallPointerArray.h' 'Span.h' 'SplayTree.h' 'SPSCQueue.h' 'StaticAnalysisFunctions.h' 'TaggedAnonymousMemory.h' 'Tainting.h' 'TemplateLib.h' 'TextUtils.h' 'ThreadLocal.h' 'ThreadSafety.h' 'ThreadSafeWeakPtr.h' 'ToString.h' 'TypedEnumBits.h' 'Types.h' 'UniquePtr.h' 'UniquePtrExtensions.h' 'Unused.h' 'Utf8.h' 'Variant.h' 'Vector.h' 'WeakPtr.h' 'WindowsVersion.h' 'WrappingOperations.h' 'XorShift128PlusRNG.h' ; do
+for i in 'Algorithm.h' 'Alignment.h' 'AllocPolicy.h' 'AlreadyAddRefed.h' 'Array.h' 'ArrayUtils.h' 'Assertions.h' 'AtomicBitfields.h' 'Atomics.h' 'Attributes.h' 'BinarySearch.h' 'BitSet.h' 'BloomFilter.h' 'Buffer.h' 'BufferList.h' 'Casting.h' 'ChaosMode.h' 'Char16.h' 'CheckedInt.h' 'CompactPair.h' 'Compiler.h' 'Compression.h' 'DbgMacro.h' 'DebugOnly.h' 'DefineEnum.h' 'DoublyLinkedList.h' 'EndianUtils.h' 'EnumeratedArray.h' 'EnumeratedRange.h' 'EnumSet.h' 'EnumTypeTraits.h' 'fallible.h' 'FastBernoulliTrial.h' 'FloatingPoint.h' 'FStream.h' 'FunctionRef.h' 'FunctionTypeTraits.h' 'Fuzzing.h' 'HashFunctions.h' 'HashTable.h' 'HelperMacros.h' 'InitializedOnce.h' 'IntegerRange.h' 'IntegerTypeTraits.h' 'JSONWriter.h' 'JsRust.h' 'Latin1.h' 'Likely.h' 'LinkedList.h' 'MacroArgs.h' 'MacroForEach.h' 'MathAlgorithms.h' 'Maybe.h' 'MaybeOneOf.h' 'MaybeStorageBase.h' 'MemoryChecking.h' 'MemoryReporting.h' 'MoveOnlyFunction.h' 'MruCache.h' 'NonDereferenceable.h' 'NotNull.h' 'Opaque.h' 'OperatorNewExtensions.h' 'PairHash.h' 'Path.h' 'PodOperations.h' 'Poison.h' 'RandomNum.h' 'Range.h' 'RangedArray.h' 'RangedPtr.h' 'ReentrancyGuard.h' 'RefCounted.h' 'RefCountType.h' 'RefPtr.h' 'Result.h' 'ResultExtensions.h' 'ResultVariant.h' 'ReverseIterator.h' 'RollingMean.h' 'Saturate.h' 'ScopeExit.h' 'SegmentedVector.h' 'SHA1.h' 'SharedLibrary.h' 'SmallPointerArray.h' 'Span.h' 'SplayTree.h' 'SPSCQueue.h' 'StaticAnalysisFunctions.h' 'TaggedAnonymousMemory.h' 'Tainting.h' 'TemplateLib.h' 'TextUtils.h' 'ThreadLocal.h' 'ThreadSafety.h' 'ThreadSafeWeakPtr.h' 'ToString.h' 'Try.h' 'TypedEnumBits.h' 'Types.h' 'UniquePtr.h' 'UniquePtrExtensions.h' 'Unused.h' 'Utf8.h' 'Variant.h' 'Vector.h' 'WeakPtr.h' 'WindowsVersion.h' 'WrappingOperations.h' 'XorShift128PlusRNG.h' ; do
     cp extract/mfbt/$i include/mozilla/
 done
 
@@ -157,6 +158,9 @@ for i in 'AutoProfilerLabel.h' 'PlatformConditionVariable.h' 'PlatformMutex.h' '
     cp extract/js/src/_build/dist/include/mozilla/$i include/mozilla
 done
 
+mkdir -p include/mozilla/glue
+cp extract/js/src/_build/dist/include/mozilla/glue/Debug.h include/mozilla/glue
+
 cp extract/js/src/_build/dist/include/fdlibm.h include
 mkdir -p extract/modules/fdlibm
 cp mozilla-release/modules/fdlibm/src/* extract/modules/fdlibm/
@@ -169,6 +173,9 @@ cp mozilla-release/mozglue/misc/StackWalk_windows.h include/mozilla/
 
 mkdir -p include/vtune
 touch include/vtune/VTuneWrapper.h
+
+mkdir -p include/wasm
+cp extract/js/src/_build/js/src/wasm/WasmBuiltinModuleGenerated.h include/wasm/
 
 xargs rm -rf<<__XARGS_RM__
 extract/js/src/_build/install_dist_bin.track

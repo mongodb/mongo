@@ -112,6 +112,20 @@ class MOZ_STACK_CLASS CallInfo {
     setCallee(callee);
     setThis(thisVal);
   }
+
+  void initForProxyGet(MDefinition* callee, MDefinition* handler,
+                       MDefinition* target, MDefinition* id,
+                       MDefinition* receiver) {
+    MOZ_ASSERT(args_.empty());
+    setCallee(callee);
+    setThis(handler);
+    static_assert(decltype(args_)::InlineLength >= 3,
+                  "Appending three arguments should be infallible");
+    MOZ_ALWAYS_TRUE(args_.append(target));
+    MOZ_ALWAYS_TRUE(args_.append(id));
+    MOZ_ALWAYS_TRUE(args_.append(receiver));
+  }
+
   void initForSetterCall(MDefinition* callee, MDefinition* thisVal,
                          MDefinition* rhs) {
     MOZ_ASSERT(args_.empty());
@@ -405,6 +419,13 @@ class WarpBuilderShared {
 
   MConstant* constant(const JS::Value& v);
   void pushConstant(const JS::Value& v);
+
+  // Note: unboxObjectInfallible defaults to adding a non-movable MUnbox to
+  // ensure we don't hoist the infallible unbox before a branch checking the
+  // value type.
+  enum class IsMovable : bool { No, Yes };
+  MDefinition* unboxObjectInfallible(MDefinition* def,
+                                     IsMovable movable = IsMovable::No);
 
   MCall* makeCall(CallInfo& callInfo, bool needsThisCheck,
                   WrappedFunction* target = nullptr, bool isDOMCall = false);

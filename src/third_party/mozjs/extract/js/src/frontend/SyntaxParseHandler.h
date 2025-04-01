@@ -8,7 +8,8 @@
 #define frontend_SyntaxParseHandler_h
 
 #include "mozilla/Assertions.h"
-#include "mozilla/Maybe.h"  // mozilla::Maybe
+#include "mozilla/Maybe.h"   // mozilla::Maybe
+#include "mozilla/Result.h"  // mozilla::Result, mozilla::UnusedZero
 
 #include <string.h>
 
@@ -22,7 +23,113 @@
 #include "frontend/TokenStream.h"
 
 namespace js {
+namespace frontend {
+enum SyntaxParseHandlerNode {
+  NodeFailure = 0,
+  NodeGeneric,
+  NodeGetProp,
+  NodeStringExprStatement,
+  NodeReturn,
+  NodeBreak,
+  NodeThrow,
+  NodeEmptyStatement,
 
+  NodeVarDeclaration,
+  NodeLexicalDeclaration,
+
+  // A non-arrow function expression with block body, from bog-standard
+  // ECMAScript.
+  NodeFunctionExpression,
+
+  NodeFunctionArrow,
+  NodeFunctionStatement,
+
+  // This is needed for proper assignment-target handling.  ES6 formally
+  // requires function calls *not* pass IsValidSimpleAssignmentTarget,
+  // but at last check there were still sites with |f() = 5| and similar
+  // in code not actually executed (or at least not executed enough to be
+  // noticed).
+  NodeFunctionCall,
+
+  NodeOptionalFunctionCall,
+
+  // Node representing normal names which don't require any special
+  // casing.
+  NodeName,
+
+  // Nodes representing the names "arguments", "length" and "eval".
+  NodeArgumentsName,
+  NodeLengthName,
+  NodeEvalName,
+
+  // Node representing the "async" name, which may actually be a
+  // contextual keyword.
+  NodePotentialAsyncKeyword,
+
+  // Node representing private names.
+  NodePrivateName,
+
+  NodeDottedProperty,
+  NodeOptionalDottedProperty,
+  NodeElement,
+  NodeOptionalElement,
+  // A distinct node for [PrivateName], to make detecting delete this.#x
+  // detectable in syntax parse
+  NodePrivateMemberAccess,
+  NodeOptionalPrivateMemberAccess,
+
+  // Node representing the compound Arguments.length expression;
+  // Used only for property access, not assignment.
+  NodeArgumentsLength,
+
+  // Destructuring target patterns can't be parenthesized: |([a]) = [3];|
+  // must be a syntax error.  (We can't use NodeGeneric instead of these
+  // because that would trigger invalid-left-hand-side ReferenceError
+  // semantics when SyntaxError semantics are desired.)
+  NodeParenthesizedArray,
+  NodeParenthesizedObject,
+
+  // In rare cases a parenthesized |node| doesn't have the same semantics
+  // as |node|.  Each such node has a special Node value, and we use a
+  // different Node value to represent the parenthesized form.  See also
+  // is{Unp,P}arenthesized*(Node), parenthesize(Node), and the various
+  // functions that deal in NodeUnparenthesized* below.
+
+  // Valuable for recognizing potential destructuring patterns.
+  NodeUnparenthesizedArray,
+  NodeUnparenthesizedObject,
+
+  // The directive prologue at the start of a FunctionBody or ScriptBody
+  // is the longest sequence (possibly empty) of string literal
+  // expression statements at the start of a function.  Thus we need this
+  // to treat |"use strict";| as a possible Use Strict Directive and
+  // |("use strict");| as a useless statement.
+  NodeUnparenthesizedString,
+
+  // For destructuring patterns an assignment element with
+  // an initializer expression is not allowed be parenthesized.
+  // i.e. |{x = 1} = obj|
+  NodeUnparenthesizedAssignment,
+
+  // This node is necessary to determine if the base operand in an
+  // exponentiation operation is an unparenthesized unary expression.
+  // We want to reject |-2 ** 3|, but still need to allow |(-2) ** 3|.
+  NodeUnparenthesizedUnary,
+
+  // This node is necessary to determine if the LHS of a property access is
+  // super related.
+  NodeSuperBase
+};
+
+}  // namespace frontend
+}  // namespace js
+
+template <>
+struct mozilla::detail::UnusedZero<js::frontend::SyntaxParseHandlerNode> {
+  static const bool value = true;
+};
+
+namespace js {
 namespace frontend {
 
 // Parse handler used when processing the syntax in a block of code, to generate
@@ -41,100 +148,16 @@ class SyntaxParseHandler {
   TokenPos lastStringPos;
 
  public:
-  enum Node {
-    NodeFailure = 0,
-    NodeGeneric,
-    NodeGetProp,
-    NodeStringExprStatement,
-    NodeReturn,
-    NodeBreak,
-    NodeThrow,
-    NodeEmptyStatement,
+  struct NodeError {};
 
-    NodeVarDeclaration,
-    NodeLexicalDeclaration,
+  using Node = SyntaxParseHandlerNode;
 
-    // A non-arrow function expression with block body, from bog-standard
-    // ECMAScript.
-    NodeFunctionExpression,
+  using NodeResult = mozilla::Result<Node, NodeError>;
+  using NodeErrorResult = mozilla::GenericErrorResult<NodeError>;
 
-    NodeFunctionArrow,
-    NodeFunctionStatement,
-
-    // This is needed for proper assignment-target handling.  ES6 formally
-    // requires function calls *not* pass IsValidSimpleAssignmentTarget,
-    // but at last check there were still sites with |f() = 5| and similar
-    // in code not actually executed (or at least not executed enough to be
-    // noticed).
-    NodeFunctionCall,
-
-    NodeOptionalFunctionCall,
-
-    // Node representing normal names which don't require any special
-    // casing.
-    NodeName,
-
-    // Nodes representing the names "arguments" and "eval".
-    NodeArgumentsName,
-    NodeEvalName,
-
-    // Node representing the "async" name, which may actually be a
-    // contextual keyword.
-    NodePotentialAsyncKeyword,
-
-    // Node representing private names.
-    NodePrivateName,
-
-    NodeDottedProperty,
-    NodeOptionalDottedProperty,
-    NodeElement,
-    NodeOptionalElement,
-    // A distinct node for [PrivateName], to make detecting delete this.#x
-    // detectable in syntax parse
-    NodePrivateMemberAccess,
-    NodeOptionalPrivateMemberAccess,
-
-    // Destructuring target patterns can't be parenthesized: |([a]) = [3];|
-    // must be a syntax error.  (We can't use NodeGeneric instead of these
-    // because that would trigger invalid-left-hand-side ReferenceError
-    // semantics when SyntaxError semantics are desired.)
-    NodeParenthesizedArray,
-    NodeParenthesizedObject,
-
-    // In rare cases a parenthesized |node| doesn't have the same semantics
-    // as |node|.  Each such node has a special Node value, and we use a
-    // different Node value to represent the parenthesized form.  See also
-    // is{Unp,P}arenthesized*(Node), parenthesize(Node), and the various
-    // functions that deal in NodeUnparenthesized* below.
-
-    // Valuable for recognizing potential destructuring patterns.
-    NodeUnparenthesizedArray,
-    NodeUnparenthesizedObject,
-
-    // The directive prologue at the start of a FunctionBody or ScriptBody
-    // is the longest sequence (possibly empty) of string literal
-    // expression statements at the start of a function.  Thus we need this
-    // to treat |"use strict";| as a possible Use Strict Directive and
-    // |("use strict");| as a useless statement.
-    NodeUnparenthesizedString,
-
-    // For destructuring patterns an assignment element with
-    // an initializer expression is not allowed be parenthesized.
-    // i.e. |{x = 1} = obj|
-    NodeUnparenthesizedAssignment,
-
-    // This node is necessary to determine if the base operand in an
-    // exponentiation operation is an unparenthesized unary expression.
-    // We want to reject |-2 ** 3|, but still need to allow |(-2) ** 3|.
-    NodeUnparenthesizedUnary,
-
-    // This node is necessary to determine if the LHS of a property access is
-    // super related.
-    NodeSuperBase
-  };
-
-#define DECLARE_TYPE(typeName, longTypeName, asMethodName) \
-  using longTypeName = Node;
+#define DECLARE_TYPE(typeName) \
+  using typeName##Type = Node; \
+  using typeName##Result = mozilla::Result<Node, NodeError>;
   FOR_EACH_PARSENODE_SUBCLASS(DECLARE_TYPE)
 #undef DECLARE_TYPE
 
@@ -146,7 +169,7 @@ class SyntaxParseHandler {
 
   bool isPropertyOrPrivateMemberAccess(Node node) {
     return node == NodeDottedProperty || node == NodeElement ||
-           node == NodePrivateMemberAccess;
+           node == NodePrivateMemberAccess || node == NodeArgumentsLength;
   }
 
   bool isOptionalPropertyOrPrivateMemberAccess(Node node) {
@@ -178,13 +201,16 @@ class SyntaxParseHandler {
   }
 
   static NullNode null() { return NodeFailure; }
+  static constexpr NodeErrorResult errorResult() {
+    return NodeErrorResult(NodeError());
+  }
 
-#define DECLARE_AS(typeName, longTypeName, asMethodName) \
-  static longTypeName asMethodName(Node node) { return node; }
+#define DECLARE_AS(typeName) \
+  static typeName##Type as##typeName(Node node) { return node; }
   FOR_EACH_PARSENODE_SUBCLASS(DECLARE_AS)
 #undef DECLARE_AS
 
-  NameNodeType newName(TaggedParserAtomIndex name, const TokenPos& pos) {
+  NameNodeResult newName(TaggedParserAtomIndex name, const TokenPos& pos) {
     lastAtom = name;
     if (name == TaggedParserAtomIndex::WellKnown::arguments()) {
       return NodeArgumentsName;
@@ -199,95 +225,96 @@ class SyntaxParseHandler {
     return NodeName;
   }
 
-  UnaryNodeType newComputedName(Node expr, uint32_t start, uint32_t end) {
+  UnaryNodeResult newComputedName(Node expr, uint32_t start, uint32_t end) {
     return NodeGeneric;
   }
 
-  UnaryNodeType newSyntheticComputedName(Node expr, uint32_t start,
-                                         uint32_t end) {
+  UnaryNodeResult newSyntheticComputedName(Node expr, uint32_t start,
+                                           uint32_t end) {
     return NodeGeneric;
   }
 
-  NameNodeType newObjectLiteralPropertyName(TaggedParserAtomIndex atom,
-                                            const TokenPos& pos) {
+  NameNodeResult newObjectLiteralPropertyName(TaggedParserAtomIndex atom,
+                                              const TokenPos& pos) {
     return NodeName;
   }
 
-  NameNodeType newPrivateName(TaggedParserAtomIndex atom, const TokenPos& pos) {
+  NameNodeResult newPrivateName(TaggedParserAtomIndex atom,
+                                const TokenPos& pos) {
     return NodePrivateName;
   }
 
-  NumericLiteralType newNumber(double value, DecimalPoint decimalPoint,
-                               const TokenPos& pos) {
+  NumericLiteralResult newNumber(double value, DecimalPoint decimalPoint,
+                                 const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  BigIntLiteralType newBigInt() { return NodeGeneric; }
+  BigIntLiteralResult newBigInt() { return NodeGeneric; }
 
-  BooleanLiteralType newBooleanLiteral(bool cond, const TokenPos& pos) {
+  BooleanLiteralResult newBooleanLiteral(bool cond, const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  NameNodeType newStringLiteral(TaggedParserAtomIndex atom,
-                                const TokenPos& pos) {
+  NameNodeResult newStringLiteral(TaggedParserAtomIndex atom,
+                                  const TokenPos& pos) {
     lastAtom = atom;
     lastStringPos = pos;
     return NodeUnparenthesizedString;
   }
 
-  NameNodeType newTemplateStringLiteral(TaggedParserAtomIndex atom,
-                                        const TokenPos& pos) {
+  NameNodeResult newTemplateStringLiteral(TaggedParserAtomIndex atom,
+                                          const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  CallSiteNodeType newCallSiteObject(uint32_t begin) { return NodeGeneric; }
+  CallSiteNodeResult newCallSiteObject(uint32_t begin) { return NodeGeneric; }
 
   void addToCallSiteObject(CallSiteNodeType callSiteObj, Node rawNode,
                            Node cookedNode) {}
 
-  ThisLiteralType newThisLiteral(const TokenPos& pos, Node thisName) {
+  ThisLiteralResult newThisLiteral(const TokenPos& pos, Node thisName) {
     return NodeGeneric;
   }
-  NullLiteralType newNullLiteral(const TokenPos& pos) { return NodeGeneric; }
-  RawUndefinedLiteralType newRawUndefinedLiteral(const TokenPos& pos) {
-    return NodeGeneric;
-  }
-
-  RegExpLiteralType newRegExp(Node reobj, const TokenPos& pos) {
+  NullLiteralResult newNullLiteral(const TokenPos& pos) { return NodeGeneric; }
+  RawUndefinedLiteralResult newRawUndefinedLiteral(const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  ConditionalExpressionType newConditional(Node cond, Node thenExpr,
-                                           Node elseExpr) {
+  RegExpLiteralResult newRegExp(Node reobj, const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  UnaryNodeType newDelete(uint32_t begin, Node expr) {
+  ConditionalExpressionResult newConditional(Node cond, Node thenExpr,
+                                             Node elseExpr) {
+    return NodeGeneric;
+  }
+
+  UnaryNodeResult newDelete(uint32_t begin, Node expr) {
     return NodeUnparenthesizedUnary;
   }
 
-  UnaryNodeType newTypeof(uint32_t begin, Node kid) {
+  UnaryNodeResult newTypeof(uint32_t begin, Node kid) {
     return NodeUnparenthesizedUnary;
   }
 
-  UnaryNodeType newUnary(ParseNodeKind kind, uint32_t begin, Node kid) {
+  UnaryNodeResult newUnary(ParseNodeKind kind, uint32_t begin, Node kid) {
     return NodeUnparenthesizedUnary;
   }
 
-  UnaryNodeType newUpdate(ParseNodeKind kind, uint32_t begin, Node kid) {
+  UnaryNodeResult newUpdate(ParseNodeKind kind, uint32_t begin, Node kid) {
     return NodeGeneric;
   }
 
-  UnaryNodeType newSpread(uint32_t begin, Node kid) { return NodeGeneric; }
+  UnaryNodeResult newSpread(uint32_t begin, Node kid) { return NodeGeneric; }
 
-  Node appendOrCreateList(ParseNodeKind kind, Node left, Node right,
-                          ParseContext* pc) {
+  NodeResult appendOrCreateList(ParseNodeKind kind, Node left, Node right,
+                                ParseContext* pc) {
     return NodeGeneric;
   }
 
   // Expressions
 
-  ListNodeType newArrayLiteral(uint32_t begin) {
+  ListNodeResult newArrayLiteral(uint32_t begin) {
     return NodeUnparenthesizedArray;
   }
   [[nodiscard]] bool addElision(ListNodeType literal, const TokenPos& pos) {
@@ -299,59 +326,60 @@ class SyntaxParseHandler {
   }
   void addArrayElement(ListNodeType literal, Node element) {}
 
-  ListNodeType newArguments(const TokenPos& pos) { return NodeGeneric; }
-  CallNodeType newCall(Node callee, Node args, JSOp callOp) {
+  ListNodeResult newArguments(const TokenPos& pos) { return NodeGeneric; }
+  CallNodeResult newCall(Node callee, ListNodeType args, JSOp callOp) {
     return NodeFunctionCall;
   }
 
-  CallNodeType newOptionalCall(Node callee, Node args, JSOp callOp) {
+  CallNodeResult newOptionalCall(Node callee, ListNodeType args, JSOp callOp) {
     return NodeOptionalFunctionCall;
   }
 
-  CallNodeType newSuperCall(Node callee, Node args, bool isSpread) {
+  CallNodeResult newSuperCall(Node callee, ListNodeType args, bool isSpread) {
     return NodeGeneric;
   }
-  CallNodeType newTaggedTemplate(Node tag, Node args, JSOp callOp) {
+  CallNodeResult newTaggedTemplate(Node tag, ListNodeType args, JSOp callOp) {
     return NodeGeneric;
   }
 
-  ListNodeType newObjectLiteral(uint32_t begin) {
+  ListNodeResult newObjectLiteral(uint32_t begin) {
     return NodeUnparenthesizedObject;
   }
 
 #ifdef ENABLE_RECORD_TUPLE
-  ListNodeType newRecordLiteral(uint32_t begin) { return NodeGeneric; }
+  ListNodeResult newRecordLiteral(uint32_t begin) { return NodeGeneric; }
 
-  ListNodeType newTupleLiteral(uint32_t begin) { return NodeGeneric; }
+  ListNodeResult newTupleLiteral(uint32_t begin) { return NodeGeneric; }
 #endif
 
-  ListNodeType newClassMemberList(uint32_t begin) { return NodeGeneric; }
-  ClassNamesType newClassNames(Node outer, Node inner, const TokenPos& pos) {
+  ListNodeResult newClassMemberList(uint32_t begin) { return NodeGeneric; }
+  ClassNamesResult newClassNames(Node outer, Node inner, const TokenPos& pos) {
     return NodeGeneric;
   }
-  ClassNodeType newClass(Node name, Node heritage, Node methodBlock,
+  ClassNodeResult newClass(Node name, Node heritage, Node methodBlock,
 #ifdef ENABLE_DECORATORS
-                         ListNodeType decorators,
+                           ListNodeType decorators,
+                           FunctionNodeType addInitializerFunction,
 #endif
-                         const TokenPos& pos) {
+                           const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  LexicalScopeNodeType newLexicalScope(Node body) {
+  LexicalScopeNodeResult newLexicalScope(Node body) {
     return NodeLexicalDeclaration;
   }
 
-  ClassBodyScopeNodeType newClassBodyScope(Node body) {
+  ClassBodyScopeNodeResult newClassBodyScope(Node body) {
     return NodeLexicalDeclaration;
   }
 
-  NewTargetNodeType newNewTarget(NullaryNodeType newHolder,
-                                 NullaryNodeType targetHolder,
-                                 NameNodeType newTargetName) {
+  NewTargetNodeResult newNewTarget(NullaryNodeType newHolder,
+                                   NullaryNodeType targetHolder,
+                                   NameNodeType newTargetName) {
     return NodeGeneric;
   }
-  NullaryNodeType newPosHolder(const TokenPos& pos) { return NodeGeneric; }
-  UnaryNodeType newSuperBase(Node thisName, const TokenPos& pos) {
+  NullaryNodeResult newPosHolder(const TokenPos& pos) { return NodeGeneric; }
+  UnaryNodeResult newSuperBase(Node thisName, const TokenPos& pos) {
     return NodeSuperBase;
   }
 
@@ -359,7 +387,7 @@ class SyntaxParseHandler {
                                           Node expr) {
     return true;
   }
-  BinaryNodeType newPropertyDefinition(Node key, Node val) {
+  BinaryNodeResult newPropertyDefinition(Node key, Node val) {
     return NodeGeneric;
   }
   void addPropertyDefinition(ListNodeType literal, BinaryNodeType propdef) {}
@@ -380,11 +408,11 @@ class SyntaxParseHandler {
                                                AccessorType atype) {
     return true;
   }
-  [[nodiscard]] Node newDefaultClassConstructor(Node key,
-                                                FunctionNodeType funNode) {
+  [[nodiscard]] NodeResult newDefaultClassConstructor(
+      Node key, FunctionNodeType funNode) {
     return NodeGeneric;
   }
-  [[nodiscard]] Node newClassMethodDefinition(
+  [[nodiscard]] NodeResult newClassMethodDefinition(
       Node key, FunctionNodeType funNode, AccessorType atype, bool isStatic,
       mozilla::Maybe<FunctionNodeType> initializerIfPrivate
 #ifdef ENABLE_DECORATORS
@@ -394,19 +422,18 @@ class SyntaxParseHandler {
   ) {
     return NodeGeneric;
   }
-  [[nodiscard]] Node newClassFieldDefinition(Node name,
-                                             FunctionNodeType initializer,
-                                             bool isStatic
+  [[nodiscard]] NodeResult newClassFieldDefinition(
+      Node name, FunctionNodeType initializer, bool isStatic
 #ifdef ENABLE_DECORATORS
-                                             ,
-                                             ListNodeType decorators,
-                                             bool hasAccessor
+      ,
+      ListNodeType decorators, ClassMethodType accessorGetterNode,
+      ClassMethodType accessorSetterNode
 #endif
   ) {
     return NodeGeneric;
   }
 
-  [[nodiscard]] Node newStaticClassBlock(FunctionNodeType block) {
+  [[nodiscard]] NodeResult newStaticClassBlock(FunctionNodeType block) {
     return NodeGeneric;
   }
 
@@ -414,171 +441,178 @@ class SyntaxParseHandler {
                                               Node member) {
     return true;
   }
-  UnaryNodeType newYieldExpression(uint32_t begin, Node value) {
+  UnaryNodeResult newYieldExpression(uint32_t begin, Node value) {
     return NodeGeneric;
   }
-  UnaryNodeType newYieldStarExpression(uint32_t begin, Node value) {
+  UnaryNodeResult newYieldStarExpression(uint32_t begin, Node value) {
     return NodeGeneric;
   }
-  UnaryNodeType newAwaitExpression(uint32_t begin, Node value) {
+  UnaryNodeResult newAwaitExpression(uint32_t begin, Node value) {
     return NodeUnparenthesizedUnary;
   }
-  UnaryNodeType newOptionalChain(uint32_t begin, Node value) {
+  UnaryNodeResult newOptionalChain(uint32_t begin, Node value) {
     return NodeGeneric;
   }
 
   // Statements
 
-  ListNodeType newStatementList(const TokenPos& pos) { return NodeGeneric; }
+  ListNodeResult newStatementList(const TokenPos& pos) { return NodeGeneric; }
   void addStatementToList(ListNodeType list, Node stmt) {}
   void setListEndPosition(ListNodeType list, const TokenPos& pos) {}
   void addCaseStatementToList(ListNodeType list, CaseClauseType caseClause) {}
   [[nodiscard]] bool prependInitialYield(ListNodeType stmtList, Node genName) {
     return true;
   }
-  NullaryNodeType newEmptyStatement(const TokenPos& pos) {
+  NullaryNodeResult newEmptyStatement(const TokenPos& pos) {
     return NodeEmptyStatement;
   }
 
-  BinaryNodeType newImportAssertion(Node keyNode, Node valueNode) {
+  BinaryNodeResult newImportAttribute(Node keyNode, Node valueNode) {
     return NodeGeneric;
   }
-  BinaryNodeType newModuleRequest(Node moduleSpec, Node importAssertionList,
-                                  const TokenPos& pos) {
+  BinaryNodeResult newModuleRequest(Node moduleSpec, Node importAttributeList,
+                                    const TokenPos& pos) {
     return NodeGeneric;
   }
-  BinaryNodeType newImportDeclaration(Node importSpecSet, Node moduleRequest,
-                                      const TokenPos& pos) {
+  BinaryNodeResult newImportDeclaration(Node importSpecSet, Node moduleRequest,
+                                        const TokenPos& pos) {
     return NodeGeneric;
   }
-  BinaryNodeType newImportSpec(Node importNameNode, Node bindingName) {
+  BinaryNodeResult newImportSpec(Node importNameNode, Node bindingName) {
     return NodeGeneric;
   }
-  UnaryNodeType newImportNamespaceSpec(uint32_t begin, Node bindingName) {
+  UnaryNodeResult newImportNamespaceSpec(uint32_t begin, Node bindingName) {
     return NodeGeneric;
   }
-  UnaryNodeType newExportDeclaration(Node kid, const TokenPos& pos) {
+  UnaryNodeResult newExportDeclaration(Node kid, const TokenPos& pos) {
     return NodeGeneric;
   }
-  BinaryNodeType newExportFromDeclaration(uint32_t begin, Node exportSpecSet,
-                                          Node moduleRequest) {
+  BinaryNodeResult newExportFromDeclaration(uint32_t begin, Node exportSpecSet,
+                                            Node moduleRequest) {
     return NodeGeneric;
   }
-  BinaryNodeType newExportDefaultDeclaration(Node kid, Node maybeBinding,
-                                             const TokenPos& pos) {
+  BinaryNodeResult newExportDefaultDeclaration(Node kid, Node maybeBinding,
+                                               const TokenPos& pos) {
     return NodeGeneric;
   }
-  BinaryNodeType newExportSpec(Node bindingName, Node exportName) {
+  BinaryNodeResult newExportSpec(Node bindingName, Node exportName) {
     return NodeGeneric;
   }
-  UnaryNodeType newExportNamespaceSpec(uint32_t begin, Node exportName) {
+  UnaryNodeResult newExportNamespaceSpec(uint32_t begin, Node exportName) {
     return NodeGeneric;
   }
-  NullaryNodeType newExportBatchSpec(const TokenPos& pos) {
+  NullaryNodeResult newExportBatchSpec(const TokenPos& pos) {
     return NodeGeneric;
   }
-  BinaryNodeType newImportMeta(NullaryNodeType importHolder,
-                               NullaryNodeType metaHolder) {
+  BinaryNodeResult newImportMeta(NullaryNodeType importHolder,
+                                 NullaryNodeType metaHolder) {
     return NodeGeneric;
   }
-  BinaryNodeType newCallImport(NullaryNodeType importHolder, Node singleArg) {
+  BinaryNodeResult newCallImport(NullaryNodeType importHolder, Node singleArg) {
     return NodeGeneric;
   }
-  BinaryNodeType newCallImportSpec(Node specifierArg, Node optionalArg) {
+  BinaryNodeResult newCallImportSpec(Node specifierArg, Node optionalArg) {
     return NodeGeneric;
   }
 
-  BinaryNodeType newSetThis(Node thisName, Node value) { return value; }
+  BinaryNodeResult newSetThis(Node thisName, Node value) { return value; }
 
-  UnaryNodeType newExprStatement(Node expr, uint32_t end) {
+  UnaryNodeResult newExprStatement(Node expr, uint32_t end) {
     return expr == NodeUnparenthesizedString ? NodeStringExprStatement
                                              : NodeGeneric;
   }
 
-  TernaryNodeType newIfStatement(uint32_t begin, Node cond, Node thenBranch,
-                                 Node elseBranch) {
+  TernaryNodeResult newIfStatement(uint32_t begin, Node cond, Node thenBranch,
+                                   Node elseBranch) {
     return NodeGeneric;
   }
-  BinaryNodeType newDoWhileStatement(Node body, Node cond,
-                                     const TokenPos& pos) {
+  BinaryNodeResult newDoWhileStatement(Node body, Node cond,
+                                       const TokenPos& pos) {
     return NodeGeneric;
   }
-  BinaryNodeType newWhileStatement(uint32_t begin, Node cond, Node body) {
+  BinaryNodeResult newWhileStatement(uint32_t begin, Node cond, Node body) {
     return NodeGeneric;
   }
-  SwitchStatementType newSwitchStatement(
+  SwitchStatementResult newSwitchStatement(
       uint32_t begin, Node discriminant,
       LexicalScopeNodeType lexicalForCaseList, bool hasDefault) {
     return NodeGeneric;
   }
-  CaseClauseType newCaseOrDefault(uint32_t begin, Node expr, Node body) {
+  CaseClauseResult newCaseOrDefault(uint32_t begin, Node expr, Node body) {
     return NodeGeneric;
   }
-  ContinueStatementType newContinueStatement(TaggedParserAtomIndex label,
-                                             const TokenPos& pos) {
+  ContinueStatementResult newContinueStatement(TaggedParserAtomIndex label,
+                                               const TokenPos& pos) {
     return NodeGeneric;
   }
-  BreakStatementType newBreakStatement(TaggedParserAtomIndex label,
-                                       const TokenPos& pos) {
+  BreakStatementResult newBreakStatement(TaggedParserAtomIndex label,
+                                         const TokenPos& pos) {
     return NodeBreak;
   }
-  UnaryNodeType newReturnStatement(Node expr, const TokenPos& pos) {
+  UnaryNodeResult newReturnStatement(Node expr, const TokenPos& pos) {
     return NodeReturn;
   }
-  UnaryNodeType newExpressionBody(Node expr) { return NodeReturn; }
-  BinaryNodeType newWithStatement(uint32_t begin, Node expr, Node body) {
+  UnaryNodeResult newExpressionBody(Node expr) { return NodeReturn; }
+  BinaryNodeResult newWithStatement(uint32_t begin, Node expr, Node body) {
     return NodeGeneric;
   }
 
-  LabeledStatementType newLabeledStatement(TaggedParserAtomIndex label,
-                                           Node stmt, uint32_t begin) {
+  LabeledStatementResult newLabeledStatement(TaggedParserAtomIndex label,
+                                             Node stmt, uint32_t begin) {
     return NodeGeneric;
   }
 
-  UnaryNodeType newThrowStatement(Node expr, const TokenPos& pos) {
+  UnaryNodeResult newThrowStatement(Node expr, const TokenPos& pos) {
     return NodeThrow;
   }
-  TernaryNodeType newTryStatement(uint32_t begin, Node body,
-                                  LexicalScopeNodeType catchScope,
-                                  Node finallyBlock) {
+  TernaryNodeResult newTryStatement(uint32_t begin, Node body,
+                                    LexicalScopeNodeType catchScope,
+                                    Node finallyBlock) {
     return NodeGeneric;
   }
-  DebuggerStatementType newDebuggerStatement(const TokenPos& pos) {
+  DebuggerStatementResult newDebuggerStatement(const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  NameNodeType newPropertyName(TaggedParserAtomIndex name,
-                               const TokenPos& pos) {
+  NameNodeResult newPropertyName(TaggedParserAtomIndex name,
+                                 const TokenPos& pos) {
     lastAtom = name;
+    if (name == TaggedParserAtomIndex::WellKnown::length()) {
+      return NodeLengthName;
+    }
     return NodeGeneric;
   }
 
-  PropertyAccessType newPropertyAccess(Node expr, NameNodeType key) {
+  PropertyAccessResult newPropertyAccess(Node expr, NameNodeType key) {
     return NodeDottedProperty;
   }
 
-  PropertyAccessType newOptionalPropertyAccess(Node expr, NameNodeType key) {
+  PropertyAccessResult newArgumentsLength(Node expr, NameNodeType key) {
+    return NodeArgumentsLength;
+  }
+
+  PropertyAccessResult newOptionalPropertyAccess(Node expr, NameNodeType key) {
     return NodeOptionalDottedProperty;
   }
 
-  PropertyByValueType newPropertyByValue(Node lhs, Node index, uint32_t end) {
+  PropertyByValueResult newPropertyByValue(Node lhs, Node index, uint32_t end) {
     MOZ_ASSERT(!isPrivateName(index));
     return NodeElement;
   }
 
-  PropertyByValueType newOptionalPropertyByValue(Node lhs, Node index,
-                                                 uint32_t end) {
+  PropertyByValueResult newOptionalPropertyByValue(Node lhs, Node index,
+                                                   uint32_t end) {
     return NodeOptionalElement;
   }
 
-  PrivateMemberAccessType newPrivateMemberAccess(Node lhs, Node privateName,
-                                                 uint32_t end) {
+  PrivateMemberAccessResult newPrivateMemberAccess(Node lhs, Node privateName,
+                                                   uint32_t end) {
     return NodePrivateMemberAccess;
   }
 
-  PrivateMemberAccessType newOptionalPrivateMemberAccess(Node lhs,
-                                                         Node privateName,
-                                                         uint32_t end) {
+  PrivateMemberAccessResult newOptionalPrivateMemberAccess(Node lhs,
+                                                           Node privateName,
+                                                           uint32_t end) {
     return NodeOptionalPrivateMemberAccess;
   }
 
@@ -594,10 +628,12 @@ class SyntaxParseHandler {
 
   void checkAndSetIsDirectRHSAnonFunction(Node pn) {}
 
-  ParamsBodyNodeType newParamsBody(const TokenPos& pos) { return NodeGeneric; }
+  ParamsBodyNodeResult newParamsBody(const TokenPos& pos) {
+    return NodeGeneric;
+  }
 
-  FunctionNodeType newFunction(FunctionSyntaxKind syntaxKind,
-                               const TokenPos& pos) {
+  FunctionNodeResult newFunction(FunctionSyntaxKind syntaxKind,
+                                 const TokenPos& pos) {
     switch (syntaxKind) {
       case FunctionSyntaxKind::Statement:
         return NodeFunctionStatement;
@@ -617,23 +653,23 @@ class SyntaxParseHandler {
   void setFunctionBox(FunctionNodeType funNode, FunctionBox* funbox) {}
   void addFunctionFormalParameter(FunctionNodeType funNode, Node argpn) {}
 
-  ForNodeType newForStatement(uint32_t begin, TernaryNodeType forHead,
-                              Node body, unsigned iflags) {
+  ForNodeResult newForStatement(uint32_t begin, TernaryNodeType forHead,
+                                Node body, unsigned iflags) {
     return NodeGeneric;
   }
 
-  TernaryNodeType newForHead(Node init, Node test, Node update,
-                             const TokenPos& pos) {
+  TernaryNodeResult newForHead(Node init, Node test, Node update,
+                               const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  TernaryNodeType newForInOrOfHead(ParseNodeKind kind, Node target,
-                                   Node iteratedExpr, const TokenPos& pos) {
+  TernaryNodeResult newForInOrOfHead(ParseNodeKind kind, Node target,
+                                     Node iteratedExpr, const TokenPos& pos) {
     return NodeGeneric;
   }
 
-  AssignmentNodeType finishInitializerAssignment(NameNodeType nameNode,
-                                                 Node init) {
+  AssignmentNodeResult finishInitializerAssignment(NameNodeType nameNode,
+                                                   Node init) {
     return NodeUnparenthesizedAssignment;
   }
 
@@ -652,29 +688,36 @@ class SyntaxParseHandler {
     return ts.currentToken().pos.begin;
   }
 
-  ListNodeType newList(ParseNodeKind kind, const TokenPos& pos) {
+  ListNodeResult newList(ParseNodeKind kind, const TokenPos& pos) {
     MOZ_ASSERT(kind != ParseNodeKind::VarStmt);
     MOZ_ASSERT(kind != ParseNodeKind::LetDecl);
     MOZ_ASSERT(kind != ParseNodeKind::ConstDecl);
     MOZ_ASSERT(kind != ParseNodeKind::ParamsBody);
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    MOZ_ASSERT(kind != ParseNodeKind::UsingDecl);
+#endif
     return NodeGeneric;
   }
 
-  ListNodeType newList(ParseNodeKind kind, Node kid) {
+  ListNodeResult newList(ParseNodeKind kind, Node kid) {
     return newList(kind, TokenPos());
   }
 
-  DeclarationListNodeType newDeclarationList(ParseNodeKind kind,
-                                             const TokenPos& pos) {
+  DeclarationListNodeResult newDeclarationList(ParseNodeKind kind,
+                                               const TokenPos& pos) {
     if (kind == ParseNodeKind::VarStmt) {
       return NodeVarDeclaration;
     }
     MOZ_ASSERT(kind == ParseNodeKind::LetDecl ||
-               kind == ParseNodeKind::ConstDecl);
+               kind == ParseNodeKind::ConstDecl
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+               || kind == ParseNodeKind::UsingDecl
+#endif
+    );
     return NodeLexicalDeclaration;
   }
 
-  ListNodeType newCommaExpressionList(Node kid) { return NodeGeneric; }
+  ListNodeResult newCommaExpressionList(Node kid) { return NodeGeneric; }
 
   void addList(ListNodeType list, Node kid) {
     MOZ_ASSERT(list == NodeGeneric || list == NodeUnparenthesizedArray ||
@@ -683,17 +726,17 @@ class SyntaxParseHandler {
                list == NodeFunctionCall);
   }
 
-  CallNodeType newNewExpression(uint32_t begin, Node ctor, Node args,
-                                bool isSpread) {
+  CallNodeResult newNewExpression(uint32_t begin, Node ctor, ListNodeType args,
+                                  bool isSpread) {
     return NodeGeneric;
   }
 
-  AssignmentNodeType newAssignment(ParseNodeKind kind, Node lhs, Node rhs) {
+  AssignmentNodeResult newAssignment(ParseNodeKind kind, Node lhs, Node rhs) {
     return kind == ParseNodeKind::AssignExpr ? NodeUnparenthesizedAssignment
                                              : NodeGeneric;
   }
 
-  AssignmentNodeType newInitExpr(Node lhs, Node rhs) { return NodeGeneric; }
+  AssignmentNodeResult newInitExpr(Node lhs, Node rhs) { return NodeGeneric; }
 
   bool isUnparenthesizedAssignment(Node node) {
     return node == NodeUnparenthesizedAssignment;
@@ -714,6 +757,8 @@ class SyntaxParseHandler {
   bool isSuperBase(Node pn) { return pn == NodeSuperBase; }
 
   void setListHasNonConstInitializer(ListNodeType literal) {}
+
+  // NOTE: This is infallible.
   [[nodiscard]] Node parenthesize(Node node) {
     // A number of nodes have different behavior upon parenthesization, but
     // only in some circumstances.  Convert these nodes to special
@@ -742,6 +787,8 @@ class SyntaxParseHandler {
     // to the unparenthesized form: return |node| unchanged.
     return node;
   }
+
+  // NOTE: This is infallible.
   template <typename NodeType>
   [[nodiscard]] NodeType setLikelyIIFE(NodeType node) {
     return node;  // Remain in syntax-parse mode.
@@ -749,12 +796,16 @@ class SyntaxParseHandler {
 
   bool isName(Node node) {
     return node == NodeName || node == NodeArgumentsName ||
-           node == NodeEvalName || node == NodePotentialAsyncKeyword;
+           node == NodeLengthName || node == NodeEvalName ||
+           node == NodePotentialAsyncKeyword;
   }
 
   bool isArgumentsName(Node node) { return node == NodeArgumentsName; }
+  bool isLengthName(Node node) { return node == NodeLengthName; }
   bool isEvalName(Node node) { return node == NodeEvalName; }
   bool isAsyncKeyword(Node node) { return node == NodePotentialAsyncKeyword; }
+
+  bool isArgumentsLength(Node node) { return node == NodeArgumentsLength; }
 
   bool isPrivateName(Node node) { return node == NodePrivateName; }
   bool isPrivateMemberAccess(Node node) {
@@ -767,7 +818,8 @@ class SyntaxParseHandler {
     // |this|.  It's not really eligible for the funapply/funcall
     // optimizations as they're currently implemented (assuming a single
     // value is used for both retrieval and |this|).
-    if (node != NodeDottedProperty && node != NodeOptionalDottedProperty) {
+    if (node != NodeDottedProperty && node != NodeOptionalDottedProperty &&
+        node != NodeArgumentsLength) {
       return TaggedParserAtomIndex::null();
     }
     return lastAtom;

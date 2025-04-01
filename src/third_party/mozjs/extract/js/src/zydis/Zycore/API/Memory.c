@@ -44,7 +44,7 @@
 /* General                                                                                        */
 /* ---------------------------------------------------------------------------------------------- */
 
-ZyanU32 ZyanMemoryGetSystemPageSize()
+ZyanU32 ZyanMemoryGetSystemPageSize(void)
 {
 #if defined(ZYAN_WINDOWS)
 
@@ -60,7 +60,7 @@ ZyanU32 ZyanMemoryGetSystemPageSize()
 #endif
 }
 
-ZyanU32 ZyanMemoryGetSystemAllocationGranularity()
+ZyanU32 ZyanMemoryGetSystemAllocationGranularity(void)
 {
 #if defined(ZYAN_WINDOWS)
 

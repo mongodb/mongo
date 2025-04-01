@@ -11,7 +11,6 @@
 
 #include "gc/Policy.h"
 #include "vm/ArrayObject.h"
-#include "vm/JSAtom.h"
 #include "vm/JSObject.h"
 
 namespace js {

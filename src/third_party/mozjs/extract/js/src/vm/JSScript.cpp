@@ -46,6 +46,7 @@
 #include "jit/JitOptions.h"
 #include "jit/JitRuntime.h"
 #include "js/CharacterEncoding.h"  // JS_EncodeStringToUTF8
+#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin, JS::ColumnNumberOneOrigin, JS::ColumnNumberOffset
 #include "js/CompileOptions.h"
 #include "js/experimental/SourceHook.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
@@ -65,11 +66,11 @@
 #include "vm/BytecodeUtil.h"  // Disassemble
 #include "vm/Compression.h"
 #include "vm/HelperThreadState.h"  // js::RunPendingSourceCompressions
-#include "vm/JSContext.h"
 #include "vm/JSFunction.h"
 #include "vm/JSObject.h"
 #include "vm/JSONPrinter.h"  // JSONPrinter
 #include "vm/Opcodes.h"
+#include "vm/PortableBaselineInterpret.h"
 #include "vm/Scope.h"  // Scope
 #include "vm/SharedImmutableStringsCache.h"
 #include "vm/StencilEnums.h"  // TryNote, TryNoteKind, ScopeNote
@@ -84,6 +85,7 @@
 #include "vm/BytecodeIterator-inl.h"
 #include "vm/BytecodeLocation-inl.h"
 #include "vm/Compartment-inl.h"
+#include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/SharedImmutableStringsCache-inl.h"
 #include "vm/Stack-inl.h"
@@ -413,14 +415,8 @@ void js::FillImmutableFlagsFromCompileOptionsForFunction(
 
 // Check if flags matches to compile options for flags set by
 // FillImmutableFlagsFromCompileOptionsForTopLevel above.
-//
-// If isMultiDecode is true, this check minimal set of CompileOptions that is
-// shared across multiple scripts in JS::DecodeMultiStencilsOffThread.
-// Other options should be checked when getting the decoded script from the
-// cache.
 bool js::CheckCompileOptionsMatch(const ReadOnlyCompileOptions& options,
-                                  ImmutableScriptFlags flags,
-                                  bool isMultiDecode) {
+                                  ImmutableScriptFlags flags) {
   using ImmutableFlags = ImmutableScriptFlagsEnum;
 
   bool selfHosted = !!(flags & uint32_t(ImmutableFlags::SelfHosted));
@@ -433,13 +429,13 @@ bool js::CheckCompileOptionsMatch(const ReadOnlyCompileOptions& options,
   return options.selfHostingMode == selfHosted &&
          options.noScriptRval == noScriptRval &&
          options.isRunOnce == treatAsRunOnce &&
-         (isMultiDecode || (options.forceStrictMode() == forceStrict &&
-                            options.nonSyntacticScope == hasNonSyntacticScope));
+         options.forceStrictMode() == forceStrict &&
+         options.nonSyntacticScope == hasNonSyntacticScope;
 }
 
 JS_PUBLIC_API bool JS::CheckCompileOptionsMatch(
     const ReadOnlyCompileOptions& options, JSScript* script) {
-  return js::CheckCompileOptionsMatch(options, script->immutableFlags(), false);
+  return js::CheckCompileOptionsMatch(options, script->immutableFlags());
 }
 
 bool JSScript::initScriptCounts(JSContext* cx) {
@@ -744,11 +740,6 @@ ScriptSourceObject* ScriptSourceObject::create(JSContext* cx,
 [[nodiscard]] static bool MaybeValidateFilename(
     JSContext* cx, Handle<ScriptSourceObject*> sso,
     const JS::InstantiateOptions& options) {
-  // When parsing off-thread we want to do filename validation on the main
-  // thread. This makes off-thread parsing more pure and is simpler because we
-  // can't easily throw exceptions off-thread.
-  MOZ_ASSERT(!cx->isHelperThreadContext());
-
   if (!gFilenameValidationCallback) {
     return true;
   }
@@ -1097,16 +1088,33 @@ void ScriptSource::performDelayedConvertToCompressedSource(
   g->pendingCompressed.destroy();
 }
 
+void ScriptSource::PinnedUnitsBase::addReader() {
+  auto guard = source_->readers_.lock();
+  guard->count++;
+}
+
+template <typename Unit>
+void ScriptSource::PinnedUnitsBase::removeReader() {
+  // Note: We use a Mutex with Exclusive access, such that no PinnedUnits
+  // instance is live while we are compressing the source.
+  auto guard = source_->readers_.lock();
+  MOZ_ASSERT(guard->count > 0);
+  if (--guard->count) {
+    source_->performDelayedConvertToCompressedSource<Unit>(guard);
+  }
+}
+
 template <typename Unit>
 ScriptSource::PinnedUnits<Unit>::~PinnedUnits() {
   if (units_) {
-    // Note: We use a Mutex with Exclusive access, such that no PinnedUnits
-    // instance is live while we are compressing the source.
-    auto guard = source_->readers_.lock();
-    MOZ_ASSERT(guard->count > 0);
-    if (--guard->count) {
-      source_->performDelayedConvertToCompressedSource<Unit>(guard);
-    }
+    removeReader<Unit>();
+  }
+}
+
+template <typename Unit>
+ScriptSource::PinnedUnitsIfUncompressed<Unit>::~PinnedUnitsIfUncompressed() {
+  if (units_) {
+    removeReader<Unit>();
   }
 }
 
@@ -1217,26 +1225,55 @@ const Unit* ScriptSource::units(JSContext* cx,
 }
 
 template <typename Unit>
+const Unit* ScriptSource::uncompressedUnits(size_t begin, size_t len) {
+  MOZ_ASSERT(begin <= length());
+  MOZ_ASSERT(begin + len <= length());
+
+  if (!isUncompressed<Unit>()) {
+    return nullptr;
+  }
+
+  const Unit* units = uncompressedData<Unit>()->units();
+  if (!units) {
+    return nullptr;
+  }
+  return units + begin;
+}
+
+template <typename Unit>
 ScriptSource::PinnedUnits<Unit>::PinnedUnits(
     JSContext* cx, ScriptSource* source,
     UncompressedSourceCache::AutoHoldEntry& holder, size_t begin, size_t len)
     : PinnedUnitsBase(source) {
   MOZ_ASSERT(source->hasSourceType<Unit>(), "must pin units of source's type");
 
-  {
-    auto guard = source->readers_.lock();
-    guard->count++;
-  }
+  addReader();
 
   units_ = source->units<Unit>(cx, holder, begin, len);
   if (!units_) {
-    auto guard = source->readers_.lock();
-    guard->count--;
+    removeReader<Unit>();
   }
 }
 
 template class ScriptSource::PinnedUnits<Utf8Unit>;
 template class ScriptSource::PinnedUnits<char16_t>;
+
+template <typename Unit>
+ScriptSource::PinnedUnitsIfUncompressed<Unit>::PinnedUnitsIfUncompressed(
+    ScriptSource* source, size_t begin, size_t len)
+    : PinnedUnitsBase(source) {
+  MOZ_ASSERT(source->hasSourceType<Unit>(), "must pin units of source's type");
+
+  addReader();
+
+  units_ = source->uncompressedUnits<Unit>(begin, len);
+  if (!units_) {
+    removeReader<Unit>();
+  }
+}
+
+template class ScriptSource::PinnedUnitsIfUncompressed<Utf8Unit>;
+template class ScriptSource::PinnedUnitsIfUncompressed<char16_t>;
 
 JSLinearString* ScriptSource::substring(JSContext* cx, size_t start,
                                         size_t stop) {
@@ -1391,9 +1428,7 @@ bool ScriptSource::tryCompressOffThread(JSContext* cx) {
   // occur, that function may require changes.
 
   // The SourceCompressionTask needs to record the major GC number for
-  // scheduling. This cannot be accessed off-thread and must be handle in
-  // ParseTask::finish instead.
-  MOZ_ASSERT(!cx->isHelperThreadContext());
+  // scheduling.
   MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
 
   // If source compression was already attempted, do not queue a new task.
@@ -1683,9 +1718,6 @@ void SourceCompressionTask::complete() {
 
 bool js::SynchronouslyCompressSource(JSContext* cx,
                                      JS::Handle<BaseScript*> script) {
-  MOZ_ASSERT(!cx->isHelperThreadContext(),
-             "should only sync-compress on the main thread");
-
   // Finish all pending source compressions, including the single compression
   // task that may have been created (by |ScriptSource::tryCompressOffThread|)
   // just after the script was compiled.  Because we have flushed this queue,
@@ -1845,7 +1877,7 @@ template bool ScriptSource::initializeUnretrievableUncompressedSource(
 // For example:
 //   foo.js line 7 > eval
 // indicating code compiled by the call to 'eval' on line 7 of foo.js.
-UniqueChars js::FormatIntroducedFilename(const char* filename, unsigned lineno,
+UniqueChars js::FormatIntroducedFilename(const char* filename, uint32_t lineno,
                                          const char* introducer) {
   // Compute the length of the string in advance, so we can allocate a
   // buffer of the right size on the first shot.
@@ -1880,7 +1912,8 @@ bool ScriptSource::initFromOptions(FrontendContext* fc,
   delazificationMode_ = options.eagerDelazificationStrategy();
 
   startLine_ = options.lineno;
-  startColumn_ = options.column;
+  startColumn_ = JS::LimitedColumnNumberOneOrigin::fromUnlimited(
+      JS::ColumnNumberOneOrigin(options.column));
   introductionType_ = options.introductionType;
   setIntroductionOffset(options.introductionOffset);
   // The parameterListEnd_ is initialized later by setParameterListEnd, before
@@ -1889,7 +1922,7 @@ bool ScriptSource::initFromOptions(FrontendContext* fc,
   if (options.hasIntroductionInfo) {
     MOZ_ASSERT(options.introductionType != nullptr);
     const char* filename =
-        options.filename() ? options.filename() : "<unknown>";
+        options.filename() ? options.filename().c_str() : "<unknown>";
     UniqueChars formatted = FormatIntroducedFilename(
         filename, options.introductionLineno, options.introductionType);
     if (!formatted) {
@@ -1900,13 +1933,13 @@ bool ScriptSource::initFromOptions(FrontendContext* fc,
       return false;
     }
   } else if (options.filename()) {
-    if (!setFilename(fc, options.filename())) {
+    if (!setFilename(fc, options.filename().c_str())) {
       return false;
     }
   }
 
   if (options.introducerFilename()) {
-    if (!setIntroducerFilename(fc, options.introducerFilename())) {
+    if (!setIntroducerFilename(fc, options.introducerFilename().c_str())) {
       return false;
     }
   }
@@ -2436,12 +2469,7 @@ bool JSScript::fullyInitFromStencil(
       script->setMemberInitializers(lazyData.get()->getMemberInitializers());
     }
   }
-
   auto* scriptData = stencil.sharedData.get(scriptIndex);
-  MOZ_ASSERT_IF(
-      script->isGenerator() || script->isAsync(),
-      scriptData->nfixed() <= frontend::ParseContext::Scope::FixedSlotLimit);
-
   script->initSharedData(scriptData);
 
   // NOTE: JSScript is now constructed and should be linked in.
@@ -2584,89 +2612,24 @@ void JSScript::assertValidJumpTargets() const {
 
 void JSScript::addSizeOfJitScript(mozilla::MallocSizeOf mallocSizeOf,
                                   size_t* sizeOfJitScript,
-                                  size_t* sizeOfBaselineFallbackStubs) const {
+                                  size_t* sizeOfAllocSites) const {
   if (!hasJitScript()) {
     return;
   }
 
   jitScript()->addSizeOfIncludingThis(mallocSizeOf, sizeOfJitScript,
-                                      sizeOfBaselineFallbackStubs);
+                                      sizeOfAllocSites);
 }
 
 js::GlobalObject& JSScript::uninlinedGlobal() const { return global(); }
 
-static const uint32_t GSN_CACHE_THRESHOLD = 100;
-
-void GSNCache::purge() {
-  code = nullptr;
-  map.clearAndCompact();
-}
-
-const js::SrcNote* js::GetSrcNote(GSNCache& cache, JSScript* script,
-                                  jsbytecode* pc) {
-  size_t target = pc - script->code();
-  if (target >= script->length()) {
-    return nullptr;
-  }
-
-  if (cache.code == script->code()) {
-    GSNCache::Map::Ptr p = cache.map.lookup(pc);
-    return p ? p->value() : nullptr;
-  }
-
-  size_t offset = 0;
-  const js::SrcNote* result;
-  for (SrcNoteIterator iter(script->notes());; ++iter) {
-    const auto* sn = *iter;
-    if (sn->isTerminator()) {
-      result = nullptr;
-      break;
-    }
-    offset += sn->delta();
-    if (offset == target && sn->isGettable()) {
-      result = sn;
-      break;
-    }
-  }
-
-  if (cache.code != script->code() && script->length() >= GSN_CACHE_THRESHOLD) {
-    unsigned nsrcnotes = 0;
-    for (SrcNoteIterator iter(script->notes()); !iter.atEnd(); ++iter) {
-      const auto* sn = *iter;
-      if (sn->isGettable()) {
-        ++nsrcnotes;
-      }
-    }
-    if (cache.code) {
-      cache.map.clear();
-      cache.code = nullptr;
-    }
-    if (cache.map.reserve(nsrcnotes)) {
-      pc = script->code();
-      for (SrcNoteIterator iter(script->notes()); !iter.atEnd(); ++iter) {
-        const auto* sn = *iter;
-        pc += sn->delta();
-        if (sn->isGettable()) {
-          cache.map.putNewInfallible(pc, sn);
-        }
-      }
-      cache.code = script->code();
-    }
-  }
-
-  return result;
-}
-
-const js::SrcNote* js::GetSrcNote(JSContext* cx, JSScript* script,
-                                  jsbytecode* pc) {
-  return GetSrcNote(cx->caches().gsnCache, script, pc);
-}
-
-unsigned js::PCToLineNumber(unsigned startLine, unsigned startCol,
-                            SrcNote* notes, jsbytecode* code, jsbytecode* pc,
-                            unsigned* columnp) {
+unsigned js::PCToLineNumber(unsigned startLine,
+                            JS::LimitedColumnNumberOneOrigin startCol,
+                            SrcNote* notes, SrcNote* notesEnd, jsbytecode* code,
+                            jsbytecode* pc,
+                            JS::LimitedColumnNumberOneOrigin* columnp) {
   unsigned lineno = startLine;
-  unsigned column = startCol;
+  JS::LimitedColumnNumberOneOrigin column = startCol;
 
   /*
    * Walk through source notes accumulating their deltas, keeping track of
@@ -2675,7 +2638,7 @@ unsigned js::PCToLineNumber(unsigned startLine, unsigned startCol,
    */
   ptrdiff_t offset = 0;
   ptrdiff_t target = pc - code;
-  for (SrcNoteIterator iter(notes); !iter.atEnd(); ++iter) {
+  for (SrcNoteIterator iter(notes, notesEnd); !iter.atEnd(); ++iter) {
     const auto* sn = *iter;
     offset += sn->delta();
     if (offset > target) {
@@ -2685,14 +2648,18 @@ unsigned js::PCToLineNumber(unsigned startLine, unsigned startCol,
     SrcNoteType type = sn->type();
     if (type == SrcNoteType::SetLine) {
       lineno = SrcNote::SetLine::getLine(sn, startLine);
-      column = 0;
+      column = JS::LimitedColumnNumberOneOrigin();
+    } else if (type == SrcNoteType::SetLineColumn) {
+      lineno = SrcNote::SetLineColumn::getLine(sn, startLine);
+      column = SrcNote::SetLineColumn::getColumn(sn);
     } else if (type == SrcNoteType::NewLine) {
       lineno++;
-      column = 0;
+      column = JS::LimitedColumnNumberOneOrigin();
+    } else if (type == SrcNoteType::NewLineColumn) {
+      lineno++;
+      column = SrcNote::NewLineColumn::getColumn(sn);
     } else if (type == SrcNoteType::ColSpan) {
-      ptrdiff_t colspan = SrcNote::ColSpan::getSpan(sn);
-      MOZ_ASSERT(ptrdiff_t(column) + colspan >= 0);
-      column += colspan;
+      column += SrcNote::ColSpan::getSpan(sn);
     }
   }
 
@@ -2704,14 +2671,15 @@ unsigned js::PCToLineNumber(unsigned startLine, unsigned startCol,
 }
 
 unsigned js::PCToLineNumber(JSScript* script, jsbytecode* pc,
-                            unsigned* columnp) {
+                            JS::LimitedColumnNumberOneOrigin* columnp) {
   /* Cope with InterpreterFrame.pc value prior to entering Interpret. */
   if (!pc) {
     return 0;
   }
 
-  return PCToLineNumber(script->lineno(), script->column(), script->notes(),
-                        script->code(), pc, columnp);
+  return PCToLineNumber(
+      script->lineno(), JS::LimitedColumnNumberOneOrigin(script->column()),
+      script->notes(), script->notesEnd(), script->code(), pc, columnp);
 }
 
 jsbytecode* js::LineNumberToPC(JSScript* script, unsigned target) {
@@ -2719,7 +2687,8 @@ jsbytecode* js::LineNumberToPC(JSScript* script, unsigned target) {
   ptrdiff_t best = -1;
   unsigned lineno = script->lineno();
   unsigned bestdiff = SrcNote::MaxOperand;
-  for (SrcNoteIterator iter(script->notes()); !iter.atEnd(); ++iter) {
+  for (SrcNoteIterator iter(script->notes(), script->notesEnd()); !iter.atEnd();
+       ++iter) {
     const auto* sn = *iter;
     /*
      * Exact-match only if offset is not in the prologue; otherwise use
@@ -2739,7 +2708,10 @@ jsbytecode* js::LineNumberToPC(JSScript* script, unsigned target) {
     SrcNoteType type = sn->type();
     if (type == SrcNoteType::SetLine) {
       lineno = SrcNote::SetLine::getLine(sn, script->lineno());
-    } else if (type == SrcNoteType::NewLine) {
+    } else if (type == SrcNoteType::SetLineColumn) {
+      lineno = SrcNote::SetLineColumn::getLine(sn, script->lineno());
+    } else if (type == SrcNoteType::NewLine ||
+               type == SrcNoteType::NewLineColumn) {
       lineno++;
     }
   }
@@ -2753,12 +2725,16 @@ out:
 JS_PUBLIC_API unsigned js::GetScriptLineExtent(JSScript* script) {
   unsigned lineno = script->lineno();
   unsigned maxLineNo = lineno;
-  for (SrcNoteIterator iter(script->notes()); !iter.atEnd(); ++iter) {
+  for (SrcNoteIterator iter(script->notes(), script->notesEnd()); !iter.atEnd();
+       ++iter) {
     const auto* sn = *iter;
     SrcNoteType type = sn->type();
     if (type == SrcNoteType::SetLine) {
       lineno = SrcNote::SetLine::getLine(sn, script->lineno());
-    } else if (type == SrcNoteType::NewLine) {
+    } else if (type == SrcNoteType::SetLineColumn) {
+      lineno = SrcNote::SetLineColumn::getLine(sn, script->lineno());
+    } else if (type == SrcNoteType::NewLine ||
+               type == SrcNoteType::NewLineColumn) {
       lineno++;
     }
 
@@ -2817,7 +2793,7 @@ void js::maybeSpewScriptFinalWarmUpCount(JSScript* script) {
 
 void js::DescribeScriptedCallerForDirectEval(JSContext* cx, HandleScript script,
                                              jsbytecode* pc, const char** file,
-                                             unsigned* linenop,
+                                             uint32_t* linenop,
                                              uint32_t* pcOffset,
                                              bool* mutedErrors) {
   MOZ_ASSERT(script->containsPC(pc));
@@ -2845,7 +2821,7 @@ void js::DescribeScriptedCallerForDirectEval(JSContext* cx, HandleScript script,
 
 void js::DescribeScriptedCallerForCompilation(
     JSContext* cx, MutableHandleScript maybeScript, const char** file,
-    unsigned* linenop, uint32_t* pcOffset, bool* mutedErrors) {
+    uint32_t* linenop, uint32_t* pcOffset, bool* mutedErrors) {
   NonBuiltinFrameIter iter(cx, cx->realm()->principals());
 
   if (iter.done()) {
@@ -2896,11 +2872,11 @@ js::UniquePtr<ImmutableScriptData> ImmutableScriptData::new_(
   size_t noteLength = notes.Length();
   MOZ_RELEASE_ASSERT(noteLength <= frontend::MaxSrcNotesLength);
 
-  size_t nullLength = ComputeNotePadding(code.Length(), noteLength);
+  size_t notePaddingLength = ComputeNotePadding(code.Length(), noteLength);
 
   // Allocate ImmutableScriptData
   js::UniquePtr<ImmutableScriptData> data(ImmutableScriptData::new_(
-      fc, code.Length(), noteLength + nullLength, resumeOffsets.Length(),
+      fc, code.Length(), noteLength + notePaddingLength, resumeOffsets.Length(),
       scopeNotes.Length(), tryNotes.Length()));
   if (!data) {
     return data;
@@ -2921,7 +2897,8 @@ js::UniquePtr<ImmutableScriptData> ImmutableScriptData::new_(
   // Initialize trailing arrays
   CopySpan(code, data->codeSpan());
   CopySpan(notes, data->notesSpan().To(noteLength));
-  std::fill_n(data->notes() + noteLength, nullLength, SrcNote::terminator());
+  std::fill_n(data->notes() + noteLength, notePaddingLength,
+              SrcNote::padding());
   CopySpan(resumeOffsets, data->resumeOffsets());
   CopySpan(scopeNotes, data->scopeNotes());
   CopySpan(tryNotes, data->tryNotes());
@@ -3193,6 +3170,14 @@ BaseScript* BaseScript::CreateRawLazy(JSContext* cx, uint32_t ngcthings,
   return lazy;
 }
 
+#ifdef ENABLE_PORTABLE_BASELINE_INTERP
+// This is an arbitrary non-null pointer that we use as a placeholder
+// for scripts that can be run in PBL: the rest of the engine expects
+// a "non-null jitcode pointer" but we'll never actually call it. We
+// have to ensure alignment to keep GC happy.
+static uint8_t* const PBLJitCodePtr = reinterpret_cast<uint8_t*>(8);
+#endif
+
 void JSScript::updateJitCodeRaw(JSRuntime* rt) {
   MOZ_ASSERT(rt);
   if (hasBaselineScript() && baselineScript()->hasPendingIonCompileTask()) {
@@ -3215,10 +3200,20 @@ void JSScript::updateJitCodeRaw(JSRuntime* rt) {
     if (!usingEntryTrampoline) {
       setJitCodeRaw(rt->jitRuntime()->baselineInterpreter().codeRaw());
     }
+#ifdef ENABLE_PORTABLE_BASELINE_INTERP
+  } else if (hasJitScript() &&
+             js::jit::IsPortableBaselineInterpreterEnabled()) {
+    // The portable baseline interpreter does not dispatch on this
+    // pointer, but it needs to be non-null to trigger the appropriate
+    // code-paths, so we set it to a placeholder value here.
+    setJitCodeRaw(PBLJitCodePtr);
+#endif  // ENABLE_PORTABLE_BASELINE_INTERP
+  } else if (!js::jit::IsBaselineInterpreterEnabled()) {
+    setJitCodeRaw(nullptr);
   } else {
     setJitCodeRaw(rt->jitRuntime()->interpreterStub().value);
   }
-  MOZ_ASSERT(jitCodeRaw());
+  MOZ_ASSERT_IF(!js::jit::IsPortableBaselineInterpreterEnabled(), jitCodeRaw());
 }
 
 bool JSScript::hasLoops() {
@@ -3251,11 +3246,14 @@ void JSScript::resetWarmUpCounterToDelayIonCompilation() {
   }
 }
 
-gc::AllocSite* JSScript::createAllocSite() {
-  return jitScript()->createAllocSite(this);
-}
-
 #if defined(DEBUG) || defined(JS_JITSPEW)
+
+void BaseScript::dumpStringContent(js::GenericPrinter& out) const {
+  StringEscape esc('"');
+  EscapePrinter ep(out, esc);
+  ep.printf("%s:%u:%u @ 0x%p", filename() ? filename() : "<null>", lineno(),
+            column().oneOriginValue(), this);
+}
 
 void JSScript::dump(JSContext* cx) {
   JS::Rooted<JSScript*> script(cx, this);
@@ -3271,7 +3269,11 @@ void JSScript::dump(JSContext* cx) {
     return;
   }
 
-  fprintf(stderr, "%s\n", sp.string());
+  JS::UniqueChars str = sp.release();
+  if (!str) {
+    return;
+  }
+  fprintf(stderr, "%s\n", str.get());
 }
 
 void JSScript::dumpRecursive(JSContext* cx) {
@@ -3289,7 +3291,11 @@ void JSScript::dumpRecursive(JSContext* cx) {
     return;
   }
 
-  fprintf(stderr, "%s\n", sp.string());
+  JS::UniqueChars str = sp.release();
+  if (!str) {
+    return;
+  }
+  fprintf(stderr, "%s\n", str.get());
 }
 
 static void DumpMutableScriptFlags(js::JSONPrinter& json,
@@ -3364,7 +3370,7 @@ static void DumpMutableScriptFlags(js::JSONPrinter& json,
 
 /* static */
 bool JSScript::dump(JSContext* cx, JS::Handle<JSScript*> script,
-                    DumpOptions& options, js::Sprinter* sp) {
+                    DumpOptions& options, js::StringPrinter* sp) {
   {
     JSONPrinter json(*sp);
 
@@ -3377,7 +3383,7 @@ bool JSScript::dump(JSContext* cx, JS::Handle<JSScript*> script,
     }
 
     json.property("lineno", script->lineno());
-    json.property("column", script->column());
+    json.property("column", script->column().oneOriginValue());
 
     json.beginListProperty("immutableFlags");
     DumpImmutableScriptFlags(json, script->immutableFlags());
@@ -3392,7 +3398,7 @@ bool JSScript::dump(JSContext* cx, JS::Handle<JSScript*> script,
     if (script->isFunction()) {
       JS::Rooted<JSFunction*> fun(cx, script->function());
 
-      JS::Rooted<JSAtom*> name(cx, fun->displayAtom());
+      JS::Rooted<JSAtom*> name(cx, fun->fullDisplayAtom());
       if (name) {
         UniqueChars bytes = JS_EncodeStringToUTF8(cx, name);
         if (!bytes) {
@@ -3412,12 +3418,11 @@ bool JSScript::dump(JSContext* cx, JS::Handle<JSScript*> script,
   }
 
   if (sp->hadOutOfMemory()) {
+    sp->forwardOutOfMemory();
     return false;
   }
 
-  if (!sp->put("\n")) {
-    return false;
-  }
+  sp->put("\n");
 
   if (!Disassemble(cx, script, /* lines = */ true, sp)) {
     return false;
@@ -3443,9 +3448,7 @@ bool JSScript::dump(JSContext* cx, JS::Handle<JSScript*> script,
 
       JSObject* obj = &gcThing.as<JSObject>();
       if (obj->is<JSFunction>()) {
-        if (!sp->put("\n")) {
-          return false;
-        }
+        sp->put("\n");
 
         JS::Rooted<JSFunction*> fun(cx, &obj->as<JSFunction>());
         if (fun->isInterpreted()) {
@@ -3458,9 +3461,7 @@ bool JSScript::dump(JSContext* cx, JS::Handle<JSScript*> script,
             return false;
           }
         } else {
-          if (!sp->put("[native code]\n")) {
-            return false;
-          }
+          sp->put("[native code]\n");
         }
       }
     }
@@ -3471,66 +3472,66 @@ bool JSScript::dump(JSContext* cx, JS::Handle<JSScript*> script,
 
 /* static */
 bool JSScript::dumpSrcNotes(JSContext* cx, JS::Handle<JSScript*> script,
-                            js::Sprinter* sp) {
-  if (!sp->put("\nSource notes:\n") ||
-      !sp->jsprintf("%4s %4s %6s %5s %6s %-10s %s\n", "ofs", "line", "column",
-                    "pc", "delta", "desc", "args") ||
-      !sp->put("---- ---- ------ ----- ------ ---------- ------\n")) {
-    return false;
-  }
-
+                            js::GenericPrinter* sp) {
+  sp->put("\nSource notes:\n");
+  sp->printf("%4s %4s %6s %5s %6s %-16s %s\n", "ofs", "line", "column", "pc",
+             "delta", "desc", "args");
+  sp->put("---- ---- ------ ----- ------ ---------------- ------\n");
   unsigned offset = 0;
   unsigned lineno = script->lineno();
-  unsigned column = script->column();
+  JS::LimitedColumnNumberOneOrigin column = script->column();
   SrcNote* notes = script->notes();
-  for (SrcNoteIterator iter(notes); !iter.atEnd(); ++iter) {
+  SrcNote* notesEnd = script->notesEnd();
+  for (SrcNoteIterator iter(notes, notesEnd); !iter.atEnd(); ++iter) {
     const auto* sn = *iter;
 
     unsigned delta = sn->delta();
     offset += delta;
     SrcNoteType type = sn->type();
     const char* name = sn->name();
-    if (!sp->jsprintf("%3u: %4u %6u %5u [%4u] %-10s", unsigned(sn - notes),
-                      lineno, column, offset, delta, name)) {
-      return false;
-    }
+    sp->printf("%3u: %4u %6u %5u [%4u] %-16s", unsigned(sn - notes), lineno,
+               column.oneOriginValue(), offset, delta, name);
 
     switch (type) {
-      case SrcNoteType::Null:
-      case SrcNoteType::AssignOp:
       case SrcNoteType::Breakpoint:
-      case SrcNoteType::StepSep:
+      case SrcNoteType::BreakpointStepSep:
       case SrcNoteType::XDelta:
         break;
 
       case SrcNoteType::ColSpan: {
-        uint32_t colspan = SrcNote::ColSpan::getSpan(sn);
-        if (!sp->jsprintf(" colspan %u", colspan)) {
-          return false;
-        }
+        JS::ColumnNumberOffset colspan = SrcNote::ColSpan::getSpan(sn);
+        sp->printf(" colspan %u", colspan.value());
         column += colspan;
         break;
       }
 
       case SrcNoteType::SetLine:
         lineno = SrcNote::SetLine::getLine(sn, script->lineno());
-        if (!sp->jsprintf(" lineno %u", lineno)) {
-          return false;
-        }
-        column = 0;
+        sp->printf(" lineno %u", lineno);
+        column = JS::LimitedColumnNumberOneOrigin();
+        break;
+
+      case SrcNoteType::SetLineColumn:
+        lineno = SrcNote::SetLineColumn::getLine(sn, script->lineno());
+        column = SrcNote::SetLineColumn::getColumn(sn);
+        sp->printf(" lineno %u column %u", lineno, column.oneOriginValue());
         break;
 
       case SrcNoteType::NewLine:
         ++lineno;
-        column = 0;
+        column = JS::LimitedColumnNumberOneOrigin();
+        break;
+
+      case SrcNoteType::NewLineColumn:
+        column = SrcNote::NewLineColumn::getColumn(sn);
+        sp->printf(" column %u", column.oneOriginValue());
+        ++lineno;
         break;
 
       default:
         MOZ_ASSERT_UNREACHABLE("unrecognized srcnote");
     }
-    if (!sp->put("\n")) {
-      return false;
-    }
+    sp->put("\n");
   }
 
   return true;
@@ -3559,127 +3560,85 @@ static const char* TryNoteName(TryNoteKind kind) {
 
 /* static */
 bool JSScript::dumpTryNotes(JSContext* cx, JS::Handle<JSScript*> script,
-                            js::Sprinter* sp) {
-  if (!sp->put(
-          "\nException table:\nkind               stack    start      end\n")) {
-    return false;
-  }
+                            js::GenericPrinter* sp) {
+  sp->put("\nException table:\nkind               stack    start      end\n");
 
   for (const js::TryNote& tn : script->trynotes()) {
-    if (!sp->jsprintf(" %-16s %6u %8u %8u\n", TryNoteName(tn.kind()),
-                      tn.stackDepth, tn.start, tn.start + tn.length)) {
-      return false;
-    }
+    sp->printf(" %-16s %6u %8u %8u\n", TryNoteName(tn.kind()), tn.stackDepth,
+               tn.start, tn.start + tn.length);
   }
   return true;
 }
 
 /* static */
 bool JSScript::dumpScopeNotes(JSContext* cx, JS::Handle<JSScript*> script,
-                              js::Sprinter* sp) {
-  if (!sp->put("\nScope notes:\n   index   parent    start      end\n")) {
-    return false;
-  }
+                              js::GenericPrinter* sp) {
+  sp->put("\nScope notes:\n   index   parent    start      end\n");
 
   for (const ScopeNote& note : script->scopeNotes()) {
     if (note.index == ScopeNote::NoScopeIndex) {
-      if (!sp->jsprintf("%8s ", "(none)")) {
-        return false;
-      }
+      sp->printf("%8s ", "(none)");
     } else {
-      if (!sp->jsprintf("%8u ", note.index.index)) {
-        return false;
-      }
+      sp->printf("%8u ", note.index.index);
     }
     if (note.parent == ScopeNote::NoScopeIndex) {
-      if (!sp->jsprintf("%8s ", "(none)")) {
-        return false;
-      }
+      sp->printf("%8s ", "(none)");
     } else {
-      if (!sp->jsprintf("%8u ", note.parent)) {
-        return false;
-      }
+      sp->printf("%8u ", note.parent);
     }
-    if (!sp->jsprintf("%8u %8u\n", note.start, note.start + note.length)) {
-      return false;
-    }
+    sp->printf("%8u %8u\n", note.start, note.start + note.length);
   }
   return true;
 }
 
 /* static */
 bool JSScript::dumpGCThings(JSContext* cx, JS::Handle<JSScript*> script,
-                            js::Sprinter* sp) {
-  if (!sp->put("\nGC things:\n   index   type       value\n")) {
-    return false;
-  }
+                            js::GenericPrinter* sp) {
+  sp->put("\nGC things:\n   index   type       value\n");
 
   size_t i = 0;
   for (JS::GCCellPtr gcThing : script->gcthings()) {
-    if (!sp->jsprintf("%8zu   ", i)) {
-      return false;
-    }
+    sp->printf("%8zu   ", i);
     if (gcThing.is<JS::BigInt>()) {
-      if (!sp->put("BigInt     ")) {
-        return false;
-      }
+      sp->put("BigInt     ");
       gcThing.as<JS::BigInt>().dump(*sp);
-      if (!sp->put("\n")) {
-        return false;
-      }
+      sp->put("\n");
     } else if (gcThing.is<Scope>()) {
-      if (!sp->put("Scope      ")) {
-        return false;
-      }
+      sp->put("Scope      ");
       JS::Rooted<Scope*> scope(cx, &gcThing.as<Scope>());
       if (!Scope::dumpForDisassemble(cx, scope, *sp,
                                      "                      ")) {
         return false;
       }
-      if (!sp->put("\n")) {
-        return false;
-      }
+      sp->put("\n");
     } else if (gcThing.is<JSObject>()) {
       JSObject* obj = &gcThing.as<JSObject>();
       if (obj->is<JSFunction>()) {
-        if (!sp->put("Function   ")) {
-          return false;
-        }
+        sp->put("Function   ");
         JS::Rooted<JSFunction*> fun(cx, &obj->as<JSFunction>());
-        if (fun->displayAtom()) {
-          JS::Rooted<JSAtom*> name(cx, fun->displayAtom());
+        if (fun->fullDisplayAtom()) {
+          JS::Rooted<JSAtom*> name(cx, fun->fullDisplayAtom());
           JS::UniqueChars utf8chars = JS_EncodeStringToUTF8(cx, name);
           if (!utf8chars) {
             return false;
           }
-          if (!sp->put(utf8chars.get())) {
-            return false;
-          }
+          sp->put(utf8chars.get());
         } else {
-          if (!sp->put("(anonymous)")) {
-            return false;
-          }
+          sp->put("(anonymous)");
         }
 
         if (fun->hasBaseScript()) {
           BaseScript* script = fun->baseScript();
-          if (!sp->jsprintf(" @ %u:%u\n", script->lineno(), script->column())) {
-            return false;
-          }
+          sp->printf(" @ %u:%u\n", script->lineno(),
+                     script->column().oneOriginValue());
         } else {
-          if (!sp->put(" (no script)\n")) {
-            return false;
-          }
+          sp->put(" (no script)\n");
         }
       } else {
         if (obj->is<RegExpObject>()) {
-          if (!sp->put("RegExp     ")) {
-            return false;
-          }
+          sp->put("RegExp     ");
         } else {
-          if (!sp->put("Object     ")) {
-            return false;
-          }
+          sp->put("Object     ");
         }
 
         JS::Rooted<JS::Value> objValue(cx, ObjectValue(*obj));
@@ -3691,39 +3650,24 @@ bool JSScript::dumpGCThings(JSContext* cx, JS::Handle<JSScript*> script,
         if (!utf8chars) {
           return false;
         }
-        if (!sp->put(utf8chars.get())) {
-          return false;
-        }
-
-        if (!sp->put("\n")) {
-          return false;
-        }
+        sp->put(utf8chars.get());
+        sp->put("\n");
       }
     } else if (gcThing.is<JSString>()) {
       JS::Rooted<JSString*> str(cx, &gcThing.as<JSString>());
       if (str->isAtom()) {
-        if (!sp->put("Atom       ")) {
-          return false;
-        }
+        sp->put("Atom       ");
       } else {
-        if (!sp->put("String     ")) {
-          return false;
-        }
+        sp->put("String     ");
       }
       JS::UniqueChars chars = QuoteString(cx, str, '"');
       if (!chars) {
         return false;
       }
-      if (!sp->put(chars.get())) {
-        return false;
-      }
-      if (!sp->put("\n")) {
-        return false;
-      }
+      sp->put(chars.get());
+      sp->put("\n");
     } else {
-      if (!sp->put("Unknown\n")) {
-        return false;
-      }
+      sp->put("Unknown\n");
     }
     i++;
   }
@@ -3763,10 +3707,10 @@ JS::ubi::Base::Size JS::ubi::Concrete<BaseScript>::size(
     JSScript* script = base->asJSScript();
 
     size_t jitScriptSize = 0;
-    size_t fallbackStubSize = 0;
-    script->addSizeOfJitScript(mallocSizeOf, &jitScriptSize, &fallbackStubSize);
+    size_t allocSitesSize = 0;
+    script->addSizeOfJitScript(mallocSizeOf, &jitScriptSize, &allocSitesSize);
     size += jitScriptSize;
-    size += fallbackStubSize;
+    size += allocSitesSize;
 
     size_t baselineSize = 0;
     jit::AddSizeOfBaselineData(script, mallocSizeOf, &baselineSize);

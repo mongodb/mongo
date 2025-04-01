@@ -108,25 +108,21 @@ bool mozilla::PrintfTarget::fill_n(const char* src, int srclen, int width,
                                    int prec, int type, int flags) {
   int zerowidth = 0;
   int precwidth = 0;
-  int signwidth = 0;
   int leftspaces = 0;
   int rightspaces = 0;
   int cvtwidth;
-  char sign;
+  char sign = 0;
 
   if ((type & 1) == 0) {
     if (flags & FLAG_NEG) {
       sign = '-';
-      signwidth = 1;
     } else if (flags & FLAG_SIGNED) {
       sign = '+';
-      signwidth = 1;
     } else if (flags & FLAG_SPACED) {
       sign = ' ';
-      signwidth = 1;
     }
   }
-  cvtwidth = signwidth + srclen;
+  cvtwidth = (sign ? 1 : 0) + srclen;
 
   if (prec > 0 && (type != TYPE_DOUBLE)) {
     if (prec > srclen) {
@@ -158,7 +154,7 @@ bool mozilla::PrintfTarget::fill_n(const char* src, int srclen, int width,
       return false;
     }
   }
-  if (signwidth) {
+  if (sign) {
     if (!emit(&sign, 1)) {
       return false;
     }

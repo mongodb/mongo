@@ -153,17 +153,20 @@ constexpr HashNumber AddU32ToHash(HashNumber aHash, uint32_t aValue) {
 }
 
 /**
- * AddUintptrToHash takes sizeof(uintptr_t) as a template parameter.
+ * AddUintNToHash takes sizeof(int_type) as a template parameter.
+ * Changes to these functions need to be propagated to
+ * MacroAssembler::prepareHashNonGCThing, which inlines them manually for
+ * the JIT.
  */
-template <size_t PtrSize>
-constexpr HashNumber AddUintptrToHash(HashNumber aHash, uintptr_t aValue) {
+template <size_t Size>
+constexpr HashNumber AddUintNToHash(HashNumber aHash, uint64_t aValue) {
   return AddU32ToHash(aHash, static_cast<uint32_t>(aValue));
 }
 
 template <>
-inline HashNumber AddUintptrToHash<8>(HashNumber aHash, uintptr_t aValue) {
+inline HashNumber AddUintNToHash<8>(HashNumber aHash, uint64_t aValue) {
   uint32_t v1 = static_cast<uint32_t>(aValue);
-  uint32_t v2 = static_cast<uint32_t>(static_cast<uint64_t>(aValue) >> 32);
+  uint32_t v2 = static_cast<uint32_t>(aValue >> 32);
   return AddU32ToHash(AddU32ToHash(aHash, v1), v2);
 }
 
@@ -196,23 +199,23 @@ template <typename A>
 
   static_assert(sizeof(aA) == sizeof(uintptr_t), "Strange pointer!");
 
-  return detail::AddUintptrToHash<sizeof(uintptr_t)>(aHash, uintptr_t(aA));
+  return detail::AddUintNToHash<sizeof(uintptr_t)>(aHash, uintptr_t(aA));
 }
 
-// We use AddUintptrToHash() for hashing all integral types.  8-byte integral
+// We use AddUintNToHash() for hashing all integral types.  8-byte integral
 // types are treated the same as 64-bit pointers, and smaller integral types are
-// first implicitly converted to 32 bits and then passed to AddUintptrToHash()
+// first implicitly converted to 32 bits and then passed to AddUintNToHash()
 // to be hashed.
 template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
 [[nodiscard]] constexpr HashNumber AddToHash(HashNumber aHash, T aA) {
-  return detail::AddUintptrToHash<sizeof(T)>(aHash, aA);
+  return detail::AddUintNToHash<sizeof(T)>(aHash, aA);
 }
 
 template <typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
 [[nodiscard]] constexpr HashNumber AddToHash(HashNumber aHash, T aA) {
-  // Hash using AddUintptrToHash with the underlying type of the enum type
+  // Hash using AddUintNToHash with the underlying type of the enum type
   using UnderlyingType = typename std::underlying_type<T>::type;
-  return detail::AddUintptrToHash<sizeof(UnderlyingType)>(
+  return detail::AddUintNToHash<sizeof(UnderlyingType)>(
       aHash, static_cast<UnderlyingType>(aA));
 }
 

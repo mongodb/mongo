@@ -999,6 +999,7 @@ class Simulator {
   void CheckBreakpoints();
 
   JS::ProfilingFrameIterator::RegisterState registerState();
+  void HandleWasmTrap();
 
   // Handle any wasm faults, returning true if the fault was handled.
   // This method is rather hot so inline the normal (no-wasm) case.

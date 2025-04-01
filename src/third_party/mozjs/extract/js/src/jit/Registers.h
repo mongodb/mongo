@@ -205,6 +205,7 @@ struct Register64 {
     return high != other.high || low != other.low;
   }
   Register scratchReg() { return high; }
+  Register secondScratchReg() { return low; }
   static Register64 Invalid() {
     return Register64(Register::Invalid(), Register::Invalid());
   }

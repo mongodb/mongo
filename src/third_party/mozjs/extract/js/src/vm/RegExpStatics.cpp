@@ -42,7 +42,7 @@ bool RegExpStatics::executeLazy(JSContext* cx) {
   Rooted<JSLinearString*> input(cx, matchesInput);
   RegExpRunStatus status =
       RegExpShared::execute(cx, &shared, input, lazyIndex, &this->matches);
-  if (status == RegExpRunStatus_Error) {
+  if (status == RegExpRunStatus::Error) {
     return false;
   }
 
@@ -50,7 +50,7 @@ bool RegExpStatics::executeLazy(JSContext* cx) {
    * RegExpStatics are only updated on successful (matching) execution.
    * Re-running the same expression must therefore produce a matching result.
    */
-  MOZ_ASSERT(status == RegExpRunStatus_Success);
+  MOZ_ASSERT(status == RegExpRunStatus::Success);
 
   /* Unset lazy state and remove rooted values that now have no use. */
   pendingLazyEvaluation = false;

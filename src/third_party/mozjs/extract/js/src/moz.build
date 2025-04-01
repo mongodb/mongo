@@ -118,6 +118,7 @@ EXPORTS += [
 ]
 
 EXPORTS.js += [
+    "!../public/PrefsGenerated.h",
     "../public/AllocationLogging.h",
     "../public/AllocationRecording.h",
     "../public/AllocPolicy.h",
@@ -131,6 +132,7 @@ EXPORTS.js += [
     "../public/CallNonGenericMethod.h",
     "../public/CharacterEncoding.h",
     "../public/Class.h",
+    "../public/ColumnNumber.h",
     "../public/ComparisonOperators.h",
     "../public/CompilationAndEvaluation.h",
     "../public/CompileOptions.h",
@@ -158,6 +160,7 @@ EXPORTS.js += [
     "../public/Id.h",
     "../public/Initialization.h",
     "../public/Interrupt.h",
+    "../public/Iterator.h",
     "../public/JitCodeAPI.h",
     "../public/JSON.h",
     "../public/LocaleSensitive.h",
@@ -167,7 +170,7 @@ EXPORTS.js += [
     "../public/MemoryMetrics.h",
     "../public/Modules.h",
     "../public/Object.h",
-    "../public/OffThreadScriptCompilation.h",
+    "../public/Prefs.h",
     "../public/Principals.h",
     "../public/Printer.h",
     "../public/Printf.h",
@@ -305,8 +308,10 @@ UNIFIED_SOURCES += [
     "builtin/MapObject.cpp",
     "builtin/ModuleObject.cpp",
     "builtin/Object.cpp",
+    "builtin/ParseRecordObject.cpp",
     "builtin/Profilers.cpp",
     "builtin/Promise.cpp",
+    "builtin/RawJSONObject.cpp",
     "builtin/Reflect.cpp",
     "builtin/ReflectParse.cpp",
     "builtin/ShadowRealm.cpp",
@@ -357,6 +362,7 @@ UNIFIED_SOURCES += [
     "vm/Compartment.cpp",
     "vm/CompilationAndEvaluation.cpp",
     "vm/Compression.cpp",
+    "vm/ConcurrentDelazification.cpp",
     "vm/DateTime.cpp",
     "vm/EnvironmentObject.cpp",
     "vm/EqualityOperations.cpp",
@@ -375,9 +381,11 @@ UNIFIED_SOURCES += [
     "vm/Id.cpp",
     "vm/Initialization.cpp",
     "vm/InternalThreadPool.cpp",
+    "vm/InvalidatingFuse.cpp",
     "vm/Iteration.cpp",
+    "vm/Iterator.cpp",
     "vm/JitActivation.cpp",
-    "vm/JSAtom.cpp",
+    "vm/JSAtomUtils.cpp",
     "vm/JSContext.cpp",
     "vm/JSFunction.cpp",
     "vm/JSObject.cpp",
@@ -389,9 +397,9 @@ UNIFIED_SOURCES += [
     "vm/Modules.cpp",
     "vm/NativeObject.cpp",
     "vm/OffThreadPromiseRuntimeState.cpp",
-    "vm/OffThreadScriptCompilation.cpp",
     "vm/PIC.cpp",
     "vm/PlainObject.cpp",
+    "vm/Prefs.cpp",
     "vm/Printer.cpp",
     "vm/Probes.cpp",
     "vm/PromiseLookup.cpp",
@@ -400,6 +408,7 @@ UNIFIED_SOURCES += [
     "vm/PropMap.cpp",
     "vm/ProxyObject.cpp",
     "vm/Realm.cpp",
+    "vm/RealmFuses.cpp",
     "vm/RegExpObject.cpp",
     "vm/RegExpStatics.cpp",
     "vm/Runtime.cpp",
@@ -435,25 +444,6 @@ UNIFIED_SOURCES += [
     "vm/Xdr.cpp",
 ]
 
-if CONFIG["MOZ_JS_STREAMS"]:
-    UNIFIED_SOURCES += [
-        "builtin/Stream.cpp",
-        "builtin/streams/MiscellaneousOperations.cpp",
-        "builtin/streams/PullIntoDescriptor.cpp",
-        "builtin/streams/QueueingStrategies.cpp",
-        "builtin/streams/QueueWithSizes.cpp",
-        "builtin/streams/ReadableStream.cpp",
-        "builtin/streams/ReadableStreamBYOBReader.cpp",
-        "builtin/streams/ReadableStreamDefaultController.cpp",
-        "builtin/streams/ReadableStreamDefaultControllerOperations.cpp",
-        "builtin/streams/ReadableStreamDefaultReader.cpp",
-        "builtin/streams/ReadableStreamInternals.cpp",
-        "builtin/streams/ReadableStreamOperations.cpp",
-        "builtin/streams/ReadableStreamReader.cpp",
-        "builtin/streams/StreamAPI.cpp",
-        "builtin/streams/TeeState.cpp",
-    ]
-
 # builtin/RegExp.cpp cannot be built in unified mode because it causes huge
 #   win32 test slowdowns
 # jsmath.cpp cannot be built in unified mode because it needs to re-#define the
@@ -466,6 +456,11 @@ SOURCES += [
     "vm/Interpreter.cpp",
     "vm/ProfilingStack.cpp",
 ]
+
+if CONFIG["ENABLE_PORTABLE_BASELINE_INTERP"]:
+    SOURCES += [
+        "vm/PortableBaselineInterpret.cpp",
+    ]
 
 if CONFIG["ENABLE_RECORD_TUPLE"]:
     UNIFIED_SOURCES += [
@@ -481,7 +476,6 @@ if CONFIG["JS_HAS_INTL_API"]:
         "builtin/intl/Collator.cpp",
         "builtin/intl/CommonFunctions.cpp",
         "builtin/intl/DateTimeFormat.cpp",
-        "builtin/intl/DecimalNumber.cpp",
         "builtin/intl/DisplayNames.cpp",
         "builtin/intl/IntlObject.cpp",
         "builtin/intl/LanguageTag.cpp",
@@ -490,6 +484,7 @@ if CONFIG["JS_HAS_INTL_API"]:
         "builtin/intl/NumberFormat.cpp",
         "builtin/intl/PluralRules.cpp",
         "builtin/intl/RelativeTimeFormat.cpp",
+        "builtin/intl/Segmenter.cpp",
         "builtin/intl/SharedIntlData.cpp",
     ]
 
@@ -501,7 +496,6 @@ if CONFIG["MOZ_INSTRUMENTS"]:
 if CONFIG["OS_ARCH"] == "WINNT":
     OS_LIBS += [
         "advapi32",
-        "winmm",
     ]
     UNIFIED_SOURCES += [
         "threading/windows/CpuCount.cpp",
@@ -517,6 +511,11 @@ else:
     UNIFIED_SOURCES += [
         "threading/posix/CpuCount.cpp",
         "threading/posix/PosixThread.cpp",
+    ]
+
+if CONFIG["JS_HAS_INTL_API"] and CONFIG["MOZ_ICU4X"]:
+    LOCAL_INCLUDES += [
+        "/intl/icu_capi/c/include",
     ]
 
 if CONFIG["JS_HAS_CTYPES"]:
@@ -547,6 +546,9 @@ if CONFIG["MOZ_VTUNE"]:
             SOURCES["vtune/ittnotify_static.c"].flags += ["-Wno-stringop-truncation"]
 
 DIRS += ["build", "debugger", "frontend", "gc", "irregexp", "jit", "util", "wasm"]
+
+if CONFIG["JS_HAS_TEMPORAL_API"]:
+    DIRS += ["builtin/temporal"]
 
 # Bug 1739321 - clang 13+ only emits debuginfo for classes that are actually
 # constructed, and we cheat in a number of cases. The flag exists at least
@@ -592,7 +594,6 @@ selfhosted_inputs = [
     "builtin/RegExpLocalReplaceOpt.h.js",
     "builtin/String.js",
     "builtin/Set.js",
-    "builtin/Sorting.js",
     "builtin/TypedArray.js",
     "builtin/WeakMap.js",
     "builtin/WeakSet.js",
@@ -610,6 +611,7 @@ selfhosted_inputs = [
         "builtin/intl/PluralRules.js",
         "builtin/intl/RelativeTimeFormat.js",
         "builtin/intl/SanctionedSimpleUnitIdentifiersGenerated.js",
+        "builtin/intl/Segmenter.js",
     ]
     if CONFIG["JS_HAS_INTL_API"]
     else []
@@ -627,13 +629,22 @@ GeneratedFile(
     inputs=selfhosted_inputs,
 )
 
+GeneratedFile(
+    "../public/PrefsGenerated.h",
+    script="GeneratePrefs.py",
+    entry_point="generate_prefs_header",
+    inputs=["../../modules/libpref/init/StaticPrefList.yaml"],
+)
+
 if CONFIG["JS_HAS_CTYPES"]:
     if CONFIG["MOZ_SYSTEM_FFI"]:
         CXXFLAGS += CONFIG["MOZ_FFI_CFLAGS"]
 
 if CONFIG["JS_HAS_INTL_API"]:
-    DIRS += [
-        "../../intl/components",
-    ]
+    if CONFIG["JS_STANDALONE"]:
+        DIRS += [
+            "../../intl/bidi",
+            "../../intl/components",
+        ]
 
     USE_LIBS += ["intlcomponents"]

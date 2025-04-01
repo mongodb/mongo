@@ -29,6 +29,10 @@ namespace wasm {
 class Code;
 class CodeRange;
 class CodeSegment;
+class TagType;
+
+extern const TagType* sWrappedJSValueTagType;
+static constexpr uint32_t WrappedJSValueTagType_ValueOffset = 0;
 
 // These methods return the wasm::CodeSegment (resp. wasm::Code) containing
 // the given pc, if any exist in the process. These methods do not take a lock,

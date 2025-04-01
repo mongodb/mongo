@@ -12,7 +12,6 @@
 #include "frontend/TDZCheckCache.h"
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
 #include "vm/EnvironmentObject.h"     // ClassBodyLexicalEnvironmentObject
-#include "vm/WellKnownAtom.h"         // js_*_str
 
 using namespace js;
 using namespace js::frontend;
@@ -64,7 +63,7 @@ bool EmitterScope::checkEnvironmentChainLength(BytecodeEmitter* bce) {
   }
 
   if (hops >= ENVCOORD_HOPS_LIMIT - 1) {
-    bce->reportError(nullptr, JSMSG_TOO_DEEP, js_function_str);
+    bce->reportError(nullptr, JSMSG_TOO_DEEP, "function");
     return false;
   }
 
@@ -140,7 +139,7 @@ mozilla::Maybe<ScopeIndex> EmitterScope::enclosingScopeIndex(
 bool EmitterScope::nameCanBeFree(BytecodeEmitter* bce,
                                  TaggedParserAtomIndex name) {
   // '.generator' cannot be accessed by name.
-  return name != TaggedParserAtomIndex::WellKnown::dotGenerator();
+  return name != TaggedParserAtomIndex::WellKnown::dot_generator_();
 }
 
 NameLocation EmitterScope::searchAndCache(BytecodeEmitter* bce,
@@ -927,12 +926,22 @@ bool EmitterScope::leave(BytecodeEmitter* bce, bool nonLocal) {
     case ScopeKind::Catch:
     case ScopeKind::FunctionLexical:
     case ScopeKind::ClassBody:
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+      if (hasDisposables()) {
+        if (!bce->emit1(JSOp::DisposeDisposables)) {
+          return false;
+        }
+      }
+#endif
+
       if (bce->sc->isFunctionBox() &&
           bce->sc->asFunctionBox()->needsClearSlotsOnExit()) {
         if (!deadZoneFrameSlots(bce)) {
           return false;
         }
       }
+
       if (!bce->emit1(hasEnvironment() ? JSOp::PopLexicalEnv
                                        : JSOp::DebugLeaveLexicalEnv)) {
         return false;

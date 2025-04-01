@@ -201,6 +201,7 @@ ZyanStatus ZydisFormatterIntelFormatOperandMEM(const ZydisFormatter* formatter,
     ZYAN_ASSERT(context);
 
     if ((context->operand->mem.type == ZYDIS_MEMOP_TYPE_MEM) ||
+        (context->operand->mem.type == ZYDIS_MEMOP_TYPE_AGEN) ||
         (context->operand->mem.type == ZYDIS_MEMOP_TYPE_VSIB))
     {
         ZYAN_CHECK(formatter->func_print_typecast(formatter, buffer, context));
@@ -425,7 +426,7 @@ ZyanStatus ZydisFormatterIntelPrintAddressMASM(const ZydisFormatter* formatter,
     if ((formatter->addr_padding_relative == ZYDIS_PADDING_AUTO) &&
         (formatter->addr_base == ZYDIS_NUMERIC_BASE_HEX))
     {
-        switch (context->instruction->stack_width)
+        switch (context->instruction->address_width)
         {
         case 16:
             padding =  4;

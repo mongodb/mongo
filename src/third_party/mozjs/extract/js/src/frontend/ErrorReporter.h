@@ -9,10 +9,12 @@
 
 #include "mozilla/Variant.h"
 
+#include <optional>
 #include <stdarg.h>  // for va_list
 #include <stddef.h>  // for size_t
 #include <stdint.h>  // for uint32_t
 
+#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin
 #include "js/UniquePtr.h"
 #include "vm/ErrorReporting.h"  // ErrorMetadata, ReportCompile{Error,Warning}
 
@@ -145,8 +147,8 @@ class ErrorReportMixin : public StrictModeGetter {
       return;
     }
 
-    ReportCompileErrorLatin1(getContext(), std::move(metadata),
-                             std::move(notes), errorNumber, args);
+    ReportCompileErrorLatin1VA(getContext(), std::move(metadata),
+                               std::move(notes), errorNumber, args);
   }
 
   // ==== warning ====
@@ -302,8 +304,8 @@ class ErrorReportMixin : public StrictModeGetter {
       return false;
     }
 
-    ReportCompileErrorLatin1(getContext(), std::move(metadata),
-                             std::move(notes), errorNumber, args);
+    ReportCompileErrorLatin1VA(getContext(), std::move(metadata),
+                               std::move(notes), errorNumber, args);
     return false;
   }
 
@@ -321,19 +323,19 @@ class ErrorReportMixin : public StrictModeGetter {
 // classes for emitter.
 class ErrorReporter : public ErrorReportMixin {
  public:
-  // Sets *onThisLine to true if the given offset is inside the given line
-  // number `lineNum`, or false otherwise, and returns true.
+  // Returns Some(true) if the given offset is inside the given line
+  // number `lineNum`, or Some(false) otherwise.
   //
-  // Return false if an error happens.  This method itself doesn't report an
+  // Return None if an error happens.  This method itself doesn't report an
   // error, and any failure is supposed to be reported as OOM in the caller.
-  virtual bool isOnThisLine(size_t offset, uint32_t lineNum,
-                            bool* onThisLine) const = 0;
+  virtual std::optional<bool> isOnThisLine(size_t offset,
+                                           uint32_t lineNum) const = 0;
 
   // Returns the line number for given offset.
   virtual uint32_t lineAt(size_t offset) const = 0;
 
   // Returns the column number for given offset.
-  virtual uint32_t columnAt(size_t offset) const = 0;
+  virtual JS::LimitedColumnNumberOneOrigin columnAt(size_t offset) const = 0;
 };
 
 }  // namespace frontend

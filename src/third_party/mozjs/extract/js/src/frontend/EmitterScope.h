@@ -45,6 +45,10 @@ class EmitterScope : public Nestable<EmitterScope> {
   // chain, false if all bindings are stored in frame slots on the stack.
   bool hasEnvironment_;
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  bool hasDisposables_ = false;
+#endif
+
   // The number of enclosing environments. Used for error checking.
   uint8_t environmentChainLength_;
 
@@ -141,6 +145,15 @@ class EmitterScope : public Nestable<EmitterScope> {
   mozilla::Maybe<ScopeIndex> scopeIndex(const BytecodeEmitter* bce) const;
 
   bool hasEnvironment() const { return hasEnvironment_; }
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  bool hasDisposables() const { return hasDisposables_; }
+
+  bool setHasDisposables() {
+    hasDisposables_ = true;
+    return true;
+  }
+#endif
 
   // The first frame slot used.
   uint32_t frameSlotStart() const {
