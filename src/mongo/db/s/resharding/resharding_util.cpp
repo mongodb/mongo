@@ -604,18 +604,26 @@ Date_t getCurrentTime() {
     return svcCtx->getFastClockSource()->now();
 }
 
-ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
-                                                const UUID& reshardingUUID) {
+boost::optional<ReshardingCoordinatorDocument> tryGetCoordinatorDoc(OperationContext* opCtx,
+                                                                    const UUID& reshardingUUID) {
     DBDirectClient client(opCtx);
-
     auto doc = client.findOne(
         NamespaceString::kConfigReshardingOperationsNamespace,
         BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << reshardingUUID));
+    if (doc.isEmpty()) {
+        return boost::none;
+    }
+    return ReshardingCoordinatorDocument::parse(IDLParserContext("getCoordinatorDoc"), doc);
+}
+
+ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
+                                                const UUID& reshardingUUID) {
+    auto maybeDoc = tryGetCoordinatorDoc(opCtx, reshardingUUID);
     uassert(9858105,
             str::stream() << "Could not find the coordinator document for the resharding operation "
                           << reshardingUUID.toString(),
-            !doc.isEmpty());
-    return ReshardingCoordinatorDocument::parse(IDLParserContext("getCoordinatorDoc"), doc);
+            maybeDoc.has_value());
+    return *maybeDoc;
 }
 
 SemiFuture<void> waitForMajority(const CancellationToken& token,

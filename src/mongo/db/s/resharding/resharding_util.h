@@ -467,6 +467,9 @@ inline Status validateReshardBlockingWritesO2FieldType(const std::string& value)
 
 Date_t getCurrentTime();
 
+boost::optional<ReshardingCoordinatorDocument> tryGetCoordinatorDoc(OperationContext* opCtx,
+                                                                    const UUID& reshardingUUID);
+
 ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
                                                 const UUID& reshardingUUID);
 

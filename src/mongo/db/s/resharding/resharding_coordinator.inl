@@ -1593,7 +1593,7 @@ void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFie
     auto updatedCoordinatorDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
         opCtx,
         _metrics.get(),
-        resharding::getCoordinatorDoc(opCtx, _coordinatorDoc.getReshardingUUID()),
+        resharding::tryGetCoordinatorDoc(opCtx, _coordinatorDoc.getReshardingUUID()).value_or(_coordinatorDoc),
         abortReason);
 
     // Update in-memory coordinator doc.
