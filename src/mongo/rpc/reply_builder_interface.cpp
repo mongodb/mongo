@@ -41,8 +41,6 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-
 
 namespace mongo {
 namespace rpc {
@@ -54,26 +52,18 @@ const char kCodeNameField[] = "codeName";
 const char kErrorField[] = "errmsg";
 
 // Similar to appendCommandStatusNoThrow (duplicating logic here to avoid cyclic library dependency)
-BSONObj augmentReplyWithStatus(const Status& originalStatus, BSONObj reply) {
+BSONObj augmentReplyWithStatus(const Status& status, BSONObj reply) {
     auto okField = reply.getField(kOKField);
     if (!okField.eoo() && okField.trueValue()) {
         return reply;
     }
 
-    auto status = originalStatus;
     BSONObjBuilder bob(std::move(reply));
     if (okField.eoo()) {
         bob.append(kOKField, status.isOK() ? 1.0 : 0.0);
     }
     if (status.isOK()) {
         return bob.obj();
-    }
-
-    boost::optional<WriteConcernErrorDetail> writeConcernErrorDetail;
-    if (originalStatus.code() == ErrorCodes::ErrorWithWriteConcernError) {
-        auto errorWithWCE = originalStatus.extraInfo<ErrorWithWriteConcernErrorInfo>();
-        status = errorWithWCE->getMainStatus();
-        writeConcernErrorDetail.emplace(errorWithWCE->getWriteConcernErrorDetail());
     }
 
     if (!bob.asTempObj().hasField(kErrorField)) {
@@ -87,10 +77,6 @@ BSONObj augmentReplyWithStatus(const Status& originalStatus, BSONObj reply) {
 
     if (auto extraInfo = status.extraInfo()) {
         extraInfo->serialize(&bob);
-    }
-
-    if (writeConcernErrorDetail && !bob.asTempObj().hasField(kWriteConcernErrorFieldName)) {
-        bob.append(kWriteConcernErrorFieldName, writeConcernErrorDetail->toBSON());
     }
 
     // Ensure the error reply satisfies the IDL-defined requirements.
