@@ -176,3 +176,8 @@ feature_flags:
         cpp_varname: gFeatureFlagPeriodicServerParameterSampling
         default: false
         shouldBeFCVGated: false
+    featureFlagExposeClientIpInAuditLogs:
+         description: "Expose client IP in audit logs for load-balanced connections"
+         cpp_varname: gFeatureFlagExposeClientIpInAuditLogs
+         default: false
+         shouldBeFCVGated: true
