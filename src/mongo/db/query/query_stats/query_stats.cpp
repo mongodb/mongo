@@ -29,18 +29,15 @@
 
 #include "mongo/db/query/query_stats/query_stats.h"
 
-#include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include <absl/container/node_hash_map.h>
 #include <absl/hash/hash.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <climits>
-#include <list>
 #include <memory>
 
 #include "mongo/base/status_with.h"
-#include "mongo/crypto/hash_block.h"
 #include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -49,7 +46,6 @@
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
 #include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 #include "mongo/db/query/util/memory_util.h"

@@ -30,7 +30,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"

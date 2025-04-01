@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/query/query_stats/query_stats_entry.h"
-#include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 
 #include <boost/optional.hpp>
 

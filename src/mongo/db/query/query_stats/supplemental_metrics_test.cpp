@@ -31,13 +31,9 @@
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include <memory>
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
 #include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
-#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo::query_stats {
 TEST(SupplementalMetricsStats, ClassicMetrics) {

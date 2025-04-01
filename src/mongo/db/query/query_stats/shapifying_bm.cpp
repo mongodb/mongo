@@ -33,20 +33,13 @@
 #include <memory>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_stats/find_key.h"
-#include "mongo/db/query/query_stats/query_stats.h"
-#include "mongo/db/query/query_stats/rate_limiting.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/testing_proctor.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {

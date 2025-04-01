@@ -34,7 +34,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_stats {
 

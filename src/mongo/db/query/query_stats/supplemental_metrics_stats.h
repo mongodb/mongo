@@ -30,13 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include <algorithm>
-#include <cstdint>
 #include <memory>
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/query/query_stats/aggregated_metric.h"
+#include "mongo/db/op_debug.h"
 #include "mongo/db/query/util/named_enum.h"
 
 namespace mongo::query_stats {

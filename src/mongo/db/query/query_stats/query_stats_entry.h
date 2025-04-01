@@ -30,16 +30,12 @@
 #pragma once
 
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
-#include <algorithm>
 #include <cstdint>
 #include <memory>
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/key.h"
-#include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
-#include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::query_stats {

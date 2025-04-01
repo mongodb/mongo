@@ -31,7 +31,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <memory>
 #include <utility>
 
 #include "mongo/base/string_data.h"

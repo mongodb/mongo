@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include <algorithm>
 #include <cstdint>
 #include <memory>
 

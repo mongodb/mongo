@@ -31,7 +31,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include "mongo/db/query/query_stats/vector_search_stats_entry.h"
-#include "mongo/util/assert_util.h"
 #include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats

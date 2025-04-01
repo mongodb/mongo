@@ -29,13 +29,11 @@
 
 #include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
 
-#include "mongo/base/init.h"
-
 #include "mongo/base/error_extra_info.h"
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {

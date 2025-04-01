@@ -29,7 +29,8 @@
 
 #include "mongo/db/query/query_stats/key.h"
 
-#include "mongo/db/query/query_stats/query_stats_helpers.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 
 namespace mongo::query_stats {
