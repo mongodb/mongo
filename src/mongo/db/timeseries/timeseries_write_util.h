@@ -63,8 +63,6 @@ namespace mongo::timeseries {
  */
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl);
 
-std::shared_ptr<bucket_catalog::WriteBatch>& extractFromSelf(
-    std::shared_ptr<bucket_catalog::WriteBatch>& batch);
 
 /**
  * Returns the document for writing a new bucket with 'measurements'. Generates the id and
@@ -89,30 +87,15 @@ void getOpTimeAndElectionId(OperationContext* opCtx,
                             boost::optional<OID>* electionId);
 
 /**
+ * Sorts batches by bucket so that preparing the commit for each batch cannot deadlock.
+ */
+void sortBatchesToCommit(TimeseriesWriteBatches& batches);
+
+/**
  * Prepares the final write batches needed for performing the writes to storage.
  */
-template <typename T, typename Fn>
 std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
-determineBatchesToCommit(T& batches, Fn&& extractElem) {
-    stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
-    std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
-        batchesToCommit;
-    for (auto& elem : batches) {
-        std::shared_ptr<timeseries::bucket_catalog::WriteBatch>& batch = extractElem(elem);
-        if (!processedBatches.contains(batch.get())) {
-            batchesToCommit.push_back(batch);
-            processedBatches.insert(batch.get());
-        }
-    }
-
-    // Sort by bucket so that preparing the commit for each batch cannot deadlock.
-    std::sort(batchesToCommit.begin(), batchesToCommit.end(), [](auto left, auto right) {
-        return left.get()->bucketId.oid < right.get()->bucketId.oid;
-    });
-
-    return batchesToCommit;
-}
-
+determineBatchesToCommit(TimeseriesWriteBatches& batches);
 /**
  * Performs modifications atomically for a user command on a time-series collection.
  *

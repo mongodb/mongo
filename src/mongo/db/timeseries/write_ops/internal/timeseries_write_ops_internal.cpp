@@ -322,14 +322,15 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
-    auto batchesToCommit = timeseries::determineBatchesToCommit(batches, extractFromSelf);
-    if (batchesToCommit.empty()) {
+    if (batches.empty()) {
         return true;
     }
 
+    timeseries::sortBatchesToCommit(batches);
+
     Status abortStatus = Status::OK();
     ScopeGuard batchGuard{[&] {
-        for (auto batch : batchesToCommit) {
+        for (auto& batch : batches) {
             if (batch.get()) {
                 abort(bucketCatalog, batch, abortStatus);
             }
@@ -371,7 +372,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             return false;
         }
 
-        for (auto batch : batchesToCommit) {
+        for (auto& batch : batches) {
             auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
             auto prepareCommitStatus =
                 bucket_catalog::prepareCommit(bucketCatalog, batch, collator);
@@ -397,9 +398,9 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
         timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
 
-        for (auto batch : batchesToCommit) {
+        for (auto& batch : batches) {
             bucket_catalog::finish(bucketCatalog, batch);
-            batch.get().reset();
+            batch.reset();
         }
     } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
         bucket_catalog::freeze(

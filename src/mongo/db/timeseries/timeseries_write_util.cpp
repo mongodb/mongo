@@ -150,10 +150,6 @@ uint64_t getStorageCacheSizeBytes(OperationContext* opCtx) {
 }
 }  // namespace
 
-std::shared_ptr<bucket_catalog::WriteBatch>& extractFromSelf(
-    std::shared_ptr<bucket_catalog::WriteBatch>& batch) {
-    return batch;
-}
 
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
     uassert(
@@ -163,6 +159,33 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
     uassert(8555701,
             "Catalog changed during operation, missing time-series options",
             bucketsColl->getTimeseriesOptions());
+}
+
+std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
+determineBatchesToCommit(TimeseriesWriteBatches& batches) {
+    stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
+    std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
+        batchesToCommit;
+
+    for (auto& batch : batches) {
+        if (!processedBatches.contains(batch.get())) {
+            batchesToCommit.push_back(batch);
+            processedBatches.insert(batch.get());
+        }
+    }
+
+    // Sort by bucket so that preparing the commit for each batch cannot deadlock.
+    std::sort(batchesToCommit.begin(), batchesToCommit.end(), [](auto left, auto right) {
+        return left.get()->bucketId.oid < right.get()->bucketId.oid;
+    });
+
+    return batchesToCommit;
+}
+
+void sortBatchesToCommit(TimeseriesWriteBatches& batches) {
+    std::sort(batches.begin(), batches.end(), [](auto left, auto right) {
+        return left.get()->bucketId.oid < right.get()->bucketId.oid;
+    });
 }
 
 BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
@@ -334,7 +357,7 @@ void commitTimeseriesBucketsAtomically(
     bool fromMigrate,
     StmtId stmtId,
     std::set<bucket_catalog::BucketId>* bucketIds) {
-    auto batchesToCommit = determineBatchesToCommit(*batches, extractFromSelf);
+    auto batchesToCommit = determineBatchesToCommit(*batches);
     if (batchesToCommit.empty()) {
         return;
     }
