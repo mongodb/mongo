@@ -25,8 +25,6 @@
 # TODO SERVER-99433: Delete featureFlagReplicaSetEndpoint.
 - featureFlagReplicaSetEndpoint
 - featureFlagGaplessFTDC
-# TODO SERVER-97315: Enable featureFlagSnapshotFCVInDDLCoordinators
-- featureFlagSnapshotFCVInDDLCoordinators
 # TODO SERVER-101589: start testing viewless timeseries in allFeatureFlag variant
 - featureFlagCreateViewlessTimeseriesCollections
 # TODO SERVER-102993: uncomment 'featureFlagSbeFull' once test tagging is changed.
