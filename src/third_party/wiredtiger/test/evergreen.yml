@@ -857,7 +857,7 @@ functions:
         # Record the start time, in seconds
         date +%s > time.txt
 
-        ${python_binary|python3} test/evergreen/code_coverage/parallel_code_coverage.py -c ${code_coverage_test_file|test/evergreen/code_coverage/code_coverage_config.json} -b $(pwd)/build_ -j ${num_jobs} -s ${code_cov_extra_args}
+        ${python_binary|python3} test/evergreen/code_coverage/parallel_code_coverage.py -c ${code_coverage_test_file|test/evergreen/code_coverage/code_coverage_config.json} -b $(pwd)/build_ -j ${num_jobs} -s ${code_cov_extra_args} -v
 
         # Record the end time, in seconds
         date +%s >> time.txt
@@ -3111,6 +3111,7 @@ tasks:
         vars:
           num_jobs: 1
           code_coverage_test_file: test/evergreen/code_coverage/code_coverage_config_catch2.json
+          code_cov_extra_args: --check_errors
       - func: "code coverage analysis"
         vars:
           working_dir: "wiredtiger"

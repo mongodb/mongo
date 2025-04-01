@@ -506,6 +506,7 @@ typedef uint64_t wt_timestamp_t;
 #include "dhandle.h"      /* required by btree.h, connection.h */
 #include "timestamp.h"    /* required by reconcile.h */
 #include "thread_group.h" /* required by rollback_to_stable.h */
+#include "verbose.h"      /* required by rollback_to_stable.h */
 
 #include "api.h"
 #include "bitstring.h"
@@ -542,7 +543,6 @@ typedef uint64_t wt_timestamp_t;
 #include "tiered.h"
 #include "truncate.h"
 #include "txn.h"
-#include "verbose.h"
 
 #include "session.h" /* required by connection.h */
 #include "version.h" /* required by connection.h */

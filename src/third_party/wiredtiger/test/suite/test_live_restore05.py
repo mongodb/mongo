@@ -61,6 +61,8 @@ class test_live_restore05(backup_base):
                                value_format=self.value_format)
             ds.populate()
 
+        self.session.checkpoint()
+
         # Close the default connection.
         os.mkdir("SOURCE")
         self.take_full_backup("SOURCE")
@@ -88,4 +90,3 @@ class test_live_restore05(backup_base):
                 if index != -1:
                     new_line = line[index+len("live_restore="):]
                     assert(new_line.find("live_restore=") == -1)
-

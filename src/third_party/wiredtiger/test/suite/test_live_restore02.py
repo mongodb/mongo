@@ -74,6 +74,8 @@ class test_live_restore02(backup_base):
           key_format=self.key_format, value_format=self.value_format)
         ds2.populate()
 
+        self.session.checkpoint()
+
         # Close the default connection.
         os.mkdir("SOURCE")
         self.take_full_backup("SOURCE")

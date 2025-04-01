@@ -57,10 +57,11 @@ def run_task(index, task):
         subprocess.run(split_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
     except subprocess.CalledProcessError as exception:
         logging.error(f'Command {exception.cmd} failed with error {exception.returncode}')
+        sys.exit(f'Exiting because command {exception.cmd} failed with error {exception.returncode}')
     end_time = datetime.now()
     diff = end_time - start_time
     logging.debug("Finished task {} in {} : took {} seconds".format(task, build_dir, diff.total_seconds()))
-    return (task, diff.total_seconds())
+    return task, diff.total_seconds()
 
 def main():
     parser = argparse.ArgumentParser()
@@ -72,6 +73,7 @@ def main():
     parser.add_argument('-v', '--verbose', action="store_true", help='Be verbose')
     parser.add_argument('-u', '--bucket', type=str, help='Run on only python tests in code coverage')
     parser.add_argument('-o', '--optimize_test_order', action="store_true", help='Review test runtimes and update the test ordering for faster test execution')
+    parser.add_argument('-e', '--check_errors', action="store_true", help='Check result codes from tasks and exit on failure')
     args = parser.parse_args()
 
     verbose = args.verbose
@@ -82,6 +84,7 @@ def main():
     parallel_tests = args.parallel
     bucket = args.bucket
     setup = args.setup
+    check_errors = args.check_errors
 
     logging.debug('Code Coverage')
     logging.debug('=============')
@@ -90,13 +93,14 @@ def main():
     logging.debug('  Base name for build directories: {}'.format(build_dir_base))
     logging.debug('  Number of parallel tests:        {}'.format(parallel_tests))
     logging.debug('  Perform setup actions:           {}'.format(setup))
+    logging.debug('  Check errors:                    {}'.format(check_errors))
 
-    if (bucket and bucket != "python" and bucket != "other"):
+    if bucket and bucket != "python" and bucket != "other":
         sys.exit("Only buckets options \"python\" and \"other\" are allowed")
 
     # optimize_test_order will rewrite the list of coverage tests. If we use this when running a
     # subset of tests only that subset will be written and we'll lose the unscheduled tests.
-    if (bucket and optimize_test_order):
+    if bucket and optimize_test_order:
         sys.exit("Analysis mode can not be done with bucket")
 
     if parallel_tests < 1:
@@ -132,10 +136,10 @@ def main():
         # To do this we divide the tests into two buckets into either only python tests or
         # non-python tests. If python is set, only include python tests in the task list.
         is_python_test = re.search("python", test)
-        if (not is_python_test and bucket == "python"):
+        if not is_python_test and bucket == "python":
             continue
         # Else if other is set, only include non-python tests in the task list.
-        elif (is_python_test and bucket == "other"):
+        elif is_python_test and bucket == "other":
             continue
         logging.debug("Prepping test {} ".format(test))
         task_list.append(test)
@@ -143,7 +147,7 @@ def main():
     logging.debug("task_list: {}".format(task_list))
 
     # Perform task operations in parallel across the build directories
-    analyse_test_timings = run_task_lists_in_parallel(build_dirs_list, task_list, run_func=run_task, optimize_test_order=optimize_test_order)
+    analyse_test_timings = run_task_lists_in_parallel(build_dirs_list, task_list, run_func=run_task, optimize_test_order=optimize_test_order, check_errors=check_errors)
 
     # In analysis mode, we analyze the test and their timings, and sort them in descending order.
     # Running the shortest tests last decreases the amount of time we spend waiting for the

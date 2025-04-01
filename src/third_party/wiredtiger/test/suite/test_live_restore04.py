@@ -68,6 +68,8 @@ class test_live_restore04(backup_base):
                                value_format=self.value_format)
             ds.populate()
 
+        self.session.checkpoint()
+
         # Dump file data for later comparison.
         for i in range(self.ntables):
             dump_out = os.path.join(util_out_path, f'{uris[i]}.out')

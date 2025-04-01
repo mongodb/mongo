@@ -54,6 +54,8 @@ class test_live_restore06(backup_base):
             key_format='S', value_format='S')
             ds.populate()
 
+        self.session.checkpoint()
+
         os.mkdir("SOURCE")
         self.take_full_backup("SOURCE")
         self.close_conn()
@@ -117,4 +119,3 @@ class test_live_restore06(backup_base):
             if uri.find("file:") != -1:
                 self.assertTrue("nbits=0," in meta_cursor[uri])
         meta_cursor.close()
-
