@@ -284,6 +284,8 @@ protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
 
+    void doForceSpill() final;
+
 private:
     Value serialize(const SerializationOptions& opts) const final {
         MONGO_UNREACHABLE_TASSERT(7484302);  // Should call serializeToArray instead.

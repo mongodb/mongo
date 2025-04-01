@@ -49,7 +49,8 @@ selector:
     # Time-outs waiting for the response to a ServerStatus request because
     # the node in init sync state ignores it and never responds to it.
     - jstests/core/query/release_memory/group.js
-    - jstests/core/query/release_memory/release_memory_text_or.js
+    - jstests/core/query/release_memory/sort.js
+    - jstests/core/query/release_memory/text_or.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

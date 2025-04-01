@@ -1,3 +1,5 @@
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 /**
  * Asserts that releaseMemory command failed for a given cursor with the appropriate code.
  */
@@ -20,4 +22,24 @@ export function assertReleaseMemoryFailedWithCode(result, cursorId, codes) {
     }
     doassert("Cursor " + tojsononeline(cursorId) +
              " did not fail during release memory. Full command result: " + tojson(result));
+}
+
+/**
+ * Accumulate metric from a server status
+ */
+export function accumulateServerStatusMetric(db, metricGetter) {
+    return retryOnRetryableError(() => {
+        let total = 0;
+        FixtureHelpers.mapOnEachShardNode({
+            db: db,
+            func: (db) => {
+                const serverStatus = db.serverStatus();
+                if (!serverStatus.hasOwnProperty("metrics")) {
+                    return;
+                }
+                total += metricGetter(serverStatus.metrics);
+            }
+        });
+        return total;
+    }, 10, 100, [ErrorCodes.InterruptedDueToStorageChange]);
 }

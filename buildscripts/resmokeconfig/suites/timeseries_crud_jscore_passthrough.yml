@@ -39,7 +39,7 @@ selector:
     # Text indexes.
     - jstests/core/query/internal_strip_invalid_assignment.js
     - jstests/core/query/plan_cache/plan_cache_eof.js
-    - jstests/core/query/release_memory/release_memory_text_or.js
+    - jstests/core/query/release_memory/text_or.js
     # Hashed indexes.
     - jstests/core/query/hashed_partial_and_sparse_index.js
     - jstests/core/query/distinct/distinct_with_hashed_index.js

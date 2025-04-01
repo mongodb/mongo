@@ -1,5 +1,5 @@
 /**
- * Test basic case for releaseMemory command.
+ * Test releaseMemory command for cursors with TEXT_OR stage.
  * @tags: [
  *   assumes_read_preference_unchanged,
  *   assumes_superuser_permissions,
@@ -12,8 +12,10 @@
  */
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
+import {
+    accumulateServerStatusMetric,
+    assertReleaseMemoryFailedWithCode
+} from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getServerParameter(knob) {
@@ -28,20 +30,7 @@ db.dropDatabase();
 const coll = db[jsTestName()];
 
 function getTextOrSpillCounter() {
-    return retryOnRetryableError(() => {
-        let totalSpills = 0;
-        FixtureHelpers.mapOnEachShardNode({
-            db: db,
-            func: (db) => {
-                const serverStatus = db.serverStatus();
-                if (!serverStatus.hasOwnProperty("metrics")) {
-                    return;
-                }
-                totalSpills += serverStatus.metrics.query.textOr.spills;
-            }
-        });
-        return totalSpills;
-    }, 10, 100, [ErrorCodes.InterruptedDueToStorageChange]);
+    return accumulateServerStatusMetric(db, metrics => metrics.query.textOr.spills);
 }
 
 const words1 = [

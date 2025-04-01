@@ -19,28 +19,15 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
-import {assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
+import {
+    accumulateServerStatusMetric,
+    assertReleaseMemoryFailedWithCode
+} from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getSpillCounter() {
-    return retryOnRetryableError(() => {
-        let totalSpills = 0;
-        FixtureHelpers.mapOnEachShardNode({
-            db: db,
-            func: (db) => {
-                const serverStatus = db.serverStatus();
-                assert(serverStatus.metrics, tojson(serverStatus));
-                assert(serverStatus.metrics.query, tojson(serverStatus.metrics));
-                assert(serverStatus.metrics.query.group, tojson(serverStatus.metrics.query));
-                assert(serverStatus.metrics.query.group.spills,
-                       tojson(serverStatus.metrics.query.group));
-                totalSpills += serverStatus.metrics.query.group.spills;
-            }
-        });
-        return totalSpills;
-    }, 10, undefined, [ErrorCodes.InterruptedDueToStorageChange]);
+    return accumulateServerStatusMetric(db, metrics => metrics.query.group.spills);
 }
 
 const sbeIncreasedSpillingKnob = "internalQuerySlotBasedExecutionHashAggIncreasedSpilling";

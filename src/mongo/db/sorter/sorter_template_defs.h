@@ -184,7 +184,42 @@ public:
     }
 
     const Key& current() override {
-        tasserted(ErrorCodes::NotImplemented, "current() not implemented for InMemIterator");
+        return _data[_index].first;
+    }
+
+    bool spillable() const override {
+        return _index < _data.size();
+    }
+
+    std::unique_ptr<SortIteratorInterface<Key, Value>> spill(
+        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) override {
+        tassert(9917201, "spill() method is called when spillable() returns false", spillable());
+
+        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Requested to spill InMemIterator but did not opt in to external sorting",
+                opts.extSortAllowed);
+
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+
+        auto spillsFile =
+            std::make_shared<SorterBase::File>(nextFileName(opts.tempDir), opts.sorterFileStats);
+        SortedFileWriter<Key, Value> writer(opts, spillsFile, settings);
+
+        for (size_t i = _index; i < _data.size(); ++i) {
+            writer.addAlreadySorted(_data[i].first, _data[i].second);
+        }
+
+        if (opts.sorterTracker) {
+            opts.sorterTracker->spilledRanges.addAndFetch(1);
+            opts.sorterTracker->spilledKeyValuePairs.addAndFetch(_data.size() - _index);
+        }
+
+        _data.clear();
+        _data.shrink_to_fit();
+        _index = 0;
+
+        return writer.doneUnique();
     }
 
 private:
@@ -1601,6 +1636,19 @@ std::shared_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>:
     writeChunk();
 
     return std::make_shared<sorter::FileIterator<Key, Value>>(_file,
+                                                              _fileStartOffset,
+                                                              _file->currentOffset(),
+                                                              _settings,
+                                                              _opts.dbName,
+                                                              _checksumCalculator.checksum(),
+                                                              _checksumCalculator.version());
+}
+
+template <typename Key, typename Value>
+std::unique_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>::doneUnique() {
+    writeChunk();
+
+    return std::make_unique<sorter::FileIterator<Key, Value>>(_file,
                                                               _fileStartOffset,
                                                               _file->currentOffset(),
                                                               _settings,

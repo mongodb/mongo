@@ -235,6 +235,30 @@ public:
         _isEOF = false;
     }
 
+    void forceSpill() {
+        if (_sorter) {
+            _sorter->spill();
+        } else if (_output) {
+            if (_output->spillable()) {
+                uint64_t previousSpilledBytes = spilledBytes();
+                uint64_t previousSpilledDataStorageSize = spilledDataStorageSize();
+
+                SorterTracker tracker;
+                auto opts = makeSortOptions();
+                opts.sorterTracker = &tracker;
+
+                _output = _output->spill(opts, typename DocumentSorter::Settings());
+
+                _stats.spillingStats.incrementSpills(tracker.spilledRanges.loadRelaxed());
+                _stats.spillingStats.incrementSpilledRecords(
+                    tracker.spilledKeyValuePairs.loadRelaxed());
+                _stats.spillingStats.incrementSpilledBytes(spilledBytes() - previousSpilledBytes);
+                _stats.spillingStats.incrementSpilledDataStorageSize(
+                    spilledDataStorageSize() - previousSpilledDataStorageSize);
+            }
+        }
+    }
+
 private:
     /*
      * '_output' is a DocumentSorter::Iterator that can have the following iterator values:

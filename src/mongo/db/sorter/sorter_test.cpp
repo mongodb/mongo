@@ -294,51 +294,81 @@ std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
 // Tests for Sorter framework internals
 //
 
-class InMemIterTests {
-public:
-    void run() {
-        {
-            EmptyIterator empty;
-            sorter::InMemIterator<IntWrapper, IntWrapper> inMem;
-            ASSERT_ITERATORS_EQUIVALENT(&inMem, &empty);
-        }
-        {
-            static const int zeroUpTo20[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
-                                             10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
-            ASSERT_ITERATORS_EQUIVALENT(makeInMemIterator(zeroUpTo20),
-                                        std::make_shared<IntIterator>(0, 20));
-        }
-        {
-            // make sure InMemIterator doesn't do any reordering on it's own
-            static const int unsorted[] = {6, 3, 7, 4, 0, 9, 5, 7, 1, 8};
-            class UnsortedIter : public IWIterator {
-            public:
-                UnsortedIter() : _pos(0) {}
-                bool more() override {
-                    return _pos < sizeof(unsorted) / sizeof(unsorted[0]);
-                }
-                IWPair next() override {
-                    IWPair ret(unsorted[_pos], -unsorted[_pos]);
-                    _pos++;
-                    return ret;
-                }
-                IntWrapper nextWithDeferredValue() override {
-                    MONGO_UNREACHABLE;
-                }
-                IntWrapper getDeferredValue() override {
-                    MONGO_UNREACHABLE;
-                }
-                const IntWrapper& current() override {
-                    MONGO_UNREACHABLE;
-                }
-                size_t _pos;
-            } unsortedIter;
+using InMemIterTest = unittest::Test;
 
-            ASSERT_ITERATORS_EQUIVALENT(makeInMemIterator(unsorted),
-                                        static_cast<IWIterator*>(&unsortedIter));
+TEST_F(InMemIterTest, Empty) {
+    EmptyIterator empty;
+    sorter::InMemIterator<IntWrapper, IntWrapper> inMem;
+    ASSERT_ITERATORS_EQUIVALENT(&inMem, &empty);
+}
+
+TEST_F(InMemIterTest, Sorted) {
+    static const int zeroUpTo20[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+                                     10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+    ASSERT_ITERATORS_EQUIVALENT(makeInMemIterator(zeroUpTo20),
+                                std::make_shared<IntIterator>(0, 20));
+}
+
+TEST_F(InMemIterTest, DoesNoReorderGivenInput) {
+    static const int unsorted[] = {6, 3, 7, 4, 0, 9, 5, 7, 1, 8};
+    class UnsortedIter : public IWIterator {
+    public:
+        UnsortedIter() : _pos(0) {}
+        bool more() override {
+            return _pos < sizeof(unsorted) / sizeof(unsorted[0]);
         }
-    }
-};
+        IWPair next() override {
+            IWPair ret(unsorted[_pos], -unsorted[_pos]);
+            _pos++;
+            return ret;
+        }
+        IntWrapper nextWithDeferredValue() override {
+            MONGO_UNREACHABLE;
+        }
+        IntWrapper getDeferredValue() override {
+            MONGO_UNREACHABLE;
+        }
+        const IntWrapper& current() override {
+            MONGO_UNREACHABLE;
+        }
+        size_t _pos;
+    } unsortedIter;
+
+    ASSERT_ITERATORS_EQUIVALENT(makeInMemIterator(unsorted),
+                                static_cast<IWIterator*>(&unsortedIter));
+}
+
+TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
+    static const int data[] = {6, 3, 7, 4, 0, 9, 5, 7, 1, 8};
+
+    auto expectedIterator = makeInMemIterator(data);
+    auto iteratorToSpill = makeInMemIterator(data);
+    ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(expectedIterator, iteratorToSpill, 3);
+
+    unittest::TempDir tempDir("InMemIterTests");
+    SorterTracker sorterTracker;
+    SorterFileStats sorterFileStats(&sorterTracker);
+    const SortOptions opts = SortOptions()
+                                 .TempDir(tempDir.path())
+                                 .FileStats(&sorterFileStats)
+                                 .Tracker(&sorterTracker)
+                                 .ExtSortAllowed(true);
+
+    ASSERT_TRUE(iteratorToSpill->spillable());
+    auto spilledIterator = iteratorToSpill->spill(opts, IWSorter::Settings{});
+    ASSERT_FALSE(spilledIterator->spillable());
+    ASSERT_ITERATORS_EQUIVALENT(expectedIterator, spilledIterator);
+
+    ASSERT_EQ(sorterTracker.spilledRanges.loadRelaxed(), 1);
+    ASSERT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
+    ASSERT_EQ(sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 56);
+    ASSERT_LT(sorterTracker.bytesSpilled.loadRelaxed(), 100);
+    ASSERT_GT(sorterTracker.bytesSpilled.loadRelaxed(), 0);
+
+    ASSERT_EQ(sorterFileStats.bytesSpilledUncompressed(), 56);
+    ASSERT_LT(sorterFileStats.bytesSpilled(), 100);
+    ASSERT_GT(sorterFileStats.bytesSpilled(), 0);
+}
 
 class SortedFileWriterAndFileIteratorTests {
 public:
@@ -1072,7 +1102,6 @@ public:
     static constexpr uint64_t kMaxAsU64 = std::numeric_limits<T>::max();
 
     void setupTests() override {
-        add<InMemIterTests>();
         add<SortedFileWriterAndFileIteratorTests>();
         add<MergeIteratorTests>();
         add<SorterTests::Basic>();

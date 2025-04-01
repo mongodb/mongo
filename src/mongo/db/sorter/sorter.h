@@ -230,6 +230,9 @@ public:
     void makeOwned() {}
 };
 
+template <typename Key, typename Value>
+class Sorter;
+
 /**
  * This is the sorted output iterator from the sorting framework.
  */
@@ -276,6 +279,22 @@ public:
     virtual SorterRange getRange() const {
         invariant(false, "Only FileIterator has ranges");
         MONGO_UNREACHABLE;
+    }
+
+    /**
+     * Returns true iff it is valid to call spill() method on this iterator.
+     */
+    virtual bool spillable() const {
+        return false;
+    }
+
+    /**
+     * Spills not-yet-returned data to disk and returns a new iterator. Invalidates the current
+     * iterator.
+     */
+    virtual std::unique_ptr<SortIteratorInterface<Key, Value>> spill(
+        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) {
+        MONGO_UNREACHABLE_TASSERT(9917200);
     }
 
 protected:
@@ -640,6 +659,7 @@ public:
      * No more data can be added via addAlreadySorted() after calling done().
      */
     std::shared_ptr<Iterator> done();
+    std::unique_ptr<Iterator> doneUnique();
 
     /**
      * The SortedFileWriter organizes data into chunks, with a chunk getting written to the output

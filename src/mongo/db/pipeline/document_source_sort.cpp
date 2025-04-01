@@ -726,4 +726,11 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
     // would generally require merging the streams before producing output.
     return false;
 }
+
+void DocumentSourceSort::doForceSpill() {
+    if (_sortExecutor.has_value()) {
+        _sortExecutor->forceSpill();
+    }
+}
+
 }  // namespace mongo
