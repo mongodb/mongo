@@ -39,6 +39,7 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
+#include "src/mongo/db/list_collections_gen.h"
 
 namespace mongo {
 
@@ -573,12 +574,31 @@ AddShardCoordinator::_getUserWritesBlockFromReplicaSet(
     return topology_change_helpers::UserWriteBlockingLevel(level);
 }
 
-// TODO(SERVER-102352): add OSI support here
 void AddShardCoordinator::_dropSessionsCollection(
     OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
 
+    ListCollections listCollectionsCmd;
+    listCollectionsCmd.setDbName(DatabaseName::kConfig);
+    listCollectionsCmd.setFilter(BSON("name" << NamespaceString::kLogicalSessionsNamespace.coll()));
+
+    auto res = topology_change_helpers::runCommandForAddShard(
+        opCtx, _getTargeter(opCtx), DatabaseName::kConfig, listCollectionsCmd.toBSON(), executor);
+    uassertStatusOK(res.commandStatus);
+
+    auto parsedResponse =
+        ListCollectionsReply::parse(IDLParserContext("ListCollectionReply"), res.response);
+    tassert(10235201,
+            "Found more than one system.session collection on the replica set being added",
+            parsedResponse.getCursor().getFirstBatch().size() <= 1);
+    if (parsedResponse.getCursor().getFirstBatch().size() == 0) {
+        return;
+    }
+
+    auto uuid = parsedResponse.getCursor().getFirstBatch()[0].getInfo()->getUuid();
+
     BSONObjBuilder builder;
     builder.append("drop", NamespaceString::kLogicalSessionsNamespace.coll());
+    uuid->appendToBuilder(&builder, "collectionUUID");
     {
         BSONObjBuilder wcBuilder(builder.subobjStart("writeConcern"));
         wcBuilder.append("w", "majority");
