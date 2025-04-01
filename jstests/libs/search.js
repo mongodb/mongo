@@ -5,30 +5,37 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 /**
  *  All search queries ($search, $vectorSearch, PlanShardedSearch) require a search index.
  *  Regardless of what a collection contains, a search query will return no results if there is
- *  no search index. Furthermore, in sharded clusters, mongos handles search index management
- *  commands. However, since mongos is spun up connected to a single mongot, it only sends the
- *  command to its colocated mongot. This is problematic for sharding with mongot-localdev as
- *  each mongod is deployed with its own mongot and (for server testing purposes) the mongos is
+ *  no search index. Furthermore, in sharded clusters, the router handles search index management
+ *  commands exclusively. However, since the router is spun up connected to a single mongot, it only
+ * sends the command to its colocated mongot. This is problematic for sharding with mongot-localdev
+ * as each mongod is deployed with its own mongot and (for server testing purposes) the router is
  *  connected to the last spun up mongot. In other words, the rest of the mongots in the cluster
  *  do not receive these index management commands and thus search queries will return incomplete
  *  results as the other mongots do not have an index (and all search queries require index).
  *
  *  The solution is to forward the search index command to every mongod. More specifically:
- *  1. The javascript search index helper calls the search index command on the collection.
- *  2. mongos receives the search index command, resolves the view name if necessary, and forwards
- *  the command to it's assigned mongot-localdev (eg searchIndexManagementHostAndPort) which it
- *  shares with the last spun up mongod.
- *  3. mongot completes the request and mongos retrieves the response.
- *  4. mongos replicates the search index command on every mongod. It does so by asynchronously
- *  multicasting _shardsvrRunSearchIndexCommand (with the original user command, the
- *  alreadyInformedMongot hostAndPort, and the optional resolved view name) on every mongod in the
- *  cluster.
- *  5. Each mongod receives the _shardsvrRunSearchIndexCommand command. If this mongod shares its
- *  mongot with mongos, it does nothing as its mongot has already received the search index command.
- *  Otherwise, mongod calls runSearchIndexCommand with the necessary parameters forwarded from
- *  mongos.
- *  5. Once every mongod has forwarded the search index command, mongos returns the response from
- *  step 3.
+ *  1. The javascript search index command helper calls the search index command on the request nss.
+ *  2. The router receives the search index command, resolves the view name if necessary, and
+ * forwards the command to its assigned mongot-localdev (e.g. searchIndexManagementHostAndPort)
+ * which it shares with the last spun up mongod.
+ *  3. mongot completes the request and the router retrieves and returns the response.
+ *  4. The javascript search index helper calls _runAndReplicateSearchIndexCommand(), which sends a
+ *  replicateSearchIndexCommand to the router with the original user command.
+ *  5. replicateSearchIndexCommand::typedRun() calls
+ *  search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(). This helper
+ *  asynchronously multicasts _shardsvrRunSearchIndexCommand (which includes the original user
+ *  command, the alreadyInformedMongot hostAndPort, and the optional resolved view name) on every
+ *  mongod in the cluster.
+ *  6. Each mongod receives the _shardsvrRunSearchIndexCommand command. If this mongod shares its
+ *  mongot with the router, it does nothing as its mongot has already received the search index
+ * command. Otherwise, mongod calls runSearchIndexCommand with the necessary parameters forwarded
+ * from the router.
+ *  7. After every mongod has been issued the _shardsvrRunSearchIndexCommand,
+ *  search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting() then issues a
+ *  $listSearchIndex command on every mongod until every mongod reports that the specified index is
+ *  queryable. It will return once the index is queryable across the entire cluster and throw an
+ *  error otherwise.
+ *  8. The javascript search index command helper returns the response from step 3.
  *
  *  It is important to note that the search index command isn't forwarded to the config server. The
  *  former doesn't communicate with mongot.
@@ -84,16 +91,11 @@ function isShardedHelper(coll) {
     return false;
 }
 
-function _runListSearchIndexOnNode(
-    coll, keys, blockOnIndexQueryable, mongodConn, latestDefinition) {
-    let name = keys["name"];
+function _runListSearchIndexOnNode(coll, indexName, latestDefinition) {
+    let name = indexName;
     let dbName = coll.getDB().getName();
     let collName = coll.getName();
-
-    let testColl = mongodConn != undefined ? mongodConn.getDB(dbName)[collName] : coll;
-
-    let searchIndexArray = testColl.aggregate([{$listSearchIndexes: {name}}]).toArray();
-
+    let searchIndexArray = coll.aggregate([{$listSearchIndexes: {name}}]).toArray();
     assert.eq(searchIndexArray.length, 1, searchIndexArray);
 
     if (latestDefinition != null) {
@@ -111,7 +113,7 @@ function _runListSearchIndexOnNode(
     }
 
     assert.soon(() => {
-        searchIndexArray = testColl.aggregate([{$listSearchIndexes: {name}}]).toArray();
+        searchIndexArray = coll.aggregate([{$listSearchIndexes: {name}}]).toArray();
         if (searchIndexArray[0]["queryable"]) {
             if (latestDefinition == null) {
                 return true;
@@ -121,13 +123,19 @@ function _runListSearchIndexOnNode(
     });
 }
 
-function runListSearchIndexHelper(coll, keys, blockOnIndexQueryable, latestDefinition) {
+function _runAndReplicateSearchIndexCommand(coll, userCmd, indexName, latestDefinition = null) {
+    let response = assert.commandWorked(coll.getDB().runCommand(userCmd));
     // Please see block comment at the top of this file to understand the sharded implementation.
-    if (!isShardedHelper(coll)) {
-        // To ensure we return the initial response from calling the specified search index command
-        // (in this case create), we do not modify response here with this listSearchIndex call.
-        _runListSearchIndexOnNode(coll, keys, blockOnIndexQueryable, null, latestDefinition);
+    if (isShardedHelper(coll)) {
+        assert.commandWorked(
+            coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd}));
+    } else {
+        // dropSearchIndex returns once the index is deleted so no need to run $listSearchIndexes.
+        if (Object.keys(userCmd)[0] != 'dropSearchIndex') {
+            _runListSearchIndexOnNode(coll, indexName, latestDefinition);
+        }
     }
+    return response;
 }
 
 export function updateSearchIndex(coll, keys, blockUntilSearchIndexQueryable = {
@@ -137,21 +145,8 @@ export function updateSearchIndex(coll, keys, blockUntilSearchIndexQueryable = {
     let blockOnIndexQueryable = blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"];
 
     const name = keys["name"];
-    let response = assert.commandWorked(
-        coll.runCommand({updateSearchIndex: coll.getName(), name, definition: keys["definition"]}));
-
-    runListSearchIndexHelper(coll, keys, blockOnIndexQueryable, keys["definition"]);
-
-    return response;
-}
-function _runDropSearchIndexOnShard(coll, keys, shardConn) {
-    let shardDB = shardConn != undefined
-        ? shardConn.getDB("admin").getSiblingDB(coll.getDB().getName())
-        : coll.getDB();
-    let collName = coll.getName();
-
-    let name = keys["name"];
-    return assert.commandWorked(shardDB.runCommand({dropSearchIndex: collName, name}));
+    let userCmd = {updateSearchIndex: coll.getName(), name, definition: keys["definition"]};
+    return _runAndReplicateSearchIndexCommand(coll, userCmd, name, keys["definition"]);
 }
 
 export function dropSearchIndex(coll, keys) {
@@ -167,7 +162,8 @@ export function dropSearchIndex(coll, keys) {
         throw new Error("dropSearchIndex library helper only accepts a search index name");
     }
     let name = keys["name"];
-    return assert.commandWorked(coll.getDB().runCommand({dropSearchIndex: coll.getName(), name}));
+    let userCmd = {dropSearchIndex: coll.getName(), name};
+    return _runAndReplicateSearchIndexCommand(coll, userCmd, name);
 }
 
 export function createSearchIndex(coll, keys, blockUntilSearchIndexQueryable) {
@@ -195,9 +191,11 @@ export function createSearchIndex(coll, keys, blockUntilSearchIndexQueryable) {
         throw new Error("createSearchIndex must have a definition");
     }
 
-    let response = assert.commandWorked(
-        coll.getDB().runCommand({createSearchIndexes: coll.getName(), indexes: [keys]}));
+    let userCmd = {createSearchIndexes: coll.getName(), indexes: [keys]};
+    let name = "default";
+    if ("name" in keys) {
+        name = keys["name"];
+    }
 
-    runListSearchIndexHelper(coll, keys, blockOnIndexQueryable, null, null);
-    return response;
+    return _runAndReplicateSearchIndexCommand(coll, userCmd, name);
 }

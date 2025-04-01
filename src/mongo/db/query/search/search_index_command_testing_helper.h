@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,10 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/query_cmd/search_index_commands_gen.h"
 #include "mongo/db/commands/shardsvr_run_search_index_command_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
@@ -37,6 +39,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
+#include "mongo/db/query/search/mongot_options.h"
+#include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_multicaster.h"
@@ -55,8 +59,8 @@ constexpr mongo::StringData kListCommand = "$listSearchIndexes"_sd;
 constexpr mongo::StringData kCreateCommand = "createSearchIndexes"_sd;
 constexpr mongo::StringData kUpdateCommand = "updateSearchIndex"_sd;
 constexpr mongo::StringData kDropCommand = "dropSearchIndex"_sd;
-// In production sharded clusters, search index commands are received by mongos which forwards them
-// to the SearchIndexManagement service (Envoy) which are then routed to MMS and stored in the
+// In production sharded clusters, search index commands are received by the router which forwards
+// them to the SearchIndexManagement service (Envoy) which are then routed to MMS and stored in the
 // control plane DB. The mongots makes regular calls to the control plane to get the updated set of
 // search indexes.
 
@@ -67,37 +71,36 @@ constexpr mongo::StringData kDropCommand = "dropSearchIndex"_sd;
 
 // Moreover, the testing environment deploys each mongod with its own mongot (for purposes of server
 // testing, "mongot" is a shorthand for "mongot-localdev"). Thus the search index command needs to
-// be forwarded to all mongots in the cluster. Previously, this was done via a javascript library
-// function that would repeat the search index command on every mongod in the cluster. However, in
-// sharded clusters, the views catalog lives exclusively on the primary shard, therefore secondary
-// shards cannot resolve the view without making a call to the primary. To support server testing of
-// sharded mongot-indexed views, the following system was devised:
+// be forwarded to all mongots in the cluster. To support server testing of sharded mongot-indexed
+// views, the following system was devised:
 
-// 1. The javascript search index helper calls the search index command on the collection.
-// 2. mongos receives the search index command, resolves the view name if necessary, and forwards
-// the command to it's assigned mongot (eg searchIndexManagementHostAndPort) which it
-// shares with the last spun up mongod.
-// 3. mongot completes the request and mongos retrieves the response.
-// 4. mongos replicates the search index command on every mongod. It does so via
-// multiCastShardsvrRunSearchIndexCommandOnAllMongods(), which multicasts
-// _shardsvrRunSearchIndexCommand (with the original user command, the alreadyInformedMongot
-// hostAndPort, and the optional resolved view name) on every mongod in the cluster.
-// 5. Each mongod receives the _shardsvrRunSearchIndexCommand command. If this mongod shares its
-// mongot with mongos, it does nothing as its mongot has already received the search index command.
-// Otherwise, mongod calls runSearchIndexCommand with the necessary parameters forwarded from
-// mongos.
-// 6. In the case of create and update, the server now needs to ensure the new search index is
-// queryable. To achieve this, blockUntilIndexQueryable() multicasts a $listSearchIndexes request on
-// the specified search index. For each mongod's response, it verifies
-// if the index has the up-to-date definition and is queryable. Until the index is fully queryable
-// on all mongots or maxRetries is hit, blockUntilIndexQueryable re-issues $listSearchIndexes on the
-// specific mongods that report the index is pending.
-// 7. Once the index is queryable across all mongots, mongos returns the response from
-// step 3.
+// 1. The javascript search index command helper calls the search index command on the request nss.
+// 2. The router receives the search index command, resolves the view name if necessary, and
+// forwards the command to it's assigned mongot-localdev (eg searchIndexManagementHostAndPort) which
+// it shares with the last spun up mongod.
+// 3. mongot completes the request and the router retrieves and returns the response.
+// 4. The javascript search index helper calls _runAndReplicateSearchIndexCommand(), which sends a
+// replicateSearchIndexCommand to the router with the original user command.
+// 5. replicateSearchIndexCommand::typedRun() calls
+// search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(). This helper
+// resolves the view name (if necessary) and then asynchronously multicasts
+// _shardsvrRunSearchIndexCommand (which includes the original user command, the
+// alreadyInformedMongot hostAndPort, and the optional resolved view name) on every mongod in the
+// cluster.
+// 6. Each mongod receives the _shardsvrRunSearchIndexCommand command. If this mongod shares its
+// mongot with the router, it does nothing as its mongot has already received the search index
+// command. Otherwise, mongod calls runSearchIndexCommand with the necessary parameters forwarded
+// from the router.
+// 7. After every mongod has been issued the _shardsvrRunSearchIndexCommand,
+// search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting() then issues a
+// $listSearchIndex command on every mongod until every mongod reports that the specified index is
+// queryable. It will return once the index is queryable across the entire cluster and throw an
+// error otherwise.
+// 8. The javascript search index command helper returns the response from step 3.
 
 
-static constexpr Milliseconds kRetryPeriodMs = Milliseconds{500};
-static constexpr Seconds kRemoteCommandTimeout{60};
+inline constexpr Milliseconds kRetryPeriodMs = Milliseconds{500};
+inline constexpr Seconds kRemoteCommandTimeout{60};
 
 inline std::vector<HostAndPort> getAllClusterHosts(OperationContext* opCtx) {
     auto registry = Grid::get(opCtx)->shardRegistry();
@@ -127,6 +130,7 @@ inline bool indexIsReady(const BSONObj& cmdResponseBson,
             "ShardsvrRunSearchIndexCommandReply.searchIndexManagerResponse for $listSearchIndexes "
             "requests",
             searchIndexManagerResponse->getCursor());
+
     auto batch = searchIndexManagerResponse->getCursor()->getFirstBatch();
 
     if (batch.empty()) {
@@ -266,7 +270,6 @@ inline BSONObj wrapCmdInShardSvrRunSearchIndexCmd(
     const BSONObj& userCmd,
     boost::optional<NamespaceString> viewName,
     boost::optional<std::vector<BSONObj>> viewPipeline) {
-
     BSONObjBuilder bob;
     bob.append("_shardsvrRunSearchIndexCommand", 1);
     bob.append("resolvedNss",
@@ -298,35 +301,49 @@ inline BSONObj createWrappedListSearchIndexesCmd(
     const BSONObj& cmd,
     boost::optional<NamespaceString> viewName,
     boost::optional<std::vector<BSONObj>> viewPipeline) {
-
     auto idxCmdType = std::string(cmd.firstElement().fieldName());
-    BSONObj searchIdxObj;
-    BSONElement searchIdxName;
+    // In order to use the IDL commands for retrieving the index name, we have to add $db field.
+    auto newCmdObj = cmd.addField(BSON("$db" << DatabaseNameUtil::serialize(
+                                           nss.dbName(), SerializationContext::stateDefault()))
+                                      .firstElement());
+    BSONObj listSearchIndexes;
     if (idxCmdType.compare(kCreateCommand.toString()) == 0) {
-        searchIdxObj = cmd["indexes"].Array()[0].Obj();
-        searchIdxName = searchIdxObj["name"];
+
+        auto indexDefinition = CreateSearchIndexesCommand::parse(
+                                   IDLParserContext("createWrappedListSearchIndexesCmd"), newCmdObj)
+                                   .getIndexes()
+                                   .front();
+
+        if (indexDefinition.getName()) {
+            listSearchIndexes =
+                BSON("$listSearchIndexes" << BSON("name" << *indexDefinition.getName()));
+        } else {
+            listSearchIndexes = BSON("$listSearchIndexes" << BSON("name" << "default"));
+        }
+
     } else if (idxCmdType.compare(kUpdateCommand.toString()) == 0) {
-        searchIdxObj = cmd;
-        searchIdxName = searchIdxObj["name"];
+        auto updateCmd = UpdateSearchIndexCommand::parse(
+            IDLParserContext("createWrappedListSearchIndexesCmd"), newCmdObj);
+        if (updateCmd.getName()) {
+            listSearchIndexes = BSON("$listSearchIndexes" << BSON("name" << *updateCmd.getName()));
+        } else {
+            listSearchIndexes = BSON("$listSearchIndexes" << BSON("name" << "default"));
+        }
     }
 
-    auto obj = BSON("$listSearchIndexes" << BSON("name" << searchIdxName));
-    auto wrappedListIdx = wrapCmdInShardSvrRunSearchIndexCmd(nss, obj, viewName, viewPipeline);
-
-    return wrappedListIdx;
+    return wrapCmdInShardSvrRunSearchIndexCmd(nss, listSearchIndexes, viewName, viewPipeline);
 }
 
-inline void _replicateSearchIndexCommandOnAllMongodsForTesting(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const BSONObj& userCmd,
-    boost::optional<NamespaceString> viewName,
-    boost::optional<std::vector<BSONObj>> viewPipeline) {
+inline void _replicateSearchIndexCommandOnAllMongodsForTesting(OperationContext* opCtx,
+                                                               const NamespaceString& nss,
+                                                               const BSONObj& userCmd) {
+    const auto [collUUID, resolvedNss, viewName, viewPipeline] =
+        retrieveCollectionUUIDAndResolveViewOrThrow(opCtx, nss);
+
     // This helper can only be called by routers for server testing with a real mongot (eg not tests
     // that use mongotmock).
     if (!getTestCommandsEnabled() ||
-        !opCtx->getService()->role().hasExclusively(ClusterRole::RouterServer) ||
-        globalSearchIndexParams.host.empty()) {
+        !opCtx->getService()->role().hasExclusively(ClusterRole::RouterServer)) {
         return;
     }
     auto idxCmdType = std::string(userCmd.firstElement().fieldName());
@@ -336,14 +353,15 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(
     boost::optional<BSONObj> searchIdxLatestDefinition;
     if (idxCmdType.compare(kListCommand.toString()) == 0) {
         listSearchIndexesCmd =
-            wrapCmdInShardSvrRunSearchIndexCmd(nss, userCmd, viewName, viewPipeline);
+            wrapCmdInShardSvrRunSearchIndexCmd(resolvedNss, userCmd, viewName, viewPipeline);
     } else {
-        auto cmdObj = wrapCmdInShardSvrRunSearchIndexCmd(nss, userCmd, viewName, viewPipeline);
+        auto cmdObj =
+            wrapCmdInShardSvrRunSearchIndexCmd(resolvedNss, userCmd, viewName, viewPipeline);
         multiCastShardsvrRunSearchIndexCommandOnAllMongods(opCtx, allClusterHosts, dbName, cmdObj);
         if (idxCmdType.compare(kCreateCommand.toString()) == 0 ||
             idxCmdType.compare(kUpdateCommand.toString()) == 0) {
             listSearchIndexesCmd =
-                createWrappedListSearchIndexesCmd(nss, userCmd, viewName, viewPipeline);
+                createWrappedListSearchIndexesCmd(resolvedNss, userCmd, viewName, viewPipeline);
             if (idxCmdType.compare(kUpdateCommand.toString()) == 0) {
                 if (userCmd.hasField("definition") && userCmd["definition"].type() == Object) {
                     searchIdxLatestDefinition = boost::make_optional(userCmd["definition"].Obj());

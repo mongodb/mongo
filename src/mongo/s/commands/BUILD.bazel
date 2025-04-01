@@ -290,6 +290,7 @@ mongo_cc_library(
         "//src/mongo/s:load_balancer_support",
         "//src/mongo/s:mongos_topology_coordinator",
         "//src/mongo/s:sharding_api",
+        "//src/mongo/s/commands/query_cmd:cluster_replicate_search_index_command_idl",
         "//src/mongo/s/query/exec:cluster_cursor",
         "//src/mongo/s/query/planner:cluster_aggregate",
         "//src/mongo/transport:message_compressor",

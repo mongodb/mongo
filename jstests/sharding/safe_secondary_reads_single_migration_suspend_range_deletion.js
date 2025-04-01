@@ -400,6 +400,7 @@ let testCases = {
     removeShardFromZone: {skip: "primary only"},
     renameCollection: {skip: "primary only"},
     repairShardedCollectionChunksHistory: {skip: "does not return user data"},
+    replicateSearchIndexCommand: {skip: "internal command"},
     replSetAbortPrimaryCatchUp: {skip: "does not return user data"},
     replSetFreeze: {skip: "does not return user data"},
     replSetGetConfig: {skip: "does not return user data"},

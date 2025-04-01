@@ -681,6 +681,7 @@ let testCases = {
         checkWriteConcern: true,
     },
     repairShardedCollectionChunksHistory: {skip: "does not accept read or write concern"},
+    replicateSearchIndexCommand: {skip: "internal command"},
     replSetAbortPrimaryCatchUp: {skip: "does not accept read or write concern"},
     replSetFreeze: {skip: "does not accept read or write concern"},
     replSetGetConfig: {skip: "does not accept read or write concern"},

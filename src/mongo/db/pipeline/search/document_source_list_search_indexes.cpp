@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 
-#include "mongo/db/query/search/search_index_command_testing_helper.h"
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/version_context.h"
@@ -180,8 +179,6 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
         // Sends a manageSearchIndex command and returns a cursor with index information.
         BSONObj manageSearchIndexResponse =
             runSearchIndexCommand(opCtx, *_resolvedNamespace, cmdBson, *_collectionUUID, _viewName);
-        search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(
-            opCtx, *_resolvedNamespace, cmdBson, _viewName, _viewPipeline);
         /**
          * 'mangeSearchIndex' returns a cursor with the following fields:
          * cursor: {

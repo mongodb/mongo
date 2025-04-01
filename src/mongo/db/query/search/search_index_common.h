@@ -60,4 +60,12 @@ BSONObj runSearchIndexCommand(OperationContext* opCtx,
  */
 void throwIfNotRunningWithRemoteSearchIndexManagement();
 
+std::tuple<const UUID,
+           const NamespaceString,
+           boost::optional<NamespaceString>,
+           boost::optional<std::vector<BSONObj>>>
+retrieveCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
+                                            const NamespaceString& currentOperationNss);
+
+
 }  // namespace mongo

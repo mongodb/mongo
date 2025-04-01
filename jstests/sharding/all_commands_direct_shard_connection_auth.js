@@ -993,6 +993,7 @@ const allCommands = {
         }
     },
     repairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
+    replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {skip: "tested in direct_shard_connection_auth_rs_commands.js"},
     replSetFreeze: {skip: "tested in direct_shard_connection_auth_rs_commands.js"},
     replSetGetConfig: {skip: "tested in direct_shard_connection_auth_rs_commands.js"},

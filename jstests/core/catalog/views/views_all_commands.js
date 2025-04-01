@@ -651,6 +651,7 @@ let viewsCommandTests = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.ConflictingOperationInProgress,
     },
+    replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {skip: isUnrelated},
     replSetFreeze: {skip: isUnrelated},
     replSetGetConfig: {skip: isUnrelated},

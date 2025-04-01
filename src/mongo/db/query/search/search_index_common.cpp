@@ -34,10 +34,12 @@
 #include "mongo/db/query/search/search_index_options_gen.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/query/search/search_task_executors.h"
+#include "mongo/db/version_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
 namespace {
+
 /**
  * Takes the input for a ManageSearchIndexRequest and turns it into a RemoteCommandRequest targeting
  * the remote search index management endpoint.
@@ -81,6 +83,43 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     return remoteManageSearchIndexRequest;
 }
 }  // namespace
+
+std::tuple<const UUID,
+           const NamespaceString,
+           boost::optional<NamespaceString>,
+           boost::optional<std::vector<BSONObj>>>
+retrieveCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
+                                            const NamespaceString& currentOperationNss) {
+    // If the index management command is being run on a view, this call will return the
+    // underlying source collection UUID and ResolvedView. If not, it will just return a UUID.
+    auto collUUIDResolvedViewPair =
+        SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveViewOrThrow(
+            opCtx, currentOperationNss);
+    // If the query is on a normal collection, the source collection will be the same as
+    // the current NS.
+    auto sourceCollectionNss = currentOperationNss;
+    boost::optional<NamespaceString> viewNss;
+    auto collUUID = collUUIDResolvedViewPair.first;
+    boost::optional<std::vector<BSONObj>> viewPipeline;
+    if (auto resolvedView = collUUIDResolvedViewPair.second) {
+        uassert(
+            ErrorCodes::QueryFeatureNotAllowed,
+            "search index commands on views are not allowed in the current configuration. "
+            "You may need to enable the "
+            "correponding feature flag",
+            feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        // The request is on a view! Therefore, currentOperationNss refers to the view
+        // NS and the namespace on resolvedView refers to the underlying source collection.
+        sourceCollectionNss = resolvedView.value().getNamespace();
+        viewNss.emplace(currentOperationNss);
+
+        viewPipeline.emplace(resolvedView.value().getPipeline());
+    }
+
+    return std::make_tuple(collUUID, sourceCollectionNss, viewNss, viewPipeline);
+}
 
 BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       const NamespaceString& nss,

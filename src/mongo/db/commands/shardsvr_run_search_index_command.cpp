@@ -88,11 +88,7 @@ public:
             auto& cmd = request();
             generic_argument_util::prepareRequestForSearchIndexManagerPassthrough(cmd);
             Response res;
-            // TODO SERVER-98535 remove and replace with better way to identify if mongot mock is
-            // running.
-            if (globalSearchIndexParams.host.empty()) {
-                return res;
-            }
+
             auto alreadyInformedMongot = cmd.getMongotAlreadyInformed();
             bool cmdIsListSearchIx = std::string(cmd.getUserCmd().firstElement().fieldName())
                                          .compare("$listSearchIndexes") == 0;

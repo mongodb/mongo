@@ -12,4 +12,5 @@ export const commandsRemovedFromMongosSinceLastLTS = [
 // defined without always existing on the mongos being used.
 export const commandsAddedToMongosSinceLastLTS = [
     "releaseMemory",
+    "replicateSearchIndexCommand",
 ];

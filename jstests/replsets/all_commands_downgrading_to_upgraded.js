@@ -1282,6 +1282,7 @@ const allCommands = {
         }
     },
     repairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
+    replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {
         // This will be tested in FCV upgrade/downgrade passthroughs through the replsets directory.
         skip: "requires changing primary connection",
