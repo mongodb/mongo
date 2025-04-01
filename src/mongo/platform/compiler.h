@@ -330,3 +330,12 @@
  */
 #define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ \
     MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overflow"))
+
+/**
+ * We selectively ignore `-Wstringop-overflow` on GCC 14 due to strong suspicion
+ * that they are false-positives. They involve an atomic write overflowing the
+ * destination, likely due to the compiler incorrectly believing they might be
+ * referencing a null pointer.
+ */
+#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_WRITE \
+    MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overflow"))

@@ -77,7 +77,7 @@ public:
             // queue behind the Guard.
             _strand->_mutex.lock();
             MONGO_COMPILER_DIAGNOSTIC_PUSH
-            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
+            MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_WRITE
             _strand->_isBound.store(true);
             MONGO_COMPILER_DIAGNOSTIC_POP
 

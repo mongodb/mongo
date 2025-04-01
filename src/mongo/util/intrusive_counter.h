@@ -60,8 +60,12 @@ public:
      */
     void threadUnsafeIncRefCountTo(uint32_t count) const {
         MONGO_COMPILER_DIAGNOSTIC_PUSH
-        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
+        MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ
         dassert(_count.load(std::memory_order_relaxed) == (count - 1));
+        MONGO_COMPILER_DIAGNOSTIC_POP
+
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_WRITE
         _count.store(count, std::memory_order_relaxed);
         MONGO_COMPILER_DIAGNOSTIC_POP
     }

@@ -77,7 +77,7 @@ public:
 
     void setEnabled(bool b) {
         MONGO_COMPILER_DIAGNOSTIC_PUSH
-        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
+        MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_WRITE
         _enabled.store(b);
         MONGO_COMPILER_DIAGNOSTIC_POP
     }
