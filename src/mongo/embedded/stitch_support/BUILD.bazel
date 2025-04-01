@@ -57,6 +57,7 @@ mongo_cc_library(
     }),
     shared_lib_name = select({
         "@platforms//os:windows": "stitch_support_shared_with_debug.dll",
+        "@platforms//os:macos": "stitch_support_shared_with_debug.dylib",
         "//conditions:default": "stitch_support_shared_with_debug.so",
     }),
     tags = ["stitch_support"],

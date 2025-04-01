@@ -120,7 +120,7 @@ def is_binary_file(ctx, basename):
     if ctx.target_platform_has_constraint(linux_constraint):
         return not (basename.startswith("lib") or basename.startswith("mongo_crypt_v") or basename.startswith("stitch_support.so"))
     elif ctx.target_platform_has_constraint(macos_constraint):
-        return not (basename.startswith("lib") or basename.startswith("mongo_crypt_v") or basename.startswith("stitch_support.so"))
+        return not (basename.startswith("lib") or basename.startswith("mongo_crypt_v") or basename.startswith("stitch_support.dylib"))
     elif ctx.target_platform_has_constraint(windows_constraint):
         return basename.endswith(".exe") or basename.endswith(".pdb") or basename.endswith(".dll") or basename.endswith(".ps1")
     else:
@@ -518,11 +518,18 @@ def mongo_install(
             attributes = pkg_attributes(mode = "644"),
         )
 
+        pkg_files(
+            name = install_target + "_files",
+            srcs = [install_target],
+            attributes = pkg_attributes(mode = "755"),
+            strip_prefix = install_target,
+            testonly = testonly,
+        )
+
         # package up the the install into an archive.
         pkg_tar(
             name = "archive-" + name + install_type + "_tar",
-            srcs = [install_target, install_target + "_licenses"],
-            mode = "755",
+            srcs = [install_target + "_files", install_target + "_licenses"],
             compressor = compressor,
             package_dir = package_extract_name,
             package_file_name = name + install_type + ".tgz",
@@ -543,8 +550,7 @@ def mongo_install(
 
         pkg_zip(
             name = "archive-" + name + install_type + "_zip",
-            srcs = [install_target, install_target + "_licenses"],
-            mode = "755",
+            srcs = [install_target + "_files", install_target + "_licenses"],
             package_dir = package_extract_name,
             package_file_name = name + install_type + ".zip",
             exec_properties = {

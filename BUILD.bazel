@@ -224,6 +224,9 @@ filegroup(
     }) + select({
         "//bazel/config:build_enterprise_windows_enabled": ["//src/mongo/db/modules/enterprise/distsrc:windows_notices"],
         "//conditions:default": [],
+    }) + select({
+        "@platforms//os:macos": ["//etc:mac_plist"],
+        "//conditions:default": [],
     }),
 )
 
