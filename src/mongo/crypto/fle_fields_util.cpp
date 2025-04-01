@@ -64,13 +64,8 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
                     placeholder->getSparsity());
         }
     } else if (placeholder->getAlgorithm() == Fle2AlgorithmInt::kTextSearch) {
-        // TODO: SERVER-98690 implement find placeholders for text search
-        uassert(9783506,
-                "Text search find is not yet supported",
-                placeholder->getType() == Fle2PlaceholderType::kInsert);
         auto val = placeholder->getValue().getElement();
-        uassert(
-            9783505, "Text Search Insert placeholder value must be an object.", val.isABSONObj());
+        uassert(9783505, "Text Search placeholder value must be an object.", val.isABSONObj());
         FLE2TextSearchInsertSpec::parse(IDLParserContext("FLE2TextSearchInsertSpec"), val.Obj());
     }
 
@@ -247,5 +242,16 @@ void validateIDLFLE2TextSearchInsertSpec(const FLE2TextSearchInsertSpec* spec) {
                 "Prefix query upper bound length cannot be less than the lower bound",
                 subspec.getMinQueryLength() <= subspec.getMaxQueryLength());
     }
+}
+
+void validateIDLFLE2FindTextPayload(const FLE2FindTextPayload* spec) {
+    auto& ts = spec->getTokenSets();
+    int field_count = (ts.getExactTokens() ? 1 : 0) + (ts.getSubstringTokens() ? 1 : 0) +
+        (ts.getSuffixTokens() ? 1 : 0) + (ts.getPrefixTokens() ? 1 : 0);
+    uassert(
+        10163701,
+        "FLE2FindTextPayload must have exactly one of exact match, substring, suffix, or prefix "
+        "token set",
+        field_count == 1);
 }
 }  // namespace mongo

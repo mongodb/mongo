@@ -712,3 +712,134 @@ structs:
             type: FLE2PrefixInsertSpec
             optional: true
             cpp_name: prefixSpec
+
+    TextExactFindTokenSet:
+      description: "Holder for tokens required for exact match text search"
+      strict: true
+      fields:
+        d:
+          description: "EDC derived from data token"
+          type: EDCTextExactDerivedFromDataToken
+          cpp_name: edcDerivedToken
+        s:
+          description: "ESC derived from data token"
+          type: ESCTextExactDerivedFromDataToken
+          cpp_name: escDerivedToken
+        l:
+          description: "server derived from data token"
+          type: ServerTextExactDerivedFromDataToken
+          cpp_name: serverDerivedToken
+
+    TextSubstringFindTokenSet:
+      description: "Holder for tokens required for substring search"
+      strict: true
+      fields:
+        d:
+          description: "EDC derived from data token"
+          type: EDCTextSubstringDerivedFromDataToken
+          cpp_name: edcDerivedToken
+        s:
+          description: "ESC derived from data token"
+          type: ESCTextSubstringDerivedFromDataToken
+          cpp_name: escDerivedToken
+        l:
+          description: "server derived from data token"
+          type: ServerTextSubstringDerivedFromDataToken
+          cpp_name: serverDerivedToken
+
+    TextSuffixFindTokenSet:
+      description: "Holder for tokens required for suffix search"
+      strict: true
+      fields:
+        d:
+          description: "EDC derived from data token"
+          type: EDCTextSuffixDerivedFromDataToken
+          cpp_name: edcDerivedToken
+        s:
+          description: "ESC derived from data token"
+          type: ESCTextSuffixDerivedFromDataToken
+          cpp_name: escDerivedToken
+        l:
+          description: "server derived from data token"
+          type: ServerTextSuffixDerivedFromDataToken
+          cpp_name: serverDerivedToken
+
+    TextPrefixFindTokenSet:
+      description: "Holder for tokens required for prefix search"
+      strict: true
+      fields:
+        d:
+          description: "EDC derived from data token"
+          type: EDCTextPrefixDerivedFromDataToken
+          cpp_name: edcDerivedToken
+        s:
+          description: "ESC derived from data token"
+          type: ESCTextPrefixDerivedFromDataToken
+          cpp_name: escDerivedToken
+        l:
+          description: "server derived from data token"
+          type: ServerTextPrefixDerivedFromDataToken
+          cpp_name: serverDerivedToken
+
+    TextSearchFindTokenSets:
+      description: "Holds token sets needed for substring/suffix/prefix/exact search"
+      strict: true
+      fields:
+        e:
+          description: "Token sets for exact string search"
+          type: TextExactFindTokenSet
+          optional: true
+          cpp_name: exactTokens
+        s:
+          description: "Token set for substring search"
+          type: TextSubstringFindTokenSet
+          optional: true
+          cpp_name: substringTokens
+        u:
+          description: "Token set for suffix search"
+          type: TextSuffixFindTokenSet
+          optional: true
+          cpp_name: suffixTokens
+        p:
+          description: "Token set for prefix search"
+          type: TextPrefixFindTokenSet
+          optional: true
+          cpp_name: prefixTokens
+
+    FLE2FindTextPayload:
+      description: "Payload for a substring/suffix/prefix find"
+      strict: true
+      cpp_validator_func: "validateIDLFLE2FindTextPayload"
+      fields:
+        ts:
+          description: "The token set needed for substring/suffix/prefix/exact search"
+          type: TextSearchFindTokenSets
+          cpp_name: tokenSets
+        cm:
+          description: "Queryable Encryption max counter"
+          type: long
+          cpp_name: maxCounter
+          optional: true
+        cf:
+          description: "case folding enabled?"
+          type: bool
+          cpp_name: caseFold
+        df:
+          description: "diacritic folding enabled?"
+          type: bool
+          cpp_name: diacriticFold
+        ss:
+          description: "parameters for substring indexing"
+          type: FLE2SubstringInsertSpec
+          optional: true
+          cpp_name: substringSpec
+        fs:
+          description: "parameters for suffix indexing"
+          type: FLE2SuffixInsertSpec
+          optional: true
+          cpp_name: suffixSpec
+        ps:
+          description: "parameters for prefix indexing"
+          type: FLE2PrefixInsertSpec
+          optional: true
+          cpp_name: prefixSpec
