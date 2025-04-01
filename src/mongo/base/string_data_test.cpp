@@ -487,5 +487,21 @@ TEST(StringData, PlusEq) {
     ASSERT_EQ(&ret, &str);
 }
 
+TEST(StringData, ConversionToStdStringViewForInterop) {
+    static constexpr StringData in = "abc";
+    static constexpr auto out = toStdStringViewForInterop(in);
+    static_assert(std::is_same_v<decltype(out), const std::string_view>);
+    ASSERT_EQ(out.data(), in.data());
+    ASSERT_EQ(out.size(), in.size());
+}
+
+TEST(StringData, ConversionToStringDataForInterop) {
+    static constexpr std::string_view in = "abc";
+    static constexpr auto out = toStringDataForInterop(in);
+    static_assert(std::is_same_v<decltype(out), const StringData>);
+    ASSERT_EQ(out.data(), in.data());
+    ASSERT_EQ(out.size(), in.size());
+}
+
 }  // namespace
 }  // namespace mongo
