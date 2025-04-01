@@ -85,13 +85,13 @@ public:
 
     template <int I>
     requires(I >= 0 && I < Arity)
-    auto& get() noexcept {
+    auto& get() {
         return this->_nodes[I];
     }
 
     template <int I>
     requires(I >= 0 && I < Arity)
-    const auto& get() const noexcept {
+    const auto& get() const {
         return this->_nodes[I];
     }
 

@@ -93,10 +93,10 @@ class ControlBlock {
     const int _tag;
 
 protected:
-    ControlBlock(int tag) noexcept : _tag(tag) {}
+    ControlBlock(int tag) : _tag(tag) {}
 
 public:
-    auto getRuntimeTag() const noexcept {
+    auto getRuntimeTag() const {
         return _tag;
     }
 };
@@ -125,20 +125,20 @@ protected:
         template <typename... Args>
         ConcreteType(Args&&... args) : AbstractType(_staticTag), _t(std::forward<Args>(args)...) {}
 
-        const T* getPtr() const noexcept {
+        const T* getPtr() const {
             return &_t;
         }
 
-        T* getPtr() noexcept {
+        T* getPtr() {
             return &_t;
         }
     };
 
-    static constexpr auto concrete(AbstractType* block) noexcept {
+    static constexpr auto concrete(AbstractType* block) {
         return static_cast<ConcreteType*>(block);
     }
 
-    static constexpr auto concrete(const AbstractType* block) noexcept {
+    static constexpr auto concrete(const AbstractType* block) {
         return static_cast<const ConcreteType*>(block);
     }
 
@@ -152,7 +152,7 @@ public:
         return new ConcreteType(*concrete(block));
     }
 
-    static void destroy(AbstractType* block) noexcept {
+    static void destroy(AbstractType* block) {
         delete concrete(block);
     }
 
@@ -170,7 +170,7 @@ public:
     static constexpr bool is_v = std::is_base_of_v<U, T>;
 
     template <typename U>
-    static U* cast(AbstractType* block) noexcept {
+    static U* cast(AbstractType* block) {
         if constexpr (is_v<U>) {
             return static_cast<U*>(concrete(block)->getPtr());
         } else {
@@ -181,7 +181,7 @@ public:
     }
 
     template <typename U>
-    static const U* castConst(const AbstractType* block) noexcept {
+    static const U* castConst(const AbstractType* block) {
         if constexpr (is_v<U>) {
             return static_cast<const U*>(concrete(block)->getPtr());
         } else {
@@ -234,9 +234,9 @@ private:
 
     ControlBlock<Ts...>* _object{nullptr};
 
-    PolyValue(ControlBlock<Ts...>* object) noexcept : _object(object) {}
+    PolyValue(ControlBlock<Ts...>* object) : _object(object) {}
 
-    auto tag() const noexcept {
+    auto tag() const {
         return _object->getRuntimeTag();
     }
 
@@ -244,7 +244,7 @@ private:
         tassert(6232700, "PolyValue is empty", object != nullptr);
     }
 
-    static void destroy(ControlBlock<Ts...>* object) noexcept {
+    static void destroy(ControlBlock<Ts...>* object) {
         static constexpr std::array destroyTbl = {&ControlBlockVTable<Ts, Ts...>::destroy...};
 
         destroyTbl[object->getRuntimeTag()](object);
@@ -368,7 +368,7 @@ private:
             return PolyValue<Ts...>::template is<T>(_object);
         }
 
-        bool empty() const noexcept {
+        bool empty() const {
             return !_object;
         }
 
@@ -377,11 +377,11 @@ private:
         }
 
         // Compare references, not the objects themselves.
-        bool operator==(const Reference& rhs) const noexcept {
+        bool operator==(const Reference& rhs) const {
             return _object == rhs._object;
         }
 
-        bool operator==(const PolyValue& rhs) const noexcept {
+        bool operator==(const PolyValue& rhs) const {
             return rhs == (*this);
         }
 
@@ -433,13 +433,13 @@ public:
         swap(other);
     }
 
-    ~PolyValue() noexcept {
+    ~PolyValue() {
         if (_object) {
             destroy(_object);
         }
     }
 
-    PolyValue& operator=(PolyValue other) noexcept {
+    PolyValue& operator=(PolyValue other) {
         swap(other);
         return *this;
     }
@@ -501,7 +501,7 @@ public:
         return is<T>(_object);
     }
 
-    bool empty() const noexcept {
+    bool empty() const {
         return !_object;
     }
 
