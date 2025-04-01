@@ -43,6 +43,7 @@ namespace mongo {
 
 GroupProcessor::GroupProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                int64_t maxMemoryUsageBytes)
+
     : GroupProcessorBase(expCtx, maxMemoryUsageBytes) {}
 
 boost::optional<Document> GroupProcessor::getNext() {
@@ -102,12 +103,10 @@ boost::optional<Document> GroupProcessor::getNextSpilled() {
 }
 
 boost::optional<Document> GroupProcessor::getNextStandard() {
-    // Not spilled, and not streaming.
-    if (!_groupsIterator || _groupsIterator == _groups.end())
+    if (_groupsIterator == _groups.end()) {
         return boost::none;
-
-    auto& it = *_groupsIterator;
-
+    }
+    auto& it = _groupsIterator;
     Document out = makeDocument(it->first, it->second);
     ++it;
     return out;
@@ -168,8 +167,6 @@ void GroupProcessor::readyGroups() {
             spill();
         }
 
-        _groups = _expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
-
         _sorterIterator = Sorter<Value, Value>::Iterator::merge(
             _sortedFiles, SortOptions(), SorterComparator(_expCtx->getValueComparator()));
 
@@ -182,34 +179,28 @@ void GroupProcessor::readyGroups() {
         MONGO_verify(_sorterIterator->more());  // we put data in, we should get something out.
         _firstPartOfNextGroup = _sorterIterator->next();
     } else {
-        // start the group iterator
         _groupsIterator = _groups.begin();
     }
+
+    _groupsReady = true;
 }
 
 void GroupProcessor::reset() {
     // Free our resources.
     GroupProcessorBase::reset();
 
+    _groupsReady = false;
+    _groupsIterator = _groups.end();
+
     _sorterIterator.reset();
     _sortedFiles.clear();
-    // Make us look done.
-    _groupsIterator = _groups.end();
 }
 
 bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
     if (!_memoryTracker.allowDiskUse() && !_memoryTracker.withinMemoryLimit()) {
         freeMemory();
     }
-
-    if (!_memoryTracker.withinMemoryLimit()) {
-        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-                "Exceeded memory limit for $group, but didn't allow external sort."
-                " Pass allowDiskUse:true to opt in.",
-                _memoryTracker.allowDiskUse());
-        return true;
-    }
-    return false;
+    return !_memoryTracker.withinMemoryLimit();
 }
 
 bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
@@ -222,6 +213,15 @@ bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
 }
 
 void GroupProcessor::spill() {
+    if (_groups.empty()) {
+        return;
+    }
+
+    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+            "Exceeded memory limit for $group, but didn't allow external sort."
+            " Pass allowDiskUse:true to opt in.",
+            _memoryTracker.allowDiskUse());
+
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
         _expCtx->getTempDir(), internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
@@ -229,8 +229,13 @@ void GroupProcessor::spill() {
     std::vector<const GroupProcessorBase::GroupsMap::value_type*>
         ptrs;  // using pointers to speed sorting
     ptrs.reserve(_groups.size());
-    for (auto it = _groups.begin(), end = _groups.end(); it != end; ++it) {
+
+    int64_t spilledRecords = 0;
+    // If _groupsReady is true, we may have already returned some results, so we should skip them.
+    auto it = _groupsReady ? _groupsIterator : _groups.begin();
+    for (auto end = _groups.end(); it != end; ++it) {
         ptrs.push_back(&*it);
+        ++spilledRecords;
     }
 
     std::sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(_expCtx->getValueComparator()));
@@ -270,13 +275,22 @@ void GroupProcessor::spill() {
 
     int64_t spilledBytes =
         _spillStats->bytesSpilled() - _stats.spillingStats.getSpilledDataStorageSize();
-    groupCounters.incrementPerSpilling(1 /* spills */, spilledBytes, _groups.size(), spilledBytes);
+    groupCounters.incrementPerSpilling(1 /* spills */, spilledBytes, spilledRecords, spilledBytes);
     _stats.spillingStats.updateSpillingStats(
-        1, _memoryTracker.currentMemoryBytes(), _groups.size(), _spillStats->bytesSpilled());
+        1, _memoryTracker.currentMemoryBytes(), spilledRecords, _spillStats->bytesSpilled());
 
     // Zero out the current per-accumulation statement memory consumption, as the memory has been
     // freed by spilling.
     GroupProcessorBase::reset();
+    _groupsIterator = _groups.end();
+
+    if (_groupsReady) {
+        tassert(9917000,
+                "Expect everything to be spilled if groups are ready and it is not the first spill",
+                !_spilled);
+        // Ready groups again to read from disk instead of from memory.
+        readyGroups();
+    }
 }
 
 }  // namespace mongo

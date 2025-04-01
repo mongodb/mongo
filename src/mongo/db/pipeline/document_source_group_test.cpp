@@ -237,6 +237,54 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
         group->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
+TEST_F(DocumentSourceGroupTest, ShouldBeAbleToForceSpillAfterReturningResults) {
+    auto expCtx = getExpCtx();
+
+    unittest::TempDir tempDir("DocumentSourceGroupTest");
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
+    const size_t maxMemoryUsageBytes = 1024 * 1024;
+
+    auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
+    auto accumulatorArg = BSON("" << "$largeStr");
+    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement pushStatement{"spaceHog", accExpr};
+    auto groupByExpression =
+        ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState);
+    auto group = DocumentSourceGroup::create(
+        expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
+
+    std::string largeStr(maxMemoryUsageBytes / 16, 'x');
+    auto mock = DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                                   Document{{"_id", 1}, {"largeStr", largeStr}},
+                                                   Document{{"_id", 2}, {"largeStr", largeStr}}},
+                                                  expCtx);
+    group->setSource(mock.get());
+
+    auto next = group->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    stdx::unordered_set<int> idSet;
+    idSet.insert(next.releaseDocument()["_id"].coerceToInt());
+
+    const auto* stats = static_cast<const GroupStats*>(group->getSpecificStats());
+    ASSERT_EQ(stats->spillingStats.getSpills(), 0);
+
+    group->forceSpill();
+
+    ASSERT_EQ(stats->spillingStats.getSpills(), 1);
+    ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 2);
+
+    for (auto result = group->getNext(); result.isAdvanced(); result = group->getNext()) {
+        idSet.insert(result.releaseDocument()["_id"].coerceToInt());
+    }
+    ASSERT_TRUE(group->getNext().isEOF());
+
+    ASSERT_EQ(idSet.size(), 3UL);
+    ASSERT_EQ(idSet.count(0), 1UL);
+    ASSERT_EQ(idSet.count(1), 1UL);
+    ASSERT_EQ(idSet.count(2), 1UL);
+}
+
 TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto expCtx = getExpCtx();
     const size_t maxMemoryUsageBytes = 1000;
