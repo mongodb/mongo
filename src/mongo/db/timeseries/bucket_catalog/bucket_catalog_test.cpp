@@ -2077,6 +2077,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
         prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
     ASSERT_OK(swResult);
     auto& [insertCtx, time] = swResult.getValue();
+    auto bucketOpenedDueToMetadata = true;
 
     Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2093,7 +2094,9 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
                                    WithLock::withoutLock(),
                                    insertCtx.key,
                                    time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
+                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   bucketOpenedDueToMetadata);
+    ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
     ASSERT_EQ(&bucket, potentialBuckets[0]);
 }
@@ -2103,6 +2106,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
         prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
     ASSERT_OK(swResult);
     auto& [insertCtx, time] = swResult.getValue();
+    auto bucketOpenedDueToMetadata = true;
 
     Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2120,7 +2124,9 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
                                    WithLock::withoutLock(),
                                    insertCtx.key,
                                    time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
+                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   bucketOpenedDueToMetadata);
+    ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
     ASSERT_EQ(&bucket, potentialBuckets[0]);
 }
@@ -2130,6 +2136,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
         prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
     ASSERT_OK(swResult);
     auto& [insertCtx, time] = swResult.getValue();
+    auto bucketOpenedDueToMetadata = true;
 
     Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2147,7 +2154,9 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
                                    WithLock::withoutLock(),
                                    insertCtx.key,
                                    time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
+                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   bucketOpenedDueToMetadata);
+    ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
     ASSERT_EQ(&bucket, potentialBuckets[0]);
 }
@@ -2163,6 +2172,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
                                                                 RolloverReason::kSize};
 
     for (size_t i = 0; i < allHardClosedRolloverReasons.size(); i++) {
+        auto bucketOpenedDueToMetadata = true;
         Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                                   WithLock::withoutLock(),
@@ -2179,7 +2189,9 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
                                        WithLock::withoutLock(),
                                        insertCtx.key,
                                        time,
-                                       Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
+                                       Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                       bucketOpenedDueToMetadata);
+        ASSERT(!bucketOpenedDueToMetadata);
         ASSERT_EQ(0, potentialBuckets.size());
         ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
     }
@@ -2196,6 +2208,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
                                                                 RolloverReason::kSize};
 
     for (size_t i = 0; i < allHardClosedRolloverReasons.size(); i++) {
+        auto bucketOpenedDueToMetadata = true;
         Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                                   WithLock::withoutLock(),
@@ -2215,9 +2228,11 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
                                        WithLock::withoutLock(),
                                        insertCtx.key,
                                        time,
-                                       Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
+                                       Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                       bucketOpenedDueToMetadata);
 
         // No results returned. Do not close the bucket because of uncommitted batches.
+        ASSERT(!bucketOpenedDueToMetadata);
         ASSERT_EQ(0, potentialBuckets.size());
         ASSERT(!_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
     }
@@ -2228,6 +2243,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
         prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
     ASSERT_OK(swResult);
     auto& [insertCtx, time] = swResult.getValue();
+    auto bucketOpenedDueToMetadata = true;
 
     Bucket& bucket1 = internal::allocateBucket(*_bucketCatalog,
                                                *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2255,7 +2271,9 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
                                    WithLock::withoutLock(),
                                    insertCtx.key,
                                    time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()));
+                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   bucketOpenedDueToMetadata);
+    ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(2, potentialBuckets.size());
     ASSERT_EQ(&bucket1, potentialBuckets[0]);
     ASSERT_EQ(&bucket2, potentialBuckets[1]);

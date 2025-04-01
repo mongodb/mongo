@@ -154,7 +154,6 @@ RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
         // Update the bucket's 'rolloverReason'.
         bucket.rolloverReason = rolloverReason;
     }
-    bucketOpenedDueToMetadata = false;
     return rolloverReason;
 }
 
@@ -183,7 +182,8 @@ Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
                                                        stripeLock,
                                                        bucketKey,
                                                        measurementTimestamp,
-                                                       Seconds(*options.getBucketMaxSpanSeconds()));
+                                                       Seconds(*options.getBucketMaxSpanSeconds()),
+                                                       bucketOpenedDueToMetadata);
     if (potentialBuckets.empty()) {
         return nullptr;
     }
@@ -625,11 +625,14 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                                                 WithLock stripeLock,
                                                 const BucketKey& bucketKey,
                                                 const Date_t& time,
-                                                const Seconds& bucketMaxSpanSeconds) {
+                                                const Seconds& bucketMaxSpanSeconds,
+                                                bool& bucketOpenedDueToMetadata) {
     std::vector<Bucket*> potentialBuckets;
     auto openBuckets = internal::findOpenBuckets(stripe, stripeLock, bucketKey);
     Bucket* bucketWithoutRolloverAction = nullptr;
     for (const auto& openBucket : openBuckets) {
+        // We found at least one bucket with the same metadata.
+        bucketOpenedDueToMetadata = false;
         auto reason = openBucket->rolloverReason;
         auto action = getRolloverAction(reason);
         switch (action) {
@@ -688,7 +691,8 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     const std::variant<OID, std::vector<BSONObj>>& reopeningCandidate,
     BucketStateRegistry::Era catalogEra,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    ExecutionStatsController& stats) {
+    ExecutionStatsController& stats,
+    bool& bucketOpenedDueToMetadata) {
     BSONObj reopenedBucketDoc = visit(
         OverloadedVisitor{
             [&](const OID& bucketId) {
@@ -706,6 +710,7 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
             getTrackingContext(catalog.trackingContexts, TrackingScope::kReopeningRequests),
             nullptr)};
     }
+    bucketOpenedDueToMetadata = false;
 
     if (!timeseries::isCompressedBucket(reopenedBucketDoc)) {
         // Compress the uncompressed bucket document and return.
@@ -790,7 +795,8 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
             allowQueryBasedReopening == internal::AllowQueryBasedReopening::kAllow,
             storageCacheSizeBytes,
             compressAndWriteBucketFunc,
-            stats);
+            stats,
+            bucketOpenedDueToMetadata);
         if (swReopenedBucket.isOK() && swReopenedBucket.getValue()) {
             auto& reopenedBucket = *swReopenedBucket.getValue();
             auto rolloverReason = determineBucketRolloverForMeasurement(catalog,
@@ -850,7 +856,8 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     bool allowQueryBasedReopening,
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    ExecutionStatsController& stats) {
+    ExecutionStatsController& stats,
+    bool& bucketOpenedDueToMetadata) {
     // Get the information needed for reopening.
     boost::optional<std::variant<OID, std::vector<BSONObj>>> reopeningCandidate;
     boost::optional<InsertWaiter> reopeningConflict;
@@ -902,7 +909,8 @@ StatusWith<Bucket*> potentiallyReopenBucket(
                                                   reopeningCandidate.get(),
                                                   catalogEra,
                                                   compressAndWriteBucketFunc,
-                                                  stats);
+                                                  stats,
+                                                  bucketOpenedDueToMetadata);
 
         if (!swReopenedBucket.isOK()) {
             return swReopenedBucket.getStatus();

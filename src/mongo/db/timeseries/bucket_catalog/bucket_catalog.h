@@ -359,7 +359,8 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                                                 WithLock stripeLock,
                                                 const BucketKey& bucketKey,
                                                 const Date_t& time,
-                                                const Seconds& bucketMaxSpanSeconds);
+                                                const Seconds& bucketMaxSpanSeconds,
+                                                bool& bucketOpenedDueToMetadata);
 
 using CompressAndWriteBucketFunc = std::function<void(
     OperationContext*, const bucket_catalog::BucketId&, const NamespaceString&, StringData)>;
@@ -380,7 +381,8 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     const std::variant<OID, std::vector<BSONObj>>& reopeningCandidate,
     BucketStateRegistry::Era catalogEra,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    ExecutionStatsController& stats);
+    ExecutionStatsController& stats,
+    bool& bucketOpenedDueToMetadata);
 
 /**
  * Reopens and loads a bucket eligible for inserts into the bucket catalog. Checks for conflicting
@@ -405,7 +407,8 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     bool allowQueryBasedReopening,
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    ExecutionStatsController& stats);
+    ExecutionStatsController& stats,
+    bool& bucketOpenedDueToMetadata);
 
 /**
  * Returns a bucket where 'measurement' can be inserted. Attempts to get the bucket with the steps:

@@ -128,7 +128,7 @@ const runTest = function(ordered) {
     assert.eq(4, TimeseriesTest.getStat(stats.timeseries, "bucketCount"));
     assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketInserts"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketUpdates"));
-    assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketsOpenedDueToMetadata"));
+    assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketsOpenedDueToMetadata"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToCount"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSchemaChange"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSize"));
@@ -160,7 +160,7 @@ const runTest = function(ordered) {
     assert.eq(4, TimeseriesTest.getStat(stats.timeseries, "bucketCount"));
     assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketInserts"));
     assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketUpdates"));
-    assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketsOpenedDueToMetadata"));
+    assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketsOpenedDueToMetadata"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToCount"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSchemaChange"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSize"));
