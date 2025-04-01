@@ -773,20 +773,26 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
             }
 
             if (blockConnection) {
-                long long blockTimeMS = 0;
-                uassert(ErrorCodes::InvalidOptions,
-                        "must specify 'blockTimeMS' when 'blockConnection' is true",
-                        data.hasField("blockTimeMS") &&
+                if (data.hasField("blockTimeMS")) {
+                    long long blockTimeMS = 0;
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Failed to parse 'blockTimeMS'",
                             bsonExtractIntegerField(data, "blockTimeMS", &blockTimeMS).isOK());
-                uassert(ErrorCodes::InvalidOptions,
-                        "'blockTimeMS' must be non-negative",
-                        blockTimeMS >= 0);
+                    uassert(ErrorCodes::InvalidOptions,
+                            "'blockTimeMS' must be non-negative",
+                            blockTimeMS >= 0);
 
-                LOGV2(20432,
-                      "Blocking command via 'failCommand' failpoint",
-                      "command"_attr = cmd->getName(),
-                      "blockTime"_attr = Milliseconds{blockTimeMS});
-                opCtx->sleepFor(Milliseconds{blockTimeMS});
+                    LOGV2(20432,
+                          "Blocking command via 'failCommand' failpoint",
+                          "command"_attr = cmd->getName(),
+                          "blockTime"_attr = Milliseconds{blockTimeMS});
+                    opCtx->sleepFor(Milliseconds{blockTimeMS});
+                } else {
+                    LOGV2(10303900,
+                          "Blocking command via 'failCommand' failpoint until failpoint is unset",
+                          "command"_attr = cmd->getName());
+                    failCommand.pauseWhileSet(opCtx);
+                }
                 LOGV2(20433,
                       "Unblocking command via 'failCommand' failpoint",
                       "command"_attr = cmd->getName());

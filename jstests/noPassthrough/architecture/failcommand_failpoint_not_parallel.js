@@ -24,17 +24,6 @@ assert.commandWorked(db.adminCommand({configureFailPoint: "failCommand", mode: "
 // Test the blockConnection patterns.
 jsTest.log("Test validation of blockConnection fields");
 {
-    // 'blockTimeMS' is required when 'blockConnection' is true.
-    assert.commandWorked(db.adminCommand({
-        configureFailPoint: "failCommand",
-        mode: "alwaysOn",
-        data: {
-            blockConnection: true,
-            failCommands: ["hello"],
-        }
-    }));
-    assert.commandFailedWithCode(db.runCommand({hello: 1}), ErrorCodes.InvalidOptions);
-
     // 'blockTimeMS' must be non-negative.
     assert.commandWorked(db.adminCommand({
         configureFailPoint: "failCommand",

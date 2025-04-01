@@ -115,7 +115,6 @@ MONGO_FAIL_POINT_DEFINE(createIndexesWriteConflict);
 // collection is created.
 MONGO_FAIL_POINT_DEFINE(hangBeforeCreateIndexesCollectionCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildAbortOnInterrupt);
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildAbort);
 
 // This failpoint hangs between logging the index build UUID and starting the index build
 // through the IndexBuildsCoordinator.
@@ -802,7 +801,6 @@ public:
                 try {
                     return runCreateIndexesWithCoordinator(opCtx, *cmd);
                 } catch (const DBException& ex) {
-                    hangAfterIndexBuildAbort.pauseWhileSet();
                     // We can only wait for an existing index build to finish if we are able to
                     // release our locks, in order to allow the existing index build to proceed. We
                     // cannot release locks in transactions, so we bypass the below logic in

@@ -1,4 +1,18 @@
 // Helper functions for failpoint tests.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
+/**
+ * Hang specific commands before starting their execution on a given node
+ */
+export const hangCommandBeforeExecution = function(
+    node, commandToFail, hangInternalCommands = true) {
+    let failPointData = {
+        failCommands: [commandToFail],
+        blockConnection: true,
+        failInternalCommands: hangInternalCommands
+    };
+    return configureFailPoint(node, "failCommand", failPointData);
+};
 
 export const failCommandWithError = function(rst, {commandToFail, errorCode, closeConnection}) {
     rst.nodes.forEach(function(node) {

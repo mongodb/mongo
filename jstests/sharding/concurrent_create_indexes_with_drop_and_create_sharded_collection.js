@@ -5,12 +5,14 @@
  *   # Cannot step down while the abort failpoint is active.
  *   does_not_support_stepdowns,
  *   # We need to wait for replication after restarting a shard, this requires persistence.
- *   requires_persistence
+ *   requires_persistence,
+ *   # hangCommandBeforeExecution was introduced in 8.2
+ *   requires_fcv_82,
  * ]
  */
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {hangCommandBeforeExecution} from "jstests/sharding/libs/failpoint_helpers.js";
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on the shards and cause them to refresh their sharding metadata.
@@ -39,12 +41,8 @@ for (let x = -500; x < 500; x++) {
 }
 assert.commandWorked(bulk.execute());
 
-jsTestLog('Restart shard, so the create index is retried with stale config.');
-st.restartShardRS(1);
-st.rs1.awaitReplication();
-
-jsTestLog('Enable failpoint to hang on abort to recreate collection before retry.');
-let hangOnAbortFailpoint = configureFailPoint(st.rs1.getPrimary(), 'hangAfterIndexBuildAbort');
+jsTestLog('Enable failpoint to hang createIndexes.');
+let hangListIndexes = hangCommandBeforeExecution(st.rs1.getPrimary(), 'createIndexes');
 
 let createIndexesThread = new Thread((mongosConnString, dbName, collName) => {
     jsTestLog('Call createIndexes, wait on first abort.');
@@ -59,14 +57,14 @@ let createIndexesThread = new Thread((mongosConnString, dbName, collName) => {
 }, st.s0.host, kDbName, collName);
 createIndexesThread.start();
 
-jsTestLog('Wait on hangAfterIndexBuildAbort.');
-hangOnAbortFailpoint.wait();
+jsTestLog('Wait until createIndexes reach the shard.');
+hangListIndexes.wait();
 
 jsTestLog('Drop and create a new collection with the same namespace.');
 st.s0.getDB(kDbName).getCollection(collName).drop();
 st.s0.adminCommand({shardCollection: ns, key: {_id: 1}});
 
-hangOnAbortFailpoint.off();
+hangListIndexes.off();
 createIndexesThread.join();
 
 jsTestLog('Check that there is only one collection created on the db primary shard.');
