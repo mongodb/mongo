@@ -131,7 +131,7 @@ const defaultExpCtxLog = [
 
 const shardKeyLog = `\'shardKeyPattern\': { a: 1.0, b: 1.0, c: 1.0 }`;
 
-function runTests() {
+function runTests(onMongos = false) {
     // Find
     runTest({
         description: "find",
@@ -272,7 +272,9 @@ function runTests() {
             'update: 0',
             'filter: { a: 1.0, b: 1.0 }',
             'updateMods: { a: 1.0 }',
-            shardKeyLog,
+            onMongos ? (`'test.differentNamespace': omitted: collection isn't sharded`,
+                        `'test.command_diagnostics_sharded': { a: 1.0, b: 1.0, c: 1.0 }`)
+                     : shardKeyLog,
         ]
     });
 
@@ -343,7 +345,7 @@ jsTestLog("Testing tassert log diagnostics on mongos");
     };
     mongosConn = st.s;
     connToCheckLogs = st.s;
-    runTests();
+    runTests(true /* onMongos */);
 
     st.stop();
 }

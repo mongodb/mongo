@@ -70,6 +70,15 @@ void write(OperationContext* opCtx,
 
     CollectionRoutingInfoTargeter targeter(opCtx, request.getNS(), targetEpoch);
 
+    // Create an RAII object that prints the collection's shard key in the case of a tassert
+    // or crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{
+            targeter.isTargetedCollectionSharded()
+                ? targeter.getRoutingInfo().getChunkManager().getShardKeyPattern().toBSON()
+                : BSONObj()});
+
     if (nss) {
         *nss = targeter.getNS();
     }

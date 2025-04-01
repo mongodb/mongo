@@ -56,13 +56,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
-#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
@@ -376,17 +374,6 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         }
 
         const auto& targeter = getTargeterFn(writeOp);
-
-        BSONObj shardKey = BSONObj();
-        auto criTargeter = dynamic_cast<const CollectionRoutingInfoTargeter*>(&targeter);
-        if (criTargeter && criTargeter->isTargetedCollectionSharded()) {
-            shardKey =
-                criTargeter->getRoutingInfo().getChunkManager().getShardKeyPattern().toBSON();
-        }
-        // Create an RAII object that prints the collection's shard key in the case of a tassert
-        // or crash.
-        ScopedDebugInfo shardKeyDiagnostics(
-            "ShardKeyDiagnostics", diagnostic_printers::ShardKeyDiagnosticPrinter{shardKey});
 
         std::vector<std::unique_ptr<TargetedWrite>> writes;
         auto targetStatus = [&] {

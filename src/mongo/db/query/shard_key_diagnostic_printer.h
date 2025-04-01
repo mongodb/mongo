@@ -33,6 +33,8 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo::diagnostic_printers {
 
@@ -59,6 +61,38 @@ struct ShardKeyDiagnosticPrinter {
     boost::optional<BSONObj> shardKey;
 };
 
+struct MultipleShardKeysDiagnosticPrinter {
+    MultipleShardKeysDiagnosticPrinter(
+        stdx::unordered_map<NamespaceString, boost::optional<BSONObj>>& inputMap) {
+        for (const auto& [ns, shardKey] : inputMap) {
+            namespaceToShardKeyMap.insert({ns,
+                                           shardKey.has_value()
+                                               ? boost::optional<BSONObj>(shardKey->getOwned())
+                                               : boost::none});
+        }
+    }
+
+    auto format(auto& fc) const {
+        auto out = fc.out();
+        out = fmt::format_to(out, "{{");
+        auto sep = ""_sd;
+        for (const auto& [ns, shardKey] : namespaceToShardKeyMap) {
+            out = fmt::format_to(
+                out,
+                "{}'{}': {}",
+                std::exchange(sep, ", "_sd),
+                NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault()),
+                shardKey.has_value() ? shardKey.value().toString()
+                                     : kOmitForUnshardedCollectionMsg);
+        }
+        out = fmt::format_to(out, "}}");
+        return out;
+    }
+
+    // Any BSONObjs in this map are owned.
+    stdx::unordered_map<NamespaceString, boost::optional<BSONObj>> namespaceToShardKeyMap;
+};
+
 }  // namespace mongo::diagnostic_printers
 
 namespace fmt {
@@ -69,6 +103,18 @@ struct formatter<mongo::diagnostic_printers::ShardKeyDiagnosticPrinter> {
     }
 
     auto format(const mongo::diagnostic_printers::ShardKeyDiagnosticPrinter& obj, auto& ctx) const {
+        return obj.format(ctx);
+    }
+};
+
+template <>
+struct formatter<mongo::diagnostic_printers::MultipleShardKeysDiagnosticPrinter> {
+    constexpr auto parse(auto& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const mongo::diagnostic_printers::MultipleShardKeysDiagnosticPrinter& obj,
+                auto& ctx) const {
         return obj.format(ctx);
     }
 };

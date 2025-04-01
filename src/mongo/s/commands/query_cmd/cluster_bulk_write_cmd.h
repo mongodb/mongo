@@ -64,6 +64,7 @@
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -350,10 +351,31 @@ public:
             // able to obtain the bucket namespace to write to which we get via targeter.
             std::vector<std::unique_ptr<NSTargeter>> targeters;
             targeters.reserve(bulkRequest.getNsInfo().size());
+
+            // This is used only for the ScopedDebugInfo construction below.
+            stdx::unordered_map<NamespaceString, boost::optional<BSONObj>> shardKeyDiagnosticInfo;
+
             for (const auto& nsInfo : bulkRequest.getNsInfo()) {
-                targeters.push_back(
-                    std::make_unique<CollectionRoutingInfoTargeter>(opCtx, nsInfo.getNs()));
+                auto targeter =
+                    std::make_unique<CollectionRoutingInfoTargeter>(opCtx, nsInfo.getNs());
+
+                shardKeyDiagnosticInfo.insert(
+                    {nsInfo.getNs(),
+                     targeter->getRoutingInfo().getChunkManager().isSharded()
+                         ? boost::optional<BSONObj>(targeter->getRoutingInfo()
+                                                        .getChunkManager()
+                                                        .getShardKeyPattern()
+                                                        .toBSON())
+                         : boost::none});
+
+                targeters.push_back(std::move(targeter));
             }
+
+            // Create an RAII object that prints each collection's shard key in the case of a
+            // tassert or crash.
+            ScopedDebugInfo shardKeyDiagnostics(
+                "MultipleShardKeysDiagnostics",
+                diagnostic_printers::MultipleShardKeysDiagnosticPrinter{shardKeyDiagnosticInfo});
 
             if (auto let = bulkRequest.getLet()) {
                 // Evaluate the let parameters.
