@@ -3,7 +3,7 @@
  * query execution.
  *
  * @tags: [
- *   featureFlagTerminateSecondaryReadsUponRangeDeletion
+ *   requires_fcv_82
  * ]
  */
 

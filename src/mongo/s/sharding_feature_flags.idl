@@ -196,7 +196,7 @@ feature_flags:
   featureFlagTerminateSecondaryReadsUponRangeDeletion:
     description: "Feature flag to enable the termination of secondary reads due to range deletions."
     cpp_varname: feature_flags::gTerminateSecondaryReadsUponRangeDeletion
-    default: false
+    default: true 
     shouldBeFCVGated: false
   # TODO (SERVER-99655): remove this feature flag
   featureFlagSnapshotFCVInDDLCoordinators:
