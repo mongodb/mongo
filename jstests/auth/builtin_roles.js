@@ -64,7 +64,8 @@ function runTest(mongo) {
         'listCollections',
         'listIndexes',
         'listSearchIndexes',
-        'planCacheRead'
+        'planCacheRead',
+        'performRawDataOperations',
     ];
     const kAdminReadPrivs = [
         {resource: {db: 'admin', collection: ''}, actions: kReadRoleActions},

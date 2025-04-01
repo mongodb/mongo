@@ -278,6 +278,7 @@ enums:
                         - listIndexes
                         - listSearchIndexes
                         - updateSearchIndex
+                        - performRawDataOperations
                         - planCacheIndexFilter
                         - planCacheRead
                         - planCacheWrite
@@ -327,6 +328,7 @@ enums:
                         - listIndexes
                         - listSearchIndexes
                         - updateSearchIndex
+                        - performRawDataOperations
                         - planCacheIndexFilter
                         - planCacheRead
                         - planCacheWrite
@@ -401,6 +403,7 @@ enums:
                         - listIndexes
                         - listSearchIndexes
                         - updateSearchIndex
+                        - performRawDataOperations
                         - planCacheIndexFilter
                         - planCacheRead
                         - planCacheWrite

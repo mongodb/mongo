@@ -41,6 +41,7 @@ roles:
           - listCollections
           - listIndexes
           - listSearchIndexes
+          - performRawDataOperations
           - planCacheRead
       - matchType: exact_namespace
         collection: "system.js"
@@ -449,9 +450,11 @@ roles:
       - matchType: any_normal
         actions:
           - find
+          - performRawDataOperations
       - matchType: any_system_buckets
         actions:
           - find
+          - performRawDataOperations
       - matchType: cluster
         actions:
           - getParameter
@@ -536,6 +539,7 @@ roles:
           - createSearchIndexes
           - dropCollection
           - insert
+          - performRawDataOperations
           - updateSearchIndex
       - matchType: database
         db: "config"

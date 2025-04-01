@@ -128,6 +128,7 @@ TEST(BuiltinRoles, addPrivilegesForBuiltinRole) {
         ActionType::listCollections,
         ActionType::listIndexes,
         ActionType::listSearchIndexes,
+        ActionType::performRawDataOperations,
         ActionType::planCacheRead,
     });
 
