@@ -7,6 +7,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForCommand} from "jstests/libs/wait_for_command.js";
@@ -136,6 +137,7 @@ let coll1 = db["coll1"];
 
         // Start remove shard.
         let shardToRemove = st.shard1.shardName;
+        let shardURL = st.rs1.getURL();
         let awaitRemoveShard = startParallelShell(
             funWithArgs(async function(shardToRemove) {
                 const {removeShard} = await import("jstests/sharding/libs/remove_shard_util.js");
@@ -148,9 +150,12 @@ let coll1 = db["coll1"];
         fp.wait();
 
         assert.eq(true, getAddOrRemoveShardInProgressParamValue());
-        assert.eq(1,
-                  st.configRS.getPrimary().getDB("admin")["system.version"].count(
-                      {_id: "addOrRemoveShardInProgressRecovery"}));
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary().getDB("admin"),
+                                                 "UseTopologyChangeCoordinators")) {
+            assert.eq(1,
+                      st.configRS.getPrimary().getDB("admin")["system.version"].count(
+                          {_id: "addOrRemoveShardInProgressRecovery"}));
+        }
 
         if (testCase === "killOp") {
             let configPrimary = st.configRS.getPrimary();
@@ -170,23 +175,54 @@ let coll1 = db["coll1"];
             // invalid after restarting the configsvr.
             db = st.s.getDB(dbName);
             coll1 = db["coll1"];
+        } else if (testCase === "stepDown") {
+            assert.commandWorked(st.configRS.getSecondary().adminCommand({replSetStepUp: 1}));
         }
+
+        // Turn off the failpoint for the coordinator case where the command is still stuck
+        st.configRS.nodes.forEach((conn) => {
+            sh.assertRetryableCommandWorkedOrFailedWithCodes(
+                () => {
+                    return conn.adminCommand(
+                        {configureFailPoint: "hangRemoveShardAfterDrainingDDL", mode: "off"});
+                },
+                "Timed out disabling fail point " +
+                    "hangRemoveShardAfterDrainingDDL");
+        });
 
         awaitRemoveShard();
 
         // Soon the cluster parameter will be reset and new DDL operations will be able to start.
         assert.soon(() => {
-            return getAddOrRemoveShardInProgressParamValue() === false &&
-                st.configRS.getPrimary().getDB("admin")["system.version"].count(
-                    {_id: "addOrRemoveShardInProgressRecovery"}) === 0;
+            let recoveryDocRemoved = true;
+            if (!FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary().getDB("admin"),
+                                                     "UseTopologyChangeCoordinators")) {
+                recoveryDocRemoved =
+                    st.configRS.getPrimary().getDB("admin")["system.version"].count(
+                        {_id: "addOrRemoveShardInProgressRecovery"}) === 0;
+            }
+            return getAddOrRemoveShardInProgressParamValue() === false && recoveryDocRemoved;
         });
 
         assert.commandWorked(coll1.insert({}));
         assert(coll1.drop());
+
+        // Re-add shard to cluster
+        assert.commandWorked(st.s.adminCommand({addShard: shardURL}));
     }
 
     test("killOp");
-    test("stopServer");
+    if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB("admin"),
+                                            "UseTopologyChangeCoordinators")) {
+        // Test step down rather than stop because stopping the primary will hang due to the
+        // coordinator waiting for the failpoint. Only run this test if we have some secondary to
+        // step up (auto bootstrap runs with a single CSRS node).
+        if (st.configRS.nodes.length > 1) {
+            test("stepDown");
+        }
+    } else {
+        test("stopServer");
+    }
 }
 
 st.stop();

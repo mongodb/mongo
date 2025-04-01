@@ -49,9 +49,9 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/config/remove_shard_command_helpers.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag.h"
-#include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
@@ -141,7 +141,7 @@ public:
 
         const auto& request = requestParser.request();
 
-        const auto shardId = [&] {
+        const auto [shardId, replicaSetName] = [&] {
             const auto shardIdOrUrl = request.getCommandParameter();
             auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl);
             if (swShard == ErrorCodes::ShardNotFound) {
@@ -155,7 +155,7 @@ public:
                 }
             }
             const auto shard = uassertStatusOK(swShard);
-            return shard->getId();
+            return std::make_pair(shard->getId(), shard->getConnString().getReplicaSetName());
         }();
 
         uassert(ErrorCodes::IllegalOperation,
@@ -166,9 +166,9 @@ public:
 
         const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
 
-        const auto shardDrainingStatus = [&] {
+        const auto shardDrainingStatus = [&, shardId = shardId, replicaSetName = replicaSetName] {
             try {
-                return topology_change_helpers::removeShard(opCtx, shardId);
+                return topology_change_helpers::removeShard(opCtx, shardId, replicaSetName);
             } catch (const DBException& ex) {
                 LOGV2(21923,
                       "Failed to remove shard",

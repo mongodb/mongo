@@ -113,7 +113,6 @@ const wcCommandsTests = {
     _configsvrMoveRange: {skip: "internal command"},
     _configsvrRemoveChunks: {skip: "internal command"},
     _configsvrRemoveShard: {skip: "internal command"},
-    _configsvrRemoveShardCommit: {skip: "internal command"},
     _configsvrRemoveShardFromZone: {skip: "internal command"},
     _configsvrRemoveTags: {skip: "internal command"},
     _configsvrRenameCollection: {skip: "internal command"},

@@ -190,24 +190,32 @@ if (!isMultiversion) {
     removeShardFp.wait();
     interruptConfigsvrRemoveShard(configPrimary);
     removeShardThread.join();
-    removeShardFp.off();
 
-    jsTest.log("Checking the cluster parameter");
+    jsTest.log("Checking the cluster parameter during hang");
     // The removeShard command has not set the cluster parameter to false again because of the
     // interrupt.
     checkClusterParameter(st.configRS, true);
     checkClusterParameter(st.rs0, true);
     checkClusterParameter(shard1Rst, true);
 
+    removeShardFp.off();
+    jsTest.log("Checking the cluster parameter after hang");
+    // Even if the command is interrupted the coordinator removes the shard eventually.
+    // The removeShard command should set to cluster parameter to false if the replica set endpoint
+    // feature flag is enabled.
+    const expectedHasTwoOrMoreShards =
+        !FeatureFlagUtil.isPresentAndEnabled(configPrimary, "ReplicaSetEndpoint");
+    assert.soon(() => {
+        let res = assert.commandWorked(st.configRS.getPrimary().adminCommand(
+            {getClusterParameter: "shardedClusterCardinalityForDirectConns"}));
+        return res.clusterParameters[0].hasTwoOrMoreShards === expectedHasTwoOrMoreShards;
+    });
+
     jsTest.log("Retry the removeShard command");
     assert.commandFailedWithCode(st.s.adminCommand({[removeShardCmdName]: st.shard0.shardName}),
                                  ErrorCodes.ShardNotFound);
 
     jsTest.log("Checking the cluster parameter");
-    // The removeShard command should set to cluster parameter to false if the replica set endpoint
-    // feature flag is enabled.
-    const expectedHasTwoOrMoreShards =
-        !FeatureFlagUtil.isPresentAndEnabled(configPrimary, "ReplicaSetEndpoint");
     checkClusterParameter(st.configRS, expectedHasTwoOrMoreShards);
     checkClusterParameter(shard1Rst, expectedHasTwoOrMoreShards);
 }

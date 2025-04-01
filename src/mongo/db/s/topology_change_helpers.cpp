@@ -1550,42 +1550,6 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
         opCtx, shardName, controlShardName, newTopologyTime.asTimestamp(), executor);
 }
 
-RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId) {
-    const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
-    while (true) {
-        try {
-            {
-                DDLLockManager::ScopedCollectionDDLLock ddlLock(
-                    opCtx,
-                    NamespaceString::kConfigsvrShardsNamespace,
-                    "startDraining",
-                    LockMode::MODE_X);
-                if (auto drainingStatus =
-                        shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId)) {
-                    return *drainingStatus;
-                }
-            }
-            if (auto drainingStatus =
-                    shardingCatalogManager->checkDrainingProgress(opCtx, shardId)) {
-                return *drainingStatus;
-            }
-            {
-                DDLLockManager::ScopedCollectionDDLLock ddlLock(
-                    opCtx,
-                    NamespaceString::kConfigsvrShardsNamespace,
-                    "removeShardFunction",
-                    LockMode::MODE_X);
-                return shardingCatalogManager->removeShard(opCtx, shardId);
-            }
-        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
-            LOGV2(10154101,
-                  "Remove shard received retriable error and will be retried",
-                  "shardId"_attr = shardId,
-                  "error"_attr = redact(ex));
-        }
-    }
-}
-
 void addShardInTransaction(OperationContext* opCtx,
                            const ShardType& newShard,
                            std::vector<DatabaseName>&& databasesInNewShard,

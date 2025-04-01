@@ -310,13 +310,6 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
                        std::shared_ptr<executor::TaskExecutor> executor);
 
 /**
- * Runs the different stages of the remove shard command - checkPreconditionsAndStartDrain,
- * checkDrainingStatus, and commit of the removal. Will retry the entire procedure after receiving
- * a ConflictingOperationOnProgress error.
- */
-RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId);
-
-/**
  * Inserts new entries into the config catalog to describe the shard being added (and the
  * databases being imported) through the internal transaction API.
  */

@@ -1,0 +1,137 @@
+/**
+ *    Copyright (C) 2025-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+#include "mongo/db/s/config/remove_shard_command_helpers.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/remove_shard_commit_coordinator.h"
+#include "mongo/db/s/remove_shard_commit_coordinator_document_gen.h"
+#include "mongo/db/s/replica_set_endpoint_feature_flag.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
+namespace mongo {
+
+namespace {
+
+RemoveShardProgress runCoordinatorRemoveShard(OperationContext* opCtx,
+                                              boost::optional<FixedFCVRegion>& fcvRegion,
+                                              const ShardId& shardId,
+                                              const std::string& replicaSetName) {
+    const auto removeShardCommitCoordinator =
+        [&, shardId = shardId, replicaSetName = replicaSetName] {
+            auto coordinatorDoc = RemoveShardCommitCoordinatorDocument();
+            coordinatorDoc.setShardId(shardId);
+            coordinatorDoc.setReplicaSetName(replicaSetName);
+            coordinatorDoc.setIsTransitionToDedicated(shardId == ShardId::kConfigServerId);
+            coordinatorDoc.setShouldUpdateClusterCardinality(
+                replica_set_endpoint::isFeatureFlagEnabled());
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{NamespaceString::kConfigsvrShardsNamespace,
+                  DDLCoordinatorTypeEnum::kRemoveShardCommit}});
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto coordinator = checked_pointer_cast<RemoveShardCommitCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            return coordinator;
+        }();
+    fcvRegion.reset();
+
+    const auto& drainingStatus = [&]() -> RemoveShardProgress {
+        try {
+            auto drainingStatus = removeShardCommitCoordinator->getResult(opCtx);
+            return drainingStatus;
+        } catch (const ExceptionFor<ErrorCodes::RemoveShardDrainingInProgress>& ex) {
+            const auto removeShardProgress = ex.extraInfo<RemoveShardDrainingInfo>();
+            tassert(
+                1003142, "RemoveShardDrainingInProgress must have extra info", removeShardProgress);
+            return removeShardProgress->getProgress();
+        }
+    }();
+    return drainingStatus;
+}
+
+}  // namespace
+
+namespace topology_change_helpers {
+
+RemoveShardProgress removeShard(OperationContext* opCtx,
+                                const ShardId& shardId,
+                                const std::string& replicaSetName) {
+    const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
+    while (true) {
+        try {
+            {
+                DDLLockManager::ScopedCollectionDDLLock ddlLock(
+                    opCtx,
+                    NamespaceString::kConfigsvrShardsNamespace,
+                    "startDraining",
+                    LockMode::MODE_X);
+                if (auto drainingStatus =
+                        shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId)) {
+                    return *drainingStatus;
+                }
+            }
+            if (auto drainingStatus =
+                    shardingCatalogManager->checkDrainingProgress(opCtx, shardId)) {
+                return *drainingStatus;
+            }
+
+            // TODO (SERVER-101452) Remove once addShard takes the FCV lock before the DDL lock.
+            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+            boost::optional<FixedFCVRegion> fixedFCV{boost::in_place_init, opCtx};
+            if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
+                    (*fixedFCV)->acquireFCVSnapshot())) {
+                return runCoordinatorRemoveShard(opCtx, fixedFCV, shardId, replicaSetName);
+            } else {
+                DDLLockManager::ScopedCollectionDDLLock ddlLock(
+                    opCtx,
+                    NamespaceString::kConfigsvrShardsNamespace,
+                    "removeShardFunction",
+                    LockMode::MODE_X);
+                fixedFCV.reset();
+                return shardingCatalogManager->removeShard(opCtx, shardId);
+            }
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
+            LOGV2(10154101,
+                  "Remove shard received retriable error and will be retried",
+                  "shardId"_attr = shardId,
+                  "error"_attr = redact(ex));
+        }
+    }
+}
+
+}  // namespace topology_change_helpers
+}  // namespace mongo

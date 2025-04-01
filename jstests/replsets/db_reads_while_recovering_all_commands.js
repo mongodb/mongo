@@ -55,7 +55,6 @@ const allCommands = {
     _configsvrMoveRange: {skip: isPrimaryOnly},
     _configsvrRemoveChunks: {skip: isPrimaryOnly},
     _configsvrRemoveShard: {skip: isPrimaryOnly},
-    _configsvrRemoveShardCommit: {skip: isPrimaryOnly},
     _configsvrRemoveShardFromZone: {skip: isPrimaryOnly},
     _configsvrRemoveTags: {skip: isPrimaryOnly},
     _configsvrRepairShardedCollectionChunksHistory: {skip: isPrimaryOnly},

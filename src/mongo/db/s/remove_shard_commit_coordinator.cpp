@@ -165,6 +165,8 @@ void RemoveShardCommitCoordinator::_stopDDLOperations(OperationContext* opCtx) {
     // done via a cluster parameter and so the only remote write commands are run as part of that
     // coordinator which is responsible for handling the replay protection of those updates.
     topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx, /*persistRecoveryDocument*/ false);
+
+    globalFailPointRegistry().find("hangRemoveShardAfterDrainingDDL")->pauseWhileSet();
 }
 
 void RemoveShardCommitCoordinator::_checkShardIsEmpty(OperationContext* opCtx) {

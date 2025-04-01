@@ -7,6 +7,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "_configsvrRefineCollectionShardKey",
     "_shardsvrCommitToShardLocalCatalog",  // Removed in 8.2
     "stageDebug",
+    "_configsvrRemoveShardCommit",
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the
