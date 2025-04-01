@@ -394,3 +394,18 @@ union __wt_rand_state {
             WT_ERR(__wt_buf_extend(session, buf, (buf)->size + __len + 1));     \
         }                                                                       \
     } while (0)
+
+/*
+ * __wt_atomic_decrement_if_positive --
+ *     Use compare and swap to atomically decrement value by 1 if it's positive.
+ */
+static inline void
+__wt_atomic_decrement_if_positive(uint32_t *valuep)
+{
+    uint32_t old_value;
+    do {
+        WT_ORDERED_READ(old_value, *valuep);
+        if (old_value == 0)
+            break;
+    } while (!__wt_atomic_cas32(valuep, old_value, old_value - 1));
+}
