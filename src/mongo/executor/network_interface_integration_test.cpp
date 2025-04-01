@@ -450,9 +450,10 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
                          << "mode"
                          << "alwaysOn"
                          << "data"
-                         << BSON("blockConnection" << true << "blockTimeMS" << 5000
-                                                   << "failCommands"
-                                                   << BSON_ARRAY("echo" << "_killOperations"))),
+                         << BSON("blockConnection"
+                                 << true << "blockTimeMS"
+                                 << NetworkInterfaceTL::kCancelCommandTimeout_forTest.count() + 1000
+                                 << "failCommands" << BSON_ARRAY("echo" << "_killOperations"))),
                     kNoTimeout);
 
     ON_BLOCK_EXIT([&] {

@@ -651,7 +651,8 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
         DatabaseName::kAdmin,
         BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(*operationKey)),
         nullptr,
-        kCancelCommandTimeout);
+        TestingProctor::instance().isEnabled() ? kCancelCommandTimeout_forTest
+                                               : kCancelCommandTimeout);
     auto cbHandle = executor::TaskExecutor::CallbackHandle();
     auto killOpCmdState = std::make_shared<CommandState>(
         this, killOpRequest, cbHandle, nullptr, CancellationToken::uncancelable());
