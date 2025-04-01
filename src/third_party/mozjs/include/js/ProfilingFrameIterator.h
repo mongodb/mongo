@@ -14,6 +14,7 @@
 #include "jstypes.h"
 
 #include "js/GCAnnotations.h"
+#include "js/ProfilingCategory.h"
 #include "js/TypeDecls.h"
 
 namespace js {
@@ -96,11 +97,30 @@ class MOZ_NON_PARAM JS_PUBLIC_API ProfilingFrameIterator {
 
  public:
   struct RegisterState {
-    RegisterState() : pc(nullptr), sp(nullptr), fp(nullptr), lr(nullptr) {}
+    RegisterState()
+        : pc(nullptr),
+          sp(nullptr),
+          fp(nullptr),
+          unused1(nullptr),
+          unused2(nullptr) {}
     void* pc;
     void* sp;
     void* fp;
-    void* lr;
+    union {
+      // Value of the LR register on ARM platforms.
+      void* lr;
+      // The return address during a tail call operation.
+      // Note that for ARM is still the value of LR register.
+      void* tempRA;
+      // Undefined on non-ARM plaforms outside tail calls operations.
+      void* unused1;
+    };
+    union {
+      // The FP reference during a tail call operation.
+      void* tempFP;
+      // Undefined outside tail calls operations.
+      void* unused2;
+    };
   };
 
   ProfilingFrameIterator(
@@ -122,7 +142,9 @@ class MOZ_NON_PARAM JS_PUBLIC_API ProfilingFrameIterator {
     Frame_BaselineInterpreter,
     Frame_Baseline,
     Frame_Ion,
-    Frame_Wasm
+    Frame_WasmBaseline,
+    Frame_WasmIon,
+    Frame_WasmOther,
   };
 
   struct Frame {
@@ -146,6 +168,23 @@ class MOZ_NON_PARAM JS_PUBLIC_API ProfilingFrameIterator {
     jsbytecode* interpreterPC() const {
       MOZ_ASSERT(kind == Frame_BaselineInterpreter);
       return interpreterPC_;
+    }
+    ProfilingCategoryPair profilingCategory() const {
+      switch (kind) {
+        case FrameKind::Frame_BaselineInterpreter:
+          return JS::ProfilingCategoryPair::JS_BaselineInterpret;
+        case FrameKind::Frame_Baseline:
+          return JS::ProfilingCategoryPair::JS_Baseline;
+        case FrameKind::Frame_Ion:
+          return JS::ProfilingCategoryPair::JS_IonMonkey;
+        case FrameKind::Frame_WasmBaseline:
+          return JS::ProfilingCategoryPair::JS_WasmBaseline;
+        case FrameKind::Frame_WasmIon:
+          return JS::ProfilingCategoryPair::JS_WasmIon;
+        case FrameKind::Frame_WasmOther:
+          return JS::ProfilingCategoryPair::JS_WasmOther;
+      }
+      MOZ_CRASH();
     }
   } JS_HAZ_GC_INVALIDATED;
 

@@ -12,13 +12,15 @@
 #include "gc/HashUtil.h"
 #include "js/friend/WindowProxy.h"  // js::IsWindow
 #include "js/HashTable.h"
+#include "js/Printer.h"  // js::GenericPrinter, js::Fprinter
 #include "js/UniquePtr.h"
-#include "vm/JSContext.h"
 #include "vm/JSObject.h"
+#include "vm/JSONPrinter.h"  // js::JSONPrinter
 #include "vm/ShapeZone.h"
 #include "vm/Watchtower.h"
 
 #include "gc/StableCellHasher-inl.h"
+#include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
 
@@ -1057,7 +1059,8 @@ bool NativeObject::changeNumFixedSlotsAfterSwap(JSContext* cx,
                              obj->shape()->proto(), nfixed);
 }
 
-BaseShape::BaseShape(const JSClass* clasp, JS::Realm* realm, TaggedProto proto)
+BaseShape::BaseShape(JSContext* cx, const JSClass* clasp, JS::Realm* realm,
+                     TaggedProto proto)
     : TenuredCellWithNonGCPointer(clasp), realm_(realm), proto_(proto) {
 #ifdef DEBUG
   AssertJSClassInvariants(clasp);
@@ -1069,6 +1072,10 @@ BaseShape::BaseShape(const JSClass* clasp, JS::Realm* realm, TaggedProto proto)
 
   // Windows may not appear on prototype chains.
   MOZ_ASSERT_IF(proto.isObject(), !IsWindow(proto.toObject()));
+
+  if (MOZ_UNLIKELY(clasp->emulatesUndefined())) {
+    cx->runtime()->hasSeenObjectEmulateUndefinedFuse.ref().popFuse(cx);
+  }
 
 #ifdef DEBUG
   if (GlobalObject* global = realm->unsafeUnbarrieredMaybeGlobal()) {
@@ -1089,7 +1096,7 @@ BaseShape* BaseShape::get(JSContext* cx, const JSClass* clasp, JS::Realm* realm,
     return *p;
   }
 
-  BaseShape* nbase = cx->newCell<BaseShape>(clasp, realm, proto);
+  BaseShape* nbase = cx->newCell<BaseShape>(cx, clasp, realm, proto);
   if (!nbase) {
     return nullptr;
   }
@@ -1157,31 +1164,37 @@ MOZ_ALWAYS_INLINE bool ShapeForAddHasher::match(SharedShape* shape,
   return shape->lastPropertyMatchesForAdd(l.key, l.flags, &slot);
 }
 
-#ifdef DEBUG
-void Shape::dump(js::GenericPrinter& out) const {
-  out.printf("shape @ 0x%p\n", this);
-  out.printf("base: 0x%p\n", base());
-  switch (kind()) {
-    case Kind::Shared:
-      out.printf("kind: Shared\n");
-      break;
-    case Kind::Dictionary:
-      out.printf("kind: Dictionary\n");
-      break;
-    case Kind::Proxy:
-      out.printf("kind: Proxy\n");
-      break;
-    case Kind::WasmGC:
-      out.printf("kind: WasmGC\n");
-      break;
-  }
-  if (isNative()) {
-    out.printf("mapLength: %u\n", asNative().propMapLength());
-    if (asNative().propMap()) {
-      out.printf("map:\n");
-      asNative().propMap()->dump(out);
+#if defined(DEBUG) || defined(JS_JITSPEW)
+void BaseShape::dump() const {
+  Fprinter out(stderr);
+  dump(out);
+}
+
+void BaseShape::dump(js::GenericPrinter& out) const {
+  js::JSONPrinter json(out);
+  dump(json);
+  out.put("\n");
+}
+
+void BaseShape::dump(js::JSONPrinter& json) const {
+  json.beginObject();
+  dumpFields(json);
+  json.endObject();
+}
+
+void BaseShape::dumpFields(js::JSONPrinter& json) const {
+  json.formatProperty("address", "(js::BaseShape*)0x%p", this);
+
+  json.formatProperty("realm", "(JS::Realm*)0x%p", realm());
+
+  if (proto().isDynamic()) {
+    json.property("proto", "<dynamic>");
+  } else {
+    JSObject* protoObj = proto().toObjectOrNull();
+    if (protoObj) {
+      json.formatProperty("proto", "(JSObject*)0x%p", protoObj);
     } else {
-      out.printf("map: (none)\n");
+      json.nullProperty("proto");
     }
   }
 }
@@ -1190,7 +1203,162 @@ void Shape::dump() const {
   Fprinter out(stderr);
   dump(out);
 }
-#endif  // DEBUG
+
+void Shape::dump(js::GenericPrinter& out) const {
+  js::JSONPrinter json(out);
+  dump(json);
+  out.put("\n");
+}
+
+void Shape::dump(js::JSONPrinter& json) const {
+  json.beginObject();
+  dumpFields(json);
+  json.endObject();
+}
+
+template <typename KnownF, typename UnknownF>
+void ForEachObjectFlag(ObjectFlags flags, KnownF known, UnknownF unknown) {
+  uint16_t raw = flags.toRaw();
+  for (uint16_t i = 1; i; i = i << 1) {
+    if (!(raw & i)) {
+      continue;
+    }
+    switch (ObjectFlag(raw & i)) {
+      case ObjectFlag::IsUsedAsPrototype:
+        known("IsUsedAsPrototype");
+        break;
+      case ObjectFlag::NotExtensible:
+        known("NotExtensible");
+        break;
+      case ObjectFlag::Indexed:
+        known("Indexed");
+        break;
+      case ObjectFlag::HasInterestingSymbol:
+        known("HasInterestingSymbol");
+        break;
+      case ObjectFlag::HasEnumerable:
+        known("HasEnumerable");
+        break;
+      case ObjectFlag::FrozenElements:
+        known("FrozenElements");
+        break;
+      case ObjectFlag::InvalidatedTeleporting:
+        known("InvalidatedTeleporting");
+        break;
+      case ObjectFlag::ImmutablePrototype:
+        known("ImmutablePrototype");
+        break;
+      case ObjectFlag::QualifiedVarObj:
+        known("QualifiedVarObj");
+        break;
+      case ObjectFlag::HasNonWritableOrAccessorPropExclProto:
+        known("HasNonWritableOrAccessorPropExclProto");
+        break;
+      case ObjectFlag::HadGetterSetterChange:
+        known("HadGetterSetterChange");
+        break;
+      case ObjectFlag::UseWatchtowerTestingLog:
+        known("UseWatchtowerTestingLog");
+        break;
+      case ObjectFlag::GenerationCountedGlobal:
+        known("GenerationCountedGlobal");
+        break;
+      case ObjectFlag::NeedsProxyGetSetResultValidation:
+        known("NeedsProxyGetSetResultValidation");
+        break;
+      case ObjectFlag::HasFuseProperty:
+        known("HasFuseProperty");
+        break;
+      default:
+        unknown(i);
+        break;
+    }
+  }
+}
+
+void Shape::dumpFields(js::JSONPrinter& json) const {
+  json.formatProperty("address", "(js::Shape*)0x%p", this);
+
+  json.beginObjectProperty("base");
+  base()->dumpFields(json);
+  json.endObject();
+
+  switch (kind()) {
+    case Kind::Shared:
+      json.property("kind", "Shared");
+      break;
+    case Kind::Dictionary:
+      json.property("kind", "Dictionary");
+      break;
+    case Kind::Proxy:
+      json.property("kind", "Proxy");
+      break;
+    case Kind::WasmGC:
+      json.property("kind", "WasmGC");
+      break;
+  }
+
+  json.beginInlineListProperty("objectFlags");
+  ForEachObjectFlag(
+      objectFlags(), [&](const char* name) { json.value("%s", name); },
+      [&](uint16_t value) { json.value("Unknown(%04x)", value); });
+  json.endInlineList();
+
+  if (isNative()) {
+    json.property("numFixedSlots", asNative().numFixedSlots());
+    json.property("propMapLength", asNative().propMapLength());
+
+    if (asNative().propMap()) {
+      json.beginObjectProperty("propMap");
+      asNative().propMap()->dumpFields(json);
+      json.endObject();
+    } else {
+      json.nullProperty("propMap");
+    }
+  }
+
+  if (isShared()) {
+    if (getObjectClass()->isNativeObject()) {
+      json.property("slotSpan", asShared().slotSpan());
+    }
+  }
+
+  if (isWasmGC()) {
+    json.formatProperty("recGroup", "(js::wasm::RecGroup*)0x%p",
+                        asWasmGC().recGroup());
+  }
+}
+
+void Shape::dumpStringContent(js::GenericPrinter& out) const {
+  out.printf("<(js::Shape*)0x%p", this);
+
+  if (isDictionary()) {
+    out.put(", dictionary");
+  }
+
+  out.put(", objectFlags=[");
+  bool first = true;
+  ForEachObjectFlag(
+      objectFlags(),
+      [&](const char* name) {
+        if (!first) {
+          out.put(", ");
+        }
+        first = false;
+
+        out.put(name);
+      },
+      [&](uint16_t value) {
+        if (!first) {
+          out.put(", ");
+        }
+        first = false;
+
+        out.printf("Unknown(%04x)", value);
+      });
+  out.put("]>");
+}
+#endif  // defined(DEBUG) || defined(JS_JITSPEW)
 
 /* static */
 SharedShape* SharedShape::getInitialShape(JSContext* cx, const JSClass* clasp,

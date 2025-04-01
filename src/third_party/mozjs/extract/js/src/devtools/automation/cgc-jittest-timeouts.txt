@@ -40,8 +40,6 @@ parser/modifier-yield-without-operand-2.js
 saved-stacks/bug-1006876-too-much-recursion.js
 self-test/assertDeepEq.js
 sunspider/check-string-unpack-code.js
-TypedObject/jit-read-u16-from-struct-array-in-struct.js
-TypedObject/jit-read-u32-from-struct-array-in-struct.js
 v8-v5/check-earley-boyer.js
 v8-v5/check-raytrace.js
 v8-v5/check-regexp.js

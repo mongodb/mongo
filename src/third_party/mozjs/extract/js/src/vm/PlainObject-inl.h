@@ -33,12 +33,7 @@
   MOZ_ASSERT(gc::CanChangeToBackgroundAllocKind(kind, &PlainObject::class_));
   kind = gc::ForegroundToBackgroundAllocKind(kind);
 
-  NativeObject* obj = NativeObject::create(cx, kind, heap, shape);
-  if (!obj) {
-    return nullptr;
-  }
-
-  return &obj->as<PlainObject>();
+  return NativeObject::create<PlainObject>(cx, kind, heap, shape);
 }
 
 /* static */ inline js::PlainObject* js::PlainObject::createWithShape(

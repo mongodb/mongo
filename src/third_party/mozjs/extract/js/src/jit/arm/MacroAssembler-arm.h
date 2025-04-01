@@ -15,6 +15,8 @@
 #include "wasm/WasmBuiltins.h"
 #include "wasm/WasmCodegenTypes.h"
 
+using js::wasm::FaultingCodeOffsetPair;
+
 namespace js {
 namespace jit {
 
@@ -369,33 +371,36 @@ class MacroAssemblerARM : public Assembler {
   void ma_dtr(LoadStore ls, Register rn, Imm32 offset, Register rt,
               AutoRegisterScope& scratch, Index mode = Offset,
               Condition cc = Always);
-  void ma_dtr(LoadStore ls, Register rt, const Address& addr,
-              AutoRegisterScope& scratch, Index mode, Condition cc);
+  FaultingCodeOffset ma_dtr(LoadStore ls, Register rt, const Address& addr,
+                            AutoRegisterScope& scratch, Index mode,
+                            Condition cc);
 
-  void ma_str(Register rt, DTRAddr addr, Index mode = Offset,
-              Condition cc = Always);
-  void ma_str(Register rt, const Address& addr, AutoRegisterScope& scratch,
-              Index mode = Offset, Condition cc = Always);
+  FaultingCodeOffset ma_str(Register rt, DTRAddr addr, Index mode = Offset,
+                            Condition cc = Always);
+  FaultingCodeOffset ma_str(Register rt, const Address& addr,
+                            AutoRegisterScope& scratch, Index mode = Offset,
+                            Condition cc = Always);
 
-  void ma_ldr(DTRAddr addr, Register rt, Index mode = Offset,
-              Condition cc = Always);
-  void ma_ldr(const Address& addr, Register rt, AutoRegisterScope& scratch,
-              Index mode = Offset, Condition cc = Always);
+  FaultingCodeOffset ma_ldr(DTRAddr addr, Register rt, Index mode = Offset,
+                            Condition cc = Always);
+  FaultingCodeOffset ma_ldr(const Address& addr, Register rt,
+                            AutoRegisterScope& scratch, Index mode = Offset,
+                            Condition cc = Always);
 
-  void ma_ldrb(DTRAddr addr, Register rt, Index mode = Offset,
-               Condition cc = Always);
-  void ma_ldrh(EDtrAddr addr, Register rt, Index mode = Offset,
-               Condition cc = Always);
-  void ma_ldrsh(EDtrAddr addr, Register rt, Index mode = Offset,
-                Condition cc = Always);
-  void ma_ldrsb(EDtrAddr addr, Register rt, Index mode = Offset,
-                Condition cc = Always);
+  FaultingCodeOffset ma_ldrb(DTRAddr addr, Register rt, Index mode = Offset,
+                             Condition cc = Always);
+  FaultingCodeOffset ma_ldrh(EDtrAddr addr, Register rt, Index mode = Offset,
+                             Condition cc = Always);
+  FaultingCodeOffset ma_ldrsh(EDtrAddr addr, Register rt, Index mode = Offset,
+                              Condition cc = Always);
+  FaultingCodeOffset ma_ldrsb(EDtrAddr addr, Register rt, Index mode = Offset,
+                              Condition cc = Always);
   void ma_ldrd(EDtrAddr addr, Register rt, mozilla::DebugOnly<Register> rt2,
                Index mode = Offset, Condition cc = Always);
-  void ma_strb(Register rt, DTRAddr addr, Index mode = Offset,
-               Condition cc = Always);
-  void ma_strh(Register rt, EDtrAddr addr, Index mode = Offset,
-               Condition cc = Always);
+  FaultingCodeOffset ma_strb(Register rt, DTRAddr addr, Index mode = Offset,
+                             Condition cc = Always);
+  FaultingCodeOffset ma_strh(Register rt, EDtrAddr addr, Index mode = Offset,
+                             Condition cc = Always);
   void ma_strd(Register rt, mozilla::DebugOnly<Register> rt2, EDtrAddr addr,
                Index mode = Offset, Condition cc = Always);
 
@@ -865,6 +870,19 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
     load32(ToPayload(src), dest);
   }
 
+  void unboxWasmAnyRefGCThingForGCBarrier(const Address& src, Register dest) {
+    load32(ToPayload(src), dest);
+    {
+      ScratchRegisterScope scratch(asMasm());
+      ma_and(Imm32(wasm::AnyRef::GCThingMask), dest, scratch);
+    }
+  }
+
+  void getWasmAnyRefGCThingChunk(Register src, Register dest) {
+    ScratchRegisterScope scratch(asMasm());
+    ma_and(Imm32(wasm::AnyRef::GCThingChunkMask), src, dest, scratch);
+  }
+
   void notBoolean(const ValueOperand& val) {
     as_eor(val.payloadReg(), val.payloadReg(), Imm8(1));
   }
@@ -1120,14 +1138,14 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   void movePtr(wasm::SymbolicAddress imm, Register dest);
   void movePtr(ImmGCPtr imm, Register dest);
 
-  void load8SignExtend(const Address& address, Register dest);
-  void load8SignExtend(const BaseIndex& src, Register dest);
+  FaultingCodeOffset load8SignExtend(const Address& address, Register dest);
+  FaultingCodeOffset load8SignExtend(const BaseIndex& src, Register dest);
 
-  void load8ZeroExtend(const Address& address, Register dest);
-  void load8ZeroExtend(const BaseIndex& src, Register dest);
+  FaultingCodeOffset load8ZeroExtend(const Address& address, Register dest);
+  FaultingCodeOffset load8ZeroExtend(const BaseIndex& src, Register dest);
 
-  void load16SignExtend(const Address& address, Register dest);
-  void load16SignExtend(const BaseIndex& src, Register dest);
+  FaultingCodeOffset load16SignExtend(const Address& address, Register dest);
+  FaultingCodeOffset load16SignExtend(const BaseIndex& src, Register dest);
 
   template <typename S>
   void load16UnalignedSignExtend(const S& src, Register dest) {
@@ -1135,8 +1153,8 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
     load16SignExtend(src, dest);
   }
 
-  void load16ZeroExtend(const Address& address, Register dest);
-  void load16ZeroExtend(const BaseIndex& src, Register dest);
+  FaultingCodeOffset load16ZeroExtend(const Address& address, Register dest);
+  FaultingCodeOffset load16ZeroExtend(const BaseIndex& src, Register dest);
 
   template <typename S>
   void load16UnalignedZeroExtend(const S& src, Register dest) {
@@ -1144,8 +1162,8 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
     load16ZeroExtend(src, dest);
   }
 
-  void load32(const Address& address, Register dest);
-  void load32(const BaseIndex& address, Register dest);
+  FaultingCodeOffset load32(const Address& address, Register dest);
+  FaultingCodeOffset load32(const BaseIndex& address, Register dest);
   void load32(AbsoluteAddress address, Register dest);
 
   template <typename S>
@@ -1154,29 +1172,33 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
     load32(src, dest);
   }
 
-  void load64(const Address& address, Register64 dest) {
+  FaultingCodeOffsetPair load64(const Address& address, Register64 dest) {
+    FaultingCodeOffset fco1, fco2;
     bool highBeforeLow = address.base == dest.low;
     if (highBeforeLow) {
-      load32(HighWord(address), dest.high);
-      load32(LowWord(address), dest.low);
+      fco1 = load32(HighWord(address), dest.high);
+      fco2 = load32(LowWord(address), dest.low);
     } else {
-      load32(LowWord(address), dest.low);
-      load32(HighWord(address), dest.high);
+      fco1 = load32(LowWord(address), dest.low);
+      fco2 = load32(HighWord(address), dest.high);
     }
+    return FaultingCodeOffsetPair(fco1, fco2);
   }
-  void load64(const BaseIndex& address, Register64 dest) {
+  FaultingCodeOffsetPair load64(const BaseIndex& address, Register64 dest) {
     // If you run into this, relax your register allocation constraints.
     MOZ_RELEASE_ASSERT(
         !((address.base == dest.low || address.base == dest.high) &&
           (address.index == dest.low || address.index == dest.high)));
+    FaultingCodeOffset fco1, fco2;
     bool highBeforeLow = address.base == dest.low || address.index == dest.low;
     if (highBeforeLow) {
-      load32(HighWord(address), dest.high);
-      load32(LowWord(address), dest.low);
+      fco1 = load32(HighWord(address), dest.high);
+      fco2 = load32(LowWord(address), dest.low);
     } else {
-      load32(LowWord(address), dest.low);
-      load32(HighWord(address), dest.high);
+      fco1 = load32(LowWord(address), dest.low);
+      fco2 = load32(HighWord(address), dest.high);
     }
+    return FaultingCodeOffsetPair(fco1, fco2);
   }
 
   template <typename S>
@@ -1185,31 +1207,31 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
     load64(src, dest);
   }
 
-  void loadPtr(const Address& address, Register dest);
-  void loadPtr(const BaseIndex& src, Register dest);
+  FaultingCodeOffset loadPtr(const Address& address, Register dest);
+  FaultingCodeOffset loadPtr(const BaseIndex& src, Register dest);
   void loadPtr(AbsoluteAddress address, Register dest);
   void loadPtr(wasm::SymbolicAddress address, Register dest);
 
   void loadPrivate(const Address& address, Register dest);
 
-  void loadDouble(const Address& addr, FloatRegister dest);
-  void loadDouble(const BaseIndex& src, FloatRegister dest);
+  FaultingCodeOffset loadDouble(const Address& addr, FloatRegister dest);
+  FaultingCodeOffset loadDouble(const BaseIndex& src, FloatRegister dest);
 
   // Load a float value into a register, then expand it to a double.
   void loadFloatAsDouble(const Address& addr, FloatRegister dest);
   void loadFloatAsDouble(const BaseIndex& src, FloatRegister dest);
 
-  void loadFloat32(const Address& addr, FloatRegister dest);
-  void loadFloat32(const BaseIndex& src, FloatRegister dest);
+  FaultingCodeOffset loadFloat32(const Address& addr, FloatRegister dest);
+  FaultingCodeOffset loadFloat32(const BaseIndex& src, FloatRegister dest);
 
-  void store8(Register src, const Address& address);
+  FaultingCodeOffset store8(Register src, const Address& address);
   void store8(Imm32 imm, const Address& address);
-  void store8(Register src, const BaseIndex& address);
+  FaultingCodeOffset store8(Register src, const BaseIndex& address);
   void store8(Imm32 imm, const BaseIndex& address);
 
-  void store16(Register src, const Address& address);
+  FaultingCodeOffset store16(Register src, const Address& address);
   void store16(Imm32 imm, const Address& address);
-  void store16(Register src, const BaseIndex& address);
+  FaultingCodeOffset store16(Register src, const BaseIndex& address);
   void store16(Imm32 imm, const BaseIndex& address);
 
   template <typename S, typename T>
@@ -1219,8 +1241,8 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   }
 
   void store32(Register src, AbsoluteAddress address);
-  void store32(Register src, const Address& address);
-  void store32(Register src, const BaseIndex& address);
+  FaultingCodeOffset store32(Register src, const Address& address);
+  FaultingCodeOffset store32(Register src, const BaseIndex& address);
   void store32(Imm32 src, const Address& address);
   void store32(Imm32 src, const BaseIndex& address);
 
@@ -1230,14 +1252,16 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
     store32(src, dest);
   }
 
-  void store64(Register64 src, Address address) {
-    store32(src.low, LowWord(address));
-    store32(src.high, HighWord(address));
+  FaultingCodeOffsetPair store64(Register64 src, Address address) {
+    FaultingCodeOffset fco1 = store32(src.low, LowWord(address));
+    FaultingCodeOffset fco2 = store32(src.high, HighWord(address));
+    return FaultingCodeOffsetPair(fco1, fco2);
   }
 
-  void store64(Register64 src, const BaseIndex& address) {
-    store32(src.low, LowWord(address));
-    store32(src.high, HighWord(address));
+  FaultingCodeOffsetPair store64(Register64 src, const BaseIndex& address) {
+    FaultingCodeOffset fco1 = store32(src.low, LowWord(address));
+    FaultingCodeOffset fco2 = store32(src.high, HighWord(address));
+    return FaultingCodeOffsetPair(fco1, fco2);
   }
 
   void store64(Imm64 imm, Address address) {
@@ -1262,8 +1286,8 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   void storePtr(ImmPtr imm, const BaseIndex& address);
   void storePtr(ImmGCPtr imm, const Address& address);
   void storePtr(ImmGCPtr imm, const BaseIndex& address);
-  void storePtr(Register src, const Address& address);
-  void storePtr(Register src, const BaseIndex& address);
+  FaultingCodeOffset storePtr(Register src, const Address& address);
+  FaultingCodeOffset storePtr(Register src, const BaseIndex& address);
   void storePtr(Register src, AbsoluteAddress dest);
 
   void moveDouble(FloatRegister src, FloatRegister dest,

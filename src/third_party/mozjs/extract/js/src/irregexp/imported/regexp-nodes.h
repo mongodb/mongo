@@ -318,7 +318,8 @@ class ActionNode : public SeqRegExpNode {
     BEGIN_NEGATIVE_SUBMATCH,
     POSITIVE_SUBMATCH_SUCCESS,
     EMPTY_MATCH_CHECK,
-    CLEAR_CAPTURES
+    CLEAR_CAPTURES,
+    MODIFY_FLAGS
   };
   static ActionNode* SetRegisterForLoop(int reg, int val,
                                         RegExpNode* on_success);
@@ -341,6 +342,7 @@ class ActionNode : public SeqRegExpNode {
                                      int repetition_register,
                                      int repetition_limit,
                                      RegExpNode* on_success);
+  static ActionNode* ModifyFlags(RegExpFlags flags, RegExpNode* on_success);
   void Accept(NodeVisitor* visitor) override;
   void Emit(RegExpCompiler* compiler, Trace* trace) override;
   void GetQuickCheckDetails(QuickCheckDetails* details,
@@ -352,6 +354,11 @@ class ActionNode : public SeqRegExpNode {
   // TODO(erikcorry): We should allow some action nodes in greedy loops.
   int GreedyLoopTextLength() override {
     return kNodeIsTooComplexForGreedyLoops;
+  }
+  RegExpFlags flags() {
+    DCHECK_EQ(action_type(), MODIFY_FLAGS);
+    // MONGODB MODIFICATION: Fix -Wc++11-narrowing error with explicit cast
+    return RegExpFlags{static_cast<RegExpFlags::Flag>(data_.u_modify_flags.flags)};
   }
 
  private:
@@ -382,9 +389,13 @@ class ActionNode : public SeqRegExpNode {
       int range_from;
       int range_to;
     } u_clear_captures;
+    struct {
+      int flags;
+    } u_modify_flags;
   } data_;
   ActionNode(ActionType action_type, RegExpNode* on_success)
       : SeqRegExpNode(on_success), action_type_(action_type) {}
+
   ActionType action_type_;
   friend class DotPrinterImpl;
   friend Zone;
@@ -499,12 +510,11 @@ class AssertionNode : public SeqRegExpNode {
 
 class BackReferenceNode : public SeqRegExpNode {
  public:
-  BackReferenceNode(int start_reg, int end_reg, RegExpFlags flags,
-                    bool read_backward, RegExpNode* on_success)
+  BackReferenceNode(int start_reg, int end_reg, bool read_backward,
+                    RegExpNode* on_success)
       : SeqRegExpNode(on_success),
         start_reg_(start_reg),
         end_reg_(end_reg),
-        flags_(flags),
         read_backward_(read_backward) {}
   void Accept(NodeVisitor* visitor) override;
   int start_register() { return start_reg_; }
@@ -522,7 +532,6 @@ class BackReferenceNode : public SeqRegExpNode {
  private:
   int start_reg_;
   int end_reg_;
-  RegExpFlags flags_;
   bool read_backward_;
 };
 

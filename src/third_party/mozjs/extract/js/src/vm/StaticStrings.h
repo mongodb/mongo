@@ -61,16 +61,17 @@ class StaticStrings {
   static constexpr size_t NUM_LENGTH2_ENTRIES =
       NUM_SMALL_CHARS * NUM_SMALL_CHARS;
 
-  JSAtom* length2StaticTable[NUM_LENGTH2_ENTRIES] = {};  // zeroes
-
  public:
   /* We keep these public for the JITs. */
   static const size_t UNIT_STATIC_LIMIT = 256U;
-  JSAtom* unitStaticTable[UNIT_STATIC_LIMIT] = {};  // zeroes
-
   static const size_t INT_STATIC_LIMIT = 256U;
-  JSAtom* intStaticTable[INT_STATIC_LIMIT] = {};  // zeroes
 
+ private:
+  JSAtom* length2StaticTable[NUM_LENGTH2_ENTRIES] = {};  // zeroes
+  JSAtom* unitStaticTable[UNIT_STATIC_LIMIT] = {};       // zeroes
+  JSAtom* intStaticTable[INT_STATIC_LIMIT] = {};         // zeroes
+
+ public:
   StaticStrings() = default;
 
   bool init(JSContext* cx);
@@ -97,7 +98,15 @@ class StaticStrings {
   }
 
   /* May not return atom, returns null on (reported) failure. */
+  inline JSLinearString* getUnitString(JSContext* cx, char16_t c);
+
+  /* May not return atom, returns null on (reported) failure. */
   inline JSLinearString* getUnitStringForElement(JSContext* cx, JSString* str,
+                                                 size_t index);
+
+  /* May not return atom, returns null on (reported) failure. */
+  inline JSLinearString* getUnitStringForElement(JSContext* cx,
+                                                 JSLinearString* str,
                                                  size_t index);
 
   template <typename CharT>

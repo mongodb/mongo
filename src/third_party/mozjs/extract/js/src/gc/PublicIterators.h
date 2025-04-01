@@ -35,7 +35,7 @@ class ZonesIter {
  public:
   ZonesIter(gc::GCRuntime* gc, ZoneSelector selector)
       : iterMarker(gc), it(gc->zones().begin()), end(gc->zones().end()) {
-    if (selector == SkipAtoms) {
+    if (selector == SkipAtoms && !done()) {
       MOZ_ASSERT(get()->isAtomsZone());
       next();
     }

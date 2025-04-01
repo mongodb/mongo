@@ -376,7 +376,7 @@ namespace JS {
 namespace ubi {
 
 RootList::RootList(JSContext* cx, bool wantNames /* = false */)
-    : cx(cx), edges(), wantNames(wantNames), inited(false) {}
+    : cx(cx), wantNames(wantNames), inited(false) {}
 
 std::pair<bool, JS::AutoCheckCannotGC> RootList::init() {
   EdgeVectorTracer tracer(cx->runtime(), &edges, wantNames);

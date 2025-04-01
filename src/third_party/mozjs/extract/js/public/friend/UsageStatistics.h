@@ -64,6 +64,7 @@ class JS_PUBLIC_API JSObject;
   _(DESERIALIZE_ITEMS, QuantityDistribution)    \
   _(DESERIALIZE_US, TimeDuration_US)            \
   _(GC_EFFECTIVENESS, MemoryDistribution)       \
+  _(GC_PARALLEL_MARK, Boolean)                  \
   _(GC_PARALLEL_MARK_SPEEDUP, Integer)          \
   _(GC_PARALLEL_MARK_UTILIZATION, Percentage)   \
   _(GC_PARALLEL_MARK_INTERRUPTIONS, Integer)    \
@@ -83,6 +84,22 @@ using JSAccumulateTelemetryDataCallback = void (*)(JSMetric, uint32_t);
 extern JS_PUBLIC_API void JS_SetAccumulateTelemetryCallback(
     JSContext* cx, JSAccumulateTelemetryDataCallback callback);
 
+#define FOR_EACH_JS_USE_COUNTER(_)                                   \
+  _(ASMJS, AsmJS)                                                    \
+  _(WASM, Wasm)                                                      \
+  _(WASM_LEGACY_EXCEPTIONS, WasmLegacyExceptions)                    \
+  _(SUBCLASSING_ARRAY_TYPE_II, SubclassingArrayTypeII)               \
+  _(SUBCLASSING_ARRAY_TYPE_III, SubclassingArrayTypeIII)             \
+  _(SUBCLASSING_PROMISE_TYPE_II, SubclassingPromiseTypeII)           \
+  _(SUBCLASSING_PROMISE_TYPE_III, SubclassingPromiseTypeIII)         \
+  _(SUBCLASSING_TYPEDARRAY_TYPE_II, SubclassingTypedArrayTypeII)     \
+  _(SUBCLASSING_TYPEDARRAY_TYPE_III, SubclassingTypedArrayTypeIII)   \
+  _(SUBCLASSING_ARRAYBUFFER_TYPE_III, SubclassingArrayBufferTypeIII) \
+  _(SUBCLASSING_SHAREDARRAYBUFFER_TYPE_III,                          \
+    SubclassingSharedArrayBufferTypeIII)                             \
+  _(SUBCLASSING_REGEXP_TYPE_III, SubclassingRegExpTypeIII)           \
+  _(SUBCLASSING_REGEXP_TYPE_IV, SubclassingRegExpTypeIV)
+
 /*
  * Use counter names passed to the accumulate use counter callback.
  *
@@ -90,7 +107,9 @@ extern JS_PUBLIC_API void JS_SetAccumulateTelemetryCallback(
  * fixed member of the mozilla::UseCounter enum by the callback.
  */
 
-enum class JSUseCounter { ASMJS, WASM };
+#define ENUM_DEF(NAME, _) NAME,
+enum class JSUseCounter { FOR_EACH_JS_USE_COUNTER(ENUM_DEF) COUNT };
+#undef ENUM_DEF
 
 using JSSetUseCounterCallback = void (*)(JSObject*, JSUseCounter);
 

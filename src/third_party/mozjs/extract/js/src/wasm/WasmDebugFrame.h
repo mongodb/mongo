@@ -135,6 +135,7 @@ class DebugFrame {
 
   bool hasCachedReturnJSValue() const { return flags_.hasCachedReturnJSValue; }
   [[nodiscard]] bool updateReturnJSValue(JSContext* cx);
+  void discardReturnJSValue();
   JS::HandleValue returnValue() const;
   void clearReturnJSValue();
 

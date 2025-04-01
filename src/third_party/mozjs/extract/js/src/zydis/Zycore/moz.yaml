@@ -1,0 +1,52 @@
+schema: 1
+
+bugzilla:
+  product: Core
+  component: "JavaScript Engine"
+
+origin:
+  name: zycore-c
+  description: library providing platform independent types, macros and a fallback for environments without LibC
+
+  url: https://github.com/zyantific/zycore-c
+
+  release: 74620eefd233bec20daeb66e78e744ff06e273b7 (2024-02-04T21:04:02Z).
+  revision: 74620eefd233bec20daeb66e78e744ff06e273b7
+
+  license: MIT
+
+vendoring:
+  url: https://github.com/zyantific/zycore-c
+  source-hosting: github
+  tracking: commit
+
+  exclude:
+    - "*"
+    - src/API/Synchronization.c
+    - src/API/Terminal.c
+    - src/API/Thread.c
+    - include/Zycore/API/Synchronization.h
+    - include/Zycore/API/Terminal.h
+    - include/Zycore/API/Thread.h
+    - tests
+    - cmake
+    - examples
+    - Internal
+    - resources
+
+  keep:
+    - LICENSE
+
+  update-actions:
+    - action: move-dir
+      from: '{vendor_dir}/src'
+      to: '{vendor_dir}'
+    - action: move-dir
+      from: '{vendor_dir}/include/Zycore'
+      to: '{vendor_dir}'
+    - action: move-file
+      from: '{vendor_dir}/String.c'
+      to: '{vendor_dir}/ZycoreString.c'
+    - action: run-script
+      script: "{vendor_dir}/../patch-include-headers.sh"
+      cwd: "{vendor_dir}"

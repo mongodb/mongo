@@ -324,6 +324,11 @@ inline void CellPtrPreWriteBarrier(JS::GCCellPtr thing) {
   PreWriteBarrierImpl(thing.asCell());
 }
 
+inline void WasmAnyRefPreWriteBarrier(const wasm::AnyRef& v) {
+  MOZ_ASSERT(v.isGCThing());
+  PreWriteBarrierImpl(v.toGCThing());
+}
+
 }  // namespace gc
 
 #ifdef DEBUG
@@ -356,6 +361,32 @@ struct InternalBarrierMethods<T*> {
 #endif
 };
 
+namespace gc {
+MOZ_ALWAYS_INLINE void ValuePostWriteBarrier(Value* vp, const Value& prev,
+                                             const Value& next) {
+  MOZ_ASSERT(!CurrentThreadIsIonCompiling());
+  MOZ_ASSERT(vp);
+
+  // If the target needs an entry, add it.
+  js::gc::StoreBuffer* sb;
+  if (next.isGCThing() && (sb = next.toGCThing()->storeBuffer())) {
+    // If we know that the prev has already inserted an entry, we can
+    // skip doing the lookup to add the new entry. Note that we cannot
+    // safely assert the presence of the entry because it may have been
+    // added via a different store buffer.
+    if (prev.isGCThing() && prev.toGCThing()->storeBuffer()) {
+      return;
+    }
+    sb->putValue(vp);
+    return;
+  }
+  // Remove the prev entry if the new value does not need it.
+  if (prev.isGCThing() && (sb = prev.toGCThing()->storeBuffer())) {
+    sb->unputValue(vp);
+  }
+}
+}  // namespace gc
+
 template <>
 struct InternalBarrierMethods<Value> {
   static bool isMarkable(const Value& v) { return v.isGCThing(); }
@@ -368,26 +399,7 @@ struct InternalBarrierMethods<Value> {
 
   static MOZ_ALWAYS_INLINE void postBarrier(Value* vp, const Value& prev,
                                             const Value& next) {
-    MOZ_ASSERT(!CurrentThreadIsIonCompiling());
-    MOZ_ASSERT(vp);
-
-    // If the target needs an entry, add it.
-    js::gc::StoreBuffer* sb;
-    if (next.isGCThing() && (sb = next.toGCThing()->storeBuffer())) {
-      // If we know that the prev has already inserted an entry, we can
-      // skip doing the lookup to add the new entry. Note that we cannot
-      // safely assert the presence of the entry because it may have been
-      // added via a different store buffer.
-      if (prev.isGCThing() && prev.toGCThing()->storeBuffer()) {
-        return;
-      }
-      sb->putValue(vp);
-      return;
-    }
-    // Remove the prev entry if the new value does not need it.
-    if (prev.isGCThing() && (sb = prev.toGCThing()->storeBuffer())) {
-      sb->unputValue(vp);
-    }
+    gc::ValuePostWriteBarrier(vp, prev, next);
   }
 
   static void readBarrier(const Value& v) {
@@ -512,7 +524,7 @@ class WriteBarriered : public BarrieredBase<T>,
 
 #define DECLARE_POINTER_ASSIGN_AND_MOVE_OPS(Wrapper, T) \
   DECLARE_POINTER_ASSIGN_OPS(Wrapper, T)                \
-  Wrapper<T>& operator=(Wrapper<T>&& other) {           \
+  Wrapper<T>& operator=(Wrapper<T>&& other) noexcept {  \
     setUnchecked(other.release());                      \
     return *this;                                       \
   }
@@ -538,7 +550,8 @@ class PreBarriered : public WriteBarriered<T> {
   explicit PreBarriered(const PreBarriered<T>& other)
       : WriteBarriered<T>(other.value) {}
 
-  PreBarriered(PreBarriered<T>&& other) : WriteBarriered<T>(other.release()) {}
+  PreBarriered(PreBarriered<T>&& other) noexcept
+      : WriteBarriered<T>(other.release()) {}
 
   ~PreBarriered() { this->pre(); }
 
@@ -569,18 +582,12 @@ class PreBarriered : public WriteBarriered<T> {
 
 }  // namespace js
 
-namespace JS {
-
-namespace detail {
-
+namespace JS::detail {
 template <typename T>
 struct DefineComparisonOps<js::PreBarriered<T>> : std::true_type {
   static const T& get(const js::PreBarriered<T>& v) { return v.get(); }
 };
-
-}  // namespace detail
-
-}  // namespace JS
+}  // namespace JS::detail
 
 namespace js {
 
@@ -621,6 +628,16 @@ class GCPtr : public WriteBarriered<T> {
   }
 #endif
 
+  /*
+   * Unlike HeapPtr<T>, GCPtr<T> must be managed with GC lifetimes.
+   * Specifically, the memory used by the pointer itself must be live until
+   * at least the next minor GC. For that reason, move semantics are invalid
+   * and are deleted here. Please note that not all containers support move
+   * semantics, so this does not completely prevent invalid uses.
+   */
+  GCPtr(GCPtr<T>&&) = delete;
+  GCPtr<T>& operator=(GCPtr<T>&&) = delete;
+
   void init(const T& v) {
     AssertTargetIsNotGray(v);
     this->value = v;
@@ -641,32 +658,16 @@ class GCPtr : public WriteBarriered<T> {
     this->value = v;
     this->post(tmp, this->value);
   }
-
-  /*
-   * Unlike HeapPtr<T>, GCPtr<T> must be managed with GC lifetimes.
-   * Specifically, the memory used by the pointer itself must be live until
-   * at least the next minor GC. For that reason, move semantics are invalid
-   * and are deleted here. Please note that not all containers support move
-   * semantics, so this does not completely prevent invalid uses.
-   */
-  GCPtr(GCPtr<T>&&) = delete;
-  GCPtr<T>& operator=(GCPtr<T>&&) = delete;
 };
 
 }  // namespace js
 
-namespace JS {
-
-namespace detail {
-
+namespace JS::detail {
 template <typename T>
 struct DefineComparisonOps<js::GCPtr<T>> : std::true_type {
   static const T& get(const js::GCPtr<T>& v) { return v.get(); }
 };
-
-}  // namespace detail
-
-}  // namespace JS
+}  // namespace JS::detail
 
 namespace js {
 
@@ -705,7 +706,7 @@ class HeapPtr : public WriteBarriered<T> {
     this->post(JS::SafelyInitialized<T>::create(), this->value);
   }
 
-  HeapPtr(HeapPtr<T>&& other) : WriteBarriered<T>(other.release()) {
+  HeapPtr(HeapPtr<T>&& other) noexcept : WriteBarriered<T>(other.release()) {
     this->post(JS::SafelyInitialized<T>::create(), this->value);
   }
 
@@ -777,7 +778,8 @@ class GCStructPtr : public BarrieredBase<T> {
 
   GCStructPtr(const GCStructPtr<T>& other) : BarrieredBase<T>(other) {}
 
-  GCStructPtr(GCStructPtr<T>&& other) : BarrieredBase<T>(other.release()) {}
+  GCStructPtr(GCStructPtr<T>&& other) noexcept
+      : BarrieredBase<T>(other.release()) {}
 
   ~GCStructPtr() {
     // No barriers are necessary as this only happens when the GC is sweeping.
@@ -812,18 +814,12 @@ class GCStructPtr : public BarrieredBase<T> {
 
 }  // namespace js
 
-namespace JS {
-
-namespace detail {
-
+namespace JS::detail {
 template <typename T>
 struct DefineComparisonOps<js::HeapPtr<T>> : std::true_type {
   static const T& get(const js::HeapPtr<T>& v) { return v.get(); }
 };
-
-}  // namespace detail
-
-}  // namespace JS
+}  // namespace JS::detail
 
 namespace js {
 
@@ -869,7 +865,8 @@ class WeakHeapPtr : public ReadBarriered<T>,
 
   // Move retains the lifetime status of the source edge, so does not fire
   // the read barrier of the defunct edge.
-  WeakHeapPtr(WeakHeapPtr&& other) : ReadBarriered<T>(other.release()) {
+  WeakHeapPtr(WeakHeapPtr&& other) noexcept
+      : ReadBarriered<T>(other.release()) {
     this->post(JS::SafelyInitialized<T>::create(), value);
   }
 
@@ -940,20 +937,14 @@ class UnsafeBarePtr : public BarrieredBase<T> {
 
 }  // namespace js
 
-namespace JS {
-
-namespace detail {
-
+namespace JS::detail {
 template <typename T>
 struct DefineComparisonOps<js::WeakHeapPtr<T>> : std::true_type {
   static const T& get(const js::WeakHeapPtr<T>& v) {
     return v.unbarrieredGet();
   }
 };
-
-}  // namespace detail
-
-}  // namespace JS
+}  // namespace JS::detail
 
 namespace js {
 
@@ -1010,18 +1001,12 @@ class HeapSlot : public WriteBarriered<Value> {
 
 }  // namespace js
 
-namespace JS {
-
-namespace detail {
-
+namespace JS::detail {
 template <>
 struct DefineComparisonOps<js::HeapSlot> : std::true_type {
   static const Value& get(const js::HeapSlot& v) { return v.get(); }
 };
-
-}  // namespace detail
-
-}  // namespace JS
+}  // namespace JS::detail
 
 namespace js {
 
@@ -1127,6 +1112,7 @@ struct RemoveBarrier<WeakHeapPtr<T>> {
 
 #if MOZ_IS_GCC
 template struct JS_PUBLIC_API StableCellHasher<JSObject*>;
+template struct JS_PUBLIC_API StableCellHasher<JSScript*>;
 #endif
 
 template <typename T>
@@ -1229,6 +1215,12 @@ struct UnsafeBarePtrHasher {
   static bool match(const Key& k, Lookup l) { return k.get() == l; }
   static void rekey(Key& k, const Key& newKey) { k.set(newKey.get()); }
 };
+
+// Set up descriptive type aliases.
+template <class T>
+using PreBarrierWrapper = PreBarriered<T>;
+template <class T>
+using PreAndPostBarrierWrapper = GCPtr<T>;
 
 }  // namespace js
 

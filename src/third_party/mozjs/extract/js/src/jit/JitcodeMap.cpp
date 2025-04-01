@@ -1007,7 +1007,7 @@ bool JitcodeIonTable::WriteIonTable(CompactBufferWriter& writer,
   JitSpew(JitSpew_Profiling,
           "Writing native to bytecode map for %s:%u:%u (%zu entries)",
           scriptList[0].script->filename(), scriptList[0].script->lineno(),
-          scriptList[0].script->column(),
+          scriptList[0].script->column().oneOriginValue(),
           mozilla::PointerRangeSize(start, end));
 
   JitSpew(JitSpew_Profiling, "  ScriptList of size %u",
@@ -1015,7 +1015,7 @@ bool JitcodeIonTable::WriteIonTable(CompactBufferWriter& writer,
   for (uint32_t i = 0; i < scriptList.length(); i++) {
     JitSpew(JitSpew_Profiling, "  Script %u - %s:%u:%u", i,
             scriptList[i].script->filename(), scriptList[i].script->lineno(),
-            scriptList[i].script->column());
+            scriptList[i].script->column().oneOriginValue());
   }
 
   // Write out runs first.  Keep a vector tracking the positive offsets from

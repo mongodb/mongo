@@ -8,8 +8,10 @@
 #define jit_shared_Assembler_shared_h
 
 #include "mozilla/CheckedInt.h"
+#include "mozilla/DebugOnly.h"
 
 #include <limits.h>
+#include <utility>  // std::pair
 
 #include "gc/Barrier.h"
 #include "jit/AtomicOp.h"
@@ -40,6 +42,8 @@
 #  define JS_CODELABEL_LINKMODE
 #endif
 
+using js::wasm::FaultingCodeOffset;
+
 namespace js {
 namespace jit {
 
@@ -58,7 +62,13 @@ static_assert(Simd128DataSize == 4 * sizeof(float),
 static_assert(Simd128DataSize == 2 * sizeof(double),
               "SIMD data should be able to contain float64x2");
 
-enum Scale { TimesOne = 0, TimesTwo = 1, TimesFour = 2, TimesEight = 3 };
+enum Scale {
+  TimesOne = 0,
+  TimesTwo = 1,
+  TimesFour = 2,
+  TimesEight = 3,
+  Invalid = -1
+};
 
 static_assert(sizeof(JS::Value) == 8,
               "required for TimesEight and 3 below to be correct");
@@ -95,6 +105,24 @@ static inline Scale ScaleFromScalarType(Scalar::Type type) {
   return ScaleFromElemWidth(Scalar::byteSize(type));
 }
 
+#ifdef JS_JITSPEW
+static inline const char* StringFromScale(Scale scale) {
+  switch (scale) {
+    case TimesOne:
+      return "TimesOne";
+    case TimesTwo:
+      return "TimesTwo";
+    case TimesFour:
+      return "TimesFour";
+    case TimesEight:
+      return "TimesEight";
+    default:
+      break;
+  }
+  MOZ_CRASH("Unknown Scale");
+}
+#endif
+
 // Used for 32-bit immediates which do not require relocation.
 struct Imm32 {
   int32_t value;
@@ -113,8 +141,9 @@ struct Imm32 {
         return Imm32(2);
       case TimesEight:
         return Imm32(3);
+      default:
+        MOZ_CRASH("Invalid scale");
     };
-    MOZ_CRASH("Invalid scale");
   }
 
   static inline Imm32 FactorOf(enum Scale s) {
@@ -508,6 +537,7 @@ typedef Vector<SymbolicAccess, 0, SystemAllocPolicy> SymbolicAccessVector;
 // code and metadata.
 
 class MemoryAccessDesc {
+  uint32_t memoryIndex_;
   uint64_t offset64_;
   uint32_t align_;
   Scalar::Type type_;
@@ -515,20 +545,29 @@ class MemoryAccessDesc {
   wasm::BytecodeOffset trapOffset_;
   wasm::SimdOp widenOp_;
   enum { Plain, ZeroExtend, Splat, Widen } loadOp_;
+  // Used for an assertion in MacroAssembler about offset length
+  mozilla::DebugOnly<bool> hugeMemory_;
 
  public:
   explicit MemoryAccessDesc(
-      Scalar::Type type, uint32_t align, uint64_t offset,
-      BytecodeOffset trapOffset,
-      const jit::Synchronization& sync = jit::Synchronization::None())
-      : offset64_(offset),
+      uint32_t memoryIndex, Scalar::Type type, uint32_t align, uint64_t offset,
+      BytecodeOffset trapOffset, mozilla::DebugOnly<bool> hugeMemory,
+      jit::Synchronization sync = jit::Synchronization::None())
+      : memoryIndex_(memoryIndex),
+        offset64_(offset),
         align_(align),
         type_(type),
         sync_(sync),
         trapOffset_(trapOffset),
         widenOp_(wasm::SimdOp::Limit),
-        loadOp_(Plain) {
+        loadOp_(Plain),
+        hugeMemory_(hugeMemory) {
     MOZ_ASSERT(mozilla::IsPowerOfTwo(align));
+  }
+
+  uint32_t memoryIndex() const {
+    MOZ_ASSERT(memoryIndex_ != UINT32_MAX);
+    return memoryIndex_;
   }
 
   // The offset is a 64-bit value because of memory64.  Almost always, it will
@@ -553,7 +592,7 @@ class MemoryAccessDesc {
   uint32_t align() const { return align_; }
   Scalar::Type type() const { return type_; }
   unsigned byteSize() const { return Scalar::byteSize(type()); }
-  const jit::Synchronization& sync() const { return sync_; }
+  jit::Synchronization sync() const { return sync_; }
   BytecodeOffset trapOffset() const { return trapOffset_; }
   wasm::SimdOp widenSimdOp() const {
     MOZ_ASSERT(isWidenSimd128Load());
@@ -563,6 +602,13 @@ class MemoryAccessDesc {
   bool isZeroExtendSimd128Load() const { return loadOp_ == ZeroExtend; }
   bool isSplatSimd128Load() const { return loadOp_ == Splat; }
   bool isWidenSimd128Load() const { return loadOp_ == Widen; }
+
+  mozilla::DebugOnly<bool> isHugeMemory() const { return hugeMemory_; }
+#ifdef DEBUG
+  void assertOffsetInGuardPages() const;
+#else
+  void assertOffsetInGuardPages() const {}
+#endif
 
   void setZeroExtendSimd128Load() {
     MOZ_ASSERT(type() == Scalar::Float32 || type() == Scalar::Float64);
@@ -599,6 +645,8 @@ class AssemblerShared {
   wasm::TrapSiteVectorArray trapSites_;
   wasm::SymbolicAccessVector symbolicAccesses_;
   wasm::TryNoteVector tryNotes_;
+  wasm::CodeRangeUnwindInfoVector codeRangesUnwind_;
+
 #ifdef DEBUG
   // To facilitate figuring out which part of SM created each instruction as
   // shown by IONFLAGS=codegen, this maintains a stack of (notionally)
@@ -655,12 +703,11 @@ class AssemblerShared {
   void append(wasm::Trap trap, wasm::TrapSite site) {
     enoughMemory_ &= trapSites_[trap].append(site);
   }
-  void append(const wasm::MemoryAccessDesc& access, uint32_t pcOffset) {
-    appendOutOfBoundsTrap(access.trapOffset(), pcOffset);
-  }
-  void appendOutOfBoundsTrap(wasm::BytecodeOffset trapOffset,
-                             uint32_t pcOffset) {
-    append(wasm::Trap::OutOfBounds, wasm::TrapSite(pcOffset, trapOffset));
+  void append(const wasm::MemoryAccessDesc& access, wasm::TrapMachineInsn insn,
+              FaultingCodeOffset assemblerOffsetOfFaultingMachineInsn) {
+    append(wasm::Trap::OutOfBounds,
+           wasm::TrapSite(insn, assemblerOffsetOfFaultingMachineInsn,
+                          access.trapOffset()));
   }
   void append(wasm::SymbolicAccess access) {
     enoughMemory_ &= symbolicAccesses_.append(access);
@@ -676,11 +723,19 @@ class AssemblerShared {
     return true;
   }
 
+  void append(wasm::CodeRangeUnwindInfo::UnwindHow unwindHow,
+              uint32_t pcOffset) {
+    enoughMemory_ &= codeRangesUnwind_.emplaceBack(pcOffset, unwindHow);
+  }
+
   wasm::CallSiteVector& callSites() { return callSites_; }
   wasm::CallSiteTargetVector& callSiteTargets() { return callSiteTargets_; }
   wasm::TrapSiteVectorArray& trapSites() { return trapSites_; }
   wasm::SymbolicAccessVector& symbolicAccesses() { return symbolicAccesses_; }
   wasm::TryNoteVector& tryNotes() { return tryNotes_; }
+  wasm::CodeRangeUnwindInfoVector& codeRangeUnwindInfos() {
+    return codeRangesUnwind_;
+  }
 };
 
 // AutoCreatedBy pushes and later pops a who-created-these-insns? tag into the

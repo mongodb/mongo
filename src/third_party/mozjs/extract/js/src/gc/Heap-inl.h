@@ -44,6 +44,10 @@ inline void js::gc::Arena::init(JS::Zone* zoneArg, AllocKind kind,
   }
 
   setAsFullyUnused();
+
+#ifdef DEBUG
+  checkNoMarkedCells();
+#endif
 }
 
 inline void js::gc::Arena::release(const AutoLockGC& lock) {
@@ -62,9 +66,5 @@ inline size_t& js::gc::Arena::atomBitmapStart() {
   MOZ_ASSERT(zone && zone->isAtomsZone());
   return atomBitmapStart_;
 }
-
-inline js::gc::NurseryCellHeader::NurseryCellHeader(AllocSite* site,
-                                                    JS::TraceKind kind)
-    : allocSiteAndTraceKind(MakeValue(site, kind)) {}
 
 #endif

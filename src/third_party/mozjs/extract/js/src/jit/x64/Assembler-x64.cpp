@@ -16,13 +16,13 @@ ABIArgGenerator::ABIArgGenerator()
     :
 #if defined(XP_WIN)
       regIndex_(0),
-      stackOffset_(ShadowStackSpace),
+      stackOffset_(ShadowStackSpace)
 #else
       intRegIndex_(0),
       floatRegIndex_(0),
-      stackOffset_(0),
+      stackOffset_(0)
 #endif
-      current_() {
+{
 }
 
 ABIArg ABIArgGenerator::next(MIRType type) {
@@ -47,7 +47,7 @@ ABIArg ABIArgGenerator::next(MIRType type) {
     case MIRType::Int32:
     case MIRType::Int64:
     case MIRType::Pointer:
-    case MIRType::RefOrNull:
+    case MIRType::WasmAnyRef:
     case MIRType::StackResults:
       current_ = ABIArg(IntArgRegs[regIndex_++]);
       break;
@@ -72,7 +72,7 @@ ABIArg ABIArgGenerator::next(MIRType type) {
     case MIRType::Int32:
     case MIRType::Int64:
     case MIRType::Pointer:
-    case MIRType::RefOrNull:
+    case MIRType::WasmAnyRef:
     case MIRType::StackResults:
       if (intRegIndex_ == NumIntArgRegs) {
         current_ = ABIArg(stackOffset_);

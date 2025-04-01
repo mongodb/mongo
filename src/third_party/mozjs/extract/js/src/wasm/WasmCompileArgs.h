@@ -20,6 +20,7 @@
 #define wasm_compile_args_h
 
 #include "mozilla/RefPtr.h"
+#include "mozilla/TypedEnumBits.h"
 
 #include "js/Utility.h"
 #include "js/WasmFeatures.h"
@@ -69,14 +70,41 @@ class Tiers {
 };
 
 // Describes per-compilation settings that are controlled by an options bag
-// passed to compilation and validation functions.  (Nonstandard extension
+// passed to compilation and validation functions. (Nonstandard extension
 // available under prefs.)
 
 struct FeatureOptions {
-  FeatureOptions() : intrinsics(false) {}
+  FeatureOptions()
+      : isBuiltinModule(false),
+        jsStringBuiltins(false)
+#ifdef ENABLE_WASM_GC
+        ,
+        requireGC(false)
+#endif
+#ifdef ENABLE_WASM_TAIL_CALLS
+        ,
+        requireTailCalls(false)
+#endif
+  {
+  }
 
-  // Enables intrinsic opcodes, only set in WasmIntrinsic.cpp.
-  bool intrinsics;
+  // Enables builtin module opcodes, only set in WasmBuiltinModule.cpp.
+  bool isBuiltinModule;
+  // Enable JS String builtins for this module, only available if the feature
+  // is also enabled.
+  bool jsStringBuiltins;
+
+#ifdef ENABLE_WASM_GC
+  // Enable GC support.
+  bool requireGC;
+#endif
+#ifdef ENABLE_WASM_TAIL_CALLS
+  // Enable tail-calls support.
+  bool requireTailCalls;
+#endif
+
+  // Parse the compile options bag.
+  [[nodiscard]] bool init(JSContext* cx, HandleValue val);
 };
 
 // Describes the features that control wasm compilation.
@@ -85,33 +113,58 @@ struct FeatureArgs {
   FeatureArgs()
       :
 #define WASM_FEATURE(NAME, LOWER_NAME, ...) LOWER_NAME(false),
-        JS_FOR_WASM_FEATURES(WASM_FEATURE, WASM_FEATURE, WASM_FEATURE)
+        JS_FOR_WASM_FEATURES(WASM_FEATURE)
 #undef WASM_FEATURE
             sharedMemory(Shareable::False),
         simd(false),
-        intrinsics(false) {
+        isBuiltinModule(false) {
   }
   FeatureArgs(const FeatureArgs&) = default;
   FeatureArgs& operator=(const FeatureArgs&) = default;
   FeatureArgs(FeatureArgs&&) = default;
 
   static FeatureArgs build(JSContext* cx, const FeatureOptions& options);
+  static FeatureArgs allEnabled() {
+    FeatureArgs args;
+#define WASM_FEATURE(NAME, LOWER_NAME, ...) args.LOWER_NAME = true;
+    JS_FOR_WASM_FEATURES(WASM_FEATURE)
+#undef WASM_FEATURE
+    args.sharedMemory = Shareable::True;
+    args.simd = true;
+    return args;
+  }
 
 #define WASM_FEATURE(NAME, LOWER_NAME, ...) bool LOWER_NAME;
-  JS_FOR_WASM_FEATURES(WASM_FEATURE, WASM_FEATURE, WASM_FEATURE)
+  JS_FOR_WASM_FEATURES(WASM_FEATURE)
 #undef WASM_FEATURE
 
   Shareable sharedMemory;
   bool simd;
-  bool intrinsics;
+  // Whether this module is a wasm builtin module (see WasmBuiltinModule.h) and
+  // can contain special opcodes in function bodies.
+  bool isBuiltinModule;
+  // The set of builtin modules that are imported by this module.
+  BuiltinModuleIds builtinModules;
 };
+
+// Observed feature usage for a compiled module. Intended to be used for use
+// counters.
+enum class FeatureUsage : uint8_t {
+  None = 0x0,
+  LegacyExceptions = 0x1,
+};
+
+void SetUseCountersForFeatureUsage(JSContext* cx, JSObject* object,
+                                   FeatureUsage usage);
+
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(FeatureUsage);
 
 // Describes the JS scripted caller of a request to compile a wasm module.
 
 struct ScriptedCaller {
   UniqueChars filename;  // UTF-8 encoded
   bool filenameIsURL;
-  unsigned line;
+  uint32_t line;
 
   ScriptedCaller() : filenameIsURL(false), line(0) {}
 };

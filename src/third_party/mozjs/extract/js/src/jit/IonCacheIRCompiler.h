@@ -53,6 +53,7 @@ class MOZ_RAII IonCacheIRCompiler : public CacheIRCompiler {
 #endif
 
   IonICPerfSpewer& perfSpewer() { return perfSpewer_; }
+  uint8_t localTracingSlots() const { return localTracingSlots_; }
 
  private:
   const CacheIRWriter& writer_;
@@ -64,6 +65,7 @@ class MOZ_RAII IonCacheIRCompiler : public CacheIRCompiler {
   mozilla::Maybe<CodeOffset> stubJitCodeOffset_;
 
   bool savedLiveRegs_;
+  uint8_t localTracingSlots_;
 
   IonICPerfSpewer perfSpewer_;
 
@@ -74,6 +76,9 @@ class MOZ_RAII IonCacheIRCompiler : public CacheIRCompiler {
   T rawInt64StubField(uint32_t offset);
 
   void enterStubFrame(MacroAssembler& masm, const AutoSaveLiveRegisters&);
+  void storeTracedValue(MacroAssembler& masm, ValueOperand value);
+  void loadTracedValue(MacroAssembler& masm, uint8_t slotIndex,
+                       ValueOperand value);
 
   template <typename Fn, Fn fn>
   void callVM(MacroAssembler& masm);
@@ -81,6 +86,11 @@ class MOZ_RAII IonCacheIRCompiler : public CacheIRCompiler {
   [[nodiscard]] bool emitAddAndStoreSlotShared(
       CacheOp op, ObjOperandId objId, uint32_t offsetOffset, ValOperandId rhsId,
       uint32_t newShapeOffset, mozilla::Maybe<uint32_t> numNewSlotsOffset);
+
+  template <typename IdType>
+  [[nodiscard]] bool emitCallScriptedProxyGetShared(
+      ValOperandId targetId, ObjOperandId receiverId, ObjOperandId handlerId,
+      ObjOperandId trapId, IdType id, uint32_t nargsAndFlags);
 
   void pushStubCodePointer();
 

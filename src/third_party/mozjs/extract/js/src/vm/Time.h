@@ -37,20 +37,6 @@ struct PRMJTime {
 /* Return the current local time in micro-seconds */
 extern int64_t PRMJ_Now();
 
-/* Initialize the resources associated with PRMJ_Now. */
-#if defined(XP_WIN)
-extern void PRMJ_NowInit();
-#else
-inline void PRMJ_NowInit() {}
-#endif
-
-/* Release the resources associated with PRMJ_Now; don't call PRMJ_Now again */
-#ifdef XP_WIN
-extern void PRMJ_NowShutdown();
-#else
-inline void PRMJ_NowShutdown() {}
-#endif
-
 #if !JS_HAS_INTL_API
 /* Format a time value into a buffer. Same semantics as strftime() */
 extern size_t PRMJ_FormatTime(char* buf, size_t buflen, const char* fmt,

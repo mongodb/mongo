@@ -61,22 +61,69 @@ class ANNOTATE("moz_inherit_type_annotations_from_template_args") Container {
     InnerClass xxx;
     return;
   }
+
+  struct Entry {
+    T t;
+    U u;
+  }* ent;
 };
 
 Cell* f() {
   Container<int, double> c1;
   Container<SimpleTemplate<int, int>, SimpleTemplate<double, double>> c2;
-  Container<Container<int, double>, Container<void, void>> c3;
-  Container<Container<SimpleTemplate<int, int>, void>,
-            Container<void, SimpleTemplate<char, char>>>
+  Container<Container<int, double>, Container<float, float>> c3;
+  Container<Container<SimpleTemplate<int, int>, float>,
+            Container<float, SimpleTemplate<char, char>>>
       c4;
 
   return nullptr;
+}
+
+// Define a set of classes for verifying that there is no infinite loop
+// when a class contains itself via mozilla::UniquePtr.
+
+namespace mozilla {
+
+template <typename A>
+struct JustAField {
+  A field;
+
+  // Hack to allow UniquePtr and SimpleUniquePtr to be swapped.
+  A& operator->() { return field; }
+};
+
+template <typename T>
+struct UniquePtr {
+  JustAField<T*> holder;
+};
+
+// This did not trigger the infinite loop, because the pointer here
+// caused the UniquePtr special handling to be skipped. It requires
+// the above definition to be triggered, which matches the actual
+// implementation (JustAField maps to CompactPair, more or less).
+// The bugfix for the infinite loop also drops this requirement, so
+// now this *would* trigger the bug if it weren't fixed in the same
+// commit.
+template <typename T>
+struct SimpleUniquePtr {
+  T* holder;
+};
+
+}  // namespace mozilla
+
+class Recursive {
+ public:
+  using EntryMap = Container<Cell*, Recursive>;
+  mozilla::UniquePtr<EntryMap> entries;
 };
 
 void rvalue_ref(World::NS::Unsafe&& arg1) { GC(); }
 
 void ref(const World::NS::Unsafe& arg2) {
+  Recursive* foo;
+  // Must actually use a type for the compiler to instantiate the
+  // template specializations.
+  foo->entries.holder->ent;
   GC();
   static int use = arg2.g;
 }

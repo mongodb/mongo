@@ -6,40 +6,22 @@
 
 #include "vm/WellKnownAtom.h"
 
-#define DECLARE_CONST_CHAR_STR(IDPART, _, TEXT) char js_##IDPART##_str[] = TEXT;
-FOR_EACH_COMMON_PROPERTYNAME(DECLARE_CONST_CHAR_STR)
-#undef DECLARE_CONST_CHAR_STR
-
-#define DECLARE_CONST_CHAR_STR(NAME, _) char js_##NAME##_str[] = #NAME;
-JS_FOR_EACH_PROTOTYPE(DECLARE_CONST_CHAR_STR)
-#undef DECLARE_CONST_CHAR_STR
-
-#define DECLARE_CONST_CHAR_STR(NAME) char js_##NAME##_str[] = #NAME;
-JS_FOR_EACH_WELL_KNOWN_SYMBOL(DECLARE_CONST_CHAR_STR)
-#undef DECLARE_CONST_CHAR_STR
-
 js::WellKnownAtomInfo js::wellKnownAtomInfos[] = {
-#define ENUM_ENTRY_(IDPART, _, _2)                                \
-  {uint32_t(sizeof(js_##IDPART##_str) - 1),                       \
-   mozilla::HashStringKnownLength(js_##IDPART##_str,              \
-                                  sizeof(js_##IDPART##_str) - 1), \
-   js_##IDPART##_str},
+#define ENUM_ENTRY_(_, TEXT)   \
+  {uint32_t(sizeof(TEXT) - 1), \
+   mozilla::HashStringKnownLength(TEXT, sizeof(TEXT) - 1), TEXT},
     FOR_EACH_COMMON_PROPERTYNAME(ENUM_ENTRY_)
 #undef ENUM_ENTRY_
 
-#define ENUM_ENTRY_(NAME, _)                                    \
-  {uint32_t(sizeof(js_##NAME##_str) - 1),                       \
-   mozilla::HashStringKnownLength(js_##NAME##_str,              \
-                                  sizeof(js_##NAME##_str) - 1), \
-   js_##NAME##_str},
+#define ENUM_ENTRY_(NAME, _)    \
+  {uint32_t(sizeof(#NAME) - 1), \
+   mozilla::HashStringKnownLength(#NAME, sizeof(#NAME) - 1), #NAME},
         JS_FOR_EACH_PROTOTYPE(ENUM_ENTRY_)
 #undef ENUM_ENTRY_
 
-#define ENUM_ENTRY_(NAME)                                       \
-  {uint32_t(sizeof(js_##NAME##_str) - 1),                       \
-   mozilla::HashStringKnownLength(js_##NAME##_str,              \
-                                  sizeof(js_##NAME##_str) - 1), \
-   js_##NAME##_str},
+#define ENUM_ENTRY_(NAME)       \
+  {uint32_t(sizeof(#NAME) - 1), \
+   mozilla::HashStringKnownLength(#NAME, sizeof(#NAME) - 1), #NAME},
             JS_FOR_EACH_WELL_KNOWN_SYMBOL(ENUM_ENTRY_)
 #undef ENUM_ENTRY_
 };

@@ -18,22 +18,19 @@
 
 namespace JS {
 
-// Argument passed to the task callback to indicate whether we're invoking it
-// because a new task was added by the JS engine or because we're on a helper
-// thread that just finished a task and there are other tasks pending.
-enum class DispatchReason { NewTask, FinishedTask };
+class HelperThreadTask;
 
 /**
- * Set callback to dispatch a tasks to an external thread pool.
+ * Set callback to dispatch a task to an external thread pool.
  *
- * When the task runs it should call JS::RunHelperThreadTask.
+ * When the task runs it should call JS::RunHelperThreadTask passing |task|.
  */
-using HelperThreadTaskCallback = void (*)(DispatchReason reason);
+using HelperThreadTaskCallback = void (*)(HelperThreadTask* task);
 extern JS_PUBLIC_API void SetHelperThreadTaskCallback(
     HelperThreadTaskCallback callback, size_t threadCount, size_t stackSize);
 
 // Function to call from external thread pool to run a helper thread task.
-extern JS_PUBLIC_API void RunHelperThreadTask();
+extern JS_PUBLIC_API void RunHelperThreadTask(HelperThreadTask* task);
 
 }  // namespace JS
 

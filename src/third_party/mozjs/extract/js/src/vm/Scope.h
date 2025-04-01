@@ -525,6 +525,11 @@ class LexicalScope : public Scope {
     //   lets - [0, constStart)
     // consts - [constStart, length)
     uint32_t constStart = 0;
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    // consts - [constStart, usingStart)
+    // usings - [usingStart, length)
+    uint32_t usingStart = 0;
+#endif
   };
 
   using RuntimeData = RuntimeScopeData<SlotInfo>;
@@ -1001,6 +1006,11 @@ class ModuleScope : public Scope {
     uint32_t varStart = 0;
     uint32_t letStart = 0;
     uint32_t constStart = 0;
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    // consts - [constStart, usingStart)
+    // usings - [usingStart, length)
+    uint32_t usingStart = 0;
+#endif
   };
 
   struct alignas(ScopeDataAlignBytes) RuntimeData
@@ -1060,6 +1070,7 @@ class WasmInstanceScope : public Scope {
     //
     // memories - [0, globalsStart)
     //  globals - [globalsStart, length)
+    uint32_t memoriesStart = 0;
     uint32_t globalsStart = 0;
   };
 
@@ -1094,7 +1105,7 @@ class WasmInstanceScope : public Scope {
  public:
   WasmInstanceObject* instance() const { return data().instance; }
 
-  uint32_t memoriesStart() const { return 0; }
+  uint32_t memoriesStart() const { return data().slotInfo.memoriesStart; }
 
   uint32_t globalsStart() const { return data().slotInfo.globalsStart; }
 
@@ -1763,6 +1774,10 @@ class MutableWrappedPtrOperations<ScopeIter, Wrapper>
 SharedShape* CreateEnvironmentShape(JSContext* cx, BindingIter& bi,
                                     const JSClass* cls, uint32_t numSlots,
                                     ObjectFlags objectFlags);
+
+SharedShape* CreateEnvironmentShapeForSyntheticModule(
+    JSContext* cx, const JSClass* cls, uint32_t numSlots,
+    Handle<ModuleObject*> module);
 
 SharedShape* EmptyEnvironmentShape(JSContext* cx, const JSClass* cls,
                                    uint32_t numSlots, ObjectFlags objectFlags);

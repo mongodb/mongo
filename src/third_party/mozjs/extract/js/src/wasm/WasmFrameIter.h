@@ -19,6 +19,7 @@
 #ifndef wasm_frame_iter_h
 #define wasm_frame_iter_h
 
+#include "js/ColumnNumber.h"  // JS::TaggedColumnNumberOneOrigin
 #include "js/ProfilingFrameIterator.h"
 #include "js/TypeDecls.h"
 
@@ -44,6 +45,7 @@ struct CallableOffsets;
 struct FuncOffsets;
 struct Offsets;
 class Frame;
+class FrameWithInstances;
 
 using RegisterState = JS::ProfilingFrameIterator::RegisterState;
 
@@ -57,7 +59,6 @@ using RegisterState = JS::ProfilingFrameIterator::RegisterState;
 class WasmFrameIter {
  public:
   enum class Unwind { True, False };
-  static constexpr uint32_t ColumnBit = 1u << 31;
 
  private:
   jit::JitActivation* activation_;
@@ -71,12 +72,16 @@ class WasmFrameIter {
   Unwind unwind_;
   void** unwoundAddressOfReturnAddress_;
   uint8_t* resumePCinCurrentFrame_;
+  // See wasm::TrapData for more information.
+  bool failedUnwindSignatureMismatch_;
+  bool stackSwitched_;
 
   void popFrame();
 
  public:
   // See comment above this class definition.
   explicit WasmFrameIter(jit::JitActivation* activation, Frame* fp = nullptr);
+  WasmFrameIter(FrameWithInstances* fp, void* returnAddress);
   const jit::JitActivation* activation() const { return activation_; }
   void setUnwind(Unwind unwind) { unwind_ = unwind; }
   void operator++();
@@ -87,7 +92,7 @@ class WasmFrameIter {
   JSAtom* functionDisplayAtom() const;
   unsigned lineOrBytecode() const;
   uint32_t funcIndex() const;
-  unsigned computeLine(uint32_t* column) const;
+  unsigned computeLine(JS::TaggedColumnNumberOneOrigin* column) const;
   const CodeRange* codeRange() const { return codeRange_; }
   void** unwoundAddressOfReturnAddress() const;
   bool debugEnabled() const;
@@ -97,6 +102,7 @@ class WasmFrameIter {
   uint8_t* unwoundCallerFP() const { return unwoundCallerFP_; }
   Frame* frame() const { return fp_; }
   Instance* instance() const { return instance_; }
+  bool stackSwitched() const { return stackSwitched_; }
 
   // Returns the address of the next instruction that will execute in this
   // frame, once control returns to this frame.
@@ -194,6 +200,12 @@ class ProfilingFrameIterator {
   ProfilingFrameIterator(const jit::JitActivation& activation,
                          const RegisterState& state);
 
+  enum Category {
+    Baseline,
+    Ion,
+    Other,
+  };
+
   void operator++();
 
   bool done() const {
@@ -210,6 +222,8 @@ class ProfilingFrameIterator {
     return unwoundJitCallerFP_;
   }
   const char* label() const;
+
+  Category category() const;
 
   void* endStackAddress() const { return endStackAddress_; }
 };

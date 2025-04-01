@@ -28,11 +28,6 @@ typedef enum DPI_AWARENESS {
 #  define DPI_AWARENESS_CONTEXT_DECLARED
 #endif  // (DPI_AWARENESS_CONTEXT_DECLARED)
 
-#if WINVER < 0x0605
-WINUSERAPI DPI_AWARENESS_CONTEXT WINAPI GetThreadDpiAwarenessContext();
-WINUSERAPI BOOL WINAPI AreDpiAwarenessContextsEqual(DPI_AWARENESS_CONTEXT,
-                                                    DPI_AWARENESS_CONTEXT);
-#endif /* WINVER < 0x0605 */
 typedef DPI_AWARENESS_CONTEXT(WINAPI* SetThreadDpiAwarenessContextProc)(
     DPI_AWARENESS_CONTEXT);
 typedef BOOL(WINAPI* EnableNonClientDpiScalingProc)(HWND);

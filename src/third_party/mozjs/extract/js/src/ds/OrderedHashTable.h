@@ -39,9 +39,11 @@
 
 #include "mozilla/HashFunctions.h"
 #include "mozilla/Likely.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/TemplateLib.h"
 
+#include <tuple>
 #include <utility>
 
 #include "gc/Barrier.h"
@@ -84,9 +86,16 @@ class OrderedHashTable {
   uint32_t dataCapacity;  // size of data, in elements
   uint32_t liveCount;     // dataLength less empty (removed) entries
   uint32_t hashShift;     // multiplicative hash shift
-  Range* ranges;  // list of all live Ranges on this table in malloc memory
-  Range*
-      nurseryRanges;  // list of all live Ranges on this table in the GC nursery
+
+  // List of all live Ranges on this table in malloc memory. Populated when
+  // ranges are created.
+  Range* ranges;
+
+  // List of all live Ranges on this table in the GC nursery. Populated when
+  // ranges are created. This is cleared at the start of minor GC and rebuilt
+  // when ranges are moved.
+  Range* nurseryRanges;
+
   AllocPolicy alloc;
   mozilla::HashCodeScrambler hcs;  // don't reveal pointer hash codes
 
@@ -203,22 +212,33 @@ class OrderedHashTable {
       return true;
     }
 
-    if (dataLength == dataCapacity) {
-      // If the hashTable is more than 1/4 deleted data, simply rehash in
-      // place to free up some space. Otherwise, grow the table.
-      uint32_t newHashShift =
-          liveCount >= dataCapacity * 0.75 ? hashShift - 1 : hashShift;
-      if (!rehash(newHashShift)) {
-        return false;
-      }
+    if (dataLength == dataCapacity && !rehashOnFull()) {
+      return false;
     }
 
-    h >>= hashShift;
-    liveCount++;
-    Data* e = &data[dataLength++];
-    new (e) Data(std::forward<ElementInput>(element), hashTable[h]);
-    hashTable[h] = e;
+    auto [entry, chain] = addEntry(h);
+    new (entry) Data(std::forward<ElementInput>(element), chain);
     return true;
+  }
+
+  /*
+   * If the table contains an entry that matches |element| then return a pointer
+   * to it, otherwise add a new entry.
+   */
+  template <typename ElementInput>
+  [[nodiscard]] T* getOrAdd(ElementInput&& element) {
+    HashNumber h = prepareHash(Ops::getKey(element));
+    if (Data* e = lookup(Ops::getKey(element), h)) {
+      return &e->element;
+    }
+
+    if (dataLength == dataCapacity && !rehashOnFull()) {
+      return nullptr;
+    }
+
+    auto [entry, chain] = addEntry(h);
+    new (entry) Data(std::forward<ElementInput>(element), chain);
+    return &entry->element;
   }
 
   /*
@@ -243,6 +263,12 @@ class OrderedHashTable {
     }
 
     *foundp = true;
+    return remove(e);
+  }
+
+  bool remove(Data* e) {
+    MOZ_ASSERT(uint32_t(e - data) < dataCapacity);
+
     liveCount--;
     Ops::makeEmpty(&e->element);
 
@@ -257,6 +283,7 @@ class OrderedHashTable {
         return false;
       }
     }
+
     return true;
   }
 
@@ -370,22 +397,28 @@ class OrderedHashTable {
         next->prevp = &next;
       }
       seek();
+      MOZ_ASSERT(valid());
     }
 
    public:
-    Range(const Range& other)
+    Range(const Range& other, bool inNursery)
         : ht(other.ht),
           i(other.i),
           count(other.count),
-          prevp(&ht->ranges),
-          next(ht->ranges) {
+          prevp(inNursery ? &ht->nurseryRanges : &ht->ranges),
+          next(*prevp) {
       *prevp = this;
       if (next) {
         next->prevp = &next;
       }
+      MOZ_ASSERT(valid());
     }
 
     ~Range() {
+      if (!prevp) {
+        // Head of removed nursery ranges.
+        return;
+      }
       *prevp = next;
       if (next) {
         next->prevp = prevp;
@@ -434,12 +467,15 @@ class OrderedHashTable {
       i = count = 0;
     }
 
-    bool valid() const { return next != this; }
+#ifdef DEBUG
+    bool valid() const { return /* *prevp == this && */ next != this; }
+#endif
 
     void onTableDestroyed() {
       MOZ_ASSERT(valid());
       prevp = &next;
       next = this;
+      MOZ_ASSERT(!valid());
     }
 
    public:
@@ -547,9 +583,6 @@ class OrderedHashTable {
   /*
    * Allocate a new Range, possibly in nursery memory. The buffer must be
    * large enough to hold a Range object.
-   *
-   * All nursery-allocated ranges can be freed in one go by calling
-   * destroyNurseryRanges().
    */
   Range* createRange(void* buffer, bool inNursery) const {
     auto* self = const_cast<OrderedHashTable*>(this);
@@ -558,7 +591,16 @@ class OrderedHashTable {
     return static_cast<Range*>(buffer);
   }
 
-  void destroyNurseryRanges() { nurseryRanges = nullptr; }
+  void destroyNurseryRanges() {
+    if (nurseryRanges) {
+      nurseryRanges->prevp = nullptr;
+    }
+    nurseryRanges = nullptr;
+  }
+
+#ifdef DEBUG
+  bool hasNurseryRanges() const { return nurseryRanges; }
+#endif
 
   /*
    * Change the value of the given key.
@@ -695,6 +737,16 @@ class OrderedHashTable {
     return const_cast<OrderedHashTable*>(this)->lookup(l, prepareHash(l));
   }
 
+  std::tuple<Data*, Data*> addEntry(HashNumber hash) {
+    MOZ_ASSERT(dataLength < dataCapacity);
+    hash >>= hashShift;
+    liveCount++;
+    Data* entry = &data[dataLength++];
+    Data* chain = hashTable[hash];
+    hashTable[hash] = entry;
+    return std::make_tuple(entry, chain);
+  }
+
   /* This is called after rehashing the table. */
   void compacted() {
     // If we had any empty entries, compacting may have moved live entries
@@ -727,6 +779,16 @@ class OrderedHashTable {
     }
     dataLength = liveCount;
     compacted();
+  }
+
+  [[nodiscard]] bool rehashOnFull() {
+    MOZ_ASSERT(dataLength == dataCapacity);
+
+    // If the hashTable is more than 1/4 deleted data, simply rehash in
+    // place to free up some space. Otherwise, grow the table.
+    uint32_t newHashShift =
+        liveCount >= dataCapacity * 0.75 ? hashShift - 1 : hashShift;
+    return rehash(newHashShift);
   }
 
   /*
@@ -859,6 +921,7 @@ class OrderedHashMap {
 
    public:
     Entry() : key(), value() {}
+    explicit Entry(const Key& k) : key(k), value() {}
     template <typename V>
     Entry(const Key& k, V&& v) : key(k), value(std::forward<V>(v)) {}
     Entry(Entry&& rhs) : key(std::move(rhs.key)), value(std::move(rhs.value)) {}
@@ -911,6 +974,12 @@ class OrderedHashMap {
   bool remove(const Lookup& key, bool* foundp) {
     return impl.remove(key, foundp);
   }
+  // Remove an entry returned by get().
+  bool remove(Entry* entry) {
+    static_assert(offsetof(typename Impl::Data, element) == 0);
+    auto* data = reinterpret_cast<typename Impl::Data*>(entry);
+    return impl.remove(data);
+  }
   [[nodiscard]] bool clear() { return impl.clear(); }
 
   template <typename K, typename V>
@@ -918,16 +987,25 @@ class OrderedHashMap {
     return impl.put(Entry(std::forward<K>(key), std::forward<V>(value)));
   }
 
+  template <typename K>
+  [[nodiscard]] Entry* getOrAdd(K&& key) {
+    return impl.getOrAdd(Entry(std::forward<K>(key)));
+  }
+
   HashNumber hash(const Lookup& key) const { return impl.prepareHash(key); }
 
   template <typename GetNewKey>
-  void rekeyOneEntry(const Lookup& current, const GetNewKey& getNewKey) {
+  mozilla::Maybe<Key> rekeyOneEntry(Lookup& current, GetNewKey&& getNewKey) {
+    // TODO: This is inefficient because we also look up the entry in
+    // impl.rekeyOneEntry below.
     const Entry* e = get(current);
     if (!e) {
-      return;
+      return mozilla::Nothing();
     }
+
     Key newKey = getNewKey(current);
-    return impl.rekeyOneEntry(current, newKey, Entry(newKey, e->value));
+    impl.rekeyOneEntry(current, newKey, Entry(newKey, e->value));
+    return mozilla::Some(newKey);
   }
 
   Range* createRange(void* buffer, bool inNursery) const {
@@ -935,6 +1013,9 @@ class OrderedHashMap {
   }
 
   void destroyNurseryRanges() { impl.destroyNurseryRanges(); }
+#ifdef DEBUG
+  bool hasNurseryRanges() const { return impl.hasNurseryRanges(); }
+#endif
 
   void trace(JSTracer* trc) { impl.trace(trc); }
 
@@ -1010,12 +1091,16 @@ class OrderedHashSet {
   HashNumber hash(const Lookup& value) const { return impl.prepareHash(value); }
 
   template <typename GetNewKey>
-  void rekeyOneEntry(const Lookup& current, const GetNewKey& getNewKey) {
+  mozilla::Maybe<T> rekeyOneEntry(Lookup& current, GetNewKey&& getNewKey) {
+    // TODO: This is inefficient because we also look up the entry in
+    // impl.rekeyOneEntry below.
     if (!has(current)) {
-      return;
+      return mozilla::Nothing();
     }
+
     T newKey = getNewKey(current);
-    return impl.rekeyOneEntry(current, newKey, newKey);
+    impl.rekeyOneEntry(current, newKey, newKey);
+    return mozilla::Some(newKey);
   }
 
   Range* createRange(void* buffer, bool inNursery) const {
@@ -1023,6 +1108,9 @@ class OrderedHashSet {
   }
 
   void destroyNurseryRanges() { impl.destroyNurseryRanges(); }
+#ifdef DEBUG
+  bool hasNurseryRanges() const { return impl.hasNurseryRanges(); }
+#endif
 
   void trace(JSTracer* trc) { impl.trace(trc); }
 

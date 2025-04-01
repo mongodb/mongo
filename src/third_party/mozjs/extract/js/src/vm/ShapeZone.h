@@ -236,7 +236,7 @@ struct ShapeZone {
   void fixupPropMapShapeTableAfterMovingGC();
 
 #ifdef JSGC_HASH_TABLE_CHECKS
-  void checkTablesAfterMovingGC();
+  void checkTablesAfterMovingGC(JS::Zone* zone);
 #endif
 };
 

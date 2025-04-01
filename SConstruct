@@ -2948,6 +2948,7 @@ elif env.TargetOSIs('windows'):
             'crypt32',
             'dnsapi',
             'kernel32',
+            'ntdll',
             'shell32',
             'pdh',
             'version',

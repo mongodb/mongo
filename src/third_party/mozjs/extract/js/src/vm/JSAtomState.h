@@ -18,7 +18,7 @@ class PropertyName;
 
 /* Various built-in or commonly-used names pinned on first context. */
 struct JSAtomState {
-#define PROPERTYNAME_FIELD(idpart, id, text) \
+#define PROPERTYNAME_FIELD(id, text) \
   js::ImmutableTenuredPtr<js::PropertyName*> id;
   FOR_EACH_COMMON_PROPERTYNAME(PROPERTYNAME_FIELD)
 #undef PROPERTYNAME_FIELD

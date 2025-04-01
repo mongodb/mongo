@@ -23,6 +23,7 @@
 #include "mozilla/Span.h"
 
 #include "js/AllocPolicy.h"
+#include "js/HashTable.h"
 #include "js/RefCounted.h"
 #include "js/Utility.h"
 #include "js/Vector.h"
@@ -159,13 +160,13 @@ class Export {
   Export() = default;
   explicit Export(CacheableName&& fieldName, uint32_t index,
                   DefinitionKind kind);
-  explicit Export(CacheableName&& fieldName, DefinitionKind kind);
 
   const CacheableName& fieldName() const { return fieldName_; }
 
   DefinitionKind kind() const { return pod.kind_; }
   uint32_t funcIndex() const;
   uint32_t tagIndex() const;
+  uint32_t memoryIndex() const;
   uint32_t globalIndex() const;
   uint32_t tableIndex() const;
 
@@ -220,6 +221,56 @@ struct FuncDesc {
 
 using FuncDescVector = Vector<FuncDesc, 0, SystemAllocPolicy>;
 
+enum class BranchHint : uint8_t { Unlikely = 0, Likely = 1, Invalid = 2 };
+
+// Stores pairs of <BranchOffset, BranchHint>
+struct BranchHintEntry {
+  uint32_t branchOffset;
+  BranchHint value;
+
+  BranchHintEntry() = default;
+  BranchHintEntry(uint32_t branchOffset, BranchHint value)
+      : branchOffset(branchOffset), value(value) {}
+};
+
+// Branch hint sorted vector for a function,
+// stores tuples of <BranchOffset, BranchHint>
+using BranchHintVector = Vector<BranchHintEntry, 0, SystemAllocPolicy>;
+
+struct BranchHintCollection {
+ private:
+  // Map from function index to their collection of branch hints
+  HashMap<uint32_t, BranchHintVector, DefaultHasher<uint32_t>,
+          SystemAllocPolicy>
+      branchHintsMap;
+
+ public:
+  // Used for lookups into the collection if a function
+  // doesn't contain any hints.
+  static BranchHintVector invalidVector;
+
+  // Add all the branch hints for a function
+  [[nodiscard]] bool addHintsForFunc(uint32_t functionIndex,
+                                     BranchHintVector&& branchHints) {
+    return branchHintsMap.put(functionIndex, std::move(branchHints));
+  }
+
+  // Return the vector with branch hints for a funcIndex.
+  // If this function doesn't contain any hints, return an empty vector.
+  BranchHintVector& getHintVector(uint32_t funcIndex) const {
+    if (auto hintsVector = branchHintsMap.readonlyThreadsafeLookup(funcIndex)) {
+      return hintsVector->value();
+    }
+
+    // If not found, return the empty invalid Vector
+    return invalidVector;
+  }
+
+  bool isEmpty() const { return branchHintsMap.empty(); }
+};
+
+enum class GlobalKind { Import, Constant, Variable };
+
 // A GlobalDesc describes a single global variable.
 //
 // wasm can import and export mutable and immutable globals.
@@ -227,9 +278,6 @@ using FuncDescVector = Vector<FuncDesc, 0, SystemAllocPolicy>;
 // asm.js can import mutable and immutable globals, but a mutable global has a
 // location that is private to the module, and its initial value is copied into
 // that cell from the environment.  asm.js cannot export globals.
-
-enum class GlobalKind { Import, Constant, Variable };
-
 class GlobalDesc {
   GlobalKind kind_;
   // Stores the value type of this global for all kinds, and the initializer
@@ -253,8 +301,8 @@ class GlobalDesc {
 
   explicit GlobalDesc(InitExpr&& initial, bool isMutable,
                       ModuleKind kind = ModuleKind::Wasm)
-      : kind_((isMutable || !initial.isLiteral()) ? GlobalKind::Variable
-                                                  : GlobalKind::Constant) {
+      : kind_((!isMutable && initial.isLiteral()) ? GlobalKind::Constant
+                                                  : GlobalKind::Variable) {
     initial_ = std::move(initial);
     if (isVariable()) {
       isMutable_ = isMutable;
@@ -339,26 +387,22 @@ using GlobalDescVector = Vector<GlobalDesc, 0, SystemAllocPolicy>;
 // data buffer stored in a Wasm exception.
 using TagOffsetVector = Vector<uint32_t, 2, SystemAllocPolicy>;
 
-struct TagType : AtomicRefCounted<TagType> {
+class TagType : public AtomicRefCounted<TagType> {
   ValTypeVector argTypes_;
   TagOffsetVector argOffsets_;
   uint32_t size_;
 
+ public:
   TagType() : size_(0) {}
+  ~TagType();
 
+  const ValTypeVector& argTypes() const { return argTypes_; }
+  const TagOffsetVector& argOffsets() const { return argOffsets_; }
   ResultType resultType() const { return ResultType::Vector(argTypes_); }
 
-  [[nodiscard]] bool initialize(ValTypeVector&& argTypes);
+  uint32_t tagSize() const { return size_; }
 
-  [[nodiscard]] bool clone(const TagType& src) {
-    MOZ_ASSERT(argTypes_.empty() && argOffsets_.empty() && size_ == 0);
-    if (!argTypes_.appendAll(src.argTypes_) ||
-        !argOffsets_.appendAll(src.argOffsets_)) {
-      return false;
-    }
-    size_ = src.size_;
-    return true;
-  }
+  [[nodiscard]] bool initialize(ValTypeVector&& argTypes);
 
   size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 };
@@ -379,42 +423,64 @@ struct TagDesc {
 };
 
 using TagDescVector = Vector<TagDesc, 0, SystemAllocPolicy>;
+using ElemExprOffsetVector = Vector<size_t, 0, SystemAllocPolicy>;
 
-// When a ElemSegment is "passive" it is shared between a wasm::Module and its
-// wasm::Instances. To allow each segment to be released as soon as the last
-// Instance elem.drops it and the Module is destroyed, each ElemSegment is
-// individually atomically ref-counted.
-
-struct ElemSegment : AtomicRefCounted<ElemSegment> {
+struct ModuleElemSegment {
   enum class Kind {
     Active,
     Passive,
     Declared,
   };
 
+  // The type of encoding used by this element segment. 0 is an invalid value to
+  // make sure we notice if we fail to correctly initialize the element segment
+  // - reading from the wrong representation could be a bad time.
+  enum class Encoding {
+    Indices = 1,
+    Expressions,
+  };
+
+  struct Expressions {
+    size_t count = 0;
+    Bytes exprBytes;
+
+    size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
+  };
+
   Kind kind;
   uint32_t tableIndex;
   RefType elemType;
   Maybe<InitExpr> offsetIfActive;
-  Uint32Vector elemFuncIndices;  // Element may be NullFuncIndex
+
+  // We store either an array of indices or the full bytecode of the element
+  // expressions, depending on the encoding used for the element segment.
+  Encoding encoding;
+  Uint32Vector elemIndices;
+  Expressions elemExpressions;
 
   bool active() const { return kind == Kind::Active; }
 
   const InitExpr& offset() const { return *offsetIfActive; }
 
-  size_t length() const { return elemFuncIndices.length(); }
+  size_t numElements() const {
+    switch (encoding) {
+      case Encoding::Indices:
+        return elemIndices.length();
+      case Encoding::Expressions:
+        return elemExpressions.count;
+      default:
+        MOZ_CRASH("unknown element segment encoding");
+    }
+  }
 
   size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 };
 
-// NullFuncIndex represents the case when an element segment (of type funcref)
-// contains a null element.
-constexpr uint32_t NullFuncIndex = UINT32_MAX;
-static_assert(NullFuncIndex > MaxFuncs, "Invariant");
+using ModuleElemSegmentVector = Vector<ModuleElemSegment, 0, SystemAllocPolicy>;
 
-using MutableElemSegment = RefPtr<ElemSegment>;
-using SharedElemSegment = RefPtr<const ElemSegment>;
-using ElemSegmentVector = Vector<SharedElemSegment, 0, SystemAllocPolicy>;
+using InstanceElemSegment = GCVector<HeapPtr<AnyRef>, 0, SystemAllocPolicy>;
+using InstanceElemSegmentVector =
+    GCVector<InstanceElemSegment, 0, SystemAllocPolicy>;
 
 // DataSegmentEnv holds the initial results of decoding a data segment from the
 // bytecode and is stored in the ModuleEnvironment during compilation. When
@@ -427,7 +493,11 @@ using ElemSegmentVector = Vector<SharedElemSegment, 0, SystemAllocPolicy>;
 // Instance mem.drops it and the Module is destroyed, each DataSegment is
 // individually atomically ref-counted.
 
+constexpr uint32_t InvalidMemoryIndex = UINT32_MAX;
+static_assert(InvalidMemoryIndex > MaxMemories, "Invariant");
+
 struct DataSegmentEnv {
+  uint32_t memoryIndex;
   Maybe<InitExpr> offsetIfActive;
   uint32_t bytecodeOffset;
   uint32_t length;
@@ -436,6 +506,7 @@ struct DataSegmentEnv {
 using DataSegmentEnvVector = Vector<DataSegmentEnv, 0, SystemAllocPolicy>;
 
 struct DataSegment : AtomicRefCounted<DataSegment> {
+  uint32_t memoryIndex;
   Maybe<InitExpr> offsetIfActive;
   Bytes bytes;
 
@@ -447,6 +518,7 @@ struct DataSegment : AtomicRefCounted<DataSegment> {
 
   [[nodiscard]] bool init(const ShareableBytes& bytecode,
                           const DataSegmentEnv& src) {
+    memoryIndex = src.memoryIndex;
     if (src.offsetIfActive) {
       offsetIfActive.emplace();
       if (!offsetIfActive->clone(*src.offsetIfActive)) {
@@ -582,11 +654,13 @@ struct MemoryDesc {
     return limits.initial * PageSize;
   }
 
-  MemoryDesc() = default;
+  MemoryDesc() {}
   explicit MemoryDesc(Limits limits) : limits(limits) {}
 };
 
 WASM_DECLARE_CACHEABLE_POD(MemoryDesc);
+
+using MemoryDescVector = Vector<MemoryDesc, 1, SystemAllocPolicy>;
 
 // We don't need to worry about overflow with a Memory32 field when
 // using a uint64_t.

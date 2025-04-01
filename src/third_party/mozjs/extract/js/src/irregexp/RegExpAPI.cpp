@@ -29,6 +29,7 @@
 #include "irregexp/RegExpNativeMacroAssembler.h"
 #include "irregexp/RegExpShim.h"
 #include "jit/JitCommon.h"
+#include "js/ColumnNumber.h"  // JS::ColumnNumberOneOrigin, JS::ColumnNumberOffset
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
 #include "js/friend/StackLimits.h"    // js::ReportOverRecursed
 #include "util/StringBuffer.h"
@@ -141,10 +142,11 @@ static uint32_t ErrorNumber(RegExpError err) {
       return JSMSG_BAD_CLASS_RANGE;
 
     case RegExpError::kInvalidClassSetOperation:
+      return JSMSG_INVALID_CLASS_SET_OP;
     case RegExpError::kInvalidCharacterInClass:
+      return JSMSG_INVALID_CHAR_IN_CLASS;
     case RegExpError::kNegatedCharacterClassWithStrings:
-      // TODO: implement support for /v flag (bug 1713657)
-      MOZ_CRASH("Unicode sets not supported");
+      return JSMSG_NEGATED_CLASS_WITH_STR;
 
     case RegExpError::NumErrors:
       MOZ_CRASH("Unreachable");
@@ -173,12 +175,16 @@ size_t IsolateSizeOfIncludingThis(Isolate* isolate,
   return isolate->sizeOfIncludingThis(mallocSizeOf);
 }
 
-static size_t ComputeColumn(const Latin1Char* begin, const Latin1Char* end) {
-  return PointerRangeSize(begin, end);
+static JS::ColumnNumberOffset ComputeColumnOffset(const Latin1Char* begin,
+                                                  const Latin1Char* end) {
+  return JS::ColumnNumberOffset(
+      AssertedCast<uint32_t>(PointerRangeSize(begin, end)));
 }
 
-static size_t ComputeColumn(const char16_t* begin, const char16_t* end) {
-  return unicode::CountCodePoints(begin, end);
+static JS::ColumnNumberOffset ComputeColumnOffset(const char16_t* begin,
+                                                  const char16_t* end) {
+  return JS::ColumnNumberOffset(
+      AssertedCast<uint32_t>(unicode::CountUTF16CodeUnits(begin, end)));
 }
 
 // This function is varargs purely so it can call ReportCompileErrorLatin1.
@@ -186,7 +192,7 @@ static size_t ComputeColumn(const char16_t* begin, const char16_t* end) {
 template <typename CharT>
 static void ReportSyntaxError(TokenStreamAnyChars& ts,
                               mozilla::Maybe<uint32_t> line,
-                              mozilla::Maybe<uint32_t> column,
+                              mozilla::Maybe<JS::ColumnNumberOneOrigin> column,
                               RegExpCompileData& result, CharT* start,
                               size_t length, ...) {
   MOZ_ASSERT(line.isSome() == column.isSome());
@@ -212,8 +218,8 @@ static void ReportSyntaxError(TokenStreamAnyChars& ts,
   // a line of context based on the expression source.
   uint32_t location = ts.currentToken().pos.begin;
   if (ts.fillExceptingContext(&err, location)) {
-    uint32_t columnNumber =
-        AssertedCast<uint32_t>(ComputeColumn(start, start + offset));
+    JS::ColumnNumberOffset columnOffset =
+        ComputeColumnOffset(start, start + offset);
     if (line.isSome()) {
       // If this pattern is being checked by the frontend Parser instead
       // of other API entry points like |new RegExp|, then the parser will
@@ -222,14 +228,14 @@ static void ReportSyntaxError(TokenStreamAnyChars& ts,
       // We adjust the columnNumber to point to the actual syntax error
       // inside the literal.
       err.lineNumber = *line;
-      err.columnNumber = *column + columnNumber;
+      err.columnNumber = *column + columnOffset;
     } else {
       // Line breaks are not significant in pattern text in the same way as
       // in source text, so act as though pattern text is a single line, then
       // compute a column based on "code point" count (treating a lone
       // surrogate as a "code point" in UTF-16).  Gak.
       err.lineNumber = 1;
-      err.columnNumber = columnNumber;
+      err.columnNumber = JS::ColumnNumberOneOrigin() + columnOffset;
     }
   }
 
@@ -275,8 +281,8 @@ static void ReportSyntaxError(TokenStreamAnyChars& ts,
 
   va_list args;
   va_start(args, length);
-  ReportCompileErrorLatin1(ts.context(), std::move(err), nullptr, errorNumber,
-                           &args);
+  ReportCompileErrorLatin1VA(ts.context(), std::move(err), nullptr, errorNumber,
+                             &args);
   va_end(args);
 }
 
@@ -311,7 +317,7 @@ bool CheckPatternSyntax(js::LifoAlloc& alloc, JS::NativeStackLimit stackLimit,
                         TokenStreamAnyChars& ts,
                         const mozilla::Range<const char16_t> chars,
                         JS::RegExpFlags flags, mozilla::Maybe<uint32_t> line,
-                        mozilla::Maybe<uint32_t> column) {
+                        mozilla::Maybe<JS::ColumnNumberOneOrigin> column) {
   RegExpCompileData result;
   JS::AutoAssertNoGC nogc;
   if (!CheckPatternSyntaxImpl(alloc, stackLimit, chars.begin().get(),
@@ -626,7 +632,7 @@ enum class AssembleResult {
     // RegExpShared.
     ByteArray bytecode =
         v8::internal::ByteArray::cast(*result.code).takeOwnership(cx->isolate);
-    uint32_t length = bytecode->length;
+    uint32_t length = bytecode->length();
     re->setByteCode(bytecode.release(), isLatin1);
     js::AddCellMemory(re, length, MemoryUse::RegExpSharedBytecode);
   }
@@ -634,9 +640,24 @@ enum class AssembleResult {
   return AssembleResult::Success;
 }
 
-struct RegExpCaptureIndexLess {
-  bool operator()(const RegExpCapture* lhs, const RegExpCapture* rhs) const {
-    return lhs->index() < rhs->index();
+struct RegExpNamedCapture {
+  const ZoneVector<char16_t>* name;
+  js::Vector<uint32_t> indices;
+
+  RegExpNamedCapture(JSContext* cx, const ZoneVector<char16_t>* name)
+      : name(name), indices(cx) {}
+};
+
+struct RegExpNamedCaptureIndexLess {
+  bool operator()(const RegExpNamedCapture& lhs,
+                  const RegExpNamedCapture& rhs) const {
+    // Every name must have at least one corresponding capture index, and all
+    // the capture indices must be distinct. This allows us to sort on the
+    // lowest capture index.
+    MOZ_ASSERT(!lhs.indices.empty());
+    MOZ_ASSERT(!rhs.indices.empty());
+    MOZ_ASSERT(lhs.indices[0] != rhs.indices[0]);
+    return lhs.indices[0] < rhs.indices[0];
   }
 };
 
@@ -649,10 +670,39 @@ bool InitializeNamedCaptures(JSContext* cx, HandleRegExpShared re,
   // the capture indices as a heap-allocated array.
   uint32_t numNamedCaptures = namedCaptures->size();
 
-  // Named captures are sorted by name (because the set is used to ensure
-  // name uniqueness). But the capture name map must be sorted by index.
-  std::sort(namedCaptures->begin(), namedCaptures->end(),
-            RegExpCaptureIndexLess{});
+  // The input vector of named captures is already sorted by name, and then by
+  // capture index if there are duplicates. We iterate through the captures,
+  // creating groups for each set of indices corresponding to a name. Usually,
+  // there will be a 1:1 mapping.
+  js::Vector<RegExpNamedCapture> groups(cx);
+  if (!groups.reserve(numNamedCaptures)) {
+    js::ReportOutOfMemory(cx);
+    return false;
+  }
+  const ZoneVector<char16_t>* prevName = nullptr;
+  uint32_t numDistinctNamedCaptures = 0;
+  for (uint32_t i = 0; i < numNamedCaptures; i++) {
+    RegExpCapture* capture = (*namedCaptures)[i];
+    const ZoneVector<char16_t>* name = capture->name();
+    if (!prevName || *name != *prevName) {
+      if (!groups.emplaceBack(RegExpNamedCapture(cx, name))) {
+        js::ReportOutOfMemory(cx);
+        return false;
+      }
+      numDistinctNamedCaptures++;
+      prevName = name;
+    }
+    // Make sure we're getting the indices in the order we expect
+    MOZ_ASSERT_IF(!groups.back().indices.empty(),
+                  groups.back().indices.back() < (uint32_t)capture->index());
+    if (!groups.back().indices.emplaceBack(capture->index())) {
+      js::ReportOutOfMemory(cx);
+      return false;
+    }
+  }
+
+  // The capture name map must be sorted by index.
+  std::sort(groups.begin(), groups.end(), RegExpNamedCaptureIndexLess{});
 
   // Create a plain template object.
   Rooted<js::PlainObject*> templateObject(
@@ -670,14 +720,29 @@ bool InitializeNamedCaptures(JSContext* cx, HandleRegExpShared re,
     return false;
   }
 
-  // Initialize the properties of the template and populate the
-  // capture index array.
+  // Allocate the capture slice index array, if necessary. We only use this
+  // if we have duplicate named capture groups.
+  bool hasDuplicateNames = numNamedCaptures != numDistinctNamedCaptures;
+  UniquePtr<uint32_t[], JS::FreePolicy> sliceIndices;
+  if (hasDuplicateNames) {
+    arraySize = numDistinctNamedCaptures * sizeof(uint32_t);
+    sliceIndices.reset(static_cast<uint32_t*>(js_malloc(arraySize)));
+    if (!sliceIndices) {
+      js::ReportOutOfMemory(cx);
+      return false;
+    }
+  }
+
+  // Initialize the properties of the template and store capture indices.
   RootedId id(cx);
   RootedValue dummyString(cx, StringValue(cx->runtime()->emptyString));
-  for (uint32_t i = 0; i < numNamedCaptures; i++) {
-    RegExpCapture* capture = (*namedCaptures)[i];
-    JSAtom* name =
-        js::AtomizeChars(cx, capture->name()->data(), capture->name()->size());
+  size_t insertIndex = 0;
+
+  for (size_t i = 0; i < numDistinctNamedCaptures; ++i) {
+    RegExpNamedCapture& group = groups[i];
+    // We store the names as properties on the template object, in the order of
+    // their lowest capture index.
+    JSAtom* name = js::AtomizeChars(cx, group.name->data(), group.name->size());
     if (!name) {
       return false;
     }
@@ -686,11 +751,24 @@ bool InitializeNamedCaptures(JSContext* cx, HandleRegExpShared re,
                                   JSPROP_ENUMERATE)) {
       return false;
     }
-    captureIndices[i] = capture->index();
+    // The slice index keeps track of the captureIndex where indices
+    // corresponding to a name start. The difference between the current slice
+    // index and the next slice index is used to calculate how many values to
+    // return in the slice. This is only needed when we have duplicate capture
+    // names, otherwise, there's a 1:1 mapping, and we don't need the extra
+    // data.
+    if (hasDuplicateNames) {
+      sliceIndices[i] = insertIndex;
+    }
+
+    for (uint32_t captureIndex : groups[i].indices) {
+      captureIndices[insertIndex++] = captureIndex;
+    }
   }
 
   RegExpShared::InitializeNamedCaptures(
-      cx, re, numNamedCaptures, templateObject, captureIndices.release());
+      cx, re, numNamedCaptures, numDistinctNamedCaptures, templateObject,
+      captureIndices.release(), sliceIndices.release());
   return true;
 }
 
@@ -767,7 +845,7 @@ bool CompilePattern(JSContext* cx, MutableHandleRegExpShared re,
   bool isLatin1 = input->hasLatin1Chars();
 
   SampleCharacters(input, compiler);
-  data.node = compiler.PreprocessRegExp(&data, flags, isLatin1);
+  data.node = compiler.PreprocessRegExp(&data, isLatin1);
   data.error = AnalyzeRegExp(cx->isolate, isLatin1, flags, data.node);
   if (data.error != RegExpError::kNone) {
     MOZ_ASSERT(data.error == RegExpError::kAnalysisStackOverflow);
@@ -799,11 +877,11 @@ RegExpRunStatus ExecuteRaw(jit::JitCode* code, const CharT* chars,
                            VectorMatchPairs* matches) {
   InputOutputData data(chars, chars + length, startIndex, matches);
 
-  static_assert(RegExpRunStatus_Error ==
+  static_assert(static_cast<int32_t>(RegExpRunStatus::Error) ==
                 v8::internal::RegExp::kInternalRegExpException);
-  static_assert(RegExpRunStatus_Success ==
+  static_assert(static_cast<int32_t>(RegExpRunStatus::Success) ==
                 v8::internal::RegExp::kInternalRegExpSuccess);
-  static_assert(RegExpRunStatus_Success_NotFound ==
+  static_assert(static_cast<int32_t>(RegExpRunStatus::Success_NotFound) ==
                 v8::internal::RegExp::kInternalRegExpFailure);
 
   typedef int (*RegExpCodeSignature)(InputOutputData*);
@@ -823,11 +901,11 @@ RegExpRunStatus Interpret(JSContext* cx, MutableHandleRegExpShared re,
   V8HandleRegExp wrappedRegExp(v8::internal::JSRegExp(re), cx->isolate);
   V8HandleString wrappedInput(v8::internal::String(input), cx->isolate);
 
-  static_assert(RegExpRunStatus_Error ==
+  static_assert(static_cast<int32_t>(RegExpRunStatus::Error) ==
                 v8::internal::RegExp::kInternalRegExpException);
-  static_assert(RegExpRunStatus_Success ==
+  static_assert(static_cast<int32_t>(RegExpRunStatus::Success) ==
                 v8::internal::RegExp::kInternalRegExpSuccess);
-  static_assert(RegExpRunStatus_Success_NotFound ==
+  static_assert(static_cast<int32_t>(RegExpRunStatus::Success_NotFound) ==
                 v8::internal::RegExp::kInternalRegExpFailure);
 
   RegExpRunStatus status =
@@ -835,9 +913,9 @@ RegExpRunStatus Interpret(JSContext* cx, MutableHandleRegExpShared re,
           cx->isolate, wrappedRegExp, wrappedInput, matches->pairsRaw(),
           uint32_t(matches->pairCount() * 2), uint32_t(startIndex));
 
-  MOZ_ASSERT(status == RegExpRunStatus_Error ||
-             status == RegExpRunStatus_Success ||
-             status == RegExpRunStatus_Success_NotFound);
+  MOZ_ASSERT(status == RegExpRunStatus::Error ||
+             status == RegExpRunStatus::Success ||
+             status == RegExpRunStatus::Success_NotFound);
 
   return status;
 }
@@ -872,7 +950,7 @@ RegExpRunStatus ExecuteForFuzzing(JSContext* cx, Handle<JSAtom*> pattern,
                                   RegExpShared::CodeKind codeKind) {
   RootedRegExpShared re(cx, cx->zone()->regExps().get(cx, pattern, flags));
   if (!RegExpShared::compileIfNecessary(cx, &re, input, codeKind)) {
-    return RegExpRunStatus_Error;
+    return RegExpRunStatus::Error;
   }
   return RegExpShared::execute(cx, &re, input, startIndex, matches);
 }

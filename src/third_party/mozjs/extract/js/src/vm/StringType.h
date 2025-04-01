@@ -17,7 +17,6 @@
 
 #include "jstypes.h"  // js::Bit
 
-#include "gc/Allocator.h"
 #include "gc/Cell.h"
 #include "gc/MaybeRooted.h"
 #include "gc/Nursery.h"
@@ -43,7 +42,8 @@ class JS_PUBLIC_API AutoStableStringChars;
 namespace js {
 
 class ArrayObject;
-class GenericPrinter;
+class JS_PUBLIC_API GenericPrinter;
+class JSONPrinter;
 class PropertyName;
 class StringBuffer;
 
@@ -144,13 +144,15 @@ bool CheckStringIsIndex(const CharT* s, size_t length, uint32_t* indexp);
  *  | \
  *  | JSRope                    leftChild, rightChild / -
  *  |
- * JSLinearString (abstract)    latin1Chars, twoByteChars / -
+ * JSLinearString               latin1Chars, twoByteChars / -
  *  |
  *  +-- JSDependentString       base / -
+ *  |   |
+ *  |   +-- JSAtomRefString     - / base points to an atom
  *  |
  *  +-- JSExternalString        - / char array memory managed by embedding
  *  |
- *  +-- JSExtensibleString      tracks total buffer capacity (including current text)
+ *  +-- JSExtensibleString      - / tracks total buffer capacity (including current text)
  *  |
  *  +-- JSInlineString (abstract) - / chars stored in header
  *  |   |
@@ -160,9 +162,12 @@ bool CheckStringIsIndex(const CharT* s, size_t length, uint32_t* indexp);
  *  |
  * JSAtom (abstract)            - / string equality === pointer equality
  *  |  |
- *  |  +-- js::NormalAtom       - JSLinearString + atom hash code
+ *  |  +-- js::NormalAtom       JSLinearString + atom hash code / -
+ *  |  |   |
+ *  |  |   +-- js::ThinInlineAtom
+ *  |  |                        possibly larger JSThinInlineString + atom hash code / -
  *  |  |
- *  |  +-- js::FatInlineAtom    - JSFatInlineString + atom hash code
+ *  |  +-- js::FatInlineAtom    JSFatInlineString w/atom hash code / -
  *  |
  * js::PropertyName             - / chars don't contain an index (uint32_t)
  *
@@ -181,13 +186,15 @@ bool CheckStringIsIndex(const CharT* s, size_t length, uint32_t* indexp);
  * Derived string types can be queried from ancestor types via isX() and
  * retrieved with asX() debug-only-checked casts.
  *
- * The ensureX() operations mutate 'this' in place to effectively the type to be
- * at least X (e.g., ensureLinear will change a JSRope to be a JSLinearString).
+ * The ensureX() operations mutate 'this' in place to effectively make the type
+ * be at least X (e.g., ensureLinear will change a JSRope to be a JSLinearString).
  */
 // clang-format on
 
 class JSString : public js::gc::CellWithLengthAndFlags {
  protected:
+  using Base = js::gc::CellWithLengthAndFlags;
+
   static const size_t NUM_INLINE_CHARS_LATIN1 =
       2 * sizeof(void*) / sizeof(JS::Latin1Char);
   static const size_t NUM_INLINE_CHARS_TWO_BYTE =
@@ -199,6 +206,53 @@ class JSString : public js::gc::CellWithLengthAndFlags {
   size_t length() const { return headerLengthField(); }
   MOZ_ALWAYS_INLINE
   uint32_t flags() const { return headerFlagsField(); }
+
+  // Class for temporarily holding character data that will be used for JSString
+  // contents. The data may be allocated in the nursery, the malloc heap, or in
+  // externally owned memory (perhaps on the stack). The class instance must be
+  // passed to the JSString constructor as a MutableHandle, so that if a GC
+  // occurs between the construction of the content and the construction of the
+  // JSString Cell to hold it, the contents can be transparently moved to the
+  // malloc heap before the nursery is reset.
+  template <typename CharT>
+  class OwnedChars {
+    mozilla::Span<CharT> chars_;
+    bool needsFree_;
+    bool isMalloced_;
+
+   public:
+    // needsFree: the chars pointer should be passed to js_free() if OwnedChars
+    // dies while still possessing ownership.
+    //
+    // isMalloced: the chars pointer does not point into the nursery.
+    //
+    // These are not quite the same, since you might have non-nursery characters
+    // that are owned by something else. needsFree implies isMalloced.
+    OwnedChars(CharT* chars, size_t length, bool isMalloced, bool needsFree);
+    OwnedChars(js::UniquePtr<CharT[], JS::FreePolicy>&& chars, size_t length,
+               bool isMalloced);
+    OwnedChars(OwnedChars&&);
+    OwnedChars(const OwnedChars&) = delete;
+    ~OwnedChars() { reset(); }
+
+    explicit operator bool() const { return !chars_.empty(); }
+    mozilla::Span<CharT> span() const { return chars_; }
+    CharT* data() const { return chars_.data(); }
+    size_t length() const { return chars_.Length(); }
+    size_t size() const { return length() * sizeof(CharT); }
+    bool isMalloced() const { return isMalloced_; }
+
+    // Return the data and release ownership to the caller.
+    inline CharT* release();
+    // Discard any owned data.
+    inline void reset();
+    // Move any nursery data into the malloc heap.
+    inline void ensureNonNursery();
+
+    // If we GC with a live OwnedChars, copy the data out of the nursery to a
+    // safely malloced location.
+    void trace(JSTracer* trc) { ensureNonNursery(); }
+  };
 
  protected:
   /* Fields only apply to string types commented on the right. */
@@ -223,6 +277,7 @@ class JSString : public js::gc::CellWithLengthAndFlags {
         } u2;
         union {
           JSLinearString* base; /* JSDependentString */
+          JSAtom* atom;         /* JSAtomRefString */
           JSString* right;      /* JSRope */
           size_t capacity;      /* JSLinearString (extensible) */
           const JSExternalStringCallbacks*
@@ -245,7 +300,10 @@ class JSString : public js::gc::CellWithLengthAndFlags {
    * If LATIN1_CHARS_BIT is set, the string's characters are stored as Latin1
    * instead of TwoByte. This flag can also be set for ropes, if both the
    * left and right nodes are Latin1. Flattening will result in a Latin1
-   * string in this case.
+   * string in this case. When we flatten a TwoByte rope, we turn child ropes
+   * (including Latin1 ropes) into TwoByte dependent strings. If one of these
+   * strings is also part of another Latin1 rope tree, we can have a Latin1 rope
+   * with a TwoByte descendent.
    *
    * The other flags store the string's type. Instead of using a dense index
    * to represent the most-derived type, string types are encoded to allow
@@ -259,20 +317,33 @@ class JSString : public js::gc::CellWithLengthAndFlags {
    * the predicate used to query whether a JSString instance is subtype
    * (reflexively) of that type.
    *
-   *   String        Instance         Subtype
-   *   type          encoding         predicate
+   *   String         Instance        Subtype
+   *   type           encoding        predicate
    *   -----------------------------------------
-   *   Rope          000000 000       xxxx0x xxx
-   *   Linear        -                xxxx1x xxx
-   *   Dependent     000110 000       xxx1xx xxx
-   *   External      100010 000       100010 xxx
-   *   Extensible    010010 000       010010 xxx
-   *   Inline        001010 000       xx1xxx xxx
-   *   FatInline     011010 000       x11xxx xxx
-   *   NormalAtom    000011 000       xxxxx1 xxx
-   *   PermanentAtom 100011 000       1xxxx1 xxx
-   *   InlineAtom    -                xx1xx1 xxx
-   *   FatInlineAtom -                x11xx1 xxx
+   *   Rope           0000000 000     xxxxx0x xxx
+   *   Linear         0000010 000     xxxxx1x xxx
+   *   Dependent      0000110 000     xxxx1xx xxx
+   *   AtomRef        1000110 000     1xxxxxx xxx
+   *   External       0100010 000     x100010 xxx
+   *   Extensible     0010010 000     x010010 xxx
+   *   Inline         0001010 000     xxx1xxx xxx
+   *   FatInline      0011010 000     xx11xxx xxx
+   *   JSAtom         -               xxxxxx1 xxx
+   *   NormalAtom     0000011 000     xxx0xx1 xxx
+   *   PermanentAtom  0100011 000     x1xxxx1 xxx
+   *   ThinInlineAtom 0001011 000     xx01xx1 xxx
+   *   FatInlineAtom  0011011 000     xx11xx1 xxx
+   *                                  ||||||| |||
+   *                                  ||||||| ||\- [0] reserved (FORWARD_BIT)
+   *                                  ||||||| |\-- [1] reserved
+   *                                  ||||||| \--- [2] reserved
+   *                                  ||||||\----- [3] IsAtom
+   *                                  |||||\------ [4] IsLinear
+   *                                  ||||\------- [5] IsDependent
+   *                                  |||\-------- [6] IsInline
+   *                                  ||\--------- [7] FatInlineAtom/Extensible
+   *                                  |\---------- [8] External/Permanent
+   *                                  \----------- [9] AtomRef
    *
    * Bits 0..2 are reserved for use by the GC (see
    * gc::CellFlagBitsReservedForGC). In particular, bit 0 is currently used for
@@ -285,7 +356,7 @@ class JSString : public js::gc::CellWithLengthAndFlags {
    *   Bit 3: IsAtom (Atom, PermanentAtom)
    *   Bit 4: IsLinear
    *   Bit 5: IsDependent
-   *   Bit 6: IsInline (Inline, FatInline)
+   *   Bit 6: IsInline (Inline, FatInline, ThinInlineAtom, FatInlineAtom)
    *
    * If INDEX_VALUE_BIT is set, bits 16 and up will also hold an integer index.
    */
@@ -298,11 +369,20 @@ class JSString : public js::gc::CellWithLengthAndFlags {
   static const uint32_t LINEAR_BIT = js::Bit(4);
   static const uint32_t DEPENDENT_BIT = js::Bit(5);
   static const uint32_t INLINE_CHARS_BIT = js::Bit(6);
+  // Indicates a dependent string pointing to an atom
+  static const uint32_t ATOM_REF_BIT = js::Bit(9);
 
-  static const uint32_t EXTENSIBLE_FLAGS = LINEAR_BIT | js::Bit(7);
-  static const uint32_t EXTERNAL_FLAGS = LINEAR_BIT | js::Bit(8);
+  static const uint32_t LINEAR_IS_EXTENSIBLE_BIT = js::Bit(7);
+  static const uint32_t INLINE_IS_FAT_BIT = js::Bit(7);
 
-  static const uint32_t FAT_INLINE_MASK = INLINE_CHARS_BIT | js::Bit(7);
+  static const uint32_t LINEAR_IS_EXTERNAL_BIT = js::Bit(8);
+  static const uint32_t ATOM_IS_PERMANENT_BIT = js::Bit(8);
+
+  static const uint32_t EXTENSIBLE_FLAGS =
+      LINEAR_BIT | LINEAR_IS_EXTENSIBLE_BIT;
+  static const uint32_t EXTERNAL_FLAGS = LINEAR_BIT | LINEAR_IS_EXTERNAL_BIT;
+
+  static const uint32_t FAT_INLINE_MASK = INLINE_CHARS_BIT | INLINE_IS_FAT_BIT;
 
   /* Initial flags for various types of strings. */
   static const uint32_t INIT_THIN_INLINE_FLAGS = LINEAR_BIT | INLINE_CHARS_BIT;
@@ -310,23 +390,37 @@ class JSString : public js::gc::CellWithLengthAndFlags {
   static const uint32_t INIT_ROPE_FLAGS = 0;
   static const uint32_t INIT_LINEAR_FLAGS = LINEAR_BIT;
   static const uint32_t INIT_DEPENDENT_FLAGS = LINEAR_BIT | DEPENDENT_BIT;
+  static const uint32_t INIT_ATOM_REF_FLAGS =
+      INIT_DEPENDENT_FLAGS | ATOM_REF_BIT;
 
-  static const uint32_t TYPE_FLAGS_MASK = js::BitMask(9) - js::BitMask(3);
+  static const uint32_t TYPE_FLAGS_MASK = js::BitMask(10) - js::BitMask(3);
   static_assert((TYPE_FLAGS_MASK & js::gc::HeaderWord::RESERVED_MASK) == 0,
                 "GC reserved bits must not be used for Strings");
 
-  static const uint32_t LATIN1_CHARS_BIT = js::Bit(9);
-
   // Whether this atom's characters store an uint32 index value less than or
-  // equal to MAX_ARRAY_INDEX. Not used for non-atomized strings.
+  // equal to MAX_ARRAY_INDEX. This bit means something different if the
+  // string is not an atom (see ATOM_REF_BIT)
   // See JSLinearString::isIndex.
-  static const uint32_t ATOM_IS_INDEX_BIT = js::Bit(10);
+  static const uint32_t ATOM_IS_INDEX_BIT = js::Bit(9);
+
+  // Linear strings:
+  // - Content and representation are Latin-1 characters.
+  // - Unmodifiable after construction.
+  //
+  // Ropes:
+  // - Content are Latin-1 characters.
+  // - Flag may be cleared when the rope is changed into a dependent string.
+  //
+  // Also see LATIN1_CHARS_BIT description under "Flag Encoding".
+  static const uint32_t LATIN1_CHARS_BIT = js::Bit(10);
 
   static const uint32_t INDEX_VALUE_BIT = js::Bit(11);
   static const uint32_t INDEX_VALUE_SHIFT = 16;
 
-  // NON_DEDUP_BIT is used in string deduplication during tenuring.
-  static const uint32_t NON_DEDUP_BIT = js::Bit(12);
+  // NON_DEDUP_BIT is used in string deduplication during tenuring. This bit is
+  // shared with both FLATTEN_FINISH_NODE and ATOM_IS_PERMANENT_BIT, since it
+  // only applies to linear non-atoms.
+  static const uint32_t NON_DEDUP_BIT = js::Bit(15);
 
   // If IN_STRING_TO_ATOM_CACHE is set, this string had an entry in the
   // StringToAtomCache at some point. Note that GC can purge the cache without
@@ -340,9 +434,14 @@ class JSString : public js::gc::CellWithLengthAndFlags {
   static const uint32_t FLATTEN_MASK =
       FLATTEN_VISIT_RIGHT | FLATTEN_FINISH_NODE;
 
+  // Indicates that this string is depended on by another string. A rope should
+  // never be depended on, and this should never be set during flattening, so
+  // we can reuse the FLATTEN_VISIT_RIGHT bit.
+  static const uint32_t DEPENDED_ON_BIT = FLATTEN_VISIT_RIGHT;
+
   static const uint32_t PINNED_ATOM_BIT = js::Bit(15);
   static const uint32_t PERMANENT_ATOM_MASK =
-      ATOM_BIT | PINNED_ATOM_BIT | js::Bit(8);
+      ATOM_BIT | PINNED_ATOM_BIT | ATOM_IS_PERMANENT_BIT;
 
   static const uint32_t MAX_LENGTH = JS::MaxStringLength;
 
@@ -445,6 +544,7 @@ class JSString : public js::gc::CellWithLengthAndFlags {
   bool empty() const { return length() == 0; }
 
   inline bool getChar(JSContext* cx, size_t index, char16_t* code);
+  inline bool getCodePoint(JSContext* cx, size_t index, char32_t* codePoint);
 
   /* Strings have either Latin1 or TwoByte chars. */
   bool hasLatin1Chars() const { return flags() & LATIN1_CHARS_BIT; }
@@ -456,6 +556,35 @@ class JSString : public js::gc::CellWithLengthAndFlags {
     MOZ_ASSERT(hasIndexValue());
     MOZ_ASSERT(isLinear());
     return flags() >> INDEX_VALUE_SHIFT;
+  }
+
+  /*
+   * Whether any dependent strings point to this string's chars. This is needed
+   * so that we don't replace the string with a forwarded atom and free its
+   * buffer.
+   *
+   * NOTE: we specifically do not set this for atoms, because they are accessed
+   * on many threads and we don't want to mess with their flags if we don't
+   * have to, and it is safe because atoms will never be replaced by an atom
+   * ref.
+   */
+  bool isDependedOn() const {
+    bool result = flags() & DEPENDED_ON_BIT;
+    MOZ_ASSERT_IF(result, !isRope() && !isAtom());
+    return result;
+  }
+
+  bool assertIsValidBase() const {
+    // See isDependedOn comment for why we're excluding atoms
+    return isAtom() || isDependedOn();
+  }
+
+  void setDependedOn() {
+    MOZ_ASSERT(!isRope());
+    if (isAtom()) {
+      return;
+    }
+    setFlagBit(DEPENDED_ON_BIT);
   }
 
   inline size_t allocSize() const;
@@ -486,6 +615,11 @@ class JSString : public js::gc::CellWithLengthAndFlags {
 
   MOZ_ALWAYS_INLINE
   bool isDependent() const { return flags() & DEPENDENT_BIT; }
+
+  MOZ_ALWAYS_INLINE
+  bool isAtomRef() const {
+    return (flags() & ATOM_REF_BIT) && !(flags() & ATOM_BIT);
+  }
 
   MOZ_ALWAYS_INLINE
   JSDependentString& asDependent() const {
@@ -544,13 +678,27 @@ class JSString : public js::gc::CellWithLengthAndFlags {
   }
 
   MOZ_ALWAYS_INLINE
-  void setNonDeduplicatable() { setFlagBit(NON_DEDUP_BIT); }
+  void setNonDeduplicatable() {
+    MOZ_ASSERT(isLinear());
+    MOZ_ASSERT(!isAtom());
+    setFlagBit(NON_DEDUP_BIT);
+  }
 
+  // After copying a string from the nursery to the tenured heap, adjust bits
+  // that no longer apply.
   MOZ_ALWAYS_INLINE
-  void clearNonDeduplicatable() { clearFlagBit(NON_DEDUP_BIT); }
+  void clearBitsOnTenure() {
+    MOZ_ASSERT(!isAtom());
+    clearFlagBit(NON_DEDUP_BIT | IN_STRING_TO_ATOM_CACHE);
+  }
 
+  // NON_DEDUP_BIT is only valid for linear non-atoms.
   MOZ_ALWAYS_INLINE
-  bool isDeduplicatable() { return !(flags() & NON_DEDUP_BIT); }
+  bool isDeduplicatable() {
+    MOZ_ASSERT(isLinear());
+    MOZ_ASSERT(!isAtom());
+    return !(flags() & NON_DEDUP_BIT);
+  }
 
   void setInStringToAtomCache() {
     MOZ_ASSERT(!isAtom());
@@ -569,6 +717,8 @@ class JSString : public js::gc::CellWithLengthAndFlags {
 
   inline JSLinearString* base() const;
 
+  inline JSAtom* atom() const;
+
   // The base may be forwarded and becomes a relocation overlay.
   // The return value can be a relocation overlay when the base is forwarded,
   // or the return value can be the actual base when it is not forwarded.
@@ -576,7 +726,10 @@ class JSString : public js::gc::CellWithLengthAndFlags {
 
   inline bool canOwnDependentChars() const;
 
+  // Only called by the GC during nursery collection.
   inline void setBase(JSLinearString* newBase);
+
+  bool tryReplaceWithAtomRef(JSAtom* atom);
 
   void traceBase(JSTracer* trc);
 
@@ -588,9 +741,11 @@ class JSString : public js::gc::CellWithLengthAndFlags {
 
   size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf);
 
-  bool ownsMallocedChars() const {
+  bool hasOutOfLineChars() const {
     return isLinear() && !isInline() && !isDependent() && !isExternal();
   }
+
+  inline bool ownsMallocedChars() const;
 
   /* Encode as many scalar values of the string as UTF-8 as can fit
    * into the caller-provided buffer replacing unpaired surrogates
@@ -667,26 +822,36 @@ class JSString : public js::gc::CellWithLengthAndFlags {
   }
 
 #if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
-  void dump();  // Debugger-friendly stderr dump.
-  void dump(js::GenericPrinter& out);
-  void dumpNoNewline(js::GenericPrinter& out);
-  void dumpCharsNoNewline(js::GenericPrinter& out);
-  void dumpRepresentation(js::GenericPrinter& out, int indent) const;
-  void dumpRepresentationHeader(js::GenericPrinter& out,
-                                const char* subclass) const;
-  void dumpCharsNoQuote(js::GenericPrinter& out);
+  void dump() const;
+  void dump(js::GenericPrinter& out) const;
+  void dump(js::JSONPrinter& json) const;
 
-  template <typename CharT>
-  static void dumpChars(const CharT* s, size_t len, js::GenericPrinter& out);
+  void dumpCommonFields(js::JSONPrinter& json) const;
+  void dumpCharsFields(js::JSONPrinter& json) const;
+
+  void dumpFields(js::JSONPrinter& json) const;
+  void dumpStringContent(js::GenericPrinter& out) const;
+  void dumpPropertyName(js::GenericPrinter& out) const;
+
+  void dumpChars(js::GenericPrinter& out) const;
+  void dumpCharsSingleQuote(js::GenericPrinter& out) const;
+  void dumpCharsNoQuote(js::GenericPrinter& out) const;
 
   template <typename CharT>
   static void dumpCharsNoQuote(const CharT* s, size_t len,
                                js::GenericPrinter& out);
 
+  void dumpRepresentation() const;
+  void dumpRepresentation(js::GenericPrinter& out) const;
+  void dumpRepresentation(js::JSONPrinter& json) const;
+  void dumpRepresentationFields(js::JSONPrinter& json) const;
+
   bool equals(const char* s);
 #endif
 
   void traceChildren(JSTracer* trc);
+
+  inline void traceBaseFromStoreBuffer(JSTracer* trc);
 
   // Override base class implementation to tell GC about permanent atoms.
   bool isPermanentAndMayBeShared() const { return isPermanentAtom(); }
@@ -708,6 +873,38 @@ class JSString : public js::gc::CellWithLengthAndFlags {
  protected:
   JSString() = default;
 };
+
+namespace js {
+
+template <typename Wrapper, typename CharT>
+class WrappedPtrOperations<JSString::OwnedChars<CharT>, Wrapper> {
+  const JSString::OwnedChars<CharT>& get() const {
+    return static_cast<const Wrapper*>(this)->get();
+  }
+
+ public:
+  explicit operator bool() const { return !!get(); }
+  mozilla::Span<CharT> span() const { return get().span(); }
+  CharT* data() const { return get().data(); }
+  size_t length() const { return get().length(); }
+  size_t size() const { return get().size(); }
+  bool isMalloced() const { return get().isMalloced(); }
+};
+
+template <typename Wrapper, typename CharT>
+class MutableWrappedPtrOperations<JSString::OwnedChars<CharT>, Wrapper>
+    : public WrappedPtrOperations<JSString::OwnedChars<CharT>, Wrapper> {
+  JSString::OwnedChars<CharT>& get() {
+    return static_cast<Wrapper*>(this)->get();
+  }
+
+ public:
+  CharT* release() { return get().release(); }
+  void reset() { get().reset(); }
+  void ensureNonNursery() { get().ensureNonNursery(); }
+};
+
+} /* namespace js */
 
 class JSRope : public JSString {
   friend class js::gc::CellAllocator;
@@ -775,7 +972,7 @@ class JSRope : public JSString {
   void traceChildren(JSTracer* trc);
 
 #if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
-  void dumpRepresentation(js::GenericPrinter& out, int indent) const;
+  void dumpOwnRepresentationFields(js::JSONPrinter& json) const;
 #endif
 
  private:
@@ -805,6 +1002,7 @@ class JSLinearString : public JSString {
   friend class JS::AutoStableStringChars;
   friend class js::gc::TenuringTracer;
   friend class js::gc::CellAllocator;
+  friend class JSDependentString;  // To allow access when used as base.
 
   /* Vacuous and therefore unimplemented. */
   JSLinearString* ensureLinear(JSContext* cx) = delete;
@@ -813,6 +1011,8 @@ class JSLinearString : public JSString {
 
   JSLinearString(const char16_t* chars, size_t length);
   JSLinearString(const JS::Latin1Char* chars, size_t length);
+  template <typename CharT>
+  explicit inline JSLinearString(JS::MutableHandle<OwnedChars<CharT>> chars);
 
  protected:
   // Used to construct subclasses that do a full initialization themselves.
@@ -834,14 +1034,14 @@ class JSLinearString : public JSString {
 
  public:
   template <js::AllowGC allowGC, typename CharT>
-  static inline JSLinearString* new_(
-      JSContext* cx, js::UniquePtr<CharT[], JS::FreePolicy> chars,
-      size_t length, js::gc::Heap heap);
+  static inline JSLinearString* new_(JSContext* cx,
+                                     JS::MutableHandle<OwnedChars<CharT>> chars,
+                                     js::gc::Heap heap);
 
   template <js::AllowGC allowGC, typename CharT>
   static inline JSLinearString* newValidLength(
-      JSContext* cx, js::UniquePtr<CharT[], JS::FreePolicy> chars,
-      size_t length, js::gc::Heap heap);
+      JSContext* cx, JS::MutableHandle<OwnedChars<CharT>> chars,
+      js::gc::Heap heap);
 
   // Convert a plain linear string to an extensible string. For testing. The
   // caller must ensure that it is a plain or extensible string already, and
@@ -924,6 +1124,10 @@ class JSLinearString : public JSString {
   // be a string equal to this string.)
   inline bool isIndex(uint32_t* indexp) const;
 
+  // Return whether the characters of this string can be moved by minor or
+  // compacting GC.
+  inline bool hasMovableChars() const;
+
   void maybeInitializeIndexValue(uint32_t index, bool allowAtom = false) {
     MOZ_ASSERT(JSString::isLinear());
     MOZ_ASSERT_IF(hasIndexValue(), getIndexValue() == index);
@@ -948,12 +1152,17 @@ class JSLinearString : public JSString {
    */
   inline js::PropertyName* toPropertyName(JSContext* cx);
 
+  // Make sure chars are not in the nursery, mallocing and copying if necessary.
+  // Should only be called during minor GC on a string that has been promoted
+  // to the tenured heap and may still point to nursery-allocated chars.
+  template <typename CharT>
+  inline size_t maybeMallocCharsOnPromotion(js::Nursery* nursery);
+
   inline void finalize(JS::GCContext* gcx);
   inline size_t allocSize() const;
 
 #if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
-  void dumpRepresentationChars(js::GenericPrinter& out, int indent) const;
-  void dumpRepresentation(js::GenericPrinter& out, int indent) const;
+  void dumpOwnRepresentationFields(js::JSONPrinter& json) const;
 #endif
 
   // Make a partially-initialized string safe for finalization.
@@ -991,8 +1200,8 @@ class JSDependentString : public JSLinearString {
   }
 
  public:
-  // This may return an inline string if the chars fit rather than a dependent
-  // string.
+  // This will always return a dependent string, and will assert if the chars
+  // could fit into an inline string.
   static inline JSLinearString* new_(JSContext* cx, JSLinearString* base,
                                      size_t start, size_t length,
                                      js::gc::Heap heap);
@@ -1002,8 +1211,15 @@ class JSDependentString : public JSLinearString {
     setNonInlineChars(chars + offset);
   }
 
+  inline JSLinearString* rootBaseDuringMinorGC();
+
+  template <typename CharT>
+  inline void sweepTypedAfterMinorGC();
+
+  inline void sweepAfterMinorGC();
+
 #if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
-  void dumpRepresentation(js::GenericPrinter& out, int indent) const;
+  void dumpOwnRepresentationFields(js::JSONPrinter& json) const;
 #endif
 
  private:
@@ -1019,6 +1235,20 @@ class JSDependentString : public JSLinearString {
 static_assert(sizeof(JSDependentString) == sizeof(JSString),
               "string subclasses must be binary-compatible with JSString");
 
+class JSAtomRefString : public JSDependentString {
+  friend class JSString;
+  friend class js::gc::CellAllocator;
+  friend class js::jit::MacroAssembler;
+
+ public:
+  inline static size_t offsetOfAtom() {
+    return offsetof(JSAtomRefString, d.s.u3.atom);
+  }
+};
+
+static_assert(sizeof(JSAtomRefString) == sizeof(JSString),
+              "string subclasses must be binary-compatible with JSString");
+
 class JSExtensibleString : public JSLinearString {
   /* Vacuous and therefore unimplemented. */
   bool isExtensible() const = delete;
@@ -1032,7 +1262,7 @@ class JSExtensibleString : public JSLinearString {
   }
 
 #if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
-  void dumpRepresentation(js::GenericPrinter& out, int indent) const;
+  void dumpOwnRepresentationFields(js::JSONPrinter& json) const;
 #endif
 };
 
@@ -1059,7 +1289,7 @@ class JSInlineString : public JSLinearString {
   static bool lengthFits(size_t length);
 
 #if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
-  void dumpRepresentation(js::GenericPrinter& out, int indent) const;
+  void dumpOwnRepresentationFields(js::JSONPrinter& json) const;
 #endif
 
  private:
@@ -1092,6 +1322,8 @@ class JSThinInlineString : public JSInlineString {
   JSThinInlineString() = default;
 
  public:
+  static constexpr size_t InlineBytes = NUM_INLINE_CHARS_LATIN1;
+
   static const size_t MAX_LENGTH_LATIN1 = NUM_INLINE_CHARS_LATIN1;
   static const size_t MAX_LENGTH_TWO_BYTE = NUM_INLINE_CHARS_TWO_BYTE;
 
@@ -1165,6 +1397,8 @@ static_assert(sizeof(JSFatInlineString) % js::gc::CellAlignBytes == 0,
 class JSExternalString : public JSLinearString {
   friend class js::gc::CellAllocator;
 
+  JSExternalString(const JS::Latin1Char* chars, size_t length,
+                   const JSExternalStringCallbacks* callbacks);
   JSExternalString(const char16_t* chars, size_t length,
                    const JSExternalStringCallbacks* callbacks);
 
@@ -1172,7 +1406,15 @@ class JSExternalString : public JSLinearString {
   bool isExternal() const = delete;
   JSExternalString& asExternal() const = delete;
 
+  template <typename CharT>
+  static inline JSExternalString* newImpl(
+      JSContext* cx, const CharT* chars, size_t length,
+      const JSExternalStringCallbacks* callbacks);
+
  public:
+  static inline JSExternalString* new_(
+      JSContext* cx, const JS::Latin1Char* chars, size_t length,
+      const JSExternalStringCallbacks* callbacks);
   static inline JSExternalString* new_(
       JSContext* cx, const char16_t* chars, size_t length,
       const JSExternalStringCallbacks* callbacks);
@@ -1184,6 +1426,7 @@ class JSExternalString : public JSLinearString {
 
   // External chars are never allocated inline or in the nursery, so we can
   // safely expose this without requiring an AutoCheckCannotGC argument.
+  const JS::Latin1Char* latin1Chars() const { return rawLatin1Chars(); }
   const char16_t* twoByteChars() const { return rawTwoByteChars(); }
 
   // Only called by the GC for strings with the AllocKind::EXTERNAL_STRING
@@ -1191,7 +1434,7 @@ class JSExternalString : public JSLinearString {
   inline void finalize(JS::GCContext* gcx);
 
 #if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
-  void dumpRepresentation(js::GenericPrinter& out, int indent) const;
+  void dumpOwnRepresentationFields(js::JSONPrinter& json) const;
 #endif
 };
 
@@ -1254,14 +1497,14 @@ class JSAtom : public JSLinearString {
   inline js::HashNumber hash() const;
   inline void initHash(js::HashNumber hash);
 
+  template <typename CharT>
+  static bool lengthFitsInline(size_t length);
+
 #if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
   void dump(js::GenericPrinter& out);
   void dump();
 #endif
 };
-
-static_assert(sizeof(JSAtom) == sizeof(JSString),
-              "string subclasses must be binary-compatible with JSString");
 
 namespace js {
 
@@ -1269,12 +1512,14 @@ class NormalAtom : public JSAtom {
   friend class gc::CellAllocator;
 
  protected:
+  static constexpr size_t ExtensionBytes =
+      js::gc::CellAlignBytes - sizeof(js::HashNumber);
+
+  char inlineStorage_[ExtensionBytes];
   HashNumber hash_;
 
-  // Inline atoms, mimicking JSThinInlineString constructors.
-  explicit NormalAtom(size_t length, JS::Latin1Char** chars,
-                      js::HashNumber hash);
-  explicit NormalAtom(size_t length, char16_t** chars, js::HashNumber hash);
+  // For subclasses to call.
+  explicit NormalAtom(js::HashNumber hash) : hash_(hash) {}
 
   // Out of line atoms, mimicking JSLinearString constructors.
   NormalAtom(const char16_t* chars, size_t length, js::HashNumber hash);
@@ -1287,15 +1532,71 @@ class NormalAtom : public JSAtom {
   static constexpr size_t offsetOfHash() { return offsetof(NormalAtom, hash_); }
 };
 
-static_assert(sizeof(NormalAtom) == sizeof(JSString) + sizeof(uint64_t),
+static_assert(sizeof(NormalAtom) ==
+                  js::RoundUp(sizeof(JSString) + sizeof(js::HashNumber),
+                              js::gc::CellAlignBytes),
               "NormalAtom must have size of a string + HashNumber, "
               "aligned to gc::CellAlignBytes");
 
+class ThinInlineAtom : public NormalAtom {
+  friend class gc::CellAllocator;
+
+ public:
+  static constexpr size_t MAX_LENGTH_LATIN1 =
+      NUM_INLINE_CHARS_LATIN1 + ExtensionBytes / sizeof(JS::Latin1Char);
+  static constexpr size_t MAX_LENGTH_TWO_BYTE =
+      NUM_INLINE_CHARS_TWO_BYTE + ExtensionBytes / sizeof(char16_t);
+
+#ifdef JS_64BIT
+  // Fat and Thin inline atoms are the same size. Only use fat.
+  static constexpr bool EverInstantiated = false;
+#else
+  static constexpr bool EverInstantiated = true;
+#endif
+
+ protected:
+  // Mimicking JSThinInlineString constructors.
+#ifdef JS_64BIT
+  ThinInlineAtom(size_t length, JS::Latin1Char** chars,
+                 js::HashNumber hash) = delete;
+  ThinInlineAtom(size_t length, char16_t** chars, js::HashNumber hash) = delete;
+#else
+  ThinInlineAtom(size_t length, JS::Latin1Char** chars, js::HashNumber hash);
+  ThinInlineAtom(size_t length, char16_t** chars, js::HashNumber hash);
+#endif
+
+ public:
+  template <typename CharT>
+  static bool lengthFits(size_t length) {
+    if constexpr (sizeof(CharT) == sizeof(JS::Latin1Char)) {
+      return length <= MAX_LENGTH_LATIN1;
+    } else {
+      return length <= MAX_LENGTH_TWO_BYTE;
+    }
+  }
+};
+
+// FatInlineAtom is basically a JSFatInlineString, except it has a hash value in
+// the last word that reduces the inline char storage.
 class FatInlineAtom : public JSAtom {
   friend class gc::CellAllocator;
 
+  // The space available for storing inline characters. It's the same amount of
+  // space as a JSFatInlineString, except we take the hash value out of it.
+  static constexpr size_t InlineBytes = sizeof(JSFatInlineString) -
+                                        sizeof(JSString::Base) -
+                                        sizeof(js::HashNumber);
+
+  static constexpr size_t ExtensionBytes =
+      InlineBytes - JSThinInlineString::InlineBytes;
+
+ public:
+  static constexpr size_t MAX_LENGTH_LATIN1 =
+      InlineBytes / sizeof(JS::Latin1Char);
+  static constexpr size_t MAX_LENGTH_TWO_BYTE = InlineBytes / sizeof(char16_t);
+
  protected:  // Silence Clang unused-field warning.
-  char inlineStorage_[sizeof(JSFatInlineString) - sizeof(JSString)];
+  char inlineStorage_[ExtensionBytes];
   HashNumber hash_;
 
   // Mimicking JSFatInlineString constructors.
@@ -1310,14 +1611,26 @@ class FatInlineAtom : public JSAtom {
   inline void finalize(JS::GCContext* gcx);
 
   static constexpr size_t offsetOfHash() {
+    static_assert(
+        sizeof(FatInlineAtom) ==
+            js::RoundUp(sizeof(JSThinInlineString) +
+                            FatInlineAtom::ExtensionBytes + sizeof(HashNumber),
+                        gc::CellAlignBytes),
+        "FatInlineAtom must have size of a thin inline string + "
+        "extension bytes if any + HashNumber, "
+        "aligned to gc::CellAlignBytes");
+
     return offsetof(FatInlineAtom, hash_);
+  }
+
+  template <typename CharT>
+  static bool lengthFits(size_t length) {
+    return length * sizeof(CharT) <= InlineBytes;
   }
 };
 
-static_assert(
-    sizeof(FatInlineAtom) == sizeof(JSFatInlineString) + sizeof(uint64_t),
-    "FatInlineAtom must have size of a fat inline string + HashNumber, "
-    "aligned to gc::CellAlignBytes");
+static_assert(sizeof(FatInlineAtom) == sizeof(JSFatInlineString),
+              "FatInlineAtom must be the same size as a fat inline string");
 
 // When an algorithm does not need a string represented as a single linear
 // array of characters, this range utility may be used to traverse the string a
@@ -1396,10 +1709,9 @@ namespace js {
  * property, as follows:
  *
  *   - uint32_t indexes,
- *   - PropertyName strings which don't encode uint32_t indexes, and
- *   - jsspecial special properties (non-ES5 properties like object-valued
- *     jsids, JSID_EMPTY, JSID_VOID, and maybe in the future Harmony-proposed
- *     private names).
+ *   - PropertyName strings which don't encode uint32_t indexes,
+ *   - Symbol, and
+ *   - JS::PropertyKey::isVoid.
  */
 class PropertyName : public JSAtom {
  private:
@@ -1449,6 +1761,7 @@ extern JSLinearString* NewStringDontDeflate(
     JSContext* cx, UniquePtr<CharT[], JS::FreePolicy> chars, size_t length,
     js::gc::Heap heap = js::gc::Heap::Default);
 
+/* This may return a static string/atom or an inline string. */
 extern JSLinearString* NewDependentString(
     JSContext* cx, JSString* base, size_t start, size_t length,
     js::gc::Heap heap = js::gc::Heap::Default);
@@ -1491,7 +1804,9 @@ inline JSLinearString* NewStringCopy(
 }
 
 /* Copy a counted string and GC-allocate a descriptor for it. */
-template <js::AllowGC allowGC, typename CharT>
+template <
+    js::AllowGC allowGC, typename CharT,
+    typename std::enable_if_t<!std::is_same_v<CharT, unsigned char>>* = nullptr>
 inline JSLinearString* NewStringCopy(
     JSContext* cx, std::basic_string_view<CharT> s,
     js::gc::Heap heap = js::gc::Heap::Default) {
@@ -1524,7 +1839,11 @@ inline JSLinearString* NewStringCopyZ(
 }
 
 extern JSLinearString* NewStringCopyUTF8N(
-    JSContext* cx, const JS::UTF8Chars utf8,
+    JSContext* cx, const JS::UTF8Chars& utf8, JS::SmallestEncoding encoding,
+    js::gc::Heap heap = js::gc::Heap::Default);
+
+extern JSLinearString* NewStringCopyUTF8N(
+    JSContext* cx, const JS::UTF8Chars& utf8,
     js::gc::Heap heap = js::gc::Heap::Default);
 
 inline JSLinearString* NewStringCopyUTF8Z(
@@ -1534,7 +1853,8 @@ inline JSLinearString* NewStringCopyUTF8Z(
       cx, JS::UTF8Chars(utf8.c_str(), strlen(utf8.c_str())), heap);
 }
 
-JSString* NewMaybeExternalString(JSContext* cx, const char16_t* s, size_t n,
+template <typename CharT>
+JSString* NewMaybeExternalString(JSContext* cx, const CharT* s, size_t n,
                                  const JSExternalStringCallbacks* callbacks,
                                  bool* allocatedExternal,
                                  js::gc::Heap heap = js::gc::Heap::Default);
@@ -1566,7 +1886,11 @@ extern bool EqualStrings(const JSLinearString* str1,
  * Compare two strings that are known to be the same length.
  * Exposed for the JITs; for ordinary uses, EqualStrings() is more sensible.
  *
- * Precondition: str1->length() == str2->length().
+ * The caller must have checked for the following cases that can be handled
+ * efficiently without requiring a character comparison:
+ *   - str1 == str2
+ *   - str1->length() != str2->length()
+ *   - str1->isAtom() && str2->isAtom()
  */
 extern bool EqualChars(const JSLinearString* str1, const JSLinearString* str2);
 
@@ -1741,14 +2065,51 @@ MOZ_ALWAYS_INLINE bool JSString::getChar(JSContext* cx, size_t index,
   return true;
 }
 
+MOZ_ALWAYS_INLINE bool JSString::getCodePoint(JSContext* cx, size_t index,
+                                              char32_t* code) {
+  // C++ implementation of https://tc39.es/ecma262/#sec-codepointat
+  size_t size = length();
+  MOZ_ASSERT(index < size);
+
+  char16_t first;
+  if (!getChar(cx, index, &first)) {
+    return false;
+  }
+  if (!js::unicode::IsLeadSurrogate(first) || index + 1 == size) {
+    *code = first;
+    return true;
+  }
+
+  char16_t second;
+  if (!getChar(cx, index + 1, &second)) {
+    return false;
+  }
+  if (!js::unicode::IsTrailSurrogate(second)) {
+    *code = first;
+    return true;
+  }
+
+  *code = js::unicode::UTF16Decode(first, second);
+  return true;
+}
+
 MOZ_ALWAYS_INLINE JSLinearString* JSString::ensureLinear(JSContext* cx) {
   return isLinear() ? &asLinear() : asRope().flatten(cx);
 }
 
 inline JSLinearString* JSString::base() const {
   MOZ_ASSERT(hasBase());
-  MOZ_ASSERT(!d.s.u3.base->isInline());
+  MOZ_ASSERT_IF(!isAtomRef(), !d.s.u3.base->isInline());
+  MOZ_ASSERT(d.s.u3.base->assertIsValidBase());
+  if (isAtomRef()) {
+    return static_cast<JSLinearString*>(d.s.u3.atom);
+  }
   return d.s.u3.base;
+}
+
+inline JSAtom* JSString::atom() const {
+  MOZ_ASSERT(isAtomRef());
+  return d.s.u3.atom;
 }
 
 inline JSLinearString* JSString::nurseryBaseOrRelocOverlay() const {
@@ -1865,9 +2226,45 @@ MOZ_ALWAYS_INLINE bool JSInlineString::lengthFits<char16_t>(size_t length) {
 }
 
 template <>
+MOZ_ALWAYS_INLINE bool js::ThinInlineAtom::lengthFits<JS::Latin1Char>(
+    size_t length) {
+  return length <= MAX_LENGTH_LATIN1;
+}
+
+template <>
+MOZ_ALWAYS_INLINE bool js::ThinInlineAtom::lengthFits<char16_t>(size_t length) {
+  return length <= MAX_LENGTH_TWO_BYTE;
+}
+
+template <>
+MOZ_ALWAYS_INLINE bool js::FatInlineAtom::lengthFits<JS::Latin1Char>(
+    size_t length) {
+  return length <= MAX_LENGTH_LATIN1;
+}
+
+template <>
+MOZ_ALWAYS_INLINE bool js::FatInlineAtom::lengthFits<char16_t>(size_t length) {
+  return length <= MAX_LENGTH_TWO_BYTE;
+}
+
+template <>
+MOZ_ALWAYS_INLINE bool JSAtom::lengthFitsInline<JS::Latin1Char>(size_t length) {
+  // If it fits in a fat inline atom, it fits in any inline atom.
+  return js::FatInlineAtom::lengthFits<JS::Latin1Char>(length);
+}
+
+template <>
+MOZ_ALWAYS_INLINE bool JSAtom::lengthFitsInline<char16_t>(size_t length) {
+  // If it fits in a fat inline atom, it fits in any inline atom.
+  return js::FatInlineAtom::lengthFits<char16_t>(length);
+}
+
+template <>
 MOZ_ALWAYS_INLINE void JSString::setNonInlineChars(const char16_t* chars) {
   // Check that the new buffer is located in the StringBufferArena
-  checkStringCharsArena(chars);
+  if (!(isAtomRef() && atom()->isInline())) {
+    checkStringCharsArena(chars);
+  }
   d.s.u2.nonInlineCharsTwoByte = chars;
 }
 
@@ -1875,7 +2272,9 @@ template <>
 MOZ_ALWAYS_INLINE void JSString::setNonInlineChars(
     const JS::Latin1Char* chars) {
   // Check that the new buffer is located in the StringBufferArena
-  checkStringCharsArena(chars);
+  if (!(isAtomRef() && atom()->isInline())) {
+    checkStringCharsArena(chars);
+  }
   d.s.u2.nonInlineCharsLatin1 = chars;
 }
 
@@ -1909,19 +2308,6 @@ inline bool JSLinearString::isIndex(uint32_t* indexp) const {
   }
 
   return isIndexSlow(indexp);
-}
-
-inline size_t JSLinearString::allocSize() const {
-  MOZ_ASSERT(ownsMallocedChars());
-
-  size_t charSize =
-      hasLatin1Chars() ? sizeof(JS::Latin1Char) : sizeof(char16_t);
-  size_t count = isExtensible() ? asExtensible().capacity() : length();
-  return count * charSize;
-}
-
-inline size_t JSString::allocSize() const {
-  return ownsMallocedChars() ? asLinear().allocSize() : 0;
 }
 
 namespace js {
@@ -1983,14 +2369,17 @@ class StringRelocationOverlay : public RelocationOverlay {
   MOZ_ALWAYS_INLINE const CharT* savedNurseryChars() const;
 
   const MOZ_ALWAYS_INLINE JS::Latin1Char* savedNurseryCharsLatin1() const {
+    MOZ_ASSERT(!forwardingAddress()->as<JSString>()->hasBase());
     return nurseryCharsLatin1;
   }
 
   const MOZ_ALWAYS_INLINE char16_t* savedNurseryCharsTwoByte() const {
+    MOZ_ASSERT(!forwardingAddress()->as<JSString>()->hasBase());
     return nurseryCharsTwoByte;
   }
 
   JSLinearString* savedNurseryBaseOrRelocOverlay() const {
+    MOZ_ASSERT(forwardingAddress()->as<JSString>()->hasBase());
     return nurseryBaseOrRelocOverlay;
   }
 

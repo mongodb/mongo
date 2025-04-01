@@ -360,15 +360,16 @@ static void PrintHelpAndExit(int status = 0) {
       "  pools         Literal Pools (ARM only for now)\n"
       "  cacheflush    Instruction Cache flushes (ARM only for now)\n"
       "  range         Range Analysis\n"
+      "  branch-hint   Wasm Branch Hinting\n"
       "  wasmbce       Wasm Bounds Check Elimination\n"
       "  shapeguards   Redundant shape guard elimination\n"
       "  gcbarriers    Redundant GC barrier elimination\n"
+      "  loadkeys      Loads used as property keys\n"
       "  logs          JSON visualization logging\n"
       "  logs-sync     Same as logs, but flushes between each pass (sync. "
       "compiled functions only).\n"
       "  profiling     Profiling-related information\n"
       "  dump-mir-expr Dump the MIR expressions\n"
-      "  scriptstats   Tracelogger summary stats\n"
       "  warp-snapshots WarpSnapshots created by WarpOracle\n"
       "  warp-transpiler Warp CacheIR transpiler\n"
       "  warp-trial-inlining Trial inlining for Warp\n"
@@ -432,6 +433,8 @@ void jit::CheckLogging() {
       EnableChannel(JitSpew_Range);
     } else if (IsFlag(found, "wasmbce")) {
       EnableChannel(JitSpew_WasmBCE);
+    } else if (IsFlag(found, "branch-hint")) {
+      EnableChannel(JitSpew_BranchHint);
     } else if (IsFlag(found, "licm")) {
       EnableChannel(JitSpew_LICM);
     } else if (IsFlag(found, "flac")) {
@@ -464,6 +467,8 @@ void jit::CheckLogging() {
       EnableChannel(JitSpew_RedundantShapeGuards);
     } else if (IsFlag(found, "gcbarriers")) {
       EnableChannel(JitSpew_RedundantGCBarriers);
+    } else if (IsFlag(found, "loadkeys")) {
+      EnableChannel(JitSpew_MarkLoadsUsedAsPropertyKeys);
     } else if (IsFlag(found, "logs")) {
       EnableIonDebugAsyncLogging();
     } else if (IsFlag(found, "logs-sync")) {
@@ -472,8 +477,6 @@ void jit::CheckLogging() {
       EnableChannel(JitSpew_Profiling);
     } else if (IsFlag(found, "dump-mir-expr")) {
       EnableChannel(JitSpew_MIRExpressions);
-    } else if (IsFlag(found, "scriptstats")) {
-      EnableChannel(JitSpew_ScriptStats);
     } else if (IsFlag(found, "warp-snapshots")) {
       EnableChannel(JitSpew_WarpSnapshots);
     } else if (IsFlag(found, "warp-transpiler")) {

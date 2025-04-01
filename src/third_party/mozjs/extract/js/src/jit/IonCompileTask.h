@@ -67,21 +67,23 @@ class IonCompileTask final : public HelperThreadTask,
 };
 
 class IonFreeTask : public HelperThreadTask {
+  IonFreeCompileTasks tasks_;
+
  public:
-  explicit IonFreeTask(IonCompileTask* task) : task_(task) {}
-  IonCompileTask* compileTask() { return task_; }
+  explicit IonFreeTask(IonFreeCompileTasks&& tasks) : tasks_(std::move(tasks)) {
+    MOZ_ASSERT(!tasks_.empty());
+  }
+
+  const IonFreeCompileTasks& compileTasks() const { return tasks_; }
 
   ThreadType threadType() override { return THREAD_TYPE_ION_FREE; }
   void runHelperThreadTask(AutoLockHelperThreadState& locked) override;
-
- private:
-  IonCompileTask* task_;
 };
 
 void AttachFinishedCompilations(JSContext* cx);
-void FinishOffThreadTask(JSRuntime* runtime, IonCompileTask* task,
-                         const AutoLockHelperThreadState& lock);
-void FreeIonCompileTask(IonCompileTask* task);
+void FinishOffThreadTask(JSRuntime* runtime, AutoStartIonFreeTask& freeTask,
+                         IonCompileTask* task);
+void FreeIonCompileTasks(const IonFreeCompileTasks& tasks);
 
 }  // namespace jit
 }  // namespace js

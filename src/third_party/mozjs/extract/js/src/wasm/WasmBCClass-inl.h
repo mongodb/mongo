@@ -29,10 +29,12 @@ const FuncType& BaseCompiler::funcType() const {
   return *moduleEnv_.funcs[func_.index].type;
 }
 
-bool BaseCompiler::usesMemory() const { return moduleEnv_.usesMemory(); }
+bool BaseCompiler::usesMemory() const {
+  return moduleEnv_.memories.length() > 0;
+}
 
-bool BaseCompiler::usesSharedMemory() const {
-  return moduleEnv_.usesSharedMemory();
+bool BaseCompiler::usesSharedMemory(uint32_t memoryIndex) const {
+  return moduleEnv_.usesSharedMemory(memoryIndex);
 }
 
 const Local& BaseCompiler::localFromSlot(uint32_t slot, MIRType type) {
@@ -44,13 +46,79 @@ BytecodeOffset BaseCompiler::bytecodeOffset() const {
   return iter_.bytecodeOffset();
 }
 
-bool BaseCompiler::isMem32() const {
-  return moduleEnv_.memory->indexType() == IndexType::I32;
+bool BaseCompiler::isMem32(uint32_t memoryIndex) const {
+  return moduleEnv_.memories[memoryIndex].indexType() == IndexType::I32;
 }
 
-bool BaseCompiler::isMem64() const {
-  return moduleEnv_.memory->indexType() == IndexType::I64;
+bool BaseCompiler::isMem64(uint32_t memoryIndex) const {
+  return moduleEnv_.memories[memoryIndex].indexType() == IndexType::I64;
 }
+
+bool BaseCompiler::hugeMemoryEnabled(uint32_t memoryIndex) const {
+  return moduleEnv_.hugeMemoryEnabled(memoryIndex);
+}
+
+uint32_t BaseCompiler::instanceOffsetOfMemoryBase(uint32_t memoryIndex) const {
+  if (memoryIndex == 0) {
+    return Instance::offsetOfMemory0Base();
+  }
+  return Instance::offsetInData(
+      moduleEnv_.offsetOfMemoryInstanceData(memoryIndex) +
+      offsetof(MemoryInstanceData, base));
+}
+
+uint32_t BaseCompiler::instanceOffsetOfBoundsCheckLimit(
+    uint32_t memoryIndex) const {
+  if (memoryIndex == 0) {
+    return Instance::offsetOfMemory0BoundsCheckLimit();
+  }
+  return Instance::offsetInData(
+      moduleEnv_.offsetOfMemoryInstanceData(memoryIndex) +
+      offsetof(MemoryInstanceData, boundsCheckLimit));
+}
+
+// The results parameter for BaseCompiler::emitCallArgs is used for
+// regular Wasm calls.
+struct NormalCallResults final {
+  const StackResultsLoc& results;
+  explicit NormalCallResults(const StackResultsLoc& results)
+      : results(results) {}
+  inline uint32_t onStackCount() const { return results.count(); }
+  inline StackResults stackResults() const { return results.stackResults(); }
+  inline void getStackResultArea(BaseStackFrame fr, RegPtr dest) const {
+    fr.computeOutgoingStackResultAreaPtr(results, dest);
+  }
+};
+
+// The results parameter for BaseCompiler::emitCallArgs is used for
+// Wasm return/tail calls.
+struct TailCallResults final {
+  bool hasStackResults;
+  explicit TailCallResults(const FuncType& funcType) {
+    hasStackResults =
+        ABIResultIter::HasStackResults(ResultType::Vector(funcType.results()));
+  }
+  inline uint32_t onStackCount() const { return 0; }
+  inline StackResults stackResults() const {
+    return hasStackResults ? StackResults::HasStackResults
+                           : StackResults::NoStackResults;
+  }
+  inline void getStackResultArea(BaseStackFrame fr, RegPtr dest) const {
+    fr.loadIncomingStackResultAreaPtr(dest);
+  }
+};
+
+// The results parameter for BaseCompiler::emitCallArgs is used when
+// no result (area) is expected.
+struct NoCallResults final {
+  inline uint32_t onStackCount() const { return 0; }
+  inline StackResults stackResults() const {
+    return StackResults::NoStackResults;
+  }
+  inline void getStackResultArea(BaseStackFrame fr, RegPtr dest) const {
+    MOZ_CRASH();
+  }
+};
 
 }  // namespace wasm
 }  // namespace js

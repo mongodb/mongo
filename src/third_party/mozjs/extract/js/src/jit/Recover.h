@@ -95,6 +95,7 @@ namespace jit {
   _(Trunc)                        \
   _(CharCodeAt)                   \
   _(FromCharCode)                 \
+  _(FromCharCodeEmptyIfNegative)  \
   _(Pow)                          \
   _(PowHalf)                      \
   _(MinMax)                       \
@@ -108,8 +109,6 @@ namespace jit {
   _(Random)                       \
   _(StringSplit)                  \
   _(NaNToZero)                    \
-  _(RegExpMatcher)                \
-  _(RegExpSearcher)               \
   _(StringReplace)                \
   _(Substr)                       \
   _(TypeOf)                       \
@@ -126,9 +125,9 @@ namespace jit {
   _(NewCallObject)                \
   _(Lambda)                       \
   _(FunctionWithProto)            \
+  _(ObjectKeys)                   \
   _(ObjectState)                  \
   _(ArrayState)                   \
-  _(SetArrayLength)               \
   _(AtomicIsLockFree)             \
   _(BigIntAsIntN)                 \
   _(BigIntAsUintN)                \
@@ -558,6 +557,14 @@ class RFromCharCode final : public RInstruction {
                              SnapshotIterator& iter) const override;
 };
 
+class RFromCharCodeEmptyIfNegative final : public RInstruction {
+ public:
+  RINSTRUCTION_HEADER_NUM_OP_(FromCharCodeEmptyIfNegative, 1)
+
+  [[nodiscard]] bool recover(JSContext* cx,
+                             SnapshotIterator& iter) const override;
+};
+
 class RPow final : public RInstruction {
  public:
   RINSTRUCTION_HEADER_NUM_OP_(Pow, 2)
@@ -675,22 +682,6 @@ class RNaNToZero final : public RInstruction {
   RINSTRUCTION_HEADER_NUM_OP_(NaNToZero, 1);
 
   bool recover(JSContext* cx, SnapshotIterator& iter) const override;
-};
-
-class RRegExpMatcher final : public RInstruction {
- public:
-  RINSTRUCTION_HEADER_NUM_OP_(RegExpMatcher, 3)
-
-  [[nodiscard]] bool recover(JSContext* cx,
-                             SnapshotIterator& iter) const override;
-};
-
-class RRegExpSearcher final : public RInstruction {
- public:
-  RINSTRUCTION_HEADER_NUM_OP_(RegExpSearcher, 3)
-
-  [[nodiscard]] bool recover(JSContext* cx,
-                             SnapshotIterator& iter) const override;
 };
 
 class RStringReplace final : public RInstruction {
@@ -838,6 +829,14 @@ class RNewCallObject final : public RInstruction {
                              SnapshotIterator& iter) const override;
 };
 
+class RObjectKeys final : public RInstruction {
+ public:
+  RINSTRUCTION_HEADER_NUM_OP_(ObjectKeys, 1)
+
+  [[nodiscard]] bool recover(JSContext* cx,
+                             SnapshotIterator& iter) const override;
+};
+
 class RObjectState final : public RInstruction {
  private:
   uint32_t numSlots_;  // Number of slots.
@@ -868,14 +867,6 @@ class RArrayState final : public RInstruction {
     // +1 for the initalized length.
     return numElements() + 2;
   }
-
-  [[nodiscard]] bool recover(JSContext* cx,
-                             SnapshotIterator& iter) const override;
-};
-
-class RSetArrayLength final : public RInstruction {
- public:
-  RINSTRUCTION_HEADER_NUM_OP_(SetArrayLength, 2)
 
   [[nodiscard]] bool recover(JSContext* cx,
                              SnapshotIterator& iter) const override;

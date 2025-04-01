@@ -230,9 +230,9 @@ class JS_PUBLIC_API BaseProxyHandler {
    *
    * enter() allows the policy to specify whether the caller may perform |act|
    * on the proxy's |id| property. In the case when |act| is CALL, |id| is
-   * generally JSID_VOID.  The |mayThrow| parameter indicates whether a
-   * handler that wants to throw custom exceptions when denying should do so
-   * or not.
+   * generally JS::PropertyKey::isVoid.  The |mayThrow| parameter indicates
+   * whether a handler that wants to throw custom exceptions when denying
+   * should do so or not.
    *
    * The |act| parameter to enter() specifies the action being performed.
    * If |bp| is false, the method suggests that the caller throw (though it

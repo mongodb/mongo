@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
  * </pre>
  * 
  * Run this script with:
- * {@code java --enable-preview --source=14 IcuMemoryUsage.java $MOZ_JS_SHELL}.
+ * {@code java IcuMemoryUsage.java $MOZ_JS_SHELL}.
  */
 @SuppressWarnings("preview")
 public class IcuMemoryUsage {
@@ -125,11 +125,7 @@ public class IcuMemoryUsage {
     }
 
     private static void measure(String exec, String constructor, String description, String initializer) throws IOException {
-        var locales = Arrays.stream(Locale.getAvailableLocales()).map(Locale::toLanguageTag).sorted()
-                .collect(Collectors.toUnmodifiableList());
-
-        var pb = new ProcessBuilder(exec, "--file=-", "--", constructor, initializer,
-                locales.stream().collect(Collectors.joining(",")));
+        var pb = new ProcessBuilder(exec, "--file=-", "--", constructor, initializer);
         var process = pb.start();
 
         try (var writer = new BufferedWriter(
@@ -206,17 +202,18 @@ public class IcuMemoryUsage {
         }
 
         var objects = new ArrayList<Entry>();
-        objects.add(Entry.of("Collator", "o.compare('a', 'b')"));
-        objects.add(Entry.of("DateTimeFormat", "DateTimeFormat (UDateFormat)", "o.format(0)"));
-        objects.add(Entry.of("DateTimeFormat", "DateTimeFormat (UDateFormat+UDateIntervalFormat)",
+        objects.add(Entry.of("Intl.Collator", "o.compare('a', 'b')"));
+        objects.add(Entry.of("Intl.DateTimeFormat", "DateTimeFormat (UDateFormat)", "o.format(0)"));
+        objects.add(Entry.of("Intl.DateTimeFormat", "DateTimeFormat (UDateFormat+UDateIntervalFormat)",
                              "o.formatRange(0, 24*60*60*1000)"));
-        objects.add(Entry.of("DisplayNames", "o.of('en')"));
-        objects.add(Entry.of("ListFormat", "o.format(['a', 'b'])"));
-        objects.add(Entry.of("NumberFormat", "o.format(0)"));
-        objects.add(Entry.of("NumberFormat", "NumberFormat (UNumberRangeFormatter)",
+        objects.add(Entry.of("Intl.DisplayNames", "o.of('en')"));
+        objects.add(Entry.of("Intl.ListFormat", "o.format(['a', 'b'])"));
+        objects.add(Entry.of("Intl.NumberFormat", "o.format(0)"));
+        objects.add(Entry.of("Intl.NumberFormat", "NumberFormat (UNumberRangeFormatter)",
                              "o.formatRange(0, 1000)"));
-        objects.add(Entry.of("PluralRules", "o.select(0)"));
-        objects.add(Entry.of("RelativeTimeFormat", "o.format(0, 'hour')"));
+        objects.add(Entry.of("Intl.PluralRules", "o.select(0)"));
+        objects.add(Entry.of("Intl.RelativeTimeFormat", "o.format(0, 'hour')"));
+        objects.add(Entry.of("Temporal.TimeZone", "o.getNextTransition(new Temporal.Instant(0n))"));
 
         for (var entry : objects) {
             measure(args[0], entry.constructor, entry.description, entry.initializer);
@@ -226,23 +223,34 @@ public class IcuMemoryUsage {
     private static final String sourceCode = """
 const constructorName = scriptArgs[0];
 const initializer = Function("o", scriptArgs[1]);
-const locales = scriptArgs[2].split(",");
 
 const extras = {};
 addIntlExtras(extras);
 
-for (let i = 0; i < locales.length; ++i) {
+let constructor;
+let inputs;
+if (constructorName.startsWith("Intl.")) {
+  let simpleName = constructorName.substring("Intl.".length);
+  constructor = Intl[simpleName];
+  inputs = getAvailableLocalesOf(simpleName);
+} else if (constructorName === "Temporal.TimeZone") {
+  constructor = Temporal.TimeZone;
+  inputs = Intl.supportedValuesOf("timeZone");
+} else {
+  throw new Error("Unsupported constructor name: " + constructorName);
+}
+
+for (let i = 0; i < inputs.length; ++i) {
   // Loop twice in case the first time we create an object with a new locale
   // allocates additional memory when loading the locale data.
   for (let j = 0; j < 2; ++j) {
-    let constructor = Intl[constructorName];
     let options = undefined;
     if (constructor === Intl.DisplayNames) {
       options = {type: "language"};
     }
 
     print("Create");
-    let obj = new constructor(locales[i], options);
+    let obj = new constructor(inputs[i], options);
 
     print("Init");
     initializer(obj);

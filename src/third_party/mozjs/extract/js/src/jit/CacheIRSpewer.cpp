@@ -16,7 +16,8 @@
 #  include "jsapi.h"
 #  include "jsmath.h"
 
-#  include "js/ScalarType.h"  // js::Scalar::Type
+#  include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin
+#  include "js/ScalarType.h"    // js::Scalar::Type
 #  include "util/GetPidProvider.h"
 #  include "util/Text.h"
 #  include "vm/JSFunction.h"
@@ -70,6 +71,10 @@ class MOZ_RAII CacheIROpsJitSpewer {
   void spewJSOpImm(const char* name, JSOp op) {
     out_.printf("%s JSOp::%s", name, CodeName(op));
   }
+  void spewTypeofEqOperandImm(const char* name, TypeofEqOperand operand) {
+    out_.printf("%s %s %s", name, JSTypeToString(operand.type()),
+                CodeName(operand.compareOp()));
+  }
   void spewStaticStringImm(const char* name, const char* str) {
     out_.printf("%s \"%s\"", name, str);
   }
@@ -105,6 +110,9 @@ class MOZ_RAII CacheIROpsJitSpewer {
   void spewGuardClassKindImm(const char* name, GuardClassKind kind) {
     out_.printf("%s GuardClassKind(%u)", name, unsigned(kind));
   }
+  void spewArrayBufferViewKindImm(const char* name, ArrayBufferViewKind kind) {
+    out_.printf("%s ArrayBufferViewKind(%u)", name, unsigned(kind));
+  }
   void spewWasmValTypeImm(const char* name, wasm::ValType::Kind kind) {
     out_.printf("%s WasmValTypeKind(%u)", name, unsigned(kind));
   }
@@ -113,6 +121,10 @@ class MOZ_RAII CacheIROpsJitSpewer {
   }
   void spewCompletionKindImm(const char* name, CompletionKind kind) {
     out_.printf("%s CompletionKind(%u)", name, unsigned(kind));
+  }
+  void spewRealmFuseIndexImm(const char* name, RealmFuses::FuseIndex index) {
+    out_.printf("%s RealmFuseIndex(%u=%s)", name, unsigned(index),
+                RealmFuses::getFuseName(index));
   }
 
  public:
@@ -215,6 +227,9 @@ class MOZ_RAII CacheIROpsJSONSpewer {
   void spewJSOpImm(const char* name, JSOp op) {
     spewArgImpl(name, "JSOp", CodeName(op));
   }
+  void spewTypeofEqOperandImm(const char* name, TypeofEqOperand operand) {
+    spewArgImpl(name, "TypeofEqOperand", uint8_t(operand.rawValue()));
+  }
   void spewStaticStringImm(const char* name, const char* str) {
     spewArgImpl(name, "String", str);
   }
@@ -244,6 +259,12 @@ class MOZ_RAII CacheIROpsJSONSpewer {
     spewArgImpl(name, "Word", uintptr_t(native));
   }
   void spewGuardClassKindImm(const char* name, GuardClassKind kind) {
+    spewArgImpl(name, "Imm", unsigned(kind));
+  }
+  void spewArrayBufferViewKindImm(const char* name, ArrayBufferViewKind kind) {
+    spewArgImpl(name, "Imm", unsigned(kind));
+  }
+  void spewRealmFuseIndexImm(const char* name, RealmFuses::FuseIndex kind) {
     spewArgImpl(name, "Imm", unsigned(kind));
   }
   void spewWasmValTypeImm(const char* name, wasm::ValType::Kind kind) {
@@ -340,9 +361,9 @@ void CacheIRSpewer::beginCache(const IRGenerator& gen) {
   j.property("file", filename ? filename : "null");
   j.property("mode", int(gen.mode_));
   if (jsbytecode* pc = gen.pc_) {
-    unsigned column;
+    JS::LimitedColumnNumberOneOrigin column;
     j.property("line", PCToLineNumber(gen.script_, pc, &column));
-    j.property("column", column);
+    j.property("column", column.oneOriginValue());
     j.formatProperty("pc", "%p", pc);
   }
 }
@@ -373,7 +394,7 @@ void CacheIRSpewer::valueProperty(const char* name, const Value& v) {
     j.formatProperty("value", "%p (shape: %p)", &object, object.shape());
 
     if (object.is<JSFunction>()) {
-      if (JSAtom* name = object.as<JSFunction>().displayAtom()) {
+      if (JSAtom* name = object.as<JSFunction>().maybePartialDisplayAtom()) {
         j.property("funName", name);
       }
     }
@@ -413,6 +434,15 @@ void CacheIRSpewer::opcodeProperty(const char* name, const JSOp op) {
 
   j.beginStringProperty(name);
   output_.put(CodeName(op));
+  j.endStringProperty();
+}
+
+void CacheIRSpewer::jstypeProperty(const char* name, const JSType type) {
+  MOZ_ASSERT(enabled());
+  JSONPrinter& j = json_.ref();
+
+  j.beginStringProperty(name);
+  output_.put(JSTypeToString(type));
   j.endStringProperty();
 }
 

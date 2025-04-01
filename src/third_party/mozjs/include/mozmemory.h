@@ -50,6 +50,8 @@ static inline size_t _malloc_good_size(size_t size) {
 #  define MALLOC_FUNCS MALLOC_FUNCS_JEMALLOC
 #  include "malloc_decls.h"
 
+// jemalloc_stats may only be called on the main thread so that it can access
+// main thread only arenas.
 #  ifdef __cplusplus
 static inline void jemalloc_stats(jemalloc_stats_t* aStats,
                                   jemalloc_bin_stats_t* aBinStats = nullptr) {

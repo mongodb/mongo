@@ -9,47 +9,48 @@
 #include "vm/Modules.h"
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
-#include "mozilla/Utf8.h"        // mozilla::Utf8Unit
+#include "mozilla/ScopeExit.h"
+#include "mozilla/Utf8.h"  // mozilla::Utf8Unit
 
 #include <stdint.h>  // uint32_t
 
 #include "jstypes.h"  // JS_PUBLIC_API
 
+#include "builtin/JSON.h"  // js::ParseJSONWithReviver
 #include "builtin/ModuleObject.h"  // js::FinishDynamicModuleImport, js::{,Requested}ModuleObject
+#include "builtin/Promise.h"  // js::CreatePromiseObjectForAsync, js::AsyncFunctionReturned
 #include "ds/Sort.h"
 #include "frontend/BytecodeCompiler.h"  // js::frontend::CompileModule
 #include "frontend/FrontendContext.h"   // js::AutoReportFrontendContext
+#include "js/ColumnNumber.h"            // JS::ColumnNumberOneOrigin
 #include "js/Context.h"                 // js::AssertHeapIsIdle
+#include "js/ErrorReport.h"             // JSErrorBase
 #include "js/RootingAPI.h"              // JS::MutableHandle
 #include "js/Value.h"                   // JS::Value
 #include "vm/EnvironmentObject.h"       // js::ModuleEnvironmentObject
+#include "vm/JSAtomUtils.h"             // AtomizeString
 #include "vm/JSContext.h"               // CHECK_THREAD, JSContext
 #include "vm/JSObject.h"                // JSObject
 #include "vm/List.h"                    // ListObject
 #include "vm/Runtime.h"                 // JSRuntime
 
-#include "vm/JSAtom-inl.h"
-#include "vm/JSContext-inl.h"  // JSContext::{c,releaseC}heck
+#include "vm/JSAtomUtils-inl.h"  // AtomToId
+#include "vm/JSContext-inl.h"    // JSContext::{c,releaseC}heck
+#include "vm/JSObject-inl.h"
+#include "vm/NativeObject-inl.h"
 
 using namespace js;
 
 using mozilla::Utf8Unit;
 
+static bool ModuleLink(JSContext* cx, Handle<ModuleObject*> module);
+static bool ModuleEvaluate(JSContext* cx, Handle<ModuleObject*> module,
+                           MutableHandle<Value> rval);
+static bool SyntheticModuleEvaluate(JSContext* cx, Handle<ModuleObject*> module,
+                                    MutableHandle<Value> rval);
+
 ////////////////////////////////////////////////////////////////////////////////
 // Public API
-
-JS_PUBLIC_API void JS::SetSupportedImportAssertions(
-    JSRuntime* rt, const ImportAssertionVector& assertions) {
-  AssertHeapIsIdle();
-  MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
-  MOZ_ASSERT(rt->supportedImportAssertions.ref().empty());
-
-  AutoEnterOOMUnsafeRegion oomUnsafe;
-  if (!rt->supportedImportAssertions.ref().appendAll(assertions)) {
-    oomUnsafe.crash("SetSupportedImportAssertions");
-  }
-}
-
 JS_PUBLIC_API JS::ModuleResolveHook JS::GetModuleResolveHook(JSRuntime* rt) {
   AssertHeapIsIdle();
 
@@ -130,6 +131,46 @@ JS_PUBLIC_API JSObject* JS::CompileModule(JSContext* cx,
   return CompileModuleHelper(cx, options, srcBuf);
 }
 
+JS_PUBLIC_API JSObject* JS::CompileJsonModule(
+    JSContext* cx, const ReadOnlyCompileOptions& options,
+    SourceText<char16_t>& srcBuf) {
+  MOZ_ASSERT(!cx->zone()->isAtomsZone());
+  AssertHeapIsIdle();
+  CHECK_THREAD(cx);
+
+  JS::RootedValue jsonValue(cx);
+  auto charRange =
+      mozilla::Range<const char16_t>(srcBuf.get(), srcBuf.length());
+  if (!js::ParseJSONWithReviver(cx, charRange, NullHandleValue, &jsonValue)) {
+    return nullptr;
+  }
+
+  Rooted<ExportNameVector> exportNames(cx);
+  if (!exportNames.reserve(1)) {
+    return nullptr;
+  }
+  exportNames.infallibleAppend(cx->names().default_);
+
+  Rooted<ModuleObject*> moduleObject(
+      cx, ModuleObject::createSynthetic(cx, &exportNames));
+  if (!moduleObject) {
+    return nullptr;
+  }
+
+  Rooted<GCVector<Value>> exportValues(cx, GCVector<Value>(cx));
+  if (!exportValues.reserve(1)) {
+    return nullptr;
+  }
+  exportValues.infallibleAppend(jsonValue);
+
+  if (!ModuleObject::createSyntheticEnvironment(cx, moduleObject,
+                                                exportValues)) {
+    return nullptr;
+  }
+
+  return moduleObject;
+}
+
 JS_PUBLIC_API void JS::SetModulePrivate(JSObject* module, const Value& value) {
   JSRuntime* rt = module->zone()->runtimeFromMainThread();
   module->as<ModuleObject>().scriptSourceObject()->setPrivate(rt, value);
@@ -150,7 +191,7 @@ JS_PUBLIC_API bool JS::ModuleLink(JSContext* cx, Handle<JSObject*> moduleArg) {
   CHECK_THREAD(cx);
   cx->releaseCheck(moduleArg);
 
-  return js::ModuleLink(cx, moduleArg.as<ModuleObject>());
+  return ::ModuleLink(cx, moduleArg.as<ModuleObject>());
 }
 
 JS_PUBLIC_API bool JS::ModuleEvaluate(JSContext* cx,
@@ -160,7 +201,17 @@ JS_PUBLIC_API bool JS::ModuleEvaluate(JSContext* cx,
   CHECK_THREAD(cx);
   cx->releaseCheck(moduleRecord);
 
-  return js::ModuleEvaluate(cx, moduleRecord.as<ModuleObject>(), rval);
+  cx->isEvaluatingModule++;
+  auto guard = mozilla::MakeScopeExit([cx] {
+    MOZ_ASSERT(cx->isEvaluatingModule != 0);
+    cx->isEvaluatingModule--;
+  });
+
+  if (moduleRecord.as<ModuleObject>()->hasSyntheticModuleFields()) {
+    return SyntheticModuleEvaluate(cx, moduleRecord.as<ModuleObject>(), rval);
+  }
+
+  return ::ModuleEvaluate(cx, moduleRecord.as<ModuleObject>(), rval);
 }
 
 JS_PUBLIC_API bool JS::ThrowOnModuleEvaluationFailure(
@@ -194,7 +245,7 @@ JS_PUBLIC_API JSString* JS::GetRequestedModuleSpecifier(
 
 JS_PUBLIC_API void JS::GetRequestedModuleSourcePos(
     JSContext* cx, Handle<JSObject*> moduleRecord, uint32_t index,
-    uint32_t* lineNumber, uint32_t* columnNumber) {
+    uint32_t* lineNumber, JS::ColumnNumberOneOrigin* columnNumber) {
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
   cx->check(moduleRecord);
@@ -259,7 +310,9 @@ JS_PUBLIC_API JSObject* JS::CreateModuleRequest(
     return nullptr;
   }
 
-  return ModuleRequestObject::create(cx, specifierAtom, nullptr);
+  Rooted<UniquePtr<ImportAttributeVector>> attributes(cx);
+
+  return ModuleRequestObject::create(cx, specifierAtom, &attributes);
 }
 
 JS_PUBLIC_API JSString* JS::GetModuleRequestSpecifier(
@@ -287,6 +340,11 @@ JS_PUBLIC_API void JS::ClearModuleEnvironment(JSObject* moduleObj) {
   for (uint32_t i = numReserved; i < numSlots; i++) {
     env->setSlot(i, UndefinedValue());
   }
+}
+
+JS_PUBLIC_API bool JS::ModuleIsLinked(JSObject* moduleObj) {
+  AssertHeapIsIdle();
+  return moduleObj->as<ModuleObject>().status() != ModuleStatus::Unlinked;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -318,10 +376,17 @@ static ModuleObject* HostResolveImportedModule(
     JSContext* cx, Handle<ModuleObject*> module,
     Handle<ModuleRequestObject*> moduleRequest,
     ModuleStatus expectedMinimumStatus);
-static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
-                                Handle<JSAtom*> exportName,
-                                MutableHandle<ResolveSet> resolveSet,
-                                MutableHandle<Value> result);
+static bool CyclicModuleResolveExport(JSContext* cx,
+                                      Handle<ModuleObject*> module,
+                                      Handle<JSAtom*> exportName,
+                                      MutableHandle<ResolveSet> resolveSet,
+                                      MutableHandle<Value> result,
+                                      ModuleErrorInfo* errorInfoOut = nullptr);
+static bool SyntheticModuleResolveExport(JSContext* cx,
+                                         Handle<ModuleObject*> module,
+                                         Handle<JSAtom*> exportName,
+                                         MutableHandle<Value> result,
+                                         ModuleErrorInfo* errorInfoOut);
 static ModuleNamespaceObject* ModuleNamespaceCreate(
     JSContext* cx, Handle<ModuleObject*> module,
     MutableHandle<UniquePtr<ExportNameVector>> exports);
@@ -355,7 +420,7 @@ static const char* ModuleStatusName(ModuleStatus status) {
   }
 }
 
-static bool ContainsElement(Handle<ExportNameVector> list, JSAtom* atom) {
+static bool ContainsElement(const ExportNameVector& list, JSAtom* atom) {
   for (JSAtom* a : list) {
     if (a == atom) {
       return true;
@@ -388,6 +453,20 @@ static size_t CountElements(Handle<ModuleVector> stack, ModuleObject* module) {
 }
 #endif
 
+// https://tc39.es/proposal-json-modules/#sec-smr-getexportednames
+static bool SyntheticModuleGetExportedNames(
+    JSContext* cx, Handle<ModuleObject*> module,
+    MutableHandle<ExportNameVector> exportedNames) {
+  MOZ_ASSERT(exportedNames.empty());
+
+  if (!exportedNames.appendAll(module->syntheticExportNames())) {
+    ReportOutOfMemory(cx);
+    return false;
+  }
+
+  return true;
+}
+
 // https://tc39.es/ecma262/#sec-getexportednames
 // ES2023 16.2.1.6.2 GetExportedNames
 static bool ModuleGetExportedNames(
@@ -396,6 +475,10 @@ static bool ModuleGetExportedNames(
     MutableHandle<ExportNameVector> exportedNames) {
   // Step 4. Let exportedNames be a new empty List.
   MOZ_ASSERT(exportedNames.empty());
+
+  if (module->hasSyntheticModuleFields()) {
+    return SyntheticModuleGetExportedNames(cx, module, exportedNames);
+  }
 
   // Step 2. If exportStarSet contains module, then:
   if (exportStarSet.has(module)) {
@@ -492,12 +575,10 @@ static ModuleObject* HostResolveImportedModule(
   if (!requestedModule) {
     return nullptr;
   }
-
   if (requestedModule->status() < expectedMinimumStatus) {
     ThrowUnexpectedModuleStatus(cx, requestedModule->status());
     return nullptr;
   }
-
   return requestedModule;
 }
 
@@ -517,13 +598,20 @@ static ModuleObject* HostResolveImportedModule(
 //  - If the request is found to be ambiguous, the string `"ambiguous"` is
 //    returned.
 //
-bool js::ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
-                             Handle<JSAtom*> exportName,
-                             MutableHandle<Value> result) {
+static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
+                                Handle<JSAtom*> exportName,
+                                MutableHandle<Value> result,
+                                ModuleErrorInfo* errorInfoOut = nullptr) {
+  if (module->hasSyntheticModuleFields()) {
+    return SyntheticModuleResolveExport(cx, module, exportName, result,
+                                        errorInfoOut);
+  }
+
   // Step 1. If resolveSet is not present, set resolveSet to a new empty List.
   Rooted<ResolveSet> resolveSet(cx);
 
-  return ::ModuleResolveExport(cx, module, exportName, &resolveSet, result);
+  return CyclicModuleResolveExport(cx, module, exportName, &resolveSet, result,
+                                   errorInfoOut);
 }
 
 static bool CreateResolvedBindingObject(JSContext* cx,
@@ -540,10 +628,12 @@ static bool CreateResolvedBindingObject(JSContext* cx,
   return true;
 }
 
-static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
-                                Handle<JSAtom*> exportName,
-                                MutableHandle<ResolveSet> resolveSet,
-                                MutableHandle<Value> result) {
+static bool CyclicModuleResolveExport(JSContext* cx,
+                                      Handle<ModuleObject*> module,
+                                      Handle<JSAtom*> exportName,
+                                      MutableHandle<ResolveSet> resolveSet,
+                                      MutableHandle<Value> result,
+                                      ModuleErrorInfo* errorInfoOut) {
   // Step 2. For each Record { [[Module]], [[ExportName]] } r of resolveSet, do:
   for (const auto& entry : resolveSet) {
     // Step 2.a. If module and r.[[Module]] are the same Module Record and
@@ -552,6 +642,9 @@ static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
       // Step 2.a.i. Assert: This is a circular import request.
       // Step 2.a.ii. Return null.
       result.setNull();
+      if (errorInfoOut) {
+        errorInfoOut->setCircularImport(cx, module);
+      }
       return true;
     }
   }
@@ -598,7 +691,7 @@ static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
         //                this export.
         // Step 5.a.ii.2. Return ResolvedBinding Record { [[Module]]:
         //                importedModule, [[BindingName]]: namespace }.
-        name = cx->names().starNamespaceStar;
+        name = cx->names().star_namespace_star_;
         return CreateResolvedBindingObject(cx, importedModule, name, result);
       } else {
         // Step 5.a.iii.1. Assert: module imports a specific binding for this
@@ -607,8 +700,8 @@ static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
         // importedModule.ResolveExport(e.[[ImportName]],
         //                 resolveSet).
         name = e.importName();
-        return ModuleResolveExport(cx, importedModule, name, resolveSet,
-                                   result);
+        return CyclicModuleResolveExport(cx, importedModule, name, resolveSet,
+                                         result, errorInfoOut);
       }
     }
   }
@@ -621,6 +714,9 @@ static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
     // Step 6.c. NOTE: A default export cannot be provided by an export * from
     //           "mod" declaration.
     result.setNull();
+    if (errorInfoOut) {
+      errorInfoOut->setImportedModule(cx, module);
+    }
     return true;
   }
 
@@ -642,8 +738,8 @@ static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
 
     // Step 8.b. Let resolution be ? importedModule.ResolveExport(exportName,
     //           resolveSet).
-    if (!ModuleResolveExport(cx, importedModule, exportName, resolveSet,
-                             &resolution)) {
+    if (!CyclicModuleResolveExport(cx, importedModule, exportName, resolveSet,
+                                   &resolution, errorInfoOut)) {
       return false;
     }
 
@@ -682,6 +778,12 @@ static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
         if (binding->module() != starResolution->module() ||
             binding->bindingName() != starResolution->bindingName()) {
           result.set(StringValue(cx->names().ambiguous));
+
+          if (errorInfoOut) {
+            Rooted<ModuleObject*> module1(cx, starResolution->module());
+            Rooted<ModuleObject*> module2(cx, binding->module());
+            errorInfoOut->setForAmbiguousImport(cx, module, module1, module2);
+          }
           return true;
         }
       }
@@ -690,7 +792,30 @@ static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
 
   // Step 9. Return starResolution.
   result.setObjectOrNull(starResolution);
+  if (!starResolution && errorInfoOut) {
+    errorInfoOut->setImportedModule(cx, module);
+  }
   return true;
+}
+
+// https://tc39.es/proposal-json-modules/#sec-smr-resolveexport
+static bool SyntheticModuleResolveExport(JSContext* cx,
+                                         Handle<ModuleObject*> module,
+                                         Handle<JSAtom*> exportName,
+                                         MutableHandle<Value> result,
+                                         ModuleErrorInfo* errorInfoOut) {
+  // Step 2. If module.[[ExportNames]] does not contain exportName, return null.
+  if (!ContainsElement(module->syntheticExportNames(), exportName)) {
+    result.setNull();
+    if (errorInfoOut) {
+      errorInfoOut->setImportedModule(cx, module);
+    }
+    return true;
+  }
+
+  // Step 3. Return ResolvedBinding Record { [[Module]]: module,
+  // [[BindingName]]: exportName }.
+  return CreateResolvedBindingObject(cx, module, exportName, result);
 }
 
 // https://tc39.es/ecma262/#sec-getmodulenamespace
@@ -822,7 +947,7 @@ static ModuleNamespaceObject* ModuleNamespaceCreate(
     importedModule = binding->module();
     bindingName = binding->bindingName();
 
-    if (bindingName == cx->names().starNamespaceStar) {
+    if (bindingName == cx->names().star_namespace_star_) {
       importedNamespace = GetOrCreateModuleNamespace(cx, importedModule);
       if (!importedNamespace) {
         return nullptr;
@@ -845,58 +970,93 @@ static ModuleNamespaceObject* ModuleNamespaceCreate(
   return ns;
 }
 
+void ModuleErrorInfo::setImportedModule(JSContext* cx,
+                                        ModuleObject* importedModule) {
+  imported = importedModule->filename();
+}
+
+void ModuleErrorInfo::setCircularImport(JSContext* cx,
+                                        ModuleObject* importedModule) {
+  setImportedModule(cx, importedModule);
+  isCircular = true;
+}
+
+void ModuleErrorInfo::setForAmbiguousImport(JSContext* cx,
+                                            ModuleObject* importedModule,
+                                            ModuleObject* module1,
+                                            ModuleObject* module2) {
+  setImportedModule(cx, importedModule);
+  entry1 = module1->filename();
+  entry2 = module2->filename();
+}
+
+static void CreateErrorNumberMessageUTF8(JSContext* cx, unsigned errorNumber,
+                                         JSErrorReport* reportOut, ...) {
+  va_list ap;
+  va_start(ap, reportOut);
+  AutoReportFrontendContext fc(cx);
+  if (!ExpandErrorArgumentsVA(&fc, GetErrorMessage, nullptr, errorNumber,
+                              ArgumentsAreUTF8, reportOut, ap)) {
+    ReportOutOfMemory(cx);
+    return;
+  }
+
+  va_end(ap);
+}
+
 static void ThrowResolutionError(JSContext* cx, Handle<ModuleObject*> module,
-                                 Handle<Value> resolution, bool isDirectImport,
-                                 Handle<JSAtom*> name, uint32_t line,
-                                 uint32_t column) {
-  MOZ_ASSERT(line != 0);
+                                 Handle<Value> resolution, Handle<JSAtom*> name,
+                                 ModuleErrorInfo* errorInfo) {
+  MOZ_ASSERT(errorInfo);
+  auto chars = StringToNewUTF8CharsZ(cx, *name);
+  if (!chars) {
+    ReportOutOfMemory(cx);
+    return;
+  }
 
   bool isAmbiguous = resolution == StringValue(cx->names().ambiguous);
 
-  static constexpr unsigned ErrorNumbers[2][2] = {
-      {JSMSG_AMBIGUOUS_IMPORT, JSMSG_MISSING_IMPORT},
-      {JSMSG_AMBIGUOUS_INDIRECT_EXPORT, JSMSG_MISSING_INDIRECT_EXPORT}};
-  unsigned errorNumber = ErrorNumbers[isDirectImport][isAmbiguous];
-
-  const JSErrorFormatString* errorString =
-      GetErrorMessage(nullptr, errorNumber);
-  MOZ_ASSERT(errorString);
-
-  MOZ_ASSERT(errorString->argCount == 0);
-  Rooted<JSString*> message(cx, JS_NewStringCopyZ(cx, errorString->format));
-  if (!message) {
-    return;
-  }
-
-  Rooted<JSString*> separator(cx, JS_NewStringCopyZ(cx, ": "));
-  if (!separator) {
-    return;
-  }
-
-  message = ConcatStrings<CanGC>(cx, message, separator);
-  if (!message) {
-    return;
-  }
-
-  message = ConcatStrings<CanGC>(cx, message, name);
-  if (!message) {
-    return;
-  }
-
-  RootedString filename(cx);
-  if (const char* chars = module->script()->filename()) {
-    filename =
-        JS_NewStringCopyUTF8Z(cx, JS::ConstUTF8CharsZ(chars, strlen(chars)));
+  unsigned errorNumber;
+  if (errorInfo->isCircular) {
+    errorNumber = JSMSG_MODULE_CIRCULAR_IMPORT;
+  } else if (isAmbiguous) {
+    errorNumber = JSMSG_MODULE_AMBIGUOUS;
   } else {
-    filename = cx->names().empty;
+    errorNumber = JSMSG_MODULE_NO_EXPORT;
   }
+
+  JSErrorReport report;
+  report.isWarning_ = false;
+  report.errorNumber = errorNumber;
+
+  if (errorNumber == JSMSG_MODULE_AMBIGUOUS) {
+    CreateErrorNumberMessageUTF8(cx, errorNumber, &report, errorInfo->imported,
+                                 chars.get(), errorInfo->entry1,
+                                 errorInfo->entry2);
+  } else {
+    CreateErrorNumberMessageUTF8(cx, errorNumber, &report, errorInfo->imported,
+                                 chars.get());
+  }
+
+  Rooted<JSString*> message(cx, report.newMessageString(cx));
+  if (!message) {
+    ReportOutOfMemory(cx);
+    return;
+  }
+
+  const char* file = module->filename();
+  RootedString filename(
+      cx, JS_NewStringCopyUTF8Z(cx, JS::ConstUTF8CharsZ(file, strlen(file))));
   if (!filename) {
+    ReportOutOfMemory(cx);
     return;
   }
 
   RootedValue error(cx);
-  if (!JS::CreateError(cx, JSEXN_SYNTAXERR, nullptr, filename, line, column,
-                       nullptr, message, JS::NothingHandleValue, &error)) {
+  if (!JS::CreateError(cx, JSEXN_SYNTAXERR, nullptr, filename,
+                       errorInfo->lineNumber, errorInfo->columnNumber, nullptr,
+                       message, JS::NothingHandleValue, &error)) {
+    ReportOutOfMemory(cx);
     return;
   }
 
@@ -905,8 +1065,8 @@ static void ThrowResolutionError(JSContext* cx, Handle<ModuleObject*> module,
 
 // https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment
 // ES2023 16.2.1.6.4 InitializeEnvironment
-bool js::ModuleInitializeEnvironment(JSContext* cx,
-                                     Handle<ModuleObject*> module) {
+static bool ModuleInitializeEnvironment(JSContext* cx,
+                                        Handle<ModuleObject*> module) {
   MOZ_ASSERT(module->status() == ModuleStatus::Linking);
 
   // Step 1. For each ExportEntry Record e of module.[[IndirectExportEntries]],
@@ -914,17 +1074,20 @@ bool js::ModuleInitializeEnvironment(JSContext* cx,
   Rooted<JSAtom*> exportName(cx);
   Rooted<Value> resolution(cx);
   for (const ExportEntry& e : module->indirectExportEntries()) {
-    // Step 1.a. Let resolution be ? module.ResolveExport(e.[[ExportName]]).
+    // Step 1.a. Assert: e.[[ExportName]] is not null.
+    MOZ_ASSERT(e.exportName());
+
+    // Step 1.b. Let resolution be ? module.ResolveExport(e.[[ExportName]]).
     exportName = e.exportName();
-    if (!ModuleResolveExport(cx, module, exportName, &resolution)) {
+    ModuleErrorInfo errorInfo{e.lineNumber(), e.columnNumber()};
+    if (!ModuleResolveExport(cx, module, exportName, &resolution, &errorInfo)) {
       return false;
     }
 
-    // Step 1.b. If resolution is null or ambiguous, throw a SyntaxError
+    // Step 1.c. If resolution is either null or AMBIGUOUS, throw a SyntaxError
     //           exception.
     if (!IsResolvedBinding(cx, resolution)) {
-      ThrowResolutionError(cx, module, resolution, false, exportName,
-                           e.lineNumber(), e.columnNumber());
+      ThrowResolutionError(cx, module, resolution, exportName, &errorInfo);
       return false;
     }
   }
@@ -973,15 +1136,16 @@ bool js::ModuleInitializeEnvironment(JSContext* cx,
       // Step 7.d. Else:
       // Step 7.d.i. Let resolution be ?
       // importedModule.ResolveExport(in.[[ImportName]]).
-      if (!ModuleResolveExport(cx, importedModule, importName, &resolution)) {
+      ModuleErrorInfo errorInfo{in.lineNumber(), in.columnNumber()};
+      if (!ModuleResolveExport(cx, importedModule, importName, &resolution,
+                               &errorInfo)) {
         return false;
       }
 
       // Step 7.d.ii. If resolution is null or ambiguous, throw a SyntaxError
       //              exception.
       if (!IsResolvedBinding(cx, resolution)) {
-        ThrowResolutionError(cx, module, resolution, true, importName,
-                             in.lineNumber(), in.columnNumber());
+        ThrowResolutionError(cx, module, resolution, importName, &errorInfo);
         return false;
       }
 
@@ -990,7 +1154,7 @@ bool js::ModuleInitializeEnvironment(JSContext* cx,
       bindingName = binding->bindingName();
 
       // Step 7.d.iii. If resolution.[[BindingName]] is namespace, then:
-      if (bindingName == cx->names().starNamespaceStar) {
+      if (bindingName == cx->names().star_namespace_star_) {
         // Step 7.d.iii.1. Let namespace be ?
         //                 GetModuleNamespace(resolution.[[Module]]).
         Rooted<ModuleNamespaceObject*> ns(
@@ -1048,7 +1212,7 @@ bool js::ModuleInitializeEnvironment(JSContext* cx,
 
 // https://tc39.es/ecma262/#sec-moduledeclarationlinking
 // ES2023 16.2.1.5.1 Link
-bool js::ModuleLink(JSContext* cx, Handle<ModuleObject*> module) {
+static bool ModuleLink(JSContext* cx, Handle<ModuleObject*> module) {
   // Step 1. Assert: module.[[Status]] is not linking or evaluating.
   ModuleStatus status = module->status();
   if (status == ModuleStatus::Linking || status == ModuleStatus::Evaluating) {
@@ -1094,11 +1258,44 @@ bool js::ModuleLink(JSContext* cx, Handle<ModuleObject*> module) {
   return true;
 }
 
+// https://tc39.es/proposal-import-attributes/#sec-AllImportAttributesSupported
+static bool AllImportAttributesSupported(
+    JSContext* cx, mozilla::Span<const ImportAttribute> attributes,
+    MutableHandle<JSAtom*> invalidKey) {
+  // Step 1. Let supported be HostGetSupportedImportAttributes().
+  //
+  // Note: This should be driven by a host hook
+  // (HostGetSupportedImportAttributes), however the infrastructure of said host
+  // hook is deeply unclear, and so right now embedders will not have the
+  // ability to alter or extend the set of supported attributes. See
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=1840723.
+
+  // Step 2. For each ImportAttribute Record attribute of attributes, do
+  for (const ImportAttribute& attribute : attributes) {
+    // Step 2.a. If supported does not contain attribute.[[Key]], return false.
+    if (attribute.key() != cx->names().type) {
+      invalidKey.set(attribute.key());
+      return false;
+    }
+  }
+
+  // Step 3. Return true.
+  return true;
+}
+
 // https://tc39.es/ecma262/#sec-InnerModuleLinking
 // ES2023 16.2.1.5.1.1 InnerModuleLinking
 static bool InnerModuleLinking(JSContext* cx, Handle<ModuleObject*> module,
                                MutableHandle<ModuleVector> stack, size_t index,
                                size_t* indexOut) {
+  // Step 1. If module is not a Cyclic Module Record, then
+  if (!module->hasCyclicModuleFields()) {
+    // Step 1.a. Perform ? module.Link(). (Skipped)
+    // Step 2.b. Return index.
+    *indexOut = index;
+    return true;
+  }
+
   // Step 2. If module.[[Status]] is linking, linked, evaluating-async, or
   //         evaluated, then:
   if (module->status() == ModuleStatus::Linking ||
@@ -1142,6 +1339,21 @@ static bool InnerModuleLinking(JSContext* cx, Handle<ModuleObject*> module,
   for (const RequestedModule& request : module->requestedModules()) {
     moduleRequest = request.moduleRequest();
 
+    // According to the spec, this should be in InnerModuleLoading, but
+    // currently, our module code is not aligned with the spec text.
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=1894729
+    Rooted<JSAtom*> invalidKey(cx);
+    if (!AllImportAttributesSupported(cx, moduleRequest->attributes(),
+                                      &invalidKey)) {
+      UniqueChars printableKey = AtomToPrintableString(cx, invalidKey);
+      JS_ReportErrorNumberASCII(
+          cx, GetErrorMessage, nullptr,
+          JSMSG_IMPORT_ATTRIBUTES_STATIC_IMPORT_UNSUPPORTED_ATTRIBUTE,
+          printableKey ? printableKey.get() : "");
+
+      return false;
+    }
+
     // Step 9.a. Let requiredModule be ? HostResolveImportedModule(module,
     //           required).
     requiredModule = HostResolveImportedModule(cx, module, moduleRequest,
@@ -1157,25 +1369,29 @@ static bool InnerModuleLinking(JSContext* cx, Handle<ModuleObject*> module,
     }
 
     // Step 9.c. If requiredModule is a Cyclic Module Record, then:
-    // Step 9.c.i. Assert: requiredModule.[[Status]] is either linking, linked,
-    //             evaluating-async, or evaluated.
-    MOZ_ASSERT(requiredModule->status() == ModuleStatus::Linking ||
-               requiredModule->status() == ModuleStatus::Linked ||
-               requiredModule->status() == ModuleStatus::EvaluatingAsync ||
-               requiredModule->status() == ModuleStatus::Evaluated);
+    if (requiredModule->hasCyclicModuleFields()) {
+      // Step 9.c.i. Assert: requiredModule.[[Status]] is either linking,
+      // linked,
+      //             evaluating-async, or evaluated.
+      MOZ_ASSERT(requiredModule->status() == ModuleStatus::Linking ||
+                 requiredModule->status() == ModuleStatus::Linked ||
+                 requiredModule->status() == ModuleStatus::EvaluatingAsync ||
+                 requiredModule->status() == ModuleStatus::Evaluated);
 
-    // Step 9.c.ii. Assert: requiredModule.[[Status]] is linking if and only if
-    //              requiredModule is in stack.
-    MOZ_ASSERT((requiredModule->status() == ModuleStatus::Linking) ==
-               ContainsElement(stack, requiredModule));
+      // Step 9.c.ii. Assert: requiredModule.[[Status]] is linking if and only
+      // if
+      //              requiredModule is in stack.
+      MOZ_ASSERT((requiredModule->status() == ModuleStatus::Linking) ==
+                 ContainsElement(stack, requiredModule));
 
-    // Step 9.c.iii. If requiredModule.[[Status]] is linking, then:
-    if (requiredModule->status() == ModuleStatus::Linking) {
-      // Step 9.c.iii.1. Set module.[[DFSAncestorIndex]] to
-      //                 min(module.[[DFSAncestorIndex]],
-      //                 requiredModule.[[DFSAncestorIndex]]).
-      module->setDfsAncestorIndex(std::min(module->dfsAncestorIndex(),
-                                           requiredModule->dfsAncestorIndex()));
+      // Step 9.c.iii. If requiredModule.[[Status]] is linking, then:
+      if (requiredModule->status() == ModuleStatus::Linking) {
+        // Step 9.c.iii.1. Set module.[[DFSAncestorIndex]] to
+        //                 min(module.[[DFSAncestorIndex]],
+        //                 requiredModule.[[DFSAncestorIndex]]).
+        module->setDfsAncestorIndex(std::min(
+            module->dfsAncestorIndex(), requiredModule->dfsAncestorIndex()));
+      }
     }
   }
 
@@ -1215,10 +1431,36 @@ static bool InnerModuleLinking(JSContext* cx, Handle<ModuleObject*> module,
   return true;
 }
 
+static bool SyntheticModuleEvaluate(JSContext* cx,
+                                    Handle<ModuleObject*> moduleArg,
+                                    MutableHandle<Value> rval) {
+  // Steps 1-12 happen elsewhere in the engine.
+
+  // Step 13. Let pc be ! NewPromiseCapability(%Promise%).
+  Rooted<PromiseObject*> resultPromise(cx, CreatePromiseObjectForAsync(cx));
+  if (!resultPromise) {
+    return false;
+  }
+
+  // Since the only synthetic modules we support are JSON modules, result is
+  // always |undefined|.
+
+  // Step 14. IfAbruptRejectPromise(result, pc) (Skipped)
+
+  // 15. Perform ! pc.[[Resolve]](result).
+  if (!AsyncFunctionReturned(cx, resultPromise, JS::UndefinedHandleValue)) {
+    return false;
+  }
+
+  // 16. Return pc.[[Promise]].
+  rval.set(ObjectValue(*resultPromise));
+  return true;
+}
+
 // https://tc39.es/ecma262/#sec-moduleevaluation
 // ES2023 16.2.1.5.2 Evaluate
-bool js::ModuleEvaluate(JSContext* cx, Handle<ModuleObject*> moduleArg,
-                        MutableHandle<Value> result) {
+static bool ModuleEvaluate(JSContext* cx, Handle<ModuleObject*> moduleArg,
+                           MutableHandle<Value> result) {
   Rooted<ModuleObject*> module(cx, moduleArg);
 
   // Step 2. Assert: module.[[Status]] is linked, evaluating-async, or
@@ -1351,6 +1593,17 @@ bool js::ModuleEvaluate(JSContext* cx, Handle<ModuleObject*> moduleArg,
 static bool InnerModuleEvaluation(JSContext* cx, Handle<ModuleObject*> module,
                                   MutableHandle<ModuleVector> stack,
                                   size_t index, size_t* indexOut) {
+  // Step 1: If module is not a Cyclic Module Record, then
+  if (!module->hasCyclicModuleFields()) {
+    // Step 1.a. Let promise be ! module.Evaluate(). (Skipped)
+    // Step 1.b. Assert: promise.[[PromiseState]] is not pending. (Skipped)
+    // Step 1.c. If promise.[[PromiseState]] is rejected, then (Skipped)
+    //   Step 1.c.i Return ThrowCompletion(promise.[[PromiseResult]]). (Skipped)
+    // Step 1.d. Return index.
+    *indexOut = index;
+    return true;
+  }
+
   // Step 2. If module.[[Status]] is evaluating-async or evaluated, then:
   if (module->status() == ModuleStatus::EvaluatingAsync ||
       module->status() == ModuleStatus::Evaluated) {
@@ -1421,55 +1674,59 @@ static bool InnerModuleEvaluation(JSContext* cx, Handle<ModuleObject*> module,
     }
 
     // Step 11.d. If requiredModule is a Cyclic Module Record, then:
-    // Step 11.d.i. Assert: requiredModule.[[Status]] is either evaluating,
-    //              evaluating-async, or evaluated.
-    MOZ_ASSERT(requiredModule->status() == ModuleStatus::Evaluating ||
-               requiredModule->status() == ModuleStatus::EvaluatingAsync ||
-               requiredModule->status() == ModuleStatus::Evaluated);
-
-    // Step 11.d.ii. Assert: requiredModule.[[Status]] is evaluating if and only
-    //               if requiredModule is in stack.
-    MOZ_ASSERT((requiredModule->status() == ModuleStatus::Evaluating) ==
-               ContainsElement(stack, requiredModule));
-
-    // Step 11.d.iii. If requiredModule.[[Status]] is evaluating, then:
-    if (requiredModule->status() == ModuleStatus::Evaluating) {
-      // Step 11.d.iii.1. Set module.[[DFSAncestorIndex]] to
-      //                  min(module.[[DFSAncestorIndex]],
-      //                  requiredModule.[[DFSAncestorIndex]]).
-      module->setDfsAncestorIndex(std::min(module->dfsAncestorIndex(),
-                                           requiredModule->dfsAncestorIndex()));
-    } else {
-      // Step 11.d.iv. Else:
-      // Step 11.d.iv.1. Set requiredModule to requiredModule.[[CycleRoot]].
-      requiredModule = requiredModule->getCycleRoot();
-
-      // Step 11.d.iv.2. Assert: requiredModule.[[Status]] is evaluating-async
-      //                 or evaluated.
-      MOZ_ASSERT(requiredModule->status() >= ModuleStatus::EvaluatingAsync ||
+    if (requiredModule->hasCyclicModuleFields()) {
+      // Step 11.d.i. Assert: requiredModule.[[Status]] is either evaluating,
+      //              evaluating-async, or evaluated.
+      MOZ_ASSERT(requiredModule->status() == ModuleStatus::Evaluating ||
+                 requiredModule->status() == ModuleStatus::EvaluatingAsync ||
                  requiredModule->status() == ModuleStatus::Evaluated);
 
-      // Step 11.d.iv.3. If requiredModule.[[EvaluationError]] is not empty,
-      //                 return ? requiredModule.[[EvaluationError]].
-      if (requiredModule->hadEvaluationError()) {
-        Rooted<Value> error(cx, requiredModule->evaluationError());
-        cx->setPendingException(error, ShouldCaptureStack::Maybe);
-        return false;
-      }
-    }
+      // Step 11.d.ii. Assert: requiredModule.[[Status]] is evaluating if and
+      //               only if requiredModule is in stack.
+      MOZ_ASSERT((requiredModule->status() == ModuleStatus::Evaluating) ==
+                 ContainsElement(stack, requiredModule));
 
-    // Step 11.d.v. If requiredModule.[[AsyncEvaluation]] is true, then:
-    if (requiredModule->isAsyncEvaluating() &&
-        requiredModule->status() != ModuleStatus::Evaluated) {
-      // Step 11.d.v.2. Append module to requiredModule.[[AsyncParentModules]].
-      if (!ModuleObject::appendAsyncParentModule(cx, requiredModule, module)) {
-        return false;
+      // Step 11.d.iii. If requiredModule.[[Status]] is evaluating, then:
+      if (requiredModule->status() == ModuleStatus::Evaluating) {
+        // Step 11.d.iii.1. Set module.[[DFSAncestorIndex]] to
+        //                  min(module.[[DFSAncestorIndex]],
+        //                  requiredModule.[[DFSAncestorIndex]]).
+        module->setDfsAncestorIndex(std::min(
+            module->dfsAncestorIndex(), requiredModule->dfsAncestorIndex()));
+      } else {
+        // Step 11.d.iv. Else:
+        // Step 11.d.iv.1. Set requiredModule to requiredModule.[[CycleRoot]].
+        requiredModule = requiredModule->getCycleRoot();
+
+        // Step 11.d.iv.2. Assert: requiredModule.[[Status]] is evaluating-async
+        //                 or evaluated.
+        MOZ_ASSERT(requiredModule->status() >= ModuleStatus::EvaluatingAsync ||
+                   requiredModule->status() == ModuleStatus::Evaluated);
+
+        // Step 11.d.iv.3. If requiredModule.[[EvaluationError]] is not empty,
+        //                 return ? requiredModule.[[EvaluationError]].
+        if (requiredModule->hadEvaluationError()) {
+          Rooted<Value> error(cx, requiredModule->evaluationError());
+          cx->setPendingException(error, ShouldCaptureStack::Maybe);
+          return false;
+        }
       }
 
-      // Step 11.d.v.1. Set module.[[PendingAsyncDependencies]] to
-      //                module.[[PendingAsyncDependencies]] + 1.
-      module->setPendingAsyncDependencies(module->pendingAsyncDependencies() +
-                                          1);
+      // Step 11.d.v. If requiredModule.[[AsyncEvaluation]] is true, then:
+      if (requiredModule->isAsyncEvaluating() &&
+          requiredModule->status() != ModuleStatus::Evaluated) {
+        // Step 11.d.v.2. Append module to
+        // requiredModule.[[AsyncParentModules]].
+        if (!ModuleObject::appendAsyncParentModule(cx, requiredModule,
+                                                   module)) {
+          return false;
+        }
+
+        // Step 11.d.v.1. Set module.[[PendingAsyncDependencies]] to
+        //                module.[[PendingAsyncDependencies]] + 1.
+        module->setPendingAsyncDependencies(module->pendingAsyncDependencies() +
+                                            1);
+      }
     }
   }
 

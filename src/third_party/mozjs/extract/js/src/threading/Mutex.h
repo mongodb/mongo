@@ -36,7 +36,7 @@ struct MutexId {
 // we must override it and make Mutex a friend.
 class MutexImpl : public mozilla::detail::MutexImpl {
  protected:
-  MutexImpl() : mozilla::detail::MutexImpl() {}
+  MutexImpl() {}
 
   friend class Mutex;
 };
@@ -67,6 +67,7 @@ class Mutex {
   void lock();
   bool tryLock();
   void unlock();
+  bool isOwnedByCurrentThread() const;
   void assertOwnedByCurrentThread() const;
 #else
   static bool Init() { return true; }

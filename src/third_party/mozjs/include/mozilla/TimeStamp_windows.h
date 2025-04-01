@@ -22,7 +22,7 @@ namespace mozilla {
  * frequency per second.  Therefore we need to multiply QPC value by 1000 to
  * have the same units to allow simple arithmentic with both QPC and GTC.
  */
-#define ms2mt(x) ((x)*mozilla::GetQueryPerformanceFrequencyPerSec())
+#define ms2mt(x) ((x) * mozilla::GetQueryPerformanceFrequencyPerSec())
 #define mt2ms(x) ((x) / mozilla::GetQueryPerformanceFrequencyPerSec())
 #define mt2ms_f(x) (double(x) / mozilla::GetQueryPerformanceFrequencyPerSec())
 
@@ -30,6 +30,8 @@ MFBT_API uint64_t GetQueryPerformanceFrequencyPerSec();
 
 class TimeStamp;
 class TimeStampValue;
+class TimeStampValueTests;
+class TimeStampTests;
 
 TimeStampValue NowInternal(bool aHighResolution);
 
@@ -38,6 +40,8 @@ class TimeStampValue {
   friend bool IsCanonicalTimeStamp(TimeStampValue);
   friend struct IPC::ParamTraits<mozilla::TimeStampValue>;
   friend class TimeStamp;
+  friend class TimeStampValueTests;
+  friend class TimeStampTests;
 
   // Both QPC and GTC are kept in [mt] units.
   uint64_t mGTC;
@@ -46,14 +50,19 @@ class TimeStampValue {
   bool mIsNull;
   bool mHasQPC;
 
-  MFBT_API TimeStampValue(uint64_t aGTC, uint64_t aQPC, bool aHasQPC);
+  constexpr MFBT_API TimeStampValue(uint64_t aGTC, uint64_t aQPC, bool aHasQPC)
+      : mGTC(aGTC),
+        mQPC(aQPC),
+        mIsNull(aGTC == 0 && aQPC == 0),
+        mHasQPC(aHasQPC) {}
+
+  // This constructor should be explicit but it is replacing a constructor that
+  // was MOZ_IMPLICIT and there are many locations that are using the automatic
+  // conversion.
+  constexpr MOZ_IMPLICIT MFBT_API TimeStampValue(uint64_t aGTCAndQPC)
+      : TimeStampValue(aGTCAndQPC, aGTCAndQPC, true) {}
 
   MFBT_API uint64_t CheckQPC(const TimeStampValue& aOther) const;
-
-  // This struct is used to allow doing TimeStampValue a = 0 and similar
-  struct _SomethingVeryRandomHere;
-  constexpr MOZ_IMPLICIT TimeStampValue(_SomethingVeryRandomHere* aNullValue)
-      : mGTC(0), mQPC(0), mIsNull(true), mHasQPC(false) {}
 
  public:
   MFBT_API uint64_t operator-(const TimeStampValue& aOther) const;
@@ -67,25 +76,29 @@ class TimeStampValue {
   MFBT_API TimeStampValue& operator+=(const int64_t aOther);
   MFBT_API TimeStampValue& operator-=(const int64_t aOther);
 
-  bool operator<(const TimeStampValue& aOther) const {
-    return int64_t(*this - aOther) < 0;
+  constexpr bool operator<(const TimeStampValue& aOther) const {
+    return mHasQPC && aOther.mHasQPC ? mQPC < aOther.mQPC : mGTC < aOther.mGTC;
   }
-  bool operator>(const TimeStampValue& aOther) const {
-    return int64_t(*this - aOther) > 0;
+  constexpr bool operator>(const TimeStampValue& aOther) const {
+    return mHasQPC && aOther.mHasQPC ? mQPC > aOther.mQPC : mGTC > aOther.mGTC;
   }
-  bool operator<=(const TimeStampValue& aOther) const {
-    return int64_t(*this - aOther) <= 0;
+  constexpr bool operator<=(const TimeStampValue& aOther) const {
+    return mHasQPC && aOther.mHasQPC ? mQPC <= aOther.mQPC
+                                     : mGTC <= aOther.mGTC;
   }
-  bool operator>=(const TimeStampValue& aOther) const {
-    return int64_t(*this - aOther) >= 0;
+  constexpr bool operator>=(const TimeStampValue& aOther) const {
+    return mHasQPC && aOther.mHasQPC ? mQPC >= aOther.mQPC
+                                     : mGTC >= aOther.mGTC;
   }
-  bool operator==(const TimeStampValue& aOther) const {
-    return int64_t(*this - aOther) == 0;
+  constexpr bool operator==(const TimeStampValue& aOther) const {
+    return mHasQPC && aOther.mHasQPC ? mQPC == aOther.mQPC
+                                     : mGTC == aOther.mGTC;
   }
-  bool operator!=(const TimeStampValue& aOther) const {
-    return int64_t(*this - aOther) != 0;
+  constexpr bool operator!=(const TimeStampValue& aOther) const {
+    return mHasQPC && aOther.mHasQPC ? mQPC != aOther.mQPC
+                                     : mGTC != aOther.mGTC;
   }
-  bool IsNull() const { return mIsNull; }
+  constexpr bool IsNull() const { return mIsNull; }
 
 #if defined(DEBUG)
   uint64_t GTC() const { return mGTC; }

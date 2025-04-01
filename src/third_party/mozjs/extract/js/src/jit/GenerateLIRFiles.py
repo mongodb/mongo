@@ -5,8 +5,6 @@
 # This script generates jit/LIROpsGenerated.h (list of LIR instructions)
 # from LIROps.yaml.
 
-from collections import OrderedDict
-
 import buildconfig
 import six
 import yaml
@@ -37,20 +35,7 @@ def load_yaml(yaml_path):
     pp.do_filter("substitution")
     pp.do_include(yaml_path)
     contents = pp.out.getvalue()
-
-    # Load into an OrderedDict to ensure order is preserved. Note: Python 3.7
-    # also preserves ordering for normal dictionaries.
-    # Code based on https://stackoverflow.com/a/21912744.
-    class OrderedLoader(yaml.Loader):
-        pass
-
-    def construct_mapping(loader, node):
-        loader.flatten_mapping(node)
-        return OrderedDict(loader.construct_pairs(node))
-
-    tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
-    OrderedLoader.add_constructor(tag, construct_mapping)
-    return yaml.load(contents, OrderedLoader)
+    return yaml.safe_load(contents)
 
 
 def generate_header(c_out, includeguard, contents):
@@ -256,10 +241,10 @@ def generate_lir_header(c_out, yaml_path):
                 assert result_types[result_type]
 
             operands = op.get("operands", None)
-            assert operands is None or OrderedDict
+            assert operands is None or isinstance(operands, dict)
 
             arguments = op.get("arguments", None)
-            assert arguments is None or isinstance(arguments, OrderedDict)
+            assert arguments is None or isinstance(arguments, dict)
 
             num_temps = op.get("num_temps", 0)
             assert num_temps is None or int

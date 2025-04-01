@@ -6,6 +6,8 @@
 
 #include "js/UbiNodeCensus.h"
 
+#include "mozilla/ScopeExit.h"
+
 #include "builtin/MapObject.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/Printer.h"
@@ -49,13 +51,12 @@ class SimpleCount : public CountType {
  public:
   explicit SimpleCount(UniqueTwoByteChars& label, bool reportCount = true,
                        bool reportBytes = true)
-      : CountType(),
-        label(std::move(label)),
+      : label(std::move(label)),
         reportCount(reportCount),
         reportBytes(reportBytes) {}
 
   explicit SimpleCount()
-      : CountType(), label(nullptr), reportCount(true), reportBytes(true) {}
+      : label(nullptr), reportCount(true), reportBytes(true) {}
 
   void destructCount(CountBase& countBase) override {
     Count& count = static_cast<Count&>(countBase);
@@ -122,11 +123,11 @@ class BucketCount : public CountType {
   struct Count : CountBase {
     JS::ubi::Vector<JS::ubi::Node::Id> ids_;
 
-    explicit Count(BucketCount& count) : CountBase(count), ids_() {}
+    explicit Count(BucketCount& count) : CountBase(count) {}
   };
 
  public:
-  explicit BucketCount() : CountType() {}
+  explicit BucketCount() = default;
 
   void destructCount(CountBase& countBase) override {
     Count& count = static_cast<Count&>(countBase);
@@ -202,8 +203,7 @@ class ByCoarseType : public CountType {
   ByCoarseType(CountTypePtr& objects, CountTypePtr& scripts,
                CountTypePtr& strings, CountTypePtr& other,
                CountTypePtr& domNode)
-      : CountType(),
-        objects(std::move(objects)),
+      : objects(std::move(objects)),
         scripts(std::move(scripts)),
         strings(std::move(strings)),
         other(std::move(other)),
@@ -412,9 +412,7 @@ class ByObjectClass : public CountType {
 
  public:
   ByObjectClass(CountTypePtr& classesType, CountTypePtr& otherType)
-      : CountType(),
-        classesType(std::move(classesType)),
-        otherType(std::move(otherType)) {}
+      : classesType(std::move(classesType)), otherType(std::move(otherType)) {}
 
   void destructCount(CountBase& countBase) override {
     Count& count = static_cast<Count&>(countBase);
@@ -524,7 +522,7 @@ class ByDomObjectClass : public CountType {
 
  public:
   explicit ByDomObjectClass(CountTypePtr& classesType)
-      : CountType(), classesType(std::move(classesType)) {}
+      : classesType(std::move(classesType)) {}
 
   void destructCount(CountBase& countBase) override {
     Count& count = static_cast<Count&>(countBase);
@@ -618,7 +616,7 @@ class ByUbinodeType : public CountType {
 
  public:
   explicit ByUbinodeType(CountTypePtr& entryType)
-      : CountType(), entryType(std::move(entryType)) {}
+      : entryType(std::move(entryType)) {}
 
   void destructCount(CountBase& countBase) override {
     Count& count = static_cast<Count&>(countBase);
@@ -763,9 +761,7 @@ class ByAllocationStack : public CountType {
 
  public:
   ByAllocationStack(CountTypePtr& entryType, CountTypePtr& noStackType)
-      : CountType(),
-        entryType(std::move(entryType)),
-        noStackType(std::move(noStackType)) {}
+      : entryType(std::move(entryType)), noStackType(std::move(noStackType)) {}
 
   void destructCount(CountBase& countBase) override {
     Count& count = static_cast<Count&>(countBase);
@@ -941,8 +937,7 @@ class ByFilename : public CountType {
 
  public:
   ByFilename(CountTypePtr&& thenType, CountTypePtr&& noFilenameType)
-      : CountType(),
-        thenType(std::move(thenType)),
+      : thenType(std::move(thenType)),
         noFilenameType(std::move(noFilenameType)) {}
 
   void destructCount(CountBase& countBase) override {
@@ -1069,17 +1064,19 @@ JS_PUBLIC_API bool CensusHandler::operator()(
 
 /*** Parsing Breakdowns *****************************************************/
 
-static CountTypePtr ParseChildBreakdown(JSContext* cx, HandleObject breakdown,
-                                        PropertyName* prop) {
+static CountTypePtr ParseChildBreakdown(
+    JSContext* cx, HandleObject breakdown, PropertyName* prop,
+    MutableHandle<GCVector<JSLinearString*>> seen) {
   RootedValue v(cx);
   if (!GetProperty(cx, breakdown, breakdown, prop, &v)) {
     return nullptr;
   }
-  return ParseBreakdown(cx, v);
+  return ParseBreakdown(cx, v, seen);
 }
 
-JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
-                                          HandleValue breakdownValue) {
+JS_PUBLIC_API CountTypePtr
+ParseBreakdown(JSContext* cx, HandleValue breakdownValue,
+               MutableHandle<GCVector<JSLinearString*>> seen) {
   if (breakdownValue.isUndefined()) {
     // Construct the default type, { by: 'count' }
     CountTypePtr simple(cx->new_<SimpleCount>());
@@ -1103,6 +1100,24 @@ JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
   if (!by) {
     return nullptr;
   }
+
+  for (auto candidate : seen.get()) {
+    if (EqualStrings(by, candidate)) {
+      UniqueChars byBytes = QuoteString(cx, by, '"');
+      if (!byBytes) {
+        return nullptr;
+      }
+
+      JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                                JSMSG_DEBUG_CENSUS_BREAKDOWN_NESTED,
+                                byBytes.get());
+      return nullptr;
+    }
+  }
+  if (!seen.append(by)) {
+    return nullptr;
+  }
+  auto popper = mozilla::MakeScopeExit([&]() { seen.popBack(); });
 
   if (StringEqualsLiteral(by, "count")) {
     RootedValue countValue(cx), bytesValue(cx);
@@ -1147,13 +1162,14 @@ JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
   }
 
   if (StringEqualsLiteral(by, "objectClass")) {
-    CountTypePtr thenType(ParseChildBreakdown(cx, breakdown, cx->names().then));
+    CountTypePtr thenType(
+        ParseChildBreakdown(cx, breakdown, cx->names().then, seen));
     if (!thenType) {
       return nullptr;
     }
 
     CountTypePtr otherType(
-        ParseChildBreakdown(cx, breakdown, cx->names().other));
+        ParseChildBreakdown(cx, breakdown, cx->names().other, seen));
     if (!otherType) {
       return nullptr;
     }
@@ -1163,27 +1179,27 @@ JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
 
   if (StringEqualsLiteral(by, "coarseType")) {
     CountTypePtr objectsType(
-        ParseChildBreakdown(cx, breakdown, cx->names().objects));
+        ParseChildBreakdown(cx, breakdown, cx->names().objects, seen));
     if (!objectsType) {
       return nullptr;
     }
     CountTypePtr scriptsType(
-        ParseChildBreakdown(cx, breakdown, cx->names().scripts));
+        ParseChildBreakdown(cx, breakdown, cx->names().scripts, seen));
     if (!scriptsType) {
       return nullptr;
     }
     CountTypePtr stringsType(
-        ParseChildBreakdown(cx, breakdown, cx->names().strings));
+        ParseChildBreakdown(cx, breakdown, cx->names().strings, seen));
     if (!stringsType) {
       return nullptr;
     }
     CountTypePtr otherType(
-        ParseChildBreakdown(cx, breakdown, cx->names().other));
+        ParseChildBreakdown(cx, breakdown, cx->names().other, seen));
     if (!otherType) {
       return nullptr;
     }
     CountTypePtr domNodeType(
-        ParseChildBreakdown(cx, breakdown, cx->names().domNode));
+        ParseChildBreakdown(cx, breakdown, cx->names().domNode, seen));
     if (!domNodeType) {
       return nullptr;
     }
@@ -1193,7 +1209,8 @@ JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
   }
 
   if (StringEqualsLiteral(by, "internalType")) {
-    CountTypePtr thenType(ParseChildBreakdown(cx, breakdown, cx->names().then));
+    CountTypePtr thenType(
+        ParseChildBreakdown(cx, breakdown, cx->names().then, seen));
     if (!thenType) {
       return nullptr;
     }
@@ -1202,7 +1219,8 @@ JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
   }
 
   if (StringEqualsLiteral(by, "descriptiveType")) {
-    CountTypePtr thenType(ParseChildBreakdown(cx, breakdown, cx->names().then));
+    CountTypePtr thenType(
+        ParseChildBreakdown(cx, breakdown, cx->names().then, seen));
     if (!thenType) {
       return nullptr;
     }
@@ -1210,12 +1228,13 @@ JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
   }
 
   if (StringEqualsLiteral(by, "allocationStack")) {
-    CountTypePtr thenType(ParseChildBreakdown(cx, breakdown, cx->names().then));
+    CountTypePtr thenType(
+        ParseChildBreakdown(cx, breakdown, cx->names().then, seen));
     if (!thenType) {
       return nullptr;
     }
     CountTypePtr noStackType(
-        ParseChildBreakdown(cx, breakdown, cx->names().noStack));
+        ParseChildBreakdown(cx, breakdown, cx->names().noStack, seen));
     if (!noStackType) {
       return nullptr;
     }
@@ -1224,13 +1243,14 @@ JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
   }
 
   if (StringEqualsLiteral(by, "filename")) {
-    CountTypePtr thenType(ParseChildBreakdown(cx, breakdown, cx->names().then));
+    CountTypePtr thenType(
+        ParseChildBreakdown(cx, breakdown, cx->names().then, seen));
     if (!thenType) {
       return nullptr;
     }
 
     CountTypePtr noFilenameType(
-        ParseChildBreakdown(cx, breakdown, cx->names().noFilename));
+        ParseChildBreakdown(cx, breakdown, cx->names().noFilename, seen));
     if (!noFilenameType) {
       return nullptr;
     }
@@ -1314,8 +1334,9 @@ JS_PUBLIC_API bool ParseCensusOptions(JSContext* cx, Census& census,
     return false;
   }
 
+  Rooted<GCVector<JSLinearString*>> seen(cx, cx);
   outResult = breakdown.isUndefined() ? GetDefaultBreakdown(cx)
-                                      : ParseBreakdown(cx, breakdown);
+                                      : ParseBreakdown(cx, breakdown, &seen);
   return !!outResult;
 }
 

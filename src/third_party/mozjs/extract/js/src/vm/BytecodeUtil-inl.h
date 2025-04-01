@@ -10,6 +10,7 @@
 #include "vm/BytecodeUtil.h"
 
 #include "frontend/SourceNotes.h"  // SrcNote, SrcNoteType, SrcNoteIterator
+#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin, JS::ColumnNumberOffset
 #include "vm/JSScript.h"
 
 namespace js {
@@ -120,12 +121,13 @@ class BytecodeRangeWithPosition : private BytecodeRange {
         lineno(script->lineno()),
         column(script->column()),
         sn(script->notes()),
+        snEnd(script->notesEnd()),
         snpc(script->code()),
         isEntryPoint(false),
         isBreakpoint(false),
         seenStepSeparator(false),
         wasArtifactEntryPoint(false) {
-    if (!sn->isTerminator()) {
+    if (sn < snEnd) {
       snpc += sn->delta();
     }
     updatePosition();
@@ -162,8 +164,8 @@ class BytecodeRangeWithPosition : private BytecodeRange {
     }
   }
 
-  size_t frontLineNumber() const { return lineno; }
-  size_t frontColumnNumber() const { return column; }
+  uint32_t frontLineNumber() const { return lineno; }
+  JS::LimitedColumnNumberOneOrigin frontColumnNumber() const { return column; }
 
   // Entry points are restricted to bytecode offsets that have an
   // explicit mention in the line table.  This restriction avoids a
@@ -194,31 +196,35 @@ class BytecodeRangeWithPosition : private BytecodeRange {
     // Determine the current line number by reading all source notes up to
     // and including the current offset.
     jsbytecode* lastLinePC = nullptr;
-    SrcNoteIterator iter(sn);
-    for (; !iter.atEnd() && snpc <= frontPC();
-         ++iter, snpc += (*iter)->delta()) {
+    SrcNoteIterator iter(sn, snEnd);
+    while (!iter.atEnd() && snpc <= frontPC()) {
       auto sn = *iter;
 
       SrcNoteType type = sn->type();
       if (type == SrcNoteType::ColSpan) {
-        ptrdiff_t colspan = SrcNote::ColSpan::getSpan(sn);
-        MOZ_ASSERT(ptrdiff_t(column) + colspan >= 0);
-        column += colspan;
-        lastLinePC = snpc;
+        column += SrcNote::ColSpan::getSpan(sn);
       } else if (type == SrcNoteType::SetLine) {
         lineno = SrcNote::SetLine::getLine(sn, initialLine);
-        column = 0;
-        lastLinePC = snpc;
+        column = JS::LimitedColumnNumberOneOrigin();
+      } else if (type == SrcNoteType::SetLineColumn) {
+        lineno = SrcNote::SetLineColumn::getLine(sn, initialLine);
+        column = SrcNote::SetLineColumn::getColumn(sn);
       } else if (type == SrcNoteType::NewLine) {
         lineno++;
-        column = 0;
-        lastLinePC = snpc;
+        column = JS::LimitedColumnNumberOneOrigin();
+      } else if (type == SrcNoteType::NewLineColumn) {
+        lineno++;
+        column = SrcNote::NewLineColumn::getColumn(sn);
       } else if (type == SrcNoteType::Breakpoint) {
         isBreakpoint = true;
-        lastLinePC = snpc;
-      } else if (type == SrcNoteType::StepSep) {
+      } else if (type == SrcNoteType::BreakpointStepSep) {
+        isBreakpoint = true;
         seenStepSeparator = true;
-        lastLinePC = snpc;
+      }
+      lastLinePC = snpc;
+      ++iter;
+      if (!iter.atEnd()) {
+        snpc += (*iter)->delta();
       }
     }
 
@@ -226,10 +232,16 @@ class BytecodeRangeWithPosition : private BytecodeRange {
     isEntryPoint = lastLinePC == frontPC();
   }
 
-  size_t initialLine;
-  size_t lineno;
-  size_t column;
+  uint32_t initialLine;
+
+  // Line number (1-origin).
+  uint32_t lineno;
+
+  // Column number in UTF-16 code units.
+  JS::LimitedColumnNumberOneOrigin column;
+
   const SrcNote* sn;
+  const SrcNote* snEnd;
   jsbytecode* snpc;
   bool isEntryPoint;
   bool isBreakpoint;

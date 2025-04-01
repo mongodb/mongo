@@ -9,6 +9,7 @@
 #ifndef mozilla_UniquePtr_h
 #define mozilla_UniquePtr_h
 
+#include <memory>
 #include <type_traits>
 #include <utility>
 
@@ -644,5 +645,93 @@ void swap(mozilla::UniquePtr<T, D>& aX, mozilla::UniquePtr<T, D>& aY) {
 }
 
 }  // namespace std
+
+/**
+TempPtrToSetter(UniquePtr<T>*) -> T**-ish
+TempPtrToSetter(std::unique_ptr<T>*) -> T**-ish
+
+Make a temporary class to support assigning to UniquePtr/unique_ptr via passing
+a pointer to the callee.
+
+Often, APIs will be shaped like this trivial example:
+```
+nsresult Foo::NewChildBar(Bar** out) {
+  if (!IsOk()) return NS_ERROR_FAILURE;
+  *out = new Bar(this);
+  return NS_OK;
+}
+```
+
+In order to make this work with unique ptrs, it's often either risky or
+overwrought:
+```
+Bar* bar = nullptr;
+const auto cleanup = MakeScopeExit([&]() {
+  if (bar) {
+    delete bar;
+  }
+});
+if (FAILED(foo->NewChildBar(&bar)) {
+  // handle it
+}
+```
+
+```
+UniquePtr<Bar> bar;
+{
+  Bar* raw = nullptr;
+  const auto res = foo->NewChildBar(&bar);
+  bar.reset(raw);
+  if (FAILED(res) {
+    // handle it
+  }
+}
+```
+TempPtrToSettable is a shorthand for the latter approach, allowing something
+cleaner but also safe:
+
+```
+UniquePtr<Bar> bar;
+if (FAILED(foo->NewChildBar(TempPtrToSetter(&bar))) {
+  // handle it
+}
+```
+*/
+
+namespace mozilla {
+namespace detail {
+
+template <class T, class UniquePtrT>
+class MOZ_TEMPORARY_CLASS TempPtrToSetterT final {
+ private:
+  UniquePtrT* const mDest;
+  T* mNewVal;
+
+ public:
+  explicit TempPtrToSetterT(UniquePtrT* dest)
+      : mDest(dest), mNewVal(mDest->get()) {}
+
+  operator T**() { return &mNewVal; }
+
+  ~TempPtrToSetterT() {
+    if (mDest->get() != mNewVal) {
+      mDest->reset(mNewVal);
+    }
+  }
+};
+
+}  // namespace detail
+
+template <class T, class Deleter>
+auto TempPtrToSetter(UniquePtr<T, Deleter>* const p) {
+  return detail::TempPtrToSetterT<T, UniquePtr<T, Deleter>>{p};
+}
+
+template <class T, class Deleter>
+auto TempPtrToSetter(std::unique_ptr<T, Deleter>* const p) {
+  return detail::TempPtrToSetterT<T, std::unique_ptr<T, Deleter>>{p};
+}
+
+}  // namespace mozilla
 
 #endif /* mozilla_UniquePtr_h */

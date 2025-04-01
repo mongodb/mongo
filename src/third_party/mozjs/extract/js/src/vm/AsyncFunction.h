@@ -8,7 +8,6 @@
 #define vm_AsyncFunction_h
 
 #include "js/Class.h"
-#include "vm/AsyncFunctionResolveKind.h"  // AsyncFunctionResolveKind
 #include "vm/GeneratorObject.h"
 #include "vm/JSObject.h"
 #include "vm/PromiseObject.h"
@@ -66,7 +65,7 @@
 //
 // ```
 //   GetAliasedVar ".generator"      # VALUE .generator
-//   AsyncResolve 0                  # PROMISE
+//   AsyncResolve                    # PROMISE
 //   SetRval                         #
 //   GetAliasedVar ".generator"      # .generator
 //   FinalYieldRval                  #
@@ -119,9 +118,9 @@
 //   Goto BODY                       #
 //
 //   JumpTarget from try             #
-//   Exception                       # EXCEPTION
-//   GetAliasedVar ".generator"      # EXCEPTION .generator
-//   AsyncResolve 1                  # PROMISE
+//   ExceptionAndStack               # EXCEPTION STACK
+//   GetAliasedVar ".generator"      # EXCEPTION STACK .generator
+//   AsyncReject                     # PROMISE
 //   SetRval                         #
 //   GetAliasedVar ".generator"      # .generator
 //   FinalYieldRval                  #
@@ -132,9 +131,9 @@
 //   (body here)                     #
 //
 //   JumpTarget from try             #
-//   Exception                       # EXCEPTION
-//   GetAliasedVar ".generator"      # EXCEPTION .generator
-//   AsyncResolve 1                  # PROMISE
+//   ExceptionAndStack               # EXCEPTION STACK
+//   GetAliasedVar ".generator"      # EXCEPTION STACK .generator
+//   AsyncReject                     # PROMISE
 //   SetRval                         #
 //   GetAliasedVar ".generator"      # .generator
 //   FinalYieldRval                  #
@@ -294,8 +293,13 @@ extern const JSClass AsyncFunctionClass;
 // return the promise object.
 JSObject* AsyncFunctionResolve(JSContext* cx,
                                Handle<AsyncFunctionGeneratorObject*> generator,
-                               HandleValue valueOrReason,
-                               AsyncFunctionResolveKind resolveKind);
+                               HandleValue value);
+
+// Reject the async function's promise object with the given value and then
+// return the promise object.
+JSObject* AsyncFunctionReject(JSContext* cx,
+                              Handle<AsyncFunctionGeneratorObject*> generator,
+                              HandleValue reason, HandleValue stack);
 
 class AsyncFunctionGeneratorObject : public AbstractGeneratorObject {
  public:

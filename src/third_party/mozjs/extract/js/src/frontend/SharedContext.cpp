@@ -45,7 +45,8 @@ SharedContext::SharedContext(FrontendContext* fc, Kind kind,
       inClass_(false),
       localStrict(false),
       hasExplicitUseStrict_(false),
-      isScriptExtraFieldCopiedToStencil(false) {
+      isScriptExtraFieldCopiedToStencil(false),
+      eligibleForArgumentsLength(true) {
   // Compute the script kind "input" flags.
   if (kind == Kind::FunctionBox) {
     setFlag(ImmutableFlags::IsFunction);

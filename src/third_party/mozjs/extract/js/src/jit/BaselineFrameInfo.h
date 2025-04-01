@@ -227,7 +227,7 @@ class CompilerFrameInfo : public FrameInfo {
 
  public:
   CompilerFrameInfo(JSScript* script, MacroAssembler& masm)
-      : FrameInfo(masm), script(script), stack(), spIndex(0) {}
+      : FrameInfo(masm), script(script), spIndex(0) {}
   [[nodiscard]] bool init(TempAllocator& alloc);
 
   size_t nlocals() const { return script->nfixed(); }

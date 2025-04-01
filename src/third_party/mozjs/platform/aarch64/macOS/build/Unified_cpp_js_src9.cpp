@@ -1,4 +1,22 @@
 #define MOZ_UNIFIED_BUILD
+#include "vm/BigIntType.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "vm/BigIntType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "vm/BigIntType.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "vm/BoundFunctionObject.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "vm/BoundFunctionObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "vm/BoundFunctionObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "vm/BuildId.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "vm/BuildId.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -33,23 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "vm/BytecodeUtil.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "vm/CallAndConstruct.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/CallAndConstruct.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "vm/CallAndConstruct.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "vm/CallNonGenericMethod.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/CallNonGenericMethod.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "vm/CallNonGenericMethod.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

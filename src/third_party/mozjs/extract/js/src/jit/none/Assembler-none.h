@@ -105,12 +105,21 @@ static constexpr Register WasmJitEntryReturnScratch{Registers::invalid_reg};
 static constexpr Register WasmCallRefCallScratchReg0{Registers::invalid_reg};
 static constexpr Register WasmCallRefCallScratchReg1{Registers::invalid_reg};
 static constexpr Register WasmCallRefReg{Registers::invalid_reg};
+static constexpr Register WasmTailCallInstanceScratchReg{
+    Registers::invalid_reg};
+static constexpr Register WasmTailCallRAScratchReg{Registers::invalid_reg};
+static constexpr Register WasmTailCallFPScratchReg{Registers::invalid_reg};
 
 static constexpr uint32_t ABIStackAlignment = 4;
 static constexpr uint32_t CodeAlignment = 16;
+#ifdef ENABLE_PORTABLE_BASELINE_INTERP
+static constexpr uint32_t JitStackAlignment = sizeof(void*);
+static constexpr uint32_t JitStackValueAlignment = 1;
+#else
 static constexpr uint32_t JitStackAlignment = 8;
 static constexpr uint32_t JitStackValueAlignment =
     JitStackAlignment / sizeof(Value);
+#endif
 
 static const Scale ScalePointer = TimesOne;
 

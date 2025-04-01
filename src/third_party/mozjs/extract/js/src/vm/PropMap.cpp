@@ -6,13 +6,17 @@
 
 #include "vm/PropMap-inl.h"
 
-#include "gc/Allocator.h"
+#include "mozilla/Sprintf.h"
+
 #include "gc/HashUtil.h"
 #include "js/GCVector.h"
+#include "js/Printer.h"  // js::GenericPrinter, js::Fprinter
 #include "vm/JSObject.h"
+#include "vm/JSONPrinter.h"  // JSONPrinter
 
 #include "gc/GCContext-inl.h"
 #include "gc/Marking-inl.h"
+#include "vm/JSContext-inl.h"
 #include "vm/ObjectFlags-inl.h"
 
 using namespace js;
@@ -964,18 +968,20 @@ void PropMapTable::trace(JSTracer* trc) {
 }
 
 #ifdef JSGC_HASH_TABLE_CHECKS
-void PropMapTable::checkAfterMovingGC() {
-  for (Set::Enum e(set_); !e.empty(); e.popFront()) {
-    PropMap* map = e.front().map();
+void PropMapTable::checkAfterMovingGC(JS::Zone* zone) {
+  CheckTableAfterMovingGC(set_, [zone](const auto& entry) {
+    PropMap* map = entry.map();
     MOZ_ASSERT(map);
-    CheckGCThingAfterMovingGC(map);
+    CheckGCThingAfterMovingGC(map, zone);
 
-    PropertyKey key = map->getKey(e.front().index());
+    PropertyKey key = map->getKey(entry.index());
     MOZ_RELEASE_ASSERT(!key.isVoid());
+    if (key.isGCThing()) {
+      CheckGCThingAfterMovingGC(key.toGCThing(), zone);
+    }
 
-    auto p = lookupRaw(key);
-    MOZ_RELEASE_ASSERT(p.found() && *p == e.front());
-  }
+    return key;
+  });
 }
 #endif
 
@@ -1028,85 +1034,222 @@ bool LinkedPropMap::createTable(JSContext* cx) {
   return true;
 }
 
-#ifdef DEBUG
-void PropMap::dump(js::GenericPrinter& out) const {
-  out.printf("map @ 0x%p\n", this);
-  out.printf("previous: 0x%p\n",
-             hasPrevious() ? asLinked()->previous() : nullptr);
-
-  if (canHaveTable()) {
-    out.printf("table: 0x%p\n", asLinked()->data_.table);
-  } else {
-    out.printf("table: (too small for table)\n");
-  }
-
-  if (isShared()) {
-    out.printf("type: shared\n");
-    out.printf("  compact: %s\n", isCompact() ? "yes" : "no");
-    SharedPropMapAndIndex parent = asShared()->treeDataRef().parent;
-    if (parent.isNone()) {
-      out.printf("  parent: (none)\n");
-    } else {
-      out.printf("  parent: 0x%p [%u]\n", parent.map(), parent.index());
-    }
-  } else {
-    const DictionaryPropMap* dictMap = asDictionary();
-    out.printf("type: dictionary\n");
-    out.printf("  freeList: %u\n", dictMap->freeList_);
-    out.printf("  holeCount: %u\n", dictMap->holeCount_);
-  }
-
-  out.printf("properties:\n");
-  for (uint32_t i = 0; i < Capacity; i++) {
-    out.printf("  %u: ", i);
-
-    if (!hasKey(i)) {
-      out.printf("(empty)\n");
-      continue;
-    }
-
-    PropertyKey key = getKey(i);
-    if (key.isInt()) {
-      out.printf("[%d]", key.toInt());
-    } else if (key.isAtom()) {
-      EscapedStringPrinter(out, key.toAtom(), '"');
-    } else {
-      MOZ_ASSERT(key.isSymbol());
-      key.toSymbol()->dump(out);
-    }
-
-    PropertyInfo prop = getPropertyInfo(i);
-    out.printf(" slot %u flags 0x%x ", prop.maybeSlot(), prop.flags().toRaw());
-
-    if (!prop.flags().isEmpty()) {
-      bool first = true;
-      auto dumpFlag = [&](PropertyFlag flag, const char* name) {
-        if (!prop.flags().hasFlag(flag)) {
-          return;
-        }
-        if (!first) {
-          out.putChar(' ');
-        }
-        out.put(name);
-        first = false;
-      };
-      out.putChar('(');
-      dumpFlag(PropertyFlag::Enumerable, "enumerable");
-      dumpFlag(PropertyFlag::Configurable, "configurable");
-      dumpFlag(PropertyFlag::Writable, "writable");
-      dumpFlag(PropertyFlag::AccessorProperty, "accessor");
-      dumpFlag(PropertyFlag::CustomDataProperty, "custom-data");
-      out.putChar(')');
-    }
-    out.putChar('\n');
-  }
-}
-
+#if defined(DEBUG) || defined(JS_JITSPEW)
 void PropMap::dump() const {
   Fprinter out(stderr);
   dump(out);
 }
 
+void PropMap::dump(js::GenericPrinter& out) const {
+  js::JSONPrinter json(out);
+  dump(json);
+  out.put("\n");
+}
+
+void PropMap::dump(js::JSONPrinter& json) const {
+  json.beginObject();
+  dumpFields(json);
+  json.endObject();
+}
+
+template <typename KnownF, typename UnknownF>
+void ForEachPropertyFlag(PropertyFlags flags, KnownF known, UnknownF unknown) {
+  uint8_t raw = flags.toRaw();
+  for (uint8_t i = 1; i; i = i << 1) {
+    if (!(raw & i)) {
+      continue;
+    }
+    switch (PropertyFlag(raw & i)) {
+      case PropertyFlag::Configurable:
+        known("Configurable");
+        break;
+      case PropertyFlag::Enumerable:
+        known("Enumerable");
+        break;
+      case PropertyFlag::Writable:
+        known("Writable");
+        break;
+      case PropertyFlag::AccessorProperty:
+        known("AccessorProperty");
+        break;
+      case PropertyFlag::CustomDataProperty:
+        known("UseWatchtowerTestingCallback");
+        break;
+      default:
+        unknown(i);
+        break;
+    }
+  }
+}
+
+template <typename KnownF, typename UnknownF>
+/* static */
+void PropMap::forEachPropMapFlag(uintptr_t flags, KnownF known,
+                                 UnknownF unknown) {
+  for (uintptr_t i = 1 << gc::CellFlagBitsReservedForGC;
+       i < 1 << PropMap::NumPreviousMapsShift; i = i << 1) {
+    if (!(flags & i)) {
+      continue;
+    }
+    switch (flags & i) {
+      case PropMap::Flags::IsCompactFlag:
+        known("IsCompactFlag");
+        break;
+      case PropMap::Flags::HasPrevFlag:
+        known("HasPrevFlag");
+        break;
+      case PropMap::Flags::IsDictionaryFlag:
+        known("IsDictionaryFlag");
+        break;
+      case PropMap::Flags::CanHaveTableFlag:
+        known("CanHaveTableFlag");
+        break;
+      case PropMap::Flags::HasChildrenSetFlag:
+        known("HasChildrenSetFlag");
+        break;
+      case PropMap::Flags::HadDictionaryConversionFlag:
+        known("HadDictionaryConversionFlag");
+        break;
+      default:
+        unknown(i);
+        break;
+    }
+  }
+}
+
+const char* PropMapTypeToString(const js::PropMap* map) {
+  if (map->isLinked()) {
+    return "js::LinkedPropMap";
+  }
+
+  if (map->isShared()) {
+    if (map->isCompact()) {
+      return "js::CompactPropMap";
+    }
+    return "js::NormalPropMap";
+  }
+
+  return "js::DictionaryPropMap";
+}
+
+void PropMap::dumpFields(js::JSONPrinter& json) const {
+  json.formatProperty("address", "(%s*)0x%p", PropMapTypeToString(this), this);
+
+  json.beginInlineListProperty("flags");
+  forEachPropMapFlag(
+      flags(), [&](const char* name) { json.value("%s", name); },
+      [&](uint32_t value) { json.value("Unknown(%08x)", value); });
+  json.endInlineList();
+
+  if (isLinked()) {
+    asLinked()->dumpOwnFields(json);
+  } else if (isShared()) {
+    asShared()->dumpOwnFields(json);
+  } else {
+    asDictionary()->dumpOwnFields(json);
+  }
+
+  json.beginObjectProperty("properties");
+  for (uint32_t i = 0; i < Capacity; i++) {
+    char name[64];
+    SprintfLiteral(name, "%u", i);
+
+    if (!hasKey(i)) {
+      json.nullProperty(name);
+      return;
+    }
+
+    json.beginObjectProperty(name);
+    dumpFieldsAt(json, i);
+    json.endObject();
+  }
+  json.endObject();
+}
+
+void LinkedPropMap::dumpOwnFields(js::JSONPrinter& json) const {
+  if (hasPrevious()) {
+    json.formatProperty("previous", "(%s*)0x%p",
+                        PropMapTypeToString(previous()), previous());
+  }
+
+  if (canHaveTable()) {
+    json.formatProperty("table", "(js::PropMapTable*)0x%p", data_.table);
+  }
+}
+
+void SharedPropMap::dumpOwnFields(js::JSONPrinter& json) const {
+  SharedPropMapAndIndex parent = treeDataRef().parent;
+  if (parent.isNone()) {
+    json.nullProperty("parent");
+  } else {
+    json.formatProperty("parent", "(%s*)0x%p [%u]",
+                        PropMapTypeToString(parent.map()), parent.map(),
+                        parent.index());
+  }
+}
+
+void DictionaryPropMap::dumpOwnFields(js::JSONPrinter& json) const {
+  json.property("freeList", freeList_);
+  json.property("holeCount", holeCount_);
+}
+
+void PropMap::dumpFieldsAt(js::JSONPrinter& json, uint32_t index) const {
+  PropertyKey key = getKey(index);
+  js::GenericPrinter& out = json.beginStringProperty("key");
+  key.dumpStringContent(out);
+  json.endStringProperty();
+
+  PropertyInfo prop = getPropertyInfo(index);
+  json.beginInlineListProperty("flags");
+  ForEachPropertyFlag(
+      prop.flags(), [&](const char* name) { json.value("%s", name); },
+      [&](uint8_t value) { json.value("Unknown(%02x)", value); });
+  json.endInlineList();
+
+  if (prop.hasSlot()) {
+    json.property("slot", prop.slot());
+  }
+}
+
+void PropMap::dumpDescriptorStringContentAt(js::GenericPrinter& out,
+                                            uint32_t index) const {
+  PropertyInfo prop = getPropertyInfo(index);
+
+  out.printf("map=(%s*)0x%p, index=%u", PropMapTypeToString(this), this, index);
+
+  if (prop.enumerable()) {
+    out.put(", enumerable");
+  }
+  if (prop.configurable()) {
+    out.put(", configurable");
+  }
+  if (prop.isDataDescriptor() && prop.writable()) {
+    out.put(", writable");
+  }
+
+  if (prop.isCustomDataProperty()) {
+    out.printf(", <custom-data-prop>");
+  }
+
+  if (prop.hasSlot()) {
+    out.printf(", slot=%u", prop.slot());
+  }
+}
+
+JS::UniqueChars PropMap::getPropertyNameAt(uint32_t index) const {
+  Sprinter sp;
+  if (!sp.init()) {
+    return nullptr;
+  }
+
+  PropertyKey key = getKey(index);
+  key.dumpPropertyName(sp);
+
+  return sp.release();
+}
+#endif  // defined(DEBUG) || defined(JS_JITSPEW)
+
+#ifdef DEBUG
 void PropMap::checkConsistency(NativeObject* obj) const {
   const uint32_t mapLength = obj->shape()->propMapLength();
   MOZ_ASSERT(mapLength <= PropMap::Capacity);

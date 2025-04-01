@@ -157,7 +157,7 @@ struct FloatRegister {
 inline bool hasUnaliasedDouble() { MOZ_CRASH(); }
 inline bool hasMultiAlias() { MOZ_CRASH(); }
 
-static const uint32_t ShadowStackSpace = 0;
+static constexpr uint32_t ShadowStackSpace = 0;
 static const uint32_t JumpImmediateRange = INT32_MAX;
 
 #ifdef JS_NUNBOX32

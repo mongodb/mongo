@@ -6,8 +6,12 @@
 #define frontend_DecoratorEmitter_h
 
 #include "mozilla/Attributes.h"
+#include "mozilla/Maybe.h"
 
 #include "frontend/ParseNode.h"
+
+#include "js/AllocPolicy.h"
+#include "js/Vector.h"
 
 namespace js::frontend {
 
@@ -29,7 +33,19 @@ class MOZ_STACK_CLASS DecoratorEmitter {
                                                           ListNode* decorators,
                                                           bool isStatic);
 
+  [[nodiscard]] bool emitApplyDecoratorsToAccessorDefinition(
+      ParseNode* key, ListNode* decorators, bool isStatic);
+
+  [[nodiscard]] bool emitApplyDecoratorsToClassDefinition(ParseNode* key,
+                                                          ListNode* decorators);
+
   [[nodiscard]] bool emitInitializeFieldOrAccessor();
+
+  [[nodiscard]] bool emitCreateAddInitializerFunction(
+      FunctionNode* addInitializerFunction, TaggedParserAtomIndex initializers);
+
+  [[nodiscard]] bool emitCallExtraInitializers(
+      TaggedParserAtomIndex extraInitializers);
 
  private:
   [[nodiscard]] bool emitPropertyKey(ParseNode* key);
@@ -38,20 +54,27 @@ class MOZ_STACK_CLASS DecoratorEmitter {
 
   [[nodiscard]] bool emitUpdateDecorationState();
 
-  [[nodiscard]] bool emitCallDecorator(Kind kind, ParseNode* key, bool isStatic,
-                                       ParseNode* decorator);
+  [[nodiscard]] bool emitCallDecoratorForElement(Kind kind, ParseNode* key,
+                                                 bool isStatic,
+                                                 ParseNode* decorator);
 
   [[nodiscard]] bool emitCreateDecoratorAccessObject();
 
   [[nodiscard]] bool emitCheckIsUndefined();
-
-  [[nodiscard]] bool emitCheckIsCallable();
 
   [[nodiscard]] bool emitCreateAddInitializerFunction();
 
   [[nodiscard]] bool emitCreateDecoratorContextObject(Kind kind, ParseNode* key,
                                                       bool isStatic,
                                                       TokenPos pos);
+
+  [[nodiscard]] bool emitHandleNewValueField(TaggedParserAtomIndex atom,
+                                             int8_t offset);
+
+  using DecoratorsVector = js::Vector<ParseNode*, 2, js::SystemAllocPolicy>;
+
+  [[nodiscard]] bool reverseDecoratorsToApplicationOrder(
+      const ListNode* decorators, DecoratorsVector& vec);
 };
 
 } /* namespace js::frontend */

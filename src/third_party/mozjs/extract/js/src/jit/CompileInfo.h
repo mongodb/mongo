@@ -82,7 +82,9 @@ class CompileInfo {
         mayReadFrameArgsDirectly_(script->mayReadFrameArgsDirectly()),
         anyFormalIsForwarded_(script->anyFormalIsForwarded()),
         isDerivedClassConstructor_(script->isDerivedClassConstructor()),
-        inlineScriptTree_(inlineScriptTree) {
+        inlineScriptTree_(inlineScriptTree),
+        hasSeenObjectEmulateUndefinedFuseIntact_(
+            runtime->hasSeenObjectEmulateUndefinedFuseIntact()) {
     MOZ_ASSERT_IF(osrPc, JSOp(*osrPc) == JSOp::LoopHead);
 
     // The function here can flow in from anywhere so look up the canonical
@@ -114,7 +116,7 @@ class CompileInfo {
     if (script->isDerivedClassConstructor()) {
       MOZ_ASSERT(script->functionHasThisBinding());
       for (BindingIter bi(script); bi; bi++) {
-        if (bi.name() != runtime->names().dotThis) {
+        if (bi.name() != runtime->names().dot_this_) {
           continue;
         }
         BindingLocation loc = bi.location();
@@ -144,11 +146,13 @@ class CompileInfo {
         hadReorderingBailout_(false),
         hadBoundsCheckBailout_(false),
         hadUnboxFoldingBailout_(false),
+        branchHintingEnabled_(false),
         mayReadFrameArgsDirectly_(false),
         anyFormalIsForwarded_(false),
         inlineScriptTree_(nullptr),
         needsBodyEnvironmentObject_(false),
-        funNeedsSomeEnvironmentObject_(false) {
+        funNeedsSomeEnvironmentObject_(false),
+        hasSeenObjectEmulateUndefinedFuseIntact_(false) {
     nimplicit_ = 0;
     nargs_ = 0;
     nlocals_ = nlocals;
@@ -336,10 +340,20 @@ class CompileInfo {
   bool hadBoundsCheckBailout() const { return hadBoundsCheckBailout_; }
   bool hadUnboxFoldingBailout() const { return hadUnboxFoldingBailout_; }
 
+  bool branchHintingEnabled() const {
+    return compilingWasm() && branchHintingEnabled_;
+  }
+
+  void setBranchHinting(bool value) { branchHintingEnabled_ = value; }
+
   bool mayReadFrameArgsDirectly() const { return mayReadFrameArgsDirectly_; }
   bool anyFormalIsForwarded() const { return anyFormalIsForwarded_; }
 
   bool isDerivedClassConstructor() const { return isDerivedClassConstructor_; }
+
+  bool hasSeenObjectEmulateUndefinedFuseIntact() const {
+    return hasSeenObjectEmulateUndefinedFuseIntact_;
+  }
 
  private:
   unsigned nimplicit_;
@@ -363,6 +377,8 @@ class CompileInfo {
   bool hadBoundsCheckBailout_;
   bool hadUnboxFoldingBailout_;
 
+  bool branchHintingEnabled_;
+
   bool mayReadFrameArgsDirectly_;
   bool anyFormalIsForwarded_;
 
@@ -374,6 +390,8 @@ class CompileInfo {
   // that the environment chain is not easy to reconstruct.
   bool needsBodyEnvironmentObject_;
   bool funNeedsSomeEnvironmentObject_;
+
+  bool hasSeenObjectEmulateUndefinedFuseIntact_;
 };
 
 }  // namespace jit

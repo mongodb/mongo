@@ -37,17 +37,23 @@ enum class DateTimeFormatOptions {
 };
 
 /**
- * Initialize an existing object as an Intl.* object using the named
- * self-hosted function.  This is only for a few old Intl.* constructors, for
- * legacy reasons -- new ones should use the function above instead.
+ * Initialize an existing object as an Intl.DateTimeFormat object.
  */
-extern bool LegacyInitializeObject(JSContext* cx, JS::Handle<JSObject*> obj,
-                                   JS::Handle<PropertyName*> initializer,
-                                   JS::Handle<JS::Value> thisValue,
-                                   JS::Handle<JS::Value> locales,
-                                   JS::Handle<JS::Value> options,
-                                   DateTimeFormatOptions dtfOptions,
-                                   JS::MutableHandle<JS::Value> result);
+extern bool InitializeDateTimeFormatObject(
+    JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JS::Value> thisValue,
+    JS::Handle<JS::Value> locales, JS::Handle<JS::Value> options,
+    JS::Handle<JSString*> required, JS::Handle<JSString*> defaults,
+    DateTimeFormatOptions dtfOptions, JS::MutableHandle<JS::Value> result);
+
+/**
+ * Initialize an existing object as an Intl.NumberFormat object.
+ */
+extern bool InitializeNumberFormatObject(JSContext* cx,
+                                         JS::Handle<JSObject*> obj,
+                                         JS::Handle<JS::Value> thisValue,
+                                         JS::Handle<JS::Value> locales,
+                                         JS::Handle<JS::Value> options,
+                                         JS::MutableHandle<JS::Value> result);
 
 /**
  * Returns the object holding the internal properties for obj.

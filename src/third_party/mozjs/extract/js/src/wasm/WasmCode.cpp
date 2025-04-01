@@ -69,7 +69,8 @@ static uint32_t RoundupCodeLength(uint32_t codeLength) {
   return RoundUp(codeLength, ExecutableCodePageSize);
 }
 
-UniqueCodeBytes wasm::AllocateCodeBytes(uint32_t codeLength) {
+UniqueCodeBytes wasm::AllocateCodeBytes(
+    Maybe<AutoMarkJitCodeWritableForThread>& writable, uint32_t codeLength) {
   if (codeLength > MaxCodeBytesPerProcess) {
     return nullptr;
   }
@@ -96,6 +97,10 @@ UniqueCodeBytes wasm::AllocateCodeBytes(uint32_t codeLength) {
   if (!p) {
     return nullptr;
   }
+
+  // Construct AutoMarkJitCodeWritableForThread after allocating memory, to
+  // ensure it's not nested (OnLargeAllocationFailure can trigger GC).
+  writable.emplace();
 
   // Zero the padding.
   memset(((uint8_t*)p) + codeLength, 0, roundedCodeLength - codeLength);
@@ -145,6 +150,12 @@ void FreeCode::operator()(uint8_t* bytes) {
 }
 
 bool wasm::StaticallyLink(const ModuleSegment& ms, const LinkData& linkData) {
+  if (!EnsureBuiltinThunksInitialized()) {
+    return false;
+  }
+
+  AutoMarkJitCodeWritableForThread writable;
+
   for (LinkData::InternalLink link : linkData.internalLinks) {
     CodeLabel label;
     label.patchAt()->bind(link.patchAtOffset);
@@ -153,10 +164,6 @@ bool wasm::StaticallyLink(const ModuleSegment& ms, const LinkData& linkData) {
     label.setLinkMode(static_cast<CodeLabel::LinkMode>(link.mode));
 #endif
     Assembler::Bind(ms.base(), label);
-  }
-
-  if (!EnsureBuiltinThunksInitialized()) {
-    return false;
   }
 
   for (auto imm : MakeEnumeratedRange(SymbolicAddress::Limit)) {
@@ -296,7 +303,8 @@ UniqueModuleSegment ModuleSegment::create(Tier tier, MacroAssembler& masm,
                                           const LinkData& linkData) {
   uint32_t codeLength = masm.bytesNeeded();
 
-  UniqueCodeBytes codeBytes = AllocateCodeBytes(codeLength);
+  Maybe<AutoMarkJitCodeWritableForThread> writable;
+  UniqueCodeBytes codeBytes = AllocateCodeBytes(writable, codeLength);
   if (!codeBytes) {
     return nullptr;
   }
@@ -312,7 +320,8 @@ UniqueModuleSegment ModuleSegment::create(Tier tier, const Bytes& unlinkedBytes,
                                           const LinkData& linkData) {
   uint32_t codeLength = unlinkedBytes.length();
 
-  UniqueCodeBytes codeBytes = AllocateCodeBytes(codeLength);
+  Maybe<AutoMarkJitCodeWritableForThread> writable;
+  UniqueCodeBytes codeBytes = AllocateCodeBytes(writable, codeLength);
   if (!codeBytes) {
     return nullptr;
   }
@@ -364,14 +373,17 @@ size_t MetadataTier::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
          codeRanges.sizeOfExcludingThis(mallocSizeOf) +
          callSites.sizeOfExcludingThis(mallocSizeOf) +
          tryNotes.sizeOfExcludingThis(mallocSizeOf) +
+         codeRangeUnwindInfos.sizeOfExcludingThis(mallocSizeOf) +
          trapSites.sizeOfExcludingThis(mallocSizeOf) +
+         stackMaps.sizeOfExcludingThis(mallocSizeOf) +
          funcImports.sizeOfExcludingThis(mallocSizeOf) +
          funcExports.sizeOfExcludingThis(mallocSizeOf);
 }
 
 UniqueLazyStubSegment LazyStubSegment::create(const CodeTier& codeTier,
                                               size_t length) {
-  UniqueCodeBytes codeBytes = AllocateCodeBytes(length);
+  Maybe<AutoMarkJitCodeWritableForThread> writable;
+  UniqueCodeBytes codeBytes = AllocateCodeBytes(writable, length);
   if (!codeBytes) {
     return nullptr;
   }
@@ -523,6 +535,7 @@ bool LazyStubTier::createManyEntryStubs(const Uint32Vector& funcExportIndices,
   MOZ_ASSERT(masm.callSiteTargets().empty());
   MOZ_ASSERT(masm.trapSites().empty());
   MOZ_ASSERT(masm.tryNotes().empty());
+  MOZ_ASSERT(masm.codeRangeUnwindInfos().empty());
 
   if (masm.oom()) {
     return false;
@@ -554,12 +567,15 @@ bool LazyStubTier::createManyEntryStubs(const Uint32Vector& funcExportIndices,
     return false;
   }
 
-  masm.executableCopy(codePtr);
-  PatchDebugSymbolicAccesses(codePtr, masm);
-  memset(codePtr + masm.bytesNeeded(), 0, codeLength - masm.bytesNeeded());
+  {
+    AutoMarkJitCodeWritableForThread writable;
+    masm.executableCopy(codePtr);
+    PatchDebugSymbolicAccesses(codePtr, masm);
+    memset(codePtr + masm.bytesNeeded(), 0, codeLength - masm.bytesNeeded());
 
-  for (const CodeLabel& label : masm.codeLabels()) {
-    Assembler::Bind(codePtr, label);
+    for (const CodeLabel& label : masm.codeLabels()) {
+      Assembler::Bind(codePtr, label);
+    }
   }
 
   if (!ExecutableAllocator::makeExecutableAndFlushICache(codePtr, codeLength)) {
@@ -1069,6 +1085,56 @@ bool Code::lookupTrap(void* pc, Trap* trapOut, BytecodeOffset* bytecode) const {
   return false;
 }
 
+bool Code::lookupFunctionTier(const CodeRange* codeRange, Tier* tier) const {
+  // This logic only works if the codeRange is a function, and therefore only
+  // exists in metadata and not a lazy stub tier. Generalizing to access lazy
+  // stubs would require taking a lock, which is undesirable for the profiler.
+  MOZ_ASSERT(codeRange->isFunction());
+  for (Tier t : tiers()) {
+    const CodeTier& code = codeTier(t);
+    const MetadataTier& metadata = code.metadata();
+    if (codeRange >= metadata.codeRanges.begin() &&
+        codeRange < metadata.codeRanges.end()) {
+      *tier = t;
+      return true;
+    }
+  }
+  return false;
+}
+
+struct UnwindInfoPCOffset {
+  const CodeRangeUnwindInfoVector& info;
+  explicit UnwindInfoPCOffset(const CodeRangeUnwindInfoVector& info)
+      : info(info) {}
+  uint32_t operator[](size_t index) const { return info[index].offset(); }
+};
+
+const CodeRangeUnwindInfo* Code::lookupUnwindInfo(void* pc) const {
+  for (Tier t : tiers()) {
+    uint32_t target = ((uint8_t*)pc) - segment(t).base();
+    const CodeRangeUnwindInfoVector& unwindInfoArray =
+        metadata(t).codeRangeUnwindInfos;
+    size_t match;
+    const CodeRangeUnwindInfo* info = nullptr;
+    if (BinarySearch(UnwindInfoPCOffset(unwindInfoArray), 0,
+                     unwindInfoArray.length(), target, &match)) {
+      info = &unwindInfoArray[match];
+    } else {
+      // Exact match is not found, using insertion point to get the previous
+      // info entry; skip if info is outside of codeRangeUnwindInfos.
+      if (match == 0) continue;
+      if (match == unwindInfoArray.length()) {
+        MOZ_ASSERT(unwindInfoArray[unwindInfoArray.length() - 1].unwindHow() ==
+                   CodeRangeUnwindInfo::Normal);
+        continue;
+      }
+      info = &unwindInfoArray[match - 1];
+    }
+    return info->unwindHow() == CodeRangeUnwindInfo::Normal ? nullptr : info;
+  }
+  return nullptr;
+}
+
 // When enabled, generate profiling labels for every name in funcNames_ that is
 // the name of some Function CodeRange. This involves malloc() so do it now
 // since, once we start sampling, we'll be in a signal-handing context where we
@@ -1225,6 +1291,75 @@ void Code::disassemble(JSContext* cx, Tier tier, int kindSelection,
       jit::Disassemble(theCode, range.end() - range.begin(), printString);
     }
   }
+}
+
+// Return a map with names and associated statistics
+MetadataAnalysisHashMap Code::metadataAnalysis(JSContext* cx) const {
+  MetadataAnalysisHashMap hashmap;
+  if (!hashmap.reserve(15)) {
+    return hashmap;
+  }
+
+  for (auto t : tiers()) {
+    size_t length = metadata(t).funcToCodeRange.length();
+    length += metadata(t).codeRanges.length();
+    length += metadata(t).callSites.length();
+    length += metadata(t).trapSites.sumOfLengths();
+    length += metadata(t).funcImports.length();
+    length += metadata(t).funcExports.length();
+    length += metadata(t).stackMaps.length();
+    length += metadata(t).tryNotes.length();
+
+    hashmap.putNewInfallible("metadata length", length);
+
+    // Iterate over the Code Ranges and accumulate all pieces of code.
+    size_t code_size = 0;
+    for (const CodeRange& codeRange : metadata(stableTier()).codeRanges) {
+      if (!codeRange.isFunction()) {
+        continue;
+      }
+      code_size += codeRange.end() - codeRange.begin();
+    }
+
+    hashmap.putNewInfallible("stackmaps number",
+                             this->metadata(t).stackMaps.length());
+    hashmap.putNewInfallible("trapSites number",
+                             this->metadata(t).trapSites.sumOfLengths());
+    hashmap.putNewInfallible("codeRange size in bytes", code_size);
+    hashmap.putNewInfallible("code segment length",
+                             this->codeTier(t).segment().length());
+
+    auto mallocSizeOf = cx->runtime()->debuggerMallocSizeOf;
+
+    hashmap.putNewInfallible("metadata total size",
+                             metadata(t).sizeOfExcludingThis(mallocSizeOf));
+    hashmap.putNewInfallible(
+        "funcToCodeRange size",
+        metadata(t).funcToCodeRange.sizeOfExcludingThis(mallocSizeOf));
+    hashmap.putNewInfallible(
+        "codeRanges size",
+        metadata(t).codeRanges.sizeOfExcludingThis(mallocSizeOf));
+    hashmap.putNewInfallible(
+        "callSites size",
+        metadata(t).callSites.sizeOfExcludingThis(mallocSizeOf));
+    hashmap.putNewInfallible(
+        "tryNotes size",
+        metadata(t).tryNotes.sizeOfExcludingThis(mallocSizeOf));
+    hashmap.putNewInfallible(
+        "trapSites size",
+        metadata(t).trapSites.sizeOfExcludingThis(mallocSizeOf));
+    hashmap.putNewInfallible(
+        "stackMaps size",
+        metadata(t).stackMaps.sizeOfExcludingThis(mallocSizeOf));
+    hashmap.putNewInfallible(
+        "funcImports size",
+        metadata(t).funcImports.sizeOfExcludingThis(mallocSizeOf));
+    hashmap.putNewInfallible(
+        "funcExports size",
+        metadata(t).funcExports.sizeOfExcludingThis(mallocSizeOf));
+  }
+
+  return hashmap;
 }
 
 void wasm::PatchDebugSymbolicAccesses(uint8_t* codeBase, MacroAssembler& masm) {

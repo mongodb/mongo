@@ -31,6 +31,7 @@ namespace js {
 
 class CompactPropMap;
 class FatInlineAtom;
+class ThinInlineAtom;
 class NormalAtom;
 class NormalPropMap;
 class DictionaryPropMap;
@@ -60,7 +61,7 @@ namespace gc {
 #define FOR_EACH_OBJECT_ALLOCKIND(D) \
  /* AllocKind              TraceKind     TypeName           SizedType          BGFinal Nursery Compact */ \
     D(FUNCTION,            Object,       JSObject,          JSObject_Slots4,   true,   true,   true) \
-    D(FUNCTION_EXTENDED,   Object,       JSObject,          JSObject_Slots6,   true,   true,   true) \
+    D(FUNCTION_EXTENDED,   Object,       JSObject,          JSObject_Slots7,   true,   true,   true) \
     D(OBJECT0,             Object,       JSObject,          JSObject_Slots0,   false,  true,   true) \
     D(OBJECT0_BACKGROUND,  Object,       JSObject,          JSObject_Slots0,   true,   true,   true) \
     D(OBJECT2,             Object,       JSObject,          JSObject_Slots2,   false,  true,   true) \
@@ -126,6 +127,8 @@ enum class AllocKind : uint8_t {
     LIMIT,
     LAST = LIMIT - 1,
 
+    INVALID = LIMIT,
+
     FIRST = 0,
     OBJECT_FIRST = FUNCTION // Hardcoded to first object kind.
   // clang-format on
@@ -150,41 +153,41 @@ constexpr size_t AllocKindCount = size_t(AllocKind::LIMIT);
  */
 enum class Heap : uint8_t { Default = 0, Tenured = 1 };
 
-inline bool IsAllocKind(AllocKind kind) {
+constexpr bool IsAllocKind(AllocKind kind) {
   return kind >= AllocKind::FIRST && kind <= AllocKind::LIMIT;
 }
 
-inline bool IsValidAllocKind(AllocKind kind) {
+constexpr bool IsValidAllocKind(AllocKind kind) {
   return kind >= AllocKind::FIRST && kind <= AllocKind::LAST;
 }
 
 const char* AllocKindName(AllocKind kind);
 
-inline bool IsObjectAllocKind(AllocKind kind) {
+constexpr bool IsObjectAllocKind(AllocKind kind) {
   return kind >= AllocKind::OBJECT_FIRST && kind <= AllocKind::OBJECT_LAST;
 }
 
-inline bool IsShapeAllocKind(AllocKind kind) {
+constexpr bool IsShapeAllocKind(AllocKind kind) {
   return kind == AllocKind::SHAPE;
 }
 
 // Returns a sequence for use in a range-based for loop,
 // to iterate over all alloc kinds.
-inline auto AllAllocKinds() {
+constexpr auto AllAllocKinds() {
   return mozilla::MakeEnumeratedRange(AllocKind::FIRST, AllocKind::LIMIT);
 }
 
 // Returns a sequence for use in a range-based for loop,
 // to iterate over all object alloc kinds.
-inline auto ObjectAllocKinds() {
+constexpr auto ObjectAllocKinds() {
   return mozilla::MakeEnumeratedRange(AllocKind::OBJECT_FIRST,
                                       AllocKind::OBJECT_LIMIT);
 }
 
 // Returns a sequence for use in a range-based for loop,
 // to iterate over alloc kinds from |first| to |limit|, exclusive.
-inline auto SomeAllocKinds(AllocKind first = AllocKind::FIRST,
-                           AllocKind limit = AllocKind::LIMIT) {
+constexpr auto SomeAllocKinds(AllocKind first = AllocKind::FIRST,
+                              AllocKind limit = AllocKind::LIMIT) {
   MOZ_ASSERT(IsAllocKind(first), "|first| is not a valid AllocKind!");
   MOZ_ASSERT(IsAllocKind(limit), "|limit| is not a valid AllocKind!");
   return mozilla::MakeEnumeratedRange(first, limit);
@@ -194,13 +197,14 @@ inline auto SomeAllocKinds(AllocKind first = AllocKind::FIRST,
 // with each index corresponding to a particular alloc kind.
 template <typename ValueType>
 using AllAllocKindArray =
-    mozilla::EnumeratedArray<AllocKind, AllocKind::LIMIT, ValueType>;
+    mozilla::EnumeratedArray<AllocKind, ValueType, size_t(AllocKind::LIMIT)>;
 
 // ObjectAllocKindArray<ValueType> gives an enumerated array of ValueTypes,
 // with each index corresponding to a particular object alloc kind.
 template <typename ValueType>
 using ObjectAllocKindArray =
-    mozilla::EnumeratedArray<AllocKind, AllocKind::OBJECT_LIMIT, ValueType>;
+    mozilla::EnumeratedArray<AllocKind, ValueType,
+                             size_t(AllocKind::OBJECT_LIMIT)>;
 
 /*
  * Map from C++ type to alloc kind for non-object types. JSObject does not have
@@ -238,6 +242,10 @@ template <>
 struct MapTypeToAllocKind<JSThinInlineString> {
   static const AllocKind kind = AllocKind::STRING;
 };
+template <>
+struct MapTypeToAllocKind<js::ThinInlineAtom> {
+  static const AllocKind kind = AllocKind::ATOM;
+};
 
 template <>
 struct MapTypeToAllocKind<js::SharedShape> {
@@ -256,8 +264,8 @@ struct MapTypeToAllocKind<js::WasmGCShape> {
   static const AllocKind kind = AllocKind::SHAPE;
 };
 
-static inline JS::TraceKind MapAllocToTraceKind(AllocKind kind) {
-  static const JS::TraceKind map[] = {
+constexpr JS::TraceKind MapAllocToTraceKind(AllocKind kind) {
+  constexpr JS::TraceKind map[] = {
 #define EXPAND_ELEMENT(allocKind, traceKind, type, sizedType, bgFinal, \
                        nursery, compact)                               \
   JS::TraceKind::traceKind,
@@ -270,10 +278,10 @@ static inline JS::TraceKind MapAllocToTraceKind(AllocKind kind) {
   return map[size_t(kind)];
 }
 
-static inline bool IsNurseryAllocable(AllocKind kind) {
+constexpr bool IsNurseryAllocable(AllocKind kind) {
   MOZ_ASSERT(IsValidAllocKind(kind));
 
-  static const bool map[] = {
+  constexpr bool map[] = {
 #define DEFINE_NURSERY_ALLOCABLE(_1, _2, _3, _4, _5, nursery, _6) nursery,
       FOR_EACH_ALLOCKIND(DEFINE_NURSERY_ALLOCABLE)
 #undef DEFINE_NURSERY_ALLOCABLE
@@ -284,10 +292,10 @@ static inline bool IsNurseryAllocable(AllocKind kind) {
   return map[size_t(kind)];
 }
 
-static inline bool IsBackgroundFinalized(AllocKind kind) {
+constexpr bool IsBackgroundFinalized(AllocKind kind) {
   MOZ_ASSERT(IsValidAllocKind(kind));
 
-  static const bool map[] = {
+  constexpr bool map[] = {
 #define DEFINE_BACKGROUND_FINALIZED(_1, _2, _3, _4, bgFinal, _5, _6) bgFinal,
       FOR_EACH_ALLOCKIND(DEFINE_BACKGROUND_FINALIZED)
 #undef DEFINE_BACKGROUND_FINALIZED
@@ -298,14 +306,14 @@ static inline bool IsBackgroundFinalized(AllocKind kind) {
   return map[size_t(kind)];
 }
 
-static inline bool IsForegroundFinalized(AllocKind kind) {
+constexpr bool IsForegroundFinalized(AllocKind kind) {
   return !IsBackgroundFinalized(kind);
 }
 
-static inline bool IsCompactingKind(AllocKind kind) {
+constexpr bool IsCompactingKind(AllocKind kind) {
   MOZ_ASSERT(IsValidAllocKind(kind));
 
-  static const bool map[] = {
+  constexpr bool map[] = {
 #define DEFINE_COMPACTING_KIND(_1, _2, _3, _4, _5, _6, compact) compact,
       FOR_EACH_ALLOCKIND(DEFINE_COMPACTING_KIND)
 #undef DEFINE_COMPACTING_KIND
@@ -316,7 +324,7 @@ static inline bool IsCompactingKind(AllocKind kind) {
   return map[size_t(kind)];
 }
 
-static inline bool IsMovableKind(AllocKind kind) {
+constexpr bool IsMovableKind(AllocKind kind) {
   return IsNurseryAllocable(kind) || IsCompactingKind(kind);
 }
 

@@ -16,6 +16,23 @@
 #include "js/MemoryFunctions.h"  // JS_FOR_EACH_PUBLIC_MEMORY_USE
 
 namespace js {
+
+// [SMDOC] AllowGC template parameter
+//
+// AllowGC is a template parameter for functions that support both with and
+// without GC operation.
+//
+// The CanGC variant of the function can trigger a garbage collection, and
+// should set a pending exception on failure.
+//
+// The NoGC variant of the function cannot trigger a garbage collection, and
+// should not set any pending exception on failure.  This variant can be called
+// in fast paths where the caller has unrooted pointers.  The failure means we
+// need to perform GC to allocate an object. The caller can fall back to a slow
+// path that roots pointers before calling a CanGC variant of the function,
+// without having to clear a pending exception.
+enum AllowGC { NoGC = 0, CanGC = 1 };
+
 namespace gc {
 
 // The phases of an incremental GC.
@@ -103,13 +120,16 @@ enum class GCAbortReason {
   _(PropMapTable)                          \
   _(ModuleBindingMap)                      \
   _(ModuleCyclicFields)                    \
+  _(ModuleSyntheticFields)                 \
   _(ModuleExports)                         \
+  _(ModuleImportAttributes)                \
   _(BaselineScript)                        \
   _(IonScript)                             \
   _(ArgumentsData)                         \
   _(RareArgumentsData)                     \
   _(RegExpSharedBytecode)                  \
   _(RegExpSharedNamedCaptureData)          \
+  _(RegExpSharedNamedCaptureSliceData)     \
   _(TypedArrayElements)                    \
   _(NativeIterator)                        \
   _(JitScript)                             \
@@ -143,7 +163,8 @@ enum class GCAbortReason {
   _(SharedArrayRawBuffer)                  \
   _(XDRBufferElements)                     \
   _(GlobalObjectData)                      \
-  _(ProxyExternalValueArray)
+  _(ProxyExternalValueArray)               \
+  _(WasmTrailerBlock)
 
 #define JS_FOR_EACH_MEMORY_USE(_)  \
   JS_FOR_EACH_PUBLIC_MEMORY_USE(_) \

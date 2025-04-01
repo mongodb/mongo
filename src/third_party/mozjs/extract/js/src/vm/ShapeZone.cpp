@@ -12,6 +12,7 @@
 #include "vm/Shape-inl.h"
 
 using namespace js;
+using namespace js::gc;
 
 void ShapeZone::fixupPropMapShapeTableAfterMovingGC() {
   for (PropMapShapeSet::Enum e(propMapShapes); !e.empty(); e.popFront()) {
@@ -27,73 +28,65 @@ void ShapeZone::fixupPropMapShapeTableAfterMovingGC() {
 }
 
 #ifdef JSGC_HASH_TABLE_CHECKS
-void ShapeZone::checkTablesAfterMovingGC() {
-  // Assert that the moving GC worked and that nothing is left in the tables
-  // that points into the nursery, and that the hash table entries are
-  // discoverable.
+void ShapeZone::checkTablesAfterMovingGC(JS::Zone* zone) {
+  CheckTableAfterMovingGC(initialPropMaps, [zone](const auto& entry) {
+    SharedPropMap* map = entry.unbarrieredGet();
+    CheckGCThingAfterMovingGC(map, zone);
+    PropertyKey key = map->getKey(0);
+    if (key.isGCThing()) {
+      CheckGCThingAfterMovingGC(key.toGCThing(), zone);
+    }
 
-  for (auto r = initialPropMaps.all(); !r.empty(); r.popFront()) {
-    SharedPropMap* map = r.front().unbarrieredGet();
-    CheckGCThingAfterMovingGC(map);
+    return InitialPropMapHasher::Lookup(key, map->getPropertyInfo(0));
+  });
 
-    InitialPropMapHasher::Lookup lookup(map->getKey(0),
-                                        map->getPropertyInfo(0));
-    InitialPropMapSet::Ptr ptr = initialPropMaps.lookup(lookup);
-    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
-  }
+  CheckTableAfterMovingGC(baseShapes, [zone](const auto& entry) {
+    BaseShape* base = entry.unbarrieredGet();
+    CheckGCThingAfterMovingGC(base, zone);
+    CheckProtoAfterMovingGC(base->proto(), zone);
 
-  for (auto r = baseShapes.all(); !r.empty(); r.popFront()) {
-    BaseShape* base = r.front().unbarrieredGet();
-    CheckGCThingAfterMovingGC(base);
+    return BaseShapeHasher::Lookup(base->clasp(), base->realm(), base->proto());
+  });
 
-    BaseShapeHasher::Lookup lookup(base->clasp(), base->realm(), base->proto());
-    BaseShapeSet::Ptr ptr = baseShapes.lookup(lookup);
-    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
-  }
+  CheckTableAfterMovingGC(initialShapes, [zone](const auto& entry) {
+    SharedShape* shape = entry.unbarrieredGet();
+    CheckGCThingAfterMovingGC(shape, zone);
+    CheckProtoAfterMovingGC(shape->proto(), zone);
 
-  for (auto r = initialShapes.all(); !r.empty(); r.popFront()) {
-    SharedShape* shape = r.front().unbarrieredGet();
-    CheckGCThingAfterMovingGC(shape);
+    return InitialShapeHasher::Lookup(shape->getObjectClass(), shape->realm(),
+                                      shape->proto(), shape->numFixedSlots(),
+                                      shape->objectFlags());
+  });
 
-    using Lookup = InitialShapeHasher::Lookup;
-    Lookup lookup(shape->getObjectClass(), shape->realm(), shape->proto(),
-                  shape->numFixedSlots(), shape->objectFlags());
-    InitialShapeSet::Ptr ptr = initialShapes.lookup(lookup);
-    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
-  }
+  CheckTableAfterMovingGC(propMapShapes, [zone](const auto& entry) {
+    SharedShape* shape = entry.unbarrieredGet();
+    CheckGCThingAfterMovingGC(shape, zone);
+    CheckGCThingAfterMovingGC(shape->base(), zone);
+    CheckGCThingAfterMovingGC(shape->propMap(), zone);
 
-  for (auto r = propMapShapes.all(); !r.empty(); r.popFront()) {
-    SharedShape* shape = r.front().unbarrieredGet();
-    CheckGCThingAfterMovingGC(shape);
+    return PropMapShapeHasher::Lookup(shape->base(), shape->numFixedSlots(),
+                                      shape->propMap(), shape->propMapLength(),
+                                      shape->objectFlags());
+  });
 
-    using Lookup = PropMapShapeHasher::Lookup;
-    Lookup lookup(shape->base(), shape->numFixedSlots(), shape->propMap(),
-                  shape->propMapLength(), shape->objectFlags());
-    PropMapShapeSet::Ptr ptr = propMapShapes.lookup(lookup);
-    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
-  }
+  CheckTableAfterMovingGC(proxyShapes, [zone](const auto& entry) {
+    ProxyShape* shape = entry.unbarrieredGet();
+    CheckGCThingAfterMovingGC(shape, zone);
+    CheckProtoAfterMovingGC(shape->proto(), zone);
 
-  for (auto r = proxyShapes.all(); !r.empty(); r.popFront()) {
-    ProxyShape* shape = r.front().unbarrieredGet();
-    CheckGCThingAfterMovingGC(shape);
+    return ProxyShapeHasher::Lookup(shape->getObjectClass(), shape->realm(),
+                                    shape->proto(), shape->objectFlags());
+  });
 
-    using Lookup = ProxyShapeHasher::Lookup;
-    Lookup lookup(shape->getObjectClass(), shape->realm(), shape->proto(),
-                  shape->objectFlags());
-    ProxyShapeSet::Ptr ptr = proxyShapes.lookup(lookup);
-    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
-  }
+  CheckTableAfterMovingGC(wasmGCShapes, [zone](const auto& entry) {
+    WasmGCShape* shape = entry.unbarrieredGet();
+    CheckGCThingAfterMovingGC(shape, zone);
+    CheckProtoAfterMovingGC(shape->proto(), zone);
 
-  for (auto r = wasmGCShapes.all(); !r.empty(); r.popFront()) {
-    WasmGCShape* shape = r.front().unbarrieredGet();
-    CheckGCThingAfterMovingGC(shape);
-
-    using Lookup = WasmGCShapeHasher::Lookup;
-    Lookup lookup(shape->getObjectClass(), shape->realm(), shape->proto(),
-                  shape->recGroup(), shape->objectFlags());
-    WasmGCShapeSet::Ptr ptr = wasmGCShapes.lookup(lookup);
-    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
-  }
+    return WasmGCShapeHasher::Lookup(shape->getObjectClass(), shape->realm(),
+                                     shape->proto(), shape->recGroup(),
+                                     shape->objectFlags());
+  });
 }
 #endif  // JSGC_HASH_TABLE_CHECKS
 

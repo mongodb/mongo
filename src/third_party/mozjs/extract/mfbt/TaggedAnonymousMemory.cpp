@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifdef ANDROID
+#ifdef XP_LINUX
 
 #  include "mozilla/TaggedAnonymousMemory.h"
 
@@ -53,41 +53,31 @@ static uintptr_t GetPageMask() {
 
 }  // namespace mozilla
 
-int MozTaggedMemoryIsSupported(void) {
-  static int supported = -1;
-
-  if (supported == -1) {
-    // Tagging an empty range always "succeeds" if the feature is supported,
-    // regardless of the start pointer.
-    supported = mozilla::TagAnonymousMemoryAligned(nullptr, 0, nullptr) == 0;
-  }
-  return supported;
-}
-
 void MozTagAnonymousMemory(const void* aPtr, size_t aLength, const char* aTag) {
-  if (MozTaggedMemoryIsSupported()) {
-    // The kernel will round up the end of the range to the next page
-    // boundary if it's not aligned (comments indicate this behavior
-    // is based on that of madvise), but it will reject the request if
-    // the start is not aligned.  We therefore round down the start
-    // address and adjust the length accordingly.
-    uintptr_t addr = reinterpret_cast<uintptr_t>(aPtr);
-    uintptr_t end = addr + aLength;
-    uintptr_t addrRounded = addr & mozilla::GetPageMask();
-    const void* ptrRounded = reinterpret_cast<const void*>(addrRounded);
+  // The kernel will round up the end of the range to the next page
+  // boundary if it's not aligned (comments indicate this behavior is
+  // based on that of madvise), but it will reject the request if the
+  // start is not aligned.  We therefore round down the start address
+  // and adjust the length accordingly.
+  uintptr_t addr = reinterpret_cast<uintptr_t>(aPtr);
+  uintptr_t end = addr + aLength;
+  uintptr_t addrRounded = addr & mozilla::GetPageMask();
+  const void* ptrRounded = reinterpret_cast<const void*>(addrRounded);
 
-    mozilla::TagAnonymousMemoryAligned(ptrRounded, end - addrRounded, aTag);
-  }
+  // Ignore the return value. TagAnonymousMemoryAligned will harmlessly fail on
+  // kernels without CONFIG_ANON_VMA_NAME.
+  mozilla::TagAnonymousMemoryAligned(ptrRounded, end - addrRounded, aTag);
 }
 
 void* MozTaggedAnonymousMmap(void* aAddr, size_t aLength, int aProt, int aFlags,
                              int aFd, off_t aOffset, const char* aTag) {
   void* mapped = mmap(aAddr, aLength, aProt, aFlags, aFd, aOffset);
-  if (MozTaggedMemoryIsSupported() &&
-      (aFlags & MAP_ANONYMOUS) == MAP_ANONYMOUS && mapped != MAP_FAILED) {
+  if ((aFlags & MAP_ANONYMOUS) == MAP_ANONYMOUS && mapped != MAP_FAILED) {
+    // Ignore the return value. TagAnonymousMemoryAligned will harmlessly fail
+    // on kernels without CONFIG_ANON_VMA_NAME.
     mozilla::TagAnonymousMemoryAligned(mapped, aLength, aTag);
   }
   return mapped;
 }
 
-#endif  // ANDROID
+#endif  // XP_LINUX

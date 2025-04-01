@@ -6,29 +6,56 @@
 
 // GC Policy Mechanism
 
-// A GCPolicy controls how the GC interacts with both direct pointers to GC
-// things (e.g. JSObject* or JSString*), tagged and/or optional pointers to GC
-// things (e.g.  Value or jsid), and C++ container types (e.g.
-// JSPropertyDescriptor or GCHashMap).
+// GCPolicy controls how the GC interacts with a given type for functionality
+// that is used by generic code. It is implemented for:
 //
-// The GCPolicy provides at a minimum:
+//  - direct pointers to GC things, e.g. JSObject* or JSString*
+//
+//  - tagged and/or optional pointers to GC things, e.g. JS::Value or jsid
+//
+//  - structures containing GC pointers, e.g. JS::PropertyDescriptor
+//
+//  - C++ container types, e.g. GCHashMap
+//
+// The GCPolicy for type |T| provides at a minimum:
 //
 //   static void trace(JSTracer, T* tp, const char* name)
-//       - Trace the edge |*tp|, calling the edge |name|. Containers like
-//         GCHashMap and GCHashSet use this method to trace their children.
+//
+//     Trace the edge |*tp|, calling the edge |name|. Generic containers
+//     like GCHashMap and GCHashSet use this method to trace their children.
 //
 //   static bool traceWeak(T* tp)
-//       - Return false if |*tp| has been set to nullptr. Otherwise, update the
-//         edge for moving GC, and return true. Containers like GCHashMap and
-//         GCHashSet use this method to decide when to remove an entry: if this
-//         function returns false on a key/value/member/etc, its entry is
-//         dropped from the container. Specializing this method is the standard
-//         way to get custom weak behavior from a container type.
+//
+//     Update any GC edges if their target has been moved. Remove or clear any
+//     edges to GC things that are going to be collected by an incremental
+//     GC. Return false if this edge itself should be removed.
+//
+//     For GC thing pointers, this will clear the edge and return false if the
+//     target is going to be collected. In general, for structures this should
+//     call |traceWeak| on internal GC edges and return whether the result was
+//     true for all of them.
+//
+//     Containers can use this to remove entries containing GC things that are
+//     going to be collected (e.g. GCVector).
 //
 //   static bool isValid(const T& t)
-//       - Return false only if |t| is corrupt in some way. The built-in GC
-//         types do some memory layout checks. For debugging only; it is ok
-//         to always return true or even to omit this member entirely.
+//
+//     Check that |t| is valid and is not corrupt in some way. The built-in GC
+//     types do some memory layout checks. This is for assertions only; it is ok
+//     to always return true.
+//
+// The GCPolicy may also provide:
+//
+//   static bool needsSweep(const T* tp)
+//
+//     Return whether this edge should be removed, like a version of |traceWeak|
+//     with the sense of the return value reversed.
+//
+//     The argument is const and this does not update any moved GC pointers, so
+//     should not be called when this is a possibility.
+//
+//     This is used internally for incremental barriers on WeakCache hash
+//     tables.
 //
 // The default GCPolicy<T> assumes that T has a default constructor and |trace|
 // and |traceWeak| methods, and forwards to them. GCPolicy has appropriate
@@ -66,6 +93,9 @@ struct StructGCPolicy {
   static void trace(JSTracer* trc, T* tp, const char* name) { tp->trace(trc); }
 
   static bool traceWeak(JSTracer* trc, T* tp) { return tp->traceWeak(trc); }
+  static bool needsSweep(JSTracer* trc, const T* tp) {
+    return tp->needsSweep(trc);
+  }
 
   static bool isValid(const T& tp) { return true; }
 };
@@ -82,6 +112,7 @@ template <typename T>
 struct IgnoreGCPolicy {
   static void trace(JSTracer* trc, T* t, const char* name) {}
   static bool traceWeak(JSTracer*, T* v) { return true; }
+  static bool needsSweep(JSTracer* trc, const T* v) { return false; }
   static bool isValid(const T& v) { return true; }
 };
 template <>
@@ -121,12 +152,8 @@ struct NonGCPointerPolicy {
     }
   }
   static bool traceWeak(JSTracer* trc, T* vp) {
-    if (*vp) {
-      return (*vp)->traceWeak(trc);
-    }
-    return true;
+    return !*vp || (*vp)->traceWeak(trc);
   }
-
   static bool isValid(T v) { return true; }
 };
 
@@ -150,16 +177,13 @@ struct GCPolicy<mozilla::UniquePtr<T, D>> {
     }
   }
   static bool traceWeak(JSTracer* trc, mozilla::UniquePtr<T, D>* tp) {
-    if (tp->get()) {
-      return GCPolicy<T>::traceWeak(trc, tp->get());
-    }
-    return true;
+    return !tp->get() || GCPolicy<T>::traceWeak(trc, tp->get());
+  }
+  static bool needsSweep(JSTracer* trc, const mozilla::UniquePtr<T, D>* tp) {
+    return tp->get() && GCPolicy<T>::needsSweep(trc, tp->get());
   }
   static bool isValid(const mozilla::UniquePtr<T, D>& t) {
-    if (t.get()) {
-      return GCPolicy<T>::isValid(*t.get());
-    }
-    return true;
+    return !t.get() || GCPolicy<T>::isValid(*t.get());
   }
 };
 
@@ -176,16 +200,13 @@ struct GCPolicy<mozilla::Maybe<T>> {
     }
   }
   static bool traceWeak(JSTracer* trc, mozilla::Maybe<T>* tp) {
-    if (tp->isSome()) {
-      return GCPolicy<T>::traceWeak(trc, tp->ptr());
-    }
-    return true;
+    return tp->isNothing() || GCPolicy<T>::traceWeak(trc, tp->ptr());
+  }
+  static bool needsSweep(JSTracer* trc, const mozilla::Maybe<T>* tp) {
+    return tp->isSome() && GCPolicy<T>::needsSweep(trc, tp->ptr());
   }
   static bool isValid(const mozilla::Maybe<T>& t) {
-    if (t.isSome()) {
-      return GCPolicy<T>::isValid(t.ref());
-    }
-    return true;
+    return t.isNothing() || GCPolicy<T>::isValid(t.ref());
   }
 };
 
@@ -198,6 +219,10 @@ struct GCPolicy<std::pair<T1, T2>> {
   static bool traceWeak(JSTracer* trc, std::pair<T1, T2>* tp) {
     return GCPolicy<T1>::traceWeak(trc, &tp->first) &&
            GCPolicy<T2>::traceWeak(trc, &tp->second);
+  }
+  static bool needsSweep(JSTracer* trc, const std::pair<T1, T2>* tp) {
+    return GCPolicy<T1>::needsSweep(trc, &tp->first) ||
+           GCPolicy<T2>::needsSweep(trc, &tp->second);
   }
   static bool isValid(const std::pair<T1, T2>& t) {
     return GCPolicy<T1>::isValid(t.first) && GCPolicy<T2>::isValid(t.second);

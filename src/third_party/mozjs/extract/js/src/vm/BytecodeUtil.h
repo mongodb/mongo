@@ -32,16 +32,12 @@
 #include "vm/ThrowMsgKind.h"   // ThrowMsgKind, ThrowCondition
 
 namespace js {
-class JS_PUBLIC_API Sprinter;
+class JS_PUBLIC_API StringPrinter;
 }  // namespace js
 
 /* Shorthand for type from format. */
 
 static inline uint32_t JOF_TYPE(uint32_t fmt) { return fmt & JOF_TYPEMASK; }
-
-/* Shorthand for mode from format. */
-
-static inline uint32_t JOF_MODE(uint32_t fmt) { return fmt & JOF_MODEMASK; }
 
 /*
  * Immediate operand getters, setters, and bounds.
@@ -308,6 +304,7 @@ static inline bool BytecodeFallsThrough(JSOp op) {
     case JSOp::RetRval:
     case JSOp::FinalYieldRval:
     case JSOp::Throw:
+    case JSOp::ThrowWithStack:
     case JSOp::ThrowMsg:
     case JSOp::ThrowSetConst:
     case JSOp::TableSwitch:
@@ -461,8 +458,6 @@ inline bool IsCheckStrictOp(JSOp op) {
   return CodeSpec(op).format & JOF_CHECKSTRICT;
 }
 
-inline bool IsNameOp(JSOp op) { return CodeSpec(op).format & JOF_NAME; }
-
 #ifdef DEBUG
 inline bool IsCheckSloppyOp(JSOp op) {
   return CodeSpec(op).format & JOF_CHECKSLOPPY;
@@ -509,10 +504,6 @@ inline bool IsSetElemOp(JSOp op) {
 
 inline bool IsSetElemPC(const jsbytecode* pc) { return IsSetElemOp(JSOp(*pc)); }
 
-inline bool IsElemPC(const jsbytecode* pc) {
-  return CodeSpec(JSOp(*pc)).format & JOF_ELEM;
-}
-
 inline bool IsInvokeOp(JSOp op) { return CodeSpec(op).format & JOF_INVOKE; }
 
 inline bool IsInvokePC(jsbytecode* pc) { return IsInvokeOp(JSOp(*pc)); }
@@ -532,6 +523,12 @@ inline bool IsConstructPC(const jsbytecode* pc) {
 inline bool IsSpreadOp(JSOp op) { return CodeSpec(op).format & JOF_SPREAD; }
 
 inline bool IsSpreadPC(const jsbytecode* pc) { return IsSpreadOp(JSOp(*pc)); }
+
+// Returns true if the specified opcode is for `typeof name` where `name` is
+// single identifier.
+inline bool IsTypeOfNameOp(JSOp op) {
+  return op == JSOp::Typeof || op == JSOp::TypeofEq;
+}
 
 inline bool OpUsesEnvironmentChain(JSOp op) {
   return CodeSpec(op).format & JOF_USES_ENV;
@@ -650,11 +647,12 @@ enum class DisassembleSkeptically { No, Yes };
  * Disassemblers, for debugging only.
  */
 [[nodiscard]] extern bool Disassemble(
-    JSContext* cx, JS::Handle<JSScript*> script, bool lines, Sprinter* sp,
+    JSContext* cx, JS::Handle<JSScript*> script, bool lines, StringPrinter* sp,
     DisassembleSkeptically skeptically = DisassembleSkeptically::No);
 
 unsigned Disassemble1(JSContext* cx, JS::Handle<JSScript*> script,
-                      jsbytecode* pc, unsigned loc, bool lines, Sprinter* sp);
+                      jsbytecode* pc, unsigned loc, bool lines,
+                      StringPrinter* sp);
 
 #endif
 

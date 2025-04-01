@@ -11,31 +11,36 @@
 
 namespace js {
 
-template <typename Mutex>
+template <typename GuardT>
 class MOZ_RAII UnlockGuard;
 
 template <typename Mutex>
 class MOZ_RAII LockGuard {
-  friend class UnlockGuard<Mutex>;
+  friend class UnlockGuard<LockGuard<Mutex>>;
   friend class ConditionVariable;
-  Mutex& lock;
+  Mutex& mutex;
 
  public:
-  explicit LockGuard(Mutex& aLock) : lock(aLock) { lock.lock(); }
+  explicit LockGuard(Mutex& mutex) : mutex(mutex) { lock(); }
+  ~LockGuard() { unlock(); }
 
-  ~LockGuard() { lock.unlock(); }
+  LockGuard(const LockGuard& other) = delete;
+
+ protected:
+  void lock() { mutex.lock(); }
+  void unlock() { mutex.unlock(); }
 };
 
-template <typename Mutex>
+// RAII class to temporarily unlock a LockGuard.
+template <typename GuardT>
 class MOZ_RAII UnlockGuard {
-  Mutex& lock;
+  GuardT& guard;
 
  public:
-  explicit UnlockGuard(LockGuard<Mutex>& aGuard) : lock(aGuard.lock) {
-    lock.unlock();
-  }
+  explicit UnlockGuard(GuardT& guard) : guard(guard) { guard.unlock(); }
+  ~UnlockGuard() { guard.lock(); }
 
-  ~UnlockGuard() { lock.lock(); }
+  UnlockGuard(const UnlockGuard& other) = delete;
 };
 
 }  // namespace js

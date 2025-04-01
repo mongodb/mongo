@@ -49,8 +49,6 @@ static_assert(js::ScopeDataAlignBytes >= MinFirstWordAlignment,
 
 #define CHECK_THING_SIZE(allocKind, traceKind, type, sizedType, bgFinal,       \
                          nursery, compact)                                     \
-  static_assert(sizeof(sizedType) >= SortedArenaList::MinThingSize,            \
-                #sizedType " is smaller than SortedArenaList::MinThingSize!"); \
   static_assert(sizeof(sizedType) >= sizeof(FreeSpan),                         \
                 #sizedType " is smaller than FreeSpan");                       \
   static_assert(sizeof(sizedType) % CellAlignBytes == 0,                       \
@@ -185,6 +183,27 @@ Arena* ArenaList::removeRemainingArenas(Arena** arenap) {
   return remainingArenas;
 }
 
+AutoGatherSweptArenas::AutoGatherSweptArenas(JS::Zone* zone, AllocKind kind) {
+  GCRuntime& gc = zone->runtimeFromMainThread()->gc;
+  sortedList = gc.maybeGetForegroundFinalizedArenas(zone, kind);
+  if (!sortedList) {
+    return;
+  }
+
+  // Link individual sorted arena lists together for iteration, saving the
+  // internal state so we can restore it later.
+  linked = sortedList->convertToArenaList(bucketLastPointers);
+}
+
+AutoGatherSweptArenas::~AutoGatherSweptArenas() {
+  if (sortedList) {
+    sortedList->restoreFromArenaList(linked, bucketLastPointers);
+  }
+  linked.clear();
+}
+
+Arena* AutoGatherSweptArenas::sweptArenas() const { return linked.head(); }
+
 FreeLists::FreeLists() {
   for (auto i : AllAllocKinds()) {
     freeLists_[i] = &emptySentinel;
@@ -193,7 +212,6 @@ FreeLists::FreeLists() {
 
 ArenaLists::ArenaLists(Zone* zone)
     : zone_(zone),
-      incrementalSweptArenaKind(AllocKind::LIMIT),
       gcCompactPropMapArenasToUpdate(nullptr),
       gcNormalPropMapArenasToUpdate(nullptr),
       savedEmptyArenas(nullptr) {
@@ -227,7 +245,6 @@ ArenaLists::~ArenaLists() {
     MOZ_ASSERT(concurrentUse(i) == ConcurrentUse::None);
     ReleaseArenaList(runtime(), arenaList(i), lock);
   }
-  ReleaseArenaList(runtime(), incrementalSweptArenas.ref(), lock);
 
   ReleaseArenas(runtime(), savedEmptyArenas, lock);
 }
@@ -255,18 +272,6 @@ Arena* ArenaLists::takeSweptEmptyArenas() {
   return arenas;
 }
 
-void ArenaLists::setIncrementalSweptArenas(AllocKind kind,
-                                           SortedArenaList& arenas) {
-  incrementalSweptArenaKind = kind;
-  incrementalSweptArenas.ref().clear();
-  incrementalSweptArenas = arenas.toArenaList();
-}
-
-void ArenaLists::clearIncrementalSweptArenas() {
-  incrementalSweptArenaKind = AllocKind::LIMIT;
-  incrementalSweptArenas.ref().clear();
-}
-
 void ArenaLists::checkGCStateNotInUse() {
   // Called before and after collection to check the state is as expected.
 #ifdef DEBUG
@@ -280,8 +285,6 @@ void ArenaLists::checkGCStateNotInUse() {
 void ArenaLists::checkSweepStateNotInUse() {
 #ifdef DEBUG
   checkNoArenasToUpdate();
-  MOZ_ASSERT(incrementalSweptArenaKind == AllocKind::LIMIT);
-  MOZ_ASSERT(incrementalSweptArenas.ref().isEmpty());
   MOZ_ASSERT(!savedEmptyArenas);
   for (auto i : AllAllocKinds()) {
     MOZ_ASSERT(concurrentUse(i) == ConcurrentUse::None);
@@ -611,6 +614,14 @@ void ChunkPool::verifyChunks() const {
 }
 
 void TenuredChunk::verify() const {
+  // Check the mark bits for each arena are aligned to the cache line size.
+  static_assert((offsetof(TenuredChunk, arenas) % ArenaSize) == 0);
+  constexpr size_t CellBytesPerMarkByte = CellBytesPerMarkBit * 8;
+  static_assert((ArenaSize % CellBytesPerMarkByte) == 0);
+  constexpr size_t MarkBytesPerArena = ArenaSize / CellBytesPerMarkByte;
+  static_assert((MarkBytesPerArena % TypicalCacheLineSize) == 0);
+  static_assert((offsetof(TenuredChunk, markBits) % TypicalCacheLineSize) == 0);
+
   MOZ_ASSERT(info.numArenasFree <= ArenasPerChunk);
   MOZ_ASSERT(info.numArenasFreeCommitted <= info.numArenasFree);
 

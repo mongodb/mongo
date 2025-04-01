@@ -3679,6 +3679,26 @@ class AssemblerX86Shared : public AssemblerShared {
         MOZ_CRASH("unexpected operand kind");
     }
   }
+  void vpmovzxbd(const Operand& src, FloatRegister dest) {
+    MOZ_ASSERT(HasSSE41());
+    switch (src.kind()) {
+      case Operand::FPREG:
+        masm.vpmovzxbd_rr(src.fpu(), dest.encoding());
+        break;
+      default:
+        MOZ_CRASH("unexpected operand kind");
+    }
+  }
+  void vpmovzxbq(const Operand& src, FloatRegister dest) {
+    MOZ_ASSERT(HasSSE41());
+    switch (src.kind()) {
+      case Operand::FPREG:
+        masm.vpmovzxbq_rr(src.fpu(), dest.encoding());
+        break;
+      default:
+        MOZ_CRASH("unexpected operand kind");
+    }
+  }
   void vpmovsxwd(const Operand& src, FloatRegister dest) {
     MOZ_ASSERT(HasSSE41());
     switch (src.kind()) {
@@ -3708,6 +3728,16 @@ class AssemblerX86Shared : public AssemblerShared {
       case Operand::MEM_SCALE:
         masm.vpmovzxwd_mr(src.disp(), src.base(), src.index(), src.scale(),
                           dest.encoding());
+        break;
+      default:
+        MOZ_CRASH("unexpected operand kind");
+    }
+  }
+  void vpmovzxwq(const Operand& src, FloatRegister dest) {
+    MOZ_ASSERT(HasSSE41());
+    switch (src.kind()) {
+      case Operand::FPREG:
+        masm.vpmovzxwq_rr(src.fpu(), dest.encoding());
         break;
       default:
         MOZ_CRASH("unexpected operand kind");

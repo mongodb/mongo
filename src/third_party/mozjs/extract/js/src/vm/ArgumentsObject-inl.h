@@ -28,13 +28,13 @@ inline const Value& ArgumentsObject::element(uint32_t i) const {
 
 inline void ArgumentsObject::setElement(uint32_t i, const Value& v) {
   MOZ_ASSERT(isElement(i));
-  GCPtr<Value>& lhs = data()->args[i];
-  if (IsMagicScopeSlotValue(lhs)) {
+  Value value = data()->args[i];
+  if (IsMagicScopeSlotValue(value)) {
     CallObject& callobj =
         getFixedSlot(MAYBE_CALL_SLOT).toObject().as<CallObject>();
-    callobj.setAliasedFormalFromArguments(lhs, v);
+    callobj.setAliasedFormalFromArguments(value, v);
   } else {
-    lhs = v;
+    setArg(i, v);
   }
 }
 

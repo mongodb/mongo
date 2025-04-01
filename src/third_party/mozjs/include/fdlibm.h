@@ -17,68 +17,74 @@
 #ifndef mozilla_imported_fdlibm_h
 #define	mozilla_imported_fdlibm_h
 
-namespace fdlibm {
-
 #ifndef M_PI_2
 #define	M_PI_2		1.57079632679489661923	/* pi/2 */
 #endif
 
-double	acos(double);
-double	asin(double);
-double	atan(double);
-double	atan2(double, double);
-double	cos(double);
-double	sin(double);
-double	tan(double);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-double	cosh(double);
-double	sinh(double);
-double	tanh(double);
+double	fdlibm_acos(double);
+double	fdlibm_asin(double);
+double	fdlibm_atan(double);
+double	fdlibm_atan2(double, double);
+double	fdlibm_cos(double);
+double	fdlibm_sin(double);
+double	fdlibm_tan(double);
 
-double	exp(double);
-double	log(double);
-double	log10(double);
+double	fdlibm_cosh(double);
+double	fdlibm_sinh(double);
+double	fdlibm_tanh(double);
 
-double	pow(double, double);
+double	fdlibm_exp(double);
+double	fdlibm_log(double);
+double	fdlibm_log10(double);
 
-double	ceil(double);
-double	fabs(double);
-double	floor(double);
+double	fdlibm_pow(double, double);
 
-double	acosh(double);
-double	asinh(double);
-double	atanh(double);
-double	cbrt(double);
-double	exp2(double);
-double	expm1(double);
-double	hypot(double, double);
-double	log1p(double);
-double	log2(double);
-double	rint(double);
-double	copysign(double, double);
-double	nearbyint(double);
-double	scalbn(double, int);
-double	trunc(double);
-float	acosf(float);
-float	asinf(float);
-float	atanf(float);
-float	cosf(float);
-float	sinf(float);
-float	tanf(float);
-float	exp2f(float);
-float	expf(float);
-float	logf(float);
-float	powf(float, float);
-float	sqrtf(float);
+double	fdlibm_ceil(double);
+double	fdlibm_fabs(double);
+double	fdlibm_floor(double);
 
-float	ceilf(float);
-float	fabsf(float);
-float	floorf(float);
-float	nearbyintf(float);
-float	rintf(float);
-float	scalbnf(float, int);
-float	truncf(float);
+double	fdlibm_acosh(double);
+double	fdlibm_asinh(double);
+double	fdlibm_atanh(double);
+double	fdlibm_cbrt(double);
+double	fdlibm_exp2(double);
+double	fdlibm_expm1(double);
+double	fdlibm_hypot(double, double);
+double	fdlibm_log1p(double);
+double	fdlibm_log2(double);
+double	fdlibm_rint(double);
+double	fdlibm_copysign(double, double);
+double	fdlibm_nearbyint(double);
+double	fdlibm_scalbn(double, int);
+double	fdlibm_trunc(double);
+float	fdlibm_acosf(float);
+float	fdlibm_asinf(float);
+float	fdlibm_atanf(float);
+float	fdlibm_cosf(float);
+float	fdlibm_sinf(float);
+float	fdlibm_tanf(float);
+float	fdlibm_exp2f(float);
+float	fdlibm_expf(float);
+float	fdlibm_log10f(float);
+float	fdlibm_logf(float);
+float	fdlibm_powf(float, float);
+float	fdlibm_sqrtf(float);
 
-} /* namespace fdlibm */
+float	fdlibm_ceilf(float);
+float	fdlibm_fabsf(float);
+float	fdlibm_floorf(float);
+float	fdlibm_hypotf(float, float);
+float	fdlibm_nearbyintf(float);
+float	fdlibm_rintf(float);
+float	fdlibm_scalbnf(float, int);
+float	fdlibm_truncf(float);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
 
 #endif /* !mozilla_imported_fdlibm_h */

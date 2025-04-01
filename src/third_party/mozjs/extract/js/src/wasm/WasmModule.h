@@ -50,19 +50,17 @@ using Tier2Listener = RefPtr<JS::OptimizedEncodingListener>;
 struct ImportValues {
   JSObjectVector funcs;
   WasmTableObjectVector tables;
-  WasmMemoryObject* memory;
+  WasmMemoryObjectVector memories;
   WasmTagObjectVector tagObjs;
   WasmGlobalObjectVector globalObjs;
   ValVector globalValues;
 
-  ImportValues() : memory(nullptr) {}
+  ImportValues() {}
 
   void trace(JSTracer* trc) {
     funcs.trace(trc);
     tables.trace(trc);
-    if (memory) {
-      TraceRoot(trc, &memory, "import values memory");
-    }
+    memories.trace(trc);
     tagObjs.trace(trc);
     globalObjs.trace(trc);
     globalValues.trace(trc);
@@ -85,7 +83,7 @@ class Module : public JS::WasmModule {
   const ImportVector imports_;
   const ExportVector exports_;
   const DataSegmentVector dataSegments_;
-  const ElemSegmentVector elemSegments_;
+  const ModuleElemSegmentVector elemSegments_;
   const CustomSectionVector customSections_;
 
   // This field is only meaningful when code_->metadata().debugEnabled.
@@ -114,8 +112,9 @@ class Module : public JS::WasmModule {
 
   bool instantiateFunctions(JSContext* cx,
                             const JSObjectVector& funcImports) const;
-  bool instantiateMemory(JSContext* cx,
-                         MutableHandle<WasmMemoryObject*> memory) const;
+  bool instantiateMemories(
+      JSContext* cx, const WasmMemoryObjectVector& memoryImports,
+      MutableHandle<WasmMemoryObjectVector> memoryObjs) const;
   bool instantiateTags(JSContext* cx, WasmTagObjectVector& tagObjs) const;
   bool instantiateImportedTable(JSContext* cx, const TableDesc& td,
                                 Handle<WasmTableObject*> table,
@@ -130,14 +129,13 @@ class Module : public JS::WasmModule {
                          SharedTableVector* tables) const;
   bool instantiateGlobals(JSContext* cx, const ValVector& globalImportValues,
                           WasmGlobalObjectVector& globalObjs) const;
-  bool initSegments(JSContext* cx, Handle<WasmInstanceObject*> instance,
-                    Handle<WasmMemoryObject*> memory) const;
 
   class Tier2GeneratorTaskImpl;
 
  public:
   Module(const Code& code, ImportVector&& imports, ExportVector&& exports,
-         DataSegmentVector&& dataSegments, ElemSegmentVector&& elemSegments,
+         DataSegmentVector&& dataSegments,
+         ModuleElemSegmentVector&& elemSegments,
          CustomSectionVector&& customSections,
          const ShareableBytes* debugBytecode = nullptr,
          bool loggingDeserialized = false)

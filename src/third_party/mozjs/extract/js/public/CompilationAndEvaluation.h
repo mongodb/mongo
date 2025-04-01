@@ -45,8 +45,8 @@ class SourceText;
  * lines in a buffer until JS_Utf8BufferIsCompilableUnit is true, then pass it
  * to the compiler.
  *
- * The provided buffer is interpreted as UTF-8 data.  An error is reported if
- * a UTF-8 encoding error is encountered.
+ * The provided buffer is interpreted as UTF-8 data.  If a UTF-8 encoding error
+ * is encountered, reports an error to JSContext and returns *true*.
  */
 extern JS_PUBLIC_API bool JS_Utf8BufferIsCompilableUnit(
     JSContext* cx, JS::Handle<JSObject*> obj, const char* utf8, size_t length);

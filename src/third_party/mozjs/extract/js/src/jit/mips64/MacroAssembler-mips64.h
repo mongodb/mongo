@@ -413,6 +413,14 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
     ma_dext(dest, src.valueReg(), Imm32(0), Imm32(JSVAL_TAG_SHIFT));
   }
 
+  void unboxWasmAnyRefGCThingForGCBarrier(const Address& src, Register dest) {
+    ScratchRegisterScope scratch(asMasm());
+    MOZ_ASSERT(scratch != dest);
+    movePtr(ImmWord(wasm::AnyRef::GCThingMask), scratch);
+    loadPtr(src, dest);
+    as_and(dest, dest, scratch);
+  }
+
   // Like unboxGCThingForGCBarrier, but loads the GC thing's chunk base.
   void getGCThingValueChunk(const Address& src, Register dest) {
     ScratchRegisterScope scratch(asMasm());
@@ -425,6 +433,12 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
     MOZ_ASSERT(src.valueReg() != dest);
     movePtr(ImmWord(JS::detail::ValueGCThingPayloadChunkMask), dest);
     as_and(dest, dest, src.valueReg());
+  }
+
+  void getWasmAnyRefGCThingChunk(Register src, Register dest) {
+    MOZ_ASSERT(src != dest);
+    movePtr(ImmWord(wasm::AnyRef::GCThingChunkMask), dest);
+    as_and(dest, dest, src);
   }
 
   void unboxInt32(const ValueOperand& operand, Register dest);

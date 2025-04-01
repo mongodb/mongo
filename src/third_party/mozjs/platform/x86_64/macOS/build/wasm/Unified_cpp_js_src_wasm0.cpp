@@ -8,6 +8,15 @@
 #error "wasm/AsmJS.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
+#include "wasm/WasmAnyRef.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "wasm/WasmAnyRef.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "wasm/WasmAnyRef.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "wasm/WasmBCFrame.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "wasm/WasmBCFrame.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -42,14 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "wasm/WasmBinary.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "wasm/WasmBuiltins.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmBuiltins.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "wasm/WasmBuiltins.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

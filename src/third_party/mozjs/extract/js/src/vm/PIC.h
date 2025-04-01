@@ -108,9 +108,7 @@ struct ForOfPIC {
     const HeapPtr<Shape*> shape_;
 
    public:
-    explicit Stub(Shape* shape) : BaseStub(), shape_(shape) {
-      MOZ_ASSERT(shape_);
-    }
+    explicit Stub(Shape* shape) : shape_(shape) { MOZ_ASSERT(shape_); }
 
     Shape* shape() { return shape_; }
 
@@ -148,9 +146,12 @@ struct ForOfPIC {
     // Pointer to owning JSObject for memory accounting purposes.
     const GCPtr<JSObject*> picObject_;
 
-    // Pointer to canonical Array.prototype and ArrayIterator.prototype
+    // Pointer to canonical Array.prototype, ArrayIterator.prototype,
+    // Iterator.prototype, and Object.prototype
     GCPtr<NativeObject*> arrayProto_;
     GCPtr<NativeObject*> arrayIteratorProto_;
+    GCPtr<NativeObject*> iteratorProto_;
+    GCPtr<NativeObject*> objectProto_;
 
     // Shape of matching Array.prototype object, and slot containing
     // the @@iterator for it, and the canonical value.
@@ -164,6 +165,11 @@ struct ForOfPIC {
     uint32_t arrayIteratorProtoNextSlot_;
     GCPtr<Value> canonicalNextFunc_;
 
+    // Shape of matching Iterator.prototype object.
+    GCPtr<Shape*> iteratorProtoShape_;
+    // Shape of matching Object.prototype object.
+    GCPtr<Shape*> objectProtoShape_;
+
     // Initialization flag marking lazy initialization of above fields.
     bool initialized_;
 
@@ -175,8 +181,7 @@ struct ForOfPIC {
 
    public:
     explicit Chain(JSObject* picObject)
-        : BaseChain(),
-          picObject_(picObject),
+        : picObject_(picObject),
           arrayProto_(nullptr),
           arrayIteratorProto_(nullptr),
           arrayProtoShape_(nullptr),
@@ -189,6 +194,9 @@ struct ForOfPIC {
 
     // Initialize the canonical iterator function.
     bool initialize(JSContext* cx);
+
+    // Try to optimize this chain for a newly allocated array.
+    bool tryOptimizeArray(JSContext* cx, bool* optimized);
 
     // Try to optimize this chain for an object.
     bool tryOptimizeArray(JSContext* cx, Handle<ArrayObject*> array,
@@ -207,11 +215,25 @@ struct ForOfPIC {
     // in a way that would disable this PIC.
     bool isArrayStateStillSane();
 
-    // Check if ArrayIterator.next is still optimizable.
-    inline bool isArrayNextStillSane() {
-      return (arrayIteratorProto_->shape() == arrayIteratorProtoShape_) &&
-             (arrayIteratorProto_->getSlot(arrayIteratorProtoNextSlot_) ==
-              canonicalNextFunc_);
+    // Check if ArrayIterator.next and ArrayIterator.return are still
+    // optimizable.
+    inline bool isArrayIteratorStateStillSane() {
+      // Ensure the prototype chain is intact, which will ensure that "return"
+      // has not been defined.
+      if (arrayIteratorProto_->shape() != arrayIteratorProtoShape_) {
+        return false;
+      }
+
+      if (iteratorProto_->shape() != iteratorProtoShape_) {
+        return false;
+      }
+
+      if (objectProto_->shape() != objectProtoShape_) {
+        return false;
+      }
+
+      return arrayIteratorProto_->getSlot(arrayIteratorProtoNextSlot_) ==
+             canonicalNextFunc_;
     }
 
     // Check if a matching optimized stub for the given object exists.

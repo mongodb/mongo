@@ -83,6 +83,9 @@ class LIRGenerator final : public LIRGeneratorSpecific {
 
   template <class MWasmCallT>
   void visitWasmCall(MWasmCallT ins);
+
+  WasmRefIsSubtypeDefs useWasmRefIsSubtype(wasm::RefType destType,
+                                           MDefinition* superSTV);
 };
 
 }  // namespace jit

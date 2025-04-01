@@ -173,9 +173,10 @@ enum class UnhandledRejectionBehavior { Ignore, Report };
     JSContext* cx, JS::Handle<PromiseObject*> resultPromise,
     JS::Handle<JS::Value> value);
 
-[[nodiscard]] bool AsyncFunctionThrown(JSContext* cx,
-                                       JS::Handle<PromiseObject*> resultPromise,
-                                       JS::Handle<JS::Value> reason);
+[[nodiscard]] bool AsyncFunctionThrown(
+    JSContext* cx, JS::Handle<PromiseObject*> resultPromise,
+    JS::Handle<JS::Value> reason,
+    JS::Handle<SavedFrame*> unwrappedRejectionStack = nullptr);
 
 // Start awaiting `value` in an async function (, but doesn't suspend the
 // async function's execution!). Returns the async function's result promise.
@@ -262,6 +263,7 @@ bool IsPromiseWithDefaultResolvingFunction(PromiseObject* promise);
 void SetAlreadyResolvedPromiseWithDefaultResolvingFunction(
     PromiseObject* promise);
 
+bool IsPromiseConstructor(const JSObject* obj);
 }  // namespace js
 
 #endif  // builtin_Promise_h

@@ -181,6 +181,10 @@ void MacroAssembler::branchToComputedAddress(const BaseIndex& address) {
   MOZ_CRASH();
 }
 
+void MacroAssembler::move8ZeroExtend(Register src, Register dest) {
+  MOZ_CRASH();
+}
+
 void MacroAssembler::move8SignExtend(Register src, Register dest) {
   MOZ_CRASH();
 }
@@ -224,6 +228,10 @@ void MacroAssembler::byteSwap32(Register reg) { MOZ_CRASH(); }
 void MacroAssembler::add32(Register src, Register dest) { MOZ_CRASH(); }
 
 void MacroAssembler::add32(Imm32 imm, Register dest) { MOZ_CRASH(); }
+
+void MacroAssembler::add32(Imm32 imm, Register src, Register dest) {
+  MOZ_CRASH();
+}
 
 void MacroAssembler::add32(Imm32 imm, const Address& dest) { MOZ_CRASH(); }
 
@@ -806,23 +814,23 @@ void MacroAssembler::spectreMovePtr(Condition cond, Register src,
   MOZ_CRASH();
 }
 
-void MacroAssembler::storeUncanonicalizedDouble(FloatRegister src,
-                                                const Address& dest) {
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
+    FloatRegister src, const Address& dest) {
   MOZ_CRASH();
 }
 
-void MacroAssembler::storeUncanonicalizedDouble(FloatRegister src,
-                                                const BaseIndex& dest) {
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
+    FloatRegister src, const BaseIndex& dest) {
   MOZ_CRASH();
 }
 
-void MacroAssembler::storeUncanonicalizedFloat32(FloatRegister src,
-                                                 const Address& dest) {
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
+    FloatRegister src, const Address& dest) {
   MOZ_CRASH();
 }
 
-void MacroAssembler::storeUncanonicalizedFloat32(FloatRegister src,
-                                                 const BaseIndex& dest) {
+FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
+    FloatRegister src, const BaseIndex& dest) {
   MOZ_CRASH();
 }
 
@@ -884,6 +892,11 @@ void MacroAssembler::spectreBoundsCheckPtr(Register index,
                                            const Address& length,
                                            Register maybeScratch,
                                            Label* failure) {
+  MOZ_CRASH();
+}
+
+void MacroAssembler::cmp32Load32(Condition cond, Register lhs, Imm32 rhs,
+                                 const Address& src, Register dest) {
   MOZ_CRASH();
 }
 
@@ -957,6 +970,11 @@ void MacroAssembler::branchTestMagic(Condition cond, const ValueOperand& value,
 
 void MacroAssembler::branchTestString(Condition cond, const ValueOperand& value,
                                       Label* label) {
+  MOZ_CRASH();
+}
+
+void MacroAssembler::cmp32Move32(Condition cond, Register lhs, Imm32 rhs,
+                                 Register src, Register dest) {
   MOZ_CRASH();
 }
 

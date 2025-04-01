@@ -217,6 +217,7 @@ void Assembler::GeneralLi(Register rd, int64_t imm) {
     return;
   } else {
     UseScratchRegisterScope temps(this);
+    BlockTrampolinePoolScope block_trampoline_pool(this, 8);
     // 64-bit case: divide imm into two 32-bit parts, upper and lower
     int64_t up_32 = imm >> 32;
     int64_t low_32 = imm & 0xffffffffull;
@@ -225,7 +226,6 @@ void Assembler::GeneralLi(Register rd, int64_t imm) {
     if (up_32 == 0 || low_32 == 0) {
       // No temp register is needed
     } else {
-      BlockTrampolinePoolScope block_trampoline_pool(this, 0);
       temp_reg = temps.hasAvailable() ? temps.Acquire() : InvalidReg;
     }
     if (temp_reg != InvalidReg) {
@@ -508,7 +508,7 @@ ABIArg ABIArgGenerator::next(MIRType type) {
     case MIRType::Int32:
     case MIRType::Int64:
     case MIRType::Pointer:
-    case MIRType::RefOrNull:
+    case MIRType::WasmAnyRef:
     case MIRType::StackResults: {
       if (intRegIndex_ == NumIntArgRegs) {
         current_ = ABIArg(stackOffset_);

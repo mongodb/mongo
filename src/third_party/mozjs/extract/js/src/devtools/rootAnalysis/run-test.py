@@ -85,7 +85,7 @@ if not cfg.sixgill_plugin:
     )
 
 subprocess.check_call(
-    [cfg.js, "-e", 'if (!getBuildConfiguration()["has-ctypes"]) quit(1)']
+    [cfg.js, "-e", 'if (!getBuildConfiguration("has-ctypes")) quit(1)']
 )
 
 

@@ -52,6 +52,8 @@ function Reflect_apply(target, thisArgument, argumentsList) {
   // Steps 2-4.
   return callFunction(std_Function_apply, target, thisArgument, argumentsList);
 }
+// This function is only barely too long for normal inlining.
+SetIsInlinableLargeFunction(Reflect_apply);
 
 // ES2017 draft rev a785b0832b071f505a694e1946182adeab84c972
 // 26.1.2 Reflect.construct ( target, argumentsList [ , newTarget ] )

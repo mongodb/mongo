@@ -14,7 +14,7 @@
 
 #include <stdint.h>  // uint32_t
 
-#include "js/Id.h"  // INT_TO_JSID, jsid, JSID_INT_MAX, SYMBOL_TO_JSID
+#include "js/Id.h"                  // jsid
 #include "js/PropertyDescriptor.h"  // JSPROP_ENUMERATE, JS::PropertyDescriptor
 #include "js/RootingAPI.h"          // JS::Handle, JS::MutableHandle, JS::Rooted
 #include "js/TypeDecls.h"           // fwd-decl: JSContext, Symbol, Value

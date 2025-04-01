@@ -147,6 +147,9 @@ PhaseKindGraphRoots = [
                     # The following are only used for parallel phase times:
                     addPhaseKind("PARALLEL_MARK_MARK", "Parallel marking work", 79),
                     addPhaseKind("PARALLEL_MARK_WAIT", "Waiting for work", 80),
+                    addPhaseKind(
+                        "PARALLEL_MARK_OTHER", "Parallel marking overhead", 82
+                    ),
                 ],
             ),
         ],
@@ -186,6 +189,7 @@ PhaseKindGraphRoots = [
                     addPhaseKind("SWEEP_COMPRESSION", "Sweep Compression Tasks", 62),
                     addPhaseKind("SWEEP_WEAKMAPS", "Sweep WeakMaps", 63),
                     addPhaseKind("SWEEP_UNIQUEIDS", "Sweep Unique IDs", 64),
+                    addPhaseKind("SWEEP_WEAK_POINTERS", "Sweep Weak Pointers", 81),
                     addPhaseKind(
                         "SWEEP_FINALIZATION_OBSERVERS",
                         "Sweep FinalizationRegistries and WeakRefs",

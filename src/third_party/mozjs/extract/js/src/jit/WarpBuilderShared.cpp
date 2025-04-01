@@ -22,9 +22,12 @@ WarpBuilderShared::WarpBuilderShared(WarpSnapshot& snapshot,
 
 bool WarpBuilderShared::resumeAfter(MInstruction* ins, BytecodeLocation loc) {
   // resumeAfter should only be used with effectful instructions. The only
-  // exception is MInt64ToBigInt, it's used to convert the result of a call into
-  // Wasm code so we attach the resume point to that instead of to the call.
-  MOZ_ASSERT(ins->isEffectful() || ins->isInt64ToBigInt());
+  // exceptions are:
+  // 1. MInt64ToBigInt, which is used to convert the result of a call into Wasm
+  //    code so we attach the resume point to that instead of to the call.
+  // 2. MPostIntPtrConversion which is used after conversion from IntPtr.
+  MOZ_ASSERT(ins->isEffectful() || ins->isInt64ToBigInt() ||
+             ins->isPostIntPtrConversion());
   MOZ_ASSERT(!ins->isMovable());
 
   MResumePoint* resumePoint = MResumePoint::New(
@@ -51,6 +54,30 @@ void WarpBuilderShared::pushConstant(const Value& v) {
   current->push(cst);
 }
 
+MDefinition* WarpBuilderShared::unboxObjectInfallible(MDefinition* def,
+                                                      IsMovable movable) {
+  if (def->type() == MIRType::Object) {
+    return def;
+  }
+
+  if (def->type() != MIRType::Value) {
+    // Corner case: if the MIR node has a type other than Object or Value, this
+    // code isn't actually reachable and we expect an earlier guard to fail.
+    // Just insert a Box to satisfy MIR invariants.
+    MOZ_ASSERT(movable == IsMovable::No);
+    auto* box = MBox::New(alloc(), def);
+    current->add(box);
+    def = box;
+  }
+
+  auto* unbox = MUnbox::New(alloc(), def, MIRType::Object, MUnbox::Infallible);
+  if (movable == IsMovable::No) {
+    unbox->setNotMovable();
+  }
+  current->add(unbox);
+  return unbox;
+}
+
 MCall* WarpBuilderShared::makeCall(CallInfo& callInfo, bool needsThisCheck,
                                    WrappedFunction* target, bool isDOMCall) {
   auto addUndefined = [this]() -> MConstant* {
@@ -73,9 +100,10 @@ MInstruction* WarpBuilderShared::makeSpreadCall(CallInfo& callInfo,
   current->add(elements);
 
   if (callInfo.constructing()) {
+    auto* newTarget = unboxObjectInfallible(callInfo.getNewTarget());
     auto* construct =
         MConstructArray::New(alloc(), target, callInfo.callee(), elements,
-                             callInfo.thisArg(), callInfo.getNewTarget());
+                             callInfo.thisArg(), newTarget);
     if (isSameRealm) {
       construct->setNotCrossRealm();
     }

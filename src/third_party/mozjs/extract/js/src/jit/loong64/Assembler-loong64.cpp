@@ -32,7 +32,7 @@ ABIArg ABIArgGenerator::next(MIRType type) {
     case MIRType::Int32:
     case MIRType::Int64:
     case MIRType::Pointer:
-    case MIRType::RefOrNull:
+    case MIRType::WasmAnyRef:
     case MIRType::StackResults: {
       if (intRegIndex_ == NumIntArgRegs) {
         current_ = ABIArg(stackOffset_);
@@ -103,15 +103,15 @@ uint32_t js::jit::SA3(uint32_t value) {
 }
 
 Register js::jit::toRK(Instruction& i) {
-  return Register::FromCode((i.encode() & RKMask) >> RKShift);
+  return Register::FromCode(((i.encode() >> RKShift) & RKMask));
 }
 
 Register js::jit::toRJ(Instruction& i) {
-  return Register::FromCode((i.encode() & RJMask) >> RJShift);
+  return Register::FromCode(((i.encode() >> RJShift) & RJMask));
 }
 
 Register js::jit::toRD(Instruction& i) {
-  return Register::FromCode((i.encode() & RDMask) >> RDShift);
+  return Register::FromCode(((i.encode() >> RDShift) & RDMask));
 }
 
 Register js::jit::toR(Instruction& i) {

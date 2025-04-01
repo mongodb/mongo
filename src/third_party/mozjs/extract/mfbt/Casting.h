@@ -198,6 +198,32 @@ inline To ReleaseAssertedCast(const From aFrom) {
   return static_cast<To>(aFrom);
 }
 
+namespace detail {
+
+template <typename From>
+class LazyAssertedCastT final {
+  const From mVal;
+
+ public:
+  explicit LazyAssertedCastT(const From val) : mVal(val) {}
+
+  template <typename To>
+  operator To() const {
+    return AssertedCast<To>(mVal);
+  }
+};
+
+}  // namespace detail
+
+/**
+ * Like AssertedCast, but infers |To| for AssertedCast lazily based on usage.
+ * > uint8_t foo = LazyAssertedCast(1000);  // boom
+ */
+template <typename From>
+inline auto LazyAssertedCast(const From val) {
+  return detail::LazyAssertedCastT<From>(val);
+}
+
 }  // namespace mozilla
 
 #endif /* mozilla_Casting_h */

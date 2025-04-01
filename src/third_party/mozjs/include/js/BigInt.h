@@ -68,8 +68,8 @@ struct NumberToBigIntConverter<bool> {
   }
 };
 
-extern JS_PUBLIC_API bool BigIntIsInt64(BigInt* bi, int64_t* result);
-extern JS_PUBLIC_API bool BigIntIsUint64(BigInt* bi, uint64_t* result);
+extern JS_PUBLIC_API bool BigIntIsInt64(const BigInt* bi, int64_t* result);
+extern JS_PUBLIC_API bool BigIntIsUint64(const BigInt* bi, uint64_t* result);
 
 template <typename T, typename = void>
 struct BigIntToNumberChecker;
@@ -83,7 +83,7 @@ struct BigIntToNumberChecker<
         std::numeric_limits<SignedIntT>::max() <= Int64Limits::max()>> {
   using TypeLimits = std::numeric_limits<SignedIntT>;
 
-  static bool fits(BigInt* bi, SignedIntT* result) {
+  static bool fits(const BigInt* bi, SignedIntT* result) {
     int64_t innerResult;
     if (!BigIntIsInt64(bi, &innerResult)) {
       return false;
@@ -102,7 +102,7 @@ struct BigIntToNumberChecker<
     std::enable_if_t<
         std::is_integral_v<UnsignedIntT> && std::is_unsigned_v<UnsignedIntT> &&
         std::numeric_limits<UnsignedIntT>::max() <= Uint64Limits::max()>> {
-  static bool fits(BigInt* bi, UnsignedIntT* result) {
+  static bool fits(const BigInt* bi, UnsignedIntT* result) {
     uint64_t innerResult;
     if (!BigIntIsUint64(bi, &innerResult)) {
       return false;
@@ -151,10 +151,10 @@ extern JS_PUBLIC_API BigInt* NumberToBigInt(JSContext* cx, double num);
  * If parsing fails, this function returns null and throws an exception.
  */
 extern JS_PUBLIC_API BigInt* StringToBigInt(
-    JSContext* cx, mozilla::Range<const Latin1Char> chars);
+    JSContext* cx, const mozilla::Range<const Latin1Char>& chars);
 
 extern JS_PUBLIC_API BigInt* StringToBigInt(
-    JSContext* cx, mozilla::Range<const char16_t> chars);
+    JSContext* cx, const mozilla::Range<const char16_t>& chars);
 
 /**
  * Create a BigInt by parsing a string consisting of an optional sign character
@@ -179,12 +179,12 @@ extern JS_PUBLIC_API BigInt* ToBigInt(JSContext* cx, Handle<Value> val);
 /**
  * Convert the given BigInt, modulo 2**64, to a signed 64-bit integer.
  */
-extern JS_PUBLIC_API int64_t ToBigInt64(BigInt* bi);
+extern JS_PUBLIC_API int64_t ToBigInt64(const BigInt* bi);
 
 /**
  * Convert the given BigInt, modulo 2**64, to an unsigned 64-bit integer.
  */
-extern JS_PUBLIC_API uint64_t ToBigUint64(BigInt* bi);
+extern JS_PUBLIC_API uint64_t ToBigUint64(const BigInt* bi);
 
 /**
  * Convert the given BigInt to a Number value as if calling the Number
@@ -192,12 +192,12 @@ extern JS_PUBLIC_API uint64_t ToBigUint64(BigInt* bi);
  * (https://tc39.es/ecma262/#sec-number-constructor-number-value). The value
  * may be rounded if it doesn't fit without loss of precision.
  */
-extern JS_PUBLIC_API double BigIntToNumber(BigInt* bi);
+extern JS_PUBLIC_API double BigIntToNumber(const BigInt* bi);
 
 /**
  * Return true if the given BigInt is negative.
  */
-extern JS_PUBLIC_API bool BigIntIsNegative(BigInt* bi);
+extern JS_PUBLIC_API bool BigIntIsNegative(const BigInt* bi);
 
 /**
  * Return true if the given BigInt fits inside the given NumericT type without
@@ -205,14 +205,14 @@ extern JS_PUBLIC_API bool BigIntIsNegative(BigInt* bi);
  * false and leave the value of the out parameter unspecified.
  */
 template <typename NumericT>
-static inline bool BigIntFits(BigInt* bi, NumericT* out) {
+static inline bool BigIntFits(const BigInt* bi, NumericT* out) {
   return detail::BigIntToNumberChecker<NumericT>::fits(bi, out);
 }
 
 /**
  * Same as BigIntFits(), but checks if the value fits inside a JS Number value.
  */
-extern JS_PUBLIC_API bool BigIntFitsNumber(BigInt* bi, double* out);
+extern JS_PUBLIC_API bool BigIntFitsNumber(const BigInt* bi, double* out);
 
 /**
  * Convert the given BigInt to a String value as if toString() were called on

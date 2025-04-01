@@ -7,6 +7,8 @@
 #ifndef jit_ABIFunctionList_inl_h
 #define jit_ABIFunctionList_inl_h
 
+#include "mozilla/SIMD.h"  // mozilla::SIMD::memchr{,2x}{8,16}
+
 #include "jslibmath.h"  // js::NumberMod
 #include "jsmath.h"     // js::ecmaPow, js::ecmaHypot, js::hypot3, js::hypot4,
                         // js::ecmaAtan2, js::UnaryMathFunctionType, js::powi
@@ -19,6 +21,7 @@
 #include "builtin/Object.h"            // js::ObjectClassToString
 #include "builtin/RegExp.h"            // js::RegExpPrototypeOptimizableRaw,
                                        // js::RegExpInstanceOptimizableRaw
+#include "builtin/Sorting.h"           // js::ArraySortData
 #include "builtin/TestingFunctions.h"  // js::FuzzilliHash*
 
 #include "irregexp/RegExpAPI.h"
@@ -43,15 +46,23 @@
 
 #include "proxy/Proxy.h"  // js::ProxyGetProperty
 
-#include "vm/ArgumentsObject.h"  // js::ArgumentsObject::finishForIonPure
-#include "vm/Interpreter.h"      // js::TypeOfObject
-#include "vm/NativeObject.h"     // js::NativeObject
-#include "vm/RegExpShared.h"     // js::ExecuteRegExpAtomRaw
-#include "wasm/WasmBuiltins.h"   // js::wasm::*
+#include "vm/ArgumentsObject.h"   // js::ArgumentsObject::finishForIonPure
+#include "vm/Interpreter.h"       // js::TypeOfObject
+#include "vm/NativeObject.h"      // js::NativeObject
+#include "vm/RegExpShared.h"      // js::ExecuteRegExpAtomRaw
+#include "vm/TypedArrayObject.h"  // js::TypedArraySortFromJit
+#include "wasm/WasmBuiltins.h"    // js::wasm::*
 
 #include "builtin/Boolean-inl.h"  // js::EmulatesUndefined
 
 namespace js {
+
+namespace wasm {
+
+class AnyRef;
+
+}  // namespace wasm
+
 namespace jit {
 
 // List of all ABI functions to be used with callWithABI. Each entry stores
@@ -94,10 +105,14 @@ namespace jit {
   _(js::ArgumentsObject::finishForIonPure)                            \
   _(js::ArgumentsObject::finishInlineForIonPure)                      \
   _(js::ArrayShiftMoveElements)                                       \
+  _(js::ArraySortData::sortArrayWithComparator)                       \
+  _(js::ArraySortData::sortTypedArrayWithComparator)                  \
+  _(js::ArraySortFromJit)                                             \
   _(js::ecmaAtan2)                                                    \
   _(js::ecmaHypot)                                                    \
   _(js::ecmaPow)                                                      \
   _(js::EmulatesUndefined)                                            \
+  _(js::EmulatesUndefinedCheckFuse)                                   \
   _(js::ExecuteRegExpAtomRaw)                                         \
   _(js_free)                                                          \
   _(js::hypot3)                                                       \
@@ -112,7 +127,6 @@ namespace jit {
   _(js::jit::AllocateBigIntNoGC)                                      \
   _(js::jit::AllocateFatInlineString)                                 \
   _(js::jit::AllocateDependentString)                                 \
-  _(js::jit::ArrayPushDensePure)                                      \
   _(js::jit::AssertMapObjectHash)                                     \
   _(js::jit::AssertPropertyLookup)                                    \
   _(js::jit::AssertSetObjectHash)                                     \
@@ -131,7 +145,6 @@ namespace jit {
   _(js::jit::NumberBigIntCompare<ComparisonKind::LessThan>)           \
   _(js::jit::NumberBigIntCompare<ComparisonKind::GreaterThanOrEqual>) \
   _(js::jit::BigIntNumberCompare<ComparisonKind::GreaterThanOrEqual>) \
-  _(js::jit::CreateMatchResultFallbackFunc)                           \
   _(js::jit::EqualStringsHelperPure)                                  \
   _(js::jit::FinishBailoutToBaseline)                                 \
   _(js::jit::FrameIsDebuggeeCheck)                                    \
@@ -158,12 +171,14 @@ namespace jit {
   _(js::jit::ObjectIsConstructor)                                     \
   _(js::jit::PostGlobalWriteBarrier)                                  \
   _(js::jit::PostWriteBarrier)                                        \
-  _(js::jit::PostWriteElementBarrier<IndexInBounds::Yes>)             \
-  _(js::jit::PostWriteElementBarrier<IndexInBounds::Maybe>)           \
+  _(js::jit::PostWriteElementBarrier)                                 \
   _(js::jit::Printf0)                                                 \
   _(js::jit::Printf1)                                                 \
   _(js::jit::StringFromCharCodeNoGC)                                  \
+  _(js::jit::StringTrimEndIndex)                                      \
+  _(js::jit::StringTrimStartIndex)                                    \
   _(js::jit::TypeOfNameObject)                                        \
+  _(js::jit::TypeOfEqObject)                                          \
   _(js::jit::WrapObjectPure)                                          \
   ABIFUNCTION_FUZZILLI_LIST(_)                                        \
   _(js::MapIteratorObject::next)                                      \
@@ -178,7 +193,12 @@ namespace jit {
   _(js::RegExpPrototypeOptimizableRaw)                                \
   _(js::SetIteratorObject::next)                                      \
   _(js::StringToNumberPure)                                           \
-  _(js::TypeOfObject)
+  _(js::TypedArraySortFromJit)                                        \
+  _(js::TypeOfObject)                                                 \
+  _(mozilla::SIMD::memchr16)                                          \
+  _(mozilla::SIMD::memchr2x16)                                        \
+  _(mozilla::SIMD::memchr2x8)                                         \
+  _(mozilla::SIMD::memchr8)
 
 // List of all ABI functions to be used with callWithABI, which are
 // overloaded. Each entry stores the fully qualified name of the C++ function,
@@ -206,6 +226,7 @@ namespace jit {
   _(void (*)(JSRuntime * rt, JSObject * *objp))     \
   _(void (*)(JSRuntime * rt, JSString * *stringp))  \
   _(void (*)(JSRuntime * rt, Shape * *shapep))      \
+  _(void (*)(JSRuntime * rt, wasm::AnyRef * refp))  \
   _(void (*)(JSRuntime * rt, Value * vp))
 
 // GCC warns when the signature does not have matching attributes (for example

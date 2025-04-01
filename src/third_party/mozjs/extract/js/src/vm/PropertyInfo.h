@@ -214,7 +214,7 @@ class WrappedPtrOperations<PropertyInfoWithKey, Wrapper> {
   PropertyFlags flags() const { return value().flags(); }
 };
 
-using PropertyInfoWithKeyVector = GCVector<PropertyInfoWithKey, 8>;
+using PropertyInfoWithKeyVector = GCVector<PropertyInfoWithKey, 16>;
 
 }  // namespace js
 

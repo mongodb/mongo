@@ -8,6 +8,7 @@
 
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/Maybe.h"  // mozilla::Maybe
+#include "mozilla/Try.h"    // MOZ_TRY*
 
 #include "jslibmath.h"
 #include "jsmath.h"
@@ -15,7 +16,8 @@
 #include "frontend/FullParseHandler.h"
 #include "frontend/ParseNode.h"
 #include "frontend/ParseNodeVisitor.h"
-#include "frontend/ParserAtom.h"  // ParserAtomsTable, TaggedParserAtomIndex
+#include "frontend/Parser-macros.h"  // MOZ_TRY_VAR_OR_RETURN
+#include "frontend/ParserAtom.h"     // ParserAtomsTable, TaggedParserAtomIndex
 #include "js/Conversions.h"
 #include "js/Stack.h"           // JS::NativeStackLimit
 #include "util/StringBuffer.h"  // StringBuffer
@@ -39,12 +41,14 @@ struct FoldInfo {
 // Don't use ReplaceNode directly, because we want the constant folder to keep
 // the attributes isInParens and isDirectRHSAnonFunction of the old node being
 // replaced.
-[[nodiscard]] inline bool TryReplaceNode(ParseNode** pnp, ParseNode* pn) {
+[[nodiscard]] inline bool TryReplaceNode(ParseNode** pnp,
+                                         ParseNodeResult result) {
   // convenience check: can call TryReplaceNode(pnp, alloc_parsenode())
   // directly, without having to worry about alloc returning null.
-  if (!pn) {
+  if (result.isErr()) {
     return false;
   }
+  auto* pn = result.unwrap();
   pn->setInParens((*pnp)->isInParens());
   pn->setDirectRHSAnonFunction((*pnp)->isDirectRHSAnonFunction());
   ReplaceNode(pnp, pn);
@@ -101,6 +105,10 @@ restart:
     // Non-global lexical declarations are block-scoped (ergo not hoistable).
     case ParseNodeKind::LetDecl:
     case ParseNodeKind::ConstDecl:
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    case ParseNodeKind::UsingDecl:
+    case ParseNodeKind::AwaitUsingDecl:
+#endif
       MOZ_ASSERT(node->is<ListNode>());
       *result = false;
       return true;
@@ -169,8 +177,8 @@ restart:
     case ParseNodeKind::ExportBatchSpecStmt:
     case ParseNodeKind::CallImportExpr:
     case ParseNodeKind::CallImportSpec:
-    case ParseNodeKind::ImportAssertionList:
-    case ParseNodeKind::ImportAssertion:
+    case ParseNodeKind::ImportAttributeList:
+    case ParseNodeKind::ImportAttribute:
     case ParseNodeKind::ImportModuleRequest:
       *result = false;
       return true;
@@ -403,6 +411,7 @@ restart:
     case ParseNodeKind::ObjectExpr:
     case ParseNodeKind::PropertyNameExpr:
     case ParseNodeKind::DotExpr:
+    case ParseNodeKind::ArgumentsLength:
     case ParseNodeKind::ElemExpr:
     case ParseNodeKind::Arguments:
     case ParseNodeKind::CallExpr:
@@ -859,7 +868,9 @@ static bool FoldConditional(FoldInfo info, ParseNode** nodePtr) {
     if (nextNode) {
       nextNode = (*nextNode == replacement) ? nodePtr : nullptr;
     }
-    ReplaceNode(nodePtr, replacement);
+    if (!TryReplaceNode(nodePtr, replacement)) {
+      return false;
+    }
   } while (nextNode);
 
   return true;
@@ -1137,10 +1148,10 @@ static bool FoldElement(FoldInfo info, ParseNode** nodePtr) {
   // Optimization 3: We have expr["foo"] where foo is not an index.  Convert
   // to a property access (like expr.foo) that optimizes better downstream.
 
-  NameNode* propertyNameExpr = info.handler->newPropertyName(name, key->pn_pos);
-  if (!propertyNameExpr) {
-    return false;
-  }
+  NameNode* propertyNameExpr;
+  MOZ_TRY_VAR_OR_RETURN(propertyNameExpr,
+                        info.handler->newPropertyName(name, key->pn_pos),
+                        false);
   if (!TryReplaceNode(
           nodePtr, info.handler->newPropertyAccess(expr, propertyNameExpr))) {
     return false;

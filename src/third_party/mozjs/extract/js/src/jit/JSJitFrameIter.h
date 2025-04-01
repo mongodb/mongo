@@ -73,6 +73,10 @@ enum class FrameType {
   // wasm, and is a special kind of exit frame that doesn't have the exit
   // footer. From the point of view of the jit, it can be skipped as an exit.
   JSJitToWasm,
+
+  // Frame for a TrampolineNative, a JS builtin implemented with a JIT
+  // trampoline. See jit/TrampolineNatives.h.
+  TrampolineNative,
 };
 
 enum class ReadFrameArgsBehavior {
@@ -111,14 +115,14 @@ class JSJitFrameIter {
  protected:
   uint8_t* current_;
   FrameType type_;
-  uint8_t* resumePCinCurrentFrame_;
+  uint8_t* resumePCinCurrentFrame_ = nullptr;
 
   // Size of the current Baseline frame. Equivalent to
   // BaselineFrame::debugFrameSize_ in debug builds.
   mozilla::Maybe<uint32_t> baselineFrameSize_;
 
  private:
-  mutable const SafepointIndex* cachedSafepointIndex_;
+  mutable const SafepointIndex* cachedSafepointIndex_ = nullptr;
   const JitActivation* activation_;
 
   void dumpBaseline() const;
@@ -173,6 +177,9 @@ class JSJitFrameIter {
     return type_ == FrameType::BaselineInterpreterEntry;
   }
   bool isRectifier() const { return type_ == FrameType::Rectifier; }
+  bool isTrampolineNative() const {
+    return type_ == FrameType::TrampolineNative;
+  }
   bool isBareExit() const;
   bool isUnwoundJitExit() const;
   template <typename T>
@@ -263,6 +270,7 @@ class JitcodeGlobalTable;
 
 class JSJitProfilingFrameIterator {
   uint8_t* fp_;
+  uint8_t* wasmCallerFP_ = nullptr;
   // See JS::ProfilingFrameIterator::endStackAddress_ comment.
   void* endStackAddress_ = nullptr;
   FrameType type_;
@@ -289,6 +297,11 @@ class JSJitProfilingFrameIterator {
   void* fp() const {
     MOZ_ASSERT(!done());
     return fp_;
+  }
+  void* wasmCallerFP() const {
+    MOZ_ASSERT(done());
+    MOZ_ASSERT(bool(wasmCallerFP_) == (type_ == FrameType::WasmToJSJit));
+    return wasmCallerFP_;
   }
   inline JitFrameLayout* framePtr() const;
   void* stackAddress() const { return fp(); }
@@ -441,6 +454,8 @@ class SnapshotIterator {
   }
   inline BailoutKind bailoutKind() const { return snapshot_.bailoutKind(); }
 
+  IonScript* ionScript() const { return ionScript_; }
+
  public:
   // Read the next instruction available and get ready to either skip it or
   // evaluate it.
@@ -488,6 +503,42 @@ class SnapshotIterator {
   SnapshotIterator();
 
   Value read() { return allocationValue(readAllocation()); }
+
+  int32_t readInt32() {
+    Value val = read();
+    MOZ_RELEASE_ASSERT(val.isInt32());
+    return val.toInt32();
+  }
+
+  double readNumber() {
+    Value val = read();
+    MOZ_RELEASE_ASSERT(val.isNumber());
+    return val.toNumber();
+  }
+
+  JSString* readString() {
+    Value val = read();
+    MOZ_RELEASE_ASSERT(val.isString());
+    return val.toString();
+  }
+
+  JS::BigInt* readBigInt() {
+    Value val = read();
+    MOZ_RELEASE_ASSERT(val.isBigInt());
+    return val.toBigInt();
+  }
+
+  JSObject* readObject() {
+    Value val = read();
+    MOZ_RELEASE_ASSERT(val.isObject());
+    return &val.toObject();
+  }
+
+  JS::GCCellPtr readGCCellPtr() {
+    Value val = read();
+    MOZ_RELEASE_ASSERT(val.isGCThing());
+    return val.toGCCellPtr();
+  }
 
   // Read the |Normal| value unless it is not available and that the snapshot
   // provides a |Default| value. This is useful to avoid invalidations of the

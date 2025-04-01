@@ -22,6 +22,7 @@
 #include "js/Class.h"  // JSClassOps, ClassSpec
 #include "vm/JSObject.h"
 #include "vm/NativeObject.h"  // NativeObject
+#include "wasm/WasmAnyRef.h"
 #include "wasm/WasmSerialize.h"
 #include "wasm/WasmTypeDef.h"
 
@@ -68,125 +69,6 @@ struct V128 {
 WASM_DECLARE_CACHEABLE_POD(V128);
 
 static_assert(sizeof(V128) == 16, "Invariant");
-
-// An AnyRef is a boxed value that can represent any wasm reference type and any
-// host type that the host system allows to flow into and out of wasm
-// transparently.  It is a pointer-sized datum that has the same representation
-// as all its subtypes (funcref, externref, eqref, (ref T), et al) due to the
-// non-coercive subtyping of the wasm type system.  Its current representation
-// is a plain JSObject*, and the private JSObject subtype WasmValueBox is used
-// to box non-object non-null JS values.
-//
-// The C++/wasm boundary always uses a 'void*' type to express AnyRef values, to
-// emphasize the pointer-ness of the value.  The C++ code must transform the
-// void* into an AnyRef by calling AnyRef::fromCompiledCode(), and transform an
-// AnyRef into a void* by calling AnyRef::toCompiledCode().  Once in C++, we use
-// AnyRef everywhere.  A JS Value is transformed into an AnyRef by calling
-// AnyRef::box(), and the AnyRef is transformed into a JS Value by calling
-// AnyRef::unbox().
-//
-// NOTE that AnyRef values may point to GC'd storage and as such need to be
-// rooted if they are kept live in boxed form across code that may cause GC!
-// Use RootedAnyRef / HandleAnyRef / MutableHandleAnyRef where necessary.
-//
-// The lowest bits of the pointer value are used for tagging, to allow for some
-// representation optimizations and to distinguish various types.
-
-// For version 0, we simply equate AnyRef and JSObject* (this means that there
-// are technically no tags at all yet).  We use a simple boxing scheme that
-// wraps a JS value that is not already JSObject in a distinguishable JSObject
-// that holds the value, see WasmTypes.cpp for details.  Knowledge of this
-// mapping is embedded in CodeGenerator.cpp (in WasmBoxValue and
-// WasmAnyRefFromJSObject) and in WasmStubs.cpp (in functions Box* and Unbox*).
-
-class AnyRef {
-  // mutable so that tracing may access a JSObject* from a `const Val` or
-  // `const AnyRef`.
-  mutable JSObject* value_;
-
-  explicit AnyRef() : value_((JSObject*)-1) {}
-  explicit AnyRef(JSObject* p) : value_(p) {
-    MOZ_ASSERT(((uintptr_t)p & 0x03) == 0);
-  }
-
- public:
-  // An invalid AnyRef cannot arise naturally from wasm and so can be used as
-  // a sentinel value to indicate failure from an AnyRef-returning function.
-  static AnyRef invalid() { return AnyRef(); }
-
-  // Given a void* that comes from compiled wasm code, turn it into AnyRef.
-  static AnyRef fromCompiledCode(void* p) { return AnyRef((JSObject*)p); }
-
-  // Given a JSObject* that comes from JS, turn it into AnyRef.
-  static AnyRef fromJSObject(JSObject* p) { return AnyRef(p); }
-
-  // Generate an AnyRef null pointer.
-  static AnyRef null() { return AnyRef(nullptr); }
-
-  bool isNull() const { return value_ == nullptr; }
-
-  bool operator==(const AnyRef& rhs) const {
-    return this->value_ == rhs.value_;
-  }
-
-  bool operator!=(const AnyRef& rhs) const { return !(*this == rhs); }
-
-  void* forCompiledCode() const { return value_; }
-
-  JSObject* asJSObject() const { return value_; }
-
-  JSObject** asJSObjectAddress() const { return &value_; }
-
-  void trace(JSTracer* trc);
-
-  // Tags (to be developed further)
-  static constexpr uintptr_t AnyRefTagMask = 1;
-  static constexpr uintptr_t AnyRefObjTag = 0;
-};
-
-using RootedAnyRef = Rooted<AnyRef>;
-using HandleAnyRef = Handle<AnyRef>;
-using MutableHandleAnyRef = MutableHandle<AnyRef>;
-
-// TODO/AnyRef-boxing: With boxed immediates and strings, these will be defined
-// as MOZ_CRASH or similar so that we can find all locations that need to be
-// fixed.
-
-#define ASSERT_ANYREF_IS_JSOBJECT (void)(0)
-#define STATIC_ASSERT_ANYREF_IS_JSOBJECT static_assert(1, "AnyRef is JSObject")
-
-// Given any JS value, box it as an AnyRef and store it in *result.  Returns
-// false on OOM.
-
-bool BoxAnyRef(JSContext* cx, HandleValue val, MutableHandleAnyRef result);
-
-// Given a JS value that requires an object box, box it as an AnyRef and return
-// it, returning nullptr on OOM.
-//
-// Currently the values requiring a box are those other than JSObject* or
-// nullptr, but in the future more values will be represented without an
-// allocation.
-JSObject* BoxBoxableValue(JSContext* cx, HandleValue val);
-
-// Given any AnyRef, unbox it as a JS Value.  If it is a reference to a wasm
-// object it will be reflected as a JSObject* representing some TypedObject
-// instance.
-
-Value UnboxAnyRef(AnyRef val);
-
-class WasmValueBox : public NativeObject {
-  static const unsigned VALUE_SLOT = 0;
-
- public:
-  static const unsigned RESERVED_SLOTS = 1;
-  static const JSClass class_;
-
-  static WasmValueBox* create(JSContext* cx, HandleValue val);
-  Value value() const { return getFixedSlot(VALUE_SLOT); }
-  static size_t offsetOfValue() {
-    return NativeObject::getFixedSlotOffset(VALUE_SLOT);
-  }
-};
 
 // A FuncRef is a JSFunction* and is hence also an AnyRef, and the remarks above
 // about AnyRef apply also to FuncRef.  When 'funcref' is used as a value type
@@ -236,7 +118,9 @@ class FuncRef {
   // FuncRef.
   static FuncRef fromAnyRefUnchecked(AnyRef p);
 
-  AnyRef asAnyRef() { return AnyRef::fromJSObject((JSObject*)value_); }
+  static FuncRef null() { return FuncRef(nullptr); }
+
+  AnyRef toAnyRef() { return AnyRef::fromJSObjectOrNull((JSObject*)value_); }
 
   void* forCompiledCode() const { return value_; }
 
@@ -270,7 +154,8 @@ class LitVal {
     float f32_;
     double f64_;
     wasm::V128 v128_;
-    wasm::AnyRef ref_;
+    // Mutable so that it can be traced
+    mutable wasm::AnyRef ref_;
 
     Cell() : v128_() {}
     ~Cell() = default;
@@ -287,7 +172,7 @@ class LitVal {
   Cell cell_;
 
  public:
-  LitVal() : type_(ValType()), cell_{} {}
+  LitVal() = default;
 
   explicit LitVal(ValType type) : type_(type) {
     switch (type.kind()) {
@@ -312,7 +197,7 @@ class LitVal {
         break;
       }
       case ValType::Kind::Ref: {
-        cell_.ref_ = AnyRef::null();
+        cell_.ref_ = nullptr;
         break;
       }
     }
@@ -338,6 +223,11 @@ class LitVal {
 
   Cell& cell() { return cell_; }
   const Cell& cell() const { return cell_; }
+
+  // Updates the type of the LitVal. Does not check that the type is valid for
+  // the actual value, so make sure the type is definitely correct via
+  // validation or something.
+  void unsafeSetType(ValType type) { type_ = type; }
 
   uint32_t i32() const {
     MOZ_ASSERT(type_ == ValType::I32);
@@ -374,7 +264,7 @@ WASM_DECLARE_CACHEABLE_POD(LitVal::Cell);
 
 class MOZ_NON_PARAM Val : public LitVal {
  public:
-  Val() : LitVal() {}
+  Val() = default;
   explicit Val(ValType type) : LitVal(type) {}
   explicit Val(const LitVal& val);
   explicit Val(uint32_t i32) : LitVal(i32) {}
@@ -388,7 +278,7 @@ class MOZ_NON_PARAM Val : public LitVal {
   }
   explicit Val(ValType type, FuncRef val) : LitVal(type, AnyRef::null()) {
     MOZ_ASSERT(type.refType().isFuncHierarchy());
-    cell_.ref_ = val.asAnyRef();
+    cell_.ref_ = val.toAnyRef();
   }
 
   Val(const Val&) = default;
@@ -417,21 +307,12 @@ class MOZ_NON_PARAM Val : public LitVal {
   }
   bool operator!=(const Val& rhs) const { return !(*this == rhs); }
 
-  bool isJSObject() const {
-    return type_.isValid() && type_.isRefRepr() && !cell_.ref_.isNull();
+  bool isInvalid() const { return !type_.isValid(); }
+  bool isAnyRef() const { return type_.isValid() && type_.isRefRepr(); }
+  AnyRef& toAnyRef() const {
+    MOZ_ASSERT(isAnyRef());
+    return cell_.ref_;
   }
-
-  JSObject* asJSObject() const {
-    MOZ_ASSERT(isJSObject());
-    return cell_.ref_.asJSObject();
-  }
-
-  JSObject** asJSObjectAddress() const {
-    return cell_.ref_.asJSObjectAddress();
-  }
-
-  // Read from `loc` which is a rooted location and needs no barriers.
-  void readFromRootedLocation(const void* loc);
 
   // Initialize from `loc` which is a rooted location and needs no barriers.
   void initFromRootedLocation(ValType type, const void* loc);
@@ -490,6 +371,10 @@ using RootedValVectorN = Rooted<ValVectorN<N>>;
 [[nodiscard]] extern bool CheckAnyRefValue(JSContext* cx, HandleValue v,
                                            MutableHandleAnyRef vp);
 
+// The same as above for when the target type is 'nullexnref'.
+[[nodiscard]] extern bool CheckNullExnRefValue(JSContext* cx, HandleValue v,
+                                               MutableHandleAnyRef vp);
+
 // The same as above for when the target type is 'nullexternref'.
 [[nodiscard]] extern bool CheckNullExternRefValue(JSContext* cx, HandleValue v,
                                                   MutableHandleAnyRef vp);
@@ -505,6 +390,10 @@ using RootedValVectorN = Rooted<ValVectorN<N>>;
 // The same as above for when the target type is 'eqref'.
 [[nodiscard]] extern bool CheckEqRefValue(JSContext* cx, HandleValue v,
                                           MutableHandleAnyRef vp);
+
+// The same as above for when the target type is 'i31ref'.
+[[nodiscard]] extern bool CheckI31RefValue(JSContext* cx, HandleValue v,
+                                           MutableHandleAnyRef vp);
 
 // The same as above for when the target type is 'structref'.
 [[nodiscard]] extern bool CheckStructRefValue(JSContext* cx, HandleValue v,
@@ -542,10 +431,6 @@ enum class CoercionLevel {
 //
 // [1] https://webassembly.github.io/spec/js-api/index.html#towebassemblyvalue
 template <typename Debug = NoDebug>
-extern bool ToWebAssemblyValue(JSContext* cx, HandleValue val, FieldType type,
-                               void* loc, bool mustWrite64,
-                               CoercionLevel level = CoercionLevel::Spec);
-template <typename Debug = NoDebug>
 extern bool ToWebAssemblyValue(JSContext* cx, HandleValue val, ValType type,
                                void* loc, bool mustWrite64,
                                CoercionLevel level = CoercionLevel::Spec);
@@ -559,11 +444,11 @@ extern bool ToWebAssemblyValue(JSContext* cx, HandleValue val, ValType type,
 //
 // [1] https://webassembly.github.io/spec/js-api/index.html#tojsvalue
 template <typename Debug = NoDebug>
-extern bool ToJSValue(JSContext* cx, const void* src, FieldType type,
+extern bool ToJSValue(JSContext* cx, const void* src, StorageType type,
                       MutableHandleValue dst,
                       CoercionLevel level = CoercionLevel::Spec);
 template <typename Debug = NoDebug>
-extern bool ToJSValueMayGC(FieldType type);
+extern bool ToJSValueMayGC(StorageType type);
 template <typename Debug = NoDebug>
 extern bool ToJSValue(JSContext* cx, const void* src, ValType type,
                       MutableHandleValue dst,
@@ -573,80 +458,99 @@ extern bool ToJSValueMayGC(ValType type);
 }  // namespace wasm
 
 template <>
-struct InternalBarrierMethods<wasm::Val> {
-  STATIC_ASSERT_ANYREF_IS_JSOBJECT;
-
-  static bool isMarkable(const wasm::Val& v) { return v.isJSObject(); }
-
-  static void preBarrier(const wasm::Val& v) {
-    if (v.isJSObject()) {
-      gc::PreWriteBarrier(v.asJSObject());
-    }
-  }
-
-  static MOZ_ALWAYS_INLINE void postBarrier(wasm::Val* vp,
-                                            const wasm::Val& prev,
-                                            const wasm::Val& next) {
-    MOZ_RELEASE_ASSERT(!prev.type().isValid() || prev.type() == next.type());
-    JSObject* prevObj = prev.isJSObject() ? prev.asJSObject() : nullptr;
-    JSObject* nextObj = next.isJSObject() ? next.asJSObject() : nullptr;
-    if (nextObj) {
-      JSObject::postWriteBarrier(vp->asJSObjectAddress(), prevObj, nextObj);
-    }
-  }
-
-  static void readBarrier(const wasm::Val& v) {
-    if (v.isJSObject()) {
-      gc::ReadBarrier(v.asJSObject());
-    }
-  }
-
-#ifdef DEBUG
-  static void assertThingIsNotGray(const wasm::Val& v) {
-    if (v.isJSObject()) {
-      JS::AssertObjectIsNotGray(v.asJSObject());
-    }
-  }
-#endif
-};
-
-template <>
 struct InternalBarrierMethods<wasm::AnyRef> {
-  STATIC_ASSERT_ANYREF_IS_JSOBJECT;
-
-  static bool isMarkable(const wasm::AnyRef v) { return !v.isNull(); }
+  static bool isMarkable(const wasm::AnyRef v) { return v.isGCThing(); }
 
   static void preBarrier(const wasm::AnyRef v) {
-    if (!v.isNull()) {
-      gc::PreWriteBarrier(v.asJSObject());
+    if (v.isGCThing()) {
+      gc::PreWriteBarrierImpl(v.toGCThing());
     }
   }
 
   static MOZ_ALWAYS_INLINE void postBarrier(wasm::AnyRef* vp,
                                             const wasm::AnyRef prev,
                                             const wasm::AnyRef next) {
-    JSObject* prevObj = !prev.isNull() ? prev.asJSObject() : nullptr;
-    JSObject* nextObj = !next.isNull() ? next.asJSObject() : nullptr;
-    if (nextObj) {
-      JSObject::postWriteBarrier(vp->asJSObjectAddress(), prevObj, nextObj);
+    // If the target needs an entry, add it.
+    gc::StoreBuffer* sb;
+    if (next.isGCThing() && (sb = next.toGCThing()->storeBuffer())) {
+      // If we know that the prev has already inserted an entry, we can
+      // skip doing the lookup to add the new entry. Note that we cannot
+      // safely assert the presence of the entry because it may have been
+      // added via a different store buffer.
+      if (prev.isGCThing() && prev.toGCThing()->storeBuffer()) {
+        return;
+      }
+      sb->putWasmAnyRef(vp);
+      return;
+    }
+    // Remove the prev entry if the new value does not need it.
+    if (prev.isGCThing() && (sb = prev.toGCThing()->storeBuffer())) {
+      sb->unputWasmAnyRef(vp);
     }
   }
 
   static void readBarrier(const wasm::AnyRef v) {
-    if (!v.isNull()) {
-      gc::ReadBarrier(v.asJSObject());
+    if (v.isGCThing()) {
+      gc::ReadBarrierImpl(v.toGCThing());
     }
   }
 
 #ifdef DEBUG
   static void assertThingIsNotGray(const wasm::AnyRef v) {
-    if (!v.isNull()) {
-      JS::AssertObjectIsNotGray(v.asJSObject());
+    if (v.isGCThing()) {
+      JS::AssertCellIsNotGray(v.toGCThing());
+    }
+  }
+#endif
+};
+
+template <>
+struct InternalBarrierMethods<wasm::Val> {
+  static bool isMarkable(const wasm::Val& v) { return v.isAnyRef(); }
+
+  static void preBarrier(const wasm::Val& v) {
+    if (v.isAnyRef()) {
+      InternalBarrierMethods<wasm::AnyRef>::preBarrier(v.toAnyRef());
+    }
+  }
+
+  static MOZ_ALWAYS_INLINE void postBarrier(wasm::Val* vp,
+                                            const wasm::Val& prev,
+                                            const wasm::Val& next) {
+    // A wasm::Val can transition from being uninitialized to holding an anyref
+    // but cannot change kind after that.
+    MOZ_ASSERT_IF(next.isAnyRef(), prev.isAnyRef() || prev.isInvalid());
+    MOZ_ASSERT_IF(prev.isAnyRef(), next.isAnyRef());
+
+    if (next.isAnyRef()) {
+      InternalBarrierMethods<wasm::AnyRef>::postBarrier(
+          &vp->toAnyRef(),
+          prev.isAnyRef() ? prev.toAnyRef() : wasm::AnyRef::null(),
+          next.toAnyRef());
+      return;
+    }
+  }
+
+  static void readBarrier(const wasm::Val& v) {
+    if (v.isAnyRef()) {
+      InternalBarrierMethods<wasm::AnyRef>::readBarrier(v.toAnyRef());
+    }
+  }
+
+#ifdef DEBUG
+  static void assertThingIsNotGray(const wasm::Val& v) {
+    if (v.isAnyRef()) {
+      InternalBarrierMethods<wasm::AnyRef>::assertThingIsNotGray(v.toAnyRef());
     }
   }
 #endif
 };
 
 }  // namespace js
+
+template <>
+struct JS::SafelyInitialized<js::wasm::AnyRef> {
+  static js::wasm::AnyRef create() { return js::wasm::AnyRef::null(); }
+};
 
 #endif  // wasm_val_h

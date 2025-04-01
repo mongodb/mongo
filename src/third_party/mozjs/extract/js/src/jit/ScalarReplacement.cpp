@@ -301,7 +301,6 @@ static bool IsObjectEscaped(MDefinition* ins, MInstruction* newObject,
 
       case MDefinition::Opcode::GuardShape: {
         MGuardShape* guard = def->toGuardShape();
-        MOZ_ASSERT(!ins->isGuardShape());
         if (shape != guard->shape()) {
           JitSpewDef(JitSpew_Escape, "has a non-matching guard shape\n", guard);
           return true;
@@ -2507,6 +2506,10 @@ void ArgumentsReplacer::visitArgumentsSlice(MArgumentsSlice* ins) {
     replacement =
         MInlineArgumentsSlice::New(alloc(), beginMin, count, actualArgs,
                                    ins->templateObj(), ins->initialHeap());
+    if (!replacement) {
+      oom_ = true;
+      return;
+    }
   } else {
     replacement = MFrameArgumentsSlice::New(
         alloc(), beginMin, count, ins->templateObj(), ins->initialHeap());

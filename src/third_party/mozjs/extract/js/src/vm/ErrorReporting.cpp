@@ -13,9 +13,12 @@
 #include "jsfriendapi.h"
 
 #include "frontend/FrontendContext.h"  // AutoReportFrontendContext
-#include "js/friend/ErrorMessages.h"   // js::GetErrorMessage, JSMSG_*
-#include "js/Printf.h"                 // JS_vsmprintf
-#include "js/Warnings.h"               // JS::WarningReporter
+#include "js/CharacterEncoding.h"      // JS::ConstUTF8CharsZ
+#include "js/ColumnNumber.h"  // JS::ColumnNumberOneOrigin, JS::TaggedColumnNumberOneOrigin
+#include "js/ErrorReport.h"           // JSErrorBase
+#include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
+#include "js/Printf.h"                // JS_vsmprintf
+#include "js/Warnings.h"              // JS::WarningReporter
 #include "vm/FrameIter.h"
 #include "vm/GlobalObject.h"
 #include "vm/JSContext.h"
@@ -63,7 +66,7 @@ bool js::ReportCompileWarning(FrontendContext* fc, ErrorMetadata&& metadata,
   err.isWarning_ = true;
   err.errorNumber = errorNumber;
 
-  err.filename = metadata.filename;
+  err.filename = JS::ConstUTF8CharsZ(metadata.filename);
   err.lineno = metadata.lineNumber;
   err.column = metadata.columnNumber;
   err.isMuted = metadata.isMuted;
@@ -92,7 +95,7 @@ static void ReportCompileErrorImpl(FrontendContext* fc,
   err.isWarning_ = false;
   err.errorNumber = errorNumber;
 
-  err.filename = metadata.filename;
+  err.filename = JS::ConstUTF8CharsZ(metadata.filename);
   err.lineno = metadata.lineNumber;
   err.column = metadata.columnNumber;
   err.isMuted = metadata.isMuted;
@@ -112,14 +115,35 @@ static void ReportCompileErrorImpl(FrontendContext* fc,
 
 void js::ReportCompileErrorLatin1(FrontendContext* fc, ErrorMetadata&& metadata,
                                   UniquePtr<JSErrorNotes> notes,
-                                  unsigned errorNumber, va_list* args) {
-  ReportCompileErrorImpl(fc, std::move(metadata), std::move(notes), errorNumber,
-                         args, ArgumentsAreLatin1);
+                                  unsigned errorNumber, ...) {
+  va_list args;
+  va_start(args, errorNumber);
+  ReportCompileErrorLatin1VA(fc, std::move(metadata), std::move(notes),
+                             errorNumber, &args);
+  va_end(args);
 }
 
 void js::ReportCompileErrorUTF8(FrontendContext* fc, ErrorMetadata&& metadata,
                                 UniquePtr<JSErrorNotes> notes,
-                                unsigned errorNumber, va_list* args) {
+                                unsigned errorNumber, ...) {
+  va_list args;
+  va_start(args, errorNumber);
+  ReportCompileErrorUTF8VA(fc, std::move(metadata), std::move(notes),
+                           errorNumber, &args);
+  va_end(args);
+}
+
+void js::ReportCompileErrorLatin1VA(FrontendContext* fc,
+                                    ErrorMetadata&& metadata,
+                                    UniquePtr<JSErrorNotes> notes,
+                                    unsigned errorNumber, va_list* args) {
+  ReportCompileErrorImpl(fc, std::move(metadata), std::move(notes), errorNumber,
+                         args, ArgumentsAreLatin1);
+}
+
+void js::ReportCompileErrorUTF8VA(FrontendContext* fc, ErrorMetadata&& metadata,
+                                  UniquePtr<JSErrorNotes> notes,
+                                  unsigned errorNumber, va_list* args) {
   ReportCompileErrorImpl(fc, std::move(metadata), std::move(notes), errorNumber,
                          args, ArgumentsAreUTF8);
 }
@@ -168,13 +192,13 @@ static void PopulateReportBlame(JSContext* cx, JSErrorReport* report) {
     return;
   }
 
-  report->filename = iter.filename();
+  report->filename = JS::ConstUTF8CharsZ(iter.filename());
   if (iter.hasScript()) {
     report->sourceId = iter.script()->scriptSource()->id();
   }
-  uint32_t column;
+  JS::TaggedColumnNumberOneOrigin column;
   report->lineno = iter.computeLine(&column);
-  report->column = FixupColumnForDisplay(column);
+  report->column = JS::ColumnNumberOneOrigin(column.oneOriginValue());
   report->isMuted = iter.mutedErrors();
 }
 

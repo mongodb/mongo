@@ -25,6 +25,23 @@ namespace wasm {
 static const uint32_t CatchAllIndex = UINT32_MAX;
 static_assert(CatchAllIndex > MaxTags);
 
+struct TryTableCatch {
+  TryTableCatch()
+      : tagIndex(CatchAllIndex), labelRelativeDepth(0), captureExnRef(false) {}
+
+  // The tag index for this catch, or CatchAllIndex for a catch_all.
+  uint32_t tagIndex;
+  // The relative depth of where to branch to when catching an exception.
+  uint32_t labelRelativeDepth;
+  // Whether the exnref that is caught should be captured and passed to the
+  // branch target.
+  bool captureExnRef;
+  // The params that the target branch at `labelRelativeDepth` expects. This
+  // includes any exnref that should or should not be captured.
+  ValTypeVector labelType;
+};
+using TryTableCatchVector = Vector<TryTableCatch, 1, SystemAllocPolicy>;
+
 }  // namespace wasm
 }  // namespace js
 
