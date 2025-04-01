@@ -69,7 +69,7 @@ with open(parent / "modules.yaml") as f:
             for glob in globs:
                 lines.append(f"/{glob} @10gen/{mod}")
                 if glob.endswith(".idl"):
-                    lines.append(f"/{glob[:-4]} _gen.* @10gen/{mod}")
+                    lines.append(f"/{glob[:-4]}_gen.* @10gen/{mod}")
         # If multiple rules match, later wins. So put rules with more
         # specificity later. For all of our current rules, longer means more
         # specific.
