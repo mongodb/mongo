@@ -205,37 +205,35 @@ const commandsToTest = [
                 cmdExtension: {readConcern: {level: "majority"}},
                 shouldWork: false,
             },
-            // // TODO (SERVER-102966) The following test cases fail with error 15959: 'the match
-            // // filter must be an expression in an object'
-            // {
-            //     cmdExtension: {readConcern: {level: "snapshot"}},
-            //     shouldWork: true,
-            //     checkCmdResponseFunc: (res, db) => {
-            //         const collOut = db.getCollection("collOut");
-            //         assert.eq(100 /*numDocs*/, collOut.countDocuments());
-            //         collOut.drop();
-            //     }
-            // },
-            // {
-            //     cmdExtension: {readConcern: {level: "local"}},
-            //     terminateSecondaryReadsOnOrphanCleanup: false,
-            //     shouldWork: true,
-            //     checkCmdResponseFunc: (res, db) => {
-            //         const collOut = db.getCollection("collOut");
-            //         assert.lt(collOut.countDocuments(), 100 /* numDocs */);
-            //         collOut.drop();
-            //     },
-            // },
-            // {
-            //     cmdExtension: {readConcern: {level: "majority"}},
-            //     terminateSecondaryReadsOnOrphanCleanup: false,
-            //     shouldWork: true,
-            //     checkCmdResponseFunc: (res, db) => {
-            //         const collOut = db.getCollection("collOut");
-            //         assert.lt(collOut.countDocuments(), 100 /* numDocs */);
-            //         collOut.drop();
-            //     },
-            // },
+            {
+                cmdExtension: {readConcern: {level: "snapshot"}},
+                shouldWork: true,
+                checkCmdResponseFunc: (res, db) => {
+                    const collOut = db.getCollection("collOut");
+                    assert.eq(100 /*numDocs*/, collOut.countDocuments({}));
+                    collOut.drop();
+                }
+            },
+            {
+                cmdExtension: {readConcern: {level: "local"}},
+                terminateSecondaryReadsOnOrphanCleanup: false,
+                shouldWork: true,
+                checkCmdResponseFunc: (res, db) => {
+                    const collOut = db.getCollection("collOut");
+                    assert.lt(collOut.countDocuments({}), 100 /* numDocs */);
+                    collOut.drop();
+                },
+            },
+            {
+                cmdExtension: {readConcern: {level: "majority"}},
+                terminateSecondaryReadsOnOrphanCleanup: false,
+                shouldWork: true,
+                checkCmdResponseFunc: (res, db) => {
+                    const collOut = db.getCollection("collOut");
+                    assert.lt(collOut.countDocuments({}), 100 /* numDocs */);
+                    collOut.drop();
+                },
+            },
         ]
     },
     {
