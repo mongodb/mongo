@@ -29,12 +29,10 @@ TimeseriesTest.run((insert) => {
 
     const runTest = function(numDocsPerInsert) {
         const coll = db.getCollection(collNamePrefix + numDocsPerInsert);
-        const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
         coll.drop();
 
         assert.commandWorked(
             db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-        assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
         let docs = [];
         for (let i = 0; i < numDocs; i++) {
@@ -62,6 +60,7 @@ TimeseriesTest.run((insert) => {
         }
 
         // Check bucket collection.
+        const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
         const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
         assert.eq(2, bucketDocs.length, bucketDocs);
 

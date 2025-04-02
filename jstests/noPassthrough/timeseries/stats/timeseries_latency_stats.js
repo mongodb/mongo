@@ -11,14 +11,12 @@ const conn = MongoRunner.runMongod();
 
 const testDB = conn.getDB('test');
 const coll = testDB[jsTestName()];
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
 coll.drop();
 
 const timeFieldName = 'time';
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 const getLatencyStats = () => {
     const stats = coll.aggregate([{$collStats: {latencyStats: {}}}]).next();

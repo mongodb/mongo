@@ -27,7 +27,6 @@ TimeseriesTest.run((insert) => {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
         collation: {locale: 'en', strength: 1, numericOrdering: true}
     }));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     // Ensure the default index has the collation.
     let indexSpec = IndexCatalogHelpers.findByName(coll.getIndexes(),

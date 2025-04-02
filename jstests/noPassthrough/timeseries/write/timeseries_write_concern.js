@@ -23,14 +23,12 @@ const dbName = jsTestName();
 const testDB = primary.getDB(dbName);
 
 const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
 
 coll.drop();
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 stopReplicationOnSecondaries(replTest);
 
@@ -71,6 +69,7 @@ restartReplicationOnSecondaries(replTest);
 awaitInsert();
 
 assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
+const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 const buckets = bucketsColl.find().toArray();
 assert.eq(buckets.length, 1, 'Expected one bucket but found: ' + tojson(buckets));
 const serverStatus = assert.commandWorked(testDB.serverStatus()).bucketCatalog;

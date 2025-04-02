@@ -38,8 +38,6 @@ const setupColl = (coll, collName, usesMeta) => {
     } else {
         assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "t"}}));
     }
-    const bucketsColl = db.getCollection('system.buckets.' + collName);
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     let docs = [];
     // If usesMeta is true, we push 10 documents with all different onlyMeta field. This tests the

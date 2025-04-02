@@ -26,7 +26,6 @@ coll.drop();
 
 const timeFieldName = 'time';
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-assert.contains(coll.getName(), db.getCollectionNames());
 
 const numDocs = 3;
 

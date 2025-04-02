@@ -61,7 +61,6 @@ TimeseriesTest.run((insert) => {
 
         assert.commandWorked(db.createCollection(
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-        assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
         // When the collection is sharded, there is 1 extra index for the shard key.
         const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) + 1;

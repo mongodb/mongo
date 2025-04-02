@@ -27,8 +27,6 @@ TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
     let coll = db[jsTestName()];
-    // Collection name used for assertions unless areViewlessTimeseriesEnabled(db) is true.
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';
     const metaFieldName = 'measurement';
@@ -37,9 +35,6 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(db.createCollection(coll.getName(), {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
     }));
-    if (!areViewlessTimeseriesEnabled(db)) {
-        assert.contains(bucketsColl.getName(), db.getCollectionNames());
-    }
 
     insert(coll, {
         _id: 0,
@@ -443,9 +438,6 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(db.createCollection(coll.getName(), {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
     }));
-    if (!areViewlessTimeseriesEnabled(db)) {
-        assert.contains(bucketsColl.getName(), db.getCollectionNames());
-    }
 
     insert(
         coll,

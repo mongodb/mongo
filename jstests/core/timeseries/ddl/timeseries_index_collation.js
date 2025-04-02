@@ -29,7 +29,6 @@ TimeseriesTest.run((insert) => {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
         collation: numericOrdering
     }));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     for (let i = 0; i < metadata.length; ++i) {
         const doc = {_id: i, [timeFieldName]: ISODate(), [metaFieldName]: metadata[i]};

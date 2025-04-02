@@ -49,12 +49,6 @@ const generateTest = (useHint) => {
             // collection. When this index is present, the query planner will use it, changing the
             // expected behaviour of this test. Drop the index.
             assert.commandWorked(coll.dropIndex({[metaFieldName]: 1, [timeFieldName]: 1}));
-
-            const dbCollNames = testDB.getCollectionNames();
-            assert.contains(bucketsColl.getName(),
-                            dbCollNames,
-                            "Failed to find namespace '" + bucketsColl.getName() +
-                                "' amongst: " + tojson(dbCollNames));
         }
 
         /**

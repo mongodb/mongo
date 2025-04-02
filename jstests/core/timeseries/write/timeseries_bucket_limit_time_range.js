@@ -36,7 +36,6 @@ TimeseriesTest.run((insert) => {
 
         assert.commandWorked(
             db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-        assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
         let docs = [];
         for (let i = 0; i < numDocs; i++) {

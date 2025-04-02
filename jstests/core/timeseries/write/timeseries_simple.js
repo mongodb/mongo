@@ -13,14 +13,12 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     coll.drop();
 
     const timeFieldName = 'time';
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
     if (TestData.runningWithBalancer) {
         // In suites running moveCollection in the background, it is possible to hit the issue
         // described by SERVER-89349 which will result in more bucket documents being created.
@@ -103,6 +101,7 @@ TimeseriesTest.run((insert) => {
     assert.eq(numDocs, viewDocs.length, viewDocs);
 
     // Check bucket collection.
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     const bucketDocs = bucketsColl.find().toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
     const bucketDoc = bucketDocs[0];

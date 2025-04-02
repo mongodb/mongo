@@ -21,7 +21,6 @@ TimeseriesTest.run((insert) => {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     const docs1 = [
         {

@@ -34,7 +34,6 @@ TimeseriesTest.run((insert) => {
         const timeFieldName = 'time';
         assert.commandWorked(db.createCollection(
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-        assert.contains(bucketsColl.getName(), db.getCollectionNames());
     };
     clearColl();
 

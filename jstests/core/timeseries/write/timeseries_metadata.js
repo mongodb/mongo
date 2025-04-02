@@ -38,7 +38,6 @@ TimeseriesTest.run((insert) => {
 
         assert.commandWorked(db.createCollection(
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-        assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
         let docs = docsBucketA.concat(docsBucketB);
         assert.commandWorked(insert(coll, docs), 'failed to insert docs: ' + tojson(docs));

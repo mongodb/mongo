@@ -81,7 +81,6 @@ TimeseriesTest.run((insert) => {
         coll.drop();
         assert.commandWorked(testDB.createCollection(
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-        assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
         // Create a TTL index on time, with a partial filter expression on the metaField.
         assert.commandWorked(coll.createIndex(timeSpec, partialIndexOptions));
@@ -96,7 +95,6 @@ TimeseriesTest.run((insert) => {
             timeseries: {timeField: timeFieldName, metaField: metaFieldName},
             expireAfterSeconds: expireAfterSeconds
         }));
-        assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
         // Create a secondary TTL index on time, with a partial filter expression on the metaField.
         assert.commandWorked(coll.createIndex(timeSpec, partialIndexOptions));

@@ -51,7 +51,6 @@ const runTest = function(docsInsert, docsUpdateA, docsUpdateB) {
 
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     // For retryable writes, the server uses 'txnNumber' as the key to look up previously executed
     // operations in the sesssion.

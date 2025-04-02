@@ -33,7 +33,6 @@ TimeseriesTest.run((insert) => {
 
         assert.commandWorked(
             db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-        assert.contains(bucketsColl.getName(), db.getCollectionNames());
         if (TestData.runningWithBalancer) {
             // In suites running moveCollection in the background, it is possible to hit the issue
             // described by SERVER-89349 which will result in more bucket documents being created.

@@ -26,7 +26,6 @@ const valueFieldName = 'value';
 coll.drop();
 assert.commandWorked(db.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
 // Insert enough documents with large enough metadata so that the bucket catalog memory
 // threshold is reached and idle buckets are expired.

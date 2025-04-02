@@ -38,7 +38,6 @@ const clearCollection = function() {
     coll.drop();
     assert.commandWorked(testDB.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     expectedStats.bucketCount = 0;
     expectedStats.numBucketInserts = 0;

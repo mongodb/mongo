@@ -33,7 +33,6 @@ coll.drop();
 
 assert.commandWorked(testDB.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 assert.commandWorked(coll.insert(docs[0]));
 assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());

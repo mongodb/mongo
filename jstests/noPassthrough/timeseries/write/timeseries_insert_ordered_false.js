@@ -31,7 +31,6 @@ function runTest(conn, failPointConn, shardColl) {
             key: {[metaFieldName]: 1},
         }));
     }
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     const docs = [
         {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: 0},

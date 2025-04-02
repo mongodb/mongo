@@ -15,7 +15,6 @@ assert.commandWorked(testDB.dropDatabase());
 
 TimeseriesTest.run((insert) => {
     const coll = testDB[jsTestName()];
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
     coll.drop();
 
@@ -24,7 +23,6 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(testDB.createCollection(
         coll.getName(),
         {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSeconds}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     // Inserts a measurement with a time in the past to ensure the measurement will be removed
     // immediately.
@@ -44,6 +42,7 @@ TimeseriesTest.run((insert) => {
     jsTestLog('Removal took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
 
     // Check bucket collection.
+    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
     const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
     assert.eq(0, bucketDocs.length, bucketDocs);
 });

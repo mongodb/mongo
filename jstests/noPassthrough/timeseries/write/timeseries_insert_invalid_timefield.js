@@ -8,7 +8,6 @@ const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 coll.drop();
 
 const timeFieldName = 'time';
@@ -16,7 +15,6 @@ const metaFieldName = 'meta';
 
 assert.commandWorked(testDB.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 // first test a good doc just in case
 const goodDocs = [

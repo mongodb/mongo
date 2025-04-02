@@ -25,7 +25,6 @@
 import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 const numericOrdering = {
     locale: "en_US",
@@ -54,7 +53,6 @@ const insensitive = {
     assert.commandWorked(db.createCollection(
         coll.getName(),
         {timeseries: {timeField: 'time', metaField: 'meta'}, collation: numericOrdering}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     assert.commandWorked(coll.insert({time: ISODate(), meta: "1", value: 42}));
     assert.commandWorked(coll.insert({time: ISODate(), meta: "10", value: 42}));
@@ -77,7 +75,6 @@ const insensitive = {
     assert.commandWorked(db.createCollection(
         coll.getName(),
         {timeseries: {timeField: 'time', metaField: 'meta'}, collation: numericOrdering}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     // The 'numericOrdering' on the collection means that the max of the bucket with the three docs
     // below is "10" (while the lexicographic max is "5").
@@ -132,7 +129,6 @@ const insensitive = {
     assert.commandWorked(db.createCollection(
         coll.getName(),
         {timeseries: {timeField: 'time', metaField: 'meta'}, collation: numericOrdering}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     assert.commandWorked(coll.insert({time: ISODate(), meta: "1", val: 1}));
     assert.commandWorked(coll.insert({time: ISODate(), meta: "5", val: 1}));
@@ -158,7 +154,6 @@ const insensitive = {
     assert.commandWorked(db.createCollection(
         coll.getName(),
         {timeseries: {timeField: 'time', metaField: 'meta'}, collation: insensitive}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     // Cause two different buckets with various case/diacritics in each for the measurement 'name'.
     assert.commandWorked(coll.insert({time: ISODate(), meta: "a", name: 'A'}));
@@ -186,7 +181,6 @@ const insensitive = {
     assert.commandWorked(db.createCollection(
         coll.getName(),
         {timeseries: {timeField: 'time', metaField: 'meta'}, collation: numericOrdering}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     // These two docs will be placed in the same bucket, and the max for the bucket will be computed
     // using collection's collation, that is, it should be "10".
@@ -195,6 +189,7 @@ const insensitive = {
 
     // Let's check our understanding of what happens with the bucketing as otherwise the tests below
     // won't be testing what we think they are.
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     let buckets = bucketsColl.find().toArray();
     assert.eq(1, buckets.length, "All docs should be placed into the same bucket");
     assert.eq("10", buckets[0].control.max.val, "Computed max control for 'val' measurement");
@@ -216,7 +211,6 @@ const insensitive = {
     assert.commandWorked(db.createCollection(
         coll.getName(),
         {timeseries: {timeField: 'time', metaField: 'meta'}, collation: diacriticSensitive}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     // Create index with a different collation.
     assert.commandWorked(coll.createIndex({meta: 1}, {collation: insensitive}));

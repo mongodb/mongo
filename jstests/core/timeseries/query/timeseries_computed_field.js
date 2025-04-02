@@ -21,7 +21,6 @@ TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
     let coll = db[jsTestName()];
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';
     const metaFieldName = 'measurement';
@@ -30,7 +29,6 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(db.createCollection(coll.getName(), {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
     }));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     insert(coll, {
         _id: 0,

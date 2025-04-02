@@ -37,12 +37,6 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(testdb.createCollection(
             timeseriescoll.getName(),
             {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-
-        const dbCollNames = testdb.getCollectionNames();
-        assert.contains(bucketscoll.getName(),
-                        dbCollNames,
-                        "Failed to find namespace '" + bucketscoll.getName() +
-                            "' amongst: " + tojson(dbCollNames));
     }
 
     /**

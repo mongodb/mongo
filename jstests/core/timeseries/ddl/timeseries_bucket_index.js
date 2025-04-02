@@ -25,8 +25,6 @@ TimeseriesTest.run((insert) => {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
-
     assert.commandWorked(bucketsColl.createIndex({"control.min.time": 1}));
 
     const t = new Date();

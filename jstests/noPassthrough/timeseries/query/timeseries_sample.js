@@ -61,9 +61,6 @@ function fillBuckets(coll, measurementsPerBucket) {
     assert.commandWorked(testDB.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-    const bucketsColl = testDB.getCollection("system.buckets." + coll.getName());
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
-
     let numDocs = nBuckets * measurementsPerBucket;
     const bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numDocs; i++) {
@@ -72,6 +69,7 @@ function fillBuckets(coll, measurementsPerBucket) {
     }
     assert.commandWorked(bulk.execute());
 
+    const bucketsColl = testDB.getCollection("system.buckets." + coll.getName());
     let buckets = bucketsColl.find().toArray();
     assert.eq(nBuckets, buckets.length, buckets);
 

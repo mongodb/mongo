@@ -26,7 +26,6 @@ const runTest = (ordered) => {
     coll.drop();
     assert.commandWorked(testDB.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     // Insert a couple measurements in different buckets.
     assert.commandWorked(

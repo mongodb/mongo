@@ -34,10 +34,8 @@ const validateBucketReopening = function(metaFieldName = null) {
               tojson(timeseriesOptions));
 
     const coll = db.getCollection(collNamePrefix + testCaseId++);
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: timeseriesOptions}));
-    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     // Insert documents with varying metaField values (if the 'metaFieldName' is specified).
     const distinctMetaValues = 10;

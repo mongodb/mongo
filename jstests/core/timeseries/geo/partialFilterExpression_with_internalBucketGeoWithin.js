@@ -22,7 +22,6 @@ const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
 const shardKeyIndexCount = FixtureHelpers.isSharded(bucketsColl) ? 1 : 0;
 

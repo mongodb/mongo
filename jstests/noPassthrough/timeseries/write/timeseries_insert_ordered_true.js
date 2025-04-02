@@ -18,7 +18,6 @@ const metaFieldName = 'meta';
 coll.drop();
 assert.commandWorked(testDB.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 const docs = [
     {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: 0},
