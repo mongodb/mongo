@@ -1,5 +1,5 @@
-"""This file contains a list of error strings that is related
-   to toolchain.
+"""This file contains a list of error strings that is related to
+   all functionality under toolchains/cc.
 """
 
 THREAD_SANITIZER_ERROR_MESSAGE = """
@@ -20,6 +20,14 @@ Error:
     passing the libcxx config on macos for compatibility reasons.
 
     libc++ requires these configuration: --compiler_type=clang
+"""
+
+#TODO SERVER-84714 add message about using the toolchain version of C++ libs
+GLIBCXX_DEBUG_ERROR_MESSAGE = """
+Error:
+    glibcxx_debug requires these configurations:
+        --dbg=True
+        --use_libcxx=False
 """
 
 REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE = """

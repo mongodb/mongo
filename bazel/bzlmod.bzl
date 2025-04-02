@@ -1,7 +1,7 @@
 load("@bazel_features//:deps.bzl", _bazel_features_deps = "bazel_features_deps")
 load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
-load("//bazel/toolchains:python_toolchain.bzl", _setup_mongo_python_toolchains = "setup_mongo_python_toolchains")
-load("//bazel/toolchains:mongo_toolchain.bzl", _setup_mongo_toolchains = "setup_mongo_toolchains")
+load("//bazel/toolchains/python:python_toolchain.bzl", _setup_mongo_python_toolchains = "setup_mongo_python_toolchains")
+load("//bazel/toolchains/cc:mongo_toolchain.bzl", _setup_mongo_toolchains = "setup_mongo_toolchains")
 
 def _bazel_features_deps_impl(_ctx):
     _bazel_features_deps()

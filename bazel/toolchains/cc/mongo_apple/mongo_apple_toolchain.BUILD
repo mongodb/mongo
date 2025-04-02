@@ -1,5 +1,5 @@
 load("@build_bazel_apple_support//configs:platforms.bzl", "APPLE_PLATFORMS_CONSTRAINTS")
-load("@//bazel/toolchains/mongo_apple:mongo_apple_toolchain.bzl", "get_supported_apple_archs")
+load("@//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "get_supported_apple_archs")
 package(default_visibility = ["//visibility:public"])
 
 [

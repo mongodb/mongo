@@ -137,9 +137,9 @@ register_execution_platforms("@internal_platforms_do_not_use//host:host")
 ##    "mongo_toolchain_v5",
 ##)
 #
-mongo_apple_toolchain_config = use_repo_rule("//bazel/toolchains/mongo_apple:mongo_apple_toolchain.bzl", "mongo_apple_toolchain_config")
+mongo_apple_toolchain_config = use_repo_rule("//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "mongo_apple_toolchain_config")
 
-mongo_apple_toolchain_setup = use_repo_rule("//bazel/toolchains/mongo_apple:mongo_apple_toolchain.bzl", "mongo_apple_toolchain_setup")
+mongo_apple_toolchain_setup = use_repo_rule("//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "mongo_apple_toolchain_setup")
 
 mongo_apple_toolchain_config(name = "mongo_apple_toolchain_config")
 

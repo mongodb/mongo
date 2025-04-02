@@ -2,7 +2,8 @@
 """
 
 load(
-    "//bazel/toolchains:mongo_errors.bzl",
+    "//bazel/toolchains/cc:mongo_errors.bzl",
+    "GLIBCXX_DEBUG_ERROR_MESSAGE",
     "LIBCXX_ERROR_MESSAGE",
     "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
     "THREAD_SANITIZER_ERROR_MESSAGE",
@@ -152,14 +153,6 @@ UNDEFINED_SANITIZER_DEFINES = select({
     "//bazel/config:ubsan_enabled": ["UNDEFINED_BEHAVIOR_SANITIZER"],
     "//bazel/config:ubsan_disabled": [],
 })
-
-#TODO SERVER-84714 add message about using the toolchain version of C++ libs
-GLIBCXX_DEBUG_ERROR_MESSAGE = """
-Error:
-    glibcxx_debug requires these configurations:
-        --dbg=True
-        --use_libcxx=False
-"""
 
 GLIBCXX_DEBUG_DEFINES = select({
     ("//bazel/config:use_glibcxx_debug_required_settings"): ["_GLIBCXX_DEBUG"],

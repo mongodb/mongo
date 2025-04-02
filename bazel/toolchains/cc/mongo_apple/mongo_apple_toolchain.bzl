@@ -175,7 +175,7 @@ def configure_osx_toolchain(repository_ctx):
 
     ###
     # mongodb customization
-    cc_toolchain_config = Label("@//bazel/toolchains/mongo_apple:mongo_apple_cc_toolchain_config.bzl")
+    cc_toolchain_config = Label("@//bazel/toolchains/cc/mongo_apple:mongo_apple_cc_toolchain_config.bzl")
 
     ###
     build_template = Label("@build_bazel_apple_support//crosstool:BUILD.tpl")
@@ -333,7 +333,7 @@ mongo_apple_toolchain_setup = repository_rule(
             doc = "Host architecture.",
         ),
         "build_tpl": attr.label(
-            default = "//bazel/toolchains/mongo_apple:mongo_apple_toolchain.BUILD",
+            default = "//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.BUILD",
             doc = "Label denoting the BUILD file template that get's installed in the repo.",
         ),
     },

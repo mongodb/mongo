@@ -1,6 +1,6 @@
 load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
 load("//bazel/platforms:normalize.bzl", "ARCH_TO_PLATFORM_MAP", "OS_TO_PLATFORM_MAP")
-load("//bazel/toolchains:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
+load("//bazel/toolchains/cc:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel:utils.bzl", "get_host_distro_major_version")
 
 def _setup_local_config_platform(ctx):

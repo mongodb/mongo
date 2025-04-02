@@ -2,9 +2,9 @@
 BUILD files in the "src/" subtree.
 """
 
-load("//bazel/toolchains:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
+load("//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
 load(
-    "//bazel/toolchains:mongo_errors.bzl",
+    "//bazel/toolchains/cc:mongo_errors.bzl",
     "LIBCXX_ERROR_MESSAGE",
     "REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE",
     "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
@@ -720,7 +720,6 @@ FUZZER_SANITIZER_LINKFLAGS = select({
     "//bazel/config:fsan_disabled": [],
 }, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE + "fuzzer")
 
-# TODO - Patrice: Move error message to defs.
 # Combines following two conditions -
 # 1.
 # TODO: SERVER-48622

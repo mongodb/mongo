@@ -35,7 +35,7 @@ load("@build_bazel_apple_support//lib:apple_support.bzl", "apple_support")
 
 ###
 # mongodb customization
-load("@//bazel/toolchains/mongo_apple:mongo_custom_features.bzl", "mongo_frameworks_feature")
+load("@//bazel/toolchains/cc/mongo_apple:mongo_custom_features.bzl", "mongo_frameworks_feature")
 ###
 
 # TODO: Remove when we drop bazel 6.x support
