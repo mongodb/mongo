@@ -57,6 +57,11 @@ public:
     static bool shouldRecoverFromOplogAsStandalone();
 
     /**
+     * Static getter for the 'skipOplogSampling' server parameter.
+     */
+    static bool shouldSkipOplogSampling();
+
+    /**
      * Setters
      */
     void setOplogSizeBytes(long long oplogSizeBytes);

@@ -803,8 +803,7 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx,
     // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
     // in this instance.
     if (_isOplog && opCtx->getServiceContext()->userWritesAllowed() &&
-        !storageGlobalParams.repair && !storageGlobalParams.restore &&
-        !storageGlobalParams.magicRestore) {
+        !storageGlobalParams.repair && !repl::ReplSettings::shouldSkipOplogSampling()) {
         _oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, this, ns);
     }
 
