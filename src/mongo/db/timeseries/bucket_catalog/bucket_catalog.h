@@ -68,6 +68,12 @@ using ShouldClearFn = std::function<bool(const UUID&)>;
 using BatchedInsertTuple = std::tuple<BSONObj, Date_t, UserBatchIndex>;
 
 /**
+ * Mode enum to control whether getReopeningCandidate() will allow query-based
+ * reopening of buckets when attempting to accommodate a new measurement.
+ */
+enum class AllowQueryBasedReopening { kAllow, kDisallow };
+
+/**
  * Bundle of information that gets passed down into 'insert' and functions below it that may create
  * a new bucket. It stores information that is used to decide which bucket to insert a measurement
  * into. Binding these values together is used to sort on measurement timestamps and keep track of
@@ -352,7 +358,7 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
  *  - A bucket with RolloverReason::kNone. The bucket's state is eligible for insert. There can be
  *    at most one such bucket, and it will be the last entry in the returned vector if it exists.
  * Rolls over buckets that don't satisfy the above requirements and cleans up buckets with states
- * conflicting with insert.
+ * conflicting with insert. Sets whether to skip query-based reopening.
  */
 std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                                                 Stripe& stripe,
@@ -360,6 +366,7 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                                                 const BucketKey& bucketKey,
                                                 const Date_t& time,
                                                 const Seconds& bucketMaxSpanSeconds,
+                                                AllowQueryBasedReopening& allowQueryBasedReopening,
                                                 bool& bucketOpenedDueToMetadata);
 
 using CompressAndWriteBucketFunc = std::function<void(
@@ -393,7 +400,6 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
  * Called with a stripe lock. May release the lock for reopening. Returns holding the lock.
  * Manages the lifetime of the reopening request in 'stripe'.
  */
-// TODO (SERVER-101256): use internal::AllowQueryBasedReopening type directly.
 StatusWith<Bucket*> potentiallyReopenBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,
@@ -404,7 +410,7 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     const Date_t& time,
     const TimeseriesOptions& options,
     BucketStateRegistry::Era catalogEra,
-    bool allowQueryBasedReopening,
+    const AllowQueryBasedReopening& allowQueryBasedReopening,
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     ExecutionStatsController& stats,

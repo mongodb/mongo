@@ -2088,6 +2088,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
                                               nullptr,
                                               insertCtx.stats);
 
+    AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
                                    *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2095,6 +2096,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
                                    insertCtx.key,
                                    time,
                                    Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
@@ -2118,6 +2120,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
                                               insertCtx.stats);
 
     bucket.rolloverReason = RolloverReason::kTimeForward;
+    AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
                                    *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2125,10 +2128,44 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
                                    insertCtx.key,
                                    time,
                                    Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
     ASSERT_EQ(&bucket, potentialBuckets[0]);
+    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
+}
+
+TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
+    auto swResult =
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
+    ASSERT_OK(swResult);
+    auto& [insertCtx, time] = swResult.getValue();
+    auto bucketOpenedDueToMetadata = true;
+
+    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
+                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                              WithLock::withoutLock(),
+                                              insertCtx.key,
+                                              insertCtx.options,
+                                              time,
+                                              nullptr,
+                                              insertCtx.stats);
+
+    bucket.rolloverReason = RolloverReason::kTimeForward;
+    AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
+    auto potentialBuckets =
+        findAndRolloverOpenBuckets(*_bucketCatalog,
+                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                   WithLock::withoutLock(),
+                                   insertCtx.key,
+                                   time + Hours(2),
+                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   allowQueryBasedReopening,
+                                   bucketOpenedDueToMetadata);
+    ASSERT(!bucketOpenedDueToMetadata);
+    ASSERT_EQ(0, potentialBuckets.size());
+    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
@@ -2148,6 +2185,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
                                               insertCtx.stats);
 
     bucket.rolloverReason = RolloverReason::kTimeBackward;
+    AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
                                    *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2155,10 +2193,12 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
                                    insertCtx.key,
                                    time,
                                    Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
     ASSERT_EQ(&bucket, potentialBuckets[0]);
+    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
@@ -2183,6 +2223,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
                                                   insertCtx.stats);
 
         bucket.rolloverReason = allHardClosedRolloverReasons[i];
+        AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
         auto potentialBuckets =
             findAndRolloverOpenBuckets(*_bucketCatalog,
                                        *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2190,10 +2231,12 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
                                        insertCtx.key,
                                        time,
                                        Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                       allowQueryBasedReopening,
                                        bucketOpenedDueToMetadata);
         ASSERT(!bucketOpenedDueToMetadata);
         ASSERT_EQ(0, potentialBuckets.size());
         ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+        ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
     }
 }
 
@@ -2222,6 +2265,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
         std::shared_ptr<WriteBatch> batch;
         auto opId = 0;
         bucket.batches.emplace(opId, batch);
+        AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
         auto potentialBuckets =
             findAndRolloverOpenBuckets(*_bucketCatalog,
                                        *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2229,12 +2273,14 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
                                        insertCtx.key,
                                        time,
                                        Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                       allowQueryBasedReopening,
                                        bucketOpenedDueToMetadata);
 
         // No results returned. Do not close the bucket because of uncommitted batches.
         ASSERT(!bucketOpenedDueToMetadata);
         ASSERT_EQ(0, potentialBuckets.size());
         ASSERT(!_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+        ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
     }
 }
 
@@ -2264,7 +2310,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
                                                nullptr,
                                                insertCtx.stats);
 
-
+    AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
                                    *_bucketCatalog->stripes[insertCtx.stripeNumber],
@@ -2272,11 +2318,13 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
                                    insertCtx.key,
                                    time,
                                    Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(2, potentialBuckets.size());
     ASSERT_EQ(&bucket1, potentialBuckets[0]);
     ASSERT_EQ(&bucket2, potentialBuckets[1]);
+    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
 }
 
 TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
