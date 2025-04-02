@@ -141,8 +141,14 @@ env.Library(
 
 env.CppUnitTest(
     target="diagnostic_printers_test",
-    source=[],
-    LIBDEPS=[],
+    source=[
+        'diagnostic_printers_test.cpp',
+    ],
+    LIBDEPS=[
+        'commands',
+        'commands/standalone',
+        'service_context_test_fixture',
+    ],
 )
 
 env.CppUnitTest(
