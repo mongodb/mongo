@@ -99,6 +99,7 @@ struct ServerGlobalParams {
     bool downgradeBackCompat{false};  // --downgradeBackCompat
 
     boost::optional<int> routerPort;      // --routerPort
+    boost::optional<int> proxyPort;       // --proxyPort
     bool doAutoBootstrapSharding{false};  // This is derived from other settings during startup.
 
     bool objcheck = true;  // --objcheck
