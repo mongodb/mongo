@@ -34,6 +34,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/shard_version_factory.h"
@@ -43,11 +44,10 @@
 namespace mongo {
 
 namespace {
-class RouterRoleTest : public virtual service_context_test::RouterRoleOverride,
-                       public ShardCatalogCacheTestFixture {
+class RouterRoleTest : public RouterCatalogCacheTestFixture {
 public:
     void setUp() override {
-        ShardCatalogCacheTestFixture::setUp();
+        RouterCatalogCacheTestFixture::setUp();
 
         const auto opCtx = operationContext();
         opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
@@ -66,7 +66,7 @@ public:
 
     void tearDown() override {
         _routerOpCtxSession.reset();
-        ShardCatalogCacheTestFixture::tearDown();
+        RouterCatalogCacheTestFixture::tearDown();
     }
 
     void actAsSubRouter() {
@@ -290,5 +290,60 @@ TEST_F(RouterRoleTest, MultiCollectionRouterRetriesOnStaleConfigForNonSubRouter)
     ASSERT_EQ(firstTry, false);
 }
 
+// TODO SERVER-102931: Integrate RouterAcquisitionSnapshot into the tests below.
+TEST_F(RouterRoleTest, RoutingContextCreation) {
+    auto opCtx = operationContext();
+
+    const auto expectedCri =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _nss));
+
+    const auto nssList = std::vector{_nss};
+    RoutingContext routingCtx(opCtx, nssList);
+    const auto& actualCri = routingCtx.getCollectionRoutingInfo(_nss);
+
+    ASSERT_TRUE(actualCri.hasRoutingTable());
+    ASSERT_TRUE(actualCri.isSharded());
+    ASSERT_EQ(actualCri.getCollectionVersion(), expectedCri.getCollectionVersion());
+}
+
+TEST_F(RouterRoleTest, RoutingContextPropagatesCatalogCacheErrors) {
+    auto opCtx = operationContext();
+
+    auto* catalogCache = Grid::get(opCtx)->catalogCache();
+    // Invalidate the cache to trigger a refresh on next access.
+    catalogCache->invalidateCollectionEntry_LINEARIZABLE(_nss);
+    {
+        FailPointEnableBlock failPoint("blockCollectionCacheLookup");
+
+        // RoutingContext should correctly propagate errors from the CatalogCache
+        const auto nssList = std::vector{_nss};
+        ASSERT_THROWS_CODE((RoutingContext{opCtx, nssList, true /* allowLocks */}),
+                           DBException,
+                           ErrorCodes::ShardCannotRefreshDueToLocksHeld);
+    }
+    catalogCache->invalidateCollectionEntry_LINEARIZABLE(_nss);
+}
+
+TEST_F(RouterRoleTest, RoutingContextRoutingTablesAreImmutable) {
+    const auto opCtx = operationContext();
+
+    const auto nssList = std::vector{_nss};
+    RoutingContext routingCtx(opCtx, nssList);
+    const auto criA = routingCtx.getCollectionRoutingInfo(_nss);
+    const auto versionA = criA.getCollectionVersion().placementVersion();
+
+    // Schedule a refresh with a new placement version.
+    auto future = scheduleRoutingInfoForcedRefresh(_nss);
+
+    mockConfigServerQueries(_nss, versionA.epoch(), versionA.getTimestamp());
+
+    const auto criB = *future.default_timed_get();
+    const auto versionB = criB.getCollectionVersion().placementVersion();
+
+    // Routing tables have changed in the CatalogCache, but not in the RoutingContext.
+    ASSERT_NE(versionA, versionB);
+    ASSERT_EQ(routingCtx.getCollectionRoutingInfo(_nss).getCollectionVersion().placementVersion(),
+              versionA);
+}
 }  // namespace
 }  // namespace mongo

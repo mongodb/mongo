@@ -41,6 +41,7 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/routing_context.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

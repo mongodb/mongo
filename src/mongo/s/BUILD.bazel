@@ -93,6 +93,8 @@ mongo_cc_library(
         "multi_statement_transaction_requests_sender.cpp",
         "router_role.cpp",
         "router_transactions_metrics.cpp",
+        "routing_context.cpp",
+        "routing_context.h",
         "session_catalog_router.cpp",
         "set_cluster_server_parameter_router_impl.cpp",
         "shard_key_pattern_query_util.cpp",
