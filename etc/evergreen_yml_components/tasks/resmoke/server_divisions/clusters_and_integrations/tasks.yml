@@ -1037,12 +1037,18 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
+        vars:
+          timeout_secs: 7200 # 2 hours
+          exec_timeout_secs: 21600 # 6 hours
 
   - <<: *gen_task_template
     name: auth_gen
     tags: ["assigned_to_jira_team_server_security", "release_critical", "auth"]
     commands:
       - func: "generate resmoke tasks"
+        vars:
+          timeout_secs: 7200 # 2 hours
+          exec_timeout_secs: 21600 # 6 hours
 
   - <<: *task_template
     name: client_encrypt
