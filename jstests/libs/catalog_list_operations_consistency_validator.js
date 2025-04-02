@@ -536,14 +536,13 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
             throw ex;
         }
 
-        // Replica set endpoints with profiling enabled on an empty database do not show the
+        // Replica set with profiling enabled on an empty database do not show the
         // system.profile collection in listCollections, but they do in $listCatalog.
         // TODO(SERVER-97721): Remove this workaround.
         if (collInfo.length === 0 && catalogInfo.length === 1 &&
-            catalogInfo[0].name === "system.profile" &&
-            FeatureFlagUtil.isEnabled(db, "ReplicaSetEndpoint")) {
+            catalogInfo[0].name === "system.profile") {
             jsTest.log.info(
-                "Skipped consistency check: Stray system.profile on RSEndpoint (SERVER-97721)");
+                "Skipped consistency check: Stray system.profile on replica set (SERVER-97721)");
             return true;
         }
 
