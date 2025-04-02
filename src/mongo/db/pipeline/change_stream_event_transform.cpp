@@ -307,14 +307,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                     auto deltaDesc = change_stream_document_diff_parser::parseDiff(
                         diffObj.getDocument().toBson());
 
-                    updateDescription =
-                        Value(Document{{"updatedFields", std::move(deltaDesc.updatedFields)},
-                                       {"removedFields", std::move(deltaDesc.removedFields)},
-                                       {"truncatedArrays", std::move(deltaDesc.truncatedArrays)},
-                                       {"disambiguatedPaths",
-                                        _changeStreamSpec.getShowExpandedEvents()
-                                            ? Value(std::move(deltaDesc.disambiguatedPaths))
-                                            : Value()}});
+                    updateDescription = Value(Document{
+                        {"updatedFields", std::move(deltaDesc.updatedFields)},
+                        {"removedFields", std::move(deltaDesc.removedFields)},
+                        {"truncatedArrays", std::move(deltaDesc.truncatedArrays)},
+                        {"disambiguatedPaths", Value(std::move(deltaDesc.disambiguatedPaths))}});
                 }
             } else if (!oplogVersion.missing() || id.missing()) {
                 // This is not a replacement op, and we did not see a valid update version number.
@@ -374,15 +371,13 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 Document opDesc = copyDocExceptFields(oField, {"create"_sd});
                 operationDescription = Value(opDesc);
 
-                if (_changeStreamSpec.getShowExpandedEvents()) {
-                    // Populate 'nsType' field with collection type (always "collection" here).
-                    auto collectionType = determineCollectionType(oField, nss.dbName());
-                    tassert(8814201,
-                            "'operationDescription.type' should always resolve to 'collection' for "
-                            "collection create events",
-                            collectionType == CollectionType::kCollection);
-                    nsType = Value(toString(collectionType));
-                }
+                // Populate 'nsType' field with collection type (always "collection" here).
+                auto collectionType = determineCollectionType(oField, nss.dbName());
+                tassert(8814201,
+                        "'operationDescription.type' should always resolve to 'collection' for "
+                        "collection create events",
+                        collectionType == CollectionType::kCollection);
+                nsType = Value(toString(collectionType));
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
@@ -533,15 +528,13 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     doc.addField(DocumentSourceChangeStream::kOperationTypeField, Value(operationType));
     doc.addField(DocumentSourceChangeStream::kClusterTimeField, Value(resumeTokenData.clusterTime));
 
-    if (_changeStreamSpec.getShowExpandedEvents()) {
-        // Commit timestamp for prepared transactions.
-        doc.addField(DocumentSourceChangeStream::kCommitTimestampField,
-                     input[DocumentSourceChangeStream::kCommitTimestampField]);
+    // Commit timestamp for CRUD events in prepared transactions.
+    doc.addField(DocumentSourceChangeStream::kCommitTimestampField,
+                 input[DocumentSourceChangeStream::kCommitTimestampField]);
 
-        // Note: If the UUID is a missing value (which can be true for events like 'dropDatabase'),
-        // 'addField' will not add anything to the document.
-        doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
-    }
+    // Note: If the UUID is a missing value (which can be true for events like 'dropDatabase'),
+    // 'addField' will not add anything to the document.
+    doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
 
     const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
     checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
@@ -572,9 +565,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // The event may have a documentKey OR an operationDescription, but not both. We already
     // validated this while creating the resume token.
     doc.addField(DocumentSourceChangeStream::kDocumentKeyField, std::move(documentKey));
-    if (_changeStreamSpec.getShowExpandedEvents()) {
-        doc.addField(DocumentSourceChangeStream::kOperationDescriptionField, operationDescription);
-    }
+    doc.addField(DocumentSourceChangeStream::kOperationDescriptionField, operationDescription);
 
     // Note that the update description field might be the 'missing' value, in which case it will
     // not be serialized.

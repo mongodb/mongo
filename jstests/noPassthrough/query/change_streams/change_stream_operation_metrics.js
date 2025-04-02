@@ -196,7 +196,7 @@ let nextId = nDocs;
         assert.gte(metrics[dbName].primaryMetrics.docUnitsRead, 2);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryBytesRead, 3);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryUnitsRead, 1);
-        assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 4);
+        assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 5);
     });
 })();
 
