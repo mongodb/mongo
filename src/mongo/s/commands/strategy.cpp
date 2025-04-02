@@ -279,7 +279,7 @@ void ExecCommandClient::_epilogue() {
         failCommand.executeIf(
             [&](const BSONObj& data) {
                 rpc::RewriteStateChangeErrors::onActiveFailCommand(opCtx, data);
-                result->getBodyBuilder().append(data[kWriteConcernErrorFieldName]);
+                result->getBodyBuilder().append(data["writeConcernError"]);
                 if (data.hasField(kErrorLabelsFieldName) &&
                     data[kErrorLabelsFieldName].type() == Array) {
                     auto labels = data.getObjectField(kErrorLabelsFieldName).getOwned();
@@ -291,7 +291,7 @@ void ExecCommandClient::_epilogue() {
             [&](const BSONObj& data) {
                 return CommandHelpers::shouldActivateFailCommandFailPoint(
                            data, _invocation, opCtx->getClient()) &&
-                    data.hasField(kWriteConcernErrorFieldName);
+                    data.hasField("writeConcernError");
             });
     }
 
@@ -1269,7 +1269,7 @@ void ClientCommand::_handleException(Status status) {
     BSONObjBuilder wceBuilder;
     {
         auto bob = reply->getBodyBuilder().asTempObj();
-        if (auto f = bob.getField(kWriteConcernErrorFieldName); !f.eoo()) {
+        if (auto f = bob.getField("writeConcernError"_sd); !f.eoo()) {
             wceBuilder.append(f);
             wceBuilder.done();
         }

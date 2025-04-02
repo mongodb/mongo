@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-#include <fmt/core.h>
-#include <fmt/format.h>
 #include <string>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -40,92 +37,14 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
 namespace {
+const std::string kCmdResponseWriteConcernField = "writeConcernError";
 const std::string kCmdResponseWriteErrorsField = "writeErrors";
-
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ErrorWithWriteConcernErrorInfo);
-
-
-boost::optional<WriteConcernErrorDetail> extractWriteConcernErrorDetail(const BSONObj& result) {
-    auto wcErrorDetailPtr = getWriteConcernErrorDetailFromBSONObj(result);
-    if (!wcErrorDetailPtr) {
-        return boost::none;
-    }
-    return *wcErrorDetailPtr;
-}
-
 }  // namespace
-
-ErrorWithWriteConcernErrorInfo::ErrorWithWriteConcernErrorInfo(
-    Status mainError, WriteConcernErrorDetail writeConcernError)
-    : _mainError(std::move(mainError)), _wcError(std::move(writeConcernError)) {}
-
-std::shared_ptr<const ErrorExtraInfo> ErrorWithWriteConcernErrorInfo::parse(const BSONObj& doc) {
-    uasserted(
-        1004350,
-        fmt::format(
-            "ErrorWithWriteConcernErrorInfo should never appear in command result BSON object: {}",
-            doc.toString()));
-    return {};
-}
-
-void ErrorWithWriteConcernErrorInfo::serialize(BSONObjBuilder* bob) const {
-    _mainError.serialize(bob);
-    bob->append(kWriteConcernErrorFieldName, _wcError.toBSON());
-}
-
-const Status& ErrorWithWriteConcernErrorInfo::getMainStatus() const {
-    return _mainError;
-}
-
-const WriteConcernErrorDetail& ErrorWithWriteConcernErrorInfo::getWriteConcernErrorDetail() const {
-    return _wcError;
-}
-
-Status getStatusWithWCErrorDetailFromCommandResult(const BSONObj& result) {
-    auto mainStatus = getStatusFromCommandResult(result);
-    auto optionalWCErrorDetail = extractWriteConcernErrorDetail(result);
-    if (!optionalWCErrorDetail) {
-        return mainStatus;
-    }
-    if (mainStatus.code() == ErrorCodes::ErrorWithWriteConcernError) {
-        return mainStatus;
-    }
-    return Status{ErrorWithWriteConcernErrorInfo{mainStatus, optionalWCErrorDetail.get()},
-                  "Error paired with write concern error"};
-}
-
-void appendWriteConcernErrorDetailToCommandResponse(const ShardId& shardId,
-                                                    WriteConcernErrorDetail wcError,
-                                                    BSONObjBuilder& responseBuilder) {
-    if (responseBuilder.hasField(kWriteConcernErrorFieldName)) {
-        return;
-    }
-
-    auto status = wcError.toStatus();
-    wcError.setStatus(
-        status.withReason(str::stream() << status.reason() << " at " << shardId.toString()));
-    responseBuilder.append(kWriteConcernErrorFieldName, wcError.toBSON());
-}
-
-Status getStatusWithWCErrorDetailFromCommandResult(const BSONObj& result,
-                                                   const ShardId& shardId,
-                                                   BSONObjBuilder& bob) {
-    auto mainStatus = getStatusFromCommandResult(result);
-    auto optionalWcErrorDetail = extractWriteConcernErrorDetail(result);
-
-    if (!optionalWcErrorDetail) {
-        return mainStatus;
-    }
-    appendWriteConcernErrorDetailToCommandResponse(shardId, *optionalWcErrorDetail, bob);
-    return Status{ErrorWithWriteConcernErrorInfo{mainStatus, *optionalWcErrorDetail},
-                  "error paired with write concern error"};
-}
 
 Status getStatusFromCommandResult(const BSONObj& result) {
     BSONElement okElement = result["ok"];
@@ -151,7 +70,6 @@ Status getErrorStatusFromCommandResult(const BSONObj& result) {
     if (0 == code) {
         code = ErrorCodes::UnknownError;
     }
-
     std::string errmsg;
     if (errmsgElement.type() == String) {
         errmsg = errmsgElement.String();
@@ -165,16 +83,37 @@ Status getErrorStatusFromCommandResult(const BSONObj& result) {
         (str::startsWith(errmsg, "no such cmd") || str::startsWith(errmsg, "no such command"))) {
         code = ErrorCodes::CommandNotFound;
     }
+
     return Status(ErrorCodes::Error(code), std::move(errmsg), result);
 }
 
 Status getWriteConcernStatusFromCommandResult(const BSONObj& obj) {
-    auto optionalWcErrorDetail = extractWriteConcernErrorDetail(obj);
-    if (!optionalWcErrorDetail) {
-        return Status::OK();
+    BSONElement wcErrorElem;
+    Status status = bsonExtractTypedField(obj, kCmdResponseWriteConcernField, Object, &wcErrorElem);
+    if (!status.isOK()) {
+        if (status == ErrorCodes::NoSuchKey) {
+            return Status::OK();
+        } else {
+            return status;
+        }
     }
 
-    return optionalWcErrorDetail->toStatus();
+    BSONObj wcErrObj(wcErrorElem.Obj());
+
+    WriteConcernErrorDetail wcError;
+    std::string wcErrorParseMsg;
+    if (!wcError.parseBSON(wcErrObj, &wcErrorParseMsg)) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream()
+                          << "Failed to parse write concern section due to " << wcErrorParseMsg);
+    }
+    std::string wcErrorInvalidMsg;
+    if (!wcError.isValid(&wcErrorInvalidMsg)) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream()
+                          << "Failed to parse write concern section due to " << wcErrorInvalidMsg);
+    }
+    return wcError.toStatus();
 }
 
 Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse) {

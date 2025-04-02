@@ -1680,8 +1680,8 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
     // This callback ensures that any write concern errors are set in the reply in the event
     // that processFindAndModifyRequest returned a non-OK status, which is then thrown.
     auto onErrorWithWCE = [&result](const WriteConcernErrorDetail& wce) {
-        if (!result.hasField(kWriteConcernErrorFieldName)) {
-            result.append(kWriteConcernErrorFieldName, wce.toBSON());
+        if (!result.hasField("writeConcernError")) {
+            result.append("writeConcernError", wce.toBSON());
         }
     };
 

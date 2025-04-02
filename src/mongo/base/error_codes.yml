@@ -838,11 +838,6 @@ error_codes:
       name: StreamProcessorExternalFunctionConnectionError,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
-  - {
-      code: 441,
-      name: ErrorWithWriteConcernError,
-      extra: ErrorWithWriteConcernErrorInfo,
-    }
   - {code: 442, name: RetryMultiPlanning}
   - {
       code: 443,

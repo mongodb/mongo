@@ -89,7 +89,7 @@ bool WriteConcernErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
         errMsg = &dummy;
 
     try {
-        auto wce = WriteConcernError::parse(IDLParserContext{kWriteConcernErrorFieldName}, source);
+        auto wce = WriteConcernError::parse(IDLParserContext{"writeConcernError"}, source);
         _status = Status(ErrorCodes::Error(wce.getCode()), wce.getErrmsg(), source);
         if ((_isErrInfoSet = wce.getErrInfo().has_value())) {
             _errInfo = wce.getErrInfo().value().getOwned();
@@ -162,7 +162,7 @@ WriteConcernErrorDetail getWriteConcernErrorDetail(const BSONElement& wcErrorEle
 
 std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(const BSONObj& obj) {
     BSONElement wcErrorElem;
-    Status status = bsonExtractTypedField(obj, kWriteConcernErrorFieldName, Object, &wcErrorElem);
+    Status status = bsonExtractTypedField(obj, "writeConcernError", Object, &wcErrorElem);
     if (!status.isOK()) {
         if (status == ErrorCodes::NoSuchKey) {
             return nullptr;

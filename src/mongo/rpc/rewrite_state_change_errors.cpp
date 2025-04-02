@@ -57,7 +57,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/static_immortal.h"
-#include "write_concern_error_detail.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -202,9 +201,9 @@ boost::optional<BSONObj> rewriteDocument(const BSONObj& doc, OperationContext* o
     }
 
     // `writeConcernError` is a single error-bearing node.
-    if (const auto& wce = doc[kWriteConcernErrorFieldName]; wce.type() == Object) {
+    if (const auto& wce = doc["writeConcernError"]; wce.type() == Object) {
         if ((oldCode = needsRewrite(sc, wce.Obj())))
-            editErrorNode(lazyMutableRoot()[kWriteConcernErrorFieldName]);
+            editErrorNode(lazyMutableRoot()["writeConcernError"]);
     }
 
     if (mutableDoc) {

@@ -59,7 +59,7 @@ const BSONField<std::vector<BatchedUpsertDetail*>> BatchedCommandResponse::upser
     "upserted");
 const BSONField<OID> BatchedCommandResponse::electionId("electionId");
 const BSONField<WriteConcernErrorDetail*> BatchedCommandResponse::writeConcernError(
-    kWriteConcernErrorFieldName.toString());
+    "writeConcernError");
 const BSONField<std::vector<std::string>> BatchedCommandResponse::errorLabels("errorLabels");
 const BSONField<std::vector<StmtId>> BatchedCommandResponse::retriedStmtIds("retriedStmtIds");
 

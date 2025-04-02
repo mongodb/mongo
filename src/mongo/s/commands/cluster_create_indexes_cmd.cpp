@@ -73,6 +73,7 @@ namespace mongo {
 namespace {
 
 constexpr auto kRawFieldName = "raw"_sd;
+constexpr auto kWriteConcernErrorFieldName = "writeConcernError"_sd;
 constexpr auto kTopologyVersionFieldName = "topologyVersion"_sd;
 
 class CreateIndexesCmd : public BasicCommandWithRequestParser<CreateIndexesCmd> {
