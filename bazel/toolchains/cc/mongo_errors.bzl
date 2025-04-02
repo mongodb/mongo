@@ -40,3 +40,25 @@ Error:
   fuzzer, address, and memory sanitizers require these configurations:
       --allocator=system
 """
+
+REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE = """
+Error:
+  any sanitizer requires these configurations:
+      --compiler_type=clang
+      --opt=on [OR] --opt=debug
+"""
+
+DETECT_ODR_VIOLATIONS_ERROR_MESSAGE = """
+Error:
+    detect_odr_violations requires these configurations:
+        --opt=off
+        --linker=gold
+"""
+
+BAZELISK_CHECK_ERROR_MESSAGE = """
+Error:
+  This repository must be built through bazelisk, please uninstall your current bazel
+  installation and then run:
+
+  python buildscripts/install_bazel.py
+"""
