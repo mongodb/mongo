@@ -13,7 +13,7 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getWinningPlanFromExplain, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const timeFieldName = "timestamp";
 

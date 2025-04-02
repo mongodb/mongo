@@ -19,7 +19,7 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 // Set up the replica set. We need to set "oplogApplicationEnforcesSteadyStateConstraints=false" as
 // we'll be violating the index build process by having the index already built on the secondary

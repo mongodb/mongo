@@ -21,7 +21,7 @@ import {
 } from "jstests/libs/collection_drop_recreate.js";
 import {
     validateShowRecordIdReplicatesAcrossNodes,
-} from "jstests/libs/replicated_record_ids_utils.js";
+} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replSet = new ReplSetTest({nodes: 2});

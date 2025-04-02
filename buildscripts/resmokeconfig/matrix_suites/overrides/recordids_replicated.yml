@@ -1,6 +1,6 @@
 - name: enable
   value:
-    eval: await import('jstests/libs/override_methods/set_recordids_replicated.js');
+    eval: await import('jstests/libs/override_methods/collection_write_path/set_recordids_replicated.js');
 
 - name: excluded_files
   value:

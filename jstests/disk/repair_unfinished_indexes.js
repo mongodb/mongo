@@ -14,7 +14,7 @@ import {
     startMongodOnExistingPath,
 } from "jstests/disk/libs/wt_file_helper.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const dbName = "repair_unfinished_indexes";
 const collName = "test";

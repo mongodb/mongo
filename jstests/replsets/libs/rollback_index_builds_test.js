@@ -3,7 +3,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 export class RollbackIndexBuildsTest {

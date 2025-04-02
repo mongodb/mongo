@@ -12,11 +12,11 @@ import {
     withAbortAndRetryOnTransientTxnError,
     withTxnAndAutoRetryOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertCollCreateFailedWithCode,
     createCollAndCRUDInTxn
-} from "jstests/libs/create_collection_txn_helpers.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+} from "jstests/libs/txns/create_collection_txn_helpers.js";
 
 function runCollectionCreateTest(command, explicitCreate) {
     const session = db.getMongo().startSession();

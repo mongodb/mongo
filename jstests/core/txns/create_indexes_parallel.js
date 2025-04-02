@@ -8,13 +8,13 @@
  * ]
  */
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     conflictingIndexSpecs,
     createIndexAndCRUDInTxn,
     indexSpecs
-} from "jstests/libs/create_index_txn_helpers.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+} from "jstests/libs/index_builds/create_index_txn_helpers.js";
 
 let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     const dbName = 'test_txns_create_indexes_parallel';

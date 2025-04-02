@@ -1,7 +1,7 @@
 /**
  * Ensures that the 'collStats' command lists indexes that are ready and in-progress.
  */
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const collName = "collStats_show_ready_and_in_progress_indexes";
 const testDB = db.getSiblingDB("test");

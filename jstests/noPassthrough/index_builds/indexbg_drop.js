@@ -6,7 +6,7 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 var dbname = jsTestName();
 var collection = 'jstests_feh';

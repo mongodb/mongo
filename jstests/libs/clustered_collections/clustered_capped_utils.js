@@ -1,4 +1,4 @@
-import {TTLUtil} from "jstests/libs/ttl_util.js";
+import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 export var ClusteredCappedUtils = class {
     // Validate TTL-based deletion on a clustered, capped collection.

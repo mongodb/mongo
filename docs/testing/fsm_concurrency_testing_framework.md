@@ -303,7 +303,9 @@ workload you are extending has a function in its data object called
 
 ```javascript
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-load("jstests/concurrency/fsm_workload_modifiers/indexed_noindex.js"); // for indexedNoindex
+load(
+  "jstests/concurrency/fsm_workload_modifiers/collection_write_path/indexed_noindex.js",
+); // for indexedNoindex
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/workload_with_index.js";
 
 export const $config = extendWorkload($baseConfig, indexedNoIndex);

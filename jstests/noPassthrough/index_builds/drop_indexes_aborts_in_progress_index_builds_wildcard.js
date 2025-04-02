@@ -6,7 +6,7 @@
  * In this file, we test calling "dropIndexes" with the "*" wildcard which will abort all
  * in-progress index builds and remove ready indexes.
  */
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);

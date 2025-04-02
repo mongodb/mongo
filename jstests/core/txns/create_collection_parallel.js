@@ -8,8 +8,8 @@
  * ]
  */
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {createCollAndCRUDInTxn} from "jstests/libs/create_collection_txn_helpers.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {createCollAndCRUDInTxn} from "jstests/libs/txns/create_collection_txn_helpers.js";
 
 const dbName = 'test_txns_create_collection_parallel';
 

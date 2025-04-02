@@ -6,6 +6,9 @@ filters:
   - "batched_write*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "op_observer*":
+    approvers:
+      - 10gen/server-collection-write-path
   - "op_observer_impl*":
     approvers:
       - 10gen/server-replication
@@ -15,3 +18,6 @@ filters:
   - "find_and_modify_images_op_observer*":
     approvers:
       - 10gen/server-replication
+  - operation_logger*:
+    approvers:
+      - 10gen/server-collection-write-path

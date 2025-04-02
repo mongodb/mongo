@@ -17,7 +17,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true;; await import('jstests/libs/override_methods/set_recordids_replicated.js');
+      eval: globalThis.testingReplication = true;; await import('jstests/libs/override_methods/collection_write_path/set_recordids_replicated.js');
   fixture:
     class: ReplicaSetFixture
     mongod_options:
@@ -42,7 +42,7 @@ selector:
     - jstests/core/**/set_param1.js
     - jstests/core/query/awaitdata_getmore_cmd.js
     - jstests/core/administrative/current_op/currentop.js
-    - jstests/core/administrative/fsync.js
+    - jstests/core/administrative/fsync/fsync.js
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
     - jstests/core/timeseries/write/timeseries_update_multi.js

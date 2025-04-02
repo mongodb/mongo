@@ -1,7 +1,7 @@
 /**
  * Verify the behavior of dropping TTL index.
  */
-import {TTLUtil} from "jstests/libs/ttl_util.js";
+import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 let conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 let db = conn.getDB('test');

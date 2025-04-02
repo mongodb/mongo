@@ -1,5 +1,5 @@
 // Tests that the TTL Monitor is disabled for <database>.system.resharding.* namespaces.
-import {TTLUtil} from "jstests/libs/ttl_util.js";
+import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 // Launch mongod with shorter TTL monitor sleep interval.
 const runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});

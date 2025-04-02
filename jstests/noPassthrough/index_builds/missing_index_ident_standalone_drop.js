@@ -7,8 +7,8 @@
  *     requires_replication,
  * ]
  */
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
-import {MissingIndexIdent} from "jstests/noPassthrough/libs/missing_index_ident.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {MissingIndexIdent} from "jstests/noPassthrough/libs/index_builds/missing_index_ident.js";
 
 const {replTest, dbpath} = MissingIndexIdent.run();
 

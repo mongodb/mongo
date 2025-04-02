@@ -7,7 +7,10 @@
  * ]
  */
 
-import {HybridGeoIndexTest, Operation} from "jstests/noPassthrough/libs/hybrid_geo_index.js";
+import {
+    HybridGeoIndexTest,
+    Operation
+} from "jstests/noPassthrough/libs/index_builds/hybrid_geo_index.js";
 
 const options = {};
 

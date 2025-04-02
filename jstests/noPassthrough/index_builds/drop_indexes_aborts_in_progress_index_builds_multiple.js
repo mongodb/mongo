@@ -6,7 +6,7 @@
  * In this file, we test calling "dropIndexes" with a list of index names, which will be used to
  * abort a single index builder only, which was building all the given indexes.
  */
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);

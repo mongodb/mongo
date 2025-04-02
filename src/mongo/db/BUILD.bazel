@@ -1596,14 +1596,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "snapshot_window_options_gen",
-    src = "snapshot_window_options.idl",
-    deps = [
-        ":basic_types_gen",
-    ],
-)
-
-idl_generator(
     name = "keys_collection_document_gen",
     src = "keys_collection_document.idl",
     deps = [
@@ -2247,16 +2239,6 @@ mongo_cc_library(
     deps = [
         ":server_base",
         "//src/mongo/crypto:sha1_block",
-    ],
-)
-
-mongo_cc_library(
-    name = "snapshot_window_options",
-    srcs = [
-        ":snapshot_window_options_gen",
-    ],
-    deps = [
-        ":server_base",
     ],
 )
 

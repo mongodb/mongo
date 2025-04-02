@@ -11,7 +11,7 @@
  *   requires_replication,
  * ]
  */
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {SecondaryReadsTest} from "jstests/replsets/libs/secondary_reads_test.js";
 
 const dbName = jsTestName();

@@ -15,3 +15,9 @@ filters:
   - "replset_writes_during_restarts_keep_fast_count_correct.js":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "insert_docs_larger_than_max_user_size_standalone.js":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "vectored_insert_no_oplog_hole.js":
+    approvers:
+      - 10gen/server-replication

@@ -806,3 +806,21 @@ filegroup(
     name = "write_unit_of_work_hdrs",
     srcs = [":write_unit_of_work.h"],
 )
+
+idl_generator(
+    name = "snapshot_window_options_gen",
+    src = "snapshot_window_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "snapshot_window_options",
+    srcs = [
+        ":snapshot_window_options_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

@@ -2,7 +2,7 @@
  * This test ensures an index build can yield during bulk load phase.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);

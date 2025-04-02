@@ -2,7 +2,7 @@
  * Sets up a test for initial sync when there are index builds in progress on the primary.
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 export var IndexInitialSyncTest = function(options) {
     if (!(this instanceof IndexInitialSyncTest)) {

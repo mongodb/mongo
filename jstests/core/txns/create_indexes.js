@@ -16,7 +16,7 @@ import {
     conflictingIndexSpecs,
     createIndexAndCRUDInTxn,
     indexSpecs
-} from "jstests/libs/create_index_txn_helpers.js";
+} from "jstests/libs/index_builds/create_index_txn_helpers.js";
 
 let doCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     const session = db.getMongo().startSession();

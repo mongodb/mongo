@@ -6,7 +6,7 @@
  *   requires_replication,
  * ]
  */
-import {IndexInitialSyncTest} from "jstests/noPassthrough/libs/index_initial_sync.js";
+import {IndexInitialSyncTest} from "jstests/noPassthrough/libs/index_builds/index_initial_sync.js";
 
 const nodes = [
     {},

@@ -8,7 +8,10 @@
  * ]
  */
 
-import {getRidForDoc, mapFieldToMatchingDocRid} from "jstests/libs/replicated_record_ids_utils.js";
+import {
+    getRidForDoc,
+    mapFieldToMatchingDocRid
+} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     moveDatabaseAndUnshardedColls

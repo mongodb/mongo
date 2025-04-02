@@ -10,7 +10,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {TTLUtil} from "jstests/libs/ttl_util.js";
+import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 const testDB = conn.getDB(jsTestName());

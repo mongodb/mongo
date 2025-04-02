@@ -1,6 +1,6 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 export class RollbackResumableIndexBuildTest {
     static checkCompletedAndDrop(
@@ -109,7 +109,7 @@ export class RollbackResumableIndexBuildTest {
             awaitCreateIndexes[i] = ResumableIndexBuildTest.createIndexWithSideWrites(
                 rollbackTest, async function(collName, indexSpecs, indexNames) {
                     const {ResumableIndexBuildTest} =
-                        await import("jstests/noPassthrough/libs/index_build.js");
+                        await import("jstests/noPassthrough/libs/index_builds/index_build.js");
                     ResumableIndexBuildTest.createIndexesFails(
                         db, collName, indexSpecs, indexNames);
                 }, colls[i], indexSpecs[i], indexNames[i], sideWrites);

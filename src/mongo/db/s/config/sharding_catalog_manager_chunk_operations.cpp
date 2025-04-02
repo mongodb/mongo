@@ -83,7 +83,7 @@
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/db/snapshot_window_options_gen.h"
+#include "mongo/db/storage/snapshot_window_options_gen.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"

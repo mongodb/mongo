@@ -85,6 +85,6 @@ function runCommandWithRecordIdsReplicated(
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/set_recordids_replicated.js");
+    "jstests/libs/override_methods/collection_write_path/set_recordids_replicated.js");
 
 OverrideHelpers.overrideRunCommand(runCommandWithRecordIdsReplicated);

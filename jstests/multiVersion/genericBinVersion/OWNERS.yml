@@ -18,3 +18,6 @@ filters:
   - "mixed_replica_set_with_latest_primary.js":
     approvers:
       - 10gen/server-replication
+  - "remove_invalid_index_options.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

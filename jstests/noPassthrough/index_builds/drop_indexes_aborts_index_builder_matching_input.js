@@ -3,7 +3,7 @@
  * command will only abort in-progress index builds if the user specifies all of the indexes that a
  * single builder is building together, as we can only abort at the index builder granularity level.
  */
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);

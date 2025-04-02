@@ -3,7 +3,7 @@
  * completed that it successfully aborted.
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const dbName = "test";
 const collName = jsTestName();

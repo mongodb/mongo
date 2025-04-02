@@ -1,8 +1,8 @@
 // Perform the upgrade/downgrade procedure by first setting the featureCompatibilityVersion and
 // then switching the binary.
-import {checkUniqueIndexFormatVersion} from "jstests/libs/check_unique_indexes.js";
 import {checkCollectionUUIDs} from "jstests/libs/check_uuids.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {checkUniqueIndexFormatVersion} from "jstests/libs/unique_indexes/check_unique_indexes.js";
 
 const latestBinary = "latest";
 

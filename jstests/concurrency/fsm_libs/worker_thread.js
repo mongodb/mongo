@@ -64,7 +64,7 @@ export const workerThread = (function() {
             // Retry operations that fail due to in-progress background operations. Load this early
             // so that later overrides can be retried.
             await import(
-                "jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js");
+                "jstests/libs/override_methods/index_builds/implicitly_retry_on_background_op_in_progress.js");
 
             if (typeof args.sessionOptions !== 'undefined') {
                 let initialClusterTime;

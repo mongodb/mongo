@@ -11,8 +11,11 @@
  * ]
  */
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {createCollAndCRUDInTxn} from "jstests/libs/create_collection_txn_helpers.js";
-import {createIndexAndCRUDInTxn, indexSpecs} from "jstests/libs/create_index_txn_helpers.js";
+import {
+    createIndexAndCRUDInTxn,
+    indexSpecs
+} from "jstests/libs/index_builds/create_index_txn_helpers.js";
+import {createCollAndCRUDInTxn} from "jstests/libs/txns/create_collection_txn_helpers.js";
 
 const session = db.getMongo().startSession();
 const collName = jsTestName();

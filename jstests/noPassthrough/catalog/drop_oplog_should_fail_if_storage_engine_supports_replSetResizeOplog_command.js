@@ -14,7 +14,7 @@
  * ]
  */
 
-import {storageEngineIsWiredTiger} from "jstests/libs/storage_engine_utils.js";
+import {storageEngineIsWiredTiger} from "jstests/libs/storage_engine/storage_engine_utils.js";
 
 // Start a standalone node.
 let primary = MongoRunner.runMongod();

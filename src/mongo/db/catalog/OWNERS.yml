@@ -43,7 +43,7 @@ filters:
   - "catalog*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "clustered_collection_options.idl":
+  - "clustered_collection*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "coll_mod*":
@@ -125,5 +125,8 @@ filters:
     approvers:
       - 10gen/query-integration-analytic-extensions
   - "README_terminology.md":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cannot_convert_index_to_unique*":
     approvers:
       - 10gen/server-catalog-and-routing

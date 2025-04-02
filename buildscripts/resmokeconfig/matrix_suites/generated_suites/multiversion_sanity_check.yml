@@ -42,7 +42,7 @@ selector:
     - jstests/core/**/set_param1.js
     - jstests/core/query/awaitdata_getmore_cmd.js
     - jstests/core/administrative/current_op/currentop.js
-    - jstests/core/administrative/fsync.js
+    - jstests/core/administrative/fsync/fsync.js
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
     - jstests/core/timeseries/write/timeseries_update_multi.js

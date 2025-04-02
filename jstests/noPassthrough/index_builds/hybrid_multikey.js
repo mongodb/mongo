@@ -3,7 +3,7 @@
  * various index types.
  */
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const conn = MongoRunner.runMongod();
 const dbName = 'test';

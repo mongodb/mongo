@@ -7,7 +7,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {TTLUtil} from "jstests/libs/ttl_util.js";
+import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 jsTest.log("Starting TTL + capped collection tests");
 

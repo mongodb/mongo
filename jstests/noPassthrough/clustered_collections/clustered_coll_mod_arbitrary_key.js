@@ -7,7 +7,7 @@
  */
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {TTLUtil} from "jstests/libs/ttl_util.js";
+import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod(

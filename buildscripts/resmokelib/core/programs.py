@@ -473,7 +473,7 @@ def mongo_shell_program(
 
     # Load this file to retry operations that fail due to in-progress background operations.
     eval_sb.append(
-        'await import("jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js")'
+        'await import("jstests/libs/override_methods/index_builds/implicitly_retry_on_background_op_in_progress.js")'
     )
 
     eval_sb.append(

@@ -9,7 +9,7 @@ import {
     getUriForIndex,
     startMongodOnExistingPath
 } from "jstests/disk/libs/wt_file_helper.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;

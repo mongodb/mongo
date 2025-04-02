@@ -48,3 +48,6 @@ filters:
   - "s2*key_generator*":
     approvers:
       - 10gen/query-integration-geo
+  - "index_descriptor*":
+    approvers:
+      - 10gen/server-catalog-and-routing

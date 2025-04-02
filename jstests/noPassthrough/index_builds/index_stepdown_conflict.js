@@ -11,7 +11,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 // The index build conflict is only an issue when oplogApplicationEnforcesSteadyStateConstraints is
 // false. This is false by default outside of our testing.

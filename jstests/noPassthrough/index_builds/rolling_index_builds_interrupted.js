@@ -9,7 +9,7 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 function clearLogInNodes(nodes) {
     nodes.forEach(node => assert.commandWorked(node.adminCommand({clearLog: "global"})));

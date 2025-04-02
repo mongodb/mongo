@@ -1,6 +1,7 @@
 // Runner for checkDBHashes() that runs the dbhash command on all replica set nodes
 // to ensure all nodes have the same data.
-import "jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js";
+import
+    "jstests/libs/override_methods/index_builds/implicitly_retry_on_background_op_in_progress.js";
 
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";

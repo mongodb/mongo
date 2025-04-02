@@ -156,7 +156,7 @@ Secondaries that were not included in the commit quorum and receive a `commitInd
 will block replication until their index build is complete.
 
 The `commitQuorum` for a running index build may be changed by the user via the
-[`setIndexCommitQuorum`](https://github.com/mongodb/mongo/blob/v6.0/src/mongo/db/commands/set_index_commit_quorum_command.cpp#L55)
+[`setIndexCommitQuorum`](https://github.com/mongodb/mongo/blob/v6.0/src/mongo/db/commands/commit_quorum/set_index_commit_quorum_command.cpp#L55)
 server command.
 
 See

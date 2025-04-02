@@ -3,7 +3,7 @@
  * When this occurs during the collection scan phase of an index build, it will get restarted.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const conn = MongoRunner.runMongod({});
 

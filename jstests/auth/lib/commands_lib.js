@@ -92,7 +92,9 @@ one argument, the connection object.
 */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine_utils.js";
+import {
+    storageEngineIsWiredTigerOrInMemory
+} from "jstests/libs/storage_engine/storage_engine_utils.js";
 
 // constants
 

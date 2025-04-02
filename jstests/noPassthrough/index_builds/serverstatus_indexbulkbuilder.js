@@ -9,7 +9,10 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {IndexBuildTest, ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {
+    IndexBuildTest,
+    ResumableIndexBuildTest
+} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const maxMemUsageMegabytes = 50;
 // 10% (maxIteratorsMemoryUsagePercentage) and up to 1MB of maxMemUsageMegabytes is used to store

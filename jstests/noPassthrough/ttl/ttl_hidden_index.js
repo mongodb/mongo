@@ -1,5 +1,5 @@
 // Make sure the TTL index still work after we hide it
-import {TTLUtil} from "jstests/libs/ttl_util.js";
+import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 let runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
 let coll = runner.getDB("test").ttl_hiddenl_index;

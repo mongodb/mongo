@@ -528,7 +528,7 @@ export const ResumableIndexBuildTest = class {
         const awaitContinueShutdown = startParallelShell(
             funWithArgs(async function(failPoints, shutdownFpTimesEntered) {
                 const {ResumableIndexBuildTest} =
-                    await import("jstests/noPassthrough/libs/index_build.js");
+                    await import("jstests/noPassthrough/libs/index_builds/index_build.js");
                 const {configureFailPoint, kDefaultWaitForFailPointTimeout} =
                     await import("jstests/libs/fail_point_util.js");
 
@@ -735,7 +735,7 @@ export const ResumableIndexBuildTest = class {
         const awaitCreateIndexes = ResumableIndexBuildTest.createIndexesWithSideWrites(
             rst, async function(collName, indexSpecs, indexNames) {
                 const {ResumableIndexBuildTest} =
-                    await import("jstests/noPassthrough/libs/index_build.js");
+                    await import("jstests/noPassthrough/libs/index_builds/index_build.js");
                 ResumableIndexBuildTest.createIndexesFails(db, collName, indexSpecs, indexNames);
             }, coll, indexSpecs, indexNames, sideWrites, {hangBeforeBuildingIndex: true});
 

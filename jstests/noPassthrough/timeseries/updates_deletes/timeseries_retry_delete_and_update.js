@@ -9,10 +9,10 @@
  *   requires_fcv_80
  * ]
  */
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     runTimeseriesRetryDeleteAndUpdateTest
-} from "jstests/libs/timeseries_retry_delete_and_update.js";
+} from "jstests/libs/collection_write_path/timeseries_retry_delete_and_update.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
     nodes: [

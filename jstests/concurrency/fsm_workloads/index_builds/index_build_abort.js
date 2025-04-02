@@ -17,7 +17,7 @@
  * ]
  */
 
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 export const $config = (function() {
     const data = {

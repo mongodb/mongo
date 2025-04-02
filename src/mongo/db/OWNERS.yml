@@ -301,3 +301,9 @@ filters:
   - "startup_warnings_mongod_thp_test*":
     approvers:
       - 10gen/server-workload-scheduling
+  - "namespace_string*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "rs_local_client*":
+    approvers:
+      - 10gen/server-catalog-and-routing

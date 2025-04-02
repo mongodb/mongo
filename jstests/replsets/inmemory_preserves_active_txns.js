@@ -12,7 +12,9 @@
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {getOldestRequiredTimestampForCrashRecovery} from "jstests/libs/storage_helpers.js";
+import {
+    getOldestRequiredTimestampForCrashRecovery
+} from "jstests/libs/storage_engine/storage_helpers.js";
 
 // If the test runner passed --storageEngine=inMemory then we know inMemory is compiled into the
 // server. We'll actually use both inMemory and wiredTiger storage engines.

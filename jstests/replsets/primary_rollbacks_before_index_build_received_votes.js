@@ -2,7 +2,7 @@
  * Test that primary rollbacks before receiving any votes from the replica set should not
  * make createIndexes command's commit quorum value to be lost.
  */
-import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = jsTest.name();

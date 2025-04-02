@@ -1,5 +1,5 @@
 // Ensure that changes to the TTL sleep time are reflected immediately.
-import {TTLUtil} from "jstests/libs/ttl_util.js";
+import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 let runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1000"});
 let db = runner.getDB("test");

@@ -8,7 +8,10 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {HybridGeoIndexTest, Operation} from "jstests/noPassthrough/libs/hybrid_geo_index.js";
+import {
+    HybridGeoIndexTest,
+    Operation
+} from "jstests/noPassthrough/libs/index_builds/hybrid_geo_index.js";
 
 // Use hybrid_geo_index.js to exercise RecordId::serializeToken
 (function testRecordSerializationForSkippedRecordTracker() {
