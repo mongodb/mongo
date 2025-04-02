@@ -505,9 +505,7 @@ Status JParse::binaryObject(StringData fieldName, BSONObjBuilder& builder) {
     std::string binDataType;
     binDataType.reserve(BINDATATYPE_RESERVE_SIZE);
 
-    if (peekToken(LBRACE)) {
-        readToken(LBRACE);
-
+    if (readToken(LBRACE)) {
         if (!readField("base64")) {
             return parseError("Expected field name: \"base64\", in \"$binary\" object");
         }
@@ -534,7 +532,9 @@ Status JParse::binaryObject(StringData fieldName, BSONObjBuilder& builder) {
         }
         if (binDataType.size() == 1)
             binDataType = "0" + binDataType;
-        readToken(RBRACE);
+        if (!readToken(RBRACE)) {
+            return parseError("Expecting '}'");
+        }
     } else {
         Status dataRet = quotedString(&binDataString);
         if (dataRet != Status::OK()) {
@@ -646,7 +646,9 @@ Status JParse::dateObject(StringData fieldName, BSONObjBuilder& builder) {
             return ret;
         }
 
-        readToken(RBRACE);
+        if (!readToken(RBRACE)) {
+            return parseError("Expecting '}'");
+        }
         date = Date_t::fromMillisSinceEpoch(numberLong);
     } else {
         StatusWith<Date_t> parsedDate = parseDate();
@@ -756,7 +758,9 @@ Status JParse::regexObjectCanonical(StringData fieldName, BSONObjBuilder& builde
     if (!readToken(COLON)) {
         return parseError("Expecting ':'");
     }
-    readToken(LBRACE);
+    if (!readToken(LBRACE)) {
+        return parseError("Expecting '{'");
+    }
     if (!readField("pattern")) {
         return parseError("Expected field name: \"pattern\", in \"$regularExpression\" object");
     }
@@ -788,7 +792,9 @@ Status JParse::regexObjectCanonical(StringData fieldName, BSONObjBuilder& builde
     if (optCheckRet != Status::OK()) {
         return optCheckRet;
     }
-    readToken(RBRACE);
+    if (!readToken(RBRACE)) {
+        return parseError("Expecting '}'");
+    }
     builder.appendRegex(fieldName, pat, opt);
     return Status::OK();
 }

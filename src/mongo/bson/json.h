@@ -473,7 +473,7 @@ private:
      * we reach the end of our buffer.  Updates the pointer to our
      * buffer (same as calling readTokenImpl with advance=true).
      */
-    inline bool readToken(StringData token);
+    [[nodiscard]] inline bool readToken(StringData token);
 
     /**
      * @return true if the given token matches the next non whitespace

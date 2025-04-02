@@ -253,4 +253,44 @@ TEST(JParseTest, InvalidDBRefObjectErrors) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseResult.getStatus().code());
 }
 
+TEST(JParseTest, FailEarlyOnMissingOpeningBrace) {
+    auto testEarlyParseFailure = [](StringData jsonString) -> void {
+        BSONObjBuilder builder;
+        JParse jparse(jsonString);
+        Status status = jparse.parse(builder);
+        ASSERT(status == ErrorCodes::FailedToParse);
+        ASSERT(status.reason().find("Expecting '{'") != status.reason().npos);
+
+        // If the builder is nonempty, parsing succeeded on the inner object and only failed
+        // subsequently while finishing the outer object. We want parsing to fail as soon as we know
+        // that the whole object is invalid.
+        BSONObjComparator bsonCmp({}, BSONObjComparator::FieldNamesMode::kConsider, nullptr);
+        ASSERT_EQ(bsonCmp.compare(builder.obj(), BSONObj()), 0);
+    };
+
+    testEarlyParseFailure(R"({"obj": {"$timestamp": "t": 0, "i": 0})");
+    testEarlyParseFailure(R"({"obj": {"$regularExpression": "pattern": "", "options": ""})");
+}
+
+TEST(JParseTest, FailEarlyOnMissingClosingBrace) {
+    auto testEarlyParseFailure = [](StringData jsonString) -> void {
+        BSONObjBuilder builder;
+        JParse jparse(jsonString);
+        Status status = jparse.parse(builder);
+        ASSERT(status == ErrorCodes::FailedToParse);
+        ASSERT(status.reason().find("Expecting '}'") != status.reason().npos);
+
+        // If the builder is nonempty, parsing succeeded on the inner object and only failed
+        // subsequently while finishing the outer object. We want parsing to fail as soon as we know
+        // that the whole object is invalid.
+        BSONObjComparator bsonCmp({}, BSONObjComparator::FieldNamesMode::kConsider, nullptr);
+        ASSERT_EQ(bsonCmp.compare(builder.obj(), BSONObj()), 0);
+    };
+
+    testEarlyParseFailure(R"({"obj": {"$binary": {"base64": "", "subType": "1" badTok)");
+    testEarlyParseFailure(R"({"obj": {"$date": {"$numberLong": "0" badTok)");
+    testEarlyParseFailure(R"({"obj": {"$timestamp": {"t": 0, "i": 0 badTok)");
+    testEarlyParseFailure(R"({"obj": {"$regularExpression": {"pattern": "", "options": "" badTok)");
+}
+
 }  // namespace mongo
