@@ -43,8 +43,13 @@ BSONObj serializeOpDebug(OperationContext* opCtx, CurOp& curOp) {
     // 'opDescription' and 'originatingCommand' are logged separately to avoid having to
     // truncate them due to the BSON size limit.
     const bool omitCommand = true;
-    curOp.debug().append(
-        opCtx, {} /*lockStats*/, {} /*flowControlStats*/, {} /*storageMetrics*/, omitCommand, bob);
+    curOp.debug().append(opCtx,
+                         {} /*lockStats*/,
+                         {} /*flowControlStats*/,
+                         {} /*storageMetrics*/,
+                         0 /*prepareReadConflicts*/,
+                         omitCommand,
+                         bob);
     return bob.obj();
 }
 }  // namespace

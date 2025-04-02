@@ -427,7 +427,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 
     BSONObjBuilder builder;
-    od.append(opCtx.get(), ls, {}, {}, false /*omitCommand*/, builder);
+    od.append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
     auto bs = builder.done();
 
     // Append should always include these basic fields.
@@ -492,7 +492,7 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
     SingleThreadedLockStats ls;
 
     BSONObjBuilder bob;
-    opDebug.append(opCtx.get(), ls, {}, {}, true /*omitCommand*/, bob);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
 
     // If the memory tracker has not updated CurOp, the memory tracking stat should not appear in
     // the profiler output.
@@ -502,7 +502,7 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
 
     curop->setMemoryTrackingStats(10 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
     BSONObjBuilder bobWithMemStats;
-    opDebug.append(opCtx.get(), ls, {}, {}, true /*omitCommand*/, bobWithMemStats);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bobWithMemStats);
     res = bobWithMemStats.done();
 
     ASSERT_EQ(15, curop->getMaxUsedMemoryBytes());
@@ -659,7 +659,7 @@ TEST(CurOpTest, KilledOperationReportsLatency) {
     SingleThreadedLockStats ls;
 
     BSONObjBuilder bob;
-    opDebug.append(opCtx.get(), ls, {}, {}, true /*omitCommand*/, bob);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
 
     auto res = bob.done();
     ASSERT_TRUE(res.hasField("interruptLatencyNanos")) << res.toString();
@@ -694,15 +694,12 @@ TEST(CurOpTest, SlowLogFinishesWithDuration) {
     ResourceConsumption::OperationMetrics opMetrics;
     opMetrics.readMetrics.docsRead.observeOne(255);
 
-    SingleThreadedStorageMetrics storageStats;
-    storageStats.incrementPrepareReadConflicts(3);
-
     curop->ensureStarted();
     curop->done();
     curop->calculateCpuTime();
 
     auto pattrs = std::make_unique<logv2::DynamicAttributes>();
-    opDebug.report(opCtx.get(), &lockStats, &opMetrics, storageStats, pattrs.get());
+    opDebug.report(opCtx.get(), &lockStats, &opMetrics, {}, 0, pattrs.get());
 
     logv2::TypeErasedAttributeStorage attrs{*pattrs};
     ASSERT_GTE(attrs.size(), 1);

@@ -95,6 +95,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                               lockerInfo.stats,
                               shard_role_details::getLocker(opCtx)->getFlowControlStats(),
                               storageMetrics,
+                              curOp->getPrepareReadConflicts(),
                               false /*omitCommand*/,
                               b);
     }

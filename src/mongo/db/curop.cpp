@@ -56,13 +56,13 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_bson_helpers.h"
-#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -541,8 +541,9 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
 
 Milliseconds CurOp::_sumBlockedTimeTotal() {
     auto locker = shard_role_details::getLocker(opCtx());
-    auto prepareConflictDurationMicros =
-        PrepareConflictTracker::get(opCtx()).getThisOpPrepareConflictDuration();
+    auto prepareConflictDurationMicros = StorageExecutionContext::get(opCtx())
+                                             ->getPrepareConflictTracker()
+                                             .getThisOpPrepareConflictDuration();
     auto cumulativeLockWaitTime = Microseconds(locker->stats().getCumulativeWaitTimeMicros());
     auto timeQueuedForTickets = ExecutionAdmissionContext::get(opCtx()).totalTimeQueuedMicros();
     auto timeQueuedForFlowControl = Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
@@ -683,8 +684,9 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         }
 
         // Gets the time spent blocked on prepare conflicts.
-        auto prepareConflictDurationMicros =
-            PrepareConflictTracker::get(opCtx).getThisOpPrepareConflictDuration();
+        auto prepareConflictDurationMicros = StorageExecutionContext::get(opCtx)
+                                                 ->getPrepareConflictTracker()
+                                                 .getThisOpPrepareConflictDuration();
         _debug.prepareConflictDurationMillis =
             duration_cast<Milliseconds>(prepareConflictDurationMicros);
 
@@ -699,7 +701,12 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         auto storageMetrics = getOperationStorageMetrics();
 
         logv2::DynamicAttributes attr;
-        _debug.report(opCtx, &lockStats, operationMetricsPtr, storageMetrics, &attr);
+        _debug.report(opCtx,
+                      &lockStats,
+                      operationMetricsPtr,
+                      storageMetrics,
+                      getPrepareReadConflicts(),
+                      &attr);
 
         LOGV2_OPTIONS(51803, logOptions, "Slow query", attr);
 
@@ -929,8 +936,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
     }
 
 
-    auto storageMetrics = getOperationStorageMetrics();
-    if (auto n = storageMetrics.prepareReadConflicts; n > 0) {
+    if (auto n = getPrepareReadConflicts(); n > 0) {
         builder->append("prepareReadConflicts", n);
     }
 
@@ -980,6 +986,12 @@ CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats(
 
 SingleThreadedStorageMetrics CurOp::getOperationStorageMetrics() const {
     return StorageExecutionContext::get(opCtx())->getStorageMetrics();
+}
+
+long long CurOp::getPrepareReadConflicts() const {
+    return StorageExecutionContext::get(opCtx())
+        ->getPrepareConflictTracker()
+        .getThisOpPrepareConflictCount();
 }
 
 void CurOp::AdditiveResourceStats::addForUnstash(const CurOp::AdditiveResourceStats& other) {

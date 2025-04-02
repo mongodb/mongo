@@ -698,6 +698,8 @@ public:
      */
     SingleThreadedStorageMetrics getOperationStorageMetrics() const;
 
+    long long getPrepareReadConflicts() const;
+
 private:
     class CurOpStack;
 

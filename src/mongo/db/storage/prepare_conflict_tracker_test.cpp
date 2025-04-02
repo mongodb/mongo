@@ -29,8 +29,9 @@
 
 #include <string>
 
-#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -50,7 +51,7 @@ public:
         auto serviceContext = getGlobalServiceContext();
         _client = serviceContext->getService()->makeClient("myClient");
         _opCtx = serviceContext->makeOperationContext(_client.get());
-        _pct = &PrepareConflictTracker::get(_opCtx.get());
+        _pct = &StorageExecutionContext::get(_opCtx.get())->getPrepareConflictTracker();
         _pct->resetGlobalPrepareConflictStats();
     }
 

@@ -158,6 +158,7 @@ void OpDebug::report(OperationContext* opCtx,
                      const SingleThreadedLockStats* lockStats,
                      const ResourceConsumption::OperationMetrics* operationMetrics,
                      const SingleThreadedStorageMetrics& storageMetrics,
+                     long long prepareReadConflicts,
                      logv2::DynamicAttributes* pAttrs) const {
     Client* client = opCtx->getClient();
     auto& curop = *CurOp::get(opCtx);
@@ -297,8 +298,8 @@ void OpDebug::report(OperationContext* opCtx,
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
 
-    if (storageMetrics.prepareReadConflicts > 0) {
-        pAttrs->add("prepareReadConflicts", storageMetrics.prepareReadConflicts);
+    if (prepareReadConflicts > 0) {
+        pAttrs->add("prepareReadConflicts", prepareReadConflicts);
     }
     OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", additiveMetrics.writeConflicts);
 
@@ -480,6 +481,7 @@ void OpDebug::append(OperationContext* opCtx,
                      const SingleThreadedLockStats& lockStats,
                      FlowControlTicketholder::CurOp flowControlStats,
                      const SingleThreadedStorageMetrics& storageMetrics,
+                     long long prepareReadConflicts,
                      bool omitCommand,
                      BSONObjBuilder& b) const {
     auto& curop = *CurOp::get(opCtx);
@@ -539,8 +541,8 @@ void OpDebug::append(OperationContext* opCtx,
 
     OPDEBUG_APPEND_OPTIONAL(b, "keysInserted", additiveMetrics.keysInserted);
     OPDEBUG_APPEND_OPTIONAL(b, "keysDeleted", additiveMetrics.keysDeleted);
-    if (storageMetrics.prepareReadConflicts > 0) {
-        b.append("prepareReadConflicts", storageMetrics.prepareReadConflicts);
+    if (prepareReadConflicts > 0) {
+        b.append("prepareReadConflicts", prepareReadConflicts);
     }
     OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", additiveMetrics.writeConflicts);
     if (storageMetrics.interruptResponseNs > 0) {
@@ -855,10 +857,8 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("prepareReadConflicts", [](auto field, auto args, auto& b) {
-        const auto storageMetrics = args.curop.getOperationStorageMetrics();
-
-        if (storageMetrics.prepareReadConflicts > 0) {
-            b.append(field, storageMetrics.prepareReadConflicts);
+        if (auto n = args.curop.getPrepareReadConflicts(); n > 0) {
+            b.append(field, n);
         }
     });
 

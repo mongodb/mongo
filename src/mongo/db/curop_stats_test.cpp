@@ -30,8 +30,9 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/mutex.h"
@@ -146,9 +147,13 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
 
     // Check that workingTimeMillis correctly excludes time spent waiting for prepare conflicts.
     // Simulate a prepare conflict and check that workingMillis is the same as before.
-    PrepareConflictTracker::get(opCtx.get()).beginPrepareConflict(*tickSource());
+    StorageExecutionContext::get(opCtx.get())
+        ->getPrepareConflictTracker()
+        .beginPrepareConflict(*tickSource());
     advanceTime(Milliseconds(1000));
-    PrepareConflictTracker::get(opCtx.get()).endPrepareConflict(*tickSource());
+    StorageExecutionContext::get(opCtx.get())
+        ->getPrepareConflictTracker()
+        .endPrepareConflict(*tickSource());
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     // This wait time should be excluded from workingTimeMillis.
     ASSERT_EQ(curop->debug().workingTimeMillis,

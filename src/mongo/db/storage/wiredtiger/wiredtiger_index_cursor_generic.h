@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -75,10 +76,11 @@ protected:
      */
     [[nodiscard]] bool advanceWTCursor() {
         WT_CURSOR* c = _cursor->get();
-        int ret =
-            wiredTigerPrepareConflictRetry(_opCtx,
-                                           *shard_role_details::getRecoveryUnit(_opCtx),
-                                           [&] { return _forward ? c->next(c) : c->prev(c); });
+        int ret = wiredTigerPrepareConflictRetry(
+            *_opCtx,
+            StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(),
+            *shard_role_details::getRecoveryUnit(_opCtx),
+            [&] { return _forward ? c->next(c) : c->prev(c); });
         if (ret == WT_NOTFOUND) {
             return false;
         }

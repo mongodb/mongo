@@ -486,7 +486,10 @@ boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
     // The cursor is bounded to a prefix. Doing a next on the un-positioned cursor will position on
     // the first key that is equal to or more than the prefix.
     int ret = wiredTigerPrepareConflictRetry(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->next(c); });
+        *opCtx,
+        StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(),
+        *shard_role_details::getRecoveryUnit(opCtx),
+        [&] { return c->next(c); });
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
 
@@ -1014,9 +1017,10 @@ protected:
         // after seeking. We also don't want to clear our bounds so that the end bound is
         // maintained.
         int ret = wiredTigerPrepareConflictRetry(
-            _opCtx, *shard_role_details::getRecoveryUnit(_opCtx), [&] {
-                return _forward ? cur->next(cur) : cur->prev(cur);
-            });
+            *_opCtx,
+            StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(),
+            *shard_role_details::getRecoveryUnit(_opCtx),
+            [&] { return _forward ? cur->next(cur) : cur->prev(cur); });
 
         // Forget the key buffer when repositioning the cursor.
         _kvView.reset();
@@ -1346,7 +1350,10 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
 
     // If the next key also matches, this is a duplicate.
     int ret = wiredTigerPrepareConflictRetry(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->next(c); });
+        *opCtx,
+        StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(),
+        *shard_role_details::getRecoveryUnit(opCtx),
+        [&] { return c->next(c); });
 
     WT_ITEM item;
     if (ret == 0) {
@@ -1518,7 +1525,10 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     // requires that we check the value of the RecordId in the keyString instead of blindly deleting
     // based on just the first part of the key.
     int ret = wiredTigerPrepareConflictRetry(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->search(c); });
+        *opCtx,
+        StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(),
+        *shard_role_details::getRecoveryUnit(opCtx),
+        [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         return;
     }
@@ -1621,7 +1631,10 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     setKey(c, keyString.getKeyView());
 
     int ret = wiredTigerPrepareConflictRetry(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->search(c); });
+        *opCtx,
+        StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(),
+        *shard_role_details::getRecoveryUnit(opCtx),
+        [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         return;
     }

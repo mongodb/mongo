@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
@@ -43,13 +42,6 @@ namespace mongo {
  */
 class PrepareConflictTracker {
 public:
-    static const OperationContext::Decoration<PrepareConflictTracker> get;
-
-    /**
-     * Decoration requires a default constructor.
-     */
-    PrepareConflictTracker() = default;
-
     /**
      * Returns whether a read thread is currently blocked on a prepare conflict.
      */
@@ -73,7 +65,7 @@ public:
     /**
      * Returns the number of prepare conflicts caused by this operation.
      */
-    long long getThisOpPrepareConflictCount();
+    long long getThisOpPrepareConflictCount() const;
 
     /**
      * Returns the statistics about prepare conflicts as would show up in serverStatus
@@ -101,13 +93,13 @@ private:
     /**
      * Stores the number of prepare conflicts caused by this operation, if any.
      */
-    long long _numPrepareConflictsThisOp{0};
+    AtomicWord<long long> _numPrepareConflictsThisOp{0};
 
     /**
      * Stores the amount of time spent blocked on a prepare read conflict for this operation, if
      * any.
      */
-    Microseconds _thisOpPrepareConflictDuration{Microseconds(0)};
+    AtomicWord<int64_t> _thisOpPrepareConflictDuration{0};
 };
 
 }  // namespace mongo

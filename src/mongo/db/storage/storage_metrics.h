@@ -56,33 +56,6 @@ public:
         return this->set(other);
     }
 
-    template <typename OtherType>
-    StorageMetrics& operator+=(const StorageMetrics<OtherType>& other) {
-        return add(other, /*positive*/ true);
-    }
-
-    template <typename OtherType>
-    StorageMetrics& operator-=(const StorageMetrics<OtherType>& other) {
-        return add(other, /*positive*/ false);
-    }
-
-    bool isEmpty() const {
-        return (counter_ops::get(prepareReadConflicts) == 0 &&
-                counter_ops::get(interruptResponseNs) == 0);
-    }
-
-    /**
-     * Increments prepareReadConflicts by n.
-     */
-    void incrementPrepareReadConflicts(CounterType n) {
-        counter_ops::add(prepareReadConflicts, n);
-    }
-
-    /**
-     * Number of read conflicts caused by a prepared transaction.
-     */
-    CounterType prepareReadConflicts{0};
-
     /**
      * Increments the time taken to respond to an interrupt.
      */
@@ -99,22 +72,7 @@ public:
 private:
     template <typename OtherType>
     StorageMetrics& set(const StorageMetrics<OtherType>& other) {
-        counter_ops::set(prepareReadConflicts, other.prepareReadConflicts);
         counter_ops::set(interruptResponseNs, other.interruptResponseNs);
-        return *this;
-    }
-
-    /**
-     * Helper to add all metrics in a different StorageMetrics to this instance's metrics. Can be
-     * used for subtraction by negating the metrics.
-     */
-    template <typename OtherType>
-    StorageMetrics& add(const StorageMetrics<OtherType>& other, bool positive) {
-        incrementPrepareReadConflicts(positive ? counter_ops::get(other.prepareReadConflicts)
-                                               : -counter_ops::get(other.prepareReadConflicts));
-
-        incrementInterruptResponseNs(positive ? counter_ops::get(other.interruptResponseNs)
-                                              : -counter_ops::get(other.interruptResponseNs));
         return *this;
     }
 };

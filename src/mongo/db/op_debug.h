@@ -246,6 +246,7 @@ public:
                 const SingleThreadedLockStats* lockStats,
                 const ResourceConsumption::OperationMetrics* operationMetrics,
                 const SingleThreadedStorageMetrics& storageMetrics,
+                long long prepareReadConflicts,
                 logv2::DynamicAttributes* pAttrs) const;
 
     void reportStorageStats(logv2::DynamicAttributes* pAttrs) const;
@@ -264,6 +265,7 @@ public:
                 const SingleThreadedLockStats& lockStats,
                 FlowControlTicketholder::CurOp flowControlStats,
                 const SingleThreadedStorageMetrics& storageMetrics,
+                long long prepareReadConflicts,
                 bool omitCommand,
                 BSONObjBuilder& builder) const;
 

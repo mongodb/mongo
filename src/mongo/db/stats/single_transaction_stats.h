@@ -197,12 +197,12 @@ public:
         return &_opDebug;
     }
 
-    AtomicStorageMetrics& getTransactionStorageMetrics() {
-        return _storageMetrics;
+    void incrementPrepareReadConflicts(long long n) {
+        _prepareReadConflicts.inc(n);
     }
 
-    const AtomicStorageMetrics& getTransactionStorageMetrics() const {
-        return _storageMetrics;
+    long long getPrepareReadConflicts() const {
+        return _prepareReadConflicts.get();
     }
 
     /**
@@ -270,6 +270,25 @@ public:
                 TickSource::Tick curTick) const;
 
 private:
+    class AtomicPrepareReadConflicts {
+    public:
+        long long get() const {
+            return _prepareReadConflicts.loadRelaxed();
+        }
+
+        void inc(long long n) {
+            _prepareReadConflicts.fetchAndAddRelaxed(n);
+        }
+
+        AtomicPrepareReadConflicts& operator=(const AtomicPrepareReadConflicts& other) {
+            _prepareReadConflicts.storeRelaxed(other.get());
+            return *this;
+        }
+
+    private:
+        AtomicWord<long long> _prepareReadConflicts{0};
+    };
+
     // The struct containing the transaction number and transaction retry counter.
     TxnNumberAndRetryCounter _txnNumberAndRetryCounter;
 
@@ -304,7 +323,7 @@ private:
     // Tracks and accumulates stats from all operations that run inside the transaction.
     OpDebug _opDebug;
 
-    AtomicStorageMetrics _storageMetrics;
+    AtomicPrepareReadConflicts _prepareReadConflicts;
 
     // Holds information about the last client to run a transaction operation.
     LastClientInfo _lastClientInfo;

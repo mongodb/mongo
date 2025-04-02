@@ -31,7 +31,7 @@
 
 #include <wiredtiger.h>
 
-#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/util/assert_util.h"
@@ -61,19 +61,21 @@ void wiredTigerPrepareConflictFailPointLog();
  * re-try f, so any required timeout behavior must be enforced within f.
  * The function f must return a WiredTiger error code.
  */
-int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx,
+int wiredTigerPrepareConflictRetrySlow(Interruptible& interruptible,
+                                       PrepareConflictTracker& tracker,
                                        RecoveryUnit& ru,
                                        std::function<int()> func);
 
 template <typename F>
-int wiredTigerPrepareConflictRetry(OperationContext* opCtx, RecoveryUnit& ru, F&& f) {
-    dassert(opCtx);
-
+int wiredTigerPrepareConflictRetry(Interruptible& interruptible,
+                                   PrepareConflictTracker& tracker,
+                                   RecoveryUnit& ru,
+                                   F&& f) {
     int ret = WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
 
-    return wiredTigerPrepareConflictRetrySlow(opCtx, ru, f);
+    return wiredTigerPrepareConflictRetrySlow(interruptible, tracker, ru, f);
 }
 
 }  // namespace mongo

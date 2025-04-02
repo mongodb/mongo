@@ -623,21 +623,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "prepare_conflict_tracker",
-    srcs = [
-        "prepare_conflict_tracker.cpp",
-    ],
-    hdrs = [
-        "prepare_conflict_tracker.h",
-    ],
-    deps = [
-        ":service_context",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",
-    ],
-)
-
 idl_generator(
     name = "mirror_maestro_gen",
     src = "mirror_maestro.idl",
@@ -1032,7 +1017,6 @@ mongo_cc_library(
         ":audit",
         ":coll_mod_command_idl",
         ":index_commands_idl",  # TODO(SERVER-93876): Remove.
-        ":prepare_conflict_tracker",
         ":profile_settings",
         ":server_base",  # TODO(SERVER-93876): Remove.
         ":server_feature_flags",  # TODO(SERVER-93876): Remove.
@@ -1056,6 +1040,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/stats:timer_stats",
         "//src/mongo/db/storage:execution_context",
+        "//src/mongo/db/storage:prepare_conflict_tracker",
         "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc",
         "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
@@ -4061,7 +4046,6 @@ mongo_cc_unit_test(
     deps = [
         ":commands",
         ":commands_test_example",
-        ":prepare_conflict_tracker",
         ":service_context_d",
         ":service_context_test_fixture",
         ":shard_role_api",
@@ -4073,6 +4057,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/db/storage:prepare_conflict_tracker",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/transport:transport_layer_mock",
@@ -4280,18 +4265,6 @@ mongo_cc_unit_test(
         ":op_msg_fuzzer_fixture",
         ":server_base",
         "//src/mongo/rpc",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "prepare_conflict_tracker_test",
-    srcs = [
-        "prepare_conflict_tracker_test.cpp",
-    ],
-    tags = ["mongo_unittest_third_group"],
-    deps = [
-        ":prepare_conflict_tracker",
-        "//src/mongo/util:tick_source_mock",
     ],
 )
 

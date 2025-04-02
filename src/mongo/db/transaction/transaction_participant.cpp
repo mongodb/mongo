@@ -1529,7 +1529,7 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
         auto curop = CurOp::get(opCtx);
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
                                                                 curop->debug().additiveMetrics,
-                                                                curop->getOperationStorageMetrics(),
+                                                                curop->getPrepareReadConflicts(),
                                                                 o().txnState.isPrepared());
     }
 
@@ -2328,7 +2328,7 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
         auto curop = CurOp::get(opCtx);
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
                                                                 curop->debug().additiveMetrics,
-                                                                curop->getOperationStorageMetrics(),
+                                                                curop->getPrepareReadConflicts(),
                                                                 o().txnState.isPrepared());
     }
     // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -2431,7 +2431,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         auto curop = CurOp::get(opCtx);
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
                                                                 curop->debug().additiveMetrics,
-                                                                curop->getOperationStorageMetrics(),
+                                                                curop->getPrepareReadConflicts(),
                                                                 o().txnState.isPrepared());
     }
 
@@ -2898,9 +2898,7 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
 
     singleTransactionStats.getOpDebug()->additiveMetrics.report(&attrs);
 
-    attrs.add(
-        "prepareReadConflicts",
-        singleTransactionStats.getTransactionStorageMetrics().prepareReadConflicts.loadRelaxed());
+    attrs.add("prepareReadConflicts", singleTransactionStats.getPrepareReadConflicts());
 
     StringData terminationCauseString =
         terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";

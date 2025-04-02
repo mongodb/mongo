@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/prepare_conflict_tracker.h"
+
 namespace mongo {
 
 /**
@@ -49,8 +51,13 @@ public:
         return _storageMetrics;
     }
 
+    PrepareConflictTracker& getPrepareConflictTracker() {
+        return _prepareConflictTracker;
+    }
+
 private:
     AtomicStorageMetrics _storageMetrics;
+    PrepareConflictTracker _prepareConflictTracker;
 };
 
 }  // namespace mongo

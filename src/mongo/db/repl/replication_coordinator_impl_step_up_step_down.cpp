@@ -30,12 +30,13 @@
 
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/dump_lock_manager.h"
-#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/stacktrace.h"
@@ -473,31 +474,39 @@ void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
     invariant(serviceCtx);
 
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
-        if (!client->canKillOperationInStepdown()) {
-            continue;
-        }
-
         ClientLock lk(client);
         OperationContext* toKill = client->getOperationContext();
 
         // Don't kill step up/step down thread.
         if (toKill && !toKill->isKillPending() && toKill->getOpID() != rstlOpCtx->getOpID()) {
-            auto locker = shard_role_details::getLocker(toKill);
-            bool alwaysInterrupt = toKill->shouldAlwaysInterruptAtStepDownOrUp();
-            bool globalLockConfict = locker->wasGlobalLockTakenInModeConflictingWithWrites();
-            bool isWaitingOnPrepareConflict =
-                PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict();
-            if (alwaysInterrupt || globalLockConfict || isWaitingOnPrepareConflict) {
-                serviceCtx->killOperation(lk, toKill, reason);
-                arsc->incrementTotalOpsKilled();
-                LOGV2(8562701,
-                      "Repl state change interrupted a thread.",
-                      "name"_attr = client->desc(),
-                      "alwaysInterrupt"_attr = alwaysInterrupt,
-                      "globalLockConflict"_attr = globalLockConfict,
-                      "isWaitingOnPrepareConflict"_attr = isWaitingOnPrepareConflict);
-            } else {
-                arsc->incrementTotalOpsRunning();
+            auto& tracker = StorageExecutionContext::get(toKill)->getPrepareConflictTracker();
+            bool isWaitingOnPrepareConflict = tracker.isWaitingOnPrepareConflict();
+            if (client->canKillOperationInStepdown()) {
+                auto locker = shard_role_details::getLocker(toKill);
+                bool alwaysInterrupt = toKill->shouldAlwaysInterruptAtStepDownOrUp();
+                bool globalLockConfict = locker->wasGlobalLockTakenInModeConflictingWithWrites();
+                if (alwaysInterrupt || globalLockConfict || isWaitingOnPrepareConflict) {
+                    serviceCtx->killOperation(lk, toKill, reason);
+                    arsc->incrementTotalOpsKilled();
+                    LOGV2(8562701,
+                          "Repl state change interrupted a thread.",
+                          "name"_attr = client->desc(),
+                          "alwaysInterrupt"_attr = alwaysInterrupt,
+                          "globalLockConflict"_attr = globalLockConfict,
+                          "isWaitingOnPrepareConflict"_attr = isWaitingOnPrepareConflict);
+                } else {
+                    arsc->incrementTotalOpsRunning();
+                }
+            } else if (isWaitingOnPrepareConflict) {
+                // All operations that hit a prepare conflict should be killable to prevent
+                // deadlocks with prepared transactions on replica set step up and step down.
+                LOGV2_FATAL(9699100,
+                            "Repl state change encountered a non-killable thread blocked on a "
+                            "prepare conflict.",
+                            "name"_attr = client->desc(),
+                            "conflictCount"_attr = tracker.getThisOpPrepareConflictCount(),
+                            "conflictDurationMicros"_attr =
+                                tracker.getThisOpPrepareConflictDuration());
             }
         }
     }

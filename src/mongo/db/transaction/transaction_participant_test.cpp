@@ -3688,87 +3688,6 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponA
         additiveMetricsToCompare));
 }
 
-TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponStash) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // Initialize field values for both StorageMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest()
-        .getTransactionStorageMetrics()
-        .incrementPrepareReadConflicts(1);
-    StorageExecutionContext::get(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(2);
-
-    auto storageMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += StorageExecutionContext::get(opCtx())->getStorageMetrics();
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    // The transaction machinery cannot store an empty locker.
-    {
-        Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    }
-    txnParticipant.stashTransactionResources(opCtx());
-
-    ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest()
-                  .getTransactionStorageMetrics()
-                  .prepareReadConflicts.load(),
-              storageMetricsToCompare.prepareReadConflicts.load());
-}
-
-TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponCommit) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // Initialize field values for both StorageMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest()
-        .getTransactionStorageMetrics()
-        .incrementPrepareReadConflicts(1);
-    StorageExecutionContext::get(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(2);
-
-    auto storageMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += StorageExecutionContext::get(opCtx())->getStorageMetrics();
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    // The transaction machinery cannot store an empty locker.
-    {
-        Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    }
-    txnParticipant.commitUnpreparedTransaction(opCtx());
-
-    ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest()
-                  .getTransactionStorageMetrics()
-                  .prepareReadConflicts.load(),
-              storageMetricsToCompare.prepareReadConflicts.load());
-}
-
-TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponAbort) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // Initialize field values for both StorageMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest()
-        .getTransactionStorageMetrics()
-        .incrementPrepareReadConflicts(1);
-    StorageExecutionContext::get(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(2);
-
-    auto storageMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += StorageExecutionContext::get(opCtx())->getStorageMetrics();
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    // The transaction machinery cannot store an empty locker.
-    {
-        Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    }
-    txnParticipant.abortTransaction(opCtx());
-
-    ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest()
-                  .getTransactionStorageMetrics()
-                  .prepareReadConflicts.load(),
-              storageMetricsToCompare.prepareReadConflicts.load());
-}
-
 TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndStash) {
     auto tickSource = mockTickSource();
 
@@ -4232,17 +4151,18 @@ void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
     CurOp::get(opCtx)->debug().additiveMetrics.writeConflicts.store(metricValue);
 }
 
-/*
- * Sets up the storage metrics for Transactions Metrics test.
- */
-void setupStorageMetrics(const int metricValue, OperationContext* opCtx) {
-    StorageExecutionContext::get(opCtx)->getStorageMetrics().prepareReadConflicts.store(
-        metricValue);
+void setupPrepareConflictMetrics(const int metricValue, OperationContext* opCtx) {
+    auto& tracker = StorageExecutionContext::get(opCtx)->getPrepareConflictTracker();
+    auto tickSource = opCtx->getServiceContext()->getTickSource();
+    for (int i = 0; i < metricValue; i++) {
+        tracker.beginPrepareConflict(*tickSource);
+        tracker.endPrepareConflict(*tickSource);
+    }
 }
 
 void setupMetrics(const int metricValue, OperationContext* opCtx) {
     setupAdditiveMetrics(metricValue, opCtx);
-    setupStorageMetrics(metricValue, opCtx);
+    setupPrepareConflictMetrics(metricValue, opCtx);
 }
 
 /*

@@ -37,6 +37,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
@@ -150,7 +151,10 @@ bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,
     if (!c)
         return true;
     int ret = wiredTigerPrepareConflictRetry(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->next(c); });
+        *opCtx,
+        StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(),
+        *shard_role_details::getRecoveryUnit(opCtx),
+        [&] { return c->next(c); });
     if (ret == WT_NOTFOUND)
         return true;
     invariantWTOK(ret, c->session);

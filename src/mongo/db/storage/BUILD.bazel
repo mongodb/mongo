@@ -237,6 +237,7 @@ mongo_cc_library(
         "//src/mongo/util:auto_clear_ptr.h",
     ],
     deps = [
+        ":prepare_conflict_tracker",
         "//src/mongo:base",
         "//src/mongo/db/storage/key_string",
     ],
@@ -553,6 +554,34 @@ mongo_cc_unit_test(
     deps = [
         ":ident",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "prepare_conflict_tracker",
+    srcs = [
+        "prepare_conflict_tracker.cpp",
+    ],
+    hdrs = [
+        "prepare_conflict_tracker.h",
+    ],
+    deps = [
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "prepare_conflict_tracker_test",
+    srcs = [
+        "prepare_conflict_tracker_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":execution_context",
+        ":prepare_conflict_tracker",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util:tick_source_mock",
     ],
 )
 
