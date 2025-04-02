@@ -10,6 +10,9 @@ import {
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
+// This test triggers an unclean shutdown, which may cause inaccurate fast counts.
+TestData.skipEnforceFastCountOnValidate = true;
+
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 
 const collName = jsTestName();
