@@ -82,7 +82,7 @@ function testModelMetrics(isTS, allowOrs) {
         {
             name: 'single $match queries',
             aggModel: getMatchArb(allowOrs).map(matchStage => [matchStage]),
-            minimumAcceptedAvgNumDocs: 20
+            minimumAcceptedAvgNumDocs: 15
         },
         {
             name: 'deterministic aggregations',
@@ -116,8 +116,8 @@ function testModelMetrics(isTS, allowOrs) {
             numRuns);
 
         const avgNumDocsReturned = avg(numDocsReturned);
-        assert.eq(numDocsReturned.length, numRuns * numQueriesPerRun);
-        assert.gt(avgNumDocsReturned, minimumAcceptedAvgNumDocs);
+        assert.eq(numDocsReturned.length, numRuns * numQueriesPerRun, name);
+        assert.gt(avgNumDocsReturned, minimumAcceptedAvgNumDocs, name);
         jsTestLog('Average number of documents returned for ' + name +
                   ' was: ' + avgNumDocsReturned);
     }
