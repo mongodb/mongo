@@ -492,14 +492,15 @@ bool findSbeCompatibleStagesForPushdown(
     const auto& sources = pipeline->getSources();
 
     bool isMainCollectionSharded = false;
+    bool isTimeseriesCollection = false;
     if (const auto& mainColl = collections.getMainCollection()) {
         isMainCollectionSharded = mainColl.isSharded_DEPRECATED();
+        isTimeseriesCollection = mainColl->isTimeseriesCollection();
     }
 
     const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
     const SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
         queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
-    const bool isTimeseriesCollection = cq->nss().isTimeseriesBucketsCollection();
 
     auto meetsRequirements = [&minRequiredCompatibility, &cq](SbeCompatibility stageCompatibility) {
         return stageCompatibility >= minRequiredCompatibility;

@@ -1091,7 +1091,10 @@ std::unique_ptr<PlannerInterface> getClassicPlannerForSbe(
  * Function which returns true if 'cq' uses features that are currently supported in SBE without
  * 'featureFlagSbeFull' being set; false otherwise.
  */
-bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, const bool sbeFull) {
+bool shouldUseRegularSbe(OperationContext* opCtx,
+                         const CanonicalQuery& cq,
+                         const CollectionPtr& mainCollection,
+                         const bool sbeFull) {
     // When featureFlagSbeFull is not enabled, we cannot use SBE unless 'trySbeEngine' is enabled or
     // if 'trySbeRestricted' is enabled, and we have eligible pushed down stages in the cq pipeline.
     auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
@@ -1099,7 +1102,7 @@ bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, cons
         return false;
     }
 
-    if (cq.nss().isTimeseriesBucketsCollection() && cq.cqPipeline().empty()) {
+    if (mainCollection && mainCollection->isTimeseriesCollection() && cq.cqPipeline().empty()) {
         // TS queries only use SBE when there's a pipeline.
         return false;
     }
@@ -1244,7 +1247,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     const bool useSbeEngine = [&] {
         const bool forceClassic =
             canonicalQuery->getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled();
-        if (forceClassic || !isQuerySbeCompatible(&mainColl, canonicalQuery.get())) {
+        if (forceClassic || !isQuerySbeCompatible(mainColl, *canonicalQuery)) {
             return false;
         }
 
@@ -1254,7 +1257,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery.get());
 
         const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled();
-        return sbeFull || shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
+        return sbeFull || shouldUseRegularSbe(opCtx, *canonicalQuery, mainColl, sbeFull);
     }();
 
     // If distinct multiplanning is enabled and we have a distinct property, we may not be able to

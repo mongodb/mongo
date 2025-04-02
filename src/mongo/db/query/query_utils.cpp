@@ -123,41 +123,40 @@ bool isSortSbeCompatible(const SortPattern& sortPattern) {
     });
 }
 
-bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery* cq) {
-    tassert(6071400,
-            "Expected CanonicalQuery and Collection pointer to not be nullptr",
-            cq && collection);
-    auto expCtx = cq->getExpCtxRaw();
+bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery& cq) {
+    auto expCtx = cq.getExpCtxRaw();
 
     // If we don't support all expressions used or the query is eligible for IDHack, don't use SBE.
     if (!expCtx || expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
         expCtx->getSbePipelineCompatibility() == SbeCompatibility::notCompatible ||
-        (*collection && isIdHackEligibleQuery(*collection, *cq))) {
+        (collection && isIdHackEligibleQuery(collection, cq))) {
         return false;
     }
 
-    const auto* proj = cq->getProj();
+    const auto* proj = cq.getProj();
     if (proj && (proj->requiresMatchDetails() || proj->containsElemMatch())) {
         return false;
     }
 
-    const auto& nss = cq->nss();
+    const auto& nss = cq.nss();
 
-    auto& queryKnob = cq->getExpCtx()->getQueryKnobConfiguration();
+    const auto isTimeseriesColl = collection && collection->isTimeseriesCollection();
+
+    auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
     if ((!feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled() ||
          queryKnob.getSbeDisableTimeSeriesForOp()) &&
-        nss.isTimeseriesBucketsCollection()) {
+        isTimeseriesColl) {
         return false;
     }
 
     // Queries against the oplog or a change collection are not supported. Also queries on the inner
     // side of a $lookup are not considered for SBE except search queries.
-    if ((expCtx->getInLookup() && !cq->isSearchQuery()) || nss.isOplog() ||
-        nss.isChangeCollection() || !cq->metadataDeps().none()) {
+    if ((expCtx->getInLookup() && !cq.isSearchQuery()) || nss.isOplog() ||
+        nss.isChangeCollection() || !cq.metadataDeps().none()) {
         return false;
     }
 
-    const auto& sortPattern = cq->getSortPattern();
+    const auto& sortPattern = cq.getSortPattern();
     return !sortPattern || isSortSbeCompatible(*sortPattern);
 }
 

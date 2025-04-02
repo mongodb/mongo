@@ -156,5 +156,5 @@ bool isSortSbeCompatible(const SortPattern& sortPattern);
  * validation to make sure the query plan can be executed with SBE. If it returns false, SBE query
  * planning can be short-circuited as it is already known that the query is ineligible for SBE.
  */
-bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery* cq);
+bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery& cq);
 }  // namespace mongo
