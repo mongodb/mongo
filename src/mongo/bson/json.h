@@ -66,22 +66,6 @@ namespace mongo {
 BSONObj fromjson(StringData str);
 
 /**
- * Tests whether the JSON string is an Array.
- *
- * Useful for assigning the result of fromjson to the right object type. Either:
- *  BSONObj
- *  BSONArray
- *
- * @example Using the method to select the proper type.
- *  If this method returns true, the user could store the result of fromjson
- *  inside a BSONArray, rather than a BSONObj, in order to have it print as an
- *  array when passed to tojson.
- *
- * @param obj The JSON string to test.
- */
-bool isArray(StringData str);
-
-/**
  * Convert a BSONArray to a JSON string.
  *
  * @param arr The BSON Array.

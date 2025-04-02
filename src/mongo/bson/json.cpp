@@ -1596,9 +1596,4 @@ std::string tojson(const BSONArray& arr, JsonStringFormat format, bool pretty) {
     return arr.jsonString(format, pretty, true);
 }
 
-bool isArray(StringData str) {
-    JParse parser(str);
-    return parser.isArray();
-}
-
-} /* namespace mongo */
+}  // namespace mongo
