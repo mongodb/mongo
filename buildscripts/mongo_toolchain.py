@@ -13,7 +13,7 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 
-SUPPORTED_VERSIONS = ("v4", "v5")
+SUPPORTED_VERSIONS = "v5"
 
 
 class MongoToolchainError(RuntimeError):
@@ -141,7 +141,7 @@ def get_mongo_toolchain(
 
     # If no version given, look in the environment or default to v4.
     if version is None:
-        version = os.environ.get("MONGO_TOOLCHAIN_VERSION", "v4")
+        version = os.environ.get("MONGO_TOOLCHAIN_VERSION", "v5")
     assert version is not None
     if version not in SUPPORTED_VERSIONS:
         raise MongoToolchainNotFoundError(f"Unknown toolchain version {version}")
