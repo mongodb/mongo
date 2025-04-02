@@ -905,8 +905,10 @@ std::vector<UUID> IndexBuildsCoordinator::abortCollectionIndexBuilds(
 
     std::vector<UUID> buildUUIDs;
     for (const auto& replState : collIndexBuilds) {
-        if (abortIndexBuildByBuildUUID(
-                opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, reason)) {
+        if (abortIndexBuildByBuildUUID(opCtx,
+                                       replState->buildUUID,
+                                       IndexBuildAction::kPrimaryAbort,
+                                       Status{ErrorCodes::IndexBuildAborted, reason})) {
             buildUUIDs.push_back(replState->buildUUID);
         }
     }
@@ -928,8 +930,10 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
     for (const auto& replState : builds) {
-        if (!abortIndexBuildByBuildUUID(
-                opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, reason)) {
+        if (!abortIndexBuildByBuildUUID(opCtx,
+                                        replState->buildUUID,
+                                        IndexBuildAction::kPrimaryAbort,
+                                        Status{ErrorCodes::IndexBuildAborted, reason})) {
             // The index build may already be in the midst of tearing down.
             LOGV2(5010502,
                   "Index build: failed to abort index build for database drop",
@@ -1004,10 +1008,11 @@ void IndexBuildsCoordinator::abortUserIndexBuildsForUserWriteBlocking(OperationC
     std::vector<std::shared_ptr<ReplIndexBuildState>> buildsWaitingToFinish;
 
     for (const auto& replState : builds) {
-        if (!abortIndexBuildByBuildUUID(opCtx,
-                                        replState->buildUUID,
-                                        IndexBuildAction::kPrimaryAbort,
-                                        "User write blocking")) {
+        if (!abortIndexBuildByBuildUUID(
+                opCtx,
+                replState->buildUUID,
+                IndexBuildAction::kPrimaryAbort,
+                Status{ErrorCodes::IndexBuildAborted, "User write blocking"})) {
             // If the index build is already finishing and thus can't be aborted, we must wait on
             // it.
             LOGV2(6511601,
@@ -1254,7 +1259,10 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
 
     std::string abortReason(str::stream()
                             << "abortIndexBuild oplog entry encountered: " << *oplogEntry.cause);
-    if (abortIndexBuildByBuildUUID(opCtx, buildUUID, IndexBuildAction::kOplogAbort, abortReason)) {
+    if (abortIndexBuildByBuildUUID(opCtx,
+                                   buildUUID,
+                                   IndexBuildAction::kOplogAbort,
+                                   Status{ErrorCodes::IndexBuildAborted, abortReason})) {
         return;
     }
 
@@ -1326,8 +1334,10 @@ boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNames(
               "collectionUUID"_attr = collectionUUID,
               "firstIndex"_attr = replState->indexNames.front());
 
-        if (abortIndexBuildByBuildUUID(
-                opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, reason)) {
+        if (abortIndexBuildByBuildUUID(opCtx,
+                                       replState->buildUUID,
+                                       IndexBuildAction::kPrimaryAbort,
+                                       Status{ErrorCodes::IndexBuildAborted, reason})) {
             buildUUID = replState->buildUUID;
         }
     };
@@ -1346,7 +1356,10 @@ void IndexBuildsCoordinator::_abortAllIndexBuildsWithReason(OperationContext* op
 
     auto builds = activeIndexBuilds.getAllIndexBuilds();
     for (const auto& replState : builds) {
-        if (!abortIndexBuildByBuildUUID(opCtx, replState->buildUUID, action, reason)) {
+        if (!abortIndexBuildByBuildUUID(opCtx,
+                                        replState->buildUUID,
+                                        action,
+                                        Status{ErrorCodes::IndexBuildAborted, reason})) {
             // The index build may already be in the midst of tearing down.
             LOGV2(7738703,
                   "Index build: failed to abort index build, this is expected if the build is "
@@ -1405,7 +1418,7 @@ bool IndexBuildsCoordinator::hasIndexBuilder(OperationContext* opCtx,
 bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
                                                         const UUID& buildUUID,
                                                         IndexBuildAction signalAction,
-                                                        std::string reason) {
+                                                        Status abortStatus) {
     std::shared_ptr<ReplIndexBuildState> replState;
     bool retry = false;
     while (true) {
@@ -1479,7 +1492,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
             }
         }
 
-        auto tryAbortResult = replState->tryAbort(opCtx, signalAction, reason);
+        auto tryAbortResult = replState->tryAbort(opCtx, signalAction, abortStatus);
         switch (tryAbortResult) {
             case ReplIndexBuildState::TryAbortResult::kNotAborted:
                 return false;
@@ -1801,8 +1814,10 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                 // All other errors must be due to key generation. Abort the build now, instead of
                 // failing later during the commit phase retry.
                 auto status = ex.toStatus().withContext("Skipped records retry failed on step-up");
-                abortIndexBuildByBuildUUID(
-                    opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, status.reason());
+                abortIndexBuildByBuildUUID(opCtx,
+                                           replState->buildUUID,
+                                           IndexBuildAction::kPrimaryAbort,
+                                           Status{ErrorCodes::IndexBuildAborted, status.reason()});
             }
         };
 
@@ -1836,9 +1851,11 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
         // This will unblock the index build and allow it to complete without cleaning up.
         // Subsequently, the rollback algorithm can decide how to undo the index build depending on
         // the state of the oplog. Signals the kRollbackAbort and then waits for the thread to join.
-        const std::string reason = "rollback";
         if (!abortIndexBuildByBuildUUID(
-                opCtx, replState->buildUUID, IndexBuildAction::kRollbackAbort, reason)) {
+                opCtx,
+                replState->buildUUID,
+                IndexBuildAction::kRollbackAbort,
+                Status{ErrorCodes::InterruptedDueToReplStateChange, "rollback"})) {
             // The index build may already be in the midst of tearing down.
             // Leave this index build out of 'buildsStopped'.
             LOGV2(5010505,

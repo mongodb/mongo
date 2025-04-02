@@ -564,7 +564,9 @@ Status IndexBuildsCoordinatorMongod::voteAbortIndexBuild(OperationContext* opCtx
         opCtx,
         buildUUID,
         IndexBuildAction::kPrimaryAbort,
-        fmt::format("'voteAbortIndexBuild' received from '{}': {}", votingNode.toString(), reason));
+        Status{ErrorCodes::IndexBuildAborted,
+               fmt::format(
+                   "'voteAbortIndexBuild' received from '{}': {}", votingNode.toString(), reason)});
 
     if (aborted) {
         return Status::OK();

@@ -463,7 +463,7 @@ public:
     enum class TryAbortResult { kRetry, kAlreadyAborted, kNotAborted, kContinueAbort };
     TryAbortResult tryAbort(OperationContext* opCtx,
                             IndexBuildAction signalAction,
-                            std::string reason);
+                            Status abortStatus);
 
     /**
      * Force an index build to abort on its own. Will return after signalling the index build or if

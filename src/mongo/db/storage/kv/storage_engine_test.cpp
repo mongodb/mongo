@@ -350,7 +350,10 @@ void abortIndexBuild(OperationContext* opCtx, const UUID& buildUUID) {
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_STARTUP2));
     ASSERT_TRUE(IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
-        opCtx, buildUUID, IndexBuildAction::kInitialSyncAbort, "Shutdown"));
+        opCtx,
+        buildUUID,
+        IndexBuildAction::kInitialSyncAbort,
+        Status{ErrorCodes::IndexBuildAborted, "Shutdown"}));
 }
 
 TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexForCleanShutdown) {

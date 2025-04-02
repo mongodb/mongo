@@ -465,7 +465,7 @@ bool ReplIndexBuildState::tryCommit(OperationContext* opCtx) {
 
 ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationContext* opCtx,
                                                                   IndexBuildAction signalAction,
-                                                                  std::string reason) {
+                                                                  Status abortStatus) {
     stdx::lock_guard lk(_mutex);
     // It is not possible for the index build to be in kExternalAbort state, as the collection
     // MODE_X lock is held and there cannot be concurrent external aborters.
@@ -528,14 +528,14 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
         return TryAbortResult::kRetry;
     }
 
-    LOGV2(4656003, "Aborting index build", "buildUUID"_attr = buildUUID, "error"_attr = reason);
+    LOGV2(
+        4656003, "Aborting index build", "buildUUID"_attr = buildUUID, "error"_attr = abortStatus);
 
     // Set the state on replState. Once set, the calling thread must complete the abort process.
     auto abortTimestamp = boost::make_optional<Timestamp>(
         !shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull(),
         shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp());
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
-    Status abortStatus = Status(ErrorCodes::IndexBuildAborted, reason);
     invariant(!abortStatus.isOK());
     _indexBuildState.setState(
         IndexBuildState::kExternalAbort, skipCheck, abortTimestamp, abortStatus);

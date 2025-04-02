@@ -623,7 +623,10 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
             std::string abortReason(str::stream() << "Index build aborted: " << buildUUID << ": "
                                                   << ex.toString());
             if (indexBuildsCoord->abortIndexBuildByBuildUUID(
-                    opCtx, buildUUID, IndexBuildAction::kPrimaryAbort, abortReason)) {
+                    opCtx,
+                    buildUUID,
+                    IndexBuildAction::kPrimaryAbort,
+                    Status{ErrorCodes::IndexBuildAborted, abortReason})) {
                 LOGV2(20446,
                       "Index build: aborted due to NotPrimary error",
                       "buildUUID"_attr = buildUUID);
@@ -664,7 +667,10 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 std::string abortReason(str::stream() << "Index build aborted: " << buildUUID
                                                       << ": " << ex.toString());
                 if (indexBuildsCoord->abortIndexBuildByBuildUUID(
-                        abortCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort, abortReason)) {
+                        abortCtx.get(),
+                        buildUUID,
+                        IndexBuildAction::kPrimaryAbort,
+                        Status{ErrorCodes::IndexBuildAborted, abortReason})) {
                     LOGV2(20443,
                           "Index build: aborted due to interruption",
                           "buildUUID"_attr = buildUUID);

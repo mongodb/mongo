@@ -331,7 +331,7 @@ public:
     bool abortIndexBuildByBuildUUID(OperationContext* opCtx,
                                     const UUID& buildUUID,
                                     IndexBuildAction signalAction,
-                                    std::string reason);
+                                    Status abortStatus);
     /**
      * Aborts an index build by its index name(s). This will only abort in-progress index builds if
      * all of the indexes are specified that a single builder is building together. When an
