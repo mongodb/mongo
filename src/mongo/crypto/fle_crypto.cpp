@@ -2227,7 +2227,8 @@ PrfBlock ESCCollection::generateId(const ESCTwiceDerivedTagToken& tagToken,
 
 PrfBlock ESCCollection::generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken,
                                             uint64_t cpos) {
-    return FLEUtil::prf(tagToken.toCDR(), cpos);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, tagToken.toCDR(), cpos);
 }
 
 template <class TagToken, class ValueToken>
@@ -3699,15 +3700,19 @@ std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSO
     return fields;
 }
 
-PrfBlock EDCServerCollection::generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count) {
-    return FLEUtil::prf(edcTwiceDerived.toCDR(), count);
+PrfBlock EDCServerCollection::generateTag(HmacContext* obj,
+                                          EDCTwiceDerivedToken edcTwiceDerived,
+                                          FLECounter count) {
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, edcTwiceDerived.toCDR(), count);
 }
 
 PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
     auto edcTwiceDerived = EDCTwiceDerivedToken::deriveFrom(payload.payload.getEdcDerivedToken());
     dassert(payload.isRangePayload() == false);
     dassert(payload.counts.size() == 1);
-    return generateTag(edcTwiceDerived, payload.counts[0]);
+    HmacContext obj;
+    return generateTag(&obj, edcTwiceDerived, payload.counts[0]);
 }
 
 std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadInfo& rangePayload) {
@@ -3725,10 +3730,12 @@ std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadIn
     std::vector<PrfBlock> tags;
     tags.reserve(edgeTokenSets.size());
 
+    HmacContext obj;
     for (size_t i = 0; i < edgeTokenSets.size(); i++) {
         auto edcTwiceDerived =
             EDCTwiceDerivedToken::deriveFrom(edgeTokenSets[i].getEdcDerivedToken());
-        tags.push_back(EDCServerCollection::generateTag(edcTwiceDerived, rangePayload.counts[i]));
+        tags.push_back(
+            EDCServerCollection::generateTag(&obj, edcTwiceDerived, rangePayload.counts[i]));
     }
     return tags;
 }
@@ -3765,10 +3772,12 @@ std::vector<PrfBlock> EDCServerCollection::generateTagsForTextSearch(
     std::vector<PrfBlock> tags;
     tags.reserve(totalTagCount);
 
+    HmacContext hmacCtx;
     for (size_t i = 0; i < totalTagCount; i++) {
         auto edcTwiceDerived = EDCTwiceDerivedToken::deriveFrom(
             EDCDerivedFromDataTokenAndContentionFactor(edcDerivedTokens[i]));
-        tags.push_back(EDCServerCollection::generateTag(edcTwiceDerived, textPayload.counts[i]));
+        tags.push_back(
+            EDCServerCollection::generateTag(&hmacCtx, edcTwiceDerived, textPayload.counts[i]));
     }
     return tags;
 }
@@ -4650,19 +4659,19 @@ PrfBlock FLEUtil::blockToArray(const SHA256Block& block) {
     return data;
 }
 
-PrfBlock FLEUtil::prf(ConstDataRange key, ConstDataRange cdr) {
+PrfBlock FLEUtil::prf(HmacContext* hmacCtx, ConstDataRange key, ConstDataRange cdr) {
     uassert(6378002, "Invalid key length", key.length() == crypto::sym256KeySize);
 
     SHA256Block block;
-    SHA256Block::computeHmac(key.data<uint8_t>(), key.length(), {cdr}, &block);
+    SHA256Block::computeHmacWithCtx(hmacCtx, key.data<uint8_t>(), key.length(), {cdr}, &block);
     return blockToArray(block);
 }
 
-PrfBlock FLEUtil::prf(ConstDataRange key, uint64_t value) {
+PrfBlock FLEUtil::prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value) {
     std::array<char, sizeof(uint64_t)> bufValue;
     DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
 
-    return prf(key, bufValue);
+    return prf(hmacCtx, key, bufValue);
 }
 
 StatusWith<std::vector<uint8_t>> FLEUtil::decryptData(ConstDataRange key,
