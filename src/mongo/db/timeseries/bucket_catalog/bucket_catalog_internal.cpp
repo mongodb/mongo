@@ -449,11 +449,13 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     ScopeGuard updateStatsOnError([&stats] { stats.incNumBucketReopeningsFailed(); });
 
     if (catalogEra < getCurrentEra(catalog.bucketStateRegistry)) {
+        stats.incNumBucketReopeningsFailedDueToEraMismatch();
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
     }
 
     BSONElement bucketIdElem = bucketDoc.getField(kBucketIdFieldName);
     if (bucketIdElem.eoo() || bucketIdElem.type() != BSONType::jstOID) {
+        stats.incNumBucketReopeningsFailedDueToMalformedIdField();
         return {ErrorCodes::BadValue,
                 str::stream() << kBucketIdFieldName << " is missing or not an ObjectId"};
     }
@@ -472,6 +474,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
                                         metadata,
                                         options.getMetaField()}};
     if (key != bucketKey) {
+        stats.incNumBucketReopeningsFailedDueToHashCollision();
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
     }
 
@@ -482,6 +485,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
 
         auto it = bucketStateRegistry.bucketStates.find(bucketId);
         if (it != bucketStateRegistry.bucketStates.end() && isBucketStateFrozen(it->second)) {
+            stats.incNumBucketReopeningsFailedDueToMarkedFrozen();
             return {ErrorCodes::BadValue,
                     "Bucket has been marked frozen and is not eligible for reopening"};
         }
@@ -493,12 +497,14 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     // Validate the bucket document against the schema.
     auto result = validator(bucketDoc);
     if (result.first != Collection::SchemaValidationResult::kPass) {
+        stats.incNumBucketReopeningsFailedDueToValidator();
         return result.second;
     }
 
     auto controlField = bucketDoc.getObjectField(kBucketControlFieldName);
     auto closedElem = controlField.getField(kBucketControlClosedFieldName);
     if (closedElem.booleanSafe()) {
+        stats.incNumBucketReopeningsFailedDueToMarkedClosed();
         return {ErrorCodes::BadValue,
                 "Bucket has been marked closed and is not eligible for reopening"};
     }
@@ -526,6 +532,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
         bucketDoc,
         comparator);
     if (!swMinMax.isOK()) {
+        stats.incNumBucketReopeningsFailedDueToMinMaxCalculation();
         return swMinMax.getStatus();
     }
     bucket->minmax = std::move(swMinMax.getValue());
@@ -535,6 +542,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
         bucketDoc,
         comparator);
     if (!swSchema.isOK()) {
+        stats.incNumBucketReopeningsFailedDueToSchemaGeneration();
         return swSchema.getStatus();
     }
     bucket->schema = std::move(swSchema.getValue());
@@ -547,6 +555,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     // This check accounts for if a user performs a direct bucket write on the timeColumnElem and we
     // attempt to rehydrate the bucket as part of query-based reopening.
     if (timeColumnElem.type() != BSONType::BinData) {
+        stats.incNumBucketReopeningsFailedDueToUncompressedTimeColumn();
         return {ErrorCodes::BadValue,
                 "Bucket data field is malformed (time column is not compressed)"};
     }
@@ -580,6 +589,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
                                   base64::encode(bucketDoc.objdata(), bucketDoc.objsize()));
 
         invariant(!TestingProctor::instance().isEnabled());
+        stats.incNumBucketReopeningsFailedDueToCompressionFailure();
         return Status(
             BucketCompressionFailure(bucketKey.collectionUUID, bucketId.oid, bucketId.keySignature),
             ex.reason());
@@ -607,6 +617,11 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
 
     // Forward the WriteConflict if the bucket has been cleared or has a pending direct write.
     if (!status.isOK()) {
+        if (status.code() == ErrorCodes::WriteConflict) {
+            stats.incNumBucketReopeningsFailedDueToWriteConflict();
+        } else if (status.code() == ErrorCodes::TimeseriesBucketFrozen) {
+            stats.incNumBucketReopeningsFailedDueToMarkedFrozen();
+        }
         return status;
     }
 

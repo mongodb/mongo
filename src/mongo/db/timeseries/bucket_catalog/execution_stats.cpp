@@ -164,6 +164,69 @@ void ExecutionStatsController::incNumBucketReopeningsFailed(long long increment)
     _globalStats->numBucketReopeningsFailed.fetchAndAddRelaxed(increment);
 }
 
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToEraMismatch(long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToEraMismatch.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToEraMismatch.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToMalformedIdField(
+    long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToMalformedIdField.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToMalformedIdField.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToHashCollision(long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToHashCollision.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToHashCollision.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToMarkedFrozen(long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToMarkedFrozen.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToMarkedFrozen.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToValidator(long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToValidator.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToValidator.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToMarkedClosed(long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToMarkedClosed.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToMarkedClosed.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToMinMaxCalculation(
+    long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToMinMaxCalculation.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToMinMaxCalculation.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToSchemaGeneration(
+    long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToSchemaGeneration.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToSchemaGeneration.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToUncompressedTimeColumn(
+    long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToUncompressedTimeColumn.fetchAndAddRelaxed(
+        increment);
+    _globalStats->numBucketReopeningsFailedDueToUncompressedTimeColumn.fetchAndAddRelaxed(
+        increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToCompressionFailure(
+    long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToCompressionFailure.fetchAndAddRelaxed(
+        increment);
+    _globalStats->numBucketReopeningsFailedDueToCompressionFailure.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketReopeningsFailedDueToWriteConflict(long long increment) {
+    _collectionStats->numBucketReopeningsFailedDueToWriteConflict.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketReopeningsFailedDueToWriteConflict.fetchAndAddRelaxed(increment);
+}
+
 void ExecutionStatsController::incNumDuplicateBucketsReopened(long long increment) {
     _collectionStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
     _globalStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
@@ -212,6 +275,28 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numBucketFetchesFailed", stats.numBucketFetchesFailed.load());
     builder.appendNumber("numBucketQueriesFailed", stats.numBucketQueriesFailed.load());
     builder.appendNumber("numBucketReopeningsFailed", stats.numBucketReopeningsFailed.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToEraMismatch",
+                         stats.numBucketReopeningsFailedDueToEraMismatch.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToMalformedIdField",
+                         stats.numBucketReopeningsFailedDueToMalformedIdField.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToHashCollision",
+                         stats.numBucketReopeningsFailedDueToHashCollision.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToMarkedFrozen",
+                         stats.numBucketReopeningsFailedDueToMarkedFrozen.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToValidator",
+                         stats.numBucketReopeningsFailedDueToValidator.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToMarkedClosed",
+                         stats.numBucketReopeningsFailedDueToMarkedClosed.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToMinMaxCalculation",
+                         stats.numBucketReopeningsFailedDueToMinMaxCalculation.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToSchemaGeneration",
+                         stats.numBucketReopeningsFailedDueToSchemaGeneration.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToUncompressedTimeColumn",
+                         stats.numBucketReopeningsFailedDueToUncompressedTimeColumn.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToCompressionFailure",
+                         stats.numBucketReopeningsFailedDueToCompressionFailure.load());
+    builder.appendNumber("numBucketReopeningsFailedDueToWriteConflict",
+                         stats.numBucketReopeningsFailedDueToWriteConflict.load());
     builder.appendNumber("numDuplicateBucketsReopened", stats.numDuplicateBucketsReopened.load());
 }
 
@@ -247,6 +332,28 @@ void addCollectionExecutionCounters(ExecutionStatsController& stats,
     stats.incNumBucketFetchesFailed(collStats.numBucketFetchesFailed.load());
     stats.incNumBucketQueriesFailed(collStats.numBucketQueriesFailed.load());
     stats.incNumBucketReopeningsFailed(collStats.numBucketReopeningsFailed.load());
+    stats.incNumBucketReopeningsFailedDueToEraMismatch(
+        collStats.numBucketReopeningsFailedDueToEraMismatch.load());
+    stats.incNumBucketReopeningsFailedDueToMalformedIdField(
+        collStats.numBucketReopeningsFailedDueToMalformedIdField.load());
+    stats.incNumBucketReopeningsFailedDueToHashCollision(
+        collStats.numBucketReopeningsFailedDueToHashCollision.load());
+    stats.incNumBucketReopeningsFailedDueToMarkedFrozen(
+        collStats.numBucketReopeningsFailedDueToMarkedFrozen.load());
+    stats.incNumBucketReopeningsFailedDueToValidator(
+        collStats.numBucketReopeningsFailedDueToValidator.load());
+    stats.incNumBucketReopeningsFailedDueToMarkedClosed(
+        collStats.numBucketReopeningsFailedDueToMarkedClosed.load());
+    stats.incNumBucketReopeningsFailedDueToMinMaxCalculation(
+        collStats.numBucketReopeningsFailedDueToMinMaxCalculation.load());
+    stats.incNumBucketReopeningsFailedDueToSchemaGeneration(
+        collStats.numBucketReopeningsFailedDueToSchemaGeneration.load());
+    stats.incNumBucketReopeningsFailedDueToUncompressedTimeColumn(
+        collStats.numBucketReopeningsFailedDueToUncompressedTimeColumn.load());
+    stats.incNumBucketReopeningsFailedDueToCompressionFailure(
+        collStats.numBucketReopeningsFailedDueToCompressionFailure.load());
+    stats.incNumBucketReopeningsFailedDueToWriteConflict(
+        collStats.numBucketReopeningsFailedDueToWriteConflict.load());
     stats.incNumDuplicateBucketsReopened(collStats.numDuplicateBucketsReopened.load());
 }
 

@@ -60,6 +60,7 @@
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -110,7 +111,13 @@ protected:
     StatusWith<tracking::unique_ptr<Bucket>> _testRehydrateBucket(const CollectionPtr& coll,
                                                                   const BSONObj& bucketDoc);
 
-    Status _reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc);
+    Status _reopenBucket(
+        const CollectionPtr& coll,
+        const BSONObj& bucketDoc,
+        const boost::optional<unsigned long>& rehydrateEra = boost::none,
+        const boost::optional<unsigned long>& loadBucketIntoCatalogEra = boost::none,
+        const boost::optional<BucketKey>& bucketKey = boost::none,
+        const boost::optional<BucketDocumentValidator>& documentValidator = boost::none);
 
     BSONObj _getCompressedBucketDoc(const BSONObj& bucketDoc);
 
@@ -318,7 +325,13 @@ StatusWith<tracking::unique_ptr<Bucket>> BucketCatalogTest::_testRehydrateBucket
                                      insertContext.stats);
 }
 
-Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc) {
+Status BucketCatalogTest::_reopenBucket(
+    const CollectionPtr& coll,
+    const BSONObj& bucketDoc,
+    const boost::optional<unsigned long>& rehydrateEra,
+    const boost::optional<unsigned long>& loadBucketIntoCatalogEra,
+    const boost::optional<BucketKey>& bucketKey,
+    const boost::optional<BucketDocumentValidator>& documentValidator) {
     const NamespaceString ns = coll->ns().getTimeseriesViewNamespace();
     const UUID uuid = coll->uuid();
     const boost::optional<TimeseriesOptions> options = coll->getTimeseriesOptions();
@@ -331,20 +344,22 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     if (metaFieldName) {
         metadata = bucketDoc.getField(kBucketMetaFieldName);
     }
-    auto key = BucketKey{uuid,
-                         BucketMetadata{getTrackingContext(_bucketCatalog->trackingContexts,
-                                                           TrackingScope::kOpenBucketsByKey),
-                                        metadata,
-                                        metaFieldName}};
+    auto key = bucketKey.value_or(
+        BucketKey{uuid,
+                  BucketMetadata{getTrackingContext(_bucketCatalog->trackingContexts,
+                                                    TrackingScope::kOpenBucketsByKey),
+                                 metadata,
+                                 metaFieldName}});
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, uuid);
     auto stripeNumber = internal::getStripeNumber(*_bucketCatalog, key);
     InsertContext insertContext{key, stripeNumber, *options, stats};
 
     // Validate the bucket document against the schema.
-    auto validator = [opCtx = _opCtx, &coll](const BSONObj& bucketDoc) -> auto {
-        return coll->checkValidation(opCtx, bucketDoc);
-    };
-    auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
+    auto validator =
+        documentValidator.value_or([opCtx = _opCtx, &coll](const BSONObj& bucketDoc) -> auto {
+            return coll->checkValidation(opCtx, bucketDoc);
+        });
+    auto era = rehydrateEra.value_or(getCurrentEra(_bucketCatalog->bucketStateRegistry));
 
     auto res = internal::rehydrateBucket(*_bucketCatalog,
                                          bucketDoc,
@@ -363,13 +378,14 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
+    era = loadBucketIntoCatalogEra.value_or(getCurrentEra(_bucketCatalog->bucketStateRegistry));
     return internal::loadBucketIntoCatalog(*_bucketCatalog,
                                            stripe,
                                            stripeLock,
                                            insertContext.stats,
                                            insertContext.key,
                                            std::move(bucket),
-                                           getCurrentEra(_bucketCatalog->bucketStateRegistry))
+                                           era)
         .getStatus();
 }
 
@@ -1294,25 +1310,44 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc));
+    auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
+
+    auto& registry = _bucketCatalog->bucketStateRegistry;
+    ASSERT_EQ(1, registry.bucketStates.size());
+    const auto bucketId = registry.bucketStates.begin()->first;
+
+    // Buckets are frozen when rejected by the validator.
+    auto unfreezeBucket = [&]() -> void {
+        registry.bucketStates[bucketId] = {BucketState::kNormal};
+        ASSERT_EQ(registry.bucketStates.bucket_count(), 1);
+        ASSERT_EQ(*std::get_if<BucketState>(&registry.bucketStates.find(bucketId)->second),
+                  BucketState::kNormal);
+    };
 
     {
         // Missing _id field.
         BSONObj missingIdObj = compressedBucketDoc.removeField("_id");
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingIdObj));
+        ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMalformedIdField.load());
 
         // Bad _id type.
         BSONObj badIdObj = compressedBucketDoc.addFields(BSON("_id" << 123));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badIdObj));
+        ASSERT_EQ(2, stats->numBucketReopeningsFailedDueToMalformedIdField.load());
     }
 
     {
         // Missing control field.
         BSONObj missingControlObj = compressedBucketDoc.removeField("control");
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingControlObj));
+        ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
 
         // Bad control type.
         BSONObj badControlObj = compressedBucketDoc.addFields(BSON("control" << BSONArray()));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badControlObj));
+        ASSERT_EQ(2, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
 
         // Bad control.version type.
         BSONObj badVersionObj = compressedBucketDoc.addFields(BSON(
@@ -1321,6 +1356,8 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                           << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z")) << "max"
                           << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badVersionObj));
+        ASSERT_EQ(3, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
 
         // Bad control.min type.
         BSONObj badMinObj = compressedBucketDoc.addFields(BSON(
@@ -1328,6 +1365,8 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                               << 1 << "min" << 123 << "max"
                               << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badMinObj));
+        ASSERT_EQ(4, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
 
         // Bad control.max type.
         BSONObj badMaxObj = compressedBucketDoc.addFields(
@@ -1336,6 +1375,8 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                                    << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
                                    << "max" << 123)));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badMaxObj));
+        ASSERT_EQ(5, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
 
         // Missing control.min.time.
         BSONObj missingMinTimeObj = compressedBucketDoc.addFields(BSON(
@@ -1343,6 +1384,8 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                               << 1 << "min" << BSON("abc" << 1) << "max"
                               << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingMinTimeObj));
+        ASSERT_EQ(6, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
 
         // Missing control.max.time.
         BSONObj missingMaxTimeObj = compressedBucketDoc.addFields(
@@ -1351,21 +1394,29 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                                    << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
                                    << "max" << BSON("abc" << 1))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingMaxTimeObj));
+        ASSERT_EQ(7, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
     }
 
     {
         // Missing data field.
         BSONObj missingDataObj = compressedBucketDoc.removeField("data");
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingDataObj));
+        ASSERT_EQ(8, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
 
         // Bad time field in the data field.
         BSONObj badTimeFieldInDataFieldObj =
             compressedBucketDoc.addFields(BSON("data" << BSON("time" << BSON("0" << 123))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badTimeFieldInDataFieldObj));
+        ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToUncompressedTimeColumn.load());
+        unfreezeBucket();
 
         // Bad data type.
         BSONObj badDataObj = compressedBucketDoc.addFields(BSON("data" << 123));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badDataObj));
+        ASSERT_EQ(9, stats->numBucketReopeningsFailedDueToValidator.load());
+        unfreezeBucket();
     }
 }
 
@@ -1393,6 +1444,7 @@ TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
 
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
     ASSERT_EQ(1, stats->numBucketReopeningsFailed.load());
+    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
 }
 
 TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
@@ -1412,6 +1464,8 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedClosedBucketDoc = _getCompressedBucketDoc(closedBucket);
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedClosedBucketDoc));
+        auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
+        ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMarkedClosed.load());
         auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
         ASSERT_EQ(1, bucketStates.size());
         ASSERT(isBucketStateFrozen(bucketStates.begin()->second));
@@ -1719,6 +1773,121 @@ TEST_F(BucketCatalogTest, RehydrateNotClosedBuckets) {
         BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
         ASSERT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedOpenBucketDoc));
     }
+}
+
+TEST_F(BucketCatalogTest, ReopenBucketWithIncorrectEra) {
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+
+    _bucketCatalog->bucketStateRegistry.currentEra = 1ul;
+    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc, 0ul));
+    auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
+    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToEraMismatch.load());
+
+    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc, boost::none, 0ul));
+    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToWriteConflict.load());
+}
+
+TEST_F(BucketCatalogTest, ReopeningFailedDueToHashCollision) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+
+    auto dummyUUID = UUID::parse("12345678-1234-4000-8000-000000000000");
+    tracking::Context dummyTrackingContext{};
+    auto incorrectMetadata = BSON(kBucketMetaFieldName << 1);
+    auto invalidKey = BucketKey{dummyUUID.getValue(),
+                                BucketMetadata{dummyTrackingContext,
+                                               incorrectMetadata.firstElement(),
+                                               StringData("incorrect field")}};
+
+    ASSERT_NOT_OK(_reopenBucket(
+        autoColl.getCollection(), compressedBucketDoc, boost::none, boost::none, invalidKey));
+    auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
+    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToHashCollision.load());
+}
+
+TEST_F(BucketCatalogTest, ReopeningFailedDueToMarkedFrozen) {
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc));
+    auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
+
+    auto& registry = _bucketCatalog->bucketStateRegistry;
+    ASSERT_EQ(1, registry.bucketStates.size());
+    const auto bucketId = registry.bucketStates.begin()->first;
+    registry.bucketStates[bucketId] = {BucketState::kFrozen};
+
+    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc.copy()));
+    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMarkedFrozen.load());
+}
+
+TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"}},
+                                   "max":{}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+
+    const auto alwaysPassValidator =
+        [](const BSONObj& document) -> std::pair<Collection::SchemaValidationResult, Status> {
+        return {Collection::SchemaValidationResult::kPass, Status::OK()};
+    };
+    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(),
+                                compressedBucketDoc,
+                                boost::none,
+                                boost::none,
+                                boost::none,
+                                boost::optional<BucketDocumentValidator>{alwaysPassValidator}));
+    auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
+    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMinMaxCalculation.load());
+}
+
+DEATH_TEST_F(BucketCatalogTest, ReopeningFailedDueToCompression, "invariant") {
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3},
+                                   "count":3},
+            "data":{"time":{"$binary":"CQBwO6c5gQEAAIANAAAAAAAAAAA=","$type":"07"},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"}}})");
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+
+    std::ignore = _reopenBucket(autoColl.getCollection(), bucketDoc);
 }
 
 TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressure) {

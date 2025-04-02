@@ -74,6 +74,17 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketFetchesFailed;
     AtomicWord<long long> numBucketQueriesFailed;
     AtomicWord<long long> numBucketReopeningsFailed;
+    AtomicWord<long long> numBucketReopeningsFailedDueToEraMismatch;
+    AtomicWord<long long> numBucketReopeningsFailedDueToMalformedIdField;
+    AtomicWord<long long> numBucketReopeningsFailedDueToHashCollision;
+    AtomicWord<long long> numBucketReopeningsFailedDueToMarkedFrozen;
+    AtomicWord<long long> numBucketReopeningsFailedDueToValidator;
+    AtomicWord<long long> numBucketReopeningsFailedDueToMarkedClosed;
+    AtomicWord<long long> numBucketReopeningsFailedDueToMinMaxCalculation;
+    AtomicWord<long long> numBucketReopeningsFailedDueToSchemaGeneration;
+    AtomicWord<long long> numBucketReopeningsFailedDueToUncompressedTimeColumn;
+    AtomicWord<long long> numBucketReopeningsFailedDueToCompressionFailure;
+    AtomicWord<long long> numBucketReopeningsFailedDueToWriteConflict;
     AtomicWord<long long> numDuplicateBucketsReopened;
 };
 
@@ -113,6 +124,17 @@ public:
     void incNumBucketFetchesFailed(long long increment = 1);
     void incNumBucketQueriesFailed(long long increment = 1);
     void incNumBucketReopeningsFailed(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToEraMismatch(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToMalformedIdField(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToHashCollision(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToMarkedFrozen(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToValidator(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToMarkedClosed(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToMinMaxCalculation(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToSchemaGeneration(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToUncompressedTimeColumn(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToCompressionFailure(long long increment = 1);
+    void incNumBucketReopeningsFailedDueToWriteConflict(long long increment = 1);
     void incNumDuplicateBucketsReopened(long long increment = 1);
 
 private:
