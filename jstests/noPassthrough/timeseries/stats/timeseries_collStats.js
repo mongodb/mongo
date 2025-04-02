@@ -276,11 +276,9 @@ const testIdleBucketExpiry = function(docFn) {
                kIdleBucketExpiryMemoryUsageThreshold}`);
 };
 
-/*
 testIdleBucketExpiry(i => {
     return {[timeFieldName]: ISODate(), [metaFieldName]: {[i.toString()]: largeValue}};
 });
-*/
 testIdleBucketExpiry(i => {
     return {[timeFieldName]: ISODate(), [metaFieldName]: i, a: largeValue};
 });

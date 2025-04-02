@@ -309,7 +309,9 @@ uint64_t getMemoryUsage(const BucketCatalog& catalog) {
         catalog.trackingContexts.openBucketsById.allocated() +
         catalog.trackingContexts.openBucketsByKey.allocated() +
         catalog.trackingContexts.reopeningRequests.allocated() +
-        catalog.trackingContexts.stats.allocated() + catalog.trackingContexts.summaries.allocated();
+        catalog.trackingContexts.stats.allocated() +
+        catalog.trackingContexts.summaries.allocated() +
+        catalog.trackingContexts.measurementBatching.allocated();
 #endif
 }
 
@@ -346,6 +348,9 @@ void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builde
                             static_cast<long long>(catalog.trackingContexts.stats.allocated()));
     subBuilder.appendNumber("summaries",
                             static_cast<long long>(catalog.trackingContexts.summaries.allocated()));
+    subBuilder.appendNumber(
+        "measurementBatching",
+        static_cast<long long>(catalog.trackingContexts.measurementBatching.allocated()));
 #endif
 }
 
