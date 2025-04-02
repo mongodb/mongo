@@ -62,6 +62,7 @@ const assertCommandNamespace = function(explain, commandRun) {
 const assertExplain = function(explain, commandRun) {
     assertQueryPlannerNamespace(explain);
     assertCommandNamespace(explain, commandRun);
+    assert(explain.command.rawData);
     assert(!getPlanStage(explain, "UNPACK_TS_BUCKET"),
            `Expected to find no unpack stage but got ${tojson(explain)}`);
 };

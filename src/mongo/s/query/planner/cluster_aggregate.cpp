@@ -150,10 +150,12 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     auto maxTimeMS = req.getMaxTimeMS();
     auto readConcern = req.getReadConcern();
     auto writeConcern = req.getWriteConcern();
+    auto rawData = req.getRawData();
     req.setGenericArguments({});
     req.setMaxTimeMS(maxTimeMS);
     req.setReadConcern(std::move(readConcern));
     req.setWriteConcern(std::move(writeConcern));
+    req.setRawData(rawData);
     aggregation_request_helper::addQuerySettingsToRequest(req, expCtx);
 
     auto cmdObj =
