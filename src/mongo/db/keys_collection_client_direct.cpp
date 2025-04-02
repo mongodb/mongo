@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/keys_collection_client_direct.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -40,7 +40,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/keys_collection_client_direct.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
@@ -215,7 +215,7 @@ Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
 }
 
 Status KeysCollectionClientDirect::insertNewKey(OperationContext* opCtx, const BSONObj& doc) {
-    return _insert(opCtx, doc, ShardingCatalogClient::kMajorityWriteConcern);
+    return _insert(opCtx, doc, defaultMajorityWriteConcernDoNotUse());
 }
 
 }  // namespace mongo

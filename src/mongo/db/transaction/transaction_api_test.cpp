@@ -1267,7 +1267,7 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
                       0 /* txnNumber */,
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
-                      generic_argument_util::kMajorityWriteConcern.toBSON());
+                      defaultMajorityWriteConcernDoNotUse().toBSON());
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
@@ -1347,7 +1347,7 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
                       0 /* txnNumber */,
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
-                      generic_argument_util::kMajorityWriteConcern.toBSON());
+                      defaultMajorityWriteConcernDoNotUse().toBSON());
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
@@ -1388,7 +1388,7 @@ TEST_F(TxnAPITest, RetriesOnNonTransientCommitWithErrorRetryableCommitWCError) {
                       0 /* txnNumber */,
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
-                      generic_argument_util::kMajorityWriteConcern.toBSON());
+                      defaultMajorityWriteConcernDoNotUse().toBSON());
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
@@ -1996,7 +1996,7 @@ TEST_F(TxnAPITest, HandleErrorRetryCommitOnNetworkError) {
                       0 /* txnNumber */,
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
-                      generic_argument_util::kMajorityWriteConcern.toBSON());
+                      defaultMajorityWriteConcernDoNotUse().toBSON());
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
@@ -2050,7 +2050,7 @@ TEST_F(TxnAPITest, RetryCommitMultipleTimesIncludesMajorityWriteConcern) {
                           boost::none /* readConcern */,
                           // First commit attempt uses the client's WC, retries use majority.
                           i == 1 ? opCtx()->getWriteConcern().toBSON()
-                                 : generic_argument_util::kMajorityWriteConcern.toBSON());
+                                 : defaultMajorityWriteConcernDoNotUse().toBSON());
         assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
         ASSERT_EQ(sentRequests[i].firstElementFieldNameStringData(), "commitTransaction"_sd);
     }
@@ -2108,7 +2108,7 @@ TEST_F(TxnAPITest, CommitAfterTransientErrorAfterRetryCommitUsesOriginalWriteCon
                           boost::none /* readConcern */,
                           // First commit attempt uses the client's WC, retry uses majority.
                           i == 1 ? opCtx()->getWriteConcern().toBSON()
-                                 : generic_argument_util::kMajorityWriteConcern.toBSON());
+                                 : defaultMajorityWriteConcernDoNotUse().toBSON());
         assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
         ASSERT_EQ(sentRequests[i].firstElementFieldNameStringData(), "commitTransaction"_sd);
     }
@@ -2120,7 +2120,7 @@ TEST_F(TxnAPITest, CommitAfterTransientErrorAfterRetryCommitUsesOriginalWriteCon
                           boost::none /* readConcern */,
                           // First commit attempt uses the client's WC, retry uses majority.
                           i == 4 ? opCtx()->getWriteConcern().toBSON()
-                                 : generic_argument_util::kMajorityWriteConcern.toBSON());
+                                 : defaultMajorityWriteConcernDoNotUse().toBSON());
         assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
         ASSERT_EQ(sentRequests[i].firstElementFieldNameStringData(), "commitTransaction"_sd);
     }
@@ -2313,7 +2313,7 @@ TEST_F(TxnAPITest, OwnSession_CommitTransactionRetryLimitOnTransientErrors) {
                       0 /* txnNumber */,
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
-                      generic_argument_util::kMajorityWriteConcern.toBSON() /* writeConcern */);
+                      defaultMajorityWriteConcernDoNotUse().toBSON() /* writeConcern */);
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }

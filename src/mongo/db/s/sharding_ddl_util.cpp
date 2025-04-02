@@ -343,7 +343,7 @@ void linearizeCSRSReads(OperationContext* opCtx) {
         "Linearize CSRS reads",
         NamespaceString::kServerConfigurationNamespace,
         {},
-        ShardingCatalogClient::kMajorityWriteConcern));
+        defaultMajorityWriteConcernDoNotUse()));
 }
 
 void removeTagsMetadataFromConfig(OperationContext* opCtx,
@@ -584,12 +584,9 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx) {
     uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
 
     WriteConcernResult ignoreResult;
-    const WriteConcernOptions majorityWriteConcern{
-        WriteConcernOptions::kMajority,
-        WriteConcernOptions::SyncMode::UNSET,
-        WriteConcernOptions::kWriteConcernTimeoutSharding};
     auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, majorityWriteConcern, &ignoreResult));
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, latestOpTime, defaultMajorityWriteConcernDoNotUse(), &ignoreResult));
 }
 
 void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,

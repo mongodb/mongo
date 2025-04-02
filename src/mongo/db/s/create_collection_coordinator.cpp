@@ -1068,7 +1068,7 @@ void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
         : originalNss;
 
     ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx, mainNss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+        opCtx, mainNss, critSecReason, defaultMajorityWriteConcernDoNotUse());
 
     // Preventively acquire the critical section protecting the buckets namespace that the
     // creation of a timeseries collection would require.
@@ -1076,7 +1076,7 @@ void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
         opCtx,
         mainNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
-        ShardingCatalogClient::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
 }
 
 void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
@@ -1092,7 +1092,7 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         opCtx,
         mainNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
-        ShardingCatalogClient::kMajorityWriteConcern,
+        defaultMajorityWriteConcernDoNotUse(),
         ShardingRecoveryService::FilteringMetadataClearer(),
         throwIfReasonDiffers);
 
@@ -1100,7 +1100,7 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         opCtx,
         mainNss,
         critSecReason,
-        ShardingCatalogClient::kMajorityWriteConcern,
+        defaultMajorityWriteConcernDoNotUse(),
         ShardingRecoveryService::FilteringMetadataClearer(),
         throwIfReasonDiffers);
 }
@@ -1228,13 +1228,13 @@ void enterCriticalSectionsOnCoordinatorToBlockReads(OperationContext* opCtx,
         : originalNss;
 
     ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx, mainNss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+        opCtx, mainNss, critSecReason, defaultMajorityWriteConcernDoNotUse());
 
     ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx,
         mainNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
-        ShardingCatalogClient::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
 }
 
 /**
@@ -1313,10 +1313,8 @@ boost::optional<UUID> createCollectionAndIndexes(
     // Wait until the index is majority written, to prevent having the collection commited to the
     // config server, but the index creation rolled backed on stepdowns.
     WriteConcernResult ignoreResult;
-    uassertStatusOK(waitForWriteConcern(opCtx,
-                                        replClientInfo.getLastOp(),
-                                        ShardingCatalogClient::kMajorityWriteConcern,
-                                        &ignoreResult));
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, replClientInfo.getLastOp(), defaultMajorityWriteConcernDoNotUse(), &ignoreResult));
 
     return *sharding_ddl_util::getCollectionUUID(opCtx, translatedNss);
 }

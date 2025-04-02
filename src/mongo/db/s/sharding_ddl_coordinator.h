@@ -46,6 +46,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
@@ -429,7 +430,7 @@ protected:
 
         PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
         try {
-            store.add(opCtx, newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
+            store.add(opCtx, newDoc, defaultMajorityWriteConcern());
         } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
             // A series of step-up and step-down events can cause a node to try and insert the
             // document when it has already been persisted locally, but we must still wait for
@@ -453,7 +454,7 @@ protected:
         store.update(opCtx,
                      BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
                      newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcernNoTimeout);
+                     defaultMajorityWriteConcern());
 
         {
             stdx::lock_guard lk{_docMutex};

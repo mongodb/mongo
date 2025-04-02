@@ -534,15 +534,15 @@ BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
 
         parsedWC.w = WriteConcernOptions::kMajority;
         return appendWCToObj(cmdObj, parsedWC);
-    } else if (!defaultWC.usedDefaultConstructedWC) {
-        defaultWC.w = WriteConcernOptions::kMajority;
-        if (defaultWC.wTimeout < generic_argument_util::kMajorityWriteConcern.wTimeout) {
-            defaultWC.wTimeout = generic_argument_util::kMajorityWriteConcern.wTimeout;
-        }
-        return appendWCToObj(cmdObj, defaultWC);
-    } else {
-        return appendWCToObj(cmdObj, generic_argument_util::kMajorityWriteConcern);
     }
+
+    auto global = defaultMajorityWriteConcernDoNotUse();
+    if (defaultWC.usedDefaultConstructedWC)
+        return appendWCToObj(cmdObj, global);
+
+    defaultWC.w = WriteConcernOptions::kMajority;
+    defaultWC.wTimeout = std::max(defaultWC.wTimeout, global.wTimeout);
+    return appendWCToObj(cmdObj, defaultWC);
 }
 
 BSONObj CommandHelpers::filterCommandRequestForPassthrough(const BSONObj& cmdObj) {

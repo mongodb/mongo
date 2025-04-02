@@ -33,14 +33,41 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/generic_argument_gen.h"
 
-namespace mongo::generic_argument_util {
+namespace mongo {
 
 /**
- * Generic majority WC to use for intra-cluster communication that requires the recipient to execute
- * some command with a majority WC. This is used by `setMajorityWriteConcern` and
- * `CommandHelpers::appendMajorityWriteConcern` unless another is specified.
+ * Hardcoded majority write concern with no timeout to use for intra-cluster writes.
+ *
+ * NOTE: Callers that need to wait for majority write concern must consider at least the following
+ * implications:
+ *
+ * (1) The wait can last a very long time (in case of replication lag). Depending on
+ * how the waiters are scheduled, this can cause a build-up of threads blocked on majority
+ * replication, so the caller needs to ensure that this does not impact availability (OOM the
+ * server). Because of (2) below, adding a timeout is usually not a good solution.
+ *
+ * (2) The wait can eventually fail, which means the state of the write is indeterminate, so the
+ * caller needs to be prepared to recover. In most cases, this recovery means using retryable writes
+ * or transactions; however if this is not possible another, more complicated recovery protocol may
+ * need to be implemented.
  */
-extern const WriteConcernOptions kMajorityWriteConcern;
+WriteConcernOptions defaultMajorityWriteConcern();
+
+/**
+ * Hardcoded majority write concern to use for intra-cluster writes, that requires the wait for
+ * majority to fail if not satisfied within a fixed time, because the caller is not prepared for a
+ * longer wait.
+ *
+ * The "fixed time" is arbitrarily selected to be 60 seconds and there could be tests and possibly
+ * external features that rely on this value, so it must not be changed. Instead all users of this
+ * value must eventually be converted to the `defaultMajorityWriteConcern` variant above.
+ *
+ * DO NOT add any new usages of this function and instead use the `defaultMajorityWriteConcern`
+ * variant above and carefully read its comments.
+ */
+WriteConcernOptions defaultMajorityWriteConcernDoNotUse();
+
+namespace generic_argument_util {
 
 /**
  * Command helpers that operate on an idl struct rather than modifying an existing BSONObj.
@@ -56,7 +83,7 @@ extern const WriteConcernOptions kMajorityWriteConcern;
  * set. Its "w" field will be set to "majority" if it was not set to that already.
  *
  * In all other cases, the write concern will be set to
- * generic_argument_util::kMajorityWriteConcern.
+ * defaultMajorityWriteConcernDoNotUse().
  */
 template <typename CommandType>
 void setMajorityWriteConcern(CommandType& args, const WriteConcernOptions* defaultWC = nullptr) {
@@ -69,15 +96,16 @@ void setMajorityWriteConcern(CommandType& args, const WriteConcernOptions* defau
         auto newWC = parsedWC;
         newWC->w = WriteConcernOptions::kMajority;
         args.setWriteConcern(std::move(newWC));
-    } else if (defaultWC && !defaultWC->usedDefaultConstructedWC) {
+    }
+
+    auto&& global = defaultMajorityWriteConcernDoNotUse();
+    if (defaultWC && !defaultWC->usedDefaultConstructedWC) {
         auto wc = *defaultWC;
         wc.w = WriteConcernOptions::kMajority;
-        if (wc.wTimeout < kMajorityWriteConcern.wTimeout) {
-            wc.wTimeout = kMajorityWriteConcern.wTimeout;
-        }
+        wc.wTimeout = std::max(wc.wTimeout, global.wTimeout);
         args.setWriteConcern(std::move(wc));
     } else {
-        args.setWriteConcern(kMajorityWriteConcern);
+        args.setWriteConcern(global);
     }
 }
 
@@ -153,4 +181,5 @@ void prepareRequestForSearchIndexManagerPassthrough(CommandType& cmd) {
     cmd.setGenericArguments({});
 }
 
-}  // namespace mongo::generic_argument_util
+}  // namespace generic_argument_util
+}  // namespace mongo

@@ -281,7 +281,10 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -295,7 +298,10 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
 
     ShardingRecoveryService::get(operationContext())
         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -308,11 +314,12 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(operationContext(),
-                                            dbName,
-                                            dbOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern,
-                                            ShardingRecoveryService::NoCustomAction());
+        ->releaseRecoverableCriticalSection(
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -328,11 +335,17 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -346,11 +359,17 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
 
     ShardingRecoveryService::get(operationContext())
         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     ShardingRecoveryService::get(operationContext())
         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -363,18 +382,20 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(operationContext(),
-                                            dbName,
-                                            dbOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern,
-                                            ShardingRecoveryService::NoCustomAction());
+        ->releaseRecoverableCriticalSection(
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction());
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(operationContext(),
-                                            dbName,
-                                            dbOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern,
-                                            ShardingRecoveryService::NoCustomAction());
+        ->releaseRecoverableCriticalSection(
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -392,13 +413,17 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     ShardingRecoveryService::get(operationContext())
-        ->acquireRecoverableCriticalSectionBlockWrites(operationContext(),
-                                                       dbName,
-                                                       differentOpReason,
-                                                       ShardingCatalogClient::kLocalWriteConcern);
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(),
+            dbName,
+            differentOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
@@ -410,7 +435,10 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -421,7 +449,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
             operationContext(),
             dbName,
             differentOpReason,
-            ShardingCatalogClient::kLocalWriteConcern);
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
@@ -433,7 +461,10 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -441,18 +472,22 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     ShardingRecoveryService::get(operationContext())
         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            operationContext(), dbName, dbOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            dbName,
+            dbOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     /////////////////////////////////
     // Unblock read/write operations
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(operationContext(),
-                                            dbName,
-                                            differentOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern,
-                                            ShardingRecoveryService::NoCustomAction());
+        ->releaseRecoverableCriticalSection(
+            operationContext(),
+            dbName,
+            differentOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction());
 }
 
 TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollection) {
@@ -462,7 +497,10 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -476,7 +514,10 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
 
     ShardingRecoveryService::get(operationContext())
         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -489,11 +530,12 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(operationContext(),
-                                            collNss,
-                                            collOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern,
-                                            ShardingRecoveryService::NoCustomAction());
+        ->releaseRecoverableCriticalSection(
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
@@ -509,11 +551,17 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -527,11 +575,17 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
 
     ShardingRecoveryService::get(operationContext())
         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     ShardingRecoveryService::get(operationContext())
         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -544,18 +598,20 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(operationContext(),
-                                            collNss,
-                                            collOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern,
-                                            ShardingRecoveryService::NoCustomAction());
+        ->releaseRecoverableCriticalSection(
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction());
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(operationContext(),
-                                            collNss,
-                                            collOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern,
-                                            ShardingRecoveryService::NoCustomAction());
+        ->releaseRecoverableCriticalSection(
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction());
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
@@ -573,13 +629,17 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     ShardingRecoveryService::get(operationContext())
-        ->acquireRecoverableCriticalSectionBlockWrites(operationContext(),
-                                                       collNss,
-                                                       differentOpReason,
-                                                       ShardingCatalogClient::kLocalWriteConcern);
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            operationContext(),
+            collNss,
+            differentOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
@@ -591,7 +651,10 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -602,7 +665,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
             operationContext(),
             collNss,
             differentOpReason,
-            ShardingCatalogClient::kLocalWriteConcern);
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
@@ -614,7 +677,10 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -622,18 +688,22 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     ShardingRecoveryService::get(operationContext())
         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            operationContext(), collNss, collOpReason, ShardingCatalogClient::kLocalWriteConcern);
+            operationContext(),
+            collNss,
+            collOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     /////////////////////////////////
     // Unblock read/write operations
     /////////////////////////////////
 
     ShardingRecoveryService::get(operationContext())
-        ->releaseRecoverableCriticalSection(operationContext(),
-                                            collNss,
-                                            differentOpReason,
-                                            ShardingCatalogClient::kLocalWriteConcern,
-                                            ShardingRecoveryService::NoCustomAction());
+        ->releaseRecoverableCriticalSection(
+            operationContext(),
+            collNss,
+            differentOpReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

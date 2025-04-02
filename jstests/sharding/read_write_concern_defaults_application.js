@@ -333,6 +333,7 @@ let testCases = {
             assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
         },
         command: {collMod: coll, validator: {}},
+        target: "replset",
         checkReadConcern: false,
         checkWriteConcern: true,
     },

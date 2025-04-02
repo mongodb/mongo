@@ -50,6 +50,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
@@ -82,7 +83,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
@@ -90,7 +90,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -112,9 +111,6 @@ const auto msmForCsr = CollectionShardingRuntime::declareDecoration<MigrationSou
 // entered
 const Hours kMaxWaitToEnterCriticalSectionTimeout(6);
 const char kWriteConcernField[] = "writeConcern";
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutMigration);
 
 /*
  * Calculates the max or min bound perform split+move in case the chunk in question is splittable.
@@ -395,7 +391,7 @@ void MigrationSourceManager::startClone() {
         nss(),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
-        ShardingCatalogClient::kMajorityWriteConcern));
+        defaultMajorityWriteConcernDoNotUse()));
 
     _cloneAndCommitTimer.reset();
 
@@ -495,7 +491,7 @@ void MigrationSourceManager::enterCriticalSection() {
         WriteConcernResult ignoreResult;
         auto latestOpTime = repl::ReplClientInfo::forClient(_opCtx->getClient()).getLastOp();
         uassertStatusOK(waitForWriteConcern(
-            _opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernNoTimeout, &ignoreResult));
+            _opCtx, latestOpTime, defaultMajorityWriteConcern(), &ignoreResult));
     }
 
     LOGV2_DEBUG_OPTIONS(4817402,
@@ -584,7 +580,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                                             metadata.getCollPlacementVersion());
 
         request.serialize(&builder);
-        builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
+        builder.append(kWriteConcernField, defaultMajorityWriteConcernDoNotUse().toBSON());
     }
 
     // Read operations must begin to wait on the critical section just before we send the commit
@@ -716,7 +712,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         nss(),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard() << "counts" << *_recipientCloneCounts),
-        ShardingCatalogClient::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
 
     const ChunkRange range(*_args.getMin(), *_args.getMax());
 
@@ -757,7 +753,7 @@ void MigrationSourceManager::_cleanupOnError() noexcept {
         _args.getCommandParameter(),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
-        ShardingCatalogClient::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
 
     _cleanup(true);
 }

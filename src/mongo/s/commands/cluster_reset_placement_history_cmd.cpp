@@ -86,7 +86,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             ConfigsvrResetPlacementHistory configsvrRequest;
             configsvrRequest.setDbName(DatabaseName::kAdmin);
-            configsvrRequest.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+            configsvrRequest.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             const auto commandResponse = uassertStatusOK(

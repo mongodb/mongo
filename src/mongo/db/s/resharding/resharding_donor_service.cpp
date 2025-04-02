@@ -472,7 +472,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            opCtx.get(),
                            _metadata.getSourceNss(),
                            _critSecReason,
-                           ShardingCatalogClient::kLocalWriteConcern,
+                           ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                            *onReleaseCriticalSectionAction);
 
                    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
@@ -829,7 +829,7 @@ void ReshardingDonorService::DonorStateMachine::
                 opCtx.get(),
                 _metadata.getSourceNss(),
                 _critSecReason,
-                ShardingCatalogClient::kLocalWriteConcern);
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
         _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                               resharding::getCurrentTime());
@@ -935,7 +935,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
                 opCtx.get(),
                 _metadata.getSourceNss(),
                 _critSecReason,
-                ShardingCatalogClient::kLocalWriteConcern);
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
         reshardingPauseDonorAfterBlockingReads.pauseWhileSet(opCtx.get());
     }
 

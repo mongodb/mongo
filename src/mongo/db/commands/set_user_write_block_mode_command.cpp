@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-
-#include <memory>
 #include <string>
 
 #include "mongo/base/error_codes.h"
@@ -41,6 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -52,7 +51,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -129,11 +127,10 @@ public:
             // majority commited.
             auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
             WriteConcernResult writeConcernResult;
-            WriteConcernOptions majority(WriteConcernOptions::kMajority,
-                                         WriteConcernOptions::SyncMode::UNSET,
-                                         WriteConcernOptions::kWriteConcernTimeoutUserCommand);
-            uassertStatusOK(
-                waitForWriteConcern(opCtx, replClient.getLastOp(), majority, &writeConcernResult));
+            uassertStatusOK(waitForWriteConcern(opCtx,
+                                                replClient.getLastOp(),
+                                                defaultMajorityWriteConcernDoNotUse(),
+                                                &writeConcernResult));
         }
 
     private:

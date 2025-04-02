@@ -214,7 +214,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     const auto originalWC = opCtx->getWriteConcern();
                     ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
 
-                    opCtx->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
+                    opCtx->setWriteConcern(defaultMajorityWriteConcernDoNotUse());
                     topology_change_helpers::addShardInTransaction(
                         opCtx, shard, std::move(dbList), std::vector<CollectionType>{});
                 }
@@ -227,7 +227,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                                        "addShard",
                                                        NamespaceString::kEmpty,
                                                        shardDetails.obj(),
-                                                       ShardingCatalogClient::kMajorityWriteConcern,
+                                                       defaultMajorityWriteConcernDoNotUse(),
                                                        shardingCatalogManager.localConfigShard(),
                                                        shardingCatalogManager.localCatalogClient());
 

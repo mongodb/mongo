@@ -92,7 +92,7 @@ void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
             newOpCtx.get(),
             bucketNs,
             reason,
-            ShardingCatalogClient::kLocalWriteConcern,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
             ShardingRecoveryService::FilteringMetadataClearer());
     } else {
         // No need to create a new operation context if no session is checked-out
@@ -100,7 +100,7 @@ void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
             opCtx,
             bucketNs,
             reason,
-            ShardingCatalogClient::kLocalWriteConcern,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
             ShardingRecoveryService::FilteringMetadataClearer());
     }
 }

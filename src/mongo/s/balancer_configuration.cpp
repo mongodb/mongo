@@ -40,7 +40,6 @@
 #include <cstdio>
 #include <deque>
 #include <iterator>
-#include <mutex>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -59,7 +58,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
@@ -149,7 +148,7 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx,
         BSON("$set" << BSON(kStopped << (mode == BalancerSettingsType::kOff) << kMode
                                      << BalancerSettingsType::kBalancerModes[mode])),
         true,
-        ShardingCatalogClient::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
 
     Status refreshStatus = refreshAndCheck(opCtx);
     if (!refreshStatus.isOK()) {
@@ -172,7 +171,7 @@ Status BalancerConfiguration::changeAutoMergeSettings(OperationContext* opCtx, b
         BSON("_id" << AutoMergeSettingsType::kKey),
         BSON("$set" << BSON(kEnabled << enable)),
         true,
-        ShardingCatalogClient::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
 
     Status refreshStatus = refreshAndCheck(opCtx);
     if (!refreshStatus.isOK()) {

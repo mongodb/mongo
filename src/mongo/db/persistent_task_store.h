@@ -33,16 +33,15 @@
 #include <fmt/format.h>
 #include <functional>
 #include <memory>
-#include <string>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
@@ -55,25 +54,9 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
-
-namespace WriteConcerns {
-
-const WriteConcernOptions kMajorityWriteConcernShardingTimeout{
-    WriteConcernOptions::kMajority,
-    WriteConcernOptions::SyncMode::UNSET,
-    WriteConcernOptions::kWriteConcernTimeoutSharding};
-
-const WriteConcernOptions kMajorityWriteConcernNoTimeout{WriteConcernOptions::kMajority,
-                                                         WriteConcernOptions::SyncMode::UNSET,
-                                                         WriteConcernOptions::kNoTimeout};
-
-const WriteConcernOptions kLocalWriteConcern;
-
-}  // namespace WriteConcerns
 
 template <typename T>
 class PersistentTaskStore {
@@ -85,8 +68,7 @@ public:
      */
     void add(OperationContext* opCtx,
              const T& task,
-             const WriteConcernOptions& writeConcern =
-                 WriteConcerns::kMajorityWriteConcernShardingTimeout) {
+             const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         DBDirectClient dbClient(opCtx);
 
         const auto commandResponse = dbClient.runCommand([&] {
@@ -110,8 +92,7 @@ public:
     void update(OperationContext* opCtx,
                 const BSONObj& filter,
                 const BSONObj& update,
-                const WriteConcernOptions& writeConcern =
-                    WriteConcerns::kMajorityWriteConcernShardingTimeout) {
+                const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         _update(opCtx, filter, update, /* upsert */ false, writeConcern);
     }
 
@@ -122,8 +103,7 @@ public:
     void upsert(OperationContext* opCtx,
                 const BSONObj& filter,
                 const BSONObj& update,
-                const WriteConcernOptions& writeConcern =
-                    WriteConcerns::kMajorityWriteConcernShardingTimeout) {
+                const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         _update(opCtx, filter, update, /* upsert */ true, writeConcern);
     }
 
@@ -132,8 +112,7 @@ public:
      */
     void remove(OperationContext* opCtx,
                 const BSONObj& filter,
-                const WriteConcernOptions& writeConcern =
-                    WriteConcerns::kMajorityWriteConcernShardingTimeout) {
+                const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = dbClient.runCommand([&] {
@@ -202,8 +181,7 @@ private:
                  const BSONObj& filter,
                  const BSONObj& update,
                  bool upsert,
-                 const WriteConcernOptions& writeConcern =
-                     WriteConcerns::kMajorityWriteConcernShardingTimeout) {
+                 const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = write_ops::checkWriteErrors(dbClient.update([&] {
@@ -226,6 +204,7 @@ private:
         auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
     }
+
     NamespaceString _storageNss;
 };
 

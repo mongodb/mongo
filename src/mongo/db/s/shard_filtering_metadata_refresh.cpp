@@ -606,7 +606,10 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                                                                       doc.getRange(),
                                                                       doc.getId());
                 rangedeletionutil::deleteRangeDeletionTaskLocally(
-                    opCtx, doc.getCollectionUuid(), doc.getRange());
+                    opCtx,
+                    doc.getCollectionUuid(),
+                    doc.getRange(),
+                    defaultMajorityWriteConcernDoNotUse());
                 coordinator.forgetMigration(opCtx);
                 setFilteringMetadata();
                 return true;

@@ -1560,7 +1560,7 @@ private:
             entry.setMulti(true);
             return entry;
         }()});
-        updateOp.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
+        updateOp.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
         DBDirectClient client(opCtx);
         const auto result = client.update(updateOp);

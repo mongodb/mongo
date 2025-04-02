@@ -28,12 +28,11 @@
  */
 
 #include "mongo/db/s/untrack_unsplittable_collection_coordinator.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
+
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_state.h"
@@ -103,9 +102,15 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
 
     auto service = ShardingRecoveryService::get(opCtx);
     service->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx, nss(), _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+        opCtx,
+        nss(),
+        _critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
     service->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx, nss(), _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+        opCtx,
+        nss(),
+        _critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     // Set the collection object in the document for the next phase.
     _doc.setOptCollType(sharding_ddl_util::getCollectionFromConfigServer(opCtx, nss()));
@@ -133,7 +138,7 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
             Grid::get(opCtx)->catalogClient(),
             _doc.getOptCollType().get(),
-            ShardingCatalogClient::kMajorityWriteConcern,
+            defaultMajorityWriteConcernDoNotUse(),
             session,
             useClusterTransaction,
             **executor);
@@ -184,11 +189,12 @@ void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
     auto service = ShardingRecoveryService::get(opCtx);
-    service->releaseRecoverableCriticalSection(opCtx,
-                                               nss(),
-                                               _critSecReason,
-                                               ShardingCatalogClient::kLocalWriteConcern,
-                                               ShardingRecoveryService::FilteringMetadataClearer());
+    service->releaseRecoverableCriticalSection(
+        opCtx,
+        nss(),
+        _critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        ShardingRecoveryService::FilteringMetadataClearer());
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "untrackCollection.end", nss());
 }

@@ -32,7 +32,6 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -56,40 +55,24 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/index_version.h"
-#include "mongo/s/request_types/placement_history_commands_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 
-struct BSONArray;
-class BSONArrayBuilder;
-class BSONObj;
-class BSONObjBuilder;
 class ChunkType;
-
 class CollectionType;
-class ConnectionString;
-
 class DatabaseType;
-class LogicalTime;
-class OperationContext;
-class ShardKeyPattern;
 class TagsType;
-
 class VersionType;
 
-namespace executor {
-struct ConnectionPoolStats;
-}
+class LogicalTime;
 
 /**
  * Abstracts reads of the sharding catalog metadata.
@@ -107,11 +90,11 @@ class ShardingCatalogClient {
     ShardingCatalogClient& operator=(const ShardingCatalogClient&) = delete;
 
 public:
-    // Constant to use for configuration data majority writes
-    static const WriteConcernOptions kMajorityWriteConcern;
-
-    // Constant to use for configuration data local writes
-    static const WriteConcernOptions kLocalWriteConcern;
+    /**
+     * Hardcoded local write concern that writes performed locally must use when they are certain
+     * that something upstream will wait for majority.
+     */
+    static WriteConcernOptions writeConcernLocalHavingUpstreamWaiter();
 
     // Identifier for the "initialization metadata" documents of config.placementHistory
     static const NamespaceString kConfigPlacementHistoryInitializationMarker;

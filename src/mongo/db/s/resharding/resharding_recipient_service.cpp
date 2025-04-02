@@ -514,7 +514,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                 opCtx.get(),
                                 _metadata.getSourceNss(),
                                 _critSecReason,
-                                ShardingCatalogClient::kLocalWriteConcern,
+                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                                 ShardingRecoveryService::FilteringMetadataClearer());
                     }
                 })
@@ -1257,7 +1257,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                         opCtx.get(),
                         _metadata.getSourceNss(),
                         _critSecReason,
-                        ShardingCatalogClient::kLocalWriteConcern);
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
             }
             reshardingPauseRecipientBeforeEnteringStrictConsistency.pauseWhileSet();
             _transitionState(RecipientStateEnum::kStrictConsistency, factory);
@@ -1318,7 +1318,7 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
                 opCtx.get(),
                 _metadata.getSourceNss(),
                 _critSecReason,
-                ShardingCatalogClient::kLocalWriteConcern);
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
         resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
     }

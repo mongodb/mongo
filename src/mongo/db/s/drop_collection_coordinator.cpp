@@ -335,7 +335,7 @@ void DropCollectionCoordinator::_commitDropCollection(
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
             Grid::get(opCtx)->catalogClient(),
             coll,
-            ShardingCatalogClient::kMajorityWriteConcern,
+            defaultMajorityWriteConcernDoNotUse(),
             getNewSession(opCtx),
             useClusterTransaction,
             **executor);

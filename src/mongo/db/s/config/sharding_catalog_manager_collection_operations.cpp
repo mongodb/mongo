@@ -53,6 +53,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -453,7 +454,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
                                                "configureCollectionBalancing",
                                                nss,
                                                logChangeDetail.obj(),
-                                               ShardingCatalogClient::kMajorityWriteConcern,
+                                               defaultMajorityWriteConcernDoNotUse(),
                                                _localConfigShard,
                                                _localCatalogClient.get());
     };

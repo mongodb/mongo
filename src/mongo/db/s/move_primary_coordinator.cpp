@@ -623,7 +623,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
             commandBuilder.appendElements(osi->toBSON());
         }
         commandBuilder.append(WriteConcernOptions::kWriteConcernField,
-                              generic_argument_util::kMajorityWriteConcern.toBSON());
+                              defaultMajorityWriteConcernDoNotUse().toBSON());
         return commandBuilder.obj();
     };
 
@@ -837,13 +837,16 @@ void MovePrimaryCoordinator::blockWrites(OperationContext* opCtx) const {
         opCtx,
         NamespaceString(_dbName),
         _csReason,
-        ShardingCatalogClient::kLocalWriteConcern,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
         clearDbInfo);
 }
 
 void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
     ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
-        opCtx, NamespaceString(_dbName), _csReason, ShardingCatalogClient::kLocalWriteConcern);
+        opCtx,
+        NamespaceString(_dbName),
+        _csReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
@@ -862,7 +865,7 @@ void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) cons
         opCtx,
         NamespaceString(_dbName),
         _csReason,
-        ShardingCatalogClient::kLocalWriteConcern,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
         beforeReleasingAction,
         false /*throwIfReasonDiffers*/);
 }

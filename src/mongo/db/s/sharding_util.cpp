@@ -56,7 +56,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
-#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/remote_command_response.h"

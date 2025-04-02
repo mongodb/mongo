@@ -54,6 +54,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
@@ -296,7 +297,7 @@ ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
                     store.upsert(opCtx,
                                  BSON(VectorClockDocument::k_idFieldName << vcd.get_id()),
                                  vcd.toBSON(),
-                                 WriteConcerns::kMajorityWriteConcernNoTimeout);
+                                 defaultMajorityWriteConcern());
                     return vectorTime;
                 });
 

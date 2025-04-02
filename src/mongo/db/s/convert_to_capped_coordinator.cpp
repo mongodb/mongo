@@ -73,7 +73,7 @@ void logConvertToCappedOnChangelog(OperationContext* opCtx,
                                                << "convertToCapped." << (start ? "start" : "end"),
                                            nss,
                                            message,
-                                           ShardingCatalogClient::kMajorityWriteConcern);
+                                           defaultMajorityWriteConcernDoNotUse());
 }
 
 void convertToCappedOnShard(OperationContext* opCtx,
@@ -235,7 +235,10 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-                    opCtx, nss(), _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+                    opCtx,
+                    nss(),
+                    _critSecReason,
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
                 // Check preconditions again under the critical section because we're guaranteed no
                 // catalog changes can happen at this point.
@@ -243,7 +246,10 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
 
                 ShardingRecoveryService::get(opCtx)
                     ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+                        opCtx,
+                        nss(),
+                        _critSecReason,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
@@ -376,7 +382,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
                             Grid::get(opCtx)->catalogClient(),
                             *_doc.getOriginalCollection(),
-                            ShardingCatalogClient::kMajorityWriteConcern,
+                            defaultMajorityWriteConcernDoNotUse(),
                             session,
                             useClusterTransaction,
                             **executor);
@@ -422,7 +428,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     opCtx,
                     nss(),
                     _critSecReason,
-                    ShardingCatalogClient::kMajorityWriteConcern,
+                    defaultMajorityWriteConcernDoNotUse(),
                     ShardingRecoveryService::FilteringMetadataClearer(),
                     true /* throwIfReasonDiffers */);
             }))
@@ -508,7 +514,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
                     opCtx,
                     nss(),
                     _critSecReason,
-                    ShardingCatalogClient::kMajorityWriteConcern,
+                    defaultMajorityWriteConcernDoNotUse(),
                     ShardingRecoveryService::NoCustomAction(),
                     false /* throwIfReasonDiffers */);
             }

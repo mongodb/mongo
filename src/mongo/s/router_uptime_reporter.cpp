@@ -29,9 +29,7 @@
 
 
 #include <memory>
-#include <mutex>
 #include <string>
-
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -41,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
@@ -58,7 +57,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
@@ -115,7 +113,7 @@ void reportStatus(OperationContext* opCtx,
             BSON(MongosType::name(instanceId)),
             BSON("$set" << BSONObjForUpdate << "$setOnInsert" << createdBSON.obj()),
             true,
-            ShardingCatalogClient::kMajorityWriteConcern));
+            defaultMajorityWriteConcernDoNotUse()));
     } catch (const DBException& e) {
         LOGV2(22875,
               "Error while attempting to write this node's uptime to config.mongos",

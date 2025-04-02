@@ -83,7 +83,7 @@ void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId) {
                     entry.setUpsert(true);
                     return entry;
                 }()});
-                updateOp.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+                updateOp.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
                 return updateOp.toBSON();
             }());
 

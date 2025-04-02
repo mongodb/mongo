@@ -50,10 +50,10 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -252,7 +252,7 @@ public:
 
             auto writeResult = [&] {
                 if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-                    request.setWriteConcern(WriteConcerns::kMajorityWriteConcernNoTimeout);
+                    request.setWriteConcern(defaultMajorityWriteConcern());
 
                     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
                     auto swResponse = configShard->runCommandWithFixedRetryAttempts(

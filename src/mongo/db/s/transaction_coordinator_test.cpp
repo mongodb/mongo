@@ -181,27 +181,26 @@ protected:
         : TransactionCoordinatorTestFixture(std::move(options)) {}
 
     void assertPrepareSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
-                                        kPrepareOk,
-                                        generic_argument_util::kMajorityWriteConcern);
+        assertCommandSentAndRespondWith(
+            PrepareTransaction::kCommandName, kPrepareOk, defaultMajorityWriteConcernDoNotUse());
     }
 
     void assertPrepareSentAndRespondWithSuccess(const Timestamp& timestamp) {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         makePrepareOkResponse(timestamp, kDummyAffectedNamespaces),
-                                        generic_argument_util::kMajorityWriteConcern);
+                                        defaultMajorityWriteConcernDoNotUse());
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransaction() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kNoSuchTransaction,
-                                        generic_argument_util::kMajorityWriteConcern);
+                                        defaultMajorityWriteConcernDoNotUse());
     }
 
     void assertPrepareSentAndRespondWithRetryableError() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kRetryableError,
-                                        generic_argument_util::kMajorityWriteConcern);
+                                        defaultMajorityWriteConcernDoNotUse());
         advanceClockAndExecuteScheduledTasks();
     }
 
@@ -287,7 +286,7 @@ auto makeDummyPrepareCommand(const LogicalSessionId& lsid,
     prepareCmd.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
     prepareCmd.setTxnRetryCounter(txnNumberAndRetryCounter.getTxnRetryCounter());
     prepareCmd.setAutocommit(false);
-    prepareCmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    prepareCmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
     return prepareCmd.toBSON();
 }
 
@@ -647,7 +646,7 @@ TEST_F(TransactionCoordinatorDriverTest,
     assertPrepareSentAndRespondWithSuccess(timestamp);
     assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                     kPrepareOkNoTimestamp,
-                                    generic_argument_util::kMajorityWriteConcern);
+                                    defaultMajorityWriteConcernDoNotUse());
 
     auto decision = future.get().decision();
 
@@ -671,7 +670,7 @@ TEST_F(TransactionCoordinatorDriverTest,
         PrepareTransaction::kCommandName,
         BSON("ok" << 0 << "code" << ErrorCodes::ReadConcernMajorityNotEnabled << "errmsg"
                   << "Read concern majority not enabled"),
-        generic_argument_util::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
 
     auto decision = future.get().decision();
 
@@ -743,13 +742,13 @@ TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardsCollectsAffectedName
         makePrepareOkResponse(timestamp,
                               {NamespaceString::createNamespaceString_forTest("db1.coll1"),
                                NamespaceString::createNamespaceString_forTest("db2.coll2")}),
-        generic_argument_util::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
     assertCommandSentAndRespondWith(
         PrepareTransaction::kCommandName,
         makePrepareOkResponse(timestamp,
                               {NamespaceString::createNamespaceString_forTest("db1.coll2"),
                                NamespaceString::createNamespaceString_forTest("db2.coll1")}),
-        generic_argument_util::kMajorityWriteConcern);
+        defaultMajorityWriteConcernDoNotUse());
 
     auto response = future.get();
     ASSERT_EQUALS(txn::CommitDecision::kCommit, response.decision().getDecision());

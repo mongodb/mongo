@@ -95,7 +95,7 @@ MoveTimingHelper::~MoveTimingHelper() {
                                                 str::stream() << "moveChunk." << _where,
                                                 _ns,
                                                 _b.obj(),
-                                                ShardingCatalogClient::kMajorityWriteConcern);
+                                                defaultMajorityWriteConcernDoNotUse());
     } catch (const std::exception& e) {
         LOGV2_WARNING(23759,
                       "couldn't record timing for moveChunk '{where}': {e_what}",

@@ -292,7 +292,7 @@ void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* 
         opCtx,
         BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << _sourceId.toBSON()),
         builder.obj(),
-        WriteConcerns::kLocalWriteConcern);
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     _env->applierMetrics()->onOplogEntriesApplied(_currentBatchToApply.size());
 

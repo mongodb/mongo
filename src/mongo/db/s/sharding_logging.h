@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
@@ -67,18 +68,17 @@ public:
         StringData what,
         const NamespaceString& ns,
         const BSONObj& detail = BSONObj(),
-        const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern,
+        const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse(),
         std::shared_ptr<Shard> configShard = nullptr,
         ShardingCatalogClient* catalogClient = nullptr);
 
-    void logChange(
-        OperationContext* const opCtx,
-        const StringData what,
-        const NamespaceString& ns,
-        const BSONObj& detail = BSONObj(),
-        const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern,
-        std::shared_ptr<Shard> configShard = nullptr,
-        ShardingCatalogClient* catalogClient = nullptr) {
+    void logChange(OperationContext* const opCtx,
+                   const StringData what,
+                   const NamespaceString& ns,
+                   const BSONObj& detail = BSONObj(),
+                   const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse(),
+                   std::shared_ptr<Shard> configShard = nullptr,
+                   ShardingCatalogClient* catalogClient = nullptr) {
         // It is safe to ignore the results of `logChangeChecked` in many cases, as the
         // failure to log a change is often of no consequence.
         logChangeChecked(

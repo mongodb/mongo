@@ -769,7 +769,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             // dimissed only when the transaction really fails.
             const auto originalWC = opCtx->getWriteConcern();
             ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
-            opCtx->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
+            opCtx->setWriteConcern(ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
             topology_change_helpers::addShardInTransaction(
                 opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
@@ -803,7 +803,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                                                "addShard",
                                                NamespaceString::kEmpty,
                                                shardDetails.obj(),
-                                               ShardingCatalogClient::kMajorityWriteConcern,
+                                               defaultMajorityWriteConcernDoNotUse(),
                                                _localConfigShard,
                                                _localCatalogClient.get());
 
@@ -931,23 +931,24 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
         LOGV2(21945, "Going to start draining shard", "shardId"_attr = shardName);
 
         // Record start in changelog
-        uassertStatusOK(
-            ShardingLogging::get(opCtx)->logChangeChecked(opCtx,
-                                                          "removeShard.start",
-                                                          NamespaceString::kEmpty,
-                                                          BSON("shard" << shardName),
-                                                          ShardingCatalogClient::kLocalWriteConcern,
-                                                          _localConfigShard,
-                                                          _localCatalogClient.get()));
+        uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
+            opCtx,
+            "removeShard.start",
+            NamespaceString::kEmpty,
+            BSON("shard" << shardName),
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            _localConfigShard,
+            _localCatalogClient.get()));
 
-        uassertStatusOKWithContext(_localCatalogClient->updateConfigDocument(
-                                       opCtx,
-                                       NamespaceString::kConfigsvrShardsNamespace,
-                                       BSON(ShardType::name() << shardName),
-                                       BSON("$set" << BSON(ShardType::draining(true))),
-                                       false,
-                                       ShardingCatalogClient::kLocalWriteConcern),
-                                   "error starting removeShard");
+        uassertStatusOKWithContext(
+            _localCatalogClient->updateConfigDocument(
+                opCtx,
+                NamespaceString::kConfigsvrShardsNamespace,
+                BSON(ShardType::name() << shardName),
+                BSON("$set" << BSON(ShardType::draining(true))),
+                false,
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter()),
+            "error starting removeShard");
 
         return RemoveShardProgress{ShardDrainingStateEnum::kStarted};
     }
@@ -1090,9 +1091,10 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                     VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot())) {
                 DBDirectClient client(opCtx);
                 BSONObj result;
-                if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,
-                                           ShardingCatalogClient::kLocalWriteConcern,
-                                           &result)) {
+                if (!client.dropCollection(
+                        NamespaceString::kLogicalSessionsNamespace,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                        &result)) {
                     uassertStatusOK(getStatusFromCommandResult(result));
                 }
             }
@@ -1146,13 +1148,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     // Record finish in changelog
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "removeShard",
-                                           NamespaceString::kEmpty,
-                                           BSON("shard" << shardName),
-                                           ShardingCatalogClient::kLocalWriteConcern,
-                                           _localConfigShard,
-                                           _localCatalogClient.get());
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx,
+        "removeShard",
+        NamespaceString::kEmpty,
+        BSON("shard" << shardName),
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        _localConfigShard,
+        _localCatalogClient.get());
 
     hangRemoveShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
 

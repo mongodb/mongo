@@ -179,10 +179,8 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
                 // Wait for majority write concern.
                 WriteConcernResult ignoreResult;
                 auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-                uassertStatusOK(waitForWriteConcern(opCtx,
-                                                    latestOpTime,
-                                                    WriteConcerns::kMajorityWriteConcernNoTimeout,
-                                                    &ignoreResult));
+                uassertStatusOK(waitForWriteConcern(
+                    opCtx, latestOpTime, defaultMajorityWriteConcern(), &ignoreResult));
             }))
         .then(_buildPhaseHandler(Phase::kComplete, [this, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();
@@ -226,7 +224,7 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
             WriteConcernResult ignoreResult;
             auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             uassertStatusOK(waitForWriteConcern(
-                opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernNoTimeout, &ignoreResult));
+                opCtx, latestOpTime, defaultMajorityWriteConcern(), &ignoreResult));
         }));
 }
 

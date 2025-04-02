@@ -125,7 +125,7 @@ public:
                             opCtx,
                             ns(),
                             reason,
-                            ShardingCatalogClient::kLocalWriteConcern,
+                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                             beforeReleasingAction,
                             request().getThrowIfReasonDiffers().value_or(true));
                         break;
@@ -135,7 +135,7 @@ public:
                             opCtx,
                             ns(),
                             reason,
-                            ShardingCatalogClient::kLocalWriteConcern,
+                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                             request().getClearDbInfo());
                         break;
                     default:
@@ -143,10 +143,13 @@ public:
                             opCtx,
                             ns(),
                             reason,
-                            ShardingCatalogClient::kLocalWriteConcern,
+                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                             request().getClearDbInfo());
                         service->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                            opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+                            opCtx,
+                            ns(),
+                            reason,
+                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                 };
             };
 

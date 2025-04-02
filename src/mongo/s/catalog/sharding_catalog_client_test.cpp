@@ -35,9 +35,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <cstddef>
-#include <cstdint>
 #include <memory>
-#include <system_error>
 #include <tuple>
 
 #include "mongo/base/error_codes.h"
@@ -45,8 +43,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/write_ops/write_ops.h"
@@ -57,7 +55,6 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -66,7 +63,6 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -1115,7 +1111,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
             BSON(DatabaseType::kDbNameFieldName << dbt.getDbName().toString_forTest()),
             dbt.toBSON(),
             true,
-            ShardingCatalogClient::kMajorityWriteConcern);
+            defaultMajorityWriteConcernDoNotUse());
         ASSERT_OK(status);
     });
 
@@ -1165,7 +1161,7 @@ TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentNonRetryableError) {
             BSON(DatabaseType::kDbNameFieldName << dbt.getDbName().toString_forTest()),
             dbt.toBSON(),
             true,
-            ShardingCatalogClient::kMajorityWriteConcern);
+            defaultMajorityWriteConcernDoNotUse());
         ASSERT_EQ(ErrorCodes::Interrupted, status);
     });
 

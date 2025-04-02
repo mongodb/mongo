@@ -192,7 +192,8 @@ public:
 
                 AuthorizationSession::get(newOpCtxPtr.get()->getClient())
                     ->grantInternalAuthorization();
-                newOpCtxPtr->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
+                newOpCtxPtr->setWriteConcern(
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                 WriteBlockBypass::get(newOpCtxPtr.get()).set(true);
                 cloneDatabase(newOpCtxPtr.get(), dbName, from, result);
             }

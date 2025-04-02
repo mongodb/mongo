@@ -119,7 +119,7 @@ public:
                     newOpCtxPtr.get(),
                     NamespaceString::kConfigsvrChunksNamespace,
                     BSON(ChunkType::collectionUUID << collectionUUID),
-                    ShardingCatalogClient::kLocalWriteConcern));
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter()));
             }
 
             // Since no write happened on this txnNumber, we need to make a dummy write so that

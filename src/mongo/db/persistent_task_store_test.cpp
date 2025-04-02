@@ -225,12 +225,10 @@ TEST_F(PersistentTaskStoreTest, TestUpsert) {
 
     // Test that an attempt to upsert from the update command throws an error.
     ASSERT_THROWS_CODE(
-        store.update(opCtx, query, taskBson, WriteConcerns::kMajorityWriteConcernShardingTimeout),
-        DBException,
-        ErrorCodes::NoMatchingDocument);
+        store.update(opCtx, query, taskBson), DBException, ErrorCodes::NoMatchingDocument);
 
     // Test that the document is created when upserted.
-    store.upsert(opCtx, query, taskBson, WriteConcerns::kMajorityWriteConcernShardingTimeout);
+    store.upsert(opCtx, query, taskBson);
 
     ASSERT_EQ(store.count(opCtx, query), 1);
 
@@ -241,19 +239,13 @@ TEST_F(PersistentTaskStoreTest, TestUpsert) {
     });
 
     // Verify that updates happen as expected with upsert and update
-    store.upsert(opCtx,
-                 query,
-                 BSON("$inc" << BSON("min" << 1)),
-                 WriteConcerns::kMajorityWriteConcernShardingTimeout);
+    store.upsert(opCtx, query, BSON("$inc" << BSON("min" << 1)));
     store.forEach(opCtx, query, [&](const TestTask& t) {
         ASSERT_EQ(t.min, 1);
         return true;
     });
 
-    store.update(opCtx,
-                 query,
-                 BSON("$inc" << BSON("min" << 1)),
-                 WriteConcerns::kMajorityWriteConcernShardingTimeout);
+    store.update(opCtx, query, BSON("$inc" << BSON("min" << 1)));
     store.forEach(opCtx, query, [&](const TestTask& t) {
         ASSERT_EQ(t.min, 2);
         return true;

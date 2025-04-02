@@ -108,7 +108,7 @@ public:
             configSvrCommitMergeAllChunksOnShard.setMaxTimeProcessingChunksMS(
                 request().getMaxTimeProcessingChunksMS());
             configSvrCommitMergeAllChunksOnShard.setWriteConcern(
-                generic_argument_util::kMajorityWriteConcern);
+                defaultMajorityWriteConcernDoNotUse());
 
             auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto swCommandResponse = config->runCommandWithFixedRetryAttempts(

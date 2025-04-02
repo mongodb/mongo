@@ -33,8 +33,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <string>
-#include <tuple>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -48,6 +46,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -225,7 +224,7 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
 
     if (_doc.getPhase() == Phase::kUnset) {
         try {
-            store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
+            store.add(opCtx.get(), newDoc, defaultMajorityWriteConcern());
         } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
             // A series of step-up and step-down events can cause a node to try and insert the
             // document when it has already been persisted locally, but we must still wait for
@@ -241,7 +240,7 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
                      BSON(StateDoc::kFromNssFieldName << NamespaceStringUtil::serialize(
                               _doc.getFromNss(), SerializationContext::stateDefault())),
                      newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcernNoTimeout);
+                     defaultMajorityWriteConcern());
     }
 
     {
@@ -261,7 +260,7 @@ void RenameParticipantInstance::_removeStateDocument(OperationContext* opCtx) {
     store.remove(opCtx,
                  BSON(StateDoc::kFromNssFieldName << NamespaceStringUtil::serialize(
                           _doc.getFromNss(), SerializationContext::stateDefault())),
-                 WriteConcerns::kMajorityWriteConcernNoTimeout);
+                 defaultMajorityWriteConcern());
     {
         stdx::lock_guard<stdx::mutex> lg(_stateMutex);
         _doc = {};
@@ -342,13 +341,25 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     sharding_ddl_util::getCriticalSectionReasonForRename(fromNss, toNss);
                 auto service = ShardingRecoveryService::get(opCtx);
                 service->acquireRecoverableCriticalSectionBlockWrites(
-                    opCtx, fromNss, reason, ShardingCatalogClient::kLocalWriteConcern);
+                    opCtx,
+                    fromNss,
+                    reason,
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                 service->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                    opCtx, fromNss, reason, ShardingCatalogClient::kLocalWriteConcern);
+                    opCtx,
+                    fromNss,
+                    reason,
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                 service->acquireRecoverableCriticalSectionBlockWrites(
-                    opCtx, toNss, reason, ShardingCatalogClient::kLocalWriteConcern);
+                    opCtx,
+                    toNss,
+                    reason,
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                 service->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                    opCtx, toNss, reason, ShardingCatalogClient::kLocalWriteConcern);
+                    opCtx,
+                    toNss,
+                    reason,
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
 
                 rangedeletionutil::snapshotRangeDeletionsForRename(opCtx, fromNss, toNss);
@@ -446,7 +457,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     opCtx,
                     fromNss,
                     reason,
-                    ShardingCatalogClient::kLocalWriteConcern,
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                     ShardingRecoveryService::FilteringMetadataClearer(
                         true /*includeStepsForNamespaceDropped*/),
                     true /* throwIfReasonDiffers*/);
@@ -454,7 +465,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     opCtx,
                     toNss,
                     reason,
-                    WriteConcerns::kMajorityWriteConcernNoTimeout,
+                    defaultMajorityWriteConcern(),
                     ShardingRecoveryService::FilteringMetadataClearer(),
                     false /* throwIfReasonDiffers*/);
 

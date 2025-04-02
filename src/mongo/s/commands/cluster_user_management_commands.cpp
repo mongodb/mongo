@@ -75,13 +75,6 @@ using std::stringstream;
 
 namespace {
 
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting UNSET here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by this mongod.
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
-
 template <typename Request>
 void uassertEmptyReply(BSONObj obj) {
     uassert(ErrorCodes::BadValue,

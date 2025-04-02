@@ -108,7 +108,7 @@ public:
                         newOpCtx.get(),
                         NamespaceString(dbName),
                         csReason,
-                        ShardingCatalogClient::kLocalWriteConcern,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         ShardingRecoveryService::FilteringMetadataClearer(),
                         false /* throwIfReasonDiffers */);
             }

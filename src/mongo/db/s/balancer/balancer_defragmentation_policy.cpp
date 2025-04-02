@@ -58,9 +58,9 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
@@ -322,68 +322,66 @@ public:
         if (_aborted) {
             return;
         }
-        visit(OverloadedVisitor{
-                  [&](const MergeInfo& mergeAction) {
-                      auto& mergeResponse = get<Status>(response);
-                      auto& shardingPendingActions = _pendingActionsByShards[mergeAction.shardId];
-                      handleActionResult(
-                          opCtx,
-                          _nss,
-                          _uuid,
-                          getType(),
-                          mergeResponse,
-                          [&]() {
-                              shardingPendingActions.rangesWithoutDataSize.emplace_back(
-                                  mergeAction.chunkRange);
-                          },
-                          [&]() {
-                              shardingPendingActions.rangesToMerge.emplace_back(
-                                  mergeAction.chunkRange);
-                          },
-                          [&]() { _abort(getType()); });
-                  },
-                  [&](const DataSizeInfo& dataSizeAction) {
-                      auto& dataSizeResponse = get<StatusWith<DataSizeResponse>>(response);
-                      handleActionResult(
-                          opCtx,
-                          _nss,
-                          _uuid,
-                          getType(),
-                          dataSizeResponse.getStatus(),
-                          [&]() {
-                              ChunkType chunk(dataSizeAction.uuid,
-                                              dataSizeAction.chunkRange,
-                                              dataSizeAction.version.placementVersion(),
-                                              dataSizeAction.shardId);
-                              auto catalogManager = ShardingCatalogManager::get(opCtx);
-                              // Max out the chunk size if it has has been estimated as bigger
-                              // than _smallChunkSizeThresholdBytes; this will exlude the
-                              // chunk from the list of candidates considered by
-                              // MoveAndMergeChunksPhase
-                              auto estimatedSize = dataSizeResponse.getValue().maxSizeReached
-                                  ? kBigChunkMarker
-                                  : dataSizeResponse.getValue().sizeBytes;
-                              catalogManager->setChunkEstimatedSize(
-                                  opCtx,
-                                  chunk,
-                                  estimatedSize,
-                                  ShardingCatalogClient::kMajorityWriteConcern);
-                          },
-                          [&]() {
-                              auto& shardingPendingActions =
-                                  _pendingActionsByShards[dataSizeAction.shardId];
-                              shardingPendingActions.rangesWithoutDataSize.emplace_back(
-                                  dataSizeAction.chunkRange);
-                          },
-                          [&]() { _abort(getType()); });
-                  },
-                  [](const MigrateInfo& _) {
-                      uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                  },
-                  [](const MergeAllChunksOnShardInfo& _) {
-                      uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                  }},
-              action);
+        visit(
+            OverloadedVisitor{
+                [&](const MergeInfo& mergeAction) {
+                    auto& mergeResponse = get<Status>(response);
+                    auto& shardingPendingActions = _pendingActionsByShards[mergeAction.shardId];
+                    handleActionResult(
+                        opCtx,
+                        _nss,
+                        _uuid,
+                        getType(),
+                        mergeResponse,
+                        [&]() {
+                            shardingPendingActions.rangesWithoutDataSize.emplace_back(
+                                mergeAction.chunkRange);
+                        },
+                        [&]() {
+                            shardingPendingActions.rangesToMerge.emplace_back(
+                                mergeAction.chunkRange);
+                        },
+                        [&]() { _abort(getType()); });
+                },
+                [&](const DataSizeInfo& dataSizeAction) {
+                    auto& dataSizeResponse = get<StatusWith<DataSizeResponse>>(response);
+                    handleActionResult(
+                        opCtx,
+                        _nss,
+                        _uuid,
+                        getType(),
+                        dataSizeResponse.getStatus(),
+                        [&]() {
+                            ChunkType chunk(dataSizeAction.uuid,
+                                            dataSizeAction.chunkRange,
+                                            dataSizeAction.version.placementVersion(),
+                                            dataSizeAction.shardId);
+                            auto catalogManager = ShardingCatalogManager::get(opCtx);
+                            // Max out the chunk size if it has has been estimated as bigger
+                            // than _smallChunkSizeThresholdBytes; this will exlude the
+                            // chunk from the list of candidates considered by
+                            // MoveAndMergeChunksPhase
+                            auto estimatedSize = dataSizeResponse.getValue().maxSizeReached
+                                ? kBigChunkMarker
+                                : dataSizeResponse.getValue().sizeBytes;
+                            catalogManager->setChunkEstimatedSize(
+                                opCtx, chunk, estimatedSize, defaultMajorityWriteConcernDoNotUse());
+                        },
+                        [&]() {
+                            auto& shardingPendingActions =
+                                _pendingActionsByShards[dataSizeAction.shardId];
+                            shardingPendingActions.rangesWithoutDataSize.emplace_back(
+                                dataSizeAction.chunkRange);
+                        },
+                        [&]() { _abort(getType()); });
+                },
+                [](const MigrateInfo& _) {
+                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                },
+                [](const MergeAllChunksOnShardInfo& _) {
+                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                }},
+            action);
     }
 
     bool isComplete() const override {
@@ -1602,7 +1600,7 @@ void BalancerDefragmentationPolicy::_persistPhaseUpdate(OperationContext* opCtx,
     WriteConcernResult ignoreResult;
     const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(
-        opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernShardingTimeout, &ignoreResult));
+        opCtx, latestOpTime, defaultMajorityWriteConcernDoNotUse(), &ignoreResult));
 }
 
 void BalancerDefragmentationPolicy::_clearDefragmentationState(OperationContext* opCtx,
@@ -1634,7 +1632,7 @@ void BalancerDefragmentationPolicy::_clearDefragmentationState(OperationContext*
     WriteConcernResult ignoreResult;
     const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(
-        opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernShardingTimeout, &ignoreResult));
+        opCtx, latestOpTime, defaultMajorityWriteConcernDoNotUse(), &ignoreResult));
 }
 
 }  // namespace mongo

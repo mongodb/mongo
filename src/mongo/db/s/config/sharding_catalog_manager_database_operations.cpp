@@ -49,6 +49,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -349,7 +350,7 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         "createDatabase.start",
         NamespaceString(dbName),
         BSON("primaryShard" << primaryShard << "userSelectedPrimary" << userSelectedPrimary),
-        ShardingCatalogClient::kMajorityWriteConcern,
+        defaultMajorityWriteConcernDoNotUse(),
         _localConfigShard,
         _localCatalogClient.get());
 
@@ -426,7 +427,7 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         NamespaceString(dbName),
         BSON("primaryShard" << db.getPrimary() << "userSelectedPrimary" << userSelectedPrimary
                             << "version" << db.getVersion().toBSON()),
-        ShardingCatalogClient::kMajorityWriteConcern,
+        defaultMajorityWriteConcernDoNotUse(),
         _localConfigShard,
         _localCatalogClient.get());
 

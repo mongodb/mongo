@@ -42,7 +42,6 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/configsvr_coordinator_gen.h"
-#include "mongo/db/s/config/set_user_write_block_mode_coordinator_document_gen.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -123,7 +122,7 @@ protected:
         store.update(opCtx,
                      BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
                      newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcernNoTimeout);
+                     defaultMajorityWriteConcern());
 
         {
             stdx::lock_guard lk{_docMutex};
@@ -227,7 +226,7 @@ protected:
         if (_doc.getPhase() == Phase::kUnset) {
             PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
             try {
-                store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
+                store.add(opCtx.get(), newDoc, defaultMajorityWriteConcern());
             } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
                 // A series of step-up and step-down events can cause a node to try and insert the
                 // document when it has already been persisted locally, but we must still wait for

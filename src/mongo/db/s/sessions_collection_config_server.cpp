@@ -121,13 +121,13 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
             opCtx->getClient()->setService(originalService);
         });
 
-        uassertStatusOK(
-            catalogClient->updateConfigDocument(opCtx,
-                                                CollectionType::ConfigNS,
-                                                filterQuery,
-                                                updateQuery,
-                                                false,
-                                                ShardingCatalogClient::kLocalWriteConcern));
+        uassertStatusOK(catalogClient->updateConfigDocument(
+            opCtx,
+            CollectionType::ConfigNS,
+            filterQuery,
+            updateQuery,
+            false,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter()));
     }
 }
 

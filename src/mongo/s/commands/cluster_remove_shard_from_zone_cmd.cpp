@@ -59,14 +59,6 @@ namespace mongo {
 namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting UNSET here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by mongod and
-                                                // writeConcernMajorityJournalDefault is set to true
-                                                // in the ReplSetConfig.
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 /**
  * {
@@ -129,15 +121,14 @@ public:
 
         BSONObjBuilder cmdBuilder;
         parsedRequest.appendAsConfigCommand(&cmdBuilder);
-        cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(
-            configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                          kPrimaryOnlyReadPreference,
-                                                          DatabaseName::kAdmin,
-                                                          cmdBuilder.obj(),
-                                                          Shard::RetryPolicy::kIdempotent));
+        auto cmdResponseStatus = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            kPrimaryOnlyReadPreference,
+            DatabaseName::kAdmin,
+            CommandHelpers::appendMajorityWriteConcern(cmdBuilder.obj(), opCtx->getWriteConcern()),
+            Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
         return true;
     }

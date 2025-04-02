@@ -471,7 +471,7 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
     updateEntry.setUpsert(true);
     updateOp.setUpdates({updateEntry});
 
-    updateOp.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    updateOp.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
     updateOp.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
     updateOp.setTxnNumber(currentTxnNumber + 1);
 
@@ -551,7 +551,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
                        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
         sessionId.append(&builder);
         builder.append(WriteConcernOptions::kWriteConcernField,
-                       generic_argument_util::kMajorityWriteConcern.toBSON());
+                       defaultMajorityWriteConcernDoNotUse().toBSON());
         const auto commandObj = builder.obj();
 
         sharding_util::retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
@@ -585,8 +585,7 @@ void persistMigrationRecipientRecoveryDocument(
     PersistentTaskStore<MigrationRecipientRecoveryDocument> store(
         NamespaceString::kMigrationRecipientsNamespace);
     try {
-        store.add(
-            opCtx, migrationRecipientDoc, WriteConcerns::kMajorityWriteConcernShardingTimeout);
+        store.add(opCtx, migrationRecipientDoc);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // Convert a DuplicateKey error to an anonymous error.
         uasserted(6064502,
@@ -607,7 +606,7 @@ void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUI
         NamespaceString::kMigrationRecipientsNamespace);
     store.remove(opCtx,
                  BSON(MigrationRecipientRecoveryDocument::kIdFieldName << migrationId),
-                 ShardingCatalogClient::kMajorityWriteConcern);
+                 defaultMajorityWriteConcernDoNotUse());
 }
 
 void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {

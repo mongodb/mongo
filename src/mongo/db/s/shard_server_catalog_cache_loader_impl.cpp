@@ -54,6 +54,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -439,13 +440,8 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {
     }
     auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
     WriteConcernResult writeConcernResult;
-    uassertStatusOK(
-        waitForWriteConcern(opCtx,
-                            replClient.getLastOp(),
-                            WriteConcernOptions(WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding),
-                            &writeConcernResult));
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, replClient.getLastOp(), defaultMajorityWriteConcernDoNotUse(), &writeConcernResult));
 }
 
 }  // namespace

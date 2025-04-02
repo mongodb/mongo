@@ -157,7 +157,7 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     donorDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
     donorDeletionTask.setPreMigrationShardVersion(_shardVersionPriorToTheMigration);
     rangedeletionutil::persistRangeDeletionTaskLocally(
-        opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcernShardingTimeout);
+        opCtx, donorDeletionTask, defaultMajorityWriteConcernDoNotUse());
 }
 
 void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
@@ -337,8 +337,10 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                 "Deleting range deletion task on donor",
                 "migrationId"_attr = _migrationInfo.getId(),
                 logAttrs(_migrationInfo.getNss()));
-    rangedeletionutil::deleteRangeDeletionTaskLocally(
-        opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
+    rangedeletionutil::deleteRangeDeletionTaskLocally(opCtx,
+                                                      _migrationInfo.getCollectionUuid(),
+                                                      _migrationInfo.getRange(),
+                                                      defaultMajorityWriteConcernDoNotUse());
 
     try {
         LOGV2_DEBUG(23900,

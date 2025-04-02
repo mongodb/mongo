@@ -1873,6 +1873,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "server_base",
     srcs = [
+        "database_name.cpp",
         "dump_lock_manager.cpp",
         "feature_compatibility_version_parser.cpp",
         "feature_flag.cpp",
@@ -1935,6 +1936,7 @@ mongo_cc_library(
         "//src/mongo/util:namespace_string_util.cpp",
     ],
     hdrs = [
+        "database_name.h",
         "//src/mongo/db:api_parameters.h",
         "//src/mongo/db:api_parameters_gen",
         "//src/mongo/db:catalog_shard_feature_flag_gen",
@@ -2153,14 +2155,12 @@ mongo_cc_unit_test(
 mongo_cc_library(
     name = "common",
     srcs = [
-        "database_name.cpp",
         "field_parser.cpp",
         "field_ref.cpp",
         "field_ref_set.cpp",
         "txn_retry_counter_too_old_info.cpp",
     ],
     hdrs = [
-        "database_name.h",
         "field_parser.h",
         "field_ref.h",
         "field_ref_set.h",

@@ -28,7 +28,8 @@
  */
 
 #include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/namespace_string.h"
+
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -57,7 +58,7 @@ Status KeysCollectionClientSharded::insertNewKey(OperationContext* opCtx, const 
     return _catalogClient->insertConfigDocument(opCtx,
                                                 NamespaceString::kKeysCollectionNamespace,
                                                 doc,
-                                                ShardingCatalogClient::kMajorityWriteConcern);
+                                                defaultMajorityWriteConcernDoNotUse());
 }
 
 }  // namespace mongo

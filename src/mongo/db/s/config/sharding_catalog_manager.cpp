@@ -951,7 +951,7 @@ Status ShardingCatalogManager::runCloneAuthoritativeMetadataOnShards(OperationCo
         const auto shard = shardStatus.getValue();
 
         ShardsvrCloneAuthoritativeMetadata request;
-        request.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+        request.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
         request.setDbName(DatabaseName::kAdmin);
 
         auto response = shard->runCommandWithFixedRetryAttempts(
@@ -1259,10 +1259,8 @@ void ShardingCatalogManager::withTransaction(
     OperationContext* opCtx,
     const NamespaceString& namespaceForInitialFind,
     unique_function<void(OperationContext*, TxnNumber)> func) {
-    withTransaction(opCtx,
-                    namespaceForInitialFind,
-                    std::move(func),
-                    ShardingCatalogClient::kMajorityWriteConcern);
+    withTransaction(
+        opCtx, namespaceForInitialFind, std::move(func), defaultMajorityWriteConcernDoNotUse());
 }
 
 void ShardingCatalogManager::withTransaction(
@@ -1408,7 +1406,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
             entry.setMulti(true);
             return entry;
         }()});
-        deleteOp.setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
+        deleteOp.setWriteConcern(ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
         uassertStatusOK(_localConfigShard->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -1419,7 +1417,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
 
         const auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
         auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-            opCtx, replClient.getLastOp(), ShardingCatalogClient::kMajorityWriteConcern);
+            opCtx, replClient.getLastOp(), defaultMajorityWriteConcernDoNotUse());
     }
 
     // Set the time of the initialization.

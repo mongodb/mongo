@@ -781,7 +781,7 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
             updateConfigCollectionsForOriginalNss(
                 opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
         },
-        ShardingCatalogClient::kLocalWriteConcern);
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 void writeParticipantShardsAndTempCollInfo(
@@ -816,7 +816,7 @@ void writeParticipantShardsAndTempCollInfo(
             updateConfigCollectionsForOriginalNss(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         },
-        ShardingCatalogClient::kLocalWriteConcern);
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     setupZonesForTempNss(opCtx, updatedCoordinatorDoc.getTempReshardingNss(), zones);
 }
@@ -854,7 +854,7 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
                         opCtx, coordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
                 }
             },
-            ShardingCatalogClient::kLocalWriteConcern);
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
@@ -916,7 +916,7 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
             updateConfigCollectionsForOriginalNss(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         },
-        ShardingCatalogClient::kLocalWriteConcern);
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
     metrics->onStateTransition(coordinatorDoc.getState(), updatedCoordinatorDoc.getState());
     return updatedCoordinatorDoc;
@@ -1058,10 +1058,11 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
 void executeMetadataChangesInTxn(
     OperationContext* opCtx,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
-    ShardingCatalogManager::withTransaction(opCtx,
-                                            NamespaceString::kConfigReshardingOperationsNamespace,
-                                            std::move(changeMetadataFunc),
-                                            ShardingCatalogClient::kLocalWriteConcern);
+    ShardingCatalogManager::withTransaction(
+        opCtx,
+        NamespaceString::kConfigReshardingOperationsNamespace,
+        std::move(changeMetadataFunc),
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 std::shared_ptr<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>

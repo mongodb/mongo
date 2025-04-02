@@ -134,7 +134,7 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
             configShard->runBatchWriteCommand(opCtx,
                                               Milliseconds(defaultConfigCommandTimeoutMS.load()),
                                               updateRequest,
-                                              ShardingCatalogClient::kMajorityWriteConcern,
+                                              defaultMajorityWriteConcernDoNotUse(),
                                               Shard::RetryPolicy::kIdempotent);
 
         uassertStatusOK(response.toStatus());

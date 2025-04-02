@@ -42,6 +42,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -60,14 +61,6 @@ namespace mongo {
 namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting UNSET here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by mongod and
-                                                // writeConcernMajorityJournalDefault is set to true
-                                                // in the ReplSetConfig.
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 /**
  * {
@@ -89,8 +82,8 @@ public:
 
             BSONObjBuilder cmdBuilder;
             ConfigsvrAddShardToZone cmd(getShard().toString(), request().getZone().toString());
+            generic_argument_util::setMajorityWriteConcern(cmd);
             cmd.serialize(&cmdBuilder);
-            cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponseStatus = uassertStatusOK(

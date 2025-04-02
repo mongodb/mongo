@@ -46,6 +46,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
@@ -70,7 +71,6 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -261,7 +261,8 @@ void markRangeDeletionTaskAsProcessing(OperationContext* opCtx,
                             << CleanWhen_serializer(CleanWhenEnum::kNow)));
 
     try {
-        store.update(opCtx, query, update, WriteConcerns::kLocalWriteConcern);
+        store.update(
+            opCtx, query, update, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
         // The collection may have been dropped or the document could have been manually deleted
     }
@@ -495,7 +496,7 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
                              query,
                              BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName
                                                  << changeInOrphans)),
-                             WriteConcerns::kLocalWriteConcern);
+                             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
             });
         BalancerStatsRegistry::get(opCtx)->updateOrphansCount(collectionUuid, changeInOrphans);
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
@@ -626,7 +627,7 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     write_ops::DeleteCommandRequest deleteOp(NamespaceString::kRangeDeletionNamespace);
     write_ops::DeleteOpEntry query(queryFilter, false /*multi*/);
     deleteOp.setDeletes({query});
-    deleteOp.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    deleteOp.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
     hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(opCtx);
 
@@ -699,7 +700,7 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     updateEntry.setMulti(false);
     updateEntry.setUpsert(false);
     updateOp.setUpdates({updateEntry});
-    updateOp.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    updateOp.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
     sharding_util::retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
         opCtx, "ready remote range deletion", [&](OperationContext* newOpCtx) {

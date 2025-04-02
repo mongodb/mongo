@@ -262,7 +262,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(const DatabaseName& dbName, Stri
             // concern to avoid double applying a transaction due to a transient NoSuchTransaction
             // error response.
             cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                              generic_argument_util::kMajorityWriteConcern.toBSON());
+                              defaultMajorityWriteConcernDoNotUse().toBSON());
         } else {
             cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
         }

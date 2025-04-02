@@ -31,7 +31,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <utility>
 
 #include <boost/move/utility_core.hpp>
 
@@ -64,10 +63,9 @@ public:
     /**
      * Stores the state document 'addDoc' on the provided namespace.
      */
-    void add(
-        OperationContext* opCtx,
-        const StateDocumentType& addDoc,
-        const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcernNoTimeout) {
+    void add(OperationContext* opCtx,
+             const StateDocumentType& addDoc,
+             const WriteConcernOptions& writeConcern = defaultMajorityWriteConcern()) {
         PersistentTaskStore<StateDocumentType> store(_stateDocumentNs);
         store.add(opCtx, addDoc, writeConcern);
     }
@@ -75,10 +73,9 @@ public:
     /**
      * Removes the state document matching the criteria stated in the 'removeDoc'.
      */
-    void remove(
-        OperationContext* opCtx,
-        const BSONObj& removeDoc,
-        const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcernNoTimeout) {
+    void remove(OperationContext* opCtx,
+                const BSONObj& removeDoc,
+                const WriteConcernOptions& writeConcern = defaultMajorityWriteConcern()) {
         PersistentTaskStore<StateDocumentType> store(_stateDocumentNs);
         store.remove(opCtx, removeDoc, writeConcern);
     }
@@ -86,11 +83,10 @@ public:
     /**
      * Updates the state document 'updateDoc' using the provided filter criteria 'filter'.
      */
-    void update(
-        OperationContext* opCtx,
-        const BSONObj& filter,
-        const BSONObj& updateDoc,
-        const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcernNoTimeout) {
+    void update(OperationContext* opCtx,
+                const BSONObj& filter,
+                const BSONObj& updateDoc,
+                const WriteConcernOptions& writeConcern = defaultMajorityWriteConcern()) {
         PersistentTaskStore<StateDocumentType> store(_stateDocumentNs);
         store.update(opCtx, filter, updateDoc, writeConcern);
     }

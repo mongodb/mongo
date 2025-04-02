@@ -29,18 +29,12 @@
 
 
 #include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
-#include <cstdint>
-#include <mutex>
-#include <string>
-#include <tuple>
-
-#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/s/config/configsvr_coordinator.h"
 #include "mongo/db/s/config/configsvr_coordinator_gen.h"
@@ -88,7 +82,7 @@ void ConfigsvrCoordinator::_removeStateDocument(OperationContext* opCtx) {
         NamespaceString::kConfigsvrCoordinatorsNamespace);
     store.remove(opCtx,
                  BSON(ConfigsvrCoordinatorMetadata::kIdFieldName << _coordId.toBSON()),
-                 WriteConcerns::kMajorityWriteConcernNoTimeout);
+                 defaultMajorityWriteConcern());
 }
 
 OperationSessionInfo ConfigsvrCoordinator::_getCurrentSession() const {

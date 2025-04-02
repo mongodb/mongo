@@ -256,13 +256,14 @@ void RemoveShardCommitCoordinator::_finalizeShardRemoval(OperationContext* opCtx
     _result = RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
     // Record finish in changelog
     auto catalogManager = ShardingCatalogManager::get(opCtx);
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "removeShard",
-                                           NamespaceString::kEmpty,
-                                           BSON("shard" << _doc.getShardId().toString()),
-                                           ShardingCatalogClient::kLocalWriteConcern,
-                                           catalogManager->localConfigShard(),
-                                           catalogManager->localCatalogClient());
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx,
+        "removeShard",
+        NamespaceString::kEmpty,
+        BSON("shard" << _doc.getShardId().toString()),
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        catalogManager->localConfigShard(),
+        catalogManager->localCatalogClient());
 }
 
 void RemoveShardCommitCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {

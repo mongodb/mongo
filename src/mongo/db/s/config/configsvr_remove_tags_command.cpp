@@ -116,7 +116,7 @@ public:
                     TagsType::ConfigNS,
                     BSON(TagsType::ns(
                         NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))),
-                    ShardingCatalogClient::kLocalWriteConcern));
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter()));
             }
 
             // Since we no write happened on this txnNumber, we need to make a dummy write so that

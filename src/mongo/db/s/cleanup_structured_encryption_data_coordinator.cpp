@@ -109,7 +109,7 @@ void createQEClusteredStateCollection(OperationContext* opCtx, const NamespaceSt
     CreateCollectionRequest request;
     request.setClusteredIndex(std::variant<bool, mongo::ClusteredIndexSpec>(clusterIdxSpec));
     createCmd.setCreateCollectionRequest(std::move(request));
-    createCmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    createCmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
     auto status = doRunCommand(opCtx, nss.dbName(), createCmd);
     if (!status.isOK()) {
         if (status != ErrorCodes::NamespaceExists) {
@@ -127,7 +127,7 @@ void dropQEStateCollection(OperationContext* opCtx,
                            boost::optional<UUID> collId) {
     Drop cmd(nss);
     cmd.setCollectionUUID(collId);
-    cmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    cmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
     uassertStatusOK(doRunCommand(opCtx, nss.dbName(), cmd));
 }
 
@@ -281,7 +281,7 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
         RenameCollectionCommand cmd(ecocNss, ecocRenameNss);
         cmd.setDropTarget(false);
         cmd.setCollectionUUID(state.getEcocUuid().value());
-        cmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+        cmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
         uassertStatusOK(doRunCommand(opCtx.get(), DatabaseName::kAdmin, cmd));
         *newEcocRenameUuid = state.getEcocUuid();

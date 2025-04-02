@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-
 #include <string>
-
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -50,7 +48,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_state.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
@@ -95,7 +92,7 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
         Status result = _createCappedConfigCollection(opCtx,
                                                       kActionLogCollectionName,
                                                       kActionLogCollectionSizeMB,
-                                                      ShardingCatalogClient::kMajorityWriteConcern,
+                                                      defaultMajorityWriteConcernDoNotUse(),
                                                       std::move(configShardToUse));
         if (result.isOK()) {
             _actionLogCollectionCreated.store(1);
@@ -110,7 +107,7 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
                 what,
                 ns,
                 detail,
-                ShardingCatalogClient::kMajorityWriteConcern,
+                defaultMajorityWriteConcernDoNotUse(),
                 catalogClientToUse);
 }
 

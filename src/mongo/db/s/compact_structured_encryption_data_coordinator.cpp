@@ -210,7 +210,7 @@ bool doRenameOperation(const CompactionState& state,
         RenameCollectionCommand cmd(ecocNss, ecocRenameNss);
         cmd.setDropTarget(false);
         cmd.setCollectionUUID(state.getEcocUuid().value());
-        cmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+        cmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
         uassertStatusOK(doRunCommand(opCtx.get(), DatabaseName::kAdmin, cmd));
         *newEcocRenameUuid = state.getEcocUuid();
@@ -229,7 +229,7 @@ bool doRenameOperation(const CompactionState& state,
         request.setClusteredIndex(
             std::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
         createCmd.setCreateCollectionRequest(std::move(request));
-        createCmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+        createCmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
         auto status = doRunCommand(opCtx.get(), ecocNss.dbName(), createCmd);
         if (!status.isOK()) {
             if (status != ErrorCodes::NamespaceExists) {
@@ -318,7 +318,7 @@ void doDropOperation(const State& state) {
 
     Drop cmd(ecocNss);
     cmd.setCollectionUUID(state.getEcocRenameUuid().value());
-    cmd.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    cmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
     uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.dbName(), cmd));
 }
 

@@ -30,14 +30,46 @@
 #include "mongo/db/generic_argument_util.h"
 
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logv2/log.h"
 
-namespace mongo::generic_argument_util {
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-const WriteConcernOptions kMajorityWriteConcern(
-    WriteConcernOptions::kMajority,
-    // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
-    // supported by the mongod.
-    WriteConcernOptions::SyncMode::UNSET,
-    WriteConcernOptions::kWriteConcernTimeoutUserCommand);
+namespace mongo {
+namespace {
 
-}  // namespace mongo::generic_argument_util
+MONGO_FAIL_POINT_DEFINE(overrideInternalWriteConcernTimeout);
+
+WriteConcernOptions makeMajorityWriteConcernOptions(WriteConcernOptions::Timeout timeout) {
+    static constexpr auto fpFieldName = "wtimeoutMillis"_sd;
+
+    auto& fp = overrideInternalWriteConcernTimeout;
+    fp.execute([&](const BSONObj& data) {
+        try {
+            auto elem = data.getField(fpFieldName);
+            Milliseconds wTimeout{elem.exactNumberLong()};
+            timeout = WriteConcernOptions::Timeout{wTimeout};
+        } catch (...) {
+            LOGV2_FATAL(10277000,
+                        "Missing or invalid parameter",
+                        "fieldName"_attr = fpFieldName,
+                        "failPoint"_attr = fp.getName());
+        }
+    });
+    return WriteConcernOptions{WriteConcernOptions::kMajority,
+                               // Note: Even though we're setting UNSET here, kMajority implies
+                               // JOURNAL if journaling is supported by the mongod.
+                               WriteConcernOptions::SyncMode::UNSET,
+                               timeout};
+}
+
+}  // namespace
+
+WriteConcernOptions defaultMajorityWriteConcern() {
+    return makeMajorityWriteConcernOptions(WriteConcernOptions::kNoTimeout);
+}
+
+WriteConcernOptions defaultMajorityWriteConcernDoNotUse() {
+    return makeMajorityWriteConcernOptions(WriteConcernOptions::Timeout{Seconds{60}});
+}
+
+}  // namespace mongo

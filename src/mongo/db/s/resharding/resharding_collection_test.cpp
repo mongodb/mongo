@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
@@ -49,7 +50,6 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
@@ -83,18 +83,13 @@ public:
 
         WriteConcernResult ignoreResult;
         auto latestOpTime = repl::ReplClientInfo::forClient(_opCtx->getClient()).getLastOp();
-        uassertStatusOK(
-            waitForWriteConcern(_opCtx, latestOpTime, kMajorityWriteConcern, &ignoreResult));
+        uassertStatusOK(waitForWriteConcern(
+            _opCtx, latestOpTime, defaultMajorityWriteConcernDoNotUse(), &ignoreResult));
 
         return status;
     }
 
 private:
-    const WriteConcernOptions kMajorityWriteConcern{
-        WriteConcernOptions::kMajority,
-        WriteConcernOptions::SyncMode::UNSET,
-        WriteConcernOptions::kWriteConcernTimeoutSharding};
-
     DBDirectClient _client;
     OperationContext* _opCtx;
 };

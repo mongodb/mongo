@@ -124,7 +124,7 @@ public:
                 ns(), shardingState->shardId(), metadataBeforeMerge.getUUID(), chunkRange};
             request.setEpoch(expectedEpoch);
             request.setTimestamp(expectedTimestamp);
-            request.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+            request.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
             auto cmdResponse =
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(

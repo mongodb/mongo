@@ -256,11 +256,8 @@ protected:
     Status log(const std::string& what, const NamespaceString& ns, const BSONObj& detail) {
         if (_configCollType == ChangeLog) {
             return ShardingLogging::get(operationContext())
-                ->logChangeChecked(operationContext(),
-                                   what,
-                                   ns,
-                                   detail,
-                                   ShardingCatalogClient::kMajorityWriteConcern);
+                ->logChangeChecked(
+                    operationContext(), what, ns, detail, defaultMajorityWriteConcernDoNotUse());
         } else {
             return ShardingLogging::get(operationContext())
                 ->logAction(operationContext(), what, ns, detail);

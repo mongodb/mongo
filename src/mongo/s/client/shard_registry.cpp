@@ -33,7 +33,6 @@
 #include <algorithm>
 #include <iterator>
 #include <list>
-#include <mutex>
 #include <tuple>
 
 #include <absl/container/node_hash_map.h>
@@ -48,12 +47,10 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/repl_set_config_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock.h"
@@ -616,13 +613,13 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
         auto update = BSON("$set" << BSON(ShardType::host()
                                           << connStr.toString() << ShardType::replSetConfigVersion()
                                           << replSetConfigVersion));
-        auto swWasUpdated = grid->catalogClient()->updateConfigDocument(
-            opCtx,
-            NamespaceString::kConfigsvrShardsNamespace,
-            filter,
-            update,
-            false /* upsert */,
-            ShardingCatalogClient::kMajorityWriteConcern);
+        auto swWasUpdated =
+            grid->catalogClient()->updateConfigDocument(opCtx,
+                                                        NamespaceString::kConfigsvrShardsNamespace,
+                                                        filter,
+                                                        update,
+                                                        false /* upsert */,
+                                                        defaultMajorityWriteConcernDoNotUse());
         auto status = swWasUpdated.getStatus();
         if (!status.isOK()) {
             LOGV2_ERROR(2118501,

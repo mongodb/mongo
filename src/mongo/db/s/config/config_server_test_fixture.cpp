@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/config/config_server_test_fixture.h"
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <memory>
@@ -43,6 +45,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/cluster_role.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -53,7 +56,6 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
@@ -404,7 +406,7 @@ DatabaseType ConfigServerTestFixture::setupDatabase(const DatabaseName& dbName,
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigDatabasesNamespace,
                                                     db.toBSON(),
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
+                                                    defaultMajorityWriteConcernDoNotUse()));
     return db;
 }
 

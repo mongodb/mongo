@@ -1178,7 +1178,7 @@ bool installShardIdentity(OperationContext* opCtx, const ShardIdentityType& iden
     BSONObjBuilder cmdObjBuilder;
     insertOp.serialize(&cmdObjBuilder);
     cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField,
-                         ShardingCatalogClient::kLocalWriteConcern.toBSON());
+                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter().toBSON());
 
     DBDirectClient localClient(opCtx);
 

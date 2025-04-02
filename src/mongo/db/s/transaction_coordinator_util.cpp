@@ -298,7 +298,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
     prepareTransaction.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
     prepareTransaction.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
     prepareTransaction.setAutocommit(false);
-    prepareTransaction.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    prepareTransaction.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
         prepareTransaction.setTxnRetryCounter(*txnRetryCounter);
@@ -518,7 +518,7 @@ Future<void> sendCommit(ServiceContext* service,
     commitTransaction.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
     commitTransaction.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
     commitTransaction.setAutocommit(false);
-    commitTransaction.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    commitTransaction.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
         commitTransaction.setTxnRetryCounter(*txnRetryCounter);
@@ -562,7 +562,7 @@ Future<void> sendAbort(ServiceContext* service,
     abortTransaction.setLsid(generic_argument_util::toLogicalSessionFromClient(lsid));
     abortTransaction.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
     abortTransaction.setAutocommit(false);
-    abortTransaction.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
+    abortTransaction.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
         abortTransaction.setTxnRetryCounter(*txnRetryCounter);

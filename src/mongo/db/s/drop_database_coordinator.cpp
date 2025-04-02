@@ -36,7 +36,6 @@
 #include <boost/none.hpp>
 #include <boost/smart_ptr.hpp>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -44,19 +43,15 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -310,7 +305,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         Grid::get(opCtx)->shardRegistry()->getConfigShard(),
         Grid::get(opCtx)->catalogClient(),
         coll,
-        ShardingCatalogClient::kMajorityWriteConcern,
+        defaultMajorityWriteConcernDoNotUse(),
         getNewSession(opCtx),
         useClusterTransaction,
         **executor);
@@ -473,10 +468,13 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         opCtx,
                         dbNss,
                         _critSecReason,
-                        ShardingCatalogClient::kLocalWriteConcern,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         clearDbInfo);
                     recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                        opCtx, dbNss, _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+                        opCtx,
+                        dbNss,
+                        _critSecReason,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
                     dropDatabaseParticipantCmd.setDbName(_dbName);
@@ -497,11 +495,10 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         WriteConcernResult ignoreResult;
                         const auto latestOpTime =
                             repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-                        uassertStatusOK(
-                            waitForWriteConcern(opCtx,
-                                                latestOpTime,
-                                                ShardingCatalogClient::kMajorityWriteConcern,
-                                                &ignoreResult));
+                        uassertStatusOK(waitForWriteConcern(opCtx,
+                                                            latestOpTime,
+                                                            defaultMajorityWriteConcernDoNotUse(),
+                                                            &ignoreResult));
                     }
 
                     // Perform the database drop on the local catalog of any other shard;
@@ -587,7 +584,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 opCtx,
                 dbNss,
                 _critSecReason,
-                WriteConcerns::kMajorityWriteConcernNoTimeout,
+                defaultMajorityWriteConcern(),
                 beforeReleasingAction,
                 false /* throwIfReasonDiffers */);
         })
@@ -641,7 +638,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                                 ->runBatchWriteCommand(opCtx,
                                                        Milliseconds::max(),
                                                        request,
-                                                       ShardingCatalogClient::kMajorityWriteConcern,
+                                                       defaultMajorityWriteConcernDoNotUse(),
                                                        Shard::RetryPolicy::kIdempotent)
                                 .toStatus());
         });

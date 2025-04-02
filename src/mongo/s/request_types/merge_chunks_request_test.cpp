@@ -80,7 +80,7 @@ TEST(ConfigSvrMergeChunks, ConfigCommandtoBSON) {
                                            << "shard0000"
                                            << "collUUID" << collUUID.toBSON() << "chunkRange"
                                            << chunkRange.toBSON());
-    auto writeConcern = generic_argument_util::kMajorityWriteConcern;
+    auto writeConcern = defaultMajorityWriteConcernDoNotUse();
 
     BSONObjBuilder cmdBuilder;
     {

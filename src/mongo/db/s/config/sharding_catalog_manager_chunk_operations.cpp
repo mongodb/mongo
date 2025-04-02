@@ -64,6 +64,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -1816,7 +1817,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
             opCtx,
             Milliseconds(defaultConfigCommandTimeoutMS.load()),
             request,
-            ShardingCatalogClient::kLocalWriteConcern,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
             Shard::RetryPolicy::kIdempotent);
         uassertStatusOK(response.toStatus());
 
@@ -1876,13 +1877,13 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
         chunkObjBuilder.appendBool(ChunkType::historyIsAt40(), true);
 
         // Run the update
-        uassertStatusOK(
-            _localCatalogClient->updateConfigDocument(opCtx,
-                                                      NamespaceString::kConfigsvrChunksNamespace,
-                                                      BSON(ChunkType::name(upgradeChunk.getName())),
-                                                      chunkObjBuilder.obj(),
-                                                      false,
-                                                      ShardingCatalogClient::kLocalWriteConcern));
+        uassertStatusOK(_localCatalogClient->updateConfigDocument(
+            opCtx,
+            NamespaceString::kConfigsvrChunksNamespace,
+            BSON(ChunkType::name(upgradeChunk.getName())),
+            chunkObjBuilder.obj(),
+            false,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter()));
     }
 
     // Wait for the writes to become majority committed so that the subsequent shard refreshes can
@@ -1890,7 +1891,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     const auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     WriteConcernResult unusedWCResult;
     uassertStatusOK(waitForWriteConcern(
-        opCtx, clientOpTime, ShardingCatalogClient::kMajorityWriteConcern, &unusedWCResult));
+        opCtx, clientOpTime, defaultMajorityWriteConcernDoNotUse(), &unusedWCResult));
 
     for (const auto& shardId : changedShardIds) {
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
@@ -2179,7 +2180,7 @@ void ShardingCatalogManager::bumpCollectionPlacementVersionAndChangeMetadataInTx
     const NamespaceString& nss,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
     bumpCollectionPlacementVersionAndChangeMetadataInTxn(
-        opCtx, nss, std::move(changeMetadataFunc), ShardingCatalogClient::kMajorityWriteConcern);
+        opCtx, nss, std::move(changeMetadataFunc), defaultMajorityWriteConcernDoNotUse());
 }
 
 void ShardingCatalogManager::bumpCollectionPlacementVersionAndChangeMetadataInTxn(
@@ -2196,10 +2197,7 @@ void ShardingCatalogManager::bumpMultipleCollectionPlacementVersionsAndChangeMet
     const std::vector<NamespaceString>& collNames,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
     bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
-        opCtx,
-        collNames,
-        std::move(changeMetadataFunc),
-        ShardingCatalogClient::kMajorityWriteConcern);
+        opCtx, collNames, std::move(changeMetadataFunc), defaultMajorityWriteConcernDoNotUse());
 }
 
 void ShardingCatalogManager::bumpMultipleCollectionPlacementVersionsAndChangeMetadataInTxn(
@@ -2300,7 +2298,7 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                 chunkQuery,
                 BSON("$set" << BSON(ChunkType::jumbo(true))),
                 false,
-                ShardingCatalogClient::kMajorityWriteConcern);
+                defaultMajorityWriteConcernDoNotUse());
             if (!status.isOK()) {
                 LOGV2(21874,
                       "Couldn't mark chunk as jumbo",
@@ -2503,7 +2501,7 @@ bool ShardingCatalogManager::clearChunkEstimatedSize(OperationContext* opCtx, co
         _localConfigShard->runBatchWriteCommand(opCtx,
                                                 Milliseconds(defaultConfigCommandTimeoutMS.load()),
                                                 request,
-                                                ShardingCatalogClient::kMajorityWriteConcern,
+                                                defaultMajorityWriteConcernDoNotUse(),
                                                 Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOK(response.toStatus());

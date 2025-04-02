@@ -473,7 +473,7 @@ void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
         NamespaceString(NamespaceString::kAggTempCollections),
         std::vector<BSONObj>({BSON(
             "_id" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))})});
-    writeToLocalShard(opCtx, bcr, generic_argument_util::kMajorityWriteConcern);
+    writeToLocalShard(opCtx, bcr, defaultMajorityWriteConcernDoNotUse());
 
     // Create the collection. Note we don't set the 'temp: true' option. The temporary-ness comes
     // from having registered on kAggTempCollections.
@@ -576,7 +576,7 @@ void ShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
         {write_ops::DeleteOpEntry(BSON("_id" << NamespaceStringUtil::serialize(
                                            nss, SerializationContext::stateDefault())),
                                   false /* multi */)}});
-    writeToLocalShard(opCtx, std::move(bcr), generic_argument_util::kMajorityWriteConcern);
+    writeToLocalShard(opCtx, std::move(bcr), defaultMajorityWriteConcernDoNotUse());
 }
 
 void ShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,

@@ -92,11 +92,6 @@ const BSONObj WriteConcernOptions::Majority(BSON("w" << WriteConcernOptions::kMa
 // "default constructed WC" ({w:1})
 const BSONObj WriteConcernOptions::kInternalWriteDefault;
 
-constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutSystem;
-constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutMigration;
-constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutSharding;
-constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutUserCommand;
-
 WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout)
     : w{numNodes},
       syncMode{sync},

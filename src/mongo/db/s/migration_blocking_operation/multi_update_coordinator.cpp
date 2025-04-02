@@ -502,17 +502,19 @@ void MultiUpdateCoordinatorInstance::_updateOnDiskState(
     auto oldPhase = _getCurrentPhase();
     auto newPhase = newPhaseDocument.getMutableFields().getPhase();
     if (oldPhase == Phase::kUnused) {
-        store.add(opCtx, newPhaseDocument, WriteConcerns::kLocalWriteConcern);
+        store.add(opCtx,
+                  newPhaseDocument,
+                  ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
     } else if (newPhase == Phase::kDone) {
         store.remove(opCtx,
                      BSON(MultiUpdateCoordinatorDocument::kIdFieldName << _metadata.getId()),
-                     WriteConcerns::kLocalWriteConcern);
+                     ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
     } else {
         store.update(opCtx,
                      BSON(MultiUpdateCoordinatorDocument::kIdFieldName << _metadata.getId()),
                      BSON("$set" << BSON(MultiUpdateCoordinatorDocument::kMutableFieldsFieldName
                                          << newPhaseDocument.getMutableFields().toBSON())),
-                     WriteConcerns::kLocalWriteConcern);
+                     ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
     }
 }
 

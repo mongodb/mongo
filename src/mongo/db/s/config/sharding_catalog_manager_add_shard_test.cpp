@@ -35,13 +35,8 @@
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <map>
 #include <memory>
-#include <numeric>
 #include <string>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -66,20 +61,16 @@
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/write_ops/write_ops.h"
-#include "mongo/db/query/write_ops/write_ops_gen.h"
-#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -814,7 +805,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigDatabasesNamespace,
                                                     existingDB.toBSON(),
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
+                                                    defaultMajorityWriteConcernDoNotUse()));
     assertDatabaseExists(existingDB);
 
 
@@ -1045,7 +1036,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
                                                     existingShard.toBSON(),
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
+                                                    defaultMajorityWriteConcernDoNotUse()));
     assertShardExists(existingShard);
 
     // Adding the same standalone host with a different shard name should fail.
@@ -1134,7 +1125,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
                                                     existingShard.toBSON(),
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
+                                                    defaultMajorityWriteConcernDoNotUse()));
     assertShardExists(existingShard);
     // Adding the same connection string with a different shard name should fail.
     std::string differentName = "anotherShardName";
@@ -1275,7 +1266,7 @@ TEST_F(AddShardTest, AddShardWithOverlappingHosts) {
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
                                                     existingShard.toBSON(),
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
+                                                    defaultMajorityWriteConcernDoNotUse()));
     assertShardExists(existingShard);
 
     // Adding a shard with a different replica set name but with some common hosts should fail.

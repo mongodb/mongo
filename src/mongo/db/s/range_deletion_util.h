@@ -29,27 +29,19 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <list>
-#include <memory>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -151,11 +143,10 @@ boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(OperationCon
  * Deletes the range deletion task document with the specified id from config.rangeDeletions and
  * waits for majority write concern.
  */
-void deleteRangeDeletionTaskLocally(
-    OperationContext* opCtx,
-    const UUID& collectionUuid,
-    const ChunkRange& range,
-    const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcernShardingTimeout);
+void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
+                                    const UUID& collectionUuid,
+                                    const ChunkRange& range,
+                                    const WriteConcernOptions& writeConcern);
 
 /**
  * Deletes the range deletion task document with the specified id from config.rangeDeletions on the

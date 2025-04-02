@@ -672,7 +672,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             NamespaceStringUtil::deserialize(
                 boost::none, "renameCollection.metadata", SerializationContext::stateDefault()),
             BSON("newCollMetadata" << optFromCollType->toBSON()),
-            ShardingCatalogClient::kMajorityWriteConcern,
+            defaultMajorityWriteConcernDoNotUse(),
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
             Grid::get(opCtx)->catalogClient());
     } else {
@@ -725,7 +725,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             NamespaceStringUtil::deserialize(
                 boost::none, "renameCollection.metadata", SerializationContext::stateDefault()),
             BSONObj(),
-            ShardingCatalogClient::kMajorityWriteConcern,
+            defaultMajorityWriteConcernDoNotUse(),
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
             Grid::get(opCtx)->catalogClient());
     }
@@ -920,12 +920,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             opCtx,
                             toNss,
                             criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
+                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                         criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             toNss,
                             criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
+                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
                         if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
                                                                                        toNss)) {
@@ -935,7 +935,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 opCtx,
                                 toNss,
                                 criticalSectionReason,
-                                WriteConcerns::kLocalWriteConcern,
+                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                                 ShardingRecoveryService::NoCustomAction());
                         }
                     }
@@ -992,7 +992,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx,
                         toNss,
                         criticalSectionReason,
-                        WriteConcerns::kLocalWriteConcern,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         ShardingRecoveryService::NoCustomAction(),
                         false /* throwIfReasonDiffers */);
                     _completeOnError = true;
@@ -1018,7 +1018,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                   << "destination"
                                   << NamespaceStringUtil::serialize(
                                          toNss, SerializationContext::stateDefault())),
-                    ShardingCatalogClient::kMajorityWriteConcern);
+                    defaultMajorityWriteConcernDoNotUse());
 
                 // Block migrations on involved collections.
                 try {
@@ -1124,16 +1124,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // Renaming the metadata will also resume migrations for the resulting collection.
                 {
                     const auto session = getNewSession(opCtx);
-                    renameCollectionMetadataInTransaction(
-                        opCtx,
-                        _doc.getOptTrackedCollInfo(),
-                        nss(),
-                        _request.getTo(),
-                        _doc.getTargetUUID(),
-                        _doc.getNewTargetCollectionUuid(),
-                        ShardingCatalogClient::kMajorityWriteConcern,
-                        **executor,
-                        session);
+                    renameCollectionMetadataInTransaction(opCtx,
+                                                          _doc.getOptTrackedCollInfo(),
+                                                          nss(),
+                                                          _request.getTo(),
+                                                          _doc.getTargetUUID(),
+                                                          _doc.getNewTargetCollectionUuid(),
+                                                          defaultMajorityWriteConcernDoNotUse(),
+                                                          **executor,
+                                                          session);
                 }
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
@@ -1180,7 +1179,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx,
                         NamespaceString::kConfigsvrChunksNamespace,
                         query,
-                        ShardingCatalogClient::kMajorityWriteConcern));
+                        defaultMajorityWriteConcernDoNotUse()));
                 }
             }))
         .then(_buildPhaseHandler(Phase::kSetResponse, [this, anchor = shared_from_this()] {
@@ -1206,7 +1205,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                               << "destination"
                               << NamespaceStringUtil::serialize(
                                      _request.getTo(), SerializationContext::stateDefault())),
-                ShardingCatalogClient::kMajorityWriteConcern);
+                defaultMajorityWriteConcernDoNotUse());
             LOGV2(5460504, "Collection renamed", logAttrs(nss()));
         }));
 }

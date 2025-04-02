@@ -45,10 +45,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -222,8 +220,7 @@ Status splitChunk(OperationContext* opCtx,
                                      chunkRange,
                                      std::move(splitPoints));
 
-    auto configCmdObj =
-        request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    auto configCmdObj = request.toConfigCommandBSON(defaultMajorityWriteConcernDoNotUse().toBSON());
 
     auto cmdResponseStatus =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(

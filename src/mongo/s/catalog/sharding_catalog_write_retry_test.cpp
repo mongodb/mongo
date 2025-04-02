@@ -33,9 +33,7 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <memory>
-#include <set>
 #include <string>
-#include <system_error>
 #include <variant>
 #include <vector>
 
@@ -47,15 +45,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -104,11 +101,8 @@ TEST_F(InsertRetryTest, RetryOnInterruptedAndNetworkErrorSuccess) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status =
-            catalogClient()->insertConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToInsert,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        Status status = catalogClient()->insertConfigDocument(
+            operationContext(), kTestNamespace, objToInsert, defaultMajorityWriteConcernDoNotUse());
         ASSERT_OK(status);
     });
 
@@ -136,11 +130,8 @@ TEST_F(InsertRetryTest, RetryOnNetworkErrorFails) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status =
-            catalogClient()->insertConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToInsert,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        Status status = catalogClient()->insertConfigDocument(
+            operationContext(), kTestNamespace, objToInsert, defaultMajorityWriteConcernDoNotUse());
         ASSERT_EQ(ErrorCodes::NetworkTimeout, status.code());
     });
 
@@ -178,11 +169,8 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status =
-            catalogClient()->insertConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToInsert,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        Status status = catalogClient()->insertConfigDocument(
+            operationContext(), kTestNamespace, objToInsert, defaultMajorityWriteConcernDoNotUse());
         ASSERT_OK(status);
     });
 
@@ -214,11 +202,8 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status =
-            catalogClient()->insertConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToInsert,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        Status status = catalogClient()->insertConfigDocument(
+            operationContext(), kTestNamespace, objToInsert, defaultMajorityWriteConcernDoNotUse());
         ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
     });
 
@@ -249,11 +234,8 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status =
-            catalogClient()->insertConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToInsert,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        Status status = catalogClient()->insertConfigDocument(
+            operationContext(), kTestNamespace, objToInsert, defaultMajorityWriteConcernDoNotUse());
         ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
     });
 
@@ -286,11 +268,8 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status =
-            catalogClient()->insertConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToInsert,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        Status status = catalogClient()->insertConfigDocument(
+            operationContext(), kTestNamespace, objToInsert, defaultMajorityWriteConcernDoNotUse());
         ASSERT_OK(status);
     });
 
@@ -340,13 +319,12 @@ TEST_F(UpdateRetryTest, Success) {
     BSONObj updateExpr = BSON("$set" << BSON("Value" << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status =
-            catalogClient()->updateConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToUpdate,
-                                                  updateExpr,
-                                                  false,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = catalogClient()->updateConfigDocument(operationContext(),
+                                                            kTestNamespace,
+                                                            objToUpdate,
+                                                            updateExpr,
+                                                            false,
+                                                            defaultMajorityWriteConcernDoNotUse());
         ASSERT_OK(status);
     });
 
@@ -373,13 +351,12 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryErrorReturnedPersistently) {
     BSONObj updateExpr = BSON("$set" << BSON("Value" << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status =
-            catalogClient()->updateConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToUpdate,
-                                                  updateExpr,
-                                                  false,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = catalogClient()->updateConfigDocument(operationContext(),
+                                                            kTestNamespace,
+                                                            objToUpdate,
+                                                            updateExpr,
+                                                            false,
+                                                            defaultMajorityWriteConcernDoNotUse());
         ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status);
     });
 
@@ -403,13 +380,12 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryReturnedFromTargeter) {
     BSONObj updateExpr = BSON("$set" << BSON("Value" << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status =
-            catalogClient()->updateConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToUpdate,
-                                                  updateExpr,
-                                                  false,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = catalogClient()->updateConfigDocument(operationContext(),
+                                                            kTestNamespace,
+                                                            objToUpdate,
+                                                            updateExpr,
+                                                            false,
+                                                            defaultMajorityWriteConcernDoNotUse());
         ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status);
     });
 
@@ -433,13 +409,12 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryOnceSuccessAfterRetry) {
     BSONObj updateExpr = BSON("$set" << BSON("Value" << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        ASSERT_OK(
-            catalogClient()->updateConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToUpdate,
-                                                  updateExpr,
-                                                  false,
-                                                  ShardingCatalogClient::kMajorityWriteConcern));
+        ASSERT_OK(catalogClient()->updateConfigDocument(operationContext(),
+                                                        kTestNamespace,
+                                                        objToUpdate,
+                                                        updateExpr,
+                                                        false,
+                                                        defaultMajorityWriteConcernDoNotUse()));
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
@@ -478,13 +453,12 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
     BSONObj updateExpr = BSON("$set" << BSON("Value" << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status =
-            catalogClient()->updateConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToUpdate,
-                                                  updateExpr,
-                                                  false,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = catalogClient()->updateConfigDocument(operationContext(),
+                                                            kTestNamespace,
+                                                            objToUpdate,
+                                                            updateExpr,
+                                                            false,
+                                                            defaultMajorityWriteConcernDoNotUse());
         ASSERT_OK(status);
     });
 
@@ -524,13 +498,12 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
     BSONObj updateExpr = BSON("$set" << BSON("Value" << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status =
-            catalogClient()->updateConfigDocument(operationContext(),
-                                                  kTestNamespace,
-                                                  objToUpdate,
-                                                  updateExpr,
-                                                  false,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = catalogClient()->updateConfigDocument(operationContext(),
+                                                            kTestNamespace,
+                                                            objToUpdate,
+                                                            updateExpr,
+                                                            false,
+                                                            defaultMajorityWriteConcernDoNotUse());
         ASSERT_OK(status);
     });
 

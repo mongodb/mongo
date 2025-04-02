@@ -116,13 +116,13 @@ public:
                         newOpCtx.get(),
                         NamespaceString(dbName),
                         csReason,
-                        ShardingCatalogClient::kLocalWriteConcern);
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                 ShardingRecoveryService::get(newOpCtx.get())
                     ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                         newOpCtx.get(),
                         NamespaceString(dbName),
                         csReason,
-                        ShardingCatalogClient::kLocalWriteConcern);
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
             }
 
             // Since no write that generated a retryable write oplog entry with this sessionId and

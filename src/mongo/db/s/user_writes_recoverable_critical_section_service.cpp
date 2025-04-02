@@ -97,7 +97,7 @@ void setBlockUserWritesDocumentField(OperationContext* opCtx,
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         BSON("$set" << BSON(UserWriteBlockingCriticalSectionDocument::kBlockUserWritesFieldName
                             << blockUserWrites)),
-        ShardingCatalogClient::kLocalWriteConcern);
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
 void acquireRecoverableCriticalSection(OperationContext* opCtx,
@@ -156,7 +156,7 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
 
         PersistentTaskStore<UserWriteBlockingCriticalSectionDocument> store(
             NamespaceString::kUserWritesCriticalSectionsNamespace);
-        store.add(opCtx, newDoc, ShardingCatalogClient::kLocalWriteConcern);
+        store.add(opCtx, newDoc, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
     }
 
     LOGV2_DEBUG(6351901,
