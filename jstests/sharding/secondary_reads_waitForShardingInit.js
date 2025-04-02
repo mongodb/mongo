@@ -72,6 +72,19 @@ jsTest.log("Going to write a document to testDB.foo.");
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: shardName}));
 assert.commandWorked(sessionDb.foo.insert({x: 1}));
 
+// TODO (SERVER-97816) remove check once 9.0 becomes last LTS.
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+if (!isMultiversion) {
+    jsTest.log(
+        "Going to send a read request which will be versioned by the mongoS to force the secondary to wait");
+    const error = st.s.getDB(dbName).runCommand({
+        find: "foo",
+        maxTimeMS: 10000,
+        $readPreference: {mode: "secondary", tags: [{"tag": "hanging"}]}
+    });
+    assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
+}
+
 /**
  * Send a read request to the hanging secondary node. We expect it to fail as the sharding state is
  * not initialized. The read will block waiting for the afterClusterTime that is younger (greater)

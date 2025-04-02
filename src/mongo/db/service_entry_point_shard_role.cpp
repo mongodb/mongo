@@ -109,6 +109,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_initialization_waiter.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -650,7 +651,13 @@ private:
     // error status if the refresh failed.
     StatusWith<bool> _refreshIfNeeded(const Status& execError);
 
-    // Any error-handling logic that must be performed if the command initiation/execution fails.
+    // Takes a command execution error (or write error), checks if the problem was that sharding is
+    // not yet initialized, and waits for initialization if so. Returns true in the case that we
+    // waited for sharding initialization and false otherwise.
+    bool _awaitShardingInitializedIfNeeded(const Status& status);
+
+    // Any error-handling logic that must be performed if the command initiation/execution
+    // fails.
     void _handleFailure(Status status);
 
     bool _isInternalClient() const {
@@ -677,6 +684,7 @@ private:
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
     bool _refreshedCatalogCache = false;
+    bool _awaitedShardingInitialization = false;
     bool _cannotRetry = false;
 
     boost::optional<Ticket> _admissionTicket;
@@ -1885,11 +1893,12 @@ void ExecCommandDatabase::_commandExec() {
     _extraFieldsBuilder.resetToEmpty();
     _execContext.getReplyBuilder()->reset();
 
-    if (OperationShardingState::isComingFromRouter(opCtx)) {
-        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-    }
-
     try {
+        // TODO (SERVER-90204) Replace with a more accurate check of whether the command is coming
+        // from a router.
+        if (OperationShardingState::isComingFromRouter(opCtx)) {
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+        }
         _runCommandOpTimes.emplace(opCtx);
         if (getInvocation()->supportsWriteConcern() ||
             getInvocation()->definition()->getLogicalOp() == LogicalOp::opGetMore) {
@@ -1909,7 +1918,9 @@ void ExecCommandDatabase::_commandExec() {
         const auto metadataRefreshStatus = _refreshIfNeeded(ex.toStatus());
         const auto refreshed = uassertStatusOK(metadataRefreshStatus);
 
-        if (refreshed && canRetryCommand(ex.toStatus())) {
+        const auto waitedForInitialized = _awaitShardingInitializedIfNeeded(ex.toStatus());
+
+        if ((refreshed || waitedForInitialized) && canRetryCommand(ex.toStatus())) {
             _resetLockerStateAfterShardingUpdate(opCtx);
             _commandExec();
             return;
@@ -2034,6 +2045,26 @@ StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) 
     return false;
 }
 
+bool ExecCommandDatabase::_awaitShardingInitializedIfNeeded(const Status& status) {
+    auto opCtx = _execContext.getOpCtx();
+
+    // If this node hasn't even been started with --shardsvr then there is no chance sharding can
+    // be initialized so there is no point waiting.
+    // TODO (SERVER-103081): non-shardsvr nodes should not receive the ShardingStateNotInitialized
+    // error.
+    if (opCtx->getClient()->isInDirectClient() ||
+        !serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        return false;
+    }
+
+    if (status == ErrorCodes::ShardingStateNotInitialized && !_awaitedShardingInitialization) {
+        sharding::awaitShardRoleReady(opCtx);
+        _awaitedShardingInitialization = true;
+        return true;
+    }
+    return false;
+}
+
 bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
     auto opCtx = _execContext.getOpCtx();
 
@@ -2052,6 +2083,16 @@ bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
         const auto inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
 
         return !inCriticalSection;
+    }
+
+    if (execError == ErrorCodes::ShardingStateNotInitialized) {
+        // We can retry commands with attached shard versions because we know that the check for
+        // sharding initialization happened before anything else. For other commands (ie. those
+        // which access the grid before it is ready), we do not know what the commands did before
+        // accessing the grid and so retrying is not necessarily safe.
+        // TODO (SERVER-90204) Replace with a more accurate check of whether the command is coming
+        // from a router.
+        return OperationShardingState::isComingFromRouter(opCtx);
     }
 
     const auto canRetryCmd = _invocation->canRetryOnStaleConfigOrShardCannotRefreshDueToLocksHeld(

@@ -13,6 +13,9 @@
 //   # $listSession is not supported in serverless.
 //   command_not_supported_in_serverless,
 //   requires_getmore,
+//   # Runs the refreshLogicalSessionCacheNow command which requires sharding to be fully
+//   # initialized
+//   assumes_sharding_initialized,
 // ]
 
 // Basic tests for the $listSessions aggregation stage.

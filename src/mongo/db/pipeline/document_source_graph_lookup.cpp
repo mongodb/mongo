@@ -241,15 +241,13 @@ boost::optional<ShardId> DocumentSourceGraphLookUp::computeMergeShardId() const 
             return pExpCtx->getMongoProcessInterface()->determineSpecificMergeShard(
                 pExpCtx->getOperationContext(), _from);
         }
-    } else {
-        auto shardId = ShardingState::get(pExpCtx->getOperationContext())->shardId();
-        // If the command is executed on a mongos, we might get an empty shardId. We should return a
-        // shardId only if it is valid (non-empty).
-        if (shardId.isValid()) {
-            return shardId;
-        } else {
-            return boost::none;
-        }
+    } else if (const auto shardingState = ShardingState::get(pExpCtx->getOperationContext());
+               shardingState->enabled()) {
+        // This path can be taken on a replica set where the sharding state is not yet initialized
+        // and the node does not have a shard id. Note that the sharding state being disabled may
+        // mean we are on a secondary of a shard server node that hasn't yet initialized its
+        // sharding state. Since this choice is only for performance, that is acceptable.
+        return shardingState->shardId();
     }
     return boost::none;
 }

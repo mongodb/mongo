@@ -757,8 +757,7 @@ SamplingBasedSplitPolicy::SamplingBasedSplitPolicy(
 }
 
 BSONObjSet SamplingBasedSplitPolicy::createFirstSplitPoints(OperationContext* opCtx,
-                                                            const ShardKeyPattern& shardKey,
-                                                            const SplitPolicyParams& params) {
+                                                            const ShardKeyPattern& shardKey) {
     if (_zones) {
         for (auto& zone : *_zones) {
             zone.setRange({shardKey.getKeyPattern().extendRangeBound(zone.getMinKey(), false),
@@ -789,7 +788,7 @@ BSONObjSet SamplingBasedSplitPolicy::createFirstSplitPoints(OperationContext* op
 
 InitialSplitPolicy::ShardCollectionConfig SamplingBasedSplitPolicy::createFirstChunks(
     OperationContext* opCtx, const ShardKeyPattern& shardKey, const SplitPolicyParams& params) {
-    auto splitPoints = createFirstSplitPoints(opCtx, shardKey, params);
+    auto splitPoints = createFirstSplitPoints(opCtx, shardKey);
 
     ZoneShardMap zoneToShardMap;
     ChunkDistributionMap chunkDistribution;

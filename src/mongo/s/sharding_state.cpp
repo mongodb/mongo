@@ -133,8 +133,9 @@ void ShardingState::assertCanAcceptShardedCommands() const {
 }
 
 ShardId ShardingState::shardId() const {
-    if (!_future.isReady())
-        return ShardId();
+    uassert(ErrorCodes::ShardingStateNotInitialized,
+            "ShardingState cannot be accessed before it is initialized",
+            _future.isReady());
 
     return _future.get().shardId;
 }

@@ -967,7 +967,6 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "shardKey"_attr = shardKey);
 
-    auto tempCollUuid = UUID::gen();
     auto shardKeyPattern = ShardKeyPattern(shardKey);
     auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
                                                           nss,
@@ -976,10 +975,9 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
                                                           boost::none /*zones*/,
                                                           boost::none /*availableShardIds*/,
                                                           gNumSamplesPerShardKeyRange.load());
-    const SplitPolicyParams splitParams{tempCollUuid, ShardingState::get(opCtx)->shardId()};
     auto splitPoints = [&] {
         try {
-            return initialSplitter.createFirstSplitPoints(opCtx, shardKeyPattern, splitParams);
+            return initialSplitter.createFirstSplitPoints(opCtx, shardKeyPattern);
         } catch (DBException& ex) {
             ex.addContext(str::stream()
                           << "Failed to find split points that partition the data into "

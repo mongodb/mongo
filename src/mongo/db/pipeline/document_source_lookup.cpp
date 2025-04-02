@@ -611,25 +611,19 @@ boost::optional<ShardId> DocumentSourceLookUp::computeMergeShardId() const {
         return msi;
     }
 
-    // If we have not yet designated a merging shard, and are either executing on mongod, the
-    // foreign collection is unsharded, or sharded $lookup is not allowed, designate the current
-    // shard as the merging shard. This is done to prevent pushing this $lookup to the shards part
-    // of the pipeline. This is an important optimization designating as this $lookup  as a merging
-    // stage allows us to execute a single $lookup (as opposed to executing one $lookup on each
-    // involved shard). When this stage is part of a deeply nested pipeline, it  prevents creating
-    // an exponential explosion of cursors/resources (proportional to the level of pipeline
-    // nesting).
-    if (!(pExpCtx->getInRouter() &&
-          pExpCtx->getMongoProcessInterface()->isSharded(pExpCtx->getOperationContext(), _fromNs) &&
-          foreignShardedLookupAllowed())) {
-        auto shardId = ShardingState::get(pExpCtx->getOperationContext())->shardId();
-        // If the command is executed on a mongos, we might get an empty shardId. We should return a
-        // shardId only if it is valid (non-empty).
-        if (shardId.isValid()) {
-            return shardId;
-        } else {
-            return boost::none;
-        }
+    // If we have not yet designated a merging shard and are executing on mongod, designate the
+    // current shard as the merging shard. This is done to prevent pushing this $lookup to the
+    // shards part of the pipeline. This is an important optimization designating as this $lookup as
+    // a merging stage allows us to execute a single $lookup (as opposed to executing one $lookup on
+    // each involved shard). When this stage is part of a deeply nested pipeline, it prevents
+    // creating an exponential explosion of cursors/resources (proportional to the level of pipeline
+    // nesting). If we are in a replica set, though, then we do not have an initialized sharding
+    // state nor a valid shard Id. Note that the sharding state being disabled may mean we are on a
+    // secondary of a shard server node that hasn't yet initialized its sharding state. Since this
+    // choice is only for performance, that is acceptable.
+    const auto shardingState = ShardingState::get(pExpCtx->getOperationContext());
+    if (!pExpCtx->getInRouter() && shardingState->enabled()) {
+        return shardingState->shardId();
     }
 
     return boost::none;

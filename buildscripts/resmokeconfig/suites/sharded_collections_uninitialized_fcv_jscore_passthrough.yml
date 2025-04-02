@@ -115,6 +115,8 @@ selector:
     - assumes_no_implicit_index_creation
     - assumes_unsharded_collection
     - cannot_create_unique_index_when_using_hashed_shard_key
+    # an initial sync node is not a fully initialized shard server
+    - assumes_sharding_initialized
 
 executor:
   config:

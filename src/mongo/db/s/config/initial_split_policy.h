@@ -306,8 +306,7 @@ public:
      * include MinKey or MaxKey.
      */
     BSONObjSet createFirstSplitPoints(OperationContext* opCtx,
-                                      const ShardKeyPattern& shardKeyPattern,
-                                      const SplitPolicyParams& params);
+                                      const ShardKeyPattern& shardKeyPattern);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,

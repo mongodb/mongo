@@ -1602,8 +1602,8 @@ public:
     void checkGeneratedInitialSplitPoints(SamplingBasedSplitPolicy* splitPolicy,
                                           const ShardKeyPattern& shardKeyPattern,
                                           const std::vector<ChunkRange>& expectedChunkRanges) {
-        const auto splitPoints = splitPolicy->createFirstSplitPoints(
-            operationContext(), shardKeyPattern, {UUID::gen(), primaryShard});
+        const auto splitPoints =
+            splitPolicy->createFirstSplitPoints(operationContext(), shardKeyPattern);
 
         const auto expectedNumSplitPoints = expectedChunkRanges.size() - 1;
         ASSERT_EQ(splitPoints.size(), expectedNumSplitPoints);
@@ -2029,7 +2029,7 @@ TEST_F(SamplingBasedInitSplitTest, ZonesHasIncompatibleShardKey) {
     {
         auto initSplitPolicy = makeInitialSplitPolicy(
             numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */);
-        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey, params),
+        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
                       DBException);
     }
 }
@@ -2065,7 +2065,7 @@ TEST_F(SamplingBasedInitSplitTest, InsufficientSamples) {
                                                       boost::none /* zones */,
                                                       mockSamples,
                                                       boost::none /* availableShardIds */);
-        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey, params),
+        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
                       DBException);
     }
 }
@@ -2100,7 +2100,7 @@ TEST_F(SamplingBasedInitSplitTest, ZeroInitialChunks) {
                                                       boost::none /* zones */,
                                                       mockSamples,
                                                       boost::none /* availableShardIds */);
-        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey, params),
+        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
                       DBException);
     }
 }

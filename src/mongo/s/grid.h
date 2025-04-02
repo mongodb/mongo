@@ -119,37 +119,37 @@ public:
      * These getter methods are safe to run only when Grid::init has been called.
      */
     ShardingCatalogClient* catalogClient() const {
-        dassert(_isGridInitialized.load());
+        _assertInitialized();
         return _catalogClient.get();
     }
 
     CatalogCache* catalogCache() const {
-        dassert(_isGridInitialized.load());
+        _assertInitialized();
         return _catalogCache.get();
     }
 
     ShardRegistry* shardRegistry() const {
-        dassert(_isGridInitialized.load());
+        _assertInitialized();
         return _shardRegistry.get();
     }
 
     ClusterCursorManager* getCursorManager() const {
-        dassert(_isGridInitialized.load());
+        _assertInitialized();
         return _cursorManager.get();
     }
 
     executor::TaskExecutorPool* getExecutorPool() const {
-        dassert(_isGridInitialized.load());
+        _assertInitialized();
         return _executorPool.get();
     }
 
     executor::NetworkInterface* getNetwork() {
-        dassert(_isGridInitialized.load());
+        _assertInitialized();
         return _network;
     }
 
     BalancerConfiguration* getBalancerConfiguration() const {
-        dassert(_isGridInitialized.load());
+        _assertInitialized();
         return _balancerConfig.get();
     }
 
@@ -165,6 +165,12 @@ public:
     void clearForUnitTests();
 
 private:
+    void _assertInitialized() const {
+        uassert(ErrorCodes::ShardingStateNotInitialized,
+                "Grid cannot be accessed before it is initialized",
+                _isGridInitialized.load());
+    }
+
     std::unique_ptr<ShardingCatalogClient> _catalogClient;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::shared_ptr<ShardRegistry> _shardRegistry;
