@@ -39,14 +39,6 @@
 namespace mongo::optimizer {
 
 /**
- * A Variable is 'resolved' when it is associated with a Definition.
- */
-struct ResolvedVariable {
-    const Variable* var;
-    const Definition def;
-};
-
-/**
  * While analyzing an ABT tree via the Collector transport class, there is a need
  * for state that is 'global' for the duration of the analysis and is accessible to
  * all Collector::transport methods. This class represents such a state.

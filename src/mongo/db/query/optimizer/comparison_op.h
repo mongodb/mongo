@@ -125,32 +125,4 @@ inline constexpr Operations flipComparisonOp(Operations op) {
             MONGO_UNREACHABLE;
     }
 }
-
-/**
- * Negate a comparison op, such that negate(op)(x, y) == not(op(x, y)).
- *
- * If the op is not a comparison, return none.
- * If the op can't be negated (for example EqMember), return none.
- *
- * Not to be confused with flipping the argument order: see 'flipComparisonOp'.
- */
-inline boost::optional<Operations> negateComparisonOp(Operations op) {
-    switch (op) {
-        case Operations::Lt:
-            return Operations::Gte;
-        case Operations::Lte:
-            return Operations::Gt;
-        case Operations::Eq:
-            return Operations::Neq;
-        case Operations::Gte:
-            return Operations::Lt;
-        case Operations::Gt:
-            return Operations::Lte;
-        case Operations::Neq:
-            return Operations::Eq;
-        default:
-            return {};
-    }
-}
-
 }  // namespace mongo::optimizer

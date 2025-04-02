@@ -49,7 +49,6 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/strong_alias.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/util/assert_util.h"
@@ -701,22 +700,6 @@ public:
         }
     }
 
-    template <class T>
-    static void printProjectionsOrdered(ExplainPrinter& printer, const T& projections) {
-        ProjectionNameOrderedSet projectionSet(projections.cbegin(), projections.cend());
-        printProjectionsUnordered(printer, projectionSet);
-    }
-
-    static void printProjection(ExplainPrinter& printer, const ProjectionName& projection) {
-        printProjectionsUnordered(printer, ProjectionNameVector{projection});
-    }
-
-    static void printCorrelatedProjections(ExplainPrinter& printer,
-                                           const ProjectionNameSet& projections) {
-        printer.fieldName("correlatedProjections", ExplainVersion::V3);
-        printProjectionsOrdered(printer, projections);
-    }
-
     /**
      * Nodes
      */
@@ -756,39 +739,6 @@ public:
             MONGO_UNREACHABLE;
         }
         return printer;
-    }
-
-    static void printFieldProjectionMap(ExplainPrinter& printer, const FieldProjectionMap& map) {
-        std::map<FieldNameType, ProjectionName> ordered;
-        if (const auto& projName = map._ridProjection) {
-            ordered.emplace("<rid>", *projName);
-        }
-        if (const auto& projName = map._rootProjection) {
-            ordered.emplace("<root>", *projName);
-        }
-        for (const auto& entry : map._fieldProjections) {
-            ordered.insert(entry);
-        }
-
-        if constexpr (version < ExplainVersion::V3) {
-            bool first = true;
-            for (const auto& [fieldName, projectionName] : ordered) {
-                if (first) {
-                    first = false;
-                } else {
-                    printer.print(", ");
-                }
-                printer.print("'").print(fieldName).print("': ").print(projectionName);
-            }
-        } else if constexpr (version == ExplainVersion::V3) {
-            ExplainPrinter local;
-            for (const auto& [fieldName, projectionName] : ordered) {
-                local.fieldName(fieldName).print(projectionName);
-            }
-            printer.fieldName("fieldProjectionMap").print(local);
-        } else {
-            MONGO_UNREACHABLE;
-        }
     }
 
     /**

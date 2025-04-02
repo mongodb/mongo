@@ -71,7 +71,6 @@
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/strong_alias.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"

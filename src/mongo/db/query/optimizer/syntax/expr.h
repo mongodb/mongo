@@ -38,7 +38,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"

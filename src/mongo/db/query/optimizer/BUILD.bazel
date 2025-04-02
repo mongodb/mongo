@@ -10,23 +10,6 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "defs",
-    srcs = [
-        "defs.cpp",
-    ],
-    hdrs = [
-        "containers.h",
-        "defs.h",
-        "strong_alias.h",
-        "//src/mongo/db/query/optimizer/syntax:syntax_fwd_declare.h",
-    ],
-    deps = [
-        "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",  # needed to register extended type destruction for MakeObjSpec :(
-        "//src/mongo/stdx",
-    ],
-)
-
 # Core definitions: ABT, Logical and physical properties, Metadata, and core
 # utilities.
 mongo_cc_library(

@@ -31,11 +31,26 @@
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/strong_alias.h"
 #include "mongo/db/query/optimizer/syntax/syntax_fwd_declare.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
+
+/**
+ * Representation of a variable name. Cannot be empty.
+ */
+struct ProjectionNameAliasTag {
+    static constexpr bool kAllowEmpty = false;
+};
+using ProjectionName = StrongStringAlias<ProjectionNameAliasTag>;
+
+using ProjectionNameSet = opt::unordered_set<ProjectionName, ProjectionName::Hasher>;
+using ProjectionNameVector = std::vector<ProjectionName>;
+
+template <typename T>
+using ProjectionNameMap = opt::unordered_map<ProjectionName, T, ProjectionName::Hasher>;
 
 /**
  * This is the core typedef that represents an abstract binding tree (ABT). The templated types

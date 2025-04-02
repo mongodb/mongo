@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
 namespace mongo::stage_builder::abt {

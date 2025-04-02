@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
