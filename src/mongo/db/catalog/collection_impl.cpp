@@ -733,10 +733,6 @@ Collection::Validator CollectionImpl::parseValidator(
 
     expCtx->variables.setDefaultRuntimeConstants(opCtx);
 
-    // The MatchExpression and contained ExpressionContext created as part of the validator are
-    // owned by the Collection and will outlive the OperationContext they were created under.
-    expCtx->setOperationContext(nullptr);
-
     // If the validation action is printing logs or the level is "moderate", then disallow any
     // encryption keywords. This is to prevent any plaintext data from showing up in the logs. Also
     // disallow if the collection has FLE2 encrypted fields.
@@ -789,6 +785,10 @@ Collection::Validator CollectionImpl::parseValidator(
     } else {
         combinedMatchExpr = std::move(explicitMatchExpr);
     }
+
+    // The MatchExpression and contained ExpressionContext created as part of the validator are
+    // owned by the Collection and will outlive the OperationContext they were created under.
+    expCtx->setOperationContext(nullptr);
 
     LOGV2_DEBUG(6364301,
                 5,

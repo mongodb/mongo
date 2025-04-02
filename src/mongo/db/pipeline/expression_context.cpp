@@ -672,24 +672,26 @@ void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(StringData name,
                           << feature_compatibility_version_documentation::compatibilityLink()
                           << " for more information.",
             flag.isEnabled([&](auto& fcvGatedFlag) {
-                // If the FCV is not initialized yet, we check whether the feature flag is enabled
-                // on the last LTS FCV, which is the lowest FCV we can have on this server. If the
-                // FCV is set, then we should check if the flag is enabled on
-                // maxFeatureCompatibilityVersion or the current FCV. If both the FCV is
-                // uninitialized and maxFeatureCompatibilityVersion is set, to be safe, we should
-                // check the lowest FCV. We are guaranteed that maxFeatureCompatibilityVersion will
-                // always be greater than or equal to the last LTS. So we will check the last LTS.
-                const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-                mongo::multiversion::FeatureCompatibilityVersion versionToCheck = fcv.getVersion();
-                if (!fcv.isVersionInitialized()) {
-                    // (Generic FCV reference): This FCV reference should exist across LTS binary
-                    // versions.
-                    versionToCheck = multiversion::GenericFCV::kLastLTS;
-                } else if (_params.maxFeatureCompatibilityVersion) {
-                    versionToCheck = *_params.maxFeatureCompatibilityVersion;
+                invariant(getOperationContext());
+
+                // maxFeatureCompatibilityVersion is set when parsing collection options that can
+                // contain query operations and which are persisted in the catalog: validators and
+                // view pipelines. When it is set, features are checked against that single FCV,
+                // instead of the server's FCV, which is not guaranteed to be stable across checks.
+                // If the operation has a VersionContext / Operation FCV, it will take precedence
+                // over the maxFeatureCompatibilityVersion in feature flag checks. This is correct,
+                // because Operation FCV provides feature flag stability for the entire operation,
+                // and therefore is is a superset of maxFeatureCompatibilityVersion, which only
+                // provides FCV stability for the feature flag checks of a single ExpressionContext.
+                if (_params.maxFeatureCompatibilityVersion) {
+                    return fcvGatedFlag.isEnabled(
+                        VersionContext::getDecoration(getOperationContext()),
+                        ServerGlobalParams::FCVSnapshot{*_params.maxFeatureCompatibilityVersion});
                 }
 
-                return fcvGatedFlag.isEnabledOnVersion(versionToCheck);
+                return fcvGatedFlag.isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(getOperationContext()),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
             }));
 }
 
