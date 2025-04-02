@@ -1,22 +1,17 @@
 import glob
-import hashlib
 import os
 import platform
 import subprocess
 import sys
-import tarfile
-from urllib.request import urlretrieve
 
 import requests
 import retry
 
 from buildscripts.util.expansions import get_expansion
 
-
-@retry.retry(tries=3, delay=5)
-def retry_download(url: str, file: str):
-    print(f"Attempting to download {file} from {url}")
-    urlretrieve(url, file)
+# This script is used to gather code coverage data from the build and post it to coveralls.
+# It is run as part of the Evergreen build process.
+# It is not intended to be run directly.
 
 
 @retry.retry(tries=3, delay=5)
@@ -33,38 +28,6 @@ def retry_coveralls_post(coveralls_report: str):
     print(response.text)
     if not response.ok:
         raise RuntimeError(f"Error while sending coveralls report: {response.status_code}")
-
-
-def download_coveralls_reporter(arch: str) -> str:
-    if arch == "arm64" or arch == "aarch64":
-        url = "https://github.com/coverallsapp/coverage-reporter/releases/download/v0.6.15/coveralls-linux-aarch64.tar.gz"
-        sha = "47653fa86b8eaae30b16c5d3f37fbeda30d8708153a261df2cdc9cb67e6c48e0"
-    else:
-        url = "https://github.com/coverallsapp/coverage-reporter/releases/download/v0.6.15/coveralls-linux-x86_64.tar.gz"
-        sha = "59b159a93ae44a649fe7ef8f10d906c146057c4f81acb4f448d441b9ff4dadb3"
-
-    print(f"Downloading coveralls from {url}")
-    tar_location = "coveralls.tar.gz"
-    retry_download(url, tar_location)
-    with tarfile.open(tar_location, "r:gz") as tar:
-        tar.extractall()
-    os.remove(tar_location)
-
-    if not os.path.exists("coveralls"):
-        raise RuntimeError(
-            "Coveralls was successfully downloaded but the binary was not found in the expected location."
-        )
-
-    sha256_hash = hashlib.sha256()
-    with open("coveralls", "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    calculated_sha = sha256_hash.hexdigest()
-    if calculated_sha != sha:
-        raise RuntimeError(
-            f"Downloaded file from {url} calculated sha ({calculated_sha}) did not match expected sha ({sha})"
-        )
-    return os.path.abspath("coveralls")
 
 
 def get_bazel_coverage_report_file() -> str:
@@ -94,12 +57,12 @@ def main():
     arch = platform.uname().machine.lower()
     print(f"Detected arch: {arch}")
     if arch in disallowed_arches:
-        print("Code coverage not supported on this architecture")
-        return 1
+        raise RuntimeError(f"Code coverage not supported on architecture '{arch}'.")
 
     if not os.path.exists(".git"):
-        print("No git repo found in working directory. Code coverage needs git repo to function.")
-        return 1
+        raise RuntimeError(
+            "No git repo found in working directory. Code coverage needs git repo to function."
+        )
 
     coveralls_token = get_expansion("coveralls_token")
     assert coveralls_token is not None, "Coveralls token was not found"
@@ -112,13 +75,11 @@ def main():
     bazel_coverage_report_location = get_bazel_coverage_report_file()
     if os.path.exists(bazel_coverage_report_location):
         print("Found bazel coverage report.")
-        coveralls_reporter_location = download_coveralls_reporter(arch)
-
         version_id = get_expansion("version_id")
         task_id = get_expansion("task_id")
 
         args = [
-            coveralls_reporter_location,
+            "coveralls",
             "report",
             bazel_coverage_report_location,
             "--service-name=travis-ci",
@@ -157,8 +118,7 @@ def main():
         os.rename(old_path, new_path)
 
     if not has_bazel_gcno:
-        print("No gcno files were found. Something went wrong.")
-        return 1
+        raise RuntimeError("Neither bazel coverage nor gcno files were found.")
 
     my_env = os.environ.copy()
     my_env["COVERALLS_REPO_TOKEN"] = coveralls_token
@@ -221,12 +181,10 @@ def main():
     )
     print(process.stdout)
     if process.returncode != 0:
-        print(f"gcovr failed with code: {process.returncode}")
-        return 1
+        raise RuntimeError(f"gcovr failed with code: {process.returncode}")
 
     if not os.path.exists(coveralls_report):
-        print("Could not find coveralls json report")
-        return 1
+        raise RuntimeError(f"Could not find coveralls json report at {coveralls_report}")
 
     retry_coveralls_post(coveralls_report)
     return 0
