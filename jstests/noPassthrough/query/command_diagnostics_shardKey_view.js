@@ -9,6 +9,9 @@ import {
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+// This test triggers an unclean shutdown, which may cause inaccurate fast counts.
+TestData.skipEnforceFastCountOnValidate = true;
+
 const dbName = "test";
 const collName = "command_diagnostics";
 const viewName = collName + "_view";

@@ -13,6 +13,9 @@ import {
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
+// This test triggers an unclean shutdown, which may cause inaccurate fast counts.
+TestData.skipEnforceFastCountOnValidate = true;
+
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 const dbName = "test";
 const collName = jsTestName();
