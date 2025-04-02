@@ -623,6 +623,10 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
     }
 
+    if (params.count("net.proxyPort")) {
+        serverGlobalParams.proxyPort = params["net.proxyPort"].as<int>();
+    }
+
     if (params.count("sharding.archiveMovedChunks")) {
         serverGlobalParams.moveParanoia = params["sharding.archiveMovedChunks"].as<bool>();
     }

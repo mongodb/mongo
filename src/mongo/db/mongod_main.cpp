@@ -95,6 +95,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/mongod_options_general_gen.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/fcv_op_observer.h"
@@ -268,6 +269,22 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeShutdown);
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoDB", L"MongoDB", L"MongoDB Server"};
 #endif
+
+auto makeTransportLayer(ServiceContext* svcCtx) {
+    boost::optional<int> proxyPort;
+
+    if (serverGlobalParams.proxyPort) {
+        proxyPort = *serverGlobalParams.proxyPort;
+        if (*proxyPort == serverGlobalParams.port) {
+            LOGV2_ERROR(9967800,
+                        "The proxy port must be different from the public listening port.",
+                        "port"_attr = serverGlobalParams.port);
+            quickExit(ExitCode::badOptions);
+        }
+    }
+
+    return transport::TransportLayerManager::createWithConfig(&serverGlobalParams, svcCtx);
+}
 
 void logStartup(OperationContext* opCtx) {
     BSONObjBuilder toLog;
@@ -495,10 +512,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Transport layer setup",
                                                   &startupTimeElapsedBuilder);
-        auto tl =
-            transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
-        auto res = tl->setup();
-        if (!res.isOK()) {
+        auto tl = makeTransportLayer(serviceContext);
+        if (auto res = tl->setup(); !res.isOK()) {
             LOGV2_ERROR(20568,
                         "Error setting up listener: {error}",
                         "Error setting up listener",

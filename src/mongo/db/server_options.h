@@ -68,6 +68,8 @@ struct ServerGlobalParams {
 
     ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
 
+    boost::optional<int> proxyPort;  // --proxyPort
+
     bool objcheck = true;  // --objcheck
 
     // Shell parameter, used for testing only, to tell the shell to crash on InvalidBSON errors.
