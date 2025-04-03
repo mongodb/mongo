@@ -662,6 +662,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();
 
     std::vector<CollectionType> collList;
+
     if (feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
             VersionContext::getDecoration(opCtx), fcvSnapshot)) {
         // TODO SERVER-80532: the sharding catalog might lose some collections.
@@ -777,7 +778,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             shardRegistry->getShard(opCtx, shardType.getName()).isOK());
 
     topology_change_helpers::hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(opCtx);
-    // Release the shard membership lock since the set cluster parameter operation below require
+
+    // Release the shard membership lock since the set cluster parameter operation below requires
     // taking this lock.
     shardMembershipLock.unlock();
 

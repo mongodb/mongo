@@ -135,6 +135,16 @@ RemoveShardProgress removeShard(OperationContext* opCtx,
                     VersionContext::getDecoration(opCtx), (*fixedFCV)->acquireFCVSnapshot())) {
                 return runCoordinatorRemoveShard(opCtx, ddlLock, fixedFCV, shardId, replicaSetName);
             } else {
+                // We need to check that there are not any coordinators which have been created but
+                // have not yet acquired the DDL lock in case we are just after an FCV downgrade. We
+                // need to release the DDL lock before waiting for that coordinator to complete, so
+                // we throw ConflictingOperationInProgress and retry after waiting.
+                uassert(ErrorCodes::ConflictingOperationInProgress,
+                        "Post FCV downgrade remove shard must wait for ongoing remove shard "
+                        "coordinators to complete before executing",
+                        ShardingDDLCoordinatorService::getService(opCtx)
+                            ->areAllCoordinatorsOfTypeFinished(
+                                opCtx, DDLCoordinatorTypeEnum::kRemoveShardCommit));
                 fixedFCV.reset();
                 return shardingCatalogManager->removeShard(opCtx, shardId);
             }
@@ -143,6 +153,10 @@ RemoveShardProgress removeShard(OperationContext* opCtx,
                   "Remove shard received retriable error and will be retried",
                   "shardId"_attr = shardId,
                   "error"_attr = redact(ex));
+
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kRemoveShardCommit);
         }
     }
 }

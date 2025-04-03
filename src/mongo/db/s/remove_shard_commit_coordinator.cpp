@@ -42,14 +42,18 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(Phase::kCheckPreconditions,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     const auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
+        .then(_buildPhaseHandler(
+            Phase::kCheckPreconditions,
+            [this, executor = executor, anchor = shared_from_this()] {
+                const auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
 
-                                     _checkShardExistsAndIsDraining(opCtx);
-                                 }))
+                // TODO(SERVER-97816): Remove this call once 9.0 becomes lastLTS.
+                topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+
+                _checkShardExistsAndIsDraining(opCtx);
+            }))
         .then(_buildPhaseHandler(
             Phase::kJoinMigrationsAndCheckRangeDeletions,
             [this, anchor = shared_from_this()] { return _doc.getIsTransitionToDedicated(); },

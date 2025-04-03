@@ -716,6 +716,15 @@ private:
                         ->waitForCoordinatorsOfGivenTypeToComplete(
                             opCtx, DDLCoordinatorTypeEnum::kMovePrimary);
                 }
+
+                // TODO (SERVER-97816): Remove once 9.0 becomes last lts.
+                if (feature_flags::gUseTopologyChangeCoordinators
+                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                      originalVersion)) {
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kRemoveShardCommit);
+                }
             }
         }
 
@@ -1721,6 +1730,18 @@ private:
             feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
                 requestedVersion)) {
             _createConfigSessionsCollectionLocally(opCtx);
+        }
+
+        // TODO (SERVER-97816): Remove once 9.0 becomes last lts.
+        if (role && role->has(ClusterRole::ConfigServer) &&
+            feature_flags::gUseTopologyChangeCoordinators.isEnabledOnVersion(requestedVersion)) {
+            // The old remove shard is not a coordinator, so we can only drain this operation by
+            // acquiring the same DDL lock that it acquires (config.shards).
+            DDLLockManager::ScopedCollectionDDLLock ddlLock(
+                opCtx,
+                NamespaceString::kConfigsvrShardsNamespace,
+                "setFCVFinalizeUpgrade",
+                LockMode::MODE_IX);
         }
     }
 
