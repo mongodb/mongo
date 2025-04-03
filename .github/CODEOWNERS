@@ -2011,6 +2011,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/plan_enumerator/**/* @10gen/query-optimization-planner @svc-auto-approve-bot
 /src/mongo/db/query/plan_enumerator/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/query_settings/OWNERS.yml
+/src/mongo/db/query/query_settings/**/* @10gen/query-execution-query-settings @svc-auto-approve-bot
+/src/mongo/db/query/query_settings/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/query_shape/OWNERS.yml
 /src/mongo/db/query/query_shape/**/* @10gen/query-integration-query-stats @svc-auto-approve-bot
 /src/mongo/db/query/query_shape/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
