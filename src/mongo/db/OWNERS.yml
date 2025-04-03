@@ -307,3 +307,6 @@ filters:
   - "rs_local_client*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "raw_data_operation*":
+    approvers:
+      - 10gen/server-catalog-and-routing

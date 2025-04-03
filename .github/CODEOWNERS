@@ -1450,6 +1450,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/startup_warnings_mongod_thp_test* @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/mongo/db/**/namespace_string* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/rs_local_client* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/**/raw_data_operation* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/admission/OWNERS.yml
 /src/mongo/db/admission/**/* @10gen/server-workload-scheduling @svc-auto-approve-bot
