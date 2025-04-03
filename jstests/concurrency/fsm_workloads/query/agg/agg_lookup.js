@@ -43,9 +43,9 @@ export const $config = (function() {
                     if (TxnUtil.isTransientTransactionError(e)) {
                         throw e;
                     }
-                    if (TestData.runningWithShardStepdowns) {
-                        // When running with stepdowns, we expect to sometimes see the query
-                        // killed.
+                    if (TestData.runningWithShardStepdowns || TestData.runningWithBalancer) {
+                        // When running with stepdowns or with balancer, we expect to sometimes see
+                        // the query killed.
                         assert.contains(e.code, interruptedQueryErrors);
                     } else {
                         throw e;
