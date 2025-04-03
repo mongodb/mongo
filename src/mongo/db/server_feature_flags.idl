@@ -96,3 +96,7 @@ feature_flags:
         description: "Expose client IP in audit logs for load-balanced connections"
         cpp_varname: gFeatureFlagExposeClientIpInAuditLogs
         default: false
+    featureFlagMongogProxyProcolSupport:
+        description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
+        cpp_varname: gFeatureFlagMongogProxyProcolSupport
+        default: false
