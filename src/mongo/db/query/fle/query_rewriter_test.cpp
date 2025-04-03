@@ -242,6 +242,73 @@ private:
     }
 };
 
+// A mock rewriter for text search predicates which will rewrite the string 'original' to
+// 'rewritten' as an arbitrary choice to show rewrites work properly.
+class EncTextSearchPredicateRewriter : public fle::EncryptedPredicate {
+public:
+    EncTextSearchPredicateRewriter(const fle::QueryRewriterInterface* rewriter)
+        : EncryptedPredicate(rewriter) {}
+
+    static inline const std::string kPayloadText{"original"};
+    static inline const std::string kRewrittenText{"rewritten"};
+
+protected:
+    bool isPayload(const BSONElement& elt) const override {
+        tasserted(10184100,
+                  "Encrypted text search predicates are only supported as aggregation expressions, "
+                  "so we will only check isPayload() on a Value.");
+    }
+
+    bool isPayload(const Value& v) const override {
+        // For this test we are only considering the string which equals payloadText as a payload.
+        return v.getString() == kPayloadText;
+    }
+
+    std::vector<PrfBlock> generateTags(fle::BSONValue payload) const override {
+        return {};
+    };
+
+    std::unique_ptr<MatchExpression> rewriteToTagDisjunction(MatchExpression* expr) const override {
+        tasserted(
+            10184101,
+            "Encrypted text search predicates are only supported as aggregation expressions.");
+    };
+
+    std::unique_ptr<Expression> rewriteToTagDisjunction(Expression* expr) const override {
+        if (auto encStrStartsWithExpr = dynamic_cast<ExpressionEncStrStartsWith*>(expr);
+            encStrStartsWithExpr) {
+            if (!isPayload(encStrStartsWithExpr->getText().getValue())) {
+                return nullptr;
+            }
+
+            auto expCtx = encStrStartsWithExpr->getExpressionContext();
+            auto textExpr = make_intrusive<ExpressionConstant>(expCtx, Value(kRewrittenText));
+
+            // Return a new ExpressionEncStrStartsWith with the same input, and rewritten prefix
+            // string.
+            return std::make_unique<ExpressionEncStrStartsWith>(
+                expCtx, std::move(encStrStartsWithExpr->getChildren()[0]), std::move(textExpr));
+        }
+        MONGO_UNREACHABLE_TASSERT(10184102);
+    }
+
+    std::unique_ptr<MatchExpression> rewriteToRuntimeComparison(
+        MatchExpression* expr) const override {
+        tasserted(
+            10184103,
+            "Encrypted text search predicates are only supported as aggregation expressions.");
+    }
+
+    std::unique_ptr<Expression> rewriteToRuntimeComparison(Expression* expr) const override {
+        return nullptr;
+    }
+
+private:
+    EncryptedBinDataType encryptedBinDataType() const override {
+        return EncryptedBinDataType::kPlaceholder;
+    }
+};
+
 // Define the mock match and agg rewrite maps to be used by the unit tests.
 static const fle::MatchTypeToRewriteMap matchRewriteMap{
     {MatchExpression::EQ,
@@ -255,7 +322,10 @@ static const fle::ExpressionToRewriteMap aggRewriteMap{
      {[](auto* rewriter, auto* expr) { return MockPredicateRewriter{rewriter}.rewrite(expr); },
       [](auto* rewriter, auto* expr) {
           return OtherMockPredicateRewriter{rewriter}.rewrite(expr);
-      }}}};
+      }}},
+    {typeid(ExpressionEncStrStartsWith), {[](auto* rewriter, auto* expr) {
+         return EncTextSearchPredicateRewriter{rewriter}.rewrite(expr);
+     }}}};
 
 
 class MockQueryRewriter : public fle::QueryRewriter {
@@ -298,6 +368,7 @@ public:
     FLEServerRewriteTest() : _mock(nullptr) {}
 
     void setUp() override {
+        fle::registerEncTextSearchExpressions();
         _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss, _mockEscMap);
     }
 
@@ -403,6 +474,37 @@ TEST_FLE_REWRITE_AGG(
     TopLevel_Or,
     "{$or: [{$eq: ['$ssn', {$const: {encrypt: 2}}]}, {$eq: ['$ssn', {$const: {encrypt: 4}}]}]}",
     "{$or: [{$gt: ['$ssn', {$const: 2}]}, {$gt: ['$ssn', {$const: 4}]}]}")
+
+TEST_FLE_REWRITE_AGG(Basic_FleEncStrStartsWith,
+                     "{$encStrStartsWith: {input: '$ssn', prefix: 'original'}}",
+                     "{$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}")
+
+TEST_FLE_REWRITE_AGG(
+    Nested_FleEncStrStartsWith_FullyRewrite,
+    "{$or: [{$encStrStartsWith: {input: '$ssn', prefix: 'original'}}, {$encStrStartsWith: {input: "
+    "'$otherSsn', prefix: 'original'}}]}",
+    "{$or: [{$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}, "
+    "{$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'rewritten'}}}]}")
+
+TEST_FLE_REWRITE_AGG(
+    Nested_FleEncStrStartsWith_PartiallyRewrite,
+    "{$and: [{$encStrStartsWith: {input: '$ssn', prefix: 'original'}}, {$encStrStartsWith: {input: "
+    "'$otherSsn', prefix: 'other'}}]}",
+    "{$and: [{$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}, "
+    "{$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'other'}}}]}")
+
+TEST_FLE_REWRITE_MATCH(
+    Match_FleEncStrStartsWith_Expr,
+    "{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}",
+    "{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}");
+
+TEST_FLE_REWRITE_MATCH(
+    Match_Nested_FleEncStrStartsWith_Expr,
+    "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}, {$expr: "
+    "{$encStrStartsWith: {input: "
+    "'$otherSsn', prefix: 'other'}}}]}",
+    "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
+    "{$expr: {$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'other'}}}}]}")
 
 
 // Test that the rewriter will work from any rewrite registered to an expression. The test rewriter
