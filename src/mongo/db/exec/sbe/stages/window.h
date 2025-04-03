@@ -196,6 +196,12 @@ private:
      */
     void spill();
 
+    void doForceSpill() final {
+        doRestoreState(true);
+        spill();
+        doSaveState(true);
+    }
+
     const value::SlotVector _currSlots;
     const value::SlotVector _boundTestingSlots;
     const size_t _partitionSlotCount;

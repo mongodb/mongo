@@ -534,12 +534,14 @@ public:
     SetWindowFieldsCounters(SetWindowFieldsCounters&) = delete;
     SetWindowFieldsCounters& operator=(const SetWindowFieldsCounters&) = delete;
 
-    void incrementSetWindowFieldsCountersPerSpilling(int64_t spills,
-                                                     int64_t spilledBytes,
-                                                     int64_t spilledRecords) {
+    void incrementPerSpilling(int64_t spills,
+                              int64_t spilledBytes,
+                              int64_t spilledRecords,
+                              int64_t spilledDataStorageSize) {
         setWindowFieldsSpills.incrementRelaxed(spills);
         setWindowFieldsSpilledBytes.incrementRelaxed(spilledBytes);
         setWindowFieldsSpilledRecords.incrementRelaxed(spilledRecords);
+        setWindowFieldsSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
     }
 
     // Counter tracking setWindowFields spills.
@@ -551,6 +553,9 @@ public:
     // Counter tracking setWindowFields spilled record number.
     Counter64& setWindowFieldsSpilledRecords =
         *MetricBuilder<Counter64>{"query.setWindowFields.spilledRecords"};
+    // The size of the file or RecordStore spilled to disk, updated after all spilling happened.
+    Counter64& setWindowFieldsSpilledDataStorageSize =
+        *MetricBuilder<Counter64>{"query.setWindowFields.spilledDataStorageSize"};
 };
 extern SetWindowFieldsCounters setWindowFieldsCounters;
 

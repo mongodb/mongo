@@ -207,15 +207,20 @@ void WindowStage::spill() {
     }
 
     // Record spilling statistics.
+    auto storageSizeBeforeSpillUpdate = _specificStats.spillingStats.getSpilledDataStorageSize();
     _specificStats.spillingStats.updateSpillingStats(
         1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
-    setWindowFieldsCounters.incrementSetWindowFieldsCountersPerSpilling(
-        1 /* spills */, spilledBytes, _rows.size());
+    auto storageSizeAfterSpillUpdate = _specificStats.spillingStats.getSpilledDataStorageSize();
+    setWindowFieldsCounters.incrementPerSpilling(1 /* spills */,
+                                                 spilledBytes,
+                                                 _rows.size(),
+                                                 storageSizeAfterSpillUpdate -
+                                                     storageSizeBeforeSpillUpdate);
 
     // Clear the in memory window buffer.
     _rows.clear();
 
-    // Fail if spilling cannot reduce memory usage below thredshold.
+    // Fail if spilling cannot reduce memory usage below threshold.
     uassert(7870900,
             "Exceeded memory limit for $setWindowFields, but cannot reduce memory usage by "
             "spilling further.",

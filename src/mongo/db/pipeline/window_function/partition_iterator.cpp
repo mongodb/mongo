@@ -106,8 +106,10 @@ PartitionIterator::PartitionIterator(ExpressionContext* expCtx,
 
 PartitionIterator::~PartitionIterator() {
     const auto& stats = _cache.getSpillingStats();
-    setWindowFieldsCounters.incrementSetWindowFieldsCountersPerSpilling(
-        stats.getSpills(), stats.getSpilledBytes(), stats.getSpilledRecords());
+    setWindowFieldsCounters.incrementPerSpilling(stats.getSpills(),
+                                                 stats.getSpilledBytes(),
+                                                 stats.getSpilledRecords(),
+                                                 stats.getSpilledDataStorageSize());
 }
 
 optional<Document> PartitionIterator::operator[](int index) {
