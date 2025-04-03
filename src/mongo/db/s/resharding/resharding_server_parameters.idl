@@ -81,6 +81,19 @@ server_parameters:
             gte: 1
         redact: false
 
+    reshardingCollectionClonerBatchSizeCount:
+        description: >-
+            Limit for the number of documents inserted per storage transaction (WriteUnitOfWork)
+            by ReshardingCollectionCloner.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingCollectionClonerBatchSizeCount
+        default:
+            expr: 100
+        validator:
+            gt: 0
+        redact: false
+
     reshardingCollectionClonerWriteThreadCount:
         description: >-
             Number of writer threads used by ReshardingCollectionCloner.
