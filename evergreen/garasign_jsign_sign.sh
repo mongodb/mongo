@@ -10,7 +10,7 @@ set -o errexit
 set -o verbose
 
 msi_filename=mongodb-${push_name}-${push_arch}-${suffix}.msi
-cp bazel-bin/src/mongo/installer/msi/mongodb-win32-x86_64-windows-${suffix}.msi $msi_filename
+cp bazel-bin/src/mongo/installer/msi/mongodb-win32-x86_64-windows-${version}.msi $msi_filename
 
 # signing windows artifacts with jsign
 cat << 'EOF' > jsign_signing_commands.sh
