@@ -69,35 +69,12 @@ void BM_HMAC_SHA256(benchmark::State& state) {
 
         // This code gets timed
         for (size_t j = 0; j < N; ++j) {
-            HmacContext hmacCtx;
-            FLEUtil::prf(&hmacCtx, hmacKey, ++i);
+            FLEUtil::prf(hmacKey, ++i);
         }
     }
 }
 
 BENCHMARK(BM_HMAC_SHA256)->Arg(1)->Arg(100)->Arg(1000)->Arg(10000)->Unit(benchmark::kMillisecond);
-
-void BM_HMAC_SHA256_High_Perf(benchmark::State& state) {
-    // Perform setup here
-    uint64_t i = 0;
-
-    uint64_t N = state.range(0);
-
-    HmacContext hmacCtx;
-    for (auto _ : state) {
-        // This code gets timed
-        for (size_t j = 0; j < N; ++j) {
-            FLEUtil::prf(&hmacCtx, hmacKey, ++i);
-        }
-    }
-}
-
-BENCHMARK(BM_HMAC_SHA256_High_Perf)
-    ->Arg(1)
-    ->Arg(100)
-    ->Arg(1000)
-    ->Arg(10000)
-    ->Unit(benchmark::kMillisecond);
 
 
 void BM_SHA256(benchmark::State& state) {

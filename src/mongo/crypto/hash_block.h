@@ -36,10 +36,6 @@
 #include <string_view>
 #include <vector>
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-#include <openssl/hmac.h>
-#endif
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status_with.h"
@@ -96,30 +92,6 @@ private:
     using SecureHashType = SecureAllocatorDefaultDomain::SecureHandle<HashType>;
 
     SecureHashType _hash;
-};
-
-/**
- * For an OpenSSL optimization where a hash needs to be computed many times in succession,
- * we can re-use the ctx object by calling init. However, this needs to be cross compatible
- * with Windows and Apple, so we define a wrapping struct that is effectively a no-op on
- * the other two platforms.
- */
-class HmacContext {
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-public:
-    HmacContext() : hmac_ctx(HMAC_CTX_new(), HMAC_CTX_free) {}
-
-    void reset() {
-        HMAC_CTX_reset(hmac_ctx.get());
-    }
-
-    HMAC_CTX* get() {
-        return hmac_ctx.get();
-    }
-
-private:
-    std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)> hmac_ctx;
-#endif
 };
 
 /**
@@ -224,20 +196,6 @@ public:
                             std::initializer_list<ConstDataRange> input,
                             HashBlock* const output) {
         Traits::computeHmac(key, keyLen, input, &(output->_hash));
-    }
-
-    /**
-     * This function is an alternative to computeHmac. It provides an optimization - when
-     * a single thread needs to compute a hash repeatedly on the OpenSSL platform, it can
-     * provide a ctx object of its own (which is an empty object in Apple and Windows)
-     * that will be re-used by being re-initialized when computing an Hmac.
-     */
-    static void computeHmacWithCtx(HmacContext* ctx,
-                                   const uint8_t* key,
-                                   size_t keyLen,
-                                   std::initializer_list<ConstDataRange> input,
-                                   HashBlock* const output) {
-        Traits::computeHmacWithCtx(ctx, key, keyLen, input, &(output->_hash));
     }
 
     const uint8_t* data() const& {
