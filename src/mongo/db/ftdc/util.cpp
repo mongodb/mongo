@@ -77,6 +77,9 @@ const char kFTDCCollectEndField[] = "end";
 
 const std::int64_t FTDCConfig::kPeriodMillisDefault = 1000;
 const std::uint64_t FTDCConfig::kMetadataCaptureFrequencyDefault = 300;
+const std::int64_t FTDCConfig::kSampleTimeoutMillisDefault = 166;
+const std::uint64_t FTDCConfig::kMinThreadsDefault = 1;
+const std::uint64_t FTDCConfig::kMaxThreadsDefault = 4;
 
 const std::size_t kMaxRecursion = 10;
 

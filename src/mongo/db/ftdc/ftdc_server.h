@@ -120,6 +120,9 @@ struct FTDCStartupParams {
     AtomicWord<bool> enabled;
     AtomicWord<int> periodMillis;
     AtomicWord<int> metadataCaptureFrequency;
+    AtomicWord<int> sampleTimeoutMillis;
+    AtomicWord<int> minThreads;
+    AtomicWord<int> maxThreads;
 
     AtomicWord<int> maxDirectorySizeMB;
     AtomicWord<int> maxFileSizeMB;
@@ -130,6 +133,9 @@ struct FTDCStartupParams {
         : enabled(FTDCConfig::kEnabledDefault),
           periodMillis(FTDCConfig::kPeriodMillisDefault),
           metadataCaptureFrequency(FTDCConfig::kMetadataCaptureFrequencyDefault),
+          sampleTimeoutMillis(FTDCConfig::kSampleTimeoutMillisDefault),
+          minThreads(FTDCConfig::kMinThreadsDefault),
+          maxThreads(FTDCConfig::kMaxThreadsDefault),
           // Scale the values down since are defaults are in bytes, but the user interface is MB
           maxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024)),
           maxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024)),
@@ -149,6 +155,10 @@ Status onUpdateFTDCDirectorySize(std::int32_t value);
 Status onUpdateFTDCFileSize(std::int32_t value);
 Status onUpdateFTDCSamplesPerChunk(std::int32_t value);
 Status onUpdateFTDCPerInterimUpdate(std::int32_t value);
+Status onUpdateFTDCSampleTimeout(std::int32_t value);
+Status onUpdateFTDCMinThreads(std::int32_t value);
+Status onUpdateFTDCMaxThreads(std::int32_t value);
+Status validateSampleTimeoutMillis(std::int32_t, const boost::optional<TenantId>&);
 
 /**
  * Server Parameter accessors

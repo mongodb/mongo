@@ -47,6 +47,9 @@ struct FTDCConfig {
           maxFileSizeBytes(kMaxFileSizeBytesDefault),
           period(kPeriodMillisDefault),
           metadataCaptureFrequency(kMetadataCaptureFrequencyDefault),
+          sampleTimeout(kSampleTimeoutMillisDefault),
+          minThreads(kMinThreadsDefault),
+          maxThreads(kMaxThreadsDefault),
           maxSamplesPerArchiveMetricChunk(kMaxSamplesPerArchiveMetricChunkDefault),
           maxSamplesPerInterimMetricChunk(kMaxSamplesPerInterimMetricChunkDefault) {}
 
@@ -84,6 +87,22 @@ struct FTDCConfig {
     std::uint64_t metadataCaptureFrequency;
 
     /**
+     * Timeout on how long the controller should wait (in MS) for a collection to finish running.
+     * This only applies to async FTDC collections.
+     */
+    Milliseconds sampleTimeout;
+
+    /**
+     * The minimum number of threads that the async collector thread pools should keep alive.
+     */
+    size_t minThreads;
+
+    /**
+     * The maximum number of threads that the async collector thread pools can scale to.
+     */
+    size_t maxThreads;
+
+    /**
      * Maximum number of samples to collect in an archive metric chunk for long term storage.
      */
     std::uint32_t maxSamplesPerArchiveMetricChunk;
@@ -98,6 +117,9 @@ struct FTDCConfig {
 
     static const std::int64_t kPeriodMillisDefault;
     static const std::uint64_t kMetadataCaptureFrequencyDefault;
+    static const std::int64_t kSampleTimeoutMillisDefault;
+    static const std::uint64_t kMinThreadsDefault;
+    static const std::uint64_t kMaxThreadsDefault;
     static const std::uint64_t kMaxDirectorySizeBytesDefault = 200 * 1024 * 1024;
     static const std::uint64_t kMaxFileSizeBytesDefault = 10 * 1024 * 1024;
 

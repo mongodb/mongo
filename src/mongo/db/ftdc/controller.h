@@ -40,6 +40,7 @@
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
+#include "mongo/db/ftdc/ftdc_feature_flag_gen.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -73,9 +74,19 @@ public:
           _path(std::move(path)),
           _config(std::move(config)),
           _configTemp(_config),
-          _multiServiceSchema(multiServiceSchema) {}
+          _multiServiceSchema(multiServiceSchema) {
+        if (feature_flags::gFeatureFlagGaplessFTDC.isEnabled()) {
+            _asyncPeriodicCollectors.emplace(
+                _config.sampleTimeout, _config.minThreads, _config.maxThreads);
+        }
+    }
 
     ~FTDCController() = default;
+
+    /**
+     * Get the number of async periodic collectors that are registered on this controller.
+     */
+    long long getNumAsyncPeriodicCollectors();
 
     /*
      * Set whether the controller is enabled, and collects data.
@@ -93,9 +104,29 @@ public:
     void setMetadataCaptureFrequency(std::uint64_t freq);
 
     /**
+     * Get the period for data collection.
+     */
+    Milliseconds getPeriod();
+
+    /**
      * Set the period for data collection.
      */
     void setPeriod(Milliseconds millis);
+
+    /**
+     * Set the sample timeout for async collectors.
+     */
+    Status setSampleTimeout(Milliseconds newValue);
+
+    /**
+     * Set the minimum number of threads used to run async collectors.
+     */
+    Status setMinThreads(size_t newValue);
+
+    /**
+     * Set the maximum number of threads used to run async collectors.
+     */
+    Status setMaxThreads(size_t newValue);
 
     /**
      * Set the maximum directory size in bytes.
@@ -261,6 +292,12 @@ private:
 
     // Set of periodic collectors
     SyncFTDCCollectorCollection _periodicCollectors;
+
+    // Set of async periodic collectors
+    boost::optional<AsyncFTDCCollectorCollection> _asyncPeriodicCollectors;
+
+    // Tracks the number of async periodic collectors that are registered with this controller.
+    Counter64 _numAsyncPeriodicCollectors;
 
     // Last seen sample document from periodic collectors
     // Owned

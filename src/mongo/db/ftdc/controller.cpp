@@ -56,6 +56,10 @@
 
 namespace mongo {
 
+long long FTDCController::getNumAsyncPeriodicCollectors() {
+    return _numAsyncPeriodicCollectors.get();
+}
+
 Status FTDCController::setEnabled(bool enabled) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
@@ -77,10 +81,76 @@ void FTDCController::setMetadataCaptureFrequency(std::uint64_t freq) {
     _condvar.notify_one();
 }
 
+Milliseconds FTDCController::getPeriod() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _configTemp.period;
+}
+
 void FTDCController::setPeriod(Milliseconds millis) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _configTemp.period = millis;
     _condvar.notify_one();
+}
+
+Status FTDCController::setSampleTimeout(Milliseconds newValue) {
+    if (!feature_flags::gFeatureFlagGaplessFTDC.isEnabled()) {
+        return Status(
+            ErrorCodes::InvalidOptions,
+            "The diagnosticDataCollectionSampleTimeoutMillis parameter is not available with "
+            "featureFlagGaplessFTDC disabled.");
+    }
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _configTemp.sampleTimeout = newValue;
+    _asyncPeriodicCollectors->updateSampleTimeout(newValue);
+    _condvar.notify_one();
+    return Status::OK();
+}
+
+Status FTDCController::setMinThreads(size_t newValue) {
+    if (!feature_flags::gFeatureFlagGaplessFTDC.isEnabled()) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "The diagnosticDataCollectionMinThreads parameter is not available with "
+                      "featureFlagGaplessFTDC disabled.");
+    }
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (newValue > _configTemp.maxThreads) {
+        return Status(
+            ErrorCodes::BadValue,
+            fmt::format("Cannot set diagnosticDataCollectionMinThreads to {}. The value must not "
+                        "exceed diagnosticDataCollectionMaxThreads, currently set to {}.",
+                        newValue,
+                        _configTemp.maxThreads));
+    }
+
+    _configTemp.minThreads = newValue;
+    _asyncPeriodicCollectors->updateMinThreads(newValue);
+    _condvar.notify_one();
+    return Status::OK();
+}
+
+Status FTDCController::setMaxThreads(size_t newValue) {
+    if (!feature_flags::gFeatureFlagGaplessFTDC.isEnabled()) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "The diagnosticDataCollectionMaxThreads parameter is not available with "
+                      "featureFlagGaplessFTDC disabled.");
+    }
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (newValue < _configTemp.minThreads) {
+        return Status(
+            ErrorCodes::BadValue,
+            fmt::format("Cannot set diagnosticDataCollectionMaxThreads to {}. The value must not "
+                        "fall below diagnosticDataCollectionMinThreads, currently set to {}.",
+                        newValue,
+                        _configTemp.minThreads));
+    }
+
+    _configTemp.maxThreads = newValue;
+    _asyncPeriodicCollectors->updateMaxThreads(newValue);
+    _condvar.notify_one();
+    return Status::OK();
 }
 
 void FTDCController::setMaxDirectorySizeBytes(std::uint64_t size) {
@@ -136,6 +206,12 @@ void FTDCController::addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface
                                           ClusterRole role) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(_state == State::kNotStarted);
+
+    if (feature_flags::gFeatureFlagGaplessFTDC.isEnabled()) {
+        _asyncPeriodicCollectors->add(std::move(collector), role);
+        _numAsyncPeriodicCollectors.increment();
+        return;
+    }
 
     _periodicCollectors.add(std::move(collector), role);
 }
@@ -286,7 +362,9 @@ void FTDCController::doLoop(Service* service) try {
             iassert(_mgr->rotate(client));
         }
 
-        auto collectSample = _periodicCollectors.collect(client, _multiServiceSchema);
+        auto collectSample = feature_flags::gFeatureFlagGaplessFTDC.isEnabled()
+            ? _asyncPeriodicCollectors->collect(client, _multiServiceSchema)
+            : _periodicCollectors.collect(client, _multiServiceSchema);
 
         Status s = _mgr->writeSampleAndRotateIfNeeded(
             client, std::get<0>(collectSample), std::get<1>(collectSample));

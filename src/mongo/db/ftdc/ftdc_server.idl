@@ -60,6 +60,38 @@ server_parameters:
         gte: 1
     redact: false
 
+  diagnosticDataCollectionSampleTimeoutMillis:
+    description: "Determines the timeout that each FTDC collector will be waited on during every
+                  sample. This is only used for async FTDC collectors."
+    set_at: [startup, runtime]
+    cpp_varname: "ftdcStartupParams.sampleTimeoutMillis"
+    on_update: "onUpdateFTDCSampleTimeout"
+    validator:
+      callback: "validateSampleTimeoutMillis" # The callback is declared in "ftdc_server.h"
+    redact: false 
+
+  diagnosticDataCollectionMinThreads:
+    description: "Determines the minimum number of async threads to keep-alive in the async FTDC 
+                  collector threadpool. Runtime updates require a join on the threadpool which could
+                  cause temporary collection delay."
+    set_at: [startup, runtime]
+    cpp_varname: "ftdcStartupParams.minThreads"
+    on_update: "onUpdateFTDCMinThreads"
+    validator:
+        gte: 1
+    redact: false
+
+  diagnosticDataCollectionMaxThreads:
+    description: "Determines the maximum number of async threads to scale to in the async FTDC
+                  collector threadpool. Runtime updates require a join on the threadpool which could
+                  cause temporary collection delay."
+    set_at: [startup, runtime]
+    cpp_varname: "ftdcStartupParams.maxThreads"
+    on_update: "onUpdateFTDCMaxThreads"
+    validator:
+        lte: 10
+    redact: false
+
   diagnosticDataCollectionDirectorySizeMB:
     description: "Specifies the maximum size, in megabytes, of the diagnostic.data directory"
     set_at: [startup, runtime]

@@ -63,6 +63,8 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(injectFTDCServerStatusCollectionDelay);
+
 const auto ftdcControllerDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<FTDCController>>();
 
@@ -189,6 +191,49 @@ Status onUpdateFTDCPerInterimUpdate(const std::int32_t potentialNewValue) {
     return Status::OK();
 }
 
+Status onUpdateFTDCSampleTimeout(std::int32_t potentialNewValue) {
+    if (FTDCController * controller;
+        hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
+        return controller->setSampleTimeout(Milliseconds(potentialNewValue));
+    }
+
+    return Status::OK();
+}
+
+Status onUpdateFTDCMinThreads(std::int32_t potentialNewValue) {
+    if (FTDCController * controller;
+        hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
+        return controller->setMinThreads(potentialNewValue);
+    }
+
+    return Status::OK();
+}
+
+Status onUpdateFTDCMaxThreads(std::int32_t potentialNewValue) {
+    if (FTDCController * controller;
+        hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
+        return controller->setMaxThreads(potentialNewValue);
+    }
+
+    return Status::OK();
+}
+
+Status validateSampleTimeoutMillis(std::int32_t potentialNewValue,
+                                   const boost::optional<TenantId>&) {
+    if (hasGlobalServiceContext()) {
+        auto controller = getFTDCController(getGlobalServiceContext());
+        double numCollectors = controller->getNumAsyncPeriodicCollectors();
+        if (potentialNewValue > controller->getPeriod().count() / numCollectors) {
+            return {ErrorCodes::InvalidOptions,
+                    fmt::format("diagnosticDataCollectionSampleTimeoutMillis must be smaller than "
+                                "diagnosticDataCollectionPeriodMillis / {}.",
+                                static_cast<int>(numCollectors))};
+        }
+    }
+
+    return Status::OK();
+}
+
 FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(StringData command,
                                                                        StringData name,
                                                                        const DatabaseName& db,
@@ -289,6 +334,12 @@ public:
             }
         }
 
+        if (MONGO_unlikely(injectFTDCServerStatusCollectionDelay.shouldFail())) {
+            injectFTDCServerStatusCollectionDelay.execute([&](const BSONObj& data) {
+                sleepFor(Milliseconds(data["sleepTimeMillis"].numberInt()));
+            });
+        }
+
         builder.appendElements(result);
     }
 
@@ -332,6 +383,10 @@ void startFTDC(ServiceContext* serviceContext,
                                     ftdcStartupParams.enabled.load());
     config.enabled = ftdcStartupParams.enabled.load();
     config.maxFileSizeBytes = ftdcStartupParams.maxFileSizeMB.load() * 1024 * 1024;
+
+    config.sampleTimeout = Milliseconds(ftdcStartupParams.sampleTimeoutMillis.load());
+    config.minThreads = ftdcStartupParams.minThreads.load();
+    config.maxThreads = ftdcStartupParams.maxThreads.load();
 
     if (feature_flags::gMultiServiceLogAndFTDCFormat.isEnabled() &&
         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {

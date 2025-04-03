@@ -167,36 +167,34 @@ SampleCollectorCache::SampleCollectorCache(ClusterRole role,
                                            Milliseconds maxSampleWaitMS,
                                            size_t minThreads,
                                            size_t maxThreads)
-    : _maxSampleWaitMS(maxSampleWaitMS) {
-    auto roleName = getRoleName(role).toString();
-    roleName[0] = ctype::toUpper(roleName[0]);
-
-    ThreadPool::Options options;
-    options.poolName = fmt::format("FTDC{}SampleCollectorCache", roleName);
-    options.minThreads = minThreads;
-    options.maxThreads = maxThreads;
-
-    _pool = std::make_unique<ThreadPool>(std::move(options));
-    _pool->startup();
+    : _role(role),
+      _maxSampleWaitMS(maxSampleWaitMS),
+      _minThreads(minThreads),
+      _maxThreads(maxThreads) {
+    _startNewPool(minThreads, maxThreads);
 }
 
 SampleCollectorCache::~SampleCollectorCache() {
     stdx::lock_guard lk(_mutex);
-    _pool->shutdown();
-    _pool->join();
+    _shutdownPool_inlock(lk);
 }
 
 void SampleCollectorCache::addCollector(StringData name,
                                         bool hasData,
                                         ClusterRole role,
                                         SampleCollectFn&& fn) {
-    _sampleCollectors[name.toString()] = {boost::none, std::move(fn), role, 0, hasData};
-    _clients[name.toString()] =
+    _sampleCollectors[name.toString()] = {
         ClientStrand::make(getGlobalServiceContext()->getService()->makeClient(
-            name.toString(), nullptr, ClientOperationKillableByStepdown{false}));
+            name.toString(), nullptr, ClientOperationKillableByStepdown{false})),
+        boost::none,
+        std::move(fn),
+        role,
+        0,
+        hasData};
 }
 
 void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* builder) {
+    auto timeout = _maxSampleWaitMS.load();
     for (auto it = _sampleCollectors.begin(); it != _sampleCollectors.end(); it++) {
         auto& name = it->first;
         auto& collector = it->second;
@@ -212,11 +210,10 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
             collector.updatedValue = std::move(future).semi();
 
             stdx::lock_guard lk(_mutex);
-            _pool->schedule([it, promise = std::move(promise), clientStrand = _clients[name]](
-                                Status) mutable {
+            _pool->schedule([it, promise = std::move(promise)](Status) mutable {
                 BSONObjBuilder collectorBuilder;
-                auto client = clientStrand->bind();
                 auto& collector = it->second;
+                auto client = collector.clientStrand->bind();
                 ServiceContext::UniqueOperationContext opCtxPtr;
 
                 try {
@@ -272,12 +269,15 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
         BSONObj result;
         try {
             opCtx->runWithDeadline(
-                getCurrentDate(opCtx) + _maxSampleWaitMS, ErrorCodes::ExceededTimeLimit, [&]() {
+                getCurrentDate(opCtx) + timeout, ErrorCodes::ExceededTimeLimit, [&]() {
                     result = std::move(collector.updatedValue->get(opCtx));
                 });
         } catch (const DBException& e) {
             if (e.code() == ErrorCodes::ExceededTimeLimit) {
-                LOGV2_INFO(10179602, "Collection timed out on collector", "collector"_attr = name);
+                LOGV2_INFO(10179602,
+                           "Collection timed out on collector",
+                           "collector"_attr = name,
+                           "timeout"_attr = timeout);
                 continue;
             }
             // Service shutdown may cause the opCtx to be interrupted. This should not be process
@@ -299,6 +299,19 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
     }
 }
 
+void SampleCollectorCache::_startNewPool(size_t minThreads, size_t maxThreads) {
+    auto roleName = getRoleName(_role).toString();
+    roleName[0] = ctype::toUpper(roleName[0]);
+
+    ThreadPool::Options options;
+    options.poolName = fmt::format("{}Collector", roleName);
+    options.minThreads = minThreads;
+    options.maxThreads = maxThreads;
+
+    _pool = std::make_unique<ThreadPool>(std::move(options));
+    _pool->startup();
+}
+
 void AsyncFTDCCollectorCollectionSet::addCollector(
     std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role) {
     auto collectFn = [collector = collector.get()](OperationContext* opCtx,
@@ -317,13 +330,21 @@ void AsyncFTDCCollectorCollectionSet::collect(OperationContext* opCtx, BSONObjBu
 
 void AsyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector,
                                        ClusterRole role) {
-    (*this)[role].addCollector(std::move(collector), role);
+    getSet(role).addCollector(std::move(collector), role);
 }
 
 void AsyncFTDCCollectorCollection::_collect(OperationContext* opCtx,
                                             ClusterRole role,
                                             BSONObjBuilder* builder) {
-    (*this)[role].collect(opCtx, builder);
+    getSet(role).collect(opCtx, builder);
+}
+
+void AsyncFTDCCollectorCollection::_forEach(
+    std::function<void(AsyncFTDCCollectorCollectionSet&)> f) {
+    for (auto&& role : roles) {
+        auto& collectionSet = getSet(role.first);
+        f(collectionSet);
+    }
 }
 
 void SyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector,
