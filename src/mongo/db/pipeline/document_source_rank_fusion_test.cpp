@@ -2696,6 +2696,192 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
         asOneObj);
 }
 
+TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    agatha: 5
+                }
+            },
+            scoreDetails: true
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$search": {
+                        "index": "search_index",
+                        "text": {
+                            "query": "mystery",
+                            "path": "genres"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "agatha_rank": {
+                                "$rank": {}
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$agatha_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 5
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "details": []
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "agatha_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_scoreDetails": {
+                            "$mergeObjects": "$agatha_scoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$agatha_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "calculatedScoreDetails": [
+                            {
+                                "$mergeObjects": [
+                                    {
+                                        "inputPipelineName": {
+                                            "$const": "agatha"
+                                        },
+                                        "rank": "$agatha_rank",
+                                        "weight": {
+                                            "$const": 5
+                                        }
+                                    },
+                                    "$agatha_scoreDetails"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": "$score",
+                            "description": {
+                                "$const": "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 + rank))) across input pipelines from which this document is output, from:"
+                            },
+                            "details": "$calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
 TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();

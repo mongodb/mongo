@@ -253,4 +253,63 @@ runTest({
     }
 }
 
+// Verify that scoreDetails cannot be projected from a $facet subpipeline where $rankFusion sets
+// scoreDetails to false.
+{
+    const pipeline = [
+        {
+            $rankFusion:
+                {input: {pipelines: {pipe: [{$sort: {textField: -1}}]}}, scoreDetails: false}
+        },
+        {
+            $facet: {
+                pipe1: [
+                    {$project: {scoreDetails: {$meta: "scoreDetails"}}},
+                    {$project: {scoreDetailsVal: "$scoreDetails.value"}},
+                    {$sort: {_id: 1}}
+                ]
+            }
+        }
+    ];
+    assertFailsScoreDetailsUnavailable(pipeline);
+}
+
+// Verify that scoreDetails can be projected from a $facet subpipeline where $rankFusion sets
+// scoreDetails to true.
+{
+    const results =
+        coll.aggregate([
+                {
+                    $rankFusion:
+                        {input: {pipelines: {pipe: [{$sort: {textField: -1}}]}}, scoreDetails: true}
+                },
+                {
+                    $facet: {
+                        pipe1: [
+                            {$project: {scoreDetails: {$meta: "scoreDetails"}}},
+                            {
+                                $project: {
+                                    scoreDetailsVal: "$scoreDetails.value",
+                                    score: {$meta: "score"}
+                                }
+                            },
+                            {$sort: {_id: 1}}
+                        ]
+                    }
+                }
+            ])
+            .toArray();
+
+    for (let result of results) {
+        let docs = result["pipe1"];
+        for (let doc of docs) {
+            assert(doc.hasOwnProperty("scoreDetailsVal"),
+                   `Result doc does not have property 
+            'scoreDetailsVal'. See  ${tojson(doc)}`);
+            assert(doc.hasOwnProperty("score"),
+                   `Result doc does not have property 
+            'score'. See  ${tojson(doc)}`);
+        }
+    }
+}
 dropSearchIndex(coll, {name: indexName});

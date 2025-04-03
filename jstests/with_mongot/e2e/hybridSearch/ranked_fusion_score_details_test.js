@@ -5,6 +5,7 @@
  * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
  */
 
+import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
@@ -275,6 +276,42 @@ for (const foundDoc of results) {
     const score = foundDoc["score"];
     assert.gte(score, 0);
 }
+
+/**
+ * Verify that when $rankFusion.scoreDetails is false and an input pipeline ($search) has
+ * scoreDetails set to true, the aggregation fails when scoreDetails metadata is projected out.
+ */
+testQuery = [
+    {
+        $rankFusion: {
+            input: {pipelines: {vector: [vectorStage], search: [searchStage, {$limit: limit}]}},
+            combination: {weights: {search: 2}},
+            scoreDetails: false,
+        },
+    },
+    {$addFields: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
+    {$project: {plot_embedding: 0}}
+];
+
+assertErrCodeAndErrMsgContains(coll, testQuery, 40218, "query requires scoreDetails metadata");
+
+/**
+ * Verify that when $rankFusion.scoreDetails is false and an input pipeline ($search) has
+ * scoreDetails set to true, the aggregation succeeds when scoreDetails metadata is NOT projected
+ * out.
+ */
+testQuery = [
+    {
+        $rankFusion: {
+            input: {pipelines: {search: [searchStage, {$limit: limit}]}},
+            combination: {weights: {search: 2}},
+            scoreDetails: false,
+        },
+    },
+    {$project: {plot_embedding: 0}}
+];
+
+assert.commandWorked(db.runCommand({aggregate: collName, pipeline: testQuery, cursor: {}}));
 
 // TODO SERVER-93218 Test scoreDetails with nested rankFusion.
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
