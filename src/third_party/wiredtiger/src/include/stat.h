@@ -566,6 +566,7 @@ struct __wt_connection_stats {
     int64_t cache_write_hs;
     int64_t cache_eviction_consider_prefetch;
     int64_t cache_pages_inuse;
+    int64_t cache_eviction_dirty_obsolete_tw;
     int64_t cache_eviction_app;
     int64_t cache_eviction_pages_in_parallel_with_checkpoint;
     int64_t cache_eviction_pages_queued;
@@ -650,6 +651,9 @@ struct __wt_connection_stats {
     int64_t checkpoint_pages_visited_leaf;
     int64_t checkpoint_pages_reconciled;
     int64_t checkpoint_cleanup_pages_evict;
+    int64_t checkpoint_cleanup_pages_obsolete_tw;
+    int64_t checkpoint_cleanup_pages_read_reclaim_space;
+    int64_t checkpoint_cleanup_pages_read_obsolete_tw;
     int64_t checkpoint_cleanup_pages_removed;
     int64_t checkpoint_cleanup_pages_walk_skipped;
     int64_t checkpoint_cleanup_pages_visited;
@@ -1182,6 +1186,7 @@ struct __wt_dsrc_stats {
     int64_t cache_read_overflow;
     int64_t cache_eviction_deepen;
     int64_t cache_write_hs;
+    int64_t cache_eviction_dirty_obsolete_tw;
     int64_t cache_read;
     int64_t cache_read_deleted;
     int64_t cache_read_deleted_prepared;
@@ -1224,6 +1229,9 @@ struct __wt_dsrc_stats {
     int64_t cache_state_pages;
     int64_t checkpoint_snapshot_acquired;
     int64_t checkpoint_cleanup_pages_evict;
+    int64_t checkpoint_cleanup_pages_obsolete_tw;
+    int64_t checkpoint_cleanup_pages_read_reclaim_space;
+    int64_t checkpoint_cleanup_pages_read_obsolete_tw;
     int64_t checkpoint_cleanup_pages_removed;
     int64_t checkpoint_cleanup_pages_walk_skipped;
     int64_t checkpoint_cleanup_pages_visited;

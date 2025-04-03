@@ -676,6 +676,124 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 }
 
 /*
+ * __evict_review_obsolete_time_window --
+ *     Check whether the ref has obsolete time window information and mark it for dirty eviction to
+ *     remove those obsolete data. An exclusive lock on the page has already been obtained by the
+ *     caller.
+ */
+static int
+__evict_review_obsolete_time_window(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+    WT_ADDR_COPY addr;
+    WT_BTREE *btree;
+    WT_CONNECTION_IMPL *conn;
+    WT_MULTI *multi;
+    WT_PAGE_MODIFY *mod;
+    WT_TIME_AGGREGATE newest_ta;
+    uint32_t i;
+    char time_string[WT_TIME_STRING_SIZE];
+
+    btree = S2BT(session);
+    conn = S2C(session);
+
+    /* Too many pages have been cleaned for this btree. */
+    if (__wt_atomic_load32(&btree->eviction_obsolete_tw_pages) >=
+      conn->heuristic_controls.eviction_obsolete_tw_pages_dirty_max)
+        return (0);
+
+    /*
+     * Pages that the application threads are evicting should not be included. Reconciliation must
+     * be performed when converting a clean page to a dirty page, which can increase latency. This
+     * check is bypassed if the session is configured with a debug option to evict the page when it
+     * is released and no longer needed.
+     */
+    if (!F_ISSET(session, WT_SESSION_EVICTION) && !F_ISSET(session, WT_SESSION_DEBUG_RELEASE_EVICT))
+        return (0);
+
+    /* Do not perform any obsolete time window cleanup during the startup or shutdown phase. */
+    if (F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT))
+        return (0);
+
+    /* If the file is being checkpointed, other threads can't evict dirty pages. */
+    if (__wt_btree_syncing_by_other_session(session))
+        return (0);
+
+    /* The checkpoint cursor dhandle is read-only. Do not mark these pages as dirty. */
+    if (WT_READING_CHECKPOINT(session))
+        return (0);
+
+    /*
+     * Rewriting internal pages doesn't clean the obsolete time window until the leaf pages are
+     * cleared from the obsolete time window.
+     */
+    WT_ASSERT(session, ref->page != NULL);
+    if (WT_PAGE_IS_INTERNAL(ref->page))
+        return (0);
+
+    /* We are only interested in clean pages. */
+    if (__wt_page_is_modified(ref->page))
+        return (0);
+
+    /* Limit the number of btrees that can be cleaned up. */
+    if (__wt_atomic_load32(&btree->eviction_obsolete_tw_pages) == 0 &&
+      __wt_atomic_load32(&btree->checkpoint_cleanup_obsolete_tw_pages) == 0 &&
+      __wt_atomic_load32(&conn->heuristic_controls.obsolete_tw_btree_count) >=
+        conn->heuristic_controls.obsolete_tw_btree_max)
+        return (0);
+
+    /* Don't add more cache pressure. */
+    if (__wt_eviction_needed(session, false, false, NULL) || __wt_cache_stuck(session))
+        return (0);
+
+    /*
+     * Initialize the time aggregate via the merge initialization, so that stop visibility is copied
+     * across correctly. That is why we need the stop timestamp/transaction IDs to start as none,
+     * otherwise we'd never mark anything as obsolete.
+     */
+    WT_TIME_AGGREGATE_INIT_MERGE(&newest_ta);
+
+    mod = ref->page->modify;
+    if (mod != NULL && mod->rec_result == WT_PM_REC_MULTIBLOCK) {
+        /* Calculate the max stop time point by traversing all multi addresses. */
+        for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i)
+            WT_TIME_AGGREGATE_MERGE(session, &newest_ta, &multi->addr.ta);
+    } else if (mod != NULL && mod->rec_result == WT_PM_REC_REPLACE)
+        WT_TIME_AGGREGATE_COPY(&newest_ta, &mod->mod_replace.ta);
+    else if (__wt_ref_addr_copy(session, ref, &addr))
+        WT_TIME_AGGREGATE_COPY(&newest_ta, &addr.ta);
+
+    /* The pages that are removed are eliminated during the checkpoint cleanup procedure. */
+    if (WT_TIME_AGGREGATE_HAS_STOP(&newest_ta))
+        return (0);
+
+    /*
+     * Mark the page as dirty to allow the page reconciliation to remove all information related to
+     * an obsolete time window.
+     */
+    if (__wt_txn_has_newest_and_visible_all(session, newest_ta.newest_txn,
+          WT_MAX(newest_ta.newest_start_durable_ts, newest_ta.newest_stop_durable_ts))) {
+        __wt_verbose(session, WT_VERB_EVICT,
+          "%p in-memory page obsolete time window: time aggregate %s", (void *)ref,
+          __wt_time_aggregate_to_string(&newest_ta, time_string));
+
+        WT_RET(__wt_page_modify_init(session, ref->page));
+        __wt_page_modify_set(session, ref->page);
+
+        /*
+         * Save that another tree has been processed if that's the first time it gets cleaned and
+         * update the number of pages made dirty for that tree.
+         */
+        if (__wt_atomic_load32(&btree->eviction_obsolete_tw_pages) == 0 &&
+          __wt_atomic_load32(&btree->checkpoint_cleanup_obsolete_tw_pages) == 0)
+            __wt_atomic_addv32(&conn->heuristic_controls.obsolete_tw_btree_count, 1);
+        __wt_atomic_addv32(&btree->eviction_obsolete_tw_pages, 1);
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_dirty_obsolete_tw);
+    }
+
+    return (0);
+}
+
+/*
  * __evict_review --
  *     Review the page and its subtree for conditions that would block its eviction.
  */
@@ -710,6 +828,9 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     /* It is always OK to evict pages from dead trees if they don't have children. */
     if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
         return (0);
+
+    /* Review the obsolete time window information before eviction. */
+    WT_RET(__evict_review_obsolete_time_window(session, ref));
 
     /*
      * Retrieve the modified state of the page. This must happen after the check for evictable

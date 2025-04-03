@@ -255,6 +255,8 @@ struct __wt_hazard_array;
 typedef struct __wt_hazard_array WT_HAZARD_ARRAY;
 struct __wt_hazard_cookie;
 typedef struct __wt_hazard_cookie WT_HAZARD_COOKIE;
+struct __wt_heuristic_controls;
+typedef struct __wt_heuristic_controls WT_HEURISTIC_CONTROLS;
 struct __wt_ikey;
 typedef struct __wt_ikey WT_IKEY;
 struct __wt_import_entry;

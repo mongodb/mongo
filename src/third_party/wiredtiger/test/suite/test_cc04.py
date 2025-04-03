@@ -58,8 +58,8 @@ class test_cc04(test_cc_base):
         self.large_updates(uri, bigvalue, ds, nrows, 10)
         self.large_updates(uri, bigvalue2, ds, nrows, 20)
 
-        # Checkpoint to ensure that the history store is populated.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and ensure that the history store is populated but not cleaned
+        # up multiple times.
         self.wait_for_cc_to_run()
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_evict), 0)
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_removed), 0)
@@ -67,8 +67,6 @@ class test_cc04(test_cc_base):
 
         self.large_updates(uri, bigvalue, ds, nrows, 30)
 
-        # Checkpoint to ensure that the history store is populated.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
         self.wait_for_cc_to_run()
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_evict), 0)
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_removed), 0)
@@ -76,8 +74,6 @@ class test_cc04(test_cc_base):
 
         self.large_updates(uri, bigvalue2, ds, nrows, 40)
 
-        # Checkpoint to ensure that the history store is populated.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
         self.wait_for_cc_to_run()
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_evict), 0)
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_removed), 0)
@@ -86,8 +82,6 @@ class test_cc04(test_cc_base):
         self.large_updates(uri, bigvalue, ds, nrows, 50)
         self.large_updates(uri, bigvalue2, ds, nrows, 60)
 
-        # Checkpoint to ensure that the history store is populated.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
         self.wait_for_cc_to_run()
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_evict), 0)
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_removed), 0)
@@ -95,8 +89,6 @@ class test_cc04(test_cc_base):
 
         self.large_updates(uri, bigvalue, ds, nrows, 70)
 
-        # Checkpoint to ensure that the history store is populated.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
         self.wait_for_cc_to_run()
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_evict), 0)
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_removed), 0)

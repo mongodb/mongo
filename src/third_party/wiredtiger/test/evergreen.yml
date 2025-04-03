@@ -211,7 +211,7 @@ functions:
         ${PREPARE_PATH}
         virtualenv -p python3 venv
         source venv/bin/activate
-        python3 -m pip install 'poetry==2.0.0'
+        python3 -m pip install 'poetry==1.5.1'
 
         export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
         # FIXME-WT-12911 - There's a dependency ordering issue in the mongo poetry.lock file. Running poetry install twice resolves it.

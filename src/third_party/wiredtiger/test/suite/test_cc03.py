@@ -73,8 +73,7 @@ class test_cc03(test_cc_base):
         # Check that old updates are seen.
         self.check(bigvalue, uri, nrows, 10)
 
-        # Checkpoint to ensure that the history store is populated.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and ensure that the history store is populated but not visited.
         self.wait_for_cc_to_run()
         self.assertGreater(self.get_stat(stat.conn.checkpoint_cleanup_pages_visited), 0)
 
@@ -115,8 +114,8 @@ class test_cc03(test_cc_base):
         self.large_updates(uri_extra, bigvalue, ds_extra, 100, 210)
         self.large_updates(uri_extra, bigvalue2, ds_extra, 100, 220)
 
-        # Checkpoint to ensure that the history store is populated and added for eviction.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and ensure that the history store is populated and pages are
+        # added for eviction.
         self.wait_for_cc_to_run()
         self.assertGreater(self.get_stat(stat.conn.checkpoint_cleanup_pages_evict), 0)
         self.assertGreater(self.get_stat(stat.conn.checkpoint_cleanup_pages_visited), 0)
@@ -131,8 +130,7 @@ class test_cc03(test_cc_base):
         self.large_updates(uri_extra, bigvalue, ds_extra, 100, 310)
         self.large_updates(uri_extra, bigvalue2, ds_extra, 100, 320)
 
-        # Checkpoint to ensure that the normal table history store gets cleaned.
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
+        # Trigger checkpoint cleanup and wait until it is done. This should clean the history store.
         self.check_cc_stats()
 
         # Check that the new updates are only seen after the update timestamp.

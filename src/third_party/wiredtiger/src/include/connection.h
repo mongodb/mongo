@@ -147,6 +147,36 @@ struct __wt_bucket_storage {
     } while (0)
 
 /*
+ * WT_HEURISTIC_CONTROLS --
+ *  Heuristic controls configuration.
+ */
+struct __wt_heuristic_controls {
+    /* Number of btrees processed in the current checkpoint. */
+    wt_shared uint32_t obsolete_tw_btree_count;
+
+    /*
+     * The controls below deal with the cleanup of obsolete time window information. This process
+     * can be configured based on two configuration items, one that is shared among the subsystems
+     * which is the number of btrees and another one which is unique to each subsystem that is
+     * the number of pages.
+     *   - The maximum number of pages per btree to process in a single checkpoint by checkpoint
+     * cleanup.
+     *   - The maximum number of pages per btree to process in a single checkpoint by eviction
+     * threads.
+     *   - The maximum number of btrees to process in a single checkpoint.
+     */
+
+    /* Maximum number of pages that can be processed per btree by checkpoint cleanup. */
+    uint32_t checkpoint_cleanup_obsolete_tw_pages_dirty_max;
+
+    /* Maximum number of pages that can be processed per btree by eviction. */
+    uint32_t eviction_obsolete_tw_pages_dirty_max;
+
+    /* Maximum number of btrees that can be processed per checkpoint. */
+    uint32_t obsolete_tw_btree_max;
+};
+
+/*
  * WT_KEYED_ENCRYPTOR --
  *	A list entry for an encryptor with a unique (name, keyid).
  */
@@ -378,6 +408,8 @@ struct __wt_connection_impl {
     wt_shared const WT_CONFIG_ENTRY **config_entries;
 
     WT_BACKGROUND_COMPACT background_compact; /* Background compaction server */
+
+    WT_HEURISTIC_CONTROLS heuristic_controls; /* Heuristic controls configuration */
 
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
 
@@ -844,7 +876,7 @@ struct __wt_connection_impl {
 #define WT_CONN_CACHE_CURSORS 0x00000002u
 #define WT_CONN_CACHE_POOL 0x00000004u
 #define WT_CONN_CALL_LOG_ENABLED 0x00000008u
-#define WT_CONN_CKPT_CLEANUP_SKIP_INT 0x00000010u
+#define WT_CONN_CKPT_CLEANUP_RECLAIM_SPACE 0x00000010u
 #define WT_CONN_CKPT_GATHER 0x00000020u
 #define WT_CONN_CKPT_SYNC 0x00000040u
 #define WT_CONN_CLOSING 0x00000080u

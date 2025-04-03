@@ -28,7 +28,7 @@
 
 from test_cc01 import test_cc_base
 from wiredtiger import stat
-from wtdataset import SimpleDataSet, simple_key, simple_value
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_cc06.py
@@ -45,12 +45,6 @@ class test_cc06(test_cc_base):
     ]
     scenarios = make_scenarios(format_values)
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_cc(self):
         uri = "table:cc06"
 
@@ -63,13 +57,13 @@ class test_cc06(test_cc_base):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
 
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
-        # Check statistics.
-        self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_visited), 0)
+        # Trigger checkpoint cleanup and check statistics.
+        self.wait_for_cc_to_run()
+        self.assertEqual(self.get_stat(stat.dsrc.checkpoint_cleanup_pages_visited, uri), 0)
 
         # Reopen the database.
         self.reopen_conn()
 
-        self.session.checkpoint("debug=(checkpoint_cleanup=true)")
-        # Check statistics.
-        self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_visited), 0)
+        # Trigger checkpoint cleanup and check statistics.
+        self.wait_for_cc_to_run()
+        self.assertEqual(self.get_stat(stat.dsrc.checkpoint_cleanup_pages_visited, uri), 0)
