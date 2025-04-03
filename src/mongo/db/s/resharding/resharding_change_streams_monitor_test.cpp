@@ -352,13 +352,20 @@ public:
             NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin), pipeline);
         auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
             &dbclient, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
+
+        bool openCursorExists = false;
         if (cursor->more()) {
             while (cursor->more()) {
-                LOGV2(10066810, "Found idle cursor", "doc"_attr = cursor->next());
+                auto doc = cursor->next();
+                // Cursors with {killPending: true} will eventually get killed. They should not
+                // be consider as open cursors.
+                if (!doc.getBoolField("killPending")) {
+                    LOGV2(10066810, "Found open cursor", "doc"_attr = doc);
+                    openCursorExists = true;
+                }
             }
-            return true;
         }
-        return false;
+        return openCursorExists;
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(
