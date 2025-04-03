@@ -431,3 +431,23 @@ buildvariants:
       - name: .release_critical .requires_large_host !.publish !.publish_crypt
         distros:
           - amazon2023-arm64-latest-large-m8g
+  - name: amazon2023-x86-streams-compile
+    display_name: "* Compile Streams Amazon Linux 2023 x86 for sys-perf"
+    tags: ["suggested"]
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    expansions:
+      <<: *sys_perf_compile_expansions
+      compile_variant: amazon2023-x86-streams-compile
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --remote-exec-release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --streams-release-build
+    run_on:
+      - amazon2023.3-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
