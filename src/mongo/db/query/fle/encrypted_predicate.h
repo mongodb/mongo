@@ -263,13 +263,13 @@ extern MatchTypeToRewriteMap matchPredicateRewriteMap;
 /**
  * Register an agg rewrite behind a feature flag.
  */
-#define REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(matchType, rewriteClass, featureFlag) \
-    REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_GUARDED(                                            \
-        matchType,                                                                               \
-        rewriteClass,                                                                            \
-        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {                  \
-            return fcvGatedFlag.isEnabled(                                                       \
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());                   \
+#define REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(matchType, rewriteClass, featureFlag)  \
+    REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_GUARDED(                                             \
+        matchType,                                                                                \
+        rewriteClass,                                                                             \
+        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {                   \
+            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                           \
+                kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()); \
         }))
 
 /**

@@ -29,9 +29,16 @@
 
 #include "text_search_predicate.h"
 
+#include "mongo/db/server_feature_flags_gen.h"
+
 namespace mongo::fle {
 
-REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE(ExpressionEncStrStartsWith, TextSearchPredicate);
+REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionEncStrStartsWith,
+                                                   TextSearchPredicate,
+                                                   gFeatureFlagQETextSearchPreview);
+REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionEncStrEndsWith,
+                                                   TextSearchPredicate,
+                                                   gFeatureFlagQETextSearchPreview);
 
 std::vector<PrfBlock> TextSearchPredicate::generateTags(BSONValue payload) const {
     // TODO SERVER-101128: Update to generate the correct tags.
@@ -39,9 +46,8 @@ std::vector<PrfBlock> TextSearchPredicate::generateTags(BSONValue payload) const
 }
 
 std::unique_ptr<Expression> TextSearchPredicate::rewriteToTagDisjunction(Expression* expr) const {
-    if (auto encStrStartsWithExpr = dynamic_cast<ExpressionEncStrStartsWith*>(expr);
-        encStrStartsWithExpr) {
-        const auto& textConstant = encStrStartsWithExpr->getText();
+    if (auto textSearchExpr = dynamic_cast<ExpressionEncTextSearch*>(expr); textSearchExpr) {
+        const auto& textConstant = textSearchExpr->getText();
         auto payload = textConstant.getValue();
         if (!isPayload(payload)) {
             return nullptr;
@@ -54,11 +60,10 @@ std::unique_ptr<Expression> TextSearchPredicate::rewriteToTagDisjunction(Express
 
 std::unique_ptr<Expression> TextSearchPredicate::rewriteToRuntimeComparison(
     Expression* expr) const {
-    if (auto encStrStartsWithExpr = dynamic_cast<ExpressionEncStrStartsWith*>(expr);
-        encStrStartsWithExpr) {
-        // Since we don't support non-encrypted ExpressionEncStrStartsWith,
-        // ExpressionEncStrStartsWith is already considered the runtime comparison, therefore we
-        // don't need to do rewriting here.
+    if (auto textSearchExpr = dynamic_cast<ExpressionEncTextSearch*>(expr); textSearchExpr) {
+        // Since we don't support non-encrypted ExpressionEncTextSearch expressions such as
+        // $encStrStartsWith $encStrEndsWith, the expression is already considered the
+        // runtime comparison, therefore we don't need to do rewriting here.
         return nullptr;
     }
     MONGO_UNREACHABLE_TASSERT(10112603);
