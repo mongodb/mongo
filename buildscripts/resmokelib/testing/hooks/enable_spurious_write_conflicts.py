@@ -17,8 +17,12 @@ class EnableSpuriousWriteConflicts(interface.Hook):
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize ToggleWriteConflicts."""
         super().__init__(hook_logger, fixture, "TogglesWTWriteConflictExceptions")
-        self._enable_js_filename = os.path.join("jstests", "hooks", "enable_write_conflicts.js")
-        self._disable_js_filename = os.path.join("jstests", "hooks", "disable_write_conflicts.js")
+        self._enable_js_filename = os.path.join(
+            "jstests", "hooks", "write_conflicts", "enable_write_conflicts.js"
+        )
+        self._disable_js_filename = os.path.join(
+            "jstests", "hooks", "write_conflicts", "disable_write_conflicts.js"
+        )
         self._shell_options = shell_options
 
     def before_test(self, test, test_report):
