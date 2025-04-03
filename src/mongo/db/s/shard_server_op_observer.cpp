@@ -523,7 +523,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
 
 void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                                    const NamespaceString& nss,
-                                                                   const UUID& uuid,
+                                                                   const UUID&,
                                                                    BSONObj indexDoc) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {

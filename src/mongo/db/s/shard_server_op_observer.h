@@ -68,7 +68,7 @@ public:
 
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
-                                                const UUID& uuid,
+                                                const UUID& /*uuid*/,
                                                 BSONObj indexDoc) override;
 
     void onCreateIndex(OperationContext* opCtx,
