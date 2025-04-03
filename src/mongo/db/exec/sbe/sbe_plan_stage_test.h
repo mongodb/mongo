@@ -103,6 +103,8 @@ template <typename T>
 using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
     T scanSlots, std::unique_ptr<PlanStage> scanStage)>;
 
+using AssertStageStatsFn = std::function<void(const SpecificStats*)>;
+
 /**
  * PlanStageTestFixture is a unittest framework for testing sbe::PlanStages.
  *
@@ -309,14 +311,16 @@ public:
                       value::Value inputVal,
                       value::TypeTags expectedTag,
                       value::Value expectedVal,
-                      const MakeStageFn<value::SlotVector>& makeStageMulti);
+                      const MakeStageFn<value::SlotVector>& makeStageMulti,
+                      const AssertStageStatsFn& assertStageStats = AssertStageStatsFn{});
 
     // Similar to above method but returns the result instead of comparing to an expected.
     std::pair<value::TypeTags, value::Value> runTestMulti(
         size_t numInputSlots,
         value::TypeTags inputTag,
         value::Value inputVal,
-        const MakeStageFn<value::SlotVector>& makeStageMulti);
+        const MakeStageFn<value::SlotVector>& makeStageMulti,
+        const AssertStageStatsFn& assertStageStats = AssertStageStatsFn{});
 
     value::SlotIdGenerator* getSlotIdGenerator() {
         return _slotIdGenerator.get();

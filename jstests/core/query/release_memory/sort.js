@@ -73,14 +73,7 @@ const pipelines = [
 ];
 
 for (let pipeline of pipelines) {
-    const explain = coll.explain().aggregate(pipeline);
     jsTestLog("Testing pipeline: " + tojson(pipeline));
-
-    // TODO SERVER-99158 Remove when forceSpill is supported in SBE
-    if (getEngine(explain) === "sbe") {
-        jsTestLog("forceSpill is not supported in SBE sort");
-        continue;
-    }
 
     let previousSpillCount = getSortSpillCounter();
     assertCursorSortedByIndex(coll.aggregate(pipeline));

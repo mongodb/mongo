@@ -71,7 +71,7 @@ TEST_F(SortStageTest, SortNumbersTest) {
                              makeE<EConstant>(value::TypeTags::NumberInt64,
                                               value::bitcastFrom<int64_t>(4)) /*limit*/,
                              204857600,
-                             false,
+                             false /* allowDiskUse */,
                              nullptr /* yieldPolicy */,
                              kEmptyPlanNodeId);
 
@@ -81,6 +81,143 @@ TEST_F(SortStageTest, SortNumbersTest) {
     inputGuard.reset();
     expectedGuard.reset();
     runTestMulti(2, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
+}
+
+std::pair<std::pair<sbe::value::TypeTags, sbe::value::Value>,
+          std::pair<sbe::value::TypeTags, sbe::value::Value>>
+makeExpectedAndInputDataForSpillingTest() {
+    std::string string512KB(512 * 1024, 'x');
+    std::vector<BSONArray> data;
+    for (size_t i = 0; i < 26; ++i) {
+        std::string suffix;
+        suffix.push_back('a' + i);
+        data.push_back(BSON_ARRAY((string512KB + suffix) << suffix));
+    }
+
+    BSONArrayBuilder expectedBuilder;
+    for (const auto& e : data) {
+        expectedBuilder.append(e);
+    }
+    auto expected = stage_builder::makeValue(expectedBuilder.arr());
+    value::ValueGuard expectedGuard{expected.first, expected.second};
+
+    std::reverse(data.begin(), data.end());
+
+    BSONArrayBuilder inputBuilder;
+    for (const auto& e : data) {
+        inputBuilder.append(e);
+    }
+    auto input = stage_builder::makeValue(inputBuilder.arr());
+    value::ValueGuard inputGuard{input.first, input.second};
+
+    expectedGuard.reset();
+    inputGuard.reset();
+    return {expected, input};
+}
+
+TEST_F(SortStageTest, SortStringsWithSpillingTest) {
+    auto [expected, input] = makeExpectedAndInputDataForSpillingTest();
+    value::ValueGuard expectedGuard{expected.first, expected.second};
+    value::ValueGuard inputGuard{input.first, input.second};
+
+    auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
+        auto sortStage =
+            makeS<SortStage>(std::move(scanStage),
+                             makeSV(scanSlots[0]),
+                             std::vector<value::SortDirection>{value::SortDirection::Ascending},
+                             makeSV(scanSlots[1]),
+                             nullptr /*limit*/,
+                             10 * 1024 * 1024 /* memoryLimit */,
+                             true /* allowDiskUse */,
+                             nullptr /* yieldPolicy */,
+                             kEmptyPlanNodeId);
+
+        return std::make_pair(scanSlots, std::move(sortStage));
+    };
+
+    auto assertStageStats = [](const SpecificStats* stats) {
+        const auto* sortStats = dynamic_cast<const SortStats*>(stats);
+        ASSERT_NE(sortStats, nullptr);
+        ASSERT_EQ(sortStats->spillingStats.getSpills(), 2);
+        ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 26);
+        ASSERT_EQ(sortStats->spillingStats.getSpilledBytes(), 13632138);
+        ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
+        ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(),
+                  sortStats->spillingStats.getSpilledBytes());
+    };
+
+    inputGuard.reset();
+    expectedGuard.reset();
+    runTestMulti(2,
+                 input.first,
+                 input.second,
+                 expected.first,
+                 expected.second,
+                 makeStageFn,
+                 assertStageStats);
+}
+
+TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
+    auto [expected, input] = makeExpectedAndInputDataForSpillingTest();
+    value::ValueGuard expectedGuard{expected.first, expected.second};
+    value::ValueGuard inputGuard{input.first, input.second};
+
+    auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
+        auto sortStage =
+            makeS<SortStage>(std::move(scanStage),
+                             makeSV(scanSlots[0]),
+                             std::vector<value::SortDirection>{value::SortDirection::Ascending},
+                             makeSV(scanSlots[1]),
+                             nullptr /*limit*/,
+                             100 * 1024 * 1024 /* memoryLimit */,
+                             true /* allowDiskUse */,
+                             nullptr /* yieldPolicy */,
+                             kEmptyPlanNodeId);
+
+        return std::make_pair(scanSlots, std::move(sortStage));
+    };
+
+    auto assertStageStats = [](const SpecificStats* stats) {
+        const auto* sortStats = dynamic_cast<const SortStats*>(stats);
+        ASSERT_NE(sortStats, nullptr);
+        ASSERT_EQ(sortStats->spillingStats.getSpills(), 1);
+        ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 23);
+        ASSERT_EQ(sortStats->spillingStats.getSpilledBytes(), 12059199);
+        ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
+        ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(),
+                  sortStats->spillingStats.getSpilledBytes());
+    };
+
+    auto ctx = makeCompileCtx();
+    inputGuard.reset();
+    auto [scanSlots, scanStage] = generateVirtualScanMulti(2, input.first, input.second);
+    auto [outputSlots, stage] = makeStageFn(scanSlots, std::move(scanStage));
+    auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
+
+    auto [resultsTag, resultsVal] = value::makeNewArray();
+    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    auto resultsView = value::getArrayView(resultsVal);
+
+    for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext()) {
+        auto [arrTag, arrVal] = value::makeNewArray();
+        value::ValueGuard guard{arrTag, arrVal};
+        auto arrView = value::getArrayView(arrVal);
+        for (size_t i = 0; i < resultAccessors.size(); ++i) {
+            auto [tag, val] = resultAccessors[i]->getCopyOfValue();
+            arrView->push_back(tag, val);
+        }
+        guard.reset();
+        resultsView->push_back(arrTag, arrVal);
+
+        if (resultsView->size() >= 3) {
+            // Force spill after returning 3 results. This should spill the rest of the data, making
+            // following forceSpill() calls do nothing.
+            stage->forceSpill();
+        }
+    }
+
+    assertValuesEqual(resultsTag, resultsVal, expected.first, expected.second);
+    assertStageStats(stage->getSpecificStats());
 }
 
 }  // namespace mongo::sbe

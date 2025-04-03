@@ -101,6 +101,12 @@ protected:
     }
 
 private:
+    void doForceSpill() override {
+        if (_stageImpl) {
+            _stageImpl->forceSpill();
+        }
+    }
+
     class SortIface {
     public:
         virtual ~SortIface() = default;
@@ -109,6 +115,7 @@ private:
         virtual void open(bool reOpen) = 0;
         virtual PlanState getNext() = 0;
         virtual void close() = 0;
+        virtual void forceSpill() = 0;
     };
 
     /** Implements `SortIface`. Defined in `sort_stage_sort_impl.cpp`. */
@@ -122,8 +129,6 @@ private:
     const std::vector<value::SortDirection> _dirs;
     const value::SlotVector _vals;
     const bool _allowDiskUse;
-
-    std::unique_ptr<SorterFileStats> _sorterFileStats;
 
     std::unique_ptr<SortIface> _stageImpl;
 

@@ -258,7 +258,8 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTestMulti(
     size_t numInputSlots,
     value::TypeTags inputTag,
     value::Value inputVal,
-    const MakeStageFn<value::SlotVector>& makeStageMulti) {
+    const MakeStageFn<value::SlotVector>& makeStageMulti,
+    const AssertStageStatsFn& assertStageStats) {
     auto ctx = makeCompileCtx();
 
     // Generate a mock scan from `input` with multiple output slots.
@@ -272,7 +273,11 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTestMulti(
     auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
 
     // Get all the results produced by the PlanStage we want to test.
-    return getAllResultsMulti(stage.get(), resultAccessors);
+    auto results = getAllResultsMulti(stage.get(), resultAccessors);
+    if (assertStageStats) {
+        assertStageStats(stage->getSpecificStats());
+    }
+    return results;
 }
 
 
@@ -281,11 +286,13 @@ void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
                                         value::Value inputVal,
                                         value::TypeTags expectedTag,
                                         value::Value expectedVal,
-                                        const MakeStageFn<value::SlotVector>& makeStageMulti) {
+                                        const MakeStageFn<value::SlotVector>& makeStageMulti,
+                                        const AssertStageStatsFn& assertStageStats) {
     // Set up a ValueGuard to ensure `expected` gets released.
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
-    auto [resultsTag, resultsVal] = runTestMulti(numInputSlots, inputTag, inputVal, makeStageMulti);
+    auto [resultsTag, resultsVal] =
+        runTestMulti(numInputSlots, inputTag, inputVal, makeStageMulti, assertStageStats);
     value::ValueGuard resultGuard{resultsTag, resultsVal};
 
     // Compare the results produced with the expected output and assert that they match.

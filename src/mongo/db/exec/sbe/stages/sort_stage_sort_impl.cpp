@@ -56,7 +56,7 @@ public:
             _inKeyAccessors.emplace_back(_stage._children[0]->getAccessor(ctx, slot));
             auto [it, inserted] = _outAccessors.emplace(
                 slot,
-                std::make_unique<value::MaterializedRowKeyAccessor<SorterData*>>(_mergeDataIt,
+                std::make_unique<value::MaterializedRowKeyAccessor<SorterData*>>(_outputDataIt,
                                                                                  counter));
             ++counter;
             uassert(4822812, str::stream() << "duplicate field: " << slot, inserted);
@@ -68,7 +68,7 @@ public:
             _inValueAccessors.emplace_back(_stage._children[0]->getAccessor(ctx, slot));
             auto [it, inserted] = _outAccessors.emplace(
                 slot,
-                std::make_unique<value::MaterializedRowValueAccessor<SorterData*>>(_mergeDataIt,
+                std::make_unique<value::MaterializedRowValueAccessor<SorterData*>>(_outputDataIt,
                                                                                    counter));
             ++counter;
             uassert(4822813, str::stream() << "duplicate field: " << slot, inserted);
@@ -125,16 +125,16 @@ public:
         }
 
         _stage._specificStats.totalDataSizeBytes += _sorter->stats().bytesSorted();
-        _mergeIt = _sorter->done();
-        _stage._specificStats.spillingStats.incrementSpills(_sorter->stats().spilledRanges());
-        _stage._specificStats.spillingStats.incrementSpilledRecords(
-            _sorter->stats().spilledKeyValuePairs());
+        _outputIt = _sorter->done();
         _stage._specificStats.keysSorted += _sorter->stats().numSorted();
-        if (_stage._sorterFileStats) {
+        if (_sorterFileStats) {
+            _stage._specificStats.spillingStats.incrementSpills(_sorter->stats().spilledRanges());
+            _stage._specificStats.spillingStats.incrementSpilledRecords(
+                _sorter->stats().spilledKeyValuePairs());
             _stage._specificStats.spillingStats.incrementSpilledDataStorageSize(
-                _stage._sorterFileStats->bytesSpilled());
+                _sorterFileStats->bytesSpilled());
             _stage._specificStats.spillingStats.incrementSpilledBytes(
-                _stage._sorterFileStats->bytesSpilledUncompressed());
+                _sorterFileStats->bytesSpilledUncompressed());
         }
 
         _stage._children[0]->close();
@@ -144,9 +144,8 @@ public:
         auto optTimer(_stage.getOptTimer(_stage._opCtx));
         _stage.checkForInterruptAndYield(_stage._opCtx);
 
-        // When the sort spilled data to disk then read back the sorted runs.
-        if (_mergeIt && _mergeIt->more()) {
-            _mergeData = _mergeIt->next();
+        if (_outputIt && _outputIt->more()) {
+            _outputData = _outputIt->next();
 
             return _stage.trackPlanState(PlanState::ADVANCED);
         } else {
@@ -158,8 +157,33 @@ public:
         auto optTimer(_stage.getOptTimer(_stage._opCtx));
 
         _stage.trackClose();
-        _mergeIt.reset();
+        _outputIt.reset();
         _sorter.reset();
+    }
+
+    void forceSpill() override {
+        if (_outputIt) {
+            if (_outputIt->spillable()) {
+                auto& spillingStats = _stage._specificStats.spillingStats;
+                uint64_t previousSpilledBytes = spillingStats.getSpilledBytes();
+                uint64_t previousSpilledDataStorageSize = spillingStats.getSpilledDataStorageSize();
+
+                SorterTracker tracker;
+                auto opts = _makeSortOptions();
+                opts.sorterTracker = &tracker;
+
+                _outputIt = _outputIt->spill(opts, typename Sorter<KeyRow, ValueRow>::Settings());
+
+                spillingStats.incrementSpills(tracker.spilledRanges.loadRelaxed());
+                spillingStats.incrementSpilledRecords(tracker.spilledKeyValuePairs.loadRelaxed());
+                spillingStats.incrementSpilledBytes(_sorterFileStats->bytesSpilledUncompressed() -
+                                                    previousSpilledBytes);
+                spillingStats.incrementSpilledDataStorageSize(_sorterFileStats->bytesSpilled() -
+                                                              previousSpilledDataStorageSize);
+            }
+        } else if (_sorter) {
+            _sorter->spill();
+        }
     }
 
 private:
@@ -174,7 +198,7 @@ private:
         return value::bitcastTo<size_t>(val);
     }
 
-    void _makeSorter() {
+    SortOptions _makeSortOptions() {
         SortOptions opts;
         opts.tempDir = storageGlobalParams.dbpath + "/_tmp";
         opts.maxMemoryUsageBytes = _stage._specificStats.maxMemoryUsageBytes;
@@ -184,9 +208,16 @@ private:
             : 0;
         opts.moveSortedDataIntoIterator = true;
         if (_stage._allowDiskUse) {
-            _stage._sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
-            opts.sorterFileStats = _stage._sorterFileStats.get();
+            if (!_sorterFileStats) {
+                _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
+            }
+            opts.sorterFileStats = _sorterFileStats.get();
         }
+        return opts;
+    }
+
+    void _makeSorter() {
+        auto opts = _makeSortOptions();
 
         auto comp = [this](const KeyRow& lhs, const KeyRow& rhs) {
             auto size = lhs.size();
@@ -205,16 +236,17 @@ private:
         };
 
         _sorter = Sorter<KeyRow, ValueRow>::make(opts, comp, {});
-        _mergeIt.reset();
+        _outputIt.reset();
     }
 
     SortStage& _stage;
     std::vector<value::SlotAccessor*> _inKeyAccessors;
     std::vector<value::SlotAccessor*> _inValueAccessors;
     value::SlotMap<std::unique_ptr<value::SlotAccessor>> _outAccessors;
-    std::unique_ptr<SorterIterator> _mergeIt;
-    SorterData _mergeData{};
-    SorterData* _mergeDataIt{&_mergeData};
+    std::unique_ptr<SorterFileStats> _sorterFileStats;
+    std::unique_ptr<SorterIterator> _outputIt;
+    SorterData _outputData{};
+    SorterData* _outputDataIt{&_outputData};
     std::unique_ptr<Sorter<KeyRow, ValueRow>> _sorter;
     std::unique_ptr<vm::CodeFragment> _limitCode;
 };
